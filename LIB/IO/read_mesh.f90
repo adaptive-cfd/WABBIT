@@ -49,11 +49,11 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     integer(kind=ik)      :: g, datarank
     integer(kind=ik), dimension(3)    :: Bs
     ! offset variables
-    integer(kind=ik)      :: ubounds(2), lbounds(2)
+    integer(kind=ik)      :: ubounds(2), lbounds(2), Bs_file(1:3)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik)      :: lgt_id, k, tree_id
     integer(kind=ik)      :: ierr
-    integer(kind=ik)      :: treecode_size, tmp(1)
+    integer(kind=ik)      :: treecode_size, tmp(1), version(1)
     integer(hsize_t)      :: dims_treecode(2)
     integer(kind=hsize_t) :: size_field(1:4)
 
@@ -71,14 +71,49 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
 
     call check_file_exists(fname)
     ! open the file
-    call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+    call open_file_hdf5(trim(adjustl(fname)), file_id, .false.)
 
     ! how much blocks are we going to read?
     call read_attribute(file_id, "blocks", "total_number_blocks", tmp)
     lgt_n = tmp(1)
 
     call get_rank_datafield(file_id, "blocks", datarank)
-    call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
+    call get_size_datafield(datarank, file_id, "blocks", size_field(1:datarank))
+
+
+    ! Files created after 08 04 2020 contain a version number. If we try to read older
+    ! files, version=0 is returned.
+    call read_attribute( file_id, "blocks", "version", version)
+
+    if (version(1) /= 20200408 .and. rank==0) then
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "The file we are trying to read is generated with an older version"
+        write(*,*) "of wabbit (prior to 08 April 2020). In this the file, the grid"
+        write(*,*) "definition includes a redundant point, i.e., a block is defined"
+        write(*,*) "with spacing dx = L*2^-J / (Bs-1). In new versions, the redundant"
+        write(*,*) "point is removed, leaving us with the spacing dx = L*2^J / Bs"
+        write(*,*) "The file can be read; but it slightly increases the resolution"
+        write(*,*) "(dx reduced), so do not expect the result to be perfectly identical"
+        write(*,*) "to what would be obtained with the old code version."
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
+    endif
+
+    if (version(1) >= 20200408) then
+        ! Newer files also contain the block size in addition:
+        call read_attribute( file_id, "blocks", "block-size", Bs_file)
+    else
+        ! The block size is also coded as the size of the dataset. Note newer files
+        ! save in fact ONE MORE point (Bs+1). The additional point is the first ghost node.
+        ! This is done purely because in visualization, paraview does not understand
+        ! that there is no missing data.
+        Bs_file = size_field(1:datarank-1)
+    endif
+
+
 
     !---------------------------------------------------------------------------
     ! Header, useful for finding errors
@@ -88,28 +123,28 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,'(A)') "READING: initializing grid from file... (NOT reading the actual data!)"
         write(*,'(80("~"))')
         write(*,'("Filename         = ",A)') trim(adjustl(fname))
+        write(*,'("VERSION of file  = ",i9)') version(1)
         write(*,'("Expected Nblocks = ",i9," (on all cpus)")') lgt_n
         write(*,'("datarank         = ",i1," ---> ",i1,"D data")') datarank, datarank-1
-        write(*,'("Bs_file          = ",3(i3,1x))') size_field(1:datarank-1)
+        write(*,'("Bs_file          = ",3(i3,1x))') Bs_file
         write(*,'("Bs_memory        = ",3(i3,1x))') params%Bs
-
-        ! If the file has the wrong dimensions, we cannot read it
-        if (maxval(Bs(1:datarank-1)-size_field(1:datarank-1)) > 0) then
-            call abort(20030218, "ERROR:read_mesh:We try to load a file which has the wrong block size!")
-        endif
-
-        ! do we have enough memory?
-        if (lgt_n > size(lgt_block,1)) then
-            call abort(20030219, "ERROR:read_mesh:We try to load a file which will not fit in the memory!")
-        endif
-
-        ! check if there is already some data on the grid
-        if ( maxval(lgt_block(:,1))>=0 ) then
-            write(*,'(A)') "ERROR: READ_MESH is called with NON_EMPTY DATA!!!!!"
-        end if
     end if
 
-    if (lgt_n <= 0) call abort(20030219, "We try to read an empty data file! Something is wrong, Nb<=0")
+
+
+    ! If the file has the wrong dimensions, we cannot read it
+    if (maxval(Bs(1:datarank-1)-size_field(1:datarank-1)) > 0) then
+        call abort(20030218, "ERROR:read_mesh:We try to load a file which has the wrong block size!")
+    endif
+
+    ! do we have enough memory?
+    if (lgt_n > size(lgt_block,1)) then
+        call abort(20030219, "ERROR:read_mesh:We try to load a file which will not fit in the memory!")
+    endif
+
+    if (lgt_n <= 0) then
+        call abort(20030219, "We try to read an empty data file! Something is wrong, Nb<=0")
+    endif
 
     ! Nblocks per CPU
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note

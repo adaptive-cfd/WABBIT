@@ -101,8 +101,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set MPI parameters
     rank = params%rank
@@ -115,8 +113,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    ! allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n ), stat=status)
-    allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+    allocate(myblockbuffer( 1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:hvy_n ), stat=status)
 
     if (status /= 0) then
         call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
@@ -133,8 +130,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     if (lgt_n < 1 ) call abort(291019, "you try to save an empty mesh.")
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! first: check if field contains NaNs
     do k = 1, hvy_n
@@ -163,7 +158,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n/) - 1
+        ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n/) - 1
 
     else
 
@@ -171,8 +166,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
-        ! ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n/) - 1
+        ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n/) - 1
 
     endif
 
@@ -195,7 +189,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
             if ( params%dim == 3 ) then
                 ! 3D
-                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(3)
@@ -209,7 +203,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
-                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, 1, dF, hvy_id)
                 ! myblockbuffer(:,:,1,l) = hvy_block( :, :, 1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -260,6 +254,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
 
     ! add additional annotations
+    call write_attribute(file_id, "blocks", "version", (/20200408/)) ! this is used to distinguish wabbit file formats
+    call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n/))

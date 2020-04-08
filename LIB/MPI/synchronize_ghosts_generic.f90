@@ -48,6 +48,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     myrank  = params%rank
     mpisize = params%number_procs
 
+    ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
+
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
     do istage = 1, 2

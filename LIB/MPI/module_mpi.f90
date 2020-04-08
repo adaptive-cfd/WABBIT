@@ -219,8 +219,7 @@ subroutine init_ghost_nodes( params )
         allocate( int_recv_buffer(1:buffer_N_int), stat=status(2) )
         allocate( new_send_buffer(1:buffer_N), stat=status(3) )
         allocate( new_recv_buffer(1:buffer_N), stat=status(4) )
-int_send_buffer=-1
-int_recv_buffer=-1
+        
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then

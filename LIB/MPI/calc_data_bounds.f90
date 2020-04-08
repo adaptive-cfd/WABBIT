@@ -392,11 +392,6 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     g             = params%n_ghosts
     Bs            = params%Bs
 
-    ! check if all dimensions are 1 for this recver patch, if so, skip it
-    if ( ijkrecv(2,1)-ijkrecv(1,1)==0 .and. ijkrecv(2,2)-ijkrecv(1,2)==0 .and. ijkrecv(2,3)-ijkrecv(1,3)==0) then
-        ! this neighborhood relation is invalid for the leveldiff, we can skip it.
-        return
-    endif
 
     if ((dir == 1) .and. (params%rank == 0)) then
         open(16, file='neighbor_blocks2D.dat', status='replace')
@@ -420,8 +415,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     send_treecode = senders(dir, leveldiff, params%dim, :)
     recv_treecode = recvers(dir, leveldiff, params%dim, :)
 
-    call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**j, kind=rk), Bs, params%dim, x0_send, dx_send )
-    call get_block_spacing_origin2( recv_treecode(1:J-leveldiff), real(Bs*2**j, kind=rk), Bs, params%dim, x0_recv, dx_recv )
+    call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_send, dx_send )
+    call get_block_spacing_origin2( recv_treecode(1:J-leveldiff), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_recv, dx_recv )
 
     do i = 1, params%dim
         ! shift to zero at the origin (which is g+1, actually)
@@ -430,8 +425,12 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
 
         ! there's a very simple relation between sender and recver boundarys.
         ! we only need to define the recver bounds
-        q1 = round_one_digit( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
-        q2 = round_one_digit( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
+
+        ! there is only two options here: either int or XX.5 floats.
+        ! q1 = round_one_digit( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
+        ! q2 = round_one_digit( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
+        q1 = ( (r1*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
+        q2 = ( (r2*dx_recv(i) + x0_recv(i) - x0_send(i)) / dx_send(i) )
 
         i1 = floor(q1) + (g+1)
         i2 = ceiling(q2) + (g+1)
@@ -479,14 +478,15 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! by S on all sides. This allows excluding one-sided interpolation stencils,
         ! but requires on the other side to have the ghost node layer on the interpolating
         ! block already filled (two stages!)
-        ijksend(1, 1:params%dim) = ijksend(1, 1:params%dim) - S
-        ijksend(2, 1:params%dim) = ijksend(2, 1:params%dim) + S
+        do i = 1, params%dim
+            ijksend(1, i) = max(1, ijksend(1, i) - S)
+            ijksend(2, i) = min(Bs(i)+2*g, ijksend(2, i) + S)
+        enddo
 
         ! then we possibly use asymmetric extension, i.e. make the patch larger in the
         ! direction of the interior. We use this also if we do not have enough points
         ! for the interpolation stencil. This way, one can still set S=0 but ensure having
         ! enough points.
-
         do i = 1, params%dim
             ! patch at least A (defined above) but possibly the required number to
             ! reach min_size.

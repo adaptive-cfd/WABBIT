@@ -104,8 +104,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level. Note that those blocks have
-    !! the status +11
+    !! except if they are already on the highest level.
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )

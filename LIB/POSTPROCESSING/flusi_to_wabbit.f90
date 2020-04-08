@@ -77,6 +77,8 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     end if
 
+    ! it should be a much simpler function now, but it has to be updated
+    call abort(7666, "This function is to be updated for the new block definition.")
 
     ! get values from command line (filename and desired blocksize)
     call check_file_exists(trim(file_in))

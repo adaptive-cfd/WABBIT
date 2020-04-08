@@ -156,11 +156,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! to refine the entire mesh at the beginning of a time step, if error
         ! control is desired.
         do k = 1, lgt_n
-            ! do not refine blocks with +11 status, as they are on the maxlevel
-            ! already (so no refinement allowed)
-            if ( lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) /= 11 ) then
-                lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = +1
-            end if
+            lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = +1
         end do
 
     case ("random")

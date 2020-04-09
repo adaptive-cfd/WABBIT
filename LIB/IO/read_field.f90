@@ -59,8 +59,8 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     g    = params%n_ghosts
     Bs   = params%Bs
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-!---------------------------------------------------------------------------------------------
-! main body
+
+    if (g == 0) call abort(20200409, "Current code versions require g>=1, but you set g=0")
 
     call check_file_exists(fname)
     ! open the file

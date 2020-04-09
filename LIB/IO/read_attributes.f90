@@ -59,8 +59,12 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     if (datarank == 3) then
         ! 2D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs(1) = int( size_field(1), kind=ik)
-        Bs(2) = int( size_field(2), kind=ik)
+        ! Note: in 04/2020, I changed the grid definition slightly to remove the redundant point
+        !   from the grid. Now each point is contained exactly one time. For postprocessing, it is often
+        !   desirable to include the redundant point, which is now simply the first ghost node. The code
+        !   thus stores blocks of size (Bs+1), i.e., in output h5 files, the block size is EVEN.
+        Bs(1) = int( size_field(1), kind=ik)-1
+        Bs(2) = int( size_field(2), kind=ik)-1
         Bs(3) = 1
         Nb = int( size_field(3), kind=ik)
         domain(3) = 0.0_rk
@@ -69,9 +73,9 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     elseif (datarank == 4) then
         ! 3D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs(1) = int( size_field(1), kind=ik)
-        Bs(2) = int( size_field(2), kind=ik)
-        Bs(3) = int( size_field(3), kind=ik)
+        Bs(1) = int( size_field(1), kind=ik)-1
+        Bs(2) = int( size_field(2), kind=ik)-1
+        Bs(3) = int( size_field(3), kind=ik)-1
         Nb = int( size_field(4), kind=ik)
         dim = 3
 

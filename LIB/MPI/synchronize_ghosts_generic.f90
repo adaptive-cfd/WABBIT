@@ -93,8 +93,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists
                 if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
-                    !  ----------------------------  determin the core ids and properties of neighbor  ------------------------------
-                    ! TODO: check if info available  when searching neighbor and store it in hvy_neighbor
                     ! neighbor light data id
                     recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
                     ! calculate neighbor rank
@@ -208,9 +206,7 @@ end subroutine send_prepare_external
 subroutine unpack_ghostlayers_external( params, hvy_block )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
 
     integer(kind=ik) :: recver_rank ! zero-based
@@ -221,43 +217,39 @@ subroutine unpack_ghostlayers_external( params, hvy_block )
     nc = size(hvy_block,4)
 
     do recver_rank = 0, params%number_procs-1 ! zero-based
-        ! skip my own rank
-        if (recver_rank /= params%rank) then
-            ! did I recv something from this rank?
-            if ( (Data_recvCounter(recver_rank) /= 0) ) then
+        ! skip my own rank, skip ranks that did not send me anything
+        if (recver_rank /= params%rank .and. Data_recvCounter(recver_rank) /= 0) then
+            ! start index of this mpirank in the int_buffer
+            l = sum(MetaData_recvCounter(0:recver_rank-1)) + 1
 
-                ! start index of this mpirank in the int_buffer
-                l = sum(MetaData_recvCounter(0:recver_rank-1)) + 1
+            do while ( iMetaData_recvBuffer(l) > -99 )
+                ! unpack the description of the next data chunk
+                recver_hvyID     = iMetaData_recvBuffer(l)
+                neighborhood     = iMetaData_recvBuffer(l+1)
+                level_diff       = iMetaData_recvBuffer(l+2)
+                buffer_position  = iMetaData_recvBuffer(l+3)
+                buffer_size      = iMetaData_recvBuffer(l+4)
+                rank_destination = iMetaData_recvBuffer(l+5)
 
-                do while ( iMetaData_recvBuffer(l) > -99 )
-                    ! unpack the description of the next data chunk
-                    recver_hvyID = iMetaData_recvBuffer(l)
-                    neighborhood = iMetaData_recvBuffer(l+1)
-                    level_diff   = iMetaData_recvBuffer(l+2)
-                    buffer_position  = iMetaData_recvBuffer(l+3)
-                    buffer_size      = iMetaData_recvBuffer(l+4)
-                    rank_destination = iMetaData_recvBuffer(l+5)
+                if (rank_destination /= params%rank) then
+                    write(*,*) "rank=", params%rank, "dest=", rank_destination, "co", MetaData_recvCounter, &
+                    "l=", l, "recver_rank=", recver_rank
+                    call abort(7373872, "EXT this data seems to be not mine!")
+                endif
 
-                    if (rank_destination /= params%rank) then
-                        write(*,*) "rank=", params%rank, "dest=", rank_destination, "co", MetaData_recvCounter, &
-                        "l=", l, "recver_rank=", recver_rank
-                        call abort(7373872, "EXT this data seems to be not mine!")
-                    endif
-
-                    ! copy data to line buffer. we now need to extract this to the ghost nodes layer (2D/3D)
-                    i0 = sum(Data_recvCounter(0:recver_rank-1)) + buffer_position
-                    line_buffer(1:buffer_size) = rData_recvBuffer( i0 : i0+buffer_size-1 )
+                ! copy data to line buffer. we now need to extract this to the ghost nodes layer (2D/3D)
+                i0 = sum(Data_recvCounter(0:recver_rank-1)) + buffer_position
+                line_buffer(1:buffer_size) = rData_recvBuffer( i0 : i0+buffer_size-1 )
 
 
-                    ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                    ! They depend on the neighbor-relation, level difference and the bounds type.
-                    ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                    call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, RECVER), hvy_block, recver_hvyID )
+                ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
+                ! They depend on the neighbor-relation, level difference and the bounds type.
+                ! The last index is 1-sender 2-receiver 3-restricted/predicted.
+                call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, RECVER), hvy_block, recver_hvyID )
 
-                    ! increase buffer postion marker
-                    l = l + 6
-                end do
-            end if
+                ! increase buffer postion marker
+                l = l + 6
+            end do
         end if
     end do
 
@@ -290,17 +282,13 @@ subroutine unpack_ghostlayers_internal( params, hvy_block )
             ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
             ! They depend on the neighbor-relation and level difference
             ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-
-            ! ALWAYS EXCLUDE_REDUNDANT
-            ! just copy the patch and be happy
             ijk1 = ijkGhosts(:,:, neighborhood, level_diff, RECVER)
             ijk2 = ijkGhosts(:,:, neighborhood, level_diff, SENDER)
 
             hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, recver_hvyID ) = &
             hvy_block( ijk2(1,1):ijk2(2,1), ijk2(1,2):ijk2(2,2), ijk2(1,3):ijk2(2,3), 1:nc, sender_hvyID)
-
-        else  ! interpolation or restriction before inserting
-
+        else
+            ! interpolation or restriction before inserting
             call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, SENDER), &
             neighborhood, level_diff, hvy_block, sender_hvyID )
 
@@ -410,8 +398,6 @@ subroutine AppendLineToBuffer( iMetaData_sendBuffer, rData_sendBuffer, buffer_si
 
     integer(kind=ik)                :: buffer_position, i0, l0
 
-    ! fill real buffer
-    ! position in real buffer is stored in int buffer
     buffer_position = real_pos(recver_rank+1) + 1
 
     i0 = sum(Data_sendCounter(0:recver_rank-1)) + buffer_position
@@ -447,26 +433,15 @@ subroutine start_xfer_mpi( params, iMetaData_sendBuffer, rData_sendBuffer, iMeta
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(inout) :: iMetaData_sendBuffer(:)
+    integer(kind=ik), intent(inout) :: iMetaData_recvBuffer(:)
+    real(kind=rk), intent(inout)    :: rData_sendBuffer(:)
+    real(kind=rk), intent(inout)    :: rData_recvBuffer(:)
+    integer(kind=ik), intent(out)   :: isend, irecv
 
-    !> send/receive buffer, integer and real
-    integer(kind=ik), intent(inout)       :: iMetaData_sendBuffer(:)
-    integer(kind=ik), intent(inout)       :: iMetaData_recvBuffer(:)
-    real(kind=rk), intent(inout)          :: rData_sendBuffer(:)
-    real(kind=rk), intent(inout)          :: rData_recvBuffer(:)
-    integer(kind=ik), intent(out) :: isend, irecv
-    ! process rank
-    integer(kind=ik) :: rank
-    ! MPI error variable
-    integer(kind=ik) :: ierr
-
-    ! MPI message tag
-    integer(kind=ik) :: tag
-    ! column number of send buffer, column number of receive buffer, real data buffer length
     integer(kind=ik) :: length_realBuffer, mpirank_partner
-    integer(kind=ik) :: length_intBuffer
-    ! loop variable
+    integer(kind=ik) :: length_intBuffer, rank, ierr, tag
     integer(kind=ik) :: k, i0, l0
 
     rank = params%rank

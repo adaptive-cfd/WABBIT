@@ -133,7 +133,7 @@ contains
                 ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
                 ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
                 ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                HD  = HD*2.0d0
+                ! HD  = HD*2.0d0
 
             case default
                 call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")

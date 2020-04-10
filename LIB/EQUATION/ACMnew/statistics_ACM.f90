@@ -98,6 +98,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
+        params_acm%sponge_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk

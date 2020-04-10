@@ -336,6 +336,13 @@ contains
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
+        ! since we have moved some blocks around, not only the active lists are outdated
+        ! but also the neighbor relations. Of course, pruned trees are incomplete, so
+        ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
+        ! it.
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id_full), lgt_n(tree_id_full),&
+        lgt_sortednumlist(:,:,tree_id_full), hvy_active(:,tree_id_full), hvy_n(tree_id_full) )
+
 
         ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
         ! same mpirank. therefore, the responsible rank can just add them together.

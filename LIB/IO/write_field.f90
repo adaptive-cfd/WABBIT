@@ -204,7 +204,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
             else
                 ! 2D
                 myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, 1, dF, hvy_id)
-                ! myblockbuffer(:,:,1,l) = hvy_block( :, :, 1, dF, hvy_id)
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(2)

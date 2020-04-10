@@ -53,7 +53,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then
+    if (params_acm%geometry == "Insect" ) then ! .and. Insect%time /= time) then
         call Update_Insect(time, Insect)
     endif
 

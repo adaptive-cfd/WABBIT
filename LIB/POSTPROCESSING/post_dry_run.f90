@@ -48,7 +48,7 @@ subroutine post_dry_run
     real(kind=rk)                       :: time
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename,fname
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
 
@@ -111,6 +111,24 @@ subroutine post_dry_run
     allocate( params%butcher_tableau(1,1) )
     ! mask, usx,usy,usz, color, sponge = 6 components
     params%n_eqn = 6
+    deallocate(params%threshold_state_vector_component)
+    allocate(params%threshold_state_vector_component(1:params%n_eqn))
+    params%threshold_state_vector_component=0_ik
+    params%threshold_state_vector_component(1)=1_ik
+
+    ! it is generally desired to create the mask on Jmax, which is the finest
+    ! level used in the simulation. This is where the RHS is computed. If the dealiasing
+    ! switch is .true., blocks on Jmx are then forced to be coarsened to Jmax-1
+    params%force_maxlevel_dealiasing = .false.
+
+    params%eps = 1.0e-5
+
+    if (params%rank==0) then
+        write(*,'(A)') "DRY-RUN: creating mask function. Please note that the params"
+        write(*,'(A)') "         eps=1.0e-5, force_maxlevel_dealiasing=false and"
+        write(*,'(A)') "         threshold_state_vector_component are hard-coded"
+        write(*,'(A)') "         and thus NOT read from the INI file."
+    endif
 
     Bs = params%Bs
     g  = params%n_ghosts
@@ -167,64 +185,70 @@ subroutine post_dry_run
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
         call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
-        lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), lgt_sortednumlist(:,:,tree_ID_mask),&
-        hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask), Jmin_equi, verbosity=.true., tree_ID=tree_ID_mask )
+        lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),&
+        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin, verbosity=.true., tree_ID=tree_ID_flow )
 
 
         if (params%rank==0) then
             write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7)') &
-            max_active_level(lgt_block, lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask)
+            max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow)), lgt_n(tree_ID_flow)
         endif
 
+        ! generate complete mask on the initial equidistant grid
+        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
 
-        ! generate complete mask on the equidistan grid
-        do k = 1, hvy_n(tree_ID_mask)
-            hvy_id = hvy_active(k,tree_ID_mask)
-
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
-            hvy_mask(:,:,:,:,hvy_id), "all-parts" )
-        enddo
+            ! call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
+            ! lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),&
+            ! hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin, verbosity=.true., tree_ID=tree_ID_flow )
+            !
+            ! call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
+            ! hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)!, all_parts=.true.)
 
         ! refine the grid near the interface and re-generate the mask function.
-        do iter = 1, Jmax - Jmin
+        do iter = 1, (Jmax - Jmin)
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
             ! Snyc'ing becomes much more expensive once the grid is refined.
             ! sync possible only before pruning
-            call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,1), hvy_n(1) )
+            call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
 
-            ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
-            ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
+            ! refine the mesh, but only where the mask is interesting (not everywhere!)
             call refine_mesh( params, lgt_block, hvy_mask, hvy_neighbor, &
-            lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
-            lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
-            hvy_n(tree_ID_mask), "mask-threshold", tree_ID_mask )
+            lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
+            hvy_n(tree_ID_flow), "mask-threshold", tree_ID_flow )
 
+            ! on new grid, create the mask again
+            call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+            Nmask = lgt_n(tree_ID_flow)
+
+            ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
+            ! is effectively ignored. It seems redundant; if we set a small eps (done independent
+            ! of the parameter file), this yields the same result
+            call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
+            tree_ID_flow, params%coarsening_indicator, hvy_mask )
+
+            ! current finest level is:
+            Jnow = max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow))
 
             if (params%rank==0) then
-                write(*,'("Did one iteration for mask generation. Now: Jmax=",i2, " Nb=",i7)') &
-                max_active_level(lgt_block, lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask)
+                write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
+                & After coarsening: Jmax=",i2, " Nb=",i7)') Nmask, Jnow, lgt_n(tree_ID_flow)
             endif
 
-
-            ! call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-            ! hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
-            do k = 1, hvy_n(tree_ID_mask)
-                hvy_id = hvy_active(k,tree_ID_mask)
-
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
-                hvy_mask(:,:,:,:,hvy_id), "all-parts" )
-            enddo
+            ! We're done once the mask is created on the final level. Relevant only if the start grid is not
+            ! created on Jmin, but on Jequi
+            if (Jnow==Jmax) exit
         enddo
 
+        ! sync is a requirement of the new grid definition, which includes saving the first ghost
+        ! node, to keep postprocessing routines intact (in particular paraview)
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         call WRITE_INSECT_DATA(time)
 
@@ -232,7 +256,7 @@ subroutine post_dry_run
             if (params%rank==0) write(*,*) "now pruning!"
 
             call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_id=tree_ID_mask)
+            hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_id=tree_ID_flow)
         endif
 
         !***********************************************************************
@@ -246,7 +270,7 @@ subroutine post_dry_run
         ! call write_field( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
         call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-        lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_mask, time=time, iteration=-1 )
+        lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_flow, time=time, iteration=-1 )
 
         !write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
         !call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)

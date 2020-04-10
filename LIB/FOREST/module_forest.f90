@@ -326,7 +326,6 @@ contains
                     comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
                     comm_list(n_comm, 2) = rank_full   ! receiver mpirank
                     comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
-                    ! write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
                 endif
             endif
         enddo
@@ -372,7 +371,7 @@ contains
                     ! hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + hvy_block(:,:,:,:,hvy_id1)
                     ! hvy_block(:,:,:,:,hvy_id2) = max(hvy_block(:,:,:,:,hvy_id2),hvy_block(:,:,:,:,hvy_id1))
 
-                    where ( hvy_block(:,:,:,1,hvy_id2)<hvy_block(:,:,:,1,hvy_id1) )
+                    where ( hvy_block(:,:,:,1,hvy_id2)<=hvy_block(:,:,:,1,hvy_id1) )
                         hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id1)
                         hvy_block(:,:,:,2,hvy_id2) = hvy_block(:,:,:,2,hvy_id1)
                         hvy_block(:,:,:,3,hvy_id2) = hvy_block(:,:,:,3,hvy_id1)

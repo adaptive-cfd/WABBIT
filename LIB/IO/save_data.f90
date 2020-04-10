@@ -78,8 +78,8 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling create_mask_tree if the mask is not stored is supposed
     ! to be small)
-    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, hvy_neighbor, &
+         hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
 
 
     ! preparatory step. The physics modules have to copy everything they want to
@@ -105,9 +105,9 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         boundary_flag=surface)
 
     enddo
-    
+
     ! Derived qtys need to be sync'ed before saving (because the code saves on additional point, the first ghost node
-    ! which is equivalent to the old redundant node
+    ! which is equivalent to the old redundant node)
     call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:params%N_fields_saved,:), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
     ! actual saving step. one file per component.

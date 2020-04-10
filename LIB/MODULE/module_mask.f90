@@ -6,6 +6,7 @@ module module_mask
     use module_params
     use module_precision
     use module_globals
+    use module_MPI
 
     implicit none
 
@@ -224,7 +225,7 @@ contains
         integer(kind=ik), intent(inout)     :: lgt_n(:)
         !> sorted list of numerical treecodes, used for block finding
         integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-        integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, tree_n, iter, lgt_id, Jmin
+        integer :: k, hvy_id, Bs(1:3), g, Jmax, tree_n, iter, lgt_id, Jmin
         real(kind=rk) :: x0(1:3), dx(1:3)
 
         if (params%rank==0) then
@@ -235,7 +236,6 @@ contains
 
         Bs = params%Bs
         g  = params%n_ghosts
-        Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
         Jmax = params%max_treelevel
         Jmin = params%min_treelevel
         tree_n = params%forest_size ! used only for resetting at this point
@@ -310,11 +310,11 @@ contains
         hvy_n(tree_ID_mask_coarser), tree_ID_mask_coarser, "everywhere", hvy_tmp, external_loop=.true.)
 
         ! prune both masks
-        if (params%rank==0) write(*,*) "Pruning mask tree (on Jmax)"
+        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask)
 
-        if (params%rank==0) write(*,*) "Pruning mask tree (on Jmax-1)"
+        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask_coarser)
 
@@ -323,6 +323,5 @@ contains
             write(*,*) "DONE creating time-independent part!"
             write(*,'(80("~"))')
         endif
-
     end subroutine
 end module

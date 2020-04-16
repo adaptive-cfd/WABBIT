@@ -296,6 +296,10 @@ contains
             enddo
 
         enddo
+	
+	! required strictly speaking only if we intend to save TREE_ID_MASK separately to disk
+	! is called only once so performance does not matter here.
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
         ! we need the mask function both on Jmax (during the RHS) and Jmax-1
         ! (during saving after coarsening)

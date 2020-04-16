@@ -79,11 +79,8 @@ subroutine post_mean(params)
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
-    call create_active_and_sorted_lists( params, lgt_block, &
-    lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1 )
-
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)

@@ -801,7 +801,6 @@ contains
                 ! remove quoatiion marks, if any
                 args = str_replace_text( args, '"', '')
                 ! now args is just the substring left of the '=' sign.
-                write(*,*) "args=", args
 
                 if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.") then
                     value = .true.

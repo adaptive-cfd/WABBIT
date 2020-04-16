@@ -122,6 +122,7 @@ subroutine post_dry_run
     params%force_maxlevel_dealiasing = .false.
 
     params%eps = 1.0e-5
+    params%coarsening_indicator = "threshold-state-vector"
 
     if (params%rank==0) then
         write(*,'(A)') "DRY-RUN: creating mask function. Please note that the params"
@@ -186,7 +187,7 @@ subroutine post_dry_run
         ! routine also deletes any existing mesh in the tree.
         call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),&
-        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin, verbosity=.true., tree_ID=tree_ID_flow )
+        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
 
 
         if (params%rank==0) then
@@ -196,14 +197,8 @@ subroutine post_dry_run
 
         ! generate complete mask on the initial equidistant grid
         call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
 
-            ! call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
-            ! lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),&
-            ! hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin, verbosity=.true., tree_ID=tree_ID_flow )
-            !
-            ! call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            ! hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)!, all_parts=.true.)
 
         ! refine the grid near the interface and re-generate the mask function.
         do iter = 1, (Jmax - Jmin)
@@ -223,7 +218,7 @@ subroutine post_dry_run
 
             ! on new grid, create the mask again
             call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
             Nmask = lgt_n(tree_ID_flow)
 
             ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
@@ -232,6 +227,10 @@ subroutine post_dry_run
             call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
             lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
             tree_ID_flow, params%coarsening_indicator, hvy_mask )
+
+            ! on new grid, create the mask again
+            call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
+            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
 
             ! current finest level is:
             Jnow = max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow))
@@ -245,6 +244,11 @@ subroutine post_dry_run
             ! created on Jmin, but on Jequi
             if (Jnow==Jmax) exit
         enddo
+
+        ! on new grid, create the mask again
+        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
+        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
+        Nmask = lgt_n(tree_ID_flow)
 
         ! sync is a requirement of the new grid definition, which includes saving the first ghost
         ! node, to keep postprocessing routines intact (in particular paraview)
@@ -272,6 +276,8 @@ subroutine post_dry_run
         call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
         lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_flow, time=time, iteration=-1 )
 
+        !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
+        !lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_mask, time=time, iteration=-1 )
         !write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
         !call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 	!

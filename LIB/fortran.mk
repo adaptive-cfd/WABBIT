@@ -324,10 +324,6 @@ $(OBJDIR)/module_forest.o: module_forest.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-# $(OBJDIR)/create_mask_tree.o: create_mask_tree.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_physics_metamodule.o \
-# 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_globals.o
-# 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_MOR.o: module_MOR.f90 $(OBJDIR)/module_forest.o $(OBJDIR)/module_IO.o \
 	$(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

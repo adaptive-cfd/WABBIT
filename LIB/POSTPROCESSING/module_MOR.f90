@@ -17,6 +17,7 @@ module module_MOR
   use module_globals
   use module_params
   use module_IO
+  use module_helpers
 
   implicit none
 
@@ -332,10 +333,10 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80)      :: file_out, args
+    character(len=80)      :: file_out, args,order
     character(len=80),dimension(:), allocatable :: fname_list
     character(len=80),dimension(:,:), allocatable :: file_in
-    real(kind=rk)   , allocatable :: time(:)
+    real(kind=rk)   , allocatable :: time(:),M(:,:)
     integer(kind=ik), allocatable :: iteration(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
@@ -348,18 +349,17 @@ contains
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
-    integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
+    integer(kind=ik) :: i, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
-    character(len=2)  :: order
     logical :: verbosity = .false., save_all = .true.
 
     call get_command_argument(2, args)
     if ( args== '--help' .or. args == '--h') then
         if ( params%rank==0 ) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list filelist.txt [list_uy.txt] [list_uz.txt]"
+            write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list=filelist.txt [list_uy.txt] [list_uz.txt]"
             write(*,*) "[--save_all --order=[2|4] --nmodes=3 --error=1e-9 --adapt=0.1]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Wavelet adaptive Snapshot POD "
@@ -369,64 +369,17 @@ contains
     end if
 
     !----------------------------------
-    ! read predefined params
+    ! read parameters
     !----------------------------------
-    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
-
-    do i = 1, command_argument_count()
-      call get_command_argument(i,args)
-      !-------------------------------
-      ! order of predictor
-      if ( index(args,"--order=")==1 ) then
-        read(args(9:len_trim(args)),* ) order
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! TRUNCATION RANK
-      if ( index(args,"--nmodes=")==1 ) then
-        read(args(10:len_trim(args)),* ) truncation_rank_in
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! TRUNCATION ERROR
-      if ( index(args,"--error=")==1 ) then
-        read(args(9:len_trim(args)),* ) truncation_error_in
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! MEMORY AVAILABLE
-      if ( index(args,"--memory=")==1 ) then
-              read(args(10:len_trim(args)-2),* ) maxmem
-              n_opt_args = n_opt_args + 1
-      endif
-      !-------------------------------
-      ! ADAPTION
-      if ( index(args,"--adapt=")==1 ) then
-        read(args(9:len_trim(args)),* ) eps
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! SAVE Additional data to files
-      if ( index(args,"--save_all")==1 ) then
-        save_all = .true.
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! Number of components in statevector
-      if ( index(args,"--components=")==1 ) then
-        read(args(14:len_trim(args)),* ) n_components
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--list")==1 ) then
-        allocate(fname_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fname_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-    end do
+    call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg( "--nmodes", truncation_rank_in, default=truncation_rank_in )
+    call get_cmd_arg( "--error", truncation_error_in, default=truncation_error_in )
+    call get_cmd_arg_str_vct( "--list", fname_list )
+    call get_cmd_arg( "--memory", args, default="2GB")
+    read(args(1:len_trim(args)-2),* ) maxmem
+    call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--components", n_components, default=n_components)
 
 
     !-------------------------------
@@ -443,13 +396,25 @@ contains
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
 
-    if (order == "2") then
+    ! Check parameters for correct inputs:
+    if (order == "CDF20") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
-    else
+    elseif (order == "CDF40") then
+        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
+    elseif (order == "CDF44") then
+        params%harten_multiresolution = .false.
+        params%wavelet_transform_type = 'biorthogonal'
+        params%order_predictor = "multiresolution_4th"
+        params%wavelet='CDF4,4'
+        params%n_ghosts = 6_ik
+    else
+        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
     end if
+
     if ( eps > 0) then
       ! adapt the mesh if possible
       params%adapt_mesh = .True.! .False.!.True.
@@ -604,7 +569,6 @@ contains
     call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        truncation_error, truncation_rank, save_all)
-
     !----------------------------------
     ! Save Modes
     !----------------------------------
@@ -618,6 +582,23 @@ contains
       end do
 
     end do
+
+    !----------------------------------
+    ! check orthonormality
+    !----------------------------------
+    allocate(M(truncation_rank,truncation_rank))
+    do i = N_snapshots+1, N_snapshots + truncation_rank
+      do j = N_snapshots+1, N_snapshots + truncation_rank
+        M(i,j) = scalar_product_two_trees( params, tree_n, &
+                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                        i, j,1)
+      end do
+    end do
+
+    call print_mat(M)
+
+
 
   end subroutine
   !##############################################################

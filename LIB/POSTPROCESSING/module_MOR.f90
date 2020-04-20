@@ -354,6 +354,7 @@ contains
     real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     logical :: verbosity = .false., save_all = .true.
+    character(len=30) :: rowfmt
 
     call get_command_argument(2, args)
     if ( args== '--help' .or. args == '--h') then
@@ -587,16 +588,27 @@ contains
     ! check orthonormality
     !----------------------------------
     allocate(M(truncation_rank,truncation_rank))
-    do i = N_snapshots+1, N_snapshots + truncation_rank
-      do j = N_snapshots+1, N_snapshots + truncation_rank
+    do i = 1, truncation_rank
+      do j = 1, truncation_rank
         M(i,j) = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        i, j,1)
+                        N_snapshots+i, N_snapshots+j,1)
       end do
     end do
 
-    call print_mat(M)
+    ! Save covariance matrix
+    if (save_all .and. params%rank==0) then
+      file_out ="scalarprod.txt"
+      write(*,'( "scalarproducts are saved to file: ", A30 )') file_out
+      write(*,*)
+      write(rowfmt,'(A,I4,A)') '(',truncation_rank,'(es15.8,1x))'
+      open(14,file=file_out, status='replace')
+      do i = 1,truncation_rank
+        write(14,FMT=rowfmt) M(i,:)
+      enddo
+      close(14)
+    end if
 
 
 

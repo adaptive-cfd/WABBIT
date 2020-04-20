@@ -101,7 +101,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
         write(*,*) "--------------------------------------------------------------------"
     endif
-
+    Bs_file = (/ 1,1,1 /)
     if (version(1) == 20200408) then
         ! Newer files also contain the block size in addition:
         call read_attribute( file_id, "blocks", "block-size", Bs_file)
@@ -110,7 +110,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         ! save in fact ONE MORE point (Bs+1). The additional point is the first ghost node.
         ! This is done purely because in visualization, paraview does not understand
         ! that there is no missing data.
-        Bs_file = size_field(1:datarank-1)
+        Bs_file(1:datarank-1) = size_field(1:datarank-1)
     endif
 
 

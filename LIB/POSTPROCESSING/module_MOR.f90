@@ -212,6 +212,7 @@ contains
 
     free_tree_id = free_tree_id + 1
 
+    ! Linear Combination of the snapshots to build the i-th POD MODE
     do tree_id = 2, N_snapshots
       call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id)
@@ -222,16 +223,18 @@ contains
       call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
 
-      if ( params%adapt_mesh) then
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id),&
-        lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), hvy_n(pod_mode_tree_id) )
-
-        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
-        lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
-        hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
-      endif
-
     end do
+
+    ! adapt POD MODE
+    if ( params%adapt_mesh) then
+      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id),&
+      lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), hvy_n(pod_mode_tree_id) )
+
+      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
+      lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
+      hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
+    endif
+
 
     t_elapse = MPI_WTIME() - t_elapse
     if (rank == 0) then

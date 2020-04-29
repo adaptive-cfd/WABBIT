@@ -89,7 +89,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
             ! are forcing values, colors, sponges, etc)
             used = .false.
             used(1) = .true.
-            
+
             ! this version requires ghost nodes to be sync'ed before the routine is called (otherwise
             ! it may refine also constant one blocks if the in the ghost nodes 0 is saved)
             ! a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
@@ -99,7 +99,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
-            if (a /= b) then
+            if ( abs(a - b)>1.0e-7_rk ) then
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
             endif
 

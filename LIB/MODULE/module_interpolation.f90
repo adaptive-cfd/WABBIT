@@ -36,6 +36,7 @@ contains
         nfine(2) = size(fine,2)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
+            write(*,*) "coarse:", shape(coarse), "fine:", shape(fine)
             call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 

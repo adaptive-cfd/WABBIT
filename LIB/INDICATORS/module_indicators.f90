@@ -18,10 +18,6 @@
 ! ********************************************************************************************
 
 module module_indicators
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     ! global parameters
     use module_params
@@ -38,19 +34,8 @@ module module_indicators
     ! required, therefore use module_MPI.
     use module_MPI
 
-!---------------------------------------------------------------------------------------------
-! variables
+implicit none
 
-    implicit none
-
-    ! interpolation fields
-    real(kind=rk), SAVE, PRIVATE, allocatable :: u2(:,:,:), u3(:,:,:)
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 

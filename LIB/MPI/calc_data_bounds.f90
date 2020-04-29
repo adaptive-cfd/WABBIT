@@ -27,9 +27,16 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     ! and the level difference, space dimension (2d/3d). They are helper qtys: not related to the treecodes
     ! of the actual computational grid.
     ! These treecodes are easily computed when the sender is on the same level or finer than the recver, by
-    ! using the adjacent block compuation. If the neighbor (sender) is coarser, then this is not trivial, as
+    ! using the adjacent block compuation. If the neighbor (recver) is coarser, then this is not trivial, as
     ! our grid definition does not allow all blocks to have coarser neighbors. In some cases, the neighbor has to be
-    ! on the same level. We computed this list simply by choosind another recver block until we found a valid combination.
+    ! on the same level. Consider five blocks:
+    !
+    ! a b E E
+    ! c d E E
+    !
+    ! then block "c" cannot have a coarser neighbor in the direction to the right! only b,d can.
+    !
+    ! We computed this list simply by choosind another recver block until we found a valid combination.
     ! For ease of coding, it is now (>03/2020) a hard coded list, see git history for the code.
     integer(kind=ik), dimension(1:74, -1:1, 2:3, 1:Jmax) :: senders, recvers
 

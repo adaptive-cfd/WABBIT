@@ -56,8 +56,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! treecode varaible
     integer(kind=ik)                    :: treecode(params%max_treelevel)
     ! mesh level
-    integer(kind=ik)                    :: level, tree_id
-
+    integer(kind=ik) :: level, tree_id
 
     N = params%number_blocks
     ! set MPI parameter
@@ -97,7 +96,6 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
                 ! interpolate data
                 call prediction_3D(hvy_block(:, :, :, dF, hvy_active(k)), data_predict_fine, params%order_predictor)
                 ! save new data, but cut ghost nodes.
-                ! new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs(1)-2, 2*g+1:2*g+1+2*Bs(2)-2, 2*g+1:2*g+1+2*Bs(3)-2)
                 new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g, 2*g+1:2*Bs(3)+2*g )
             end do
 

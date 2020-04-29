@@ -67,6 +67,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     number_procs = params%number_procs
     Bs           = params%Bs
     g            = params%n_ghosts
+    Bs_file      = 1
 
 
     call check_file_exists(fname)
@@ -85,23 +86,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! files, version=0 is returned.
     call read_attribute( file_id, "blocks", "version", version)
 
-    if (version(1) /= 20200408 .and. rank==0) then
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "The file we are trying to read is generated with an older version"
-        write(*,*) "of wabbit (prior to 08 April 2020). In this the file, the grid"
-        write(*,*) "definition includes a redundant point, i.e., a block is defined"
-        write(*,*) "with spacing dx = L*2^-J / (Bs-1). In new versions, the redundant"
-        write(*,*) "point is removed, leaving us with the spacing dx = L*2^-J / Bs"
-        write(*,*) "The file can be read; but it slightly increases the resolution"
-        write(*,*) "(dx reduced), so do not expect the result to be perfectly identical"
-        write(*,*) "to what would be obtained with the old code version."
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
-    endif
-    Bs_file = (/ 1,1,1 /)
+
     if (version(1) == 20200408) then
         ! Newer files also contain the block size in addition:
         call read_attribute( file_id, "blocks", "block-size", Bs_file)
@@ -110,7 +95,25 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         ! save in fact ONE MORE point (Bs+1). The additional point is the first ghost node.
         ! This is done purely because in visualization, paraview does not understand
         ! that there is no missing data.
-        Bs_file(1:datarank-1) = size_field(1:datarank-1)
+
+        ! this is an old file: the dimension of the array in the HDF5 file must be
+        ! (Bs+1)
+        Bs_file(1:datarank-1) = size_field(1:datarank-1) - 1
+
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "The file we are trying to read is generated with an older version"
+        write(*,*) "of wabbit (prior to 08 April 2020). In this the file, the grid"
+        write(*,*) "definition includes a redundant point, i.e., a block is defined"
+        write(*,*) "with spacing dx = L*2^-J / (Bs-1). In new versions, the redundant"
+        write(*,*) "point is removed, leaving us with the spacing dx = L*2^-J / Bs"
+        write(*,*) "The file can be read; provided that the new Bs (in this version of the code)"
+        write(*,*) "is the old one -1, this is an EVEN number, which the code supports as"
+        write(*,*) "of 29 Apr 2020."
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
     endif
 
 
@@ -132,7 +135,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
 
 
     ! If the file has the wrong dimensions, we cannot read it
-    if (maxval(Bs(1:datarank-1)-size_field(1:datarank-1)) > 0) then
+    if (maxval(Bs(1:datarank-1)-Bs_file(1:datarank-1)) > 0) then
         call abort(20030218, "ERROR:read_mesh:We try to load a file which has the wrong block size!")
     endif
 

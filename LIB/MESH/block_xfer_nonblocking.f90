@@ -34,21 +34,22 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
     logical :: xfer_started(1:N_xfers)
+    logical :: source_block_deleted(1:N_xfers)
 
     ! array of mpi requests, taken from stack. for extremely large N_xfers, that can cause stack problems
     integer(kind=ik) :: requests(1:2*N_xfers)
     integer(kind=ik) :: ireq
 
     logical :: not_enough_memory
-    integer(kind=ik) :: counter, k_start
+    integer(kind=ik) :: counter
 
     ! if the list of xfers is empty, then we just return.
     if (N_xfers==0) return
 
     myrank = params%rank
     counter = 0
-    k_start = 1
     xfer_started = .false.
+    source_block_deleted = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 
@@ -58,7 +59,10 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 1   ireq = 0
     not_enough_memory = .false.
 
-    do k = k_start, N_xfers
+    do k = 1, N_xfers
+        ! if this xfer has already been started, we are happy and go to the next one.
+        if (xfer_started(k)) cycle
+
         ! we will transfer this block:
         lgt_id = xfer_list(k,3)
 
@@ -74,14 +78,12 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         ! the idea is now if we do not have enough memory (ie no free block on target rank) we can
         ! wait until the current requests are finnished. Then we retry the loop.
         if (lgt_id_new == -1) then
-            k_start = k
             not_enough_memory = .true.
-            ! to avoid infinite loops, loop counter
-            counter = counter + 1
             ! this marks that we can NOT delete the source block after waiting for MPI xfer
             xfer_started(k) = .false.
-            ! interrupt do loop
-            exit
+            counter = counter +1
+            ! skip this xfer (it will be treated in the next iteration)
+            cycle
         else
             ! this marks that we can delete the source block after waiting for MPI xfer
             xfer_started(k) = .true.
@@ -155,19 +157,26 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         ! note you mut NOT delete the original block now. only after xfer is completed.
     enddo
 
-    ! wait for all my xfers to be completed.
+    ! wait for all my xfers to be completed. (ireq is different on each mpirank)
+    ! both send/recv are waited for
     if (ireq > 0) then
         call MPI_waitall( ireq, requests(1:ireq), MPI_STATUSES_IGNORE, ierr )
         if (ierr /= MPI_SUCCESS) call abort(1809181533, "[block_xfer.f90] MPI_waitall failed!")
     endif
 
+
     ! now all data is transfered on this rank, and we will no longer change it.
-    ! so now, we can safely delete the original blocks, if their xfer was started
+    ! so now, we can safely delete the original blocks, if their xfer was started.
+    ! Note that the waiting is different for each rank, and they do arrive here at different times,
+    ! but they all eventually delete the source blocks only after they have been transfered.
     do i = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
-        if (xfer_started(i)) then
+        if (xfer_started(i) .and. .not. source_block_deleted(i)) then
             lgt_block( xfer_list(i,3), : ) = -1
-            xfer_started(i) = .false.
+            ! pay attention here: you must not delete the block twice. after the first delete, it is
+            ! free and can be used for a newly xferd block: then it is no longer free and must not be
+            ! deleted again
+            source_block_deleted(i) = .true.
         endif
     enddo
 
@@ -176,7 +185,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! we waited once for all xfers and the temporary blocks are freed. Now we can try again! We count
     ! to avoid infinite loops - in this case, we simply *really* ran out of memory.
     if (not_enough_memory) then
-        if (counter < 10) then
+        if (counter < 20) then
             ! like in the golden age of computer programming:
             goto 1
         else

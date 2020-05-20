@@ -81,7 +81,6 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             not_enough_memory = .true.
             ! this marks that we can NOT delete the source block after waiting for MPI xfer
             xfer_started(k) = .false.
-            counter = counter +1
             ! skip this xfer (it will be treated in the next iteration)
             cycle
         else
@@ -185,12 +184,12 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! we waited once for all xfers and the temporary blocks are freed. Now we can try again! We count
     ! to avoid infinite loops - in this case, we simply *really* ran out of memory.
     if (not_enough_memory) then
-        if (counter < 20) then
+        if (counter < 2000) then
             ! like in the golden age of computer programming:
+            counter = counter + 1
             goto 1
         else
-            call abort(1909181808, "[block_xfer.f90]: we tried but we simply do not have enough memory to complete transfer. &
-            & you need to allocate more --memory")
+            call abort(1909181808, "[block_xfer.f90]: not enough memory to complete transfer. you need to allocate more --memory")
         endif
     endif
 

@@ -23,7 +23,7 @@
 !! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
 
     use module_indicators
 
@@ -60,6 +60,10 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+
+    ! for the mask generation (time-independent mask) we require the mask on the highest
+    ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
+    logical, intent(in) :: ignore_maxlevel
 
     ! local variables
     integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr, level
@@ -245,7 +249,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> force blocks on maximum refinement level to coarsen, if parameter is set
     !---------------------------------------------------------------------------
-    if (params%force_maxlevel_dealiasing) then
+    ! Note this behavior can be bypassed using the ignore_maxlevel switch
+    if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
         do k = 1, lgt_n
             lgt_id = lgt_active(k)
             if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then

@@ -274,12 +274,9 @@ contains
             lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
             hvy_n(tree_ID_mask), "mask-threshold", tree_ID_mask )
 
-
             if (params%rank==0) then
-                write(*,'("Did one iteration for time-independent mask. Now: Jmax=",i2, " Nb=",i7,&
-                &" lgt_n=",(4(i6,1x)))') &
-                max_active_level(lgt_block,lgt_active(:,tree_ID_mask),lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), &
-                lgt_n
+                write(*,'("Did refinement for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
+                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
             endif
 
             ! the constant part needs to be generated on Jmax (where RHS is computed)
@@ -295,10 +292,23 @@ contains
                 endif
             enddo
 
+            ! we found that sometimes, we end up with more blocks than expected
+            ! and some zero-blocks can be coarsened again. doing that turned out to be
+            ! important for large-scale simulations
+            call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
+            lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
+            lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
+            hvy_n(tree_ID_mask), tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, external_loop=.false., ignore_maxlevel=.true.)
+
+
+            if (params%rank==0) then
+                write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
+                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
+            endif
         enddo
-	
-	! required strictly speaking only if we intend to save TREE_ID_MASK separately to disk
-	! is called only once so performance does not matter here.
+
+        ! required strictly speaking only if we intent to save TREE_ID_MASK separately to disk.
+        ! is called only once so performance does not matter here.
         call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
         ! we need the mask function both on Jmax (during the RHS) and Jmax-1

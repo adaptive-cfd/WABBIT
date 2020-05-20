@@ -20,7 +20,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop)
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
     implicit none
 
@@ -61,6 +61,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! only on one point, which is then completely removed (happens for a mask function, for example.)
     !! if external_loop=.true., only one iteration step is performed.
     logical, intent(in), optional       :: external_loop
+    ! during mask generation it can be required to ignore the maxlevel coarsening....life can suck, at times.
+    logical, intent(in), optional       :: ignore_maxlevel
 
     integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
@@ -69,6 +71,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     real(kind=rk)                       :: t0, t1
     ! MPI error variable
     integer(kind=ik)                    :: ierr, k1, hvy_id
+    logical :: ignore_maxlevel2
 
 
     ! start time
@@ -76,6 +79,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     t1 = t0
     lgt_n_old = 0
     iteration = 0
+
+    if(present(ignore_maxlevel)) then
+        ignore_maxlevel2 = ignore_maxlevel
+    else
+        ignore_maxlevel2 = .false.
+    endif
 
     if ( params%dim == 3 ) then
         max_neighbors = 56
@@ -129,17 +138,19 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2, hvy_mask)
         else
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2)
         endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
-        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        if (ignore_maxlevel2 .eqv. .false.) then
+            call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        endif
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness

@@ -72,7 +72,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
 
-    nwork = max( 2*Neqn, params%N_fields_saved)
+    nwork = max(2*Neqn, params%N_fields_saved)
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -118,7 +118,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_work
@@ -139,7 +139,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_work

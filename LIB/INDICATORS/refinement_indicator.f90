@@ -92,10 +92,10 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
 
             ! this version requires ghost nodes to be sync'ed before the routine is called (otherwise
             ! it may refine also constant one blocks if the in the ghost nodes 0 is saved)
-            ! a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            ! b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            a = minval(hvy_block(:, :, :, 1, hvy_id))
-            b = maxval(hvy_block(:, :, :, 1, hvy_id))
+            a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
+            b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
+            ! a = minval(hvy_block(:, :, :, 1, hvy_id))
+            ! b = maxval(hvy_block(:, :, :, 1, hvy_id))
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
@@ -107,7 +107,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
             ! lgt_block(lgt_id, Jmax + IDX_REFINE_STS), nnorm, level, eps=1.0e-10_rk )
             !
             ! ! hack: currently, threshold_block assigns only -1 or 0
-            ! lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = lgt_block(lgt_id, Jmax + IDX_REFINE_STS)+1
+            ! lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = lgt_block(lgt_id, Jmax + IDX_REFINE_STS) + 1
         enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.

@@ -83,6 +83,11 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         ! if the iteration loop is on (you can bypass that behavior using external_loop=.true.)
         refinement_status = -1
 
+    case ("mask-allzero-noghosts")
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
+            refinement_status = -1
+        endif
+
     case ("threshold-state-vector", "primary-variables")
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components

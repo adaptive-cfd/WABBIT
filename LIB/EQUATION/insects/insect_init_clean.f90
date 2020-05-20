@@ -256,9 +256,15 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
 
     ! wing FSI section
-    call read_param_mpi(PARAMS,"Insects","wing_fsi",Insect%wing_fsi,"no")
-    call read_param_mpi(PARAMS,"Insects","init_alpha_phi_theta",&
-    Insect%init_alpha_phi_theta, (/0.d0, 0.d0, 0.d0 /) )
+    call read_param_mpi(PARAMS, "Insects", "wing_fsi", Insect%wing_fsi, "no")
+    call read_param_mpi(PARAMS, "Insects", "init_alpha_phi_theta", Insect%init_alpha_phi_theta, (/0.d0, 0.d0, 0.d0/) )
+
+
+    ! section for additional fractal tree
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree", Insect%fractal_tree, .false.)
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_file", Insect%fractal_tree_file, "tree_data.in")
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_x0", Insect%fractal_tree_x0, (/0.0d0, 0.0d0, 0.0d0/) )
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_scaling", Insect%fractal_tree_scaling, 1.0_rk )
 
 
     ! wing inertia tensor (we currently assume two identical wings)
@@ -277,6 +283,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
+    ! NOTE: 05/2020 Thomas, I changed the default back to local. There
     call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"global")
     Insect%smooth = 1.0d0*dx_reference
     Insect%safety = 3.5d0*Insect%smooth
@@ -319,9 +326,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! clean ini file
     call clean_ini_file_mpi(PARAMS)
 
+
+
     !-----------------------------------------------------------------------------
     ! other initialization
     !-----------------------------------------------------------------------------
+
+    if (Insect%fractal_tree) then
+        ! we can also simulate an insect together with a fractal tree as turbulence
+        ! generators.
+        call fractal_tree_init(Insect)
+    endif
 
     ! If required, initialize rigid solid dynamics solver
     if (Insect%BodyMotion=="free_flight") then
@@ -348,21 +363,23 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     do wingID = 1, Nwings
         ! exclude wings that are hard-coded, otherwise, call initialization routine
         if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
-        Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
-        Insect%WingShape(wingID)/="TwoEllipses") then
+            Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
+            Insect%WingShape(wingID)/="TwoEllipses") then
 
-        ! we have some pre-defined, hard-coded data, but also can read the wing shape
-        ! from INI files.
-        call Setup_Wing_Fourier_coefficients(Insect, wingID)
+            ! we have some pre-defined, hard-coded data, but also can read the wing shape
+            ! from INI files.
+            call Setup_Wing_Fourier_coefficients(Insect, wingID)
+        endif
+
+    enddo
+
+
+    if (root) then
+        write(*,'(80("<"))')
+        write(*,*) "Insect initialization is complete."
+        write(*,'(80("<"))')
     endif
-enddo
-
-
-if (root) then
-    write(*,'(80("<"))')
-    write(*,*) "Insect initialization is complete."
-    write(*,'(80("<"))')
-endif
+    Insect%initialized = .true.
 
 end subroutine insect_init
 

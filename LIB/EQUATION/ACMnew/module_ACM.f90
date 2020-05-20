@@ -350,7 +350,7 @@ end subroutine
     endif
 
     if (params_acm%geometry=="fractal_tree") then
-        call fractal_tree_init()
+        call fractal_tree_init( Insect )
     endif
 
     params_acm%initialized = .true.

@@ -31,8 +31,9 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     !! Note the secondary array can have different #components.
     real(kind=rk), intent(inout), optional :: hvy_block2(:, :, :, :, :)
 
-    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank
+    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
+    logical :: xfer_started(1:N_xfers)
 
     ! array of mpi requests, taken from stack. for extremely large N_xfers, that can cause stack problems
     integer(kind=ik) :: requests(1:2*N_xfers)
@@ -47,6 +48,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     myrank = params%rank
     counter = 0
     k_start = 1
+    xfer_started = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 
@@ -74,9 +76,15 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         if (lgt_id_new == -1) then
             k_start = k
             not_enough_memory = .true.
+            ! to avoid infinite loops, loop counter
             counter = counter + 1
+            ! this marks that we can NOT delete the source block after waiting for MPI xfer
+            xfer_started(k) = .false.
             ! interrupt do loop
             exit
+        else
+            ! this marks that we can delete the source block after waiting for MPI xfer
+            xfer_started(k) = .true.
         endif
 
 
@@ -154,10 +162,13 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     endif
 
     ! now all data is transfered on this rank, and we will no longer change it.
-    ! so now, we can safely delete the original blocks
-    do k = 1, N_xfers
+    ! so now, we can safely delete the original blocks, if their xfer was started
+    do i = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
-        lgt_block( xfer_list(k,3), : ) = -1
+        if (xfer_started(i)) then
+            lgt_block( xfer_list(i,3), : ) = -1
+            xfer_started(i) = .false.
+        endif
     enddo
 
     ! it may happen that we cannot execute a xfer because the target ranks has no more memory left

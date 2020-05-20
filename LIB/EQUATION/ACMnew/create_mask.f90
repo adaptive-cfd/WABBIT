@@ -95,6 +95,14 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
                 mask(:,:,:,5) = real(mask_color, kind=rk)
             endif
 
+            ! we can also simulate an insect together with a fractal tree as turbulence
+            ! generators. This part is time-independent as the tree does not move.
+            if (Insect%fractal_tree) then
+                call draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+                ! store the mask color array as double
+                mask(:,:,:,5) = real(mask_color, kind=rk)
+            endif
+
         case ("time-dependent-part")
             if (Insect%body_moves == "no") then
                 ! wings
@@ -104,6 +112,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
                 ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
                 call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
             endif
+
             ! store the mask color array as double
             mask(:,:,:,5) = real(mask_color, kind=rk)
 
@@ -111,6 +120,12 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
             ! wings and body
             ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
             call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+
+            ! we can also simulate an insect together with a fractal tree as turbulence
+            ! generators. This part is time-independent as the tree does not move.
+            if (Insect%fractal_tree) then
+                call draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+            endif
 
             ! store the mask color array as double
             mask(:,:,:,5) = real(mask_color, kind=rk)

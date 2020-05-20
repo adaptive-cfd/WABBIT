@@ -120,14 +120,14 @@ contains
     ! do not include x=1.0.
     ! a valid example is x=(0:N-1)/N
     !-------------------------------------------------------------------------------
-    subroutine hermite_eval(time,u,u_dt,ai,bi)
+    subroutine hermite_eval(time, u, u_dt, ai, bi)
         implicit none
 
         real(kind=rk), intent(in) :: time
         real(kind=rk), intent(in), dimension(1:) :: ai,bi
         real(kind=rk), intent(out) :: u, u_dt
-        real(kind=rk) :: dt,h00,h10,h01,h11,t, time_periodized
-        integer :: n, j1,j2
+        real(kind=rk) :: dt, h00, h10, h01, h11, t, time_periodized
+        integer :: n, j1, j2
 
         n = size(ai)
 
@@ -136,7 +136,7 @@ contains
             time_periodized = time_periodized - 1.0_rk
         enddo
 
-        dt = 1.d0 / dble(n)
+        dt = 1.0_rk / dble(n)
         j1 = floor(time_periodized/dt) + 1
         j2 = j1 + 1
         ! periodization
@@ -145,19 +145,19 @@ contains
         t = (time_periodized-dble(j1-1)*dt) /dt
 
         ! values of hermite interpolant
-        h00 = (1.d0+2.d0*t)*((1.d0-t)**2)
-        h10 = t*((1.d0-t)**2)
-        h01 = (t**2)*(3.d0-2.d0*t)
-        h11 = (t**2)*(t-1.d0)
+        h00 = (1.0_rk+2.0_rk*t)*((1.0_rk-t)**2)
+        h10 = t*((1.0_rk-t)**2)
+        h01 = (t**2)*(3.0_rk-2.0_rk*t)
+        h11 = (t**2)*(t-1.0_rk)
 
         ! function value
         u = h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2)
 
         ! derivative values of basis functions
-        h00 = 6.d0*t**2 - 6.d0*t
-        h10 = 3.d0*t**2 - 4.d0*t + 1.d0
-        h01 =-6.d0*t**2 + 6.d0*t
-        h11 = 3.d0*t**2 - 2.d0*t
+        h00 = 6.0_rk*t**2 - 6.0_rk*t
+        h10 = 3.0_rk*t**2 - 4.0_rk*t + 1.0_rk
+        h01 =-6.0_rk*t**2 + 6.0_rk*t
+        h11 = 3.0_rk*t**2 - 2.0_rk*t
 
         ! function derivative value
         u_dt = (h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2) ) / dt
@@ -424,8 +424,19 @@ contains
         character(len=80) :: command
         character(len=80) :: file
         type(inifile) :: CTRL_FILE
+        logical :: exists
+        integer :: mpirank, mpicode
 
         file ="runtime_control"
+        call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+
+        if (mpirank==0) then
+            inquire(file=file, exist=exists)
+            if (.not. exists) then
+                call Initialize_runtime_control_file()
+            endif
+        endif
+
 
         ! root reads in the control file
         ! and fetched the command
@@ -438,6 +449,7 @@ contains
         else
             runtime_control_stop = .false.
         endif
+
     end function runtime_control_stop
 
 

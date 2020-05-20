@@ -104,7 +104,8 @@ module module_params
         integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
 
         ! switch for mesh adaption
-        logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
+        logical :: adapt_mesh=.false., adapt_inicond=.false.
+        logical :: out_of_memory = .false.
         ! number of allocated heavy data fields per process
         integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields

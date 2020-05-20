@@ -278,6 +278,12 @@ program main
             lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), params)
         endif
 
+        ! check if we still have enough memory left: for very large simulations
+        ! we cannot affort to have them fail without the possibility to resume them
+        if (not_enough_memory(params, lgt_block, lgt_active, lgt_n)) then
+            ! yippieh, a goto statement. thats soooo 90s.
+            goto 17
+        endif
 
         !***********************************************************************
         ! refine everywhere
@@ -444,7 +450,7 @@ program main
     !***************************************************************************
     ! end of main time loop
     !***************************************************************************
-    if (rank==0) write(*,*) "This is the end of the main time loop!"
+17  if (rank==0) write(*,*) "This is the end of the main time loop!"
 
 
     !*******************************************************************
@@ -500,7 +506,7 @@ program main
     ! and has to resume expensive simulations quite often. this process is usually automatized
     ! but for this it is nice to have a quick-to-evaluate criterion to know if a run ended normally
     ! or with an error. So write an empty success file if the run ended normally
-    if (rank==0) then
+    if (rank==0 .and. .not. params%out_of_memory) then
         open (77, file='success', status='replace')
         close(77)
     endif

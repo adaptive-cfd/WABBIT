@@ -350,7 +350,7 @@ subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_win
   real(kind=rk) :: R, R0, R_tmp, zz0
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
-  real(kind=rk) :: L_membrane=100.0_rk/130.0_rk, c_membrane=8.6_rk/130.0_rk
+  real(kind=rk) :: L_membrane, c_membrane
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
@@ -358,7 +358,12 @@ subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_win
   if ((Insect%wing_file_type(wingID)) /= "kleemeier") call abort(26111902,"draw_wing_kleemeier called with non-kleemeier wing...")
 
   s = Insect%safety
+  L_membrane = Insect%L_membrane(wingID)
+  c_membrane = Insect%B_membrane(wingID)
 
+  !-----------------------------------------------------------------------------
+  ! membrane (rectangle)
+  !-----------------------------------------------------------------------------
   do iz = g, size(mask,3)-1-g
       x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
       do iy = g, size(mask,2)-1-g
@@ -1837,6 +1842,10 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     call abort(6652, "ini file for wing does not seem to be fourier series...")
   endif
 
+  if (Insect%wing_file_type(wingID) == "kleemeier" ) then
+      call read_param_mpi(ifile, "Wing", "B_membrane", Insect%B_membrane(wingID), 8.6_rk/130.0_rk)
+      call read_param_mpi(ifile, "Wing", "L_membrane", Insect%L_membrane(wingID), 100.0_rk/130.0_rk)
+  endif
   !-----------------------------------------------------------------------------
   ! Read fourier coeffs for wing radius
   !-----------------------------------------------------------------------------
@@ -1885,7 +1894,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       else
          init_thickness = 0.05d0 ! This is the defauls value otherwise, because we may not know dx here
       endif
-      
+
       call read_param_mpi(ifile,"Wing","wing_thickness_value",Insect%WingThickness, init_thickness)
 
   elseif ( Insect%wing_thickness_distribution == "variable") then

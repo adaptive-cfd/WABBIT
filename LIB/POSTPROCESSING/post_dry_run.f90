@@ -278,15 +278,18 @@ subroutine post_dry_run
 
         !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
         !lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_mask, time=time, iteration=-1 )
-        
-        !write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
-        !call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-	!
-        !write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
-        !call write_field( fname, time, -99, 3, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+
+        ! write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+        ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+        ! lgt_n, hvy_n, hvy_active, dF=2, tree_id=tree_ID_flow, time=time, iteration=-1 )
         !
-        !write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
-        ! call write_field( fname, time, -99, 4, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        ! write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+        ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+        ! lgt_n, hvy_n, hvy_active, dF=3, tree_id=tree_ID_flow, time=time, iteration=-1 )
+        !
+        ! write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+        ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+        ! lgt_n, hvy_n, hvy_active, dF=4, tree_id=tree_ID_flow, time=time, iteration=-1 )
 
         time = time + params%write_time
     end do

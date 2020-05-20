@@ -63,6 +63,7 @@ module module_insects
   ! stuff for the fractal tree
   real(kind=rk), allocatable, save :: treedata(:,:)
 
+
   !-----------------------------------------------------------------------------
   ! TYPE DEFINITIONS
   ! datatype for wing kinematics, if described by a Fourier series or kineloader
@@ -89,6 +90,7 @@ module module_insects
   !-----------------------------------------------------------------------------
   ! derived datatype for insect parameters (for readability)
   type diptera
+    logical :: initialized = .false.
     !-------------------------------------------------------------
     ! Body motion state, wing motion state and characteristic points on insect
     !-------------------------------------------------------------
@@ -205,6 +207,16 @@ module module_insects
     real(kind=rk) :: corrugation_array_bbox(1:4)
     logical :: bristles = .false.
     real(kind=rk), ALLOCATABLE :: bristles_coords(:,:,:)
+    ! used for rectangular part of bristled model wings (Kleemeier)
+    real(kind=rk) :: B_membrane(1:4), L_membrane(1:4)
+
+    !--------------------------------------------------------------
+    ! Wing kinematics
+    !--------------------------------------------------------------
+    logical :: fractal_tree = .false.
+    character(len=strlen) :: fractal_tree_file = "tree_data.in"
+    real(kind=rk), dimension(1:3) :: fractal_tree_x0 = (/0.0_rk, 0.0_rk, 0.0_rk/)
+    real(kind=rk) :: fractal_tree_scaling = 1.0_rk
 
     !--------------------------------------------------------------
     ! Wing kinematics

@@ -111,6 +111,11 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
     ! and how many it should have, if equally distributed: "opt_dist_list(myrank+1)"
 
+    if (rank==0) then
+        call append_t_file( "balancing.t", (/ real(maxval(opt_dist_list-dist_list),kind=rk),&
+        real(minval(opt_dist_list-dist_list),kind=rk),&
+        real(sum(abs(opt_dist_list-dist_list)),kind=rk) /))
+    endif
 
     select case(params%block_distribution)
         case("sfc_hilbert","sfc_z")

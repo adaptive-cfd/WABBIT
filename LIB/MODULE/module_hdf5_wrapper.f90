@@ -98,6 +98,7 @@ contains
 
     integer(hid_t) :: plist_id
     integer :: error
+    integer :: mpirank, mpicode
     logical :: exist
 
     ! Initialize HDF5 library and Fortran interfaces.
@@ -114,7 +115,13 @@ contains
     ! open the file
     !---------------------------------------------------------------------------
     ! check if the file already exists
-    inquire ( file=filename, exist=exist )
+    call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+    if (mpirank==0) then
+        inquire ( file=filename, exist=exist )
+    endif
+    call MPI_BCAST( exist, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+
+
     if ((exist .eqv. .false. ) .or. (ovrwrte .eqv. .true.) ) then
         ! file does not exist, create the file collectively
         call h5fcreate_f(trim(adjustl(filename)), H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)

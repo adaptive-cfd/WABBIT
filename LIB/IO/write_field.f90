@@ -128,13 +128,13 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     coords_origin = 7.0e6_rk
 
-    if (lgt_n < 1 ) call abort(291019, "you try to save an empty mesh.")
+    if (lgt_n < 1 ) call abort(291019, "IO: you try to save an empty mesh.")
 
 
     ! first: check if field contains NaNs
-    do k = 1, hvy_n
-        if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
-    end do
+    ! do k = 1, hvy_n
+    !     if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
+    ! end do
 
     ! output on screen
     if (rank == 0) then

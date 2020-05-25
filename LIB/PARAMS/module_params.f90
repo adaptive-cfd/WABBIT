@@ -60,7 +60,7 @@ module module_params
         ! data writing frequency
         character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency
-        real(kind=rk)                                :: write_time=0.1_rk
+        real(kind=rk)                                :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk
         ! data next write time, store here the next time for output data
         real(kind=rk)                                :: next_write_time=0.0_rk
         ! this number is used when generating random grids.

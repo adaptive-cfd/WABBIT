@@ -133,7 +133,7 @@ subroutine ini_file_to_params( params, filename )
         call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
 
         select case (params%wavelet)
-        case ('CDF4,4')
+        case ('CDF4,4', 'CDF44', 'CDF22', 'CDF2,2')
 
 
         case default
@@ -352,6 +352,8 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
       ! read output write frequency
       call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+      ! read output write frequency
+      call read_param_mpi(FILE, 'Time', 'walltime_write', params%walltime_write, 99999.9_rk )
       ! assume start at time 0.0
       params%next_write_time = 0.0_rk + params%write_time
       ! read value of fixed time step

@@ -87,6 +87,9 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
             refinement_status = -1
         endif
+        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )>=1.0_rk- 1.0e-9_rk ) then
+            refinement_status = -1
+        endif
 
     case ("threshold-state-vector", "primary-variables")
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered

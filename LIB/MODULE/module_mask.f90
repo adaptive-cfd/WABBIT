@@ -284,12 +284,14 @@ contains
                 hvy_id = hvy_active(k, tree_ID_mask)
 
                 ! NOTE: if I am not mistaken, we could at this point also escape zero-valued blocks (Thomas, Yokohama, 23 Oct 2019)
-                if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
+                ! ==> you are mistaken. some blocks contain garbage and will not be removed
+                ! probably you could set those blocks to zero but until we use the µCT really, we should not bother.
+                ! if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
                     call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
                     hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
-                endif
+                ! endif
             enddo
 
             ! we found that sometimes, we end up with more blocks than expected

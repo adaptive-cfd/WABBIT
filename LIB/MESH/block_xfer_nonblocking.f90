@@ -184,12 +184,12 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! we waited once for all xfers and the temporary blocks are freed. Now we can try again! We count
     ! to avoid infinite loops - in this case, we simply *really* ran out of memory.
     if (not_enough_memory) then
-        if (counter < 2000) then
-            ! like in the golden age of computer programming:
+        if (counter < 200000) then
             counter = counter + 1
+            ! like in the golden age of computer programming:
             goto 1
         else
-            call abort(1909181808, "[block_xfer.f90]: not enough memory to complete transfer. you need to allocate more --memory")
+            call abort(1909181808, "[block_xfer.f90]: not enough memory to complete transfer.")
         endif
     endif
 

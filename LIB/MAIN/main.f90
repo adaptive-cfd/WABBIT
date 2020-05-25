@@ -243,6 +243,7 @@ program main
     call init_t_file('performance.t', overwrite)
     call init_t_file('eps_norm.t', overwrite)
     call init_t_file('krylov_err.t', overwrite)
+    call init_t_file('balancing.t', overwrite)
 
     if (rank==0) then
         call Initialize_runtime_control_file()
@@ -324,7 +325,11 @@ program main
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
+                it_is_time_to_save_data= .true.
+            endif
+            if ((MPI_wtime()-tstart)/3600.0_rk - params%walltime_last_write > params%walltime_write) then
+                params%walltime_last_write = MPI_wtime()
                 it_is_time_to_save_data= .true.
             endif
 
@@ -429,7 +434,7 @@ program main
         ! system kills the job regardless of whether we're done or not. If WABBIT itself ends execution,
         ! a backup is written and you can resume the simulation right where it stopped
         if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
-            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+            if (rank==0) write(*,'("WE ARE OUT OF WALLTIME: STOP. ",g12.3,"h / ",g12.3,"h")') (MPI_wtime()-tstart)/3600.0_rk, params%walltime_max
             keep_running = .false.
         endif
 

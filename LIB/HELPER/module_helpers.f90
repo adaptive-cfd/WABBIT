@@ -337,11 +337,16 @@ contains
 
         character (len=*), intent(in) :: fname
         logical :: exist1
+        integer :: mpirank, mpicode
 
-        inquire ( file=fname, exist=exist1 )
-        if ( exist1 .eqv. .false.) then
-            write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
-            call abort( 191919, "File not found...."//trim(adjustl(fname)) )
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            inquire ( file=fname, exist=exist1 )
+            if ( exist1 .eqv. .false.) then
+                write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
+                call abort( 191919, "File not found...."//trim(adjustl(fname)) )
+            endif
         endif
 
     end subroutine check_file_exists
@@ -403,16 +408,23 @@ contains
     subroutine Initialize_runtime_control_file()
         ! overwrites the file again with the standard runtime_control file
         implicit none
+        integer :: mpirank, mpicode
+        character(len=80) :: file
 
-        open  (14,file='runtime_control',status='replace')
-        write (14,'(A)') "# This is wabbit's runtime control file"
-        write (14,'(A)') "# Stop the run but makes a backup first"
-        write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
-        write (14,'(A)') "#       runtime_control=save_stop;"
-        write (14,'(A)') ""
-        write (14,'(A)') "[runtime_control]"
-        write (14,'(A)') "runtime_control=nothing;"
-        close (14)
+        file = "runtime_control"
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            open  (14,file=file, status='replace')
+            write (14,'(A)') "# This is wabbit's runtime control file"
+            write (14,'(A)') "# Stops the run but makes a backup first"
+            write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
+            write (14,'(A)') "#       runtime_control=save_stop;"
+            write (14,'(A)') ""
+            write (14,'(A)') "[runtime_control]"
+            write (14,'(A)') "runtime_control=nothing;"
+            close (14)
+        endif
 
     end subroutine Initialize_runtime_control_file
 
@@ -428,7 +440,7 @@ contains
         integer :: mpirank, mpicode
 
         file ="runtime_control"
-        call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
         if (mpirank==0) then
             inquire(file=file, exist=exists)
@@ -437,6 +449,11 @@ contains
             endif
         endif
 
+        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+        if (.not. exists) then
+            runtime_control_stop = .false.
+            return
+        endif
 
         ! root reads in the control file
         ! and fetched the command

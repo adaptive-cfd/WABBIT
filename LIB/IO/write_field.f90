@@ -36,13 +36,6 @@
 ! ********************************************************************************************
 
 subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> file name
@@ -102,10 +95,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
 
 
-    ! set MPI parameters
     rank = params%rank
-
-    ! grid parameter
     Bs   = params%Bs
     g    = params%n_ghosts
     dim  = params%dim

@@ -4,7 +4,7 @@ module module_t_files
 
     ! precision statement
     integer, parameter :: rk = 8
-    integer, parameter :: flush_frequency = 5
+    integer, parameter :: flush_frequency = 10
     integer, parameter :: max_parallel_files = 50
     integer, parameter :: max_columns = 45
     integer, save :: mpirank = 7

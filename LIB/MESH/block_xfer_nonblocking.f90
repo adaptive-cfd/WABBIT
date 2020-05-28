@@ -31,7 +31,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     !! Note the secondary array can have different #components.
     real(kind=rk), intent(inout), optional :: hvy_block2(:, :, :, :, :)
 
-    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i
+    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
     logical :: xfer_started(1:N_xfers)
     logical :: source_block_deleted(1:N_xfers)
@@ -42,10 +42,12 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 
     logical :: not_enough_memory
     integer(kind=ik) :: counter
+    real(kind=rk) :: t0
 
     ! if the list of xfers is empty, then we just return.
     if (N_xfers==0) return
 
+    t0 = MPI_wtime()
     myrank = params%rank
     counter = 0
     xfer_started = .false.
@@ -55,9 +57,14 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 
     if (present(hvy_block2)) npoints2 = size(hvy_block2,1)*size(hvy_block2,2)*size(hvy_block2,3)*size(hvy_block2,4)
 
+    Nxfer_done = 0
+    Nxfer_total = N_xfers
+
 ! the routine can resume from the next line on (like in the olden days, before screens were invented)
 1   ireq = 0
     not_enough_memory = .false.
+
+    Nxfer_notPossibleNow = 0
 
     do k = 1, N_xfers
         ! if this xfer has already been started, we are happy and go to the next one.
@@ -81,11 +88,13 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             not_enough_memory = .true.
             ! this marks that we can NOT delete the source block after waiting for MPI xfer
             xfer_started(k) = .false.
+            Nxfer_notPossibleNow = Nxfer_notPossibleNow + 1
             ! skip this xfer (it will be treated in the next iteration)
             cycle
         else
             ! this marks that we can delete the source block after waiting for MPI xfer
             xfer_started(k) = .true.
+            Nxfer_done = Nxfer_done + 1
         endif
 
 
@@ -186,9 +195,15 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     if (not_enough_memory) then
         if (counter < 200000) then
             counter = counter + 1
+            if (myrank==0) then
+                ! t0 is just an identifier for the call
+                call append_t_file( "block_xfer.t", (/t0, real(counter,kind=rk), real(Nxfer_total,kind=rk), &
+                real(Nxfer_done,kind=rk), real(Nxfer_notPossibleNow,kind=rk) /) )
+            endif
             ! like in the golden age of computer programming:
             goto 1
         else
+            call close_all_t_files()
             call abort(1909181808, "[block_xfer.f90]: not enough memory to complete transfer.")
         endif
     endif

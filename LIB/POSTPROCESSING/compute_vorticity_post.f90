@@ -182,6 +182,8 @@ subroutine compute_vorticity_post(params)
         endif
     end do
 
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
 
     if (operator == "--vorticity") then
         write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
@@ -211,6 +213,8 @@ subroutine compute_vorticity_post(params)
         enddo
 
         write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
+
+        call sync_ghosts( params, lgt_block, hvy_tmp, hvy_neighbor, hvy_active, hvy_n )
 
         call write_field(fname, time, iteration, 1, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )

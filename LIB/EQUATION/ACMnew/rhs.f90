@@ -245,8 +245,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     eps         = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
-    dx_inv = 1.0_rk / dx(1)
-    dy_inv = 1.0_rk / dx(2)
+    dx_inv  = 1.0_rk / dx(1)
+    dy_inv  = 1.0_rk / dx(2)
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 
@@ -269,19 +269,20 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
+                u_dx   = (phi(ix+1,iy  ,1) - phi(ix-1,iy  ,1))*dx_inv*0.5_rk
+                u_dy   = (phi(ix  ,iy+1,1) - phi(ix  ,iy-1,1))*dy_inv*0.5_rk
 
-                u_dx   = (phi(ix+1,iy,1) - phi(ix-1,iy,1))*dx_inv*0.5_rk
-                u_dy   = (phi(ix,iy+1,1) - phi(ix,iy-1,1))*dy_inv*0.5_rk
-                u_dxdx = (phi(ix-1,iy,1) -2.0_rk*phi(ix,iy,1) +phi(ix+1,iy,1))*dx2_inv
-                u_dydy = (phi(ix,iy-1,1) -2.0_rk*phi(ix,iy,1) +phi(ix,iy+1,1))*dy2_inv
+                v_dx   = (phi(ix+1,iy  ,2) - phi(ix-1,iy  ,2))*dx_inv*0.5_rk
+                v_dy   = (phi(ix  ,iy+1,2) - phi(ix  ,iy-1,2))*dy_inv*0.5_rk
 
-                v_dx   = (phi(ix+1,iy,2) -phi(ix-1,iy,2))*dx_inv*0.5_rk
-                v_dy   = (phi(ix,iy+1,2) -phi(ix,iy-1,2))*dy_inv*0.5_rk
-                v_dxdx = (phi(ix-1,iy,2) -2.0_rk*phi(ix,iy,2) +phi(ix+1,iy,2))*dx2_inv
-                v_dydy = (phi(ix,iy-1,2) -2.0_rk*phi(ix,iy,2) +phi(ix,iy+1,2))*dy2_inv
+                u_dxdx = (phi(ix-1,iy  ,1) -2.0_rk*phi(ix,iy,1) +phi(ix+1,iy  ,1))*dx2_inv
+                u_dydy = (phi(ix  ,iy-1,1) -2.0_rk*phi(ix,iy,1) +phi(ix  ,iy+1,1))*dy2_inv
 
-                p_dx = (phi(ix+1,iy,3) -phi(ix-1,iy,3))*dx_inv*0.5_rk
-                p_dy = (phi(ix,iy+1,3) -phi(ix,iy-1,3))*dy_inv*0.5_rk
+                v_dxdx = (phi(ix-1,iy  ,2) -2.0_rk*phi(ix,iy,2) +phi(ix+1,iy  ,2))*dx2_inv
+                v_dydy = (phi(ix  ,iy-1,2) -2.0_rk*phi(ix,iy,2) +phi(ix  ,iy+1,2))*dy2_inv
+
+                p_dx = (phi(ix+1,iy  ,3) -phi(ix-1,iy  ,3))*dx_inv*0.5_rk
+                p_dy = (phi(ix  ,iy+1,3) -phi(ix  ,iy-1,3))*dy_inv*0.5_rk
 
                 div_U = u_dx + v_dy
 
@@ -292,7 +293,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                 rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
                 rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
-
             end do
         end do
 

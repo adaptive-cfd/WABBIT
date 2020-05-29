@@ -166,12 +166,12 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   case default
       ! if all other options fail, we still might load coefficients from file:
       wingshape_str = Insect%WingShape(wingID)
-      if (index(wingshape_str,"from_file::bristled") /= 0) then
-          ! wing blade shape is read from ini-file and bristles are hardcoded
-          call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-          x_pivot_b,rot_rel_wing_w)
-
-      else
+      ! if (index(wingshape_str,"from_file::bristled") /= 0) then
+      !     ! wing blade shape is read from ini-file and bristles are hardcoded
+      !     call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+      !     x_pivot_b,rot_rel_wing_w)
+      !
+      ! else
           ! we assume the default to be defined in fourier coefficients, the subroutine
           ! yells if it does not recongnize the wing.
           select case (Insect%wing_file_type(wingID))
@@ -189,7 +189,7 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
           case default
               call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
           end select
-      end if
+      ! end if
 
   end select
 

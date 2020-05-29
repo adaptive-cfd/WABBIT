@@ -72,7 +72,7 @@ module module_params
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
 
-        logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false.
+        logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false., dont_use_pruned_tree_mask=.false.
 
         ! threshold for wavelet indicator
         real(kind=rk) :: eps=0.0_rk

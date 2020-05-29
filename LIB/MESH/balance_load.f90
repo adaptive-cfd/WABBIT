@@ -4,26 +4,12 @@
 ! WABBIT
 ! ============================================================================================
 !> \name balance_load_2D.f90
-!> \version 0.4
-!> \author msr
+!> \author engels
 !
 !> \brief balance the load
 !
 !> \image html balancing.svg "Load balancing" width=400
-!
-!> \details
-!! input:    - params, light and heavy data, neighbor data, lists of active blocks \n
-!! output:   - light and heavy data arrays
-!! \n
-!> = log ======================================================================================
-!!\n
-!! 08/11/16    - switch to v0.4 \n
-!! 16/11/2016  - Avoid some communication by more carefully distributing the excess blocks \n
-!! 05/12/2016  - add space filling curve distribution \n
-!
-!> \image html load_balancing.svg width=500
 ! ********************************************************************************************
-
 subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, predictable_dist)
 
@@ -61,9 +47,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), &
                      affinity(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
     real(kind=rk) :: t0, t1
-    logical       :: is_predictable=.False.
+    logical       :: is_predictable
 
     ! check if argument is present or not
+    is_predictable=.False.
     if (present(predictable_dist)) then
       is_predictable=predictable_dist
     endif
@@ -95,8 +82,6 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     N = params%number_blocks
     neq = params%n_eqn
 
-!---------------------------------------------------------------------------------------------
-! main body
 
 
     !---------------------------------------------------------------------------------
@@ -117,125 +102,123 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !     real(sum(abs(opt_dist_list-dist_list)),kind=rk) /))
     ! endif
 
-    select case(params%block_distribution)
-        case("sfc_hilbert","sfc_z")
-            !---------------------------------------------------------------------------------
-            ! 1st: calculate space filling curve index for all blocks
-            !---------------------------------------------------------------------------------
-            t1 = MPI_wtime()
+    !---------------------------------------------------------------------------------
+    ! 1st: calculate space filling curve index for all blocks
+    !---------------------------------------------------------------------------------
+    t1 = MPI_wtime()
+    select case (params%block_distribution)
+    case("sfc_z")
+        !-----------------------------------------------------------
+        ! Z - curve
+        !-----------------------------------------------------------
+        if (params%dim == 3) then
             do k = 1, lgt_n
-                select case (params%block_distribution)
-                case("sfc_z")
-                    !-----------------------------------------------------------
-                    ! Z - curve
-                    !-----------------------------------------------------------
-                    if (params%dim == 3) then
-                        call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
-                    else
-                        call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
-                    endif
-
-                case("sfc_hilbert")
-                    !-----------------------------------------------------------
-                    ! Hilbert curve
-                    !-----------------------------------------------------------
-                    if (params%dim == 3) then
-                        ! transfer treecode to hilbertcode
-                        call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
-                        ! calculate sfc position from hilbertcode
-                        call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
-                    else
-                        ! transfer treecode to hilbertcode
-                        call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
-                        ! calculate sfc position from hilbertcode
-                        call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
-                    endif
-
-                end select
-
-                ! fill sfc list
-                sfc_sorted_list(k, 1) = sfc_id
-                sfc_sorted_list(k, 2) = lgt_active(k)
+                call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
             end do
-
-            ! sort sfc_list according to the first dimension, thus the position on
-            ! the space filling curve (this was a bug, fixed: Thomas, 13/03/2018)
-            if (lgt_n > 1) then
-                call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
-            end if
-            call toc( "balance_load (SFC+sort)", MPI_wtime()-t1 )
-
-            !---------------------------------------------------------------------------------
-            ! 2nd: plan communication (fill list of blocks to transfer)
-            !---------------------------------------------------------------------------------
-            t1 = MPI_wtime()
-            ! proc_dist_id: process responsible for current part of sfc
-            ! proc_data_id: process who stores data of sfc element
-
-            ! we start the loop on the root rank (0), then assign the first elements
-            ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
-            proc_dist_id = 0
-
-            ! communication counter. each communication (=send and receive) is stored
-            ! in a long list
-            com_i = 0
-
-            ! loop over sfc_list
+        else
             do k = 1, lgt_n
-                ! if the current owner of the SFC is supposed to have zero blocks
-                ! then it does not really own this part of the SFC. So we look for the
-                ! first rank which is supposed to hold at least one block, and declare it as owner
-                ! of this part. NOTE: as we try to minimize communication during send/recv in
-                ! load balancing, it may well be that the list of active mpiranks (ie those
-                ! which have nonzero number of blocks) is non contiguous, i.e.
-                ! opt_dist_list = 1 1 1 0 0 0 0 1 0 1
-                ! can happen.
-                do while ( opt_dist_list(proc_dist_id+1) == 0 )
-                    proc_dist_id = proc_dist_id + 1
-                end do
-
-                ! find out on which mpirank lies the block that we're looking at
-                call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
-
-                ! does this block lie on the right mpirank, i.e., the current part of the
-                ! SFC? if so, nothing needs to be done. otherwise, the following if is active
-                if ( proc_dist_id /= proc_data_id ) then
-                    ! as this block is one the wrong rank, it will be sent away from its
-                    ! current owner (proc_data_id) to the owner of this part of the
-                    ! SFC (proc_dist_id)
-
-                    ! save this send+receive operation in the list of planned communications
-                    ! column
-                    !    1     sender proc
-                    !    2     receiver proc
-                    !    3     block light data id
-                    com_i = com_i + 1
-                    sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
-                    sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
-                    sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)   ! light id of block
-                end if
-
-                ! The opt_dist_list defines how many blocks this rank should have, and
-                ! we just treated one (which either already was on the mpirank or will be on
-                ! it after communication), so remove one item from the opt_dist_list
-                opt_dist_list( proc_dist_id+1 ) = opt_dist_list( proc_dist_id+1 ) - 1
-
-                ! if there is no more blocks to be checked, increase mpirank counter by one
-                if ( opt_dist_list( proc_dist_id+1 ) == 0 ) then
-                    proc_dist_id = proc_dist_id + 1
-                end if
+                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
             end do
-
-            !---------------------------------------------------------------------------------
-            ! 3rd: actual communication (send/recv)
-            !---------------------------------------------------------------------------------
-            call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block )
-            call toc( "balance_load (comm)", MPI_wtime()-t1 )
-
-        case default
-            call abort(2009182147, "[balance_load.f90] ERROR: block distribution scheme is unknown")
-
+        endif
+    case("sfc_hilbert")
+        !-----------------------------------------------------------
+        ! Hilbert curve
+        !-----------------------------------------------------------
+        if (params%dim == 3) then
+            do k = 1, lgt_n
+                ! transfer treecode to hilbertcode
+                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                ! calculate sfc position from hilbertcode
+                call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+            end do
+        else
+            do k = 1, lgt_n
+                ! transfer treecode to hilbertcode
+                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                ! calculate sfc position from hilbertcode
+                call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+            end do
+        endif
     end select
+
+
+    ! sort sfc_list according to the first dimension, thus the position on
+    ! the space filling curve (this was a bug, fixed: Thomas, 13/03/2018)
+    if (lgt_n > 1) then
+        call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
+    end if
+    call toc( "balance_load (SFC+sort)", MPI_wtime()-t1 )
+
+    !---------------------------------------------------------------------------------
+    ! 2nd: plan communication (fill list of blocks to transfer)
+    !---------------------------------------------------------------------------------
+    t1 = MPI_wtime()
+    ! proc_dist_id: process responsible for current part of sfc
+    ! proc_data_id: process who stores data of sfc element
+
+    ! we start the loop on the root rank (0), then assign the first elements
+    ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
+    proc_dist_id = 0
+
+    ! communication counter. each communication (=send and receive) is stored
+    ! in a long list
+    com_i = 0
+
+    ! loop over sfc_list
+    do k = 1, lgt_n
+        ! if the current owner of the SFC is supposed to have zero blocks
+        ! then it does not really own this part of the SFC. So we look for the
+        ! first rank which is supposed to hold at least one block, and declare it as owner
+        ! of this part. NOTE: as we try to minimize communication during send/recv in
+        ! load balancing, it may well be that the list of active mpiranks (ie those
+        ! which have nonzero number of blocks) is non contiguous, i.e.
+        ! opt_dist_list = 1 1 1 0 0 0 0 1 0 1
+        ! can happen.
+        do while ( opt_dist_list(proc_dist_id+1) == 0 )
+            proc_dist_id = proc_dist_id + 1
+        end do
+
+        ! find out on which mpirank lies the block that we're looking at
+        call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
+
+        ! does this block lie on the right mpirank, i.e., the current part of the
+        ! SFC? if so, nothing needs to be done. otherwise, the following if is active
+        if ( proc_dist_id /= proc_data_id ) then
+            ! as this block is one the wrong rank, it will be sent away from its
+            ! current owner (proc_data_id) to the owner of this part of the
+            ! SFC (proc_dist_id)
+
+            ! save this send+receive operation in the list of planned communications
+            ! column
+            !    1     sender proc
+            !    2     receiver proc
+            !    3     block light data id
+            com_i = com_i + 1
+            sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
+            sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
+            sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)   ! light id of block
+        end if
+
+        ! The opt_dist_list defines how many blocks this rank should have, and
+        ! we just treated one (which either already was on the mpirank or will be on
+        ! it after communication), so remove one item from the opt_dist_list
+        opt_dist_list( proc_dist_id+1 ) = opt_dist_list( proc_dist_id+1 ) - 1
+
+        ! if there is no more blocks to be checked, increase mpirank counter by one
+        if ( opt_dist_list( proc_dist_id+1 ) == 0 ) then
+            proc_dist_id = proc_dist_id + 1
+        end if
+    end do
+
+    !---------------------------------------------------------------------------------
+    ! 3rd: actual communication (send/recv)
+    !---------------------------------------------------------------------------------
+    call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, msg="balance_load" )
+    call toc( "balance_load (comm)", MPI_wtime()-t1 )
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     ! NOTE: an idea would be to also xfer the neighboring information (to save the update_neighbors

@@ -13,7 +13,7 @@
 ! performance is better. note you have to wait somewhere! always!
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
-subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_block2 )
+subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_block2, msg )
     implicit none
 
     !> user defined parameter structure
@@ -30,6 +30,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     !! simultaneously coarsen the flow grid and the corresponding mask grid.
     !! Note the secondary array can have different #components.
     real(kind=rk), intent(inout), optional :: hvy_block2(:, :, :, :, :)
+    character(len=*), intent(in), optional :: msg
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
@@ -43,6 +44,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     logical :: not_enough_memory
     integer(kind=ik) :: counter
     real(kind=rk) :: t0
+    character(len=40) :: msg2
 
     ! if the list of xfers is empty, then we just return.
     if (N_xfers==0) return
@@ -59,6 +61,9 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 
     Nxfer_done = 0
     Nxfer_total = N_xfers
+
+    msg2 = ""
+    if (present(msg)) msg2=msg
 
 ! the routine can resume from the next line on (like in the olden days, before screens were invented)
 1   ireq = 0
@@ -114,7 +119,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
             tag, WABBIT_COMM, requests(ireq), ierr)
 
-            if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
+            if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
@@ -124,7 +129,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
                 call MPI_irecv( hvy_block2(:,:,:,:,hvy_id_new), npoints2, MPI_DOUBLE_PRECISION, mpirank_sender, &
                 tag, WABBIT_COMM, requests(ireq), ierr)
 
-                if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
+                if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
             endif
 
             ! Am I the owner of this block, so will I have to send data?
@@ -143,7 +148,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
             WABBIT_COMM, requests(ireq), ierr)
 
-            if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] MPI_isend failed!")
+            if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
@@ -153,7 +158,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
                 call MPI_isend( hvy_block2(:,:,:,:,hvy_id), npoints2, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
                 WABBIT_COMM, requests(ireq), ierr)
 
-                if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] MPI_isend failed!")
+                if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
             endif
         endif
 
@@ -169,7 +174,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! both send/recv are waited for
     if (ireq > 0) then
         call MPI_waitall( ireq, requests(1:ireq), MPI_STATUSES_IGNORE, ierr )
-        if (ierr /= MPI_SUCCESS) call abort(1809181533, "[block_xfer.f90] MPI_waitall failed!")
+        if (ierr /= MPI_SUCCESS) call abort(1809181533, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_waitall failed!")
     endif
 
 
@@ -204,7 +209,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             goto 1
         else
             call close_all_t_files()
-            call abort(1909181808, "[block_xfer.f90]: not enough memory to complete transfer.")
+            call abort(1909181808, "[block_xfer.f90]: "//trim(adjustl(msg2))//" not enough memory to complete transfer.")
         endif
     endif
 

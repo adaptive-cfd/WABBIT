@@ -269,6 +269,7 @@ end subroutine ini_file_to_params
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%n_ghosts_rhs, params%n_ghosts )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )

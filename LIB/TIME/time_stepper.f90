@@ -147,7 +147,7 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
         !-----------------------------------------------------------------------
 
         ! synchronize ghost nodes
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs )
 
         ! calculate time step
         call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
@@ -176,7 +176,7 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
 
             ! synchronize ghost nodes for new input
             ! further ghost nodes synchronization, fixed grid
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs )
 
             ! note substeps are at different times, use temporary time "t"
             t = time + dt*rk_coeffs(j,1)

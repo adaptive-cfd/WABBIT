@@ -6,20 +6,20 @@
 ! Now you can be clever: synchronizing ghosts means copying points with THE SAME COORDINATES. Makes sense, doesnt't it?
 ! So all you would have to do is compute the sender bounds (from the given, manually set recver bounds)
 
-subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff)
+subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, g )
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in) :: ijkrecv(2,3)
     integer(kind=ik), intent(out) :: ijkbuffer(2,3)
     integer(kind=ik), intent(out) :: ijksend(2,3)
     ! leveldiff = 1 ! -1: interpolation, +1: coarsening
-    integer(kind=ik), intent(in) :: dir, leveldiff
+    integer(kind=ik), intent(in) :: dir, leveldiff, g
 
     integer(kind=ik), parameter :: Jmax = 6
     integer(kind=ik) :: send_treecode(1:Jmax)
     integer(kind=ik) :: recv_treecode(1:Jmax)
     integer(kind=ik) :: J=4, ineighbor, ishift, ileveldiff
-    integer(kind=ik) :: i1, i2, g, nDirs, min_size, Nsender, i
+    integer(kind=ik) :: i1, i2, nDirs, min_size, Nsender, i
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x0_send(1:3), dx_send(1:3), x0_recv(1:3), dx_recv(1:3), x0_buffer(1:3), dx_buffer(1:3)
     real(kind=rk) :: r1, r2, q1, q2
@@ -396,7 +396,6 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     recv_treecode = -1
     ijksend       = 1
     ijkbuffer     = 1
-    g             = params%n_ghosts
     Bs            = params%Bs
 
 
@@ -570,7 +569,7 @@ logical function patch_crosses_periodic_BC(x0, dx, ijk, dim)
 end function
 
 
-subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
+subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, g)
     implicit none
 
     !> user defined parameter structure
@@ -580,9 +579,8 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
     !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
     !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff
+    integer(kind=ik), intent(in)                    :: level_diff, g
 
-    integer(kind=ik) :: g
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: sh_start, sh_end
 
@@ -590,7 +588,6 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff)
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%n_ghosts
 
     sh_start = 1
     sh_end   = 0

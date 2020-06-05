@@ -1,4 +1,4 @@
-subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, n_ghosts )
 
     implicit none
 
@@ -14,11 +14,12 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in), optional :: n_ghosts
 
     ! MPI parameter
     integer(kind=ik)   :: myrank, mpisize
     ! grid parameter
-    integer(kind=ik)   :: g, ii0, ii1
+    integer(kind=ik)   :: ii0, ii1
     integer(kind=ik), dimension(3) :: Bs
     ! loop variables
     integer(kind=ik)   :: N, k, neighborhood, level_diff
@@ -28,11 +29,31 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     integer(kind=ik) :: ijk(2,3), isend, irecv
     integer(kind=ik) :: bounds_type, istage, inverse
+    real(kind=rk) :: t0
+    
+    t0 = MPI_wtime()
 
     if (.not. ghost_nodes_module_ready) then
         ! in order to keep the syntax clean, buffers are module-global and need to be
         ! allocated here.
         call init_ghost_nodes( params )
+    endif
+
+    if (present(n_ghosts)) then
+        if (n_ghosts == params%n_ghosts) then
+            ! use all ghost nodes
+            ijkGhosts = ijkGhosts_all
+
+        elseif (n_ghosts == params%n_ghosts_rhs) then
+            ! use only a subset of ghost nodes
+            ijkGhosts = ijkGhosts_rhs
+
+        else
+            call abort(20200604,"well what now.")
+        endif
+    else
+        ! default uses full params%n_ghosts
+        ijkGhosts = ijkGhosts_all
     endif
 
     ! if this mpirank has no active blocks, it has nothing to do here.
@@ -43,7 +64,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     endif
 
     Bs    = params%Bs
-    g     = params%n_ghosts
     N     = params%number_blocks
     myrank  = params%rank
     mpisize = params%number_procs
@@ -150,7 +170,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     end do ! loop over stages 1,2
 
-end subroutine synchronize_ghosts_generic_sequence
+    call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
+
+end subroutine sync_ghosts
 
 
 

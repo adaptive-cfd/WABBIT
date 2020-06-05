@@ -77,6 +77,8 @@ module module_MPI
     ! This arrays indices are:
     ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [sender/receiver/up-downsampled])
     integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts_rhs
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts_all
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
@@ -94,7 +96,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: synchronize_ghosts_generic_sequence, init_ghost_nodes
+    PUBLIC :: init_ghost_nodes
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -188,10 +190,10 @@ subroutine init_ghost_nodes( params )
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
         if ( dim == 3 ) then
-          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
+            buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
-          ! 2D case
-          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
+            ! 2D case
+            buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
         end if
 
         !-----------------------------------------------------------------------
@@ -269,21 +271,44 @@ subroutine init_ghost_nodes( params )
         ! This arrays indices are:
         ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
 
+        ijkGhosts_all = 1
+        ijkGhosts_rhs = 1
         ijkGhosts = 1
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
+                !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
                 ! The receiver bounds are hard-coded with a huge amount of tedious indices.
-                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff)
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
+                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, g)
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
 
                 ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
                 ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
                 ! up or down sampled.
-                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff )
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
+                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, g )
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
+
+                !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
+                ! The receiver bounds are hard-coded with a huge amount of tedious indices.
+                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, g=params%n_ghosts_rhs)
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
+
+                ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+                ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+                ! up or down sampled.
+                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, g=params%n_ghosts_rhs )
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
+
+                ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,RECVER) = ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,RECVER) + (g-params%n_ghosts_rhs)
+                ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,SENDER) = ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,SENDER) + (g-params%n_ghosts_rhs)
+
+
             enddo
         enddo
+
+        ! default is all ghost nodes
+        ijkGhosts = ijkGhosts_all
 
         ! now we know how large the patches are we'd like to store in the RESPRE buffer
         i = maxval( ijkGhosts(2,1,:,:,RESPRE) )*2
@@ -308,6 +333,26 @@ subroutine init_ghost_nodes( params )
                         do j = 1, 3
                             do k = 1, 3
                                 write(16,'(i3)') ijkGhosts(i, j, ineighbor, leveldiff, k)
+                            enddo
+                        enddo
+                    enddo
+                enddo
+            enddo
+            close(16)
+
+            open(16,file='ghost_bounds_rhs.dat',status='replace')
+            write(16,'(i3)') Bs(1)
+            write(16,'(i3)') Bs(2)
+            write(16,'(i3)') Bs(3)
+            write(16,'(i3)') params%n_ghosts_rhs
+            write(16,'(i3)') S
+            write(16,'(i3)') A
+            do ineighbor = 1, Nneighbor
+                do leveldiff = -1, 1
+                    do i = 1, 2
+                        do j = 1, 3
+                            do k = 1, 3
+                                write(16,'(i3)') ijkGhosts_rhs(i, j, ineighbor, leveldiff, k)
                             enddo
                         enddo
                     enddo

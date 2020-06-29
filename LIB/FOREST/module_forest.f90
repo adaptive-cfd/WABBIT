@@ -326,7 +326,6 @@ contains
                     comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
                     comm_list(n_comm, 2) = rank_full   ! receiver mpirank
                     comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
-                    ! write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
                 endif
             endif
         enddo
@@ -336,6 +335,13 @@ contains
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+
+        ! since we have moved some blocks around, not only the active lists are outdated
+        ! but also the neighbor relations. Of course, pruned trees are incomplete, so
+        ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
+        ! it.
+        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id_full), lgt_n(tree_id_full),&
+        lgt_sortednumlist(:,:,tree_id_full), hvy_active(:,tree_id_full), hvy_n(tree_id_full) )
 
 
         ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
@@ -372,7 +378,7 @@ contains
                     ! hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + hvy_block(:,:,:,:,hvy_id1)
                     ! hvy_block(:,:,:,:,hvy_id2) = max(hvy_block(:,:,:,:,hvy_id2),hvy_block(:,:,:,:,hvy_id1))
 
-                    where ( hvy_block(:,:,:,1,hvy_id2)<hvy_block(:,:,:,1,hvy_id1) )
+                    where ( hvy_block(:,:,:,1,hvy_id2)<=hvy_block(:,:,:,1,hvy_id1) )
                         hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id1)
                         hvy_block(:,:,:,2,hvy_id2) = hvy_block(:,:,:,2,hvy_id1)
                         hvy_block(:,:,:,3,hvy_id2) = hvy_block(:,:,:,3,hvy_id1)
@@ -598,10 +604,10 @@ contains
             ! integrate squared quantity
             ! ----------------------------
             if (params%dim == 3) then
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, &
-                g+1:Bs(3)+g-1,dF , hvy_id)**2)*dx(1)*dx(2)*dx(3)
+                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, &
+                g+1:Bs(3)+g, dF, hvy_id)**2)*dx(1)*dx(2)*dx(3)
             else
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, &
+                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, &
                 dF, hvy_id)**2)*dx(1)*dx(2)
             endif
         end do
@@ -1670,9 +1676,9 @@ function scalar_product_two_trees( params, tree_n, &
       ! It is needed to perform the L2 inner product
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
       if ( params%dim == 3 ) then
-        sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
+        sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
       else
-        sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
+        sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
       endif
     end do
     t_inc(2) = MPI_wtime()-t_inc(2)

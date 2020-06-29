@@ -120,8 +120,7 @@ program main
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
     character(len=80)                   :: filename
-    ! loop variable
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp, mpicode
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
@@ -154,6 +153,7 @@ program main
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
 
+    call print_command_line_arguments()
 
     ! start time
     sub_t0 = MPI_Wtime()
@@ -170,8 +170,7 @@ program main
     call ini_file_to_params( params, filename )
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
-    ! have the pysics module read their own parameters. They also decide how many grid-qtys
-    ! they want
+    ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
@@ -223,7 +222,6 @@ program main
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
-
     end if
 
     ! decide whether the ascii log files are overwritten and re-initialized (on startup
@@ -244,6 +242,8 @@ program main
     call init_t_file('performance.t', overwrite)
     call init_t_file('eps_norm.t', overwrite)
     call init_t_file('krylov_err.t', overwrite)
+    call init_t_file('balancing.t', overwrite)
+    call init_t_file('block_xfer.t', overwrite)
 
     if (rank==0) then
         call Initialize_runtime_control_file()
@@ -269,24 +269,6 @@ program main
         t2 = MPI_wtime()
 
         !***********************************************************************
-        ! check redundant nodes
-        !***********************************************************************
-        t4 = MPI_wtime()
-        if (params%check_redundant_nodes) then
-            ! run the internal test for the ghost nodes.
-            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), &
-            hvy_n(tree_ID_flow), test_failed)
-
-            if (test_failed) then
-                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-                lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
-                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
-            endif
-        endif
-        call toc( "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
-
-
-        !***********************************************************************
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then
@@ -296,6 +278,12 @@ program main
             lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), params)
         endif
 
+        ! check if we still have enough memory left: for very large simulations
+        ! we cannot affort to have them fail without the possibility to resume them
+        if (not_enough_memory(params, lgt_block, lgt_active, lgt_n)) then
+            ! yippieh, a goto statement. thats soooo 90s.
+            goto 17
+        endif
 
         !***********************************************************************
         ! refine everywhere
@@ -337,7 +325,11 @@ program main
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1e-12_rk)) then
+                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
+                it_is_time_to_save_data= .true.
+            endif
+            if ((MPI_wtime()-tstart)/3600.0_rk - params%walltime_last_write > params%walltime_write) then
+                params%walltime_last_write = MPI_wtime()
                 it_is_time_to_save_data= .true.
             endif
 
@@ -359,7 +351,7 @@ program main
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs)
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
                 lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
@@ -441,10 +433,13 @@ program main
         ! is exceeded. This is useful on real clusters, where the walltime of a job is limited, and the
         ! system kills the job regardless of whether we're done or not. If WABBIT itself ends execution,
         ! a backup is written and you can resume the simulation right where it stopped
-        if ( (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
-            if (rank==0) write(*,*) "WE ARE OUT OF WALLTIME AND STOPPING NOW!"
+        if ( (rank==0) .and. (MPI_wtime()-tstart)/3600.0_rk >= params%walltime_max ) then
+            if (rank==0) write(*,'("WE ARE OUT OF WALLTIME: STOP. ",g12.3,"h / ",g12.3,"h")') (MPI_wtime()-tstart)/3600.0_rk, params%walltime_max
             keep_running = .false.
         endif
+        ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
+        ! stop and others not. this is a rare but severe problem, to solve it, synchronize:
+        call MPI_BCAST( keep_running, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
 
         !***********************************************************************
         ! runtime control
@@ -462,23 +457,8 @@ program main
     !***************************************************************************
     ! end of main time loop
     !***************************************************************************
-    if (rank==0) write(*,*) "This is the end of the main time loop!"
+17  if (rank==0) write(*,*) "This is the end of the main time loop!"
 
-
-    !*******************************************************************
-    ! statistics ( last time )
-    !*******************************************************************
-    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
-        ! we need to sync ghost nodes for some derived qtys, for sure
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
-        call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
-    endif
-
-
-    ! close and flush all existings *.t files
-    call close_all_t_files()
 
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
@@ -496,6 +476,23 @@ program main
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
     end if
+
+
+    !*******************************************************************
+    ! statistics ( last time )
+    !*******************************************************************
+    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        ! we need to sync ghost nodes for some derived qtys, for sure
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs)
+
+        call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
+    endif
+
+
+    ! close and flush all existings *.t files
+    call close_all_t_files()
+
 
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)
@@ -518,7 +515,7 @@ program main
     ! and has to resume expensive simulations quite often. this process is usually automatized
     ! but for this it is nice to have a quick-to-evaluate criterion to know if a run ended normally
     ! or with an error. So write an empty success file if the run ended normally
-    if (rank==0) then
+    if (rank==0 .and. .not. params%out_of_memory) then
         open (77, file='success', status='replace')
         close(77)
     endif

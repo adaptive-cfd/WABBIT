@@ -9,6 +9,40 @@ contains
 
 #include "get_neighbor_treecode.f90"
 
+!> \file
+!> \author engels
+!> \brief For any block lgt_id this routine computes, from the treecode stored in
+!! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
+!! and origin are 3D vectors, the third component being zero in a 2D case. \n
+subroutine get_block_spacing_origin2( treecode, domain, Bs, dim, x0, dx )
+    implicit none
+
+    integer(kind=ik), intent(in)               :: dim
+    real(kind=rk), dimension(1:3), intent(in)  :: domain
+    integer(kind=ik), dimension(1:3)           :: Bs
+    integer(kind=ik), intent(in)               :: treecode(:)
+    !> output
+    real(kind=rk), dimension(1:3), intent(out) :: x0, dx
+
+    integer(kind=ik)                           :: ix, iy, iz, J
+
+    ! fetch this blocks level:
+    J = size(treecode)
+
+    ! compute its coordinates in ijk space
+    call decoding(treecode, ix, iy, iz, J)
+
+    ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
+    ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
+    dx = 0.0_rk
+    dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim), kind=rk )
+
+    ! note zero based indexing:
+    x0 = real( ((/ix,iy,iz/) - 1)*Bs, kind=rk) * dx
+
+end subroutine get_block_spacing_origin2
+
+
   !===============================================================================
   !> \brief from a tree id and treecode we make a tree-identifieer, which is
   !! an integer made of the tree_id and the treecode

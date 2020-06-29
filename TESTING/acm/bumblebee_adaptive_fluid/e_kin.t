@@ -1,0 +1,1 @@
+%           time           e_kin

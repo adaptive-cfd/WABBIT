@@ -4,7 +4,7 @@ module module_t_files
 
     ! precision statement
     integer, parameter :: rk = 8
-    integer, parameter :: flush_frequency = 5
+    integer, parameter :: flush_frequency = 10
     integer, parameter :: max_parallel_files = 50
     integer, parameter :: max_columns = 45
     integer, save :: mpirank = 7
@@ -115,7 +115,7 @@ contains
         if (.not. allocated(filenames)) call init_t_file(fname, .false.)
 
 
-        do fileID = 1, max_parallel_files
+        do fileID = 1, max_parallel_files-1
             ! entry for current file exists
             if ( filenames(fileID) == fname ) exit
         end do

@@ -61,24 +61,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     ! cpu time variables for running time calculation
     real(kind=rk)                          :: t0, t1, t2, t_misc
-    integer(kind=ik)                       :: k
+    integer(kind=ik)                       :: k, hvy_n_afterRefinement, lgt_id
     ! start time
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
 
-    ! if the refinement is "everwhere" and we use filtering on the max level
-    ! (force_maxlvel_dealiasing=1), then we end up with exactly 8*hvy_n blocks (on this rank)
-    ! and we can say right now if the memory is sufficient or not. Advantage: you
-    ! get a cleaner error message than the one issued by get_free_local_light_id
-    if ( indicator == "everywhere" .and. params%force_maxlevel_dealiasing ) then
-        if ( (2**params%dim)*hvy_n > params%number_blocks ) then
-            write(*,'("On rank:",i5," hvy_n=",i6," which will give ",i1,"*hvy_n=",i7," but limit is ",i6)') &
-            params%rank, hvy_n, 2**params%dim, (2**params%dim)*hvy_n, params%number_blocks
-
-            call abort (1909181827,"[refine_mesh.f90]: The refinement step will fail because we do not&
-            & have enough memory. Try increasing --memory.")
-        endif
-    endif
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
@@ -103,9 +90,39 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     call toc( "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
 
 
+    !---------------------------------------------------------------------------
+    ! check if the refinement step will suceed or if we will run out of memory
+    !---------------------------------------------------------------------------
+    ! NOTE: in the simulation part, a second check is performed BEFORE this routine
+    ! is called. It then aborts the time loop and dumps a backup for late resuming.
+    ! If the following check fails, then this will be in postprocessing, and it will kill the code.
+    hvy_n_afterRefinement = 0
+    do k = 1, hvy_n
+        ! loop over hvy is safer, because we can tell for each mpirank if it fails or not
+        ! so we detect also problems arising from load-imbalancing.
+        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+
+        if ( lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) == +1) then
+            ! this block will be refined, so it creates 2**D new blocks but is deleted
+            hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim - 1)
+        else
+            ! this block will not be refined, so it remains.
+            hvy_n_afterRefinement = hvy_n_afterRefinement + 1
+        endif
+    enddo
+
+    ! oh-oh case.
+    if ( hvy_n_afterRefinement > params%number_blocks ) then
+        write(*,'("On rank:",i5," hvy_n=",i5," will refine to ",i5," but limit is ",i5)') &
+        params%rank, hvy_n, hvy_n_afterRefinement, params%number_blocks
+
+        call abort (1909181827,"[refine_mesh.f90]: The refinement step will fail (not enough memory).")
+    endif
+    !---------------------------------------------------------------------------
+
+
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level. Note that those blocks have
-    !! the status +11
+    !! except if they are already on the highest level.
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
         call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )

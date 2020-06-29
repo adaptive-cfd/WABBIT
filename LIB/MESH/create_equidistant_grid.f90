@@ -84,10 +84,10 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
     ny = 2**Jmin
 
     if ( (params%rank == 0) .and. verbosity ) then
-        write(*,'(A)') "INIT: initializing an equidistant grid..."
-        write(*,'(" Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
-        write(*,'(" on this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
-        write(*,'(" tree_ID=",i2)') tree_ID
+        write(*,'(A)') "EQUI: initializing an equidistant grid..."
+        write(*,'("EQUI: Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
+        write(*,'("EQUI: On this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
+        write(*,'("EQUI: tree_ID=",i2)') tree_ID
 
     endif
 
@@ -174,9 +174,7 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
 
     ! as the grid has changed (we created it here), we now update the heavy and light
     ! active lists, as well as neighbor relations.
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID )
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
 end subroutine create_equidistant_grid

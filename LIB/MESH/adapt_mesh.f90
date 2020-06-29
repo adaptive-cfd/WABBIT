@@ -20,7 +20,7 @@
 !> \image html adapt_mesh.svg width=400
 
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop)
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
     implicit none
 
@@ -61,6 +61,8 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! only on one point, which is then completely removed (happens for a mask function, for example.)
     !! if external_loop=.true., only one iteration step is performed.
     logical, intent(in), optional       :: external_loop
+    ! during mask generation it can be required to ignore the maxlevel coarsening....life can suck, at times.
+    logical, intent(in), optional       :: ignore_maxlevel
 
     integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
@@ -69,6 +71,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     real(kind=rk)                       :: t0, t1
     ! MPI error variable
     integer(kind=ik)                    :: ierr, k1, hvy_id
+    logical :: ignore_maxlevel2
 
 
     ! start time
@@ -76,6 +79,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     t1 = t0
     lgt_n_old = 0
     iteration = 0
+
+    if(present(ignore_maxlevel)) then
+        ignore_maxlevel2 = ignore_maxlevel
+    else
+        ignore_maxlevel2 = .false.
+    endif
 
     if ( params%dim == 3 ) then
         max_neighbors = 56
@@ -129,17 +138,19 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2, hvy_mask)
         else
             call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor)
+            lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2)
         endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
-        call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        if (ignore_maxlevel2 .eqv. .false.) then
+            call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
+        endif
         call toc( "adapt_mesh (respect_min_max_treelevel)", MPI_Wtime()-t0 )
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
@@ -184,20 +195,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         if (present(external_loop)) then
             if (external_loop) exit ! exit loop
         endif
-    end do
-
-    ! The grid adaptation is done now, the blocks that can be coarsened are coarser.
-    ! If a block is on Jmax now, we assign it the status +11.
-    ! NOTE: Consider two blocks, a coarse on Jmax-1 and a fine on Jmax. If you refine only
-    ! the coarse one (Jmax-1 -> Jmax), because you cannot refine the other one anymore
-    ! (by defintion of Jmax), then the redundant layer in both blocks is different.
-    ! To corrent that, you need to know which of the blocks results from interpolation and
-    ! which one has previously been at Jmax. This latter one gets the 11 status.
-    do k = 1, lgt_n
-        lgt_id = lgt_active(k)
-        if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
-            lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
-        end if
     end do
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened

@@ -51,7 +51,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! grid parameter
     integer(kind=ik)                        :: g, number_blocks
     integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk)                           :: Lx, Ly, Lz
+    real(kind=rk)                           :: Lx, Ly, Lz, x, y, z
     ! data dimensionality
     integer(kind=ik)                        :: d, dF, max_neighbors
     ! frequency of sin functions for testing:
@@ -59,16 +59,16 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik)                        :: ifrequ
 
     ! error variable
-    real(kind=rk)                           :: error(1:6), my_error, norm, my_norm
+    real(kind=rk)                           :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty
     ! MPI error variable
     integer(kind=ik)                        :: ierr
     logical::test
 
-!---------------------------------------------------------------------------------------------
-! interfaces
+    !---------------------------------------------------------------------------------------------
+    ! interfaces
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
 
     ! set MPI parameters
     rank = params%rank
@@ -86,8 +86,8 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         max_neighbors = 12
     endif
 
-!---------------------------------------------------------------------------------------------
-! main body
+    !---------------------------------------------------------------------------------------------
+    ! main body
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -101,7 +101,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     number_blocks = params%number_blocks
 
     if (rank == 0) then
-      write(*,'("UNIT TEST: testing Bs=",i4," x ",i4," x ",i4," blocks-per-mpirank=",i5)')  Bs(1),Bs(2),Bs(3), params%number_blocks
+        write(*,'("UNIT TEST: testing Bs=",i4," x ",i4," x ",i4," blocks-per-mpirank=",i5)')  Bs(1),Bs(2),Bs(3), params%number_blocks
     end if
 
     !---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! perform 5 iterations of random refinement/coarsening
     l = 5
     call create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l, tree_ID_flow )
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l, tree_ID_flow )
 
     if (params%rank == 0) then
         write(*,'(80("-"))')
@@ -135,38 +135,37 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
     ! loop over frequencies
     do ifrequ = 1 , size(frequ)
-
         !-----------------------------------------------------------------------
         ! Fill the above constructed grid with the exact solution values
         !-----------------------------------------------------------------------
         ! loop over all active blocks
         do k = 1, hvy_n
-          ! hvy_id of the block we're looking at
-          hvy_id = hvy_active(k)
-          ! light id of this block
-          call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params%number_blocks )
-          ! compute block spacing and origin from treecode
-          call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+            ! hvy_id of the block we're looking at
+            hvy_id = hvy_active(k)
+            ! light id of this block
+            call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params%number_blocks )
+            ! compute block spacing and origin from treecode
+            call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
-          ! fill coordinate arrays, of course including ghost nodes
-          do l = 1, Bs(1)+2*g
-            coord_x(l) = real(l-(g+1), kind=rk) * ddx(1) + xx0(1)
-          enddo
-          do l = 1, Bs(2)+2*g
-            coord_y(l) = real(l-(g+1), kind=rk) * ddx(2) + xx0(2)
-          enddo
-          do l = 1, Bs(3)+2*g
-            coord_z(l) = real(l-(g+1), kind=rk) * ddx(3) + xx0(3)
-          enddo
+            ! fill coordinate arrays, of course including ghost nodes
+            do l = 1, Bs(1)+2*g
+                coord_x(l) = real(l-(g+1), kind=rk) * ddx(1) + xx0(1)
+            enddo
+            do l = 1, Bs(2)+2*g
+                coord_y(l) = real(l-(g+1), kind=rk) * ddx(2) + xx0(2)
+            enddo
+            do l = 1, Bs(3)+2*g
+                coord_z(l) = real(l-(g+1), kind=rk) * ddx(3) + xx0(3)
+            enddo
 
-          ! calculate f(x,y,z) for first datafield
-          if ( params%dim == 3 ) then
-            ! 3D:
-            call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_id), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
-          else
-            ! 2D:
-            call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_id), Bs, g, Lx, Ly, frequ(ifrequ)  )
-          end if
+            ! calculate f(x,y,z) for first datafield
+            if ( params%dim == 3 ) then
+                ! 3D:
+                call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_id), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+            else
+                ! 2D:
+                call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_id), Bs, g, Lx, Ly, frequ(ifrequ)  )
+            end if
 
         end do
 
@@ -184,30 +183,46 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! compute error (normalized, global, 2-norm)
         !-----------------------------------------------------------------------
         ! reset error
-        my_error = 0.0_rk
-        my_norm = 0.0_rk
+        error_L2 = 0.0_rk
+        error_Linfty = 0.0_rk
+        norm_L2 = 0.0_rk
+        norm_Linfty = 0.0_rk
 
         ! loop over all active blocks and compute their error
         do k = 1, hvy_n
-          my_error = my_error + sqrt(sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
-          my_norm = my_norm  + sqrt(sum((hvy_work(:,:,:,1,hvy_active(k),1))**2 ))
+            error_L2     = error_L2 + sum((hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k),1))**2)
+            error_Linfty = max( error_Linfty, maxval(abs(hvy_block(:,:,:,1,hvy_active(k))-hvy_work(:,:,:,1,hvy_active(k),1))) )
+
+            norm_L2     = norm_L2 + sum( (hvy_work(:,:,:,1,hvy_active(k),1))**2 )
+            norm_Linfty = max( error_Linfty, maxval(abs(hvy_work(:,:,:,1,hvy_active(k),1))) )
         end do
 
-        ! synchronize errors
-        call MPI_Allreduce(my_error, error(ifrequ), 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
-        call MPI_Allreduce(my_norm, norm, 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
 
-        error(ifrequ) = error(ifrequ) / norm
+        call MPI_Allreduce(error_L2, error1(ifrequ), 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
+        error1(ifrequ) = sqrt(error1(ifrequ))
+
+        call MPI_Allreduce(MPI_IN_PLACE, norm_L2, 1, MPI_REAL8, MPI_SUM, WABBIT_COMM, ierr)
+        norm_L2 = sqrt(norm_L2)
+
+        error1(ifrequ) = error1(ifrequ) / norm_L2
+
+        call MPI_Allreduce(error_Linfty, error2(ifrequ), 1, MPI_REAL8, MPI_MAX, WABBIT_COMM, ierr)
+        call MPI_Allreduce(MPI_IN_PLACE, norm_Linfty, 1, MPI_REAL8, MPI_MAX, WABBIT_COMM, ierr)
+
+        error2(ifrequ) = error2(ifrequ) / norm_L2
 
         ! output
         if (rank==0) then
-            write(*,'(" done - ghost nodes synchronization error = ",es16.8," frequ=",g12.4)')  error(ifrequ), frequ(ifrequ)
+            write(*,'(" done - ghost nodes synchronization error_L2 = ",es16.8," error_Linfty=",es16.8," frequ=",g12.4)')  &
+            error1(ifrequ), error2(ifrequ), frequ(ifrequ)
         end if
-      end do
+    end do
 
     if (rank==0) then
-      write(*,'(" done - convergence order was ",6(g12.4,1x))')  sqrt(error(2:6) / error(1:5))
-      write(*,'(" done - mean convergence order was ",g12.4)')  sum(sqrt(error(2:6) / error(1:5))) / 5.0_rk
+        write(*,'(" done - L2 convergence order was ",6(g12.4,1x))')  sqrt(error1(2:6) / error1(1:5))
+        write(*,'(" done - L2 mean convergence order was ",g12.4)')  sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
+        write(*,'(" done - Linfty convergence order was ",6(g12.4,1x))')  sqrt(error2(2:6) / error2(1:5))
+        write(*,'(" done - Linfty mean convergence order was ",g12.4)')  sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
     endif
 
     !---------------------------------------------------------------------------------------------

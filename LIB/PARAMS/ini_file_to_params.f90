@@ -23,10 +23,6 @@
 ! ********************************************************************************************
 
 subroutine ini_file_to_params( params, filename )
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -46,15 +42,9 @@ subroutine ini_file_to_params( params, filename )
     integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
     integer(kind=ik), dimension(3)                  :: Bs
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    ! set MPI parameter
     rank         = params%rank
     number_procs = params%number_procs
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
@@ -130,6 +120,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
     call read_param_mpi(FILE, 'VPM', 'mask_time_dependent_part', params%mask_time_dependent_part, .true.)
     call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
+    call read_param_mpi(FILE, 'VPM', 'dont_use_pruned_tree_mask', params%dont_use_pruned_tree_mask, .false.)
 
     ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
     ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
@@ -143,7 +134,7 @@ subroutine ini_file_to_params( params, filename )
         call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
 
         select case (params%wavelet)
-        case ('CDF4,4')
+        case ('CDF4,4', 'CDF44', 'CDF22', 'CDF2,2')
 
 
         case default
@@ -278,10 +269,12 @@ end subroutine ini_file_to_params
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%n_ghosts_rhs, params%n_ghosts )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
 
@@ -361,6 +354,8 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
       ! read output write frequency
       call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+      ! read output write frequency
+      call read_param_mpi(FILE, 'Time', 'walltime_write', params%walltime_write, 99999.9_rk )
       ! assume start at time 0.0
       params%next_write_time = 0.0_rk + params%write_time
       ! read value of fixed time step
@@ -393,90 +388,41 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, butcher_RK4)
     end subroutine ini_time
 
-    !-------------------------------------------------------------------------!
-    !> @brief remove (multiple) blancs as seperators in a string
-    subroutine merge_blancs(string_merge)
-      ! this routine removes blanks at the beginning and end of an string
-      ! and multiple blanks which are right next to each other
-
-      implicit none
-      character(len=*), intent(inout) :: string_merge
-      integer(kind=ik) :: i, j, len_str, count
-
-      len_str = len(string_merge)
-      count = 0
-
-      string_merge = string_merge
-      do i=1,len_str-1
-        if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
-          count = count + 1
-          string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
-        end if
-      end do
-
-      string_merge = adjustl(string_merge)
-
-    end subroutine merge_blancs
 
 
     !-------------------------------------------------------------------------!
     !> @brief Read Bs from inifile for unknown number of Bs in inifile
-function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
-  type(inifile) ,intent(inout)     :: FILE
-  character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
-  character(len=*), intent(in)    :: keyword ! what keyword do you
-  integer(kind=ik), intent(in)    :: default_Bs(:)
-  integer(kind=ik), intent(in)    :: dims !number of dimensions
-  character(len=:), allocatable :: output_trim
-  integer(kind=ik):: Bs(3)
-  integer(kind=ik):: i, n_entries
-  character(len=80):: output
+    function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
+        type(inifile) ,intent(inout)     :: FILE
+        character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+        character(len=*), intent(in)    :: keyword ! what keyword do you
+        integer(kind=ik), intent(in)    :: default_Bs(:)
+        integer(kind=ik), intent(in)    :: dims !number of dimensions
+        integer(kind=ik):: Bs(3)
+        integer(kind=ik):: i, n_entries
+        character(len=80):: output
 
-  Bs = 1
-  ! read number_block_nodes
-  call read_param_mpi(FILE, section, keyword, output, "empty")
-  if (trim(output) .eq. "empty") then
-      write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
-      Bs=default_Bs
-  else
-    call merge_blancs(output)
-    output_trim=trim(output)
-    call count_entries(output_trim, " ", n_entries)
-    ! check if the number of entries is valid
-    if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
-    ! Cast the output string into the integer
-    read(output_trim,*) (Bs(i), i=1,n_entries)
-    ! If only one Bs is given in the ini file, we duplicate it
-    ! for the rest of the Bs array:
-    if (n_entries==1) then
-      Bs(1:dims) = Bs(1)
-    endif
-  endif
-end function
+        Bs = 1
+        ! read number_block_nodes
+        call read_param_mpi(FILE, section, keyword, output, "empty")
 
-    !-------------------------------------------------------------------------!
-    !> @brief count number of vector elements in a string
-    subroutine count_entries(string_cnt, seperator, n_entries)
-      ! only to be used after merged blaks
-      ! this routine counts the seperators and gives back this value +1
+        if (trim(output) .eq. "empty") then
+            write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+            Bs = default_Bs
 
-      implicit none
-      character(len=1), intent(in) :: seperator
-      character(len=*), intent(in) :: string_cnt
-      integer(kind=ik), intent(out) :: n_entries
-      integer(kind=ik) :: count_seperator, i, l_string
-      character(len=Len_trim(adjustl(string_cnt))):: string_trim
+        else
+            call count_entries(output, n_entries)
 
-      count_seperator = 0
-      string_trim = trim(adjustl(string_cnt))
-      l_string = LEN(string_trim)
+            ! check if the number of entries is valid
+            if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
 
-      do i=1,l_string
-        if (string_trim(i:i)==seperator) then
-          count_seperator = count_seperator + 1
-        end if
-      end do
+            ! Cast the output string into the integer
+            read(output,*) (Bs(i), i=1,n_entries)
 
-      n_entries = count_seperator + 1
-
-    end subroutine count_entries
+            ! If only one Bs is given in the ini file, we duplicate it
+            ! for the rest of the Bs array:
+            if (n_entries==1) then
+                Bs(1:dims) = Bs(1)
+            endif
+        endif
+    end function

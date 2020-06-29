@@ -17,9 +17,6 @@
 
 module module_IO
 
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     use hdf5
     ! global parameters
@@ -42,16 +39,9 @@ module module_IO
     use module_helpers, only : check_file_exists, block_contains_NaN
     use module_mask
 
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 

@@ -3,7 +3,7 @@
 !> \brief
 !! Module of global parameters and functions
 !> \details
-!!    * index positions of lgt_data (idx_tree_number,IDX_MESH_LVL,IDX_REFINE_STS etc)
+!!    * index positions of lgt_data (IDX_TREE_ID, IDX_MESH_LVL, IDX_REFINE_STS etc)
 !!    * functions abort
 !!    * global prints (todo)
 !!    * global MPI communicator
@@ -32,7 +32,7 @@ module module_globals
   ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
   ! universality dictates that we can also use a different number of components, for example
   ! when syn'ing the mask function (which in many cases has six entries.)
-  integer, public  :: N_MAX_COMPONENTS = 6
+  integer, public  :: N_MAX_COMPONENTS = 8
 
   !subroutines of this module
   interface abort

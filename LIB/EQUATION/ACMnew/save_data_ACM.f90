@@ -42,16 +42,18 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
     integer(kind=ik), dimension(3) :: Bs
     character(len=80) :: name
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: PREPARE_SAVE_DATA_ACM called but ACM not initialized"
     ! number of state variables
     neqn = size(u,4)
     ! number of available work array slots
     nwork = size(work,4)
 
+
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" .and. Insect%time /= time) then
+    if (params_acm%geometry == "Insect" ) then ! .and. Insect%time /= time) then
         call Update_Insect(time, Insect)
     endif
 
@@ -141,6 +143,8 @@ subroutine FIELD_NAMES_ACM( N, name )
     integer(kind=ik), intent(in) :: N
     ! returns the name
     character(len=80), intent(out) :: name
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: FIELD_NAMES_ACM called but ACM not initialized"
 
     if (allocated(params_acm%names)) then
         name = params_acm%names(N)

@@ -62,6 +62,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     integer(kind=2) :: color
     logical :: is_insect
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
+
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
@@ -96,6 +98,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
+        params_acm%sponge_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk
@@ -143,8 +146,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 div = 0.00_rk
             end where
 
-            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs(1)+g-1
+            do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
                 ! coloring not implemented for 2D
                 color = 0_2
 
@@ -188,11 +191,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             end where
 
 
-            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+            do iz = g+1, Bs(3)+g
                 z = x0(3) + dble(iz-(g+1)) * dx(3)
-                do iy = g+1, Bs(2)+g-1
+                do iy = g+1, Bs(2)+g
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
-                    do ix = g+1, Bs(1)+g-1
+                    do ix = g+1, Bs(1)+g
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
                         ! get this points color
@@ -279,7 +282,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim ==2) then
-            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g-1,g+1:Bs(2)+g-1,1,1)**2)*dx(1)*dx(2)
+            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g,g+1:Bs(2)+g,1,1)**2)*dx(1)*dx(2)
         else
             params_acm%enstrophy = 0.0_rk
             ! call abort(6661,"ACM 3D not implemented.")

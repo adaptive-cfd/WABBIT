@@ -72,7 +72,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     if (s<4) call abort(1715929,"runge-kutta-chebychev: s cannot be less than 4")
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
@@ -106,7 +106,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
 
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs )
         call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, lgt_block, &
         lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
 

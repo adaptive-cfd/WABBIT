@@ -68,7 +68,7 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "       for 3D data:"
         write(*,*) "       ./wabbit-post --flusi-to-wabbit mask_00000.h5 wabbit_000000000.h5 33 33 33"
         write(*,*) "       for 2D data:"
-        write(*,*) "       ./wabbit-post --flusi-to-wabbit mask_00000.h5 wabbit_000000000.h5 33 33 1"
+        write(*,*) "       ./wabbit-post --flusi-to-wabbit --input=mask_00000.h5 --output=wabbit_000000000.h5 --Bs=33"
         write(*,*) ""
         write(*,*) "NOTES: * Even though anisotropic resolution would be possible, it is not implemented yet"
         write(*,*) "       * The blocksize BS is isotropic"
@@ -77,23 +77,12 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     end if
 
+    call get_cmd_arg( "--input", file_in, default="none" )
+    call get_cmd_arg( "--output", file_out, default="none" )
+    call get_cmd_arg( "--bs", Bs(1), default=33 )
 
     ! get values from command line (filename and desired blocksize)
     call check_file_exists(trim(file_in))
-    call get_command_argument(3, file_out)
-
-    ! /todo to be checked (l66-72)
-
-    call get_command_argument(4, dummy)
-    read(dummy,*) Bs(1)
-    call get_command_argument(5, dummy)
-    read(dummy,*) Bs(2)
-    call get_command_argument(6, dummy)
-    read(dummy,*) Bs(3)
-    if (mod(Bs(1),2)==0 .or. mod(Bs(2),2)==0 .or. mod(Bs(3),2)==0) then
-        write(*,*) Bs
-        call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
-    endif
 
     ! read attributes such as number of discretisation points, time, domain size
     call get_attributes_flusi(file_in, nxyz, time, domain)
@@ -114,6 +103,8 @@ subroutine flusi_to_wabbit(params)
         !-----------------------------------------------------------------------
         params%dim = 3
 
+        bs(1:params%dim) = bs(1)
+
         if (mod(nxyz(1),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
         if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
         if (mod(nxyz(3),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
@@ -123,6 +114,8 @@ subroutine flusi_to_wabbit(params)
         ! 2D
         !-----------------------------------------------------------------------
         params%dim = 2
+        bs(1:params%dim) = bs(1)
+        bs(3) = 1
 
         ! there is a goofy shift. in flusi, 2D runs ALWAYS need to set the x-direction to
         ! 1 point (that is a memory consistency requirement)
@@ -142,7 +135,7 @@ subroutine flusi_to_wabbit(params)
     level = 0
     do k = 1, params%dim
         if (Bs(k)==1) call abort(11021903, "ERROR: Blocksize cannot be one! (Even though that is an odd number)")
-        level_tmp(k) = log(dble(nxyz(k))/dble(Bs(k)-1)) / log(2.0_rk)
+        level_tmp(k) = log(dble(nxyz(k))/dble(Bs(k))) / log(2.0_rk)
         level(k) = int(level_tmp(k))
     enddo
 
@@ -154,10 +147,10 @@ subroutine flusi_to_wabbit(params)
     endif
 
     ! this would actually now be possible but needs to be implemented:
-    !if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
+    if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
     do k = 1, params%dim
-        if (mod(nxyz(k),(Bs(k)-1)) /=0 ) then
+        if (mod(nxyz(k), Bs(k)) /=0 ) then
             call abort(11021901, "The input data size and your choice of BS are not compatible.")
         endif
         ! non-integer levels indicate the resolution is not a multiple of Bs
@@ -168,7 +161,7 @@ subroutine flusi_to_wabbit(params)
 
 
     ! set important parameters
-    params%max_treelevel=max(max(level(1),level(2)),max(level(2),level(3)))
+    params%max_treelevel = max(max(level(1),level(2)),max(level(2),level(3)))
     params%domain_size = domain
     params%Bs = Bs
     params%n_ghosts = 1_ik
@@ -188,19 +181,6 @@ subroutine flusi_to_wabbit(params)
     ! read the field from flusi file and organize it in WABBITs blocks
     call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
     hvy_active, params, nxyz)
-    ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
-    ! they will therefore send their redundant points to the last blocks in x,y and z-direction
-    do k = 1, lgt_n
-        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
-        start_x = nint(x0(1)/dx(1))
-        start_y = nint(x0(2)/dx(2))
-        if (params%dim == 3) then
-            start_z = nint(x0(3)/dx(3))
-        else
-            start_z = 0_ik
-        end if
-        lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
-    end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -209,20 +189,3 @@ subroutine flusi_to_wabbit(params)
     hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 
 end subroutine flusi_to_wabbit
-
-function refinement_status(start_x, start_y, start_z, Bs_f, Bs)
-    use module_precision
-    implicit none
-    integer(kind=ik), intent(in) :: start_x, start_y, start_z
-    integer(kind=ik), dimension(3), intent(in) :: Bs, Bs_f
-    integer(kind=ik) :: refinement_status
-
-    ! if I'm the last block in x,y and/or z-direction,
-    ! set my refinement refinement_status to 0, otherwise to 11 (historic fine)
-    if (((start_x==Bs_f(1)-Bs(1)+1) .or. (start_y==Bs_f(2)-Bs(2)+1)) .or. (start_z==Bs_f(3)-Bs(3)+1)) then
-        refinement_status = 0_ik
-    else
-        refinement_status = 11_ik
-    end if
-
-end function refinement_status

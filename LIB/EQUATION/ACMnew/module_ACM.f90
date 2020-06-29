@@ -28,7 +28,6 @@ module module_acm
   use module_operators, only : compute_vorticity, divergence
   use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data
-  use module_params, only : merge_blancs, count_entries
   use module_timing
 
   !---------------------------------------------------------------------------------------------
@@ -45,7 +44,7 @@ module module_acm
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
-  create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM, &
+  create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA
   !**********************************************************************************************
 
@@ -69,6 +68,7 @@ module module_acm
     logical :: use_sponge = .false.
     logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
+    character(len=80) :: eps_norm
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -98,9 +98,12 @@ module module_acm
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
-    integer(kind=ik) :: Jmax, N_eqn
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: Jmax, N_eqn, n_ghosts = -9999999
+    integer(kind=ik), dimension(3) :: Bs = -1
+
+    logical :: initialized = .false.
   end type type_params_acm
+
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
   type(type_params_acm), save :: params_acm
@@ -125,6 +128,8 @@ contains
 subroutine WRITE_INSECT_DATA(time)
     implicit none
     real(kind=rk), intent(in) :: time
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: WRITE_INSECT_DATA called but ACM not initialized"
 
     if (Insect%second_wing_pair) then
         call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
@@ -216,7 +221,8 @@ end subroutine
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
-    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-vorticity")
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
+    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
@@ -241,6 +247,7 @@ end subroutine
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_acm%n_ghosts, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
     params_acm%N_eqn = Neqn
 
@@ -302,7 +309,7 @@ end subroutine
         ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
-    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
 
     dx_min = minval( ddx(1:params_acm%dim) )
     nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
@@ -343,8 +350,10 @@ end subroutine
     endif
 
     if (params_acm%geometry=="fractal_tree") then
-        call fractal_tree_init()
+        call fractal_tree_init( Insect )
     endif
+
+    params_acm%initialized = .true.
   end subroutine READ_PARAMETERS_ACM
 
 
@@ -382,6 +391,8 @@ end subroutine
     integer :: iscalar, dim
 
     if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: GET_DT_BLOCK_ACM called but ACM not initialized"
 
     dim = params_acm%dim
 
@@ -482,48 +493,9 @@ end subroutine
       ! so return this number as well.
       integer(kind=ik), intent(out):: N_thresholding_components
 
-
-      call compute_vorticity( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-      dx, params_acm%Bs, g, params_acm%discretization, threshold_field(:,:,:,1:3) )
-
-      N_thresholding_components = params_acm%dim
+      ! this function should not be called for the regular statevector thresholding
+      call abort(27022017,"The ACM module supports only coarsening_indicator=threshold-state-vector; !")
   end subroutine
-
-
-  !-----------------------------------------------------------------------------
-  ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-  ! MPI_MAX
-  ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
-  !-----------------------------------------------------------------------------
-  subroutine NORM_THRESHOLDFIELD_ACM( thresholdfield_block , norm)
-      implicit none
-      !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-      real(kind=rk), intent(in) :: thresholdfield_block(:, :, :, :)
-      !> normalization for details, ouput of this routine
-      real(kind=rk), intent(inout) :: norm(:)
-
-      integer(kind=ik) :: neq
-
-      neq = params_acm%N_eqn
-
-      if (params_acm%coarsening_indicator=="threshold-vorticity") then
-          ! loop over my active hvy data
-          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1)))
-      else
-
-          ! max over velocities
-          norm(1) = maxval(abs(thresholdfield_block(:,:,:,1:params_acm%dim)) )
-          norm(1:params_acm%dim) = norm(1)
-          ! pressure
-          norm(params_acm%dim+1) = maxval(abs(thresholdfield_block(:,:,:,params_acm%dim+1)) )
-          norm(params_acm%dim+2:neq) = 1.0d0
-      endif
-
-
-  end subroutine
-
-
-
 
 
   ! the statistics are written to ascii files (usually *.t files) with the help

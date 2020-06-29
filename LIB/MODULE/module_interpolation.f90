@@ -9,34 +9,15 @@
 !
 !> \brief refinement and coarsening subroutines
 !
-!>
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4 \n
-!! 03/02/17 - create subroutines for 3D
-!
 ! ********************************************************************************************
-
 module module_interpolation
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    ! global parameters
     use module_params
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
 
     implicit none
 
     PRIVATE
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
 
 contains
 
@@ -55,6 +36,7 @@ contains
         nfine(2) = size(fine,2)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
+            write(*,*) "coarse:", shape(coarse), "fine:", shape(fine)
             call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
@@ -79,7 +61,7 @@ contains
         ! initialize filter according to wavelet
         if (.not. allocated(HD)) then
             select case(wavelet)
-            case("CDF4,4")
+            case("CDF4,4", "CDF44")
                 allocate( HD(-6:6) )
 
                 ! H TILDE filter
@@ -87,6 +69,24 @@ contains
                 87.0d0*2.0d0**(-7.d0), &
                 9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
 
+            case("CDF2,2", "CDF22")
+
+                ! allocate( HD(-1:1) )
+                ! HD = (/ 0.5d0, 1.0d0, 0.5d0 /)
+                ! HD = (/ dsqrt(2.0d0)/4.0d0, dsqrt(2.0d0)/2.0d0, dsqrt(2.0d0)/4.0d0 /)
+! 0.1767766952966369*0.75/1.0606601717798214
+
+!
+! On the one hand, the coefficients correspond to:
+! reconstruction low-pass filter http://wavelets.pybytes.com/wavelet/rbio2.2/
+!
+! But in my notes (in FLUSI), this is the decomposition low pass filter
+!
+! A last observation is that we do not have these coefficients appear in the draft
+! manuscript ? This seems to be a bug. 
+                allocate( HD(-2:2) )  ! H TILDE
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+                ! (-1.0)*[+1.0/8.0, -1.0/4.0, -3.0/4.0, -1.0/4.0, +1.0/8.0]
             case default
                 call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
 
@@ -141,7 +141,7 @@ contains
         ! initialize filter according to wavelet
         if (.not. allocated(HD)) then
             select case(wavelet)
-            case("CDF4,4")
+            case("CDF4,4", "CDF44")
                 allocate( HD(-6:6) )
 
                 ! H TILDE filter ( from Sweldens 1996 paper)
@@ -152,10 +152,13 @@ contains
                 ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
                 ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
                 ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                HD  = HD*2.0d0
+                ! HD  = HD*2.0d0
+            case("CDF2,2", "CDF22")
+                allocate( HD(-2:2) )  ! H TILDE
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
 
             case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
 
             end select
         endif

@@ -28,6 +28,7 @@ module module_MPI
     ! interpolation routines
     use module_interpolation
     use module_treelib
+    use module_helpers
 
     implicit none
 !---------------------------------------------------------------------------------------------
@@ -40,22 +41,21 @@ module module_MPI
     ! everything is save by default
     SAVE
 
-    ! We require two stages: first, we fill all ghost nodes which are simple copy,
-    ! then in the second stage we can use interpolation and fill the remaining ones.
-    ! In order not to send ALL data in both stages, we allocate one buffer for each stage.
-    integer(kind=ik) :: Nstages = 2
-
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
-    integer(kind=ik), allocatable :: int_send_buffer(:,:), int_recv_buffer(:,:)
-    integer(kind=ik), allocatable :: int_recv_counter(:,:), int_send_counter(:,:)
-    integer(kind=ik), allocatable :: recv_counter(:,:), send_counter(:,:)
-    integer(kind=ik), allocatable :: real_pos(:,:)
-    real(kind=rk), allocatable    :: new_send_buffer(:,:), new_recv_buffer(:,:)
+    integer(kind=ik), allocatable :: iMetaData_sendBuffer(:), iMetaData_recvBuffer(:)
+    integer(kind=ik), allocatable :: MetaData_recvCounter(:), MetaData_sendCounter(:)
+    integer(kind=ik), allocatable :: Data_recvCounter(:), Data_sendCounter(:)
+    integer(kind=ik), allocatable :: real_pos(:), internalNeighborSyncs(:)
+    real(kind=rk), allocatable    :: rData_sendBuffer(:), rData_recvBuffer(:)
+    integer(kind=ik) :: internalNeighbor_pos
+    !
+    integer(kind=ik), allocatable :: send_request(:)
+    integer(kind=ik), allocatable :: recv_request(:)
 
     ! an array to count how many messages we send to the other mpiranks.
-    integer(kind=ik), allocatable :: communication_counter(:,:), int_pos(:,:)
+    integer(kind=ik), allocatable :: int_pos(:)
 
     ! internally, we flatten the ghost nodes layers to a line. this is stored in
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
@@ -65,33 +65,27 @@ module module_MPI
     real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
-    integer(kind=ik), PARAMETER   :: EXCLUDE_REDUNDANT = 1, INCLUDE_REDUNDANT = 2, ONLY_REDUNDANT = 3
     integer(kind=ik), PARAMETER   :: SENDER = 1, RECVER = 2, RESPRE = 3
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
     integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
-    ! these arrays are used in the compare_hvy_data routines for the ghost nodes origin test. They allow
-    ! much nicer handling of errors. Only allocated in the "check_unique_origin" routine (i.e. unused in production)
-    real(kind=rk), allocatable :: hvy_block_test_err(:,:,:,:,:)
-    real(kind=rk), allocatable :: hvy_block_test_val(:,:,:,:,:)
-    real(kind=rk), allocatable :: hvy_block_test_interpref(:,:,:,:,:)
-
-
     ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [data_bounds_type], [sender/receiver/up-downsampled])
-    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3, 1:3) :: ijkGhosts
+    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [sender/receiver/up-downsampled])
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts_rhs
+    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts_all
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
     integer(kind=ik) :: dim = 2_ik
 
     ! we use this flag to call the allocation routine only once.
-    logical          :: ghost_nodes_module_ready = .false.
+    logical :: ghost_nodes_module_ready = .false.
 
     ! two shift parameters (asymmetric and symmetric ) used for selection of interpolation
     ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
@@ -102,7 +96,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: synchronize_ghosts_generic_sequence, init_ghost_nodes, check_unique_origin
+    PUBLIC :: init_ghost_nodes
 
 !---------------------------------------------------------------------------------------------
 ! main body
@@ -128,7 +122,7 @@ subroutine init_ghost_nodes( params )
     ! local variables
     integer(kind=ik) :: buffer_N_int, buffer_N, g, Neqn, number_blocks, rank
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, idata_bounds_type, Ncpu
+    integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, Ncpu
     integer(kind=ik) ::  j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
     integer(kind=ik) :: i, k, status(1:4)
     integer(kind=ik) :: ijkrecv(2,3)
@@ -173,20 +167,20 @@ subroutine init_ghost_nodes( params )
         ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
         ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
         dim = params%dim
-        if ( params%dim == 3 ) then
+        if ( dim == 3 ) then
             !---3d---3d---
-            ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
+            ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
             ! at most, we can have 56 neighbors ACTIVE per block
-            buffer_N_int = number_blocks * 56 * 5
+            buffer_N_int = number_blocks * 56 * 6
             ! how many possible neighbor relations are there?
             Nneighbor = 74
 
             allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn) )
         else
             !---2d---2d---
-            ! per neighborhood relation, we send 5 integers as metadata in the int_buffer
+            ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
             ! at most, we can have 12 neighbors ACTIVE per block
-            buffer_N_int = number_blocks * 12 * 5
+            buffer_N_int = number_blocks * 12 * 6
             ! how many possible neighbor relations are there?
             Nneighbor = 16
 
@@ -195,11 +189,11 @@ subroutine init_ghost_nodes( params )
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks. previous versions allocated one of those per "friend"
-        if ( params%dim==3 ) then
-          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
+        if ( dim == 3 ) then
+            buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
-          ! 2D case
-          buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
+            ! 2D case
+            buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
         end if
 
         !-----------------------------------------------------------------------
@@ -209,67 +203,61 @@ subroutine init_ghost_nodes( params )
         if (rank==0) then
             write(*,'("GHOSTS-INIT: Attempting to allocate the ghost-sync-buffer.")')
 
-            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12," Nstages=",i1)') &
-            buffer_N_int, buffer_N, Nstages
+            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12)') &
+            buffer_N_int, buffer_N
 
             write(*,'("GHOSTS-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N_int)*dble(Nstages)*8e-9
+                2.0*dble(buffer_N_int)*8e-9
 
             write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N)*dble(Nstages)*8e-9
+                2.0*dble(buffer_N)*8e-9
             write(*,'("---------------- allocating now ----------------")')
         endif
 
         ! wait now so that if allocation fails, we get at least the above info
         call MPI_barrier( WABBIT_COMM, status(1))
 
-        allocate( int_send_buffer( 1:buffer_N_int, 1:Nstages), stat=status(1) )
-        allocate( int_recv_buffer( 1:buffer_N_int, 1:Nstages), stat=status(2) )
-        allocate( new_send_buffer( 1:buffer_N, 1:Nstages), stat=status(3) )
-        allocate( new_recv_buffer( 1:buffer_N, 1:Nstages), stat=status(4) )
+        allocate( internalNeighborSyncs(1:buffer_N_int), stat=status(1) )
+        allocate( iMetaData_sendBuffer(1:buffer_N_int), stat=status(1) )
+        allocate( iMetaData_recvBuffer(1:buffer_N_int), stat=status(2) )
+        allocate( rData_sendBuffer(1:buffer_N), stat=status(3) )
+        allocate( rData_recvBuffer(1:buffer_N), stat=status(4) )
 
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
+            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
+            "rData_sendBuffer", shape(rData_sendBuffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "new_send_buffer", shape(new_send_buffer)
+            "rData_recvBuffer", shape(rData_recvBuffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "new_recv_buffer", shape(new_recv_buffer)
+            "iMetaData_sendBuffer", shape(iMetaData_sendBuffer)
 
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "int_send_buffer", shape(int_send_buffer)
+            "iMetaData_recvBuffer", shape(iMetaData_recvBuffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-             "int_recv_buffer", shape(int_recv_buffer)
+            write(*,'("GHOSTS-INIT: on each mpirank, rData_sendBuffer size is",f9.4," GB ")') &
+            product(real(shape(rData_sendBuffer)))*8e-9
 
-            write(*,'("GHOSTS-INIT: on each mpirank, new_send_buffer size is",f9.4," GB ")') &
-             product(real(shape(new_send_buffer)))*8e-9
+            write(*,'("GHOSTS-INIT: on each mpirank, rData_recvBuffer size is",f9.4," GB ")') &
+            product(real(shape(rData_recvBuffer)))*8e-9
 
-             write(*,'("GHOSTS-INIT: on each mpirank, new_recv_buffer size is",f9.4," GB ")') &
-              product(real(shape(new_recv_buffer)))*8e-9
+            write(*,'("GHOSTS-INIT: on each mpirank, iMetaData_sendBuffer size is",f9.4," GB ")') &
+            product(real(shape(iMetaData_sendBuffer)))*4e-9
 
-            write(*,'("GHOSTS-INIT: on each mpirank, int_send_buffer size is",f9.4," GB ")') &
-             product(real(shape(int_send_buffer)))*4e-9
-
-             write(*,'("GHOSTS-INIT: on each mpirank, int_recv_buffer size is",f9.4," GB ")') &
-              product(real(shape(int_recv_buffer)))*4e-9
+            write(*,'("GHOSTS-INIT: on each mpirank, iMetaData_recvBuffer size is",f9.4," GB ")') &
+            product(real(shape(iMetaData_recvBuffer)))*4e-9
         endif
 
-        ! this is a list of communications with all other procs
-        allocate( communication_counter(1:Ncpu, 1:Nstages) )
-        allocate( int_pos(1:Ncpu, 1:Nstages) )
-        allocate( real_pos(1:Ncpu, 1:Nstages) )
-        if ( params%dim==3 ) then
-          allocate( line_buffer( Neqn*(Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) ) )
-        else
-          ! 2D case
-          allocate( line_buffer( Neqn*(Bs(1)+2*g)*(Bs(2)+2*g) ) )
-        end if
-
-        allocate( recv_counter(0:Ncpu-1, 1:Nstages), send_counter(0:Ncpu-1, 1:Nstages) )
-        allocate( int_recv_counter(0:Ncpu-1, 1:Nstages), int_send_counter(0:Ncpu-1, 1:Nstages) )
+        allocate( send_request(1:2*Ncpu) )
+        allocate( recv_request(1:2*Ncpu) )
+        allocate( int_pos(1:Ncpu) )
+        allocate( real_pos(1:Ncpu) )
+        allocate( line_buffer( 1:Neqn*product(Bs(1:params%dim)+2*g) ) )
+        allocate( Data_recvCounter(0:Ncpu-1), Data_sendCounter(0:Ncpu-1) )
+        allocate( MetaData_recvCounter(0:Ncpu-1), MetaData_sendCounter(0:Ncpu-1) )
 
         ! wait now so that if allocation fails, we get at least the above info
         call MPI_barrier( WABBIT_COMM, status(1))
@@ -281,30 +269,51 @@ subroutine init_ghost_nodes( params )
         ! once in a large, module-global array (which is faster than computing it every time with tons
         ! of IF-THEN clauses).
         ! This arrays indices are:
-        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idata_bounds_type], [isendrecv])
+        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
 
+        ijkGhosts_all = 1
+        ijkGhosts_rhs = 1
         ijkGhosts = 1
         do ineighbor = 1, Nneighbor
             do leveldiff = -1, 1
-                do idata_bounds_type = 1, 3
-                    ! The receiver bounds are hard-coded with a huge amount of tedious indices.
-                    call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, idata_bounds_type, 'receiver')
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RECVER) = ijkrecv
+                !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
+                ! The receiver bounds are hard-coded with a huge amount of tedious indices.
+                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, g)
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
 
-                    ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
-                    ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
-                    ! up or down sampled.
-                    call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, idata_bounds_type)
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, SENDER) = ijksend
-                    ijkGhosts(1:2, 1:3, ineighbor, leveldiff, idata_bounds_type, RESPRE) = ijkbuffer
-                enddo
+                ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+                ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+                ! up or down sampled.
+                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, g )
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
+                ijkGhosts_all(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
+
+                !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
+                ! The receiver bounds are hard-coded with a huge amount of tedious indices.
+                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, g=params%n_ghosts_rhs)
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
+
+                ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+                ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+                ! up or down sampled.
+                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, g=params%n_ghosts_rhs )
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
+                ijkGhosts_rhs(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
+
+                ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,RECVER) = ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,RECVER) + (g-params%n_ghosts_rhs)
+                ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,SENDER) = ijkGhosts_rhs(1:2,1:dim, ineighbor, leveldiff,SENDER) + (g-params%n_ghosts_rhs)
+
+
             enddo
         enddo
 
+        ! default is all ghost nodes
+        ijkGhosts = ijkGhosts_all
+
         ! now we know how large the patches are we'd like to store in the RESPRE buffer
-        i = maxval( ijkGhosts(2,1,:,:,:,RESPRE) )*2
-        j = maxval( ijkGhosts(2,2,:,:,:,RESPRE) )*2
-        k = maxval( ijkGhosts(2,3,:,:,:,RESPRE) )*2
+        i = maxval( ijkGhosts(2,1,:,:,RESPRE) )*2
+        j = maxval( ijkGhosts(2,2,:,:,RESPRE) )*2
+        k = maxval( ijkGhosts(2,3,:,:,RESPRE) )*2
 
         allocate( res_pre_data( i, j, k, Neqn) )
         res_pre_data = 9.9_rk
@@ -320,12 +329,30 @@ subroutine init_ghost_nodes( params )
             write(16,'(i3)') A
             do ineighbor = 1, Nneighbor
                 do leveldiff = -1, 1
-                    do idata_bounds_type = 1, 3
-                        do i = 1, 2
-                            do j = 1, 3
-                                do k = 1, 3
-                                    write(16,'(i3)') ijkGhosts(i, j, ineighbor, leveldiff, idata_bounds_type, k)
-                                enddo
+                    do i = 1, 2
+                        do j = 1, 3
+                            do k = 1, 3
+                                write(16,'(i3)') ijkGhosts(i, j, ineighbor, leveldiff, k)
+                            enddo
+                        enddo
+                    enddo
+                enddo
+            enddo
+            close(16)
+
+            open(16,file='ghost_bounds_rhs.dat',status='replace')
+            write(16,'(i3)') Bs(1)
+            write(16,'(i3)') Bs(2)
+            write(16,'(i3)') Bs(3)
+            write(16,'(i3)') params%n_ghosts_rhs
+            write(16,'(i3)') S
+            write(16,'(i3)') A
+            do ineighbor = 1, Nneighbor
+                do leveldiff = -1, 1
+                    do i = 1, 2
+                        do j = 1, 3
+                            do k = 1, 3
+                                write(16,'(i3)') ijkGhosts_rhs(i, j, ineighbor, leveldiff, k)
                             enddo
                         enddo
                     enddo

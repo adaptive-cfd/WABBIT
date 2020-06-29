@@ -1,35 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name respect_min_max_treelevel.f90
-!> \version 0.4
-!> \author msr
-!
-!> \brief unset refinement status in respect of min/max treelevel
-!
-!>
-!! input:
-!!           - light data
-!!           - min/max treelevel
-!!
-!! output:
-!!           - light data arrays
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4
-! ********************************************************************************************
-
 subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -46,26 +15,20 @@ subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     ! loop variables
     integer(kind=ik) :: k
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     Jmax = params%max_treelevel
     Jmin = params%min_treelevel
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! loop over all active blocks
     do k = 1, lgt_n
 
-        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == +1).and.(lgt_block( lgt_active(k), Jmax + IDX_MESH_LVL ) >= Jmax)) then
+        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == +1_ik).and.(lgt_block( lgt_active(k), Jmax + IDX_MESH_LVL ) >= Jmax)) then
             ! can not refine (set flag to 0 = stay)
-            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
+            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0_ik
         end if
 
-        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == -1).and.(lgt_block( lgt_active(k), Jmax + IDX_MESH_LVL ) <= Jmin)) then
+        if ((lgt_block( lgt_active(k), Jmax + idx_refine_sts ) == -1_ik).and.(lgt_block( lgt_active(k), Jmax + IDX_MESH_LVL ) <= Jmin)) then
             ! can not coarsen
-            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0
+            lgt_block( lgt_active(k), Jmax + idx_refine_sts ) = 0_ik
         end if
 
     end do

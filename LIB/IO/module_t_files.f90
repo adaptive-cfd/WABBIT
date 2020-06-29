@@ -4,7 +4,7 @@ module module_t_files
 
     ! precision statement
     integer, parameter :: rk = 8
-    integer, parameter :: flush_frequency = 100
+    integer, parameter :: flush_frequency = 5
     integer, parameter :: max_parallel_files = 50
     integer, parameter :: max_columns = 45
     integer, save :: mpirank = 7
@@ -12,16 +12,22 @@ module module_t_files
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)
     character(len=80), save, allocatable :: filenames(:)
     integer, save, allocatable :: iteration(:), n_columns(:)
-
+    logical :: disable_all_output = .false.
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
 
 
-    PUBLIC :: init_t_file, append_t_file, close_t_file, close_all_t_files
+    PUBLIC :: init_t_file, append_t_file, close_t_file, close_all_t_files, disable_all_t_files_output
 
 contains
 
+    ! It may sometimes be useful not to have any output generated, for example during
+    ! testing and development. calling this function effectively disables the entire module.
+    subroutine disable_all_t_files_output()
+        implicit none
+        disable_all_output = .true.
+    end subroutine
 
     subroutine init_t_file(fname, overwrite, header)
         implicit none
@@ -32,6 +38,8 @@ contains
         integer :: fileID, mpicode
         logical :: exists
         character(len=80) :: format
+
+        if (disable_all_output) return
 
         ! the first called routine will have to set this...
         call MPI_COMM_RANK (MPI_COMM_WORLD, mpirank, mpicode)
@@ -94,6 +102,8 @@ contains
 
         integer :: fileID, mpicode
 
+        if (disable_all_output) return
+
         ! the first called routine will have to set this...
         call MPI_COMM_RANK(MPI_COMM_WORLD, mpirank, mpicode)
 
@@ -147,6 +157,8 @@ contains
         character(len=80) :: format
         integer :: i
 
+        if (disable_all_output) return
+
         if (mpirank/=0) return
 
         if (iteration(fileID)-1 == 0 ) return
@@ -173,6 +185,7 @@ contains
         character(len=*), intent(in) :: fname
         integer :: fileID
 
+        if (disable_all_output) return
         if (mpirank/=0) return
 
         ! dump data to buffer, flush if it is time to do so
@@ -194,6 +207,7 @@ contains
         implicit none
         integer :: fileID
 
+        if (disable_all_output) return
         if (mpirank/=0) return
 
         ! dump data to buffer, flush if it is time to do so

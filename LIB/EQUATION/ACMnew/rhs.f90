@@ -39,11 +39,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
 
+    real(kind=rk), allocatable, save :: vor(:,:,:,:)
+
 
     ! local variables
-    integer(kind=ik) :: mpierr, i, dim
+    integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -60,8 +62,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         ! this stage is called only once, not for each block.
         ! performs initializations in the RHS module, such as resetting integrals
 
-        params_acm%mean_flow = 0.0_rk
-        params_acm%mean_p = 0.0_rk
+        ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
+        ! rate at all times, so compute that, if we use the forcing.
+        if (params_acm%use_HIT_linear_forcing) then
+            params_acm%e_kin = 0.0_rk
+            params_acm%enstrophy = 0.0_rk
+        endif
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
@@ -83,25 +89,46 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
             endif
         enddo
 
-        if (params_acm%dim == 2) then
-            if (params_acm%u_mean_zero .or. params_acm%forcing) then
-                params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1))*dx(1)*dx(2)
-                params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 2))*dx(1)*dx(2)
-            endif
-            if (params_acm%p_mean_zero) then
-                params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 3))*dx(1)*dx(2)
-            endif
+        ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
+        ! rate at all times, so compute that, if we use the forcing.
+        if (params_acm%use_HIT_linear_forcing) then
+            ! vorticity work array
+            if (.not. allocated(vor) ) allocate(vor(1:size(u,1), 1:size(u,2), 1:size(u,3), 1:3 ))
+            ! to compute the current dissipation rate
+            call vorticity_ACM_block(Bs, g, dx, u, vor)
 
-        else
-            if (params_acm%u_mean_zero .or. params_acm%forcing) then
-                params_acm%mean_flow(1) = params_acm%mean_flow(1) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1))*dx(1)*dx(2)*dx(3)
-                params_acm%mean_flow(2) = params_acm%mean_flow(2) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 2))*dx(1)*dx(2)*dx(3)
-                params_acm%mean_flow(3) = params_acm%mean_flow(3) + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 3))*dx(1)*dx(2)*dx(3)
-            endif
-            if (params_acm%p_mean_zero) then
-                params_acm%mean_p = params_acm%mean_p + sum(u(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 4))*dx(1)*dx(2)*dx(3)
-            endif
-        endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+            if (dim == 2) then
+                dV = dx(1)*dx(2)
+                dV2 = dV * 0.5_rk
+
+                iz = 1
+                do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
+                    do ix = g+1, Bs(1)+g-1
+                        ! note dV2 contains the 0.5 from energy as well as the spacing
+                        params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) )
+
+                        params_acm%enstrophy = params_acm%enstrophy + dv * vor(ix,iy,iz,1)*vor(ix,iy,iz,1)
+                    enddo
+                enddo
+            else
+                dV = dx(1)*dx(2)*dx(3)
+                dV2 = dV * 0.5_rk
+
+                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+                    do iy = g+1, Bs(2)+g-1
+                        do ix = g+1, Bs(1)+g-1
+                            ! note dV2 contains the 0.5 from energy as well as the spacing
+                            params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) &
+                            + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
+
+                            params_acm%enstrophy = params_acm%enstrophy + dv*( vor(ix,iy,iz,1)*vor(ix,iy,iz,1) &
+                            + vor(ix,iy,iz,2)*vor(ix,iy,iz,2) + vor(ix,iy,iz,3)*vor(ix,iy,iz,3) )
+                        enddo
+                    enddo
+                enddo
+
+            endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+        endif
 
     case ("post_stage")
         !-------------------------------------------------------------------------
@@ -109,15 +136,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
         !-------------------------------------------------------------------------
         ! this stage is called only once, not for each block.
 
-        if (params_acm%u_mean_zero .or. params_acm%forcing) then
-            tmp = params_acm%mean_flow
-            call MPI_ALLREDUCE(tmp, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:dim))
-        endif
-        if (params_acm%p_mean_zero) then
-            tmp2 = params_acm%mean_p
-            call MPI_ALLREDUCE(tmp2, params_acm%mean_p, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_acm%mean_p = params_acm%mean_p / product(params_acm%domain_size(1:dim))
+        ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
+        ! rate at all times, so compute that, if we use the forcing.
+        if (params_acm%use_HIT_linear_forcing) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+            params_acm%dissipation = params_acm%enstrophy * params_acm%nu
         endif
 
     case ("local_stage")
@@ -235,12 +260,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
-    if (maxval(abs(params_acm%mean_flow)) > 1.0e3_rk ) then
-        call abort(887, "ACM: meanflow out of bounds")
-    endif
-
-
-
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -323,64 +342,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         call abort(441166, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end if
 
-    ! --------------------------------------------------------------------------
-    ! forcing term.
-    ! --------------------------------------------------------------------------
-    ! is forcing used at all?
-    if (params_acm%forcing) then
-        do idir = 1, 2
-            select case (params_acm%forcing_type(idir))
-            case('accelerate')
-                forcing(idir) = max(0.0_rk, params_acm%u_mean_set(idir)-params_acm%mean_flow(idir)) &
-                * startup_conditioner(time, 0.0_rk, 0.5_rk)
-                ! add forcing to right hand side
-                rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
-
-            case('fixed')
-                ! note fixed forcing directly modifies the state vetor and is not a
-                ! forcing term in the conventional sense.
-                forcing(idir) = 0.0_rk
-                phi(:,:,idir) = phi(:,:,idir) - params_acm%mean_flow(idir) + params_acm%u_mean_set(idir)
-                ! add forcing to right hand side
-                rhs(:,:,idir) = rhs(:,:,idir) + forcing(idir)
-
-            case('none')
-                ! do nothing in this direction.
-
-            case('taylor_green')
-                if (idir==1) then
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            x = x0(1) + dble(ix-g-1) * dx(1)
-                            y = x0(2) + dble(iy-g-1) * dx(2)
-                            call continue_periodic(x,params_acm%domain_size(1))
-                            call continue_periodic(y,params_acm%domain_size(2))
-                            term_2 = 2.0_rk*nu*dcos(time) - dsin(time)
-                            forcing(1) = dsin(x - params_acm%u_mean_set(1)*time) * dcos(y - params_acm%u_mean_set(2)*time) *term_2
-                            forcing(2) = -dcos(x - params_acm%u_mean_set(1)*time) * dsin(y - params_acm%u_mean_set(2) * time) *term_2
-                            rhs(ix,iy,1:2) = rhs(ix,iy,1:2) + forcing(1:2)
-                        end do
-                    end do
-                end if
-
-            case default
-                call abort(7710, "ACM::rhs.f90::meanflow forcing type unkown")
-
-            end select
-        end do
-    end if
-
-    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
-    ! state vector and not the RHS.
-    if (params_acm%p_mean_zero) then
-        phi(:,:,3) = phi(:,:,3) - params_acm%mean_p
-    end if
-
-    ! remove mean flow
-    if (params_acm%u_mean_zero) then
-        phi(:,:,1) = phi(:,:,1) - params_acm%mean_flow(1)
-        phi(:,:,2) = phi(:,:,2) - params_acm%mean_flow(2)
-    end if
 
     ! --------------------------------------------------------------------------
     ! sponge term.
@@ -439,7 +400,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, eps, eps_inv, gamma, spo
+                     nu, eps, eps_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
     real(kind=rk) :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
@@ -468,8 +429,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
     eps_inv = 1.0_rk / eps
-
-
 
     if (order_discretization == "FD_2nd_central" ) then
         !-----------------------------------------------------------------------
@@ -611,18 +570,19 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end if
 
-    ! remove mean pressure. NOTE: there is some oddities here, as the code modifies the
-    ! state vector and not the RHS.
-    if (params_acm%p_mean_zero) then
-        phi(:,:,:,4) = phi(:,:,:,4) - params_acm%mean_p
-    end if
+    ! --------------------------------------------------------------------------
+    ! HIT linear forcing
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_HIT_linear_forcing) then
+        G_gain = 100.0_rk
+        e_kin_set = 0.5_rk * (product(params_acm%domain_size))
+        t_l_inf = 1.0_rk ! (2.0_rk/3.0_rk) * e_kin_set /
+        A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
 
-    ! remove mean flow
-    if (params_acm%u_mean_zero) then
-        phi(:,:,:,1) = phi(:,:,:,1) - params_acm%mean_flow(1)
-        phi(:,:,:,2) = phi(:,:,:,2) - params_acm%mean_flow(2)
-        phi(:,:,:,3) = phi(:,:,:,3) - params_acm%mean_flow(3)
-    end if
+        rhs(:,:,:,1) = rhs(:,:,:,1) + A_forcing*phi(:,:,:,1)
+        rhs(:,:,:,2) = rhs(:,:,:,2) + A_forcing*phi(:,:,:,2)
+        rhs(:,:,:,3) = rhs(:,:,:,3) + A_forcing*phi(:,:,:,3)
+    endif
 
     ! --------------------------------------------------------------------------
     ! sponge term.
@@ -708,6 +668,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     if (order_discretization == "FD_2nd_central" ) then
         call abort(2208191, "passive scalar implemented only with 4th order....sorry, I am lazy")
+
     else if (order_discretization == "FD_4th_central_optimized") then
         !-----------------------------------------------------------------------
         ! 4th order
@@ -1097,3 +1058,167 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end if
 end subroutine RHS_2D_scalar
+
+
+
+
+subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
+    implicit none
+
+    !> grid parameter
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> spacing of the block
+    real(kind=rk), dimension(3), intent(in) :: dx
+    !> datafields
+    real(kind=rk), intent(inout) :: u(:,:,:,:)
+    real(kind=rk), intent(inout) :: vor(:,:,:,:)
+
+    !> derivatives
+    real(kind=rk) :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
+    !> inverse of dx, dy, dz
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+    ! coefficients for Tam&Webb
+    real(kind=rk) :: a(-3:3)
+
+    ! Tam & Webb, 4th order optimized (for first derivative)
+    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
+    0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+
+    if ( params_acm%dim == 2) then
+        !-----------------------------------------------------------------------
+        ! 2D, vorticity is a scalar
+        !-----------------------------------------------------------------------
+        dx_inv = 1.0_rk / dx(1)
+        dy_inv = 1.0_rk / dx(2)
+
+        if (params_acm%discretization == "FD_2nd_central") then
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        u_dy = (u(ix,iy+1,iz,1)-u(ix,iy-1,iz,1))*dy_inv*0.5_rk
+                        v_dx = (u(ix+1,iy,iz,2)-u(ix-1,iy,iz,2))*dx_inv*0.5_rk
+
+                        vor(ix,iy,iz,1) = v_dx - u_dy
+                    end do
+                end do
+            end do
+        elseif (params_acm%discretization == "FD_4th_central_optimized") then
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        u_dy = (a(-3)*u(ix,iy-3,iz,1) &
+                        + a(-2)*u(ix,iy-2,iz,1) &
+                        + a(-1)*u(ix,iy-1,iz,1) &
+                        + a(0) *u(ix,iy,iz,1) &
+                        + a(+1)*u(ix,iy+1,iz,1) &
+                        + a(+2)*u(ix,iy+2,iz,1) &
+                        + a(+3)*u(ix,iy+3,iz,1))*dy_inv
+
+                        v_dx = (a(-3)*u(ix-3,iy,iz,2) &
+                        + a(-2)*u(ix-2,iy,iz,2) &
+                        + a(-1)*u(ix-1,iy,iz,2) &
+                        + a(0) *u(ix,iy,iz,2) &
+                        + a(+1)*u(ix+1,iy,iz,2) &
+                        + a(+2)*u(ix+2,iy,iz,2) &
+                        + a(+3)*u(ix+3,iy,iz,2))*dx_inv
+
+                        vor(ix,iy,iz,1) = v_dx - u_dy
+                    end do
+                end do
+            end do
+        else
+            call abort(1902201, "unknown order_discretization in ACM vorticity")
+        endif
+    else
+        !-----------------------------------------------------------------------
+        ! 3D, vorticity is a vector
+        !-----------------------------------------------------------------------
+        dx_inv = 1.0_rk / dx(1)
+        dy_inv = 1.0_rk / dx(2)
+        dz_inv = 1.0_rk / dx(3)
+
+        if (params_acm%discretization == "FD_2nd_central") then
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        u_dy = (u(ix,iy+1,iz,1) - u(ix,iy-1,iz,1))*dy_inv*0.5_rk
+                        u_dz = (u(ix,iy,iz+1,1) - u(ix,iy,iz-1,1))*dz_inv*0.5_rk
+                        v_dx = (u(ix+1,iy,iz,2) - u(ix-1,iy,iz,2))*dx_inv*0.5_rk
+                        v_dz = (u(ix,iy,iz+1,2) - u(ix,iy,iz-1,2))*dz_inv*0.5_rk
+                        w_dx = (u(ix+1,iy,iz,3) - u(ix-1,iy,iz,3))*dx_inv*0.5_rk
+                        w_dy = (u(ix,iy+1,iz,3) - u(ix,iy-1,iz,3))*dy_inv*0.5_rk
+
+                        vor(ix,iy,iz,1) = w_dy - v_dz
+                        vor(ix,iy,iz,2) = u_dz - w_dx
+                        vor(ix,iy,iz,3) = v_dx - u_dy
+                    end do
+                end do
+            end do
+        elseif (params_acm%discretization == "FD_4th_central_optimized") then
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        u_dy = (a(-3)*u(ix,iy-3,iz,1) &
+                        + a(-2)*u(ix,iy-2,iz,1) &
+                        + a(-1)*u(ix,iy-1,iz,1) &
+                        + a(0) *u(ix,iy,iz,1) &
+                        + a(+1)*u(ix,iy+1,iz,1) &
+                        + a(+2)*u(ix,iy+2,iz,1) &
+                        + a(+3)*u(ix,iy+3,iz,1))*dy_inv
+
+                        u_dz = (a(-3)*u(ix,iy,iz-3,1) &
+                        + a(-2)*u(ix,iy,iz-2,1) &
+                        + a(-1)*u(ix,iy,iz-1,1) &
+                        + a(0) *u(ix,iy,iz,1) &
+                        + a(+1)*u(ix,iy,iz+1,1) &
+                        + a(+2)*u(ix,iy,iz+2,1) &
+                        + a(+3)*u(ix,iy,iz+3,1))*dz_inv
+
+                        v_dx = (a(-3)*u(ix-3,iy,iz,2) &
+                        + a(-2)*u(ix-2,iy,iz,2)  &
+                        + a(-1)*u(ix-1,iy,iz,2) &
+                        + a(0) *u(ix,iy,iz,2) &
+                        + a(+1)*u(ix+1,iy,iz,2) &
+                        + a(+2)*u(ix+2,iy,iz,2) &
+                        + a(+3)*u(ix+3,iy,iz,2))*dx_inv
+
+                        v_dz = (a(-3)*u(ix,iy,iz-3,2) &
+                        + a(-2)*u(ix,iy,iz-2,2) &
+                        + a(-1)*u(ix,iy,iz-1,2) &
+                        + a(0) *u(ix,iy,iz,2) &
+                        + a(+1)*u(ix,iy,iz+1,2) &
+                        + a(+2)*u(ix,iy,iz+2,2) &
+                        + a(+3)*u(ix,iy,iz+3,2))*dz_inv
+
+                        w_dx = (a(-3)*u(ix-3,iy,iz,3) &
+                        + a(-2)*u(ix-2,iy,iz,3) &
+                        + a(-1)*u(ix-1,iy,iz,3) &
+                        + a(0) *u(ix,iy,iz,3) &
+                        + a(+1)*u(ix+1,iy,iz,3) &
+                        + a(+2)*u(ix+2,iy,iz,3) &
+                        + a(+3)*u(ix+3,iy,iz,3))*dx_inv
+
+                        w_dy = (a(-3)*u(ix,iy-3,iz,3) &
+                        + a(-2)*u(ix,iy-2,iz,3) &
+                        + a(-1)*u(ix,iy-1,iz,3) &
+                        + a(0) *u(ix,iy,iz,3) &
+                        + a(+1)*u(ix,iy+1,iz,3) &
+                        + a(+2)*u(ix,iy+2,iz,3) &
+                        + a(+3)*u(ix,iy+3,iz,3))*dy_inv
+
+                        vor(ix,iy,iz,1) = w_dy - v_dz
+                        vor(ix,iy,iz,2) = u_dz - w_dx
+                        vor(ix,iy,iz,3) = v_dx - u_dy
+                    end do
+                end do
+            end do
+        else
+            call abort(1902201, "unknown order_discretization in ACM vorticity")
+        endif
+    endif
+
+
+end subroutine

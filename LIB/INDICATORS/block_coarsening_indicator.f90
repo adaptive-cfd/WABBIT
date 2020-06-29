@@ -55,7 +55,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, nnorm(1)
@@ -114,16 +114,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         !! only once in the first iteration. this is important: as adapt_mesh is an iterative
         !! routine that calls the coarsening until the grid does not change anymore. without
         !! the iteration==0 check, it will always keep on coarsening.
-
-        if (iteration == 0) then
-            ! call init_random_seed()
-            ! the chance for coarsening:
-            crsn_chance = 0.25_rk
-            ! random number
-            call random_number(r)
-            ! set refinement status to coarsen based on random numbers.
-            if ( r <= crsn_chance ) refinement_status = -1
-        endif
+        call abort(77777,"This function has been moved to grid_coarsening_indicator.f90 and should not be called")
 
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))

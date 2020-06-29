@@ -330,10 +330,9 @@ program main
             ! advance in time (make one time step)
             !*******************************************************************
             t4 = MPI_wtime()
-            call time_stepper( time, dt, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
+            call time_stepper( time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
             hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
             call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
-            iteration = iteration + 1
 
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
@@ -364,12 +363,6 @@ program main
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
                 lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
-
-                params%next_stats_time = params%next_stats_time + params%tsave_stats
-                ! Ensure that the output is written in the end of the simulation
-                if (params%next_stats_time > params%time_max) then
-                    params%next_stats_time = params%time_max
-                endif
             endif
 
             ! if multiple time steps are performed on the same grid, we have to be careful
@@ -470,6 +463,19 @@ program main
     ! end of main time loop
     !***************************************************************************
     if (rank==0) write(*,*) "This is the end of the main time loop!"
+
+
+    !*******************************************************************
+    ! statistics ( last time )
+    !*******************************************************************
+    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        ! we need to sync ghost nodes for some derived qtys, for sure
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+
+        call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
+    endif
+
 
     ! close and flush all existings *.t files
     call close_all_t_files()

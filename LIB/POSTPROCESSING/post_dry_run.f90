@@ -21,6 +21,9 @@ subroutine post_dry_run
     use module_bridge_interface
     use module_forest
     use module_mask
+    ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
+    ! to dump kinematics data.
+    use module_ACM
 
     implicit none
 
@@ -88,6 +91,37 @@ subroutine post_dry_run
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
+
+    !-----------------------------------
+    call init_t_file('kinematics.t', .true., (/ &
+    "           time", &
+    "    xc_body_g_x", &
+    "    xc_body_g_y", &
+    "    xc_body_g_z", &
+    "            psi", &
+    "           beta", &
+    "          gamma", &
+    "     eta_stroke", &
+    "        alpha_l", &
+    "          phi_l", &
+    "        theta_l", &
+    "        alpha_r", &
+    "          phi_r", &
+    "        theta_r", &
+    "  rot_rel_l_w_x", &
+    "  rot_rel_l_w_y", &
+    "  rot_rel_l_w_z", &
+    "  rot_rel_r_w_x", &
+    "  rot_rel_r_w_y", &
+    "  rot_rel_r_w_z", &
+    "   rot_dt_l_w_x", &
+    "   rot_dt_l_w_y", &
+    "   rot_dt_l_w_z", &
+    "   rot_dt_r_w_x", &
+    "   rot_dt_r_w_y", &
+    "   rot_dt_r_w_z"/) )
+    !-----------------------------------
+
     do while ( time < params%time_max )
 
         ! start with an equidistant grid on coarsest level.
@@ -151,6 +185,10 @@ subroutine post_dry_run
 
         enddo
 
+
+        call WRITE_INSECT_DATA(time)
+
+
         !***********************************************************************
         ! Write fields to HDF5 file
         !***********************************************************************
@@ -161,14 +199,14 @@ subroutine post_dry_run
         write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
         call write_field( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
-        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-
-        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 3, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-
-        write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
-        call write_field( fname, time, -99, 4, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        !write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+        !call write_field( fname, time, -99, 2, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+	!
+        !write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+        !call write_field( fname, time, -99, 3, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        !
+        !write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+        ! call write_field( fname, time, -99, 4, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
         time = time + params%write_time
     end do

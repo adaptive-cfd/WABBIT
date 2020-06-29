@@ -35,6 +35,10 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
     endif
 
     select case (params_acm%inicond)
+    case ("noise")
+        call random_data(u)
+        u = u * params_acm%beta
+
     case("pressure-blob")
         if (params_acm%dim==2) then
             ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.

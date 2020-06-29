@@ -67,21 +67,28 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)      :: Bs
     integer(kind=2)                     :: surface(3)=0
+    real(kind=rk)                       :: t0, t1
 
     ! grid parameter
     Bs = params%Bs
     g  = params%n_ghosts
+    t0 = MPI_wtime()
+
+
 
     !-------------------------------------------------------------------------
     ! create mask function at current time
     !-------------------------------------------------------------------------
+    t1 = MPI_wtime()
     call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
         hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    call toc( "RHS_wrapper::create_mask_tree", MPI_wtime()-t1 )
 
 
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
+    t1 = MPI_wtime()
     ! performs initializations in the RHS module, such as resetting integrals
     hvy_id = hvy_active(1, tree_ID_flow) ! for this stage, just pass any block (result does not depend on block)
     call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
@@ -117,6 +124,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     hvy_id = hvy_active(1, tree_ID_flow) ! for this stage, just pass any block (result does not depend on block)
     call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
     hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "post_stage" )
+    call toc( "RHS_wrapper::integral-stage", MPI_wtime()-t1 )
 
 
     !-------------------------------------------------------------------------
@@ -125,9 +133,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     ! the second stage then is what you would usually do: evaluate local differential
     ! operators etc.
 
-    ! I think the idea would be to add mask generation here; take it out of
-    ! physics modules rhs.f90
-
+    t1 = MPI_wtime()
     do k = 1, hvy_n(tree_ID_flow)
         hvy_id = hvy_active(k, tree_ID_flow)
         ! convert given hvy_id to lgt_id for block spacing routine
@@ -144,5 +150,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
         x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:, hvy_id), "local_stage", &
         boundary_flag=surface )
     enddo
+    call toc( "RHS_wrapper::local-stage", MPI_wtime()-t1 )
 
+    call toc( "RHS_wrapper_ALL", MPI_wtime()-t0 )
 end subroutine RHS_wrapper

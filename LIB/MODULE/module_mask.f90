@@ -60,6 +60,7 @@ contains
         ! default is false
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
+        if (params%dim == 2) force_all_parts = .true.
 
         !-----------------------------------------------------------------------
         ! complete generation of all parts, if required

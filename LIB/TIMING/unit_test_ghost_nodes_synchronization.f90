@@ -109,8 +109,12 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! and perform the same test for differnet frequencies (= resolutions) only on
     ! this one grid.
     !---------------------------------------------------------------------------
+    ! this parameter controls roughly how dense the random grid is, i.e., in % of the
+    ! complete memory.
+    params%max_grid_density = 0.02_rk
+    ! perform 5 iterations of random refinement/coarsening
     l = 5
-    call create_random_grid( params, lgt_block, hvy_block, hvy_work, hvy_tmp, hvy_neighbor, lgt_active, &
+    call create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l, tree_ID_flow )
 
     if (params%rank == 0) then

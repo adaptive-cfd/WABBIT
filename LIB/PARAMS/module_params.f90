@@ -45,7 +45,9 @@ module module_params
         real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
         character(len=80)                            :: time_step_method="RungeKuttaGeneric"
         character(len=80)                            :: krylov_subspace_dimension="fixed"
-        ! dt
+        logical :: RKC_custom_scheme=.false.
+        real(kind=rk), dimension(1:60) :: RKC_mu=0.0_rk, RKC_mu_tilde=0.0_rk, RKC_nu=0.0_rk, RKC_gamma_tilde=0.0_rk, RKC_c=0.0_rk
+         ! dt
         real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
         integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
@@ -60,6 +62,11 @@ module module_params
         real(kind=rk)                                :: write_time=0.1_rk
         ! data next write time, store here the next time for output data
         real(kind=rk)                                :: next_write_time=0.0_rk
+        ! this number is used when generating random grids.
+        ! the default of 75% is useful for ghost node unit tests, but we sometimes
+        ! have to create random grids that have no more than 1/8 active blocks so that
+        ! we can still refine them by one level.
+        real(kind=rk) :: max_grid_density = 0.75_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau

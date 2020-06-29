@@ -26,9 +26,10 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
-  use module_params, only: read_bs
-  use module_helpers, only : startup_conditioner, smoothstep
-  use module_params, only: merge_blancs, count_entries
+  use module_params, only : read_bs
+  use module_helpers, only : startup_conditioner, smoothstep, random_data
+  use module_params, only : merge_blancs, count_entries
+  use module_timing
 
   !---------------------------------------------------------------------------------------------
   ! variables
@@ -45,7 +46,7 @@ module module_acm
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, NORM_THRESHOLDFIELD_ACM, PREPARE_THRESHOLDFIELD_ACM, &
-  INITIALIZE_ASCII_FILES_ACM
+  INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -63,17 +64,14 @@ module module_acm
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?
-    logical :: forcing, penalization, smooth_mask=.True., compute_flow=.true.
-    ! the mean pressure has no meaning in incompressible fluids, but sometimes it can
-    ! be nice to ensure the mean is zero, e.g., for comparison wit other codes. if set to true
-    ! wabbit removes the mean pressure at every time step.
-    logical :: p_mean_zero=.false., u_mean_zero=.false.
+    logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:
-    logical :: use_sponge=.false.
+    logical :: use_sponge = .false.
+    logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
 
     logical :: use_passive_scalar = .false.
-    integer(kind=ik) :: N_scalars = 0
+    integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
     real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
     z0source(:), scalar_Ceta(:), widthsource(:)
     character(len=80), allocatable :: scalar_inicond(:), scalar_source_type(:)
@@ -86,17 +84,17 @@ module module_acm
     logical :: absorbing_sponge = .true.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=80) :: sponge_type=""
     character(len=80) :: coarsening_indicator=""
-    character(len=80), allocatable :: names(:), forcing_type(:)
+    character(len=80), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3)
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -119,6 +117,34 @@ contains
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
 #include "filter_ACM.f90"
+
+! this routine is public, even though it is non-standard for all physics modules.
+! it is used in "dry-run" mode, which we use to create insect mask functions without
+! solving the fluid equations. This is an incredibly useful mode, and it needs to write
+! the kinematics to *.t file. until a permanent solution is found, this is a HACK
+subroutine WRITE_INSECT_DATA(time)
+    implicit none
+    real(kind=rk), intent(in) :: time
+
+    if (Insect%second_wing_pair) then
+        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
+        Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
+        Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
+        Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
+        Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
+    else
+        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
+    endif
+
+end subroutine
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -177,16 +203,10 @@ contains
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
-    ! want to add a forcing term?
-    call read_param_mpi(FILE, 'ACM-new', 'forcing', params_acm%forcing, .false.)
-    if (allocated(params_acm%forcing_type)) deallocate(params_acm%forcing_type)
-    allocate( params_acm%forcing_type(1:3) )
-    call read_param_mpi(FILE, 'ACM-new', 'forcing_type', params_acm%forcing_type, (/"accelerate","none      ","none      "/) )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
-    call read_param_mpi(FILE, 'ACM-new', 'p_mean_zero', params_acm%p_mean_zero, .false. )
-    call read_param_mpi(FILE, 'ACM-new', 'u_mean_zero', params_acm%u_mean_zero, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
+    call read_param_mpi(FILE, 'ACM-new', 'use_HIT_linear_forcing', params_acm%use_HIT_linear_forcing, .false. )
 
 
     ! initial condition
@@ -217,6 +237,7 @@ contains
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
     call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(dble(params_acm%dim)*pi**2) )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
+    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params_acm%nsave_stats, 999999   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
@@ -332,12 +353,13 @@ contains
   ! condition, sometimes not. So each physic module must be able to decide on its
   ! time step. This routine is called for all blocks, the smallest returned dt is used.
   !-----------------------------------------------------------------------------
-  subroutine GET_DT_BLOCK_ACM( time, u, Bs, g, x0, dx, dt )
+  subroutine GET_DT_BLOCK_ACM( time, iteration, u, Bs, g, x0, dx, dt )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
-    real(kind=rk), intent (in) :: time
+    real(kind=rk), intent(in) :: time
+    integer(kind=ik), intent(in) :: iteration
 
     ! block data, containg the state vector. In general a 4D field (3 dims+components)
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -539,6 +561,39 @@ contains
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)
+
+      if (Insect%second_wing_pair) then
+          ! TODO
+          call init_t_file('kinematics.t', overwrite)
+      else
+          call init_t_file('kinematics.t', overwrite, (/&
+          "           time", &
+          "    xc_body_g_x", &
+          "    xc_body_g_y", &
+          "    xc_body_g_z", &
+          "            psi", &
+          "           beta", &
+          "          gamma", &
+          "     eta_stroke", &
+          "        alpha_l", &
+          "          phi_l", &
+          "        theta_l", &
+          "        alpha_r", &
+          "          phi_r", &
+          "        theta_r", &
+          "  rot_rel_l_w_x", &
+          "  rot_rel_l_w_y", &
+          "  rot_rel_l_w_z", &
+          "  rot_rel_r_w_x", &
+          "  rot_rel_r_w_y", &
+          "  rot_rel_r_w_z", &
+          "   rot_dt_l_w_x", &
+          "   rot_dt_l_w_y", &
+          "   rot_dt_l_w_z", &
+          "   rot_dt_r_w_x", &
+          "   rot_dt_r_w_y", &
+          "   rot_dt_r_w_z"/) )
+      endif
 
   end subroutine INITIALIZE_ASCII_FILES_ACM
 

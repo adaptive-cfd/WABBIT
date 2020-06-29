@@ -482,7 +482,7 @@ end subroutine read_intarray_from_ascii_file
     real(kind=rk) :: params_vector(1:)
     real(kind=rk), optional, intent(in) :: defaultvalue(1:)
 
-    integer :: n, m
+    integer :: n, m, iostat
     character(len=maxcolumns) :: value
     character(len=14)::formatstring
 
@@ -503,8 +503,13 @@ end subroutine read_intarray_from_ascii_file
 
     if (value .ne. '') then
       ! read the n values from the vector string
-      read (value, *) params_vector
-      write (value,formatstring) params_vector
+      read (value, *, iostat=iostat) params_vector
+      if (iostat /= 0) then
+          write(*,*) "ERROR! The vector we try to read from "//trim(adjustl(section))//"::"//trim(adjustl(keyword))
+          write(*,*) "does NOT have the right length (expected::",n,")"
+          stop
+      endif
+      write (value, formatstring) params_vector
     else
       if (present(defaultvalue)) then
         ! return default

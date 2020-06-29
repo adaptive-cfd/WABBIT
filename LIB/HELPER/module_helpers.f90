@@ -123,20 +123,25 @@ contains
         implicit none
 
         real(kind=rk), intent(in) :: time
-        real(kind=rk), intent(in), dimension(:) :: ai,bi
+        real(kind=rk), intent(in), dimension(1:) :: ai,bi
         real(kind=rk), intent(out) :: u, u_dt
-        real(kind=rk) :: dt,h00,h10,h01,h11,t
+        real(kind=rk) :: dt,h00,h10,h01,h11,t, time_periodized
         integer :: n, j1,j2
 
-        n=size(ai)
+        n = size(ai)
+
+        time_periodized = time
+        do while (time_periodized > 1.0_rk )
+            time_periodized = time_periodized - 1.0_rk
+        enddo
 
         dt = 1.d0 / dble(n)
-        j1 = floor(time/dt) + 1
+        j1 = floor(time_periodized/dt) + 1
         j2 = j1 + 1
         ! periodization
-        if (j2 > n) j2=1
+        if (j2 > n) j2 = 1
         ! normalized time (between two data points)
-        t = (time-dble(j1-1)*dt) /dt
+        t = (time_periodized-dble(j1-1)*dt) /dt
 
         ! values of hermite interpolant
         h00 = (1.d0+2.d0*t)*((1.d0-t)**2)
@@ -145,8 +150,7 @@ contains
         h11 = (t**2)*(t-1.d0)
 
         ! function value
-        u = h00*ai(j1) + h10*dt*bi(j1) &
-        + h01*ai(j2) + h11*dt*bi(j2)
+        u = h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2)
 
         ! derivative values of basis functions
         h00 = 6.d0*t**2 - 6.d0*t
@@ -155,8 +159,7 @@ contains
         h11 = 3.d0*t**2 - 2.d0*t
 
         ! function derivative value
-        u_dt = (h00*ai(j1) + h10*dt*bi(j1) &
-        + h01*ai(j2) + h11*dt*bi(j2) ) / dt
+        u_dt = (h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2) ) / dt
     end subroutine hermite_eval
 
 
@@ -440,20 +443,20 @@ contains
   subroutine component_wise_max_norm( block_data, block_norm)
      implicit none
      !------------------------------------------------------------------------
-     !> heavy data - this routine is called on one block only, 
+     !> heavy data - this routine is called on one block only,
      !> not on the entire grid. hence th 4D array.
      real(kind=rk), intent(in)    :: block_data(:, :, :, :)
-     !> norm of the block 
-     real(kind=rk), intent(inout) :: block_norm(:) 
+     !> norm of the block
+     real(kind=rk), intent(inout) :: block_norm(:)
      !------------------------------------------------------------------------
      integer(kind=ik) :: n_eqn, n
 
      n_eqn = size(block_data,4)
 
-     do n= 1, n_eqn    
+     do n= 1, n_eqn
        block_norm(n) = maxval(abs(block_data(:,:,:,n)) )
-     end do 
+     end do
 
-  end subroutine 
+  end subroutine
 
 end module module_helpers

@@ -204,7 +204,7 @@ contains
         end select
 
     end subroutine FIELD_NAMES_meta
-    
+
 
     !-----------------------------------------------------------------------------
     ! main level wrapper to set the right hand side on a block. Note this is completely
@@ -277,9 +277,9 @@ contains
     end subroutine RHS_meta
 
 
-  
+
      !-----------------------------------------------------------------------------
-     ! Adaptation is dependent on the different physics application. 
+     ! Adaptation is dependent on the different physics application.
      ! Every physics module can choose its own coarsening indicator.
     !-----------------------------------------------------------------------------
     subroutine PREPARE_THRESHOLDFIELD_meta( physics, time, u, g, x0, dx, &
@@ -313,7 +313,7 @@ contains
         ! level. All parts of the mask shall be included: chi, boundary values, sponges.
         ! On input, the mask array is correctly filled. You cannot create the full mask here.
         real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
-        
+
        ! !> if true then wabbit will ignore threshold_field and use the normal statevector instead
         !!> note: if false additional synchronicing will be needed, which makes
         !!>      adaptation SLOOOOOWWWWWWWWWW
@@ -335,11 +335,11 @@ contains
 
         end select
 
-    end subroutine 
+    end subroutine
 
     !-----------------------------------------------------------------------------
     ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX 
+    ! MPI_MAX
     ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
     !-----------------------------------------------------------------------------
     subroutine NORM_THRESHOLDFIELD_meta( physics, thresholdfield_block , BLOCK_NORM)
@@ -359,7 +359,7 @@ contains
 
         case ('navier_stokes')
           call NORM_THRESHOLDFIELD_NSTOKES(thresholdfield_block, BLOCK_NORM)
-          
+
         case ('POD')
           call component_wise_max_norm( thresholdfield_block, BLOCK_NORM)
 
@@ -369,7 +369,7 @@ contains
         end select
 
     end subroutine
-    
+
 
     !-----------------------------------------------------------------------------
     ! main level wrapper to compute statistics (such as mean flow, global energy,
@@ -468,12 +468,13 @@ contains
     ! condition, sometimes not. So each physic module must be able to decide on its
     ! time step. This routine is called for all blocks, the smallest returned dt is used.
     !-----------------------------------------------------------------------------
-    subroutine GET_DT_BLOCK_meta( physics, time, u, Bs, g, x0, dx, dt )
+    subroutine GET_DT_BLOCK_meta( physics, time, iteration, u, Bs, g, x0, dx, dt )
         implicit none
         character(len=*), intent(in) :: physics
         ! it may happen that some source terms have an explicit time-dependency
         ! therefore the general call has to pass time
         real(kind=rk), intent (in) :: time
+        integer(kind=ik), intent(in) :: iteration
 
         ! block data, containg the state vector. In general a 4D field (3 dims+components)
         ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
@@ -494,7 +495,7 @@ contains
         select case (physics)
         case ('ACM-new')
             ! artificial compressibility
-            call GET_DT_BLOCK_ACM( time, u, Bs, g, x0, dx, dt )
+            call GET_DT_BLOCK_ACM( time, iteration, u, Bs, g, x0, dx, dt )
 
         case ('ConvDiff-new')
             ! convection-diffusion

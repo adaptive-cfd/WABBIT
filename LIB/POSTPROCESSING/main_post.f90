@@ -19,7 +19,7 @@ program main_post
     use mpi
     ! global parameters
     use module_params
-    use module_MOR, only : post_POD, post_reconstruct, post_PODerror
+    use module_MOR, only : post_POD, post_reconstruct, post_PODerror, post_timecoef_POD
     use module_timing
 !---------------------------------------------------------------------------------------------
 ! variables
@@ -74,7 +74,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks")
+    case ("--add-two-masks", "--add", "--subtract", "--multiply")
         call post_add_two_masks(params)
 
     case ("--stl2dist")
@@ -96,6 +96,9 @@ program main_post
 
     case("--sparse-to-dense")
         call sparse_to_dense(params)
+
+    case ("--performance-test")
+        call performance_test(params)
 
     case("--dense-to-sparse")
         call dense_to_sparse(params)
@@ -129,6 +132,8 @@ program main_post
   case ("--POD-error")
     call post_PODerror(params)
 
+  case ("--POD-time")
+    call post_timecoef_POD(params)
 
     case default
 
@@ -148,6 +153,7 @@ program main_post
             write(*,*) "--POD"
             write(*,*) "--POD-reconstruct"
             write(*,*) "--POD-error"
+            write(*,*) "--POD-time"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
             write(*,*) "--post_rhs"

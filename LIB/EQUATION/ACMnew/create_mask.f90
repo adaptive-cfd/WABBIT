@@ -182,6 +182,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_cylinder( mask, x0, dx, Bs, g )
         endif
 
+    case ('rotating_cylinder')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_rotating_cylinder( time, mask, x0, dx, Bs, g )
+        endif
+
     case ('two-cylinders')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
@@ -268,6 +273,75 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 end subroutine draw_cylinder
 
+!-------------------------------------------------------------------------------
+
+subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    real(kind=rk) :: time
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk) :: x, y, r, h, dx_min, tmp, x00, y00, radius, frequ, alpha
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! frequency of rotation is unity:
+    frequ = 1.0_rk
+    ! radius of rotation:
+    radius = 1.0_rk
+    alpha = 2.0_rk * pi * time * frequ
+    ! cylinder mid-point as a function of time:
+    x00 = params_acm%x_cntr(1) + dcos(alpha)*radius
+    y00 = params_acm%x_cntr(2) + dsin(alpha)*radius
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    h = 1.5_rk * dx_min
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        do ix = 1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! distance from center of cylinder
+            r = dsqrt( (x-x00)*(x-x00) + (y-y00)*(y-y00) )
+
+            tmp = smoothstep(r, params_acm%R_cyl, h)
+
+            if (tmp >= mask(ix,iy,1) .and. tmp > 0.0_rk) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! usx
+                mask(ix,iy,2) = -2.0_rk * pi * frequ * sin(alpha)
+                ! usy
+                mask(ix,iy,3) = +2.0_rk * pi * frequ * cos(alpha)
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_rotating_cylinder
+
+! ------------------------------------------------------------------------------
 
 subroutine draw_cavity(mask, x0, dx, Bs, g )
 

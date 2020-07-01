@@ -101,7 +101,7 @@ contains
     if (present(truncation_error)) then
       max_err=truncation_error
     else
-      max_err=1e-9_rk
+      max_err=0.0_rk
     endif
 
     if (rank == 0) then
@@ -354,7 +354,7 @@ contains
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
     integer(kind=ik) :: i, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
-    real(kind=rk) :: truncation_error=1e-13_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
+    real(kind=rk) :: truncation_error=0.0_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume
     logical :: verbosity = .false., save_all = .true.
     character(len=30) :: rowfmt

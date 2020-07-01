@@ -517,13 +517,19 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   character(len=80)                   :: detector_method, sigma_method
 
   stencil(1:stencil_size) = (/  1.0_rk/  4.0_rk, &
-  -1.0_rk/  2.0_rk, &
-  1.0_rk/  4.0_rk/)
+                               -1.0_rk/  2.0_rk, &
+                                1.0_rk/  4.0_rk/)
 
   ! threshold value
   r_th = filter%r_th!/( real(level,kind=rk) )**2.0_rk
 
   detector_method = filter%detector_method ! "p", "divU"
+
+
+  if (detector_method == "p") then
+      call abort(79655,"ERROR: filter detector pressure note implemented")
+  endif
+
   sigma_method    = filter%sigma_switch ! "abs", "tanh"
 
   c_stencil = (/ -c2, -c1, c1, c2 /);

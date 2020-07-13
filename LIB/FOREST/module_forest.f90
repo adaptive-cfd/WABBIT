@@ -895,7 +895,7 @@ contains
         integer(kind=ik),optional, intent(in)::dest_tree_id !< optional for saving results to destination tree id
         !-----------------------------------------------------------------
         integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
-        integer(kind=ik)    :: k1, k2, N, level_min, rank1, rank2, iq, iz, iy, ix, &
+        integer(kind=ik)    :: k1, k2, N, iq, iz, iy, ix, &
         hvy_id1, hvy_id2, Bs(3), g, lgt_id_dest, hvy_id_dest
         integer(kind=tsize) :: treecode1, treecode2
         real (kind=rk) :: t_elapse
@@ -1566,6 +1566,149 @@ contains
 ! prodcut for 2 different trees
 !  <f(x),g(x)> = int f(x) * g(x) dx
 function scalar_product_two_trees( params, tree_n, &
+                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                       tree_id1, tree_id2)  result(sprod)
+    implicit none
+
+    !-----------------------------------------------------------------
+    !> user defined parameter structure
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
+    !> light data array
+    integer(kind=ik),  intent(inout):: lgt_block(:, :)
+    !> size of active lists
+    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
+    !> heavy data array - block data
+    real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+    !> heavy temp data: needed in blockxfer which is called in add_two_trees
+    real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
+    !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout) :: lgt_active(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout) :: hvy_active(:, :)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    !---------------------------------------------------------------
+    integer(kind=ik)    :: free_tree_id, Jmax, Bs(3), g, &
+                         N, k, rank, i, mpierr
+    integer(kind=ik)    :: level1, level2, hvy_id1, hvy_id2, lgt_id1, lgt_id2
+    integer(kind=tsize) :: treecode1, treecode2
+    integer(kind=ik)    :: ix, iy, iz, iq, k1, k2
+
+
+    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2), sprod_block
+    real(kind=rk) :: x0(3), dx(3)
+
+
+    N = params%number_blocks
+    rank = params%rank
+    Jmax = params%max_treelevel
+    g = params%n_ghosts
+    Bs= params%Bs
+    Volume = product(params%domain_size(1:params%dim))
+
+    !----------------------------------------------
+    ! sprod = <X_i, X_j>
+    t_elapse = MPI_wtime()
+
+    t_inc(1) = t_elapse
+    !=============================================
+    ! Prepare the trees for pointwise arithmentic
+    !=============================================
+    ! The Trees can only be added when their grids are identical. At present we
+    ! try to keep the finest levels of all trees. This means we refine
+    ! all blocks which are not on the same level.
+
+    call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+
+    ! because all trees have the same treestructrue thier hilbertcurve is identical
+    ! and therefore balance the load will try to distribute blocks with the same
+    ! treecode (but on different trees) at the same rank.
+    call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+    lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+    hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
+
+    call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+    lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+    hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
+
+    t_inc(2) = MPI_WTIME()
+
+    sprod = 0.0_rk
+    do k1 = 1, hvy_n(tree_id1)
+        hvy_id1 = hvy_active(k1,tree_id1)
+        call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+        level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+        treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+        do k2 = 1, hvy_n(tree_id2)
+            hvy_id2 = hvy_active(k2,tree_id2)
+            call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+            level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
+            treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+            if (treecode1 .ne. treecode2 ) then
+                cycle
+            else
+                call get_block_spacing_origin( params, lgt_id1, lgt_block, x0, dx )
+                sprod_block = 0
+                if (params%dim==2) then
+                    !##########################################
+                    ! 2d
+                    do iq = 1, params%N_eqn
+                        do iy = g+1, Bs(2) + g
+                            do ix = g+1, Bs(1) + g
+                                sprod_block = sprod_block + hvy_block(ix,iy,1,iq,hvy_id1) * &
+                                hvy_block(ix,iy,1,iq,hvy_id2)
+                            end do
+                        end do
+                    end do
+                    !##########################################
+                else
+                    !##########################################
+                    ! 3D
+                    do iq = 1, params%N_eqn
+                        do iz = g+1, Bs(3) + g
+                            do iy = g+1, Bs(2) + g
+                                do ix = g+1, Bs(1) + g
+                                    sprod_block = sprod_block + hvy_block(ix,iy,iz,iq,hvy_id1) * &
+                                    hvy_block(ix,iy,iz,iq,hvy_id2)
+                                end do
+                            end do
+                        end do
+                    end do
+                    !##########################################
+                endif
+                sprod =sprod + product(dx(1:params%dim))*sprod_block
+                exit
+            endif
+         end do
+    end do
+
+    t_inc(1) = t_inc(2)-t_inc(1)
+    t_inc(2) = MPI_wtime()-t_inc(2)
+    !----------------------------------------------------
+    ! sum over all Procs
+    !----------------------------------------------------
+    call MPI_ALLREDUCE(MPI_IN_PLACE, sprod, 1, MPI_DOUBLE_PRECISION, &
+                       MPI_SUM,WABBIT_COMM, mpierr)
+
+    t_elapse = MPI_WTIME() - t_elapse
+
+    call toc( "scalra prod (prepare: refine_tree+balance_load)", t_inc(1) )
+    call toc( "scalra prod (hvy_data operation)", t_inc(2) )
+    call toc( "scalra prod (total)", t_elapse )
+end function
+!##############################################################
+
+
+!##############################################################
+! This function returns an scalar computed from the L2 scalar
+! prodcut for 2 different trees
+!  <f(x),g(x)> = int f(x) * g(x) dx
+function scalar_product_two_trees_old( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
                        tree_id1, tree_id2, buffer_tree_id)  result(sprod)

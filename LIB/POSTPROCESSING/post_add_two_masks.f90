@@ -136,14 +136,14 @@ subroutine post_add_two_masks(params)
         norm =  scalar_product_two_trees( params, tree_n, &
                                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                                       tree_id1=4, tree_id2=4, buffer_tree_id=5)
+                                       tree_id1=4, tree_id2=4)
         if (params%rank==0) then
             write(*,*) "Norm (should be not 0): ", norm
         end if
         norm =  scalar_product_two_trees( params, tree_n, &
                               lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                               hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                              tree_id1=2, tree_id2=2, buffer_tree_id=5)
+                              tree_id1=2, tree_id2=2)
         if (params%rank==0) then
           write(*,*) "Norm (should be not 0): ", norm
         end if
@@ -152,7 +152,7 @@ subroutine post_add_two_masks(params)
         norm =  scalar_product_two_trees( params, tree_n, &
                                    lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                    hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                                   tree_id1=3, tree_id2=3, buffer_tree_id=5)
+                                   tree_id1=3, tree_id2=3)
         if (params%rank==0) then
             write(*,*) "Norm (should be 0): ", norm
         end if

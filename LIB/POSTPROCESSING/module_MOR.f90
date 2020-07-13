@@ -253,7 +253,6 @@ contains
   !---------------------------------------------------------------------------
   if (rank ==0) write(*,*) "Computing temporal coefficients a"
 
-  free_tree_id = tree_n + 1
   do it = 1, N_snapshots
     do i = 1, N_modes
        ! scalar product (inner product)
@@ -261,13 +260,9 @@ contains
        V(it,i) = scalar_product_two_trees( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                       it, pod_mode_tree_id, free_tree_id)
+                       it, pod_mode_tree_id)
     enddo
   enddo
-  !! we do not need the free_tree_id any more. So we delete it
-  call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
-  call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-  lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
   Volume = product(params%domain_size(1:params%dim))
   ! V is the matrix of eigenvectors
@@ -603,7 +598,7 @@ contains
         M(i,j) = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        N_snapshots+i, N_snapshots+j,1)
+                        N_snapshots+i, N_snapshots+j)
       end do
     end do
 
@@ -1166,6 +1161,7 @@ contains
     real(kind=rk) :: C_val, Volume, t_elapse, t_inc(2)
     real(kind=rk) :: x0(3), dx(3)
 
+    t_elapse = MPI_wtime()
     N_snapshots = size(C,1)
     N = params%number_blocks
     rank = params%rank
@@ -1179,64 +1175,31 @@ contains
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
-        t_elapse = MPI_wtime()
-
-        !---------------------------------------------------
-        ! multiply tree_id2 * free_tree_id -> free_tree_id
-        !---------------------------------------------------
         t_inc(1) = MPI_wtime()
-        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, free_tree_id)
-        t_inc(1) = MPI_wtime()-t_inc(1)
 
-        !---------------------------------------------------
-        ! adapt the mesh before summing it up
-        !---------------------------------------------------
-        if ( params%adapt_mesh ) then
-            !call adapt_tree_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-            !lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, &
-            !free_tree_id, tree_n )
-        endif
+        ! L2 scalarproduct between tree 1 and tree 2
+        C_val = scalar_product_two_trees( params, tree_n, &
+                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                        tree_id2, tree_id2)
 
-        !----------------------------------------------------
-        ! sum over all elements of the tree with free_tree_id
-        !-----------------------------------------------------
-        t_inc(2) = MPI_wtime()
-        C_val = 0.0_rk
-        do k = 1, hvy_n(free_tree_id)
-          hvy_id = hvy_active(k, free_tree_id)
-          call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
-          ! calculate the lattice spacing.
-          ! It is needed to perform the L2 inner product
-          call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-          if ( params%dim == 3 ) then
-              C_val = C_val + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
-          else
-              C_val = C_val + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
-          endif
-        end do
-        t_inc(2) = MPI_wtime()-t_inc(2)
-        ! Construct correlation matrix
+        ! Construct symmetric correlation matrix
         C(tree_id1, tree_id2) = C_val
         C(tree_id2, tree_id1) = C_val
         !
-        t_elapse = MPI_WTIME() - t_elapse
+        t_inc(1) = MPI_WTIME() - t_inc(1)
         if (rank == 0) then
           write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
-          tree_id1, tree_id2, t_elapse
+          tree_id1, tree_id2, t_inc(1)
         endif
-        call toc( "compute_covariance_matrix (multiply trees)", t_inc(1) )
-        call toc( "compute_covariance_matrix (integrate over tree)", t_inc(2) )
       end do
     end do
-    ! sum over all Procs
-    call MPI_ALLREDUCE(MPI_IN_PLACE, C, N_snapshots**2, MPI_DOUBLE_PRECISION, &
-                       MPI_SUM,WABBIT_COMM, mpierr)
     ! Normalice C to the Volume of the integrated area (L2 scalar product)
     ! and by the number of snapshots
     C = C / Volume
     C = C / real(N_snapshots,kind=rk)
 
+    call toc( "compute_covariance_matrix", MPI_WTIME() - t_elapse )
     !if (rank==0)then
       !call print_mat(C)
     !endif
@@ -2087,13 +2050,6 @@ contains
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
-    !---------------------------------------------------------------
-
-    if (tree_n < fsize) then
-      free_tree_id = tree_n + 1
-    else
-       call abort(2808191, "Take care of the trees, they will take care of you.")
-    end if
 
     !---------------------------------------------------------------------------
     ! temporal coefficients
@@ -2107,13 +2063,9 @@ contains
          a_coefs(it,i) = scalar_product_two_trees( params, tree_n, &
                          lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                          hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                         it, pod_mode_tree_id, free_tree_id)
+                         it, pod_mode_tree_id)
       enddo
     enddo
-    !! we do not need the free_tree_id any more. So we delete it
-    call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     Volume = product(params%domain_size(1:params%dim))
     ! V is the matrix of eigenvectors

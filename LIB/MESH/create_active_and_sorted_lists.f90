@@ -30,7 +30,7 @@
 ! ################################################################################
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE by looping
 !> over the hvy ids and synchronizing the active lists with the other procs
-subroutine create_active_and_sorted_lists_tree_comm2( params, lgt_block, lgt_active, &
+subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     implicit none
@@ -144,14 +144,14 @@ subroutine create_active_and_sorted_lists_tree_comm2( params, lgt_block, lgt_act
     call toc("create_active_and_sorted_lists_tree (loop over lgt_n_sum)", t(4)-t(3))
     call toc("create_active_and_sorted_lists_tree (quicksort)", t(5)-t(4))
     call toc("create_active_and_sorted_lists_tree", MPI_wtime()-t0)
-end subroutine create_active_and_sorted_lists_tree_comm2
+end subroutine create_active_and_sorted_lists_tree
 
 
 ! ################################################################################
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE by looping
 !> over the hvy ids and synchronizing the active lists with the other procs
 !> \author PKrah
-subroutine create_active_and_sorted_lists_tree_comm( params, lgt_block, lgt_active, &
+subroutine create_active_and_sorted_lists_tree_comm2( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     implicit none
@@ -274,12 +274,12 @@ subroutine create_active_and_sorted_lists_tree_comm( params, lgt_block, lgt_acti
     call toc("create_active_and_sorted_lists_tree (loop over lgt_n)", t(4)-t(3))
     call toc("create_active_and_sorted_lists_tree (quicksort)", t(5)-t(4))
     call toc("create_active_and_sorted_lists_tree", MPI_wtime()-t0)
-end subroutine create_active_and_sorted_lists_tree_comm
+end subroutine create_active_and_sorted_lists_tree_comm2
 
 ! ################################################################################
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE
 !> \author PKrah
-subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
+subroutine create_active_and_sorted_lists_tree_old( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     implicit none
@@ -374,7 +374,7 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     call toc("create_active_and_sorted_lists_tree (loop over lgt_n)", t(3)-t(2))
     call toc("create_active_and_sorted_lists_tree (quicksort)", t(4)-t(3))
     call toc("create_active_and_sorted_lists_tree", MPI_wtime()-t0)
-end subroutine create_active_and_sorted_lists_tree
+end subroutine create_active_and_sorted_lists_tree_old
 
 
 ! ################################################################################

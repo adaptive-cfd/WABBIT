@@ -666,7 +666,6 @@ contains
         ! to be identical. Therefore, this routine modifies both trees such that for any position x in space
         ! the resolution is the higher
 
-
         ! loop until both trees have the same grid structure, meaning that no block has to be refined anymore
         do while( .true. )
             Nblocks_2refine = 0
@@ -742,7 +741,6 @@ contains
                 ! 1) check gradedness of the grid (meshlevel of adjacent blocks should not differe by more than 1
                 call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), lgt_n(tree_id1), &
                 lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
-
                 call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id2), lgt_n(tree_id2), &
                 lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
 
@@ -756,7 +754,6 @@ contains
                     ! 2D:
                     call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
                     hvy_active(:,tree_id1), hvy_n(tree_id1) )
-
                     call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
                     hvy_active(:,tree_id2), hvy_n(tree_id2) )
                 end if
@@ -948,19 +945,19 @@ contains
         hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
 
         ! since lgt_block was synced we have to create the active lists again
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
-        lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
-        lgt_sortednumlist(:,:,tree_id1), tree_id1 )
+        ! call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
+        ! lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
+        ! lgt_sortednumlist(:,:,tree_id1), tree_id1 )
 
         call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
         lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
         hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
 
         ! since lgt_block was synced we have to create the active lists again
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
-        lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
-        lgt_sortednumlist(:,:,tree_id2), tree_id2 )
-        call toc( "pointwise_tree_arithmetic (balancing + active list)", MPI_Wtime()-t_elapse )
+        ! call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
+        ! lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
+        ! lgt_sortednumlist(:,:,tree_id2), tree_id2 )
+        call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
         !=================================================
         ! Decide which pointwice arithmetic shell be used
         !=================================================
@@ -1398,30 +1395,12 @@ contains
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
         if (present(dest_tree_id)) then
-          ! we have to synchronize lgt data since we were updating it locally
+          ! we have to synchronize lgt data since we were updating it locally on this procesor
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-
-          ! the updates were only involving dest_tree_id so
-          ! all other active lists are still updated
-          !call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,dest_tree_id),&
-          !lgt_n(dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id), &
-          !lgt_sortednumlist(:,:,dest_tree_id), dest_tree_id )
-
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
         endif
 
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1),&
-        lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1) )
-
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-        hvy_active(:,tree_id1), hvy_n(tree_id1) )
-
-        call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id2),&
-        lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2) )
-
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-        hvy_active(:,tree_id2), hvy_n(tree_id2) )
     end subroutine
     !##############################################################
 

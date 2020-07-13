@@ -355,7 +355,7 @@ contains
     integer(kind=ik) :: i, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=0.0_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
-                     eps=-1.0_rk, L2norm, Volume
+                     eps=-1.0_rk, L2norm, Volume,t_elapse(2)
     logical :: verbosity = .false., save_all = .true.
     character(len=30) :: rowfmt
 
@@ -513,7 +513,7 @@ contains
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
-
+    t_elapse(1) = MPI_WTIME()
     do tree_id = 1, N_snapshots
       call read_field2tree(params,file_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
@@ -529,6 +529,8 @@ contains
           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
       endif
     end do
+    ! elapsed time for reading and coarsening the data
+    t_elapse(1)= MPI_Wtime()-t_elapse(1)
 
     ! --------------------
     ! Compute the L2 norm
@@ -570,9 +572,14 @@ contains
     !----------------------------------
     ! COMPUTE POD Modes
     !----------------------------------
+    t_elapse(2) = MPI_WTIME()
     call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        truncation_error, truncation_rank, save_all)
+    t_elapse(2) = MPI_Wtime()-t_elapse(2)
+    call toc( "post_POD (read + coarse): ", t_elapse(1) )
+    call toc( "post_POD (snapshot_POD): ", t_elapse(2) )
+    call toc( "post_POD (total wPOD algo): ", t_elapse(1) + t_elapse(2) )
     !----------------------------------
     ! Save Modes
     !----------------------------------

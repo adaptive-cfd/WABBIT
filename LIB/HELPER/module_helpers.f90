@@ -966,7 +966,7 @@ contains
       read (str,*, iostat=iostat) round_one_digit
 
       if (iostat /= 0) write(*,*) a, str
-    end
+    end function
 
 
 end module module_helpers

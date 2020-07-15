@@ -87,6 +87,7 @@ subroutine mult_mask(params)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
     params%n_ghosts = 2_ik
+    params%order_predictor == "multiresolution_2nd"
 
     allocate(params%butcher_tableau(1,1))
 

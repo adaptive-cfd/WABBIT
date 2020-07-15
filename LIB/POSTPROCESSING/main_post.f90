@@ -82,7 +82,7 @@ program main_post
     case("--compute-rhs")
         call post_rhs(params)
 
-    case("--mult-mask")
+    case("--mult-mask", "--mult-mask-direct", "--mult-mask-inverse")
         call mult_mask(params)
 
     !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
@@ -159,6 +159,9 @@ program main_post
             write(*,*) "--POD-time"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
+            write(*,*) "--mult-mask"
+            write(*,*) "--mult-mask-direct"
+            write(*,*) "--mult-mask-inverse"
             write(*,*) "--post_rhs"
             write(*,*) "--average"
 

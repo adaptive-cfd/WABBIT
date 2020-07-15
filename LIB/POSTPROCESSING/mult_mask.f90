@@ -14,7 +14,7 @@ subroutine mult_mask(params)
     type (type_params), intent(inout)  :: params
     character(len=80)      :: fname_input, fname_mask, fname_result, operation
     real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
+    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
@@ -80,8 +80,6 @@ subroutine mult_mask(params)
         end if
     endif
 
-
-
     params%max_treelevel = tc_length
     params%n_eqn = 2
     params%domain_size(1) = domain(1)
@@ -105,12 +103,21 @@ subroutine mult_mask(params)
     call read_field(fname_input, 1, params, hvy_block, hvy_n)
     call read_field(fname_mask , 2, params, hvy_block, hvy_n)
 
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    !call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    !    lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-        
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+
     ! calculate product
     if (operation == "--mult-mask" .or. operation == "--mult-mask-inverse") then
         do k = 1, hvy_n

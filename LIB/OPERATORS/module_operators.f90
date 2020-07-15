@@ -34,7 +34,7 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_vorticity, divergence, compute_Qcriterion, component_wise_tree_norm
+PUBLIC :: compute_vorticity, divergence, gradient, compute_Qcriterion, component_wise_tree_norm
 
 
 contains

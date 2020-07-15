@@ -108,6 +108,9 @@ program main_post
     case("--vorticity", "--divergence", "--vor-abs", "--Q")
         call compute_vorticity_post(params)
 
+    case("--gradient")
+        call compute_scalar_field_post(params)
+
     case("--keyvalues")
         call get_command_argument(2,filename)
         call keyvalues(filename, params)
@@ -145,6 +148,7 @@ program main_post
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
             write(*,*) "--Q"
+            write(*,*) "--gradient"            
             write(*,*) "--keyvalues"
             write(*,*) "--dry-run"
             write(*,*) "--compare-keys"

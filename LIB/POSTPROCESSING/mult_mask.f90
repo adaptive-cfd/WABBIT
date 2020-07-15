@@ -86,6 +86,7 @@ subroutine mult_mask(params)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
+    params%n_ghosts = 2_ik
 
     allocate(params%butcher_tableau(1,1))
 

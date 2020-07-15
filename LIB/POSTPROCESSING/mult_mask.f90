@@ -12,7 +12,7 @@ subroutine mult_mask(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: fname_input, fname_mask, fname_result
+    character(len=80)      :: fname_input, fname_mask, fname_result, operation
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
     integer(kind=ik), dimension(3) :: Bs
@@ -30,15 +30,22 @@ subroutine mult_mask(params)
     real(kind=rk), dimension(3)        :: domain
 
     !-----------------------------------------------------------------------------------------------------
+    ! operation name
+    call get_command_argument(1, operation)
+
     ! does the user need help?
     call get_command_argument(2, fname_input)
-
+    
     if (fname_input=='--help' .or. fname_input=='--h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
             write(*,*) "wabbit postprocessing routine for mutliplication with mask"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) " ./wabbit-post --mult-mask input_0000.h5 mask_0000.h5 result_0000.h5"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) " ./wabbit-post --mult-mask-direct input_0000.h5 mask_0000.h5 result_0000.h5"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) " ./wabbit-post --mult-mask-inverse input_0000.h5 mask_0000.h5 result_0000.h5"
             write(*,*) "------------------------------------------------------------------"
         end if
         return
@@ -52,16 +59,27 @@ subroutine mult_mask(params)
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-
+    
     if (params%rank==0) then
-        write(*,*) "------------------------------------------------------------------"
-        write(*,*) "Mutliplying field with 1-mask: result = (1.0-mask)*input"
-        write(*,*) "------------------------------------------------------------------"
-        write(*,*) "input= ", trim(adjustl(fname_input))
-        write(*,*) "mask=  ", trim(adjustl(fname_mask))
-        write(*,*) "result=", trim(adjustl(fname_result))
-        write(*,*) "------------------------------------------------------------------"
+        if (operation == "--mult-mask" .or. operation == "--mult-mask-inverse") then
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "Mutliplying field with 1-mask: result = (1.0-mask)*input"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "input= ", trim(adjustl(fname_input))
+            write(*,*) "mask=  ", trim(adjustl(fname_mask))
+            write(*,*) "result=", trim(adjustl(fname_result))
+            write(*,*) "------------------------------------------------------------------"
+        elseif (operation == "--mult-mask-direct") then
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "Mutliplying field with 1-mask: result = mask*input"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "input= ", trim(adjustl(fname_input))
+            write(*,*) "mask=  ", trim(adjustl(fname_mask))
+            write(*,*) "result=", trim(adjustl(fname_result))
+            write(*,*) "------------------------------------------------------------------"
+        end if
     endif
+
 
 
     params%max_treelevel = tc_length
@@ -92,12 +110,17 @@ subroutine mult_mask(params)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-
-
-    ! calculate vorticity from velocities
-    do k = 1, hvy_n
-        hvy_block(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k)) * (1.0_rk - hvy_block(:,:,:,2,hvy_active(k)))
-    end do
+        
+    ! calculate product
+    if (operation == "--mult-mask" .or. operation == "--mult-mask-inverse") then
+        do k = 1, hvy_n
+            hvy_block(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k)) * (1.0_rk - hvy_block(:,:,:,2,hvy_active(k)))
+        end do
+    elseif (operation == "--mult-mask-direct") then
+        do k = 1, hvy_n
+            hvy_block(:,:,:,1,hvy_active(k)) = hvy_block(:,:,:,1,hvy_active(k)) * hvy_block(:,:,:,2,hvy_active(k))
+        end do
+    end if
 
     call write_field(fname_result, time, iteration, 1, params, lgt_block, &
     hvy_block, lgt_active, lgt_n, hvy_n, hvy_active )

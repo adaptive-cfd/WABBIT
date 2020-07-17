@@ -38,7 +38,7 @@ subroutine post_mean(params)
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
     real(kind=rk)    :: x,y,z
-    real(kind=rk)    :: maxi,mini,squari,meani,qi
+    real(kind=rk)    :: maxi,mini,squari,meani,qi,inti
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
     integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, tc_length
 
@@ -112,13 +112,15 @@ subroutine post_mean(params)
 
     if (params%dim == 3) then
         meani = meani / (params%domain_size(1)*params%domain_size(2)*params%domain_size(3))
+        inti = meani*product(domain)
     else
         meani = meani / (params%domain_size(1)*params%domain_size(2))
+        inti = meani*product(domain(1:2))
     endif
 
     if (rank == 0) then
         write(*,*) "Computed mean value is: ", meani
-        write(*,*) "Computed integral value is: ", meani*product(domain)
+        write(*,*) "Computed integral value is: ", inti
 
         ! write volume integral to disk
         call get_command_argument(3,fname_out)

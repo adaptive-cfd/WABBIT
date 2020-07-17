@@ -29,7 +29,7 @@ subroutine post_mean(params)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim, g
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
@@ -97,14 +97,15 @@ subroutine post_mean(params)
 
     meanl = 0.0_rk
 
+    g = params%n_ghosts
     do k = 1,hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
+        
         if (params%dim == 3) then
-            meanl = meanl + sum( hvy_block(1:Bs(1), 1:Bs(2), 1:Bs(3), 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(1:Bs(1), 1:Bs(2), 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
         endif
     end do
 

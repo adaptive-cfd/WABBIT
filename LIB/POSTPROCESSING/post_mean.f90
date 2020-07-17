@@ -79,8 +79,13 @@ subroutine post_mean(params)
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -90,7 +95,6 @@ subroutine post_mean(params)
         nz = 1
     end if
 
-
     meanl = 0.0_rk
 
     do k = 1,hvy_n
@@ -98,9 +102,9 @@ subroutine post_mean(params)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (params%dim == 3) then
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(1:Bs(1), 1:Bs(2), 1:Bs(3), 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(1:Bs(1), 1:Bs(2), 1, 1, hvy_active(k)))*dx(1)*dx(2)
         endif
     end do
 

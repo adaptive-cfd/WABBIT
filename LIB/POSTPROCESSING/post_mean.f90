@@ -125,7 +125,7 @@ subroutine post_mean(params)
         ! write volume integral to disk
         call get_command_argument(3,fname_out)
         open(14,file=fname_out, status='replace')
-        write(14,*) meani*product(domain)
+        write(14,*) inti        
         close(14)
     endif
 end subroutine post_mean

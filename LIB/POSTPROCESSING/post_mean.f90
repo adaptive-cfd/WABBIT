@@ -103,9 +103,9 @@ subroutine post_mean(params)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         
         if (params%dim == 3) then
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_active(k)))*dx(1)*dx(2)
         endif
     end do
 

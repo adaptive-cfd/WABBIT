@@ -40,7 +40,7 @@ subroutine post_mean(params)
     real(kind=rk)    :: x,y,z
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, g, tc_length
+    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, tc_length
 
 
 
@@ -65,8 +65,8 @@ subroutine post_mean(params)
 
     params%Bs = Bs
     params%n_eqn = 1
-    params%n_ghosts = 0
-    g = 0
+    params%n_ghosts = 2_ik
+    params%order_predictor = "multiresolution_2nd"
     params%max_treelevel = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)

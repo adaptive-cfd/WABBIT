@@ -357,7 +357,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
 
-    nwork = max( 2*Neqn, params%N_fields_saved)
+    nwork = max( 2*Neqn, params%N_fields_saved) ! why 2*Neqn? which routine requieres minimum of 2*Neqn?
 
     if (rank == 0) then
         write(*,'(80("_"))')

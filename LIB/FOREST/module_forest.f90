@@ -27,7 +27,7 @@ module module_forest
     !**********************************************************************************************
     PUBLIC :: add_two_trees, substract_two_trees, count_tree_hvy_n, average_trees, &
     copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
-    compute_tree_L2norm, delete_tree, scalar_product_two_trees, &
+    compute_tree_L2norm, delete_tree, scalar_product_two_trees, scalar_product_two_trees_old, &
     same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree
     !**********************************************************************************************
 
@@ -560,62 +560,50 @@ contains
     end subroutine
     !##############################################################
 
+
     !##############################################################
-    !> L2 norm of all components in the statevector:
-    !             norm(q_f) = sqrt( sum_ijk q_f^2 * dx_i dx_j dz_k )
-    function compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt, &
-        tree_id_opt, verbosity) result(L2norm)
+    !> scalar product assoziated L2 norm ||u||_L2 = sqrt(<u,u>_L2)
+    !> note that this not implies a simple sum over the squares of u_ijk
+    !> it is rather a weighted sum depending on the wavelet basis.
+    function compute_tree_L2norm(params, tree_n, &
+                                 lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                                 hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp, &
+                                 tree_id, verbosity ) &
+                                 result(L2norm)
 
         implicit none
         !-----------------------------------------------------------------
         ! inputs:
-        type (type_params), intent(in) :: params   !< params structure
-        integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
-        real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-        integer(kind=ik), intent(in)   :: lgt_block(:, :)
-        integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
-        integer(kind=ik), intent(in),optional:: dF_opt ! statevector index (dF_opt = 1...,number equations) default:1
-        integer(kind=ik), intent(in),optional:: tree_id_opt !< which tree is used (default:1)
-        logical, intent(in),optional      :: verbosity !< if true aditional stdout is printed
+        type (type_params), intent(in)  :: params
+        integer(kind=ik), intent(in)      :: tree_id
+        !> light data array
+        integer(kind=ik),  intent(inout):: lgt_block(:, :)
+        !> size of active lists
+        integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
+        !> heavy data array - block data
+        real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+        !> heavy temp data: needed in blockxfer which is called in add_two_trees
+        real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
+        !> neighbor array (heavy data)
+        integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
+        !> list of active blocks (light data)
+        integer(kind=ik), intent(inout) :: lgt_active(:, :)
+        !> list of active blocks (light data)
+        integer(kind=ik), intent(inout) :: hvy_active(:, :)
+        !> sorted list of numerical treecodes, used for block finding
+        integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+        logical, intent(in),optional      :: verbosity !< if true: additional information of processing
         !-----------------------------------------------------------------
         ! result
         real(kind=rk) :: L2norm
         !-----------------------------------------------------------------
-        integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
-        integer(kind=ik)    :: k, N, rank, g, Bs(3), dF=1
-        real(kind=rk) :: norm, x0(3), dx(3)
         logical :: verbose=.false.
-
-        if (present(dF_opt)) dF = dF_opt
-        if (present(tree_id_opt)) tree_id = tree_id_opt
         if (present(verbosity)) verbose = verbosity
-        rank = params%rank
-        N = params%number_blocks
-        Bs= params%Bs
-        g = params%n_ghosts
 
-        norm = 0.0_rk
-        ! Loop over the active hvy_data
-        do k = 1,hvy_n(tree_id)
-            hvy_id = hvy_active(k, tree_id)
-            call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N)
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-            ! ----------------------------
-            ! integrate squared quantity
-            ! ----------------------------
-            if (params%dim == 3) then
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, &
-                g+1:Bs(3)+g, dF, hvy_id)**2)*dx(1)*dx(2)*dx(3)
-            else
-                norm = norm + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, &
-                dF, hvy_id)**2)*dx(1)*dx(2)
-            endif
-        end do
-        ! -------------------
-        ! sum over all blocks
-        ! -------------------
-        call MPI_ALLREDUCE( norm, L2norm, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
-
+        L2norm =  scalar_product_two_trees( params, tree_n, &
+                                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                                       tree_id1=tree_id, tree_id2=tree_id)
         L2norm = sqrt(L2norm)
         if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
     end function
@@ -1568,7 +1556,7 @@ contains
 function scalar_product_two_trees( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                       tree_id1, tree_id2)  result(sprod)
+                       tree_id1, tree_id2, verbosity)  result(sprod)
     implicit none
 
     !-----------------------------------------------------------------
@@ -1591,17 +1579,20 @@ function scalar_product_two_trees( params, tree_n, &
     integer(kind=ik), intent(inout) :: hvy_active(:, :)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !---------------------------------------------------------------
+    logical :: verbose=.false.
     integer(kind=ik)    :: free_tree_id, Jmax, Bs(3), g, &
                          N, k, rank, i, mpierr
     integer(kind=ik)    :: level1, level2, hvy_id1, hvy_id2, lgt_id1, lgt_id2
     integer(kind=tsize) :: treecode1, treecode2
-    integer(kind=ik)    :: ix, iy, iz, iq, k1, k2
+    integer(kind=ik)    :: ix, iy, iz, iq, k1, k2, Nord, delta1, delta2, delta3
 
-
-    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2), sprod_block
+    real(kind=rk), allocatable , save ::  M(:)
+    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
     real(kind=rk) :: x0(3), dx(3)
 
+    if (present(verbosity)) verbose=verbosity
 
     N = params%number_blocks
     rank = params%rank
@@ -1610,6 +1601,36 @@ function scalar_product_two_trees( params, tree_n, &
     Bs= params%Bs
     Volume = product(params%domain_size(1:params%dim))
 
+    ! depending on the predictor order, i.e. the order of the lagrange interpolation
+    ! scheme. we have to use a different "FEM" Mass matrices. See:
+    ! https://moodle.polymtl.ca/pluginfile.php/47880/mod_resource/content/0/week7.pdf
+    ! The matrix M_ij = <phi_i,phi_j> where the phis are the lagrange basis elements
+        if (params%order_predictor == "multiresolution_4th" ) then
+            ! cubic lagrange polynomials
+            Nord = 6
+            if (.not. allocated(M) ) then
+                allocate( M(Nord))
+                M  = (/ 0.8009680404299244, &
+                    0.13704178233326222, &
+                    -0.04024485728521606, &
+                    0.002795127767100863, &
+                    -7.592473960186964e-05, &
+                    -1.482905070349005e-07 /)
+
+                    if (params%n_ghosts .ne. 6) then
+                        call abort(09421, "for using the scalarproduct n_ghost must be at least 6!")
+                    endif
+            endif
+        elseif (params%order_predictor == "multiresolution_2nd" ) then
+            ! linear lagrange polynomials
+            Nord = 2
+            if (.not. allocated(M) ) then
+                allocate( M(Nord))
+                M  = (/ 0.66666667, 0.16666667 /)
+            endif
+        else
+            call abort(2875490, "The predictor method is unknown")
+        endif
     !----------------------------------------------
     ! sprod = <X_i, X_j>
     t_elapse = MPI_wtime()
@@ -1621,21 +1642,21 @@ function scalar_product_two_trees( params, tree_n, &
     ! The Trees can only be added when their grids are identical. At present we
     ! try to keep the finest levels of all trees. This means we refine
     ! all blocks which are not on the same level.
+    if (tree_id1 .ne. tree_id2) then
+        call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
 
-    call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+        ! because all trees have the same treestructrue thier hilbertcurve is identical
+        ! and therefore balance the load will try to distribute blocks with the same
+        ! treecode (but on different trees) at the same rank.
+        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+        lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+        hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
 
-    ! because all trees have the same treestructrue thier hilbertcurve is identical
-    ! and therefore balance the load will try to distribute blocks with the same
-    ! treecode (but on different trees) at the same rank.
-    call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-    lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-    hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
-
-    call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-    lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-    hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
-
+        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+        lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
+    end if
     t_inc(2) = MPI_WTIME()
 
     sprod = 0.0_rk
@@ -1653,15 +1674,22 @@ function scalar_product_two_trees( params, tree_n, &
                 cycle
             else
                 call get_block_spacing_origin( params, lgt_id1, lgt_block, x0, dx )
-                sprod_block = 0
+                sprod_block = 0.0_rk
                 if (params%dim==2) then
                     !##########################################
                     ! 2d
                     do iq = 1, params%N_eqn
                         do iy = g+1, Bs(2) + g
                             do ix = g+1, Bs(1) + g
-                                sprod_block = sprod_block + hvy_block(ix,iy,1,iq,hvy_id1) * &
-                                hvy_block(ix,iy,1,iq,hvy_id2)
+                                tmp = 0.0_rk
+                                do delta1 = -Nord+1, Nord-1
+                                 do delta2 = -Nord+1, Nord-1
+                                     tmp = tmp+ M(abs(delta1)+1)* M(abs(delta2)+1) *hvy_block(ix-delta1,iy-delta2,1,iq,hvy_id2)
+                                 end do
+                                end do
+                                !    sprod_block = sprod_block + hvy_block(ix,iy,1,iq,hvy_id1) * &
+                                !    hvy_block(ix,iy,1,iq,hvy_id2)
+                                sprod_block = sprod_block + hvy_block(ix,iy,1,iq,hvy_id1) * tmp
                             end do
                         end do
                     end do

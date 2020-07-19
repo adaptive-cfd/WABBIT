@@ -117,7 +117,7 @@ contains
       write(*, *)
     endif
 
-    if ( params%forest_size <= 2*N_snapshots) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if ( params%forest_size <= N_snapshots + truncation_rank) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
 
     !---------------------------------------------------------------------------
     ! Covariance Matrix of snapshot matrix X: C = X^T*X
@@ -337,7 +337,7 @@ contains
     real(kind=rk)   , allocatable :: time(:),M(:,:)
     integer(kind=ik), allocatable :: iteration(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :)
     integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:)
@@ -351,7 +351,7 @@ contains
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=0.0_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume,t_elapse(2)
-    logical :: verbosity = .false., save_all = .true.
+    logical :: verbose = .false., save_all = .true.
     character(len=30) :: rowfmt
 
     call get_command_argument(2, args)
@@ -372,13 +372,13 @@ contains
     !----------------------------------
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
-    call get_cmd_arg( "--nmodes", truncation_rank_in, default=truncation_rank_in )
-    call get_cmd_arg( "--error", truncation_error_in, default=truncation_error_in )
+    call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
+    call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
     call get_cmd_arg_str_vct( "--list", fname_list )
     call get_cmd_arg( "--memory", args, default="2GB")
     read(args(1:len_trim(args)-2),* ) maxmem
     call get_cmd_arg( "--save_all", save_all, default=.true.)
-    call get_cmd_arg( "--components", n_components, default=n_components)
+    call get_cmd_arg( "--components", n_components, default=1_ik)
 
 
     !-------------------------------
@@ -395,24 +395,7 @@ contains
     params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
 
-    ! Check parameters for correct inputs:
-    if (order == "CDF20") then
-        params%harten_multiresolution = .true.
-        params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
-    elseif (order == "CDF40") then
-        params%harten_multiresolution = .true.
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    elseif (order == "CDF44") then
-        params%harten_multiresolution = .false.
-        params%wavelet_transform_type = 'biorthogonal'
-        params%order_predictor = "multiresolution_4th"
-        params%wavelet='CDF4,4'
-        params%n_ghosts = 6_ik
-    else
-        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
-    end if
+    call set_wavelet_params(params, order )
 
     if ( eps > 0) then
       ! adapt the mesh if possible
@@ -428,7 +411,7 @@ contains
     ! set defaults for POD truncation
     !-------------------------------
     if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
-    if (truncation_error_in >1e-16_rk ) truncation_error = truncation_error_in
+    if (truncation_error_in >0.0_rk ) truncation_error = truncation_error_in
 
 
     !-------------------------------
@@ -483,7 +466,11 @@ contains
       i = i + 1
     end do
     ! now we have all information to allocate the grid and set up the forest:
-    fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
+    if (truncation_rank_in /= -1) then
+      fsize = N_snapshots + truncation_rank + 2 !we need some extra fields for storing etc
+    else
+      fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
+    end if
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = n_components
@@ -497,7 +484,7 @@ contains
     ! allocate data
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
    call reset_forest(lgt_block, lgt_active(:, 1), &
    params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
@@ -530,8 +517,8 @@ contains
     ! --------------------
     ! Compute the L2 norm
     !---------------------
-    L2norm = compute_L2norm(params, lgt_block, hvy_block, hvy_active, &
-                        hvy_n, N_snapshots, verbosity)
+    L2norm = compute_L2norm(params, tree_n, lgt_n, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, &
+                            hvy_neighbor, lgt_active, lgt_sortednumlist ,N_snapshots, verbose)
     Volume = product(domain(1:params%dim))
     if (params%rank==0) then
         write(*,'(80("-"))')
@@ -643,13 +630,13 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) :: fname_acoefs, filename, args
+    character(len=80) :: fname_acoefs, filename, args, order
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
     character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
-    real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
     real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
     integer(kind=ik), allocatable :: hvy_neighbor(:,:), hvy_active(:, :)
     integer(kind=ik), allocatable :: lgt_active(:,:), lgt_n(:), hvy_n(:)
@@ -663,7 +650,6 @@ contains
     integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
-    character(len=2)  :: order
     logical :: verbose = .false., save_all = .false.
 
     call get_command_argument(2, args)
@@ -673,13 +659,13 @@ contains
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Compute L2-error of wPOD "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) "Call mpi_command -n number_procs ./wabbit-post --POD-error a_coefs --components=3"
-            write(*,*) "                                --snapshot-list list_u1.txt [list_u2.txt] [list_u3.txt]"
-            write(*,*) "                                --mode-list     list_m1.txt [list_m2.txt] [list_m3.txt]"
-            write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB --iteration=1]"
+            write(*,*) "Call mpi_command -n number_procs ./wabbit-post --POD-error --time_coefficients=a_coefs.txt --components=3"
+            write(*,*) '                                --snapshot-list="list_u1.txt [list_u2.txt] [list_u3.txt]"'
+            write(*,*) '                                --mode-list="list_m1.txt [list_m2.txt] [list_m3.txt]"'
+            write(*,*) "                                [--order=[CDF40] --adapt=0.1 --memory=2GB --iteration=1]"
             write(*,*) "                                [--save_all]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
+            write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --snapshot-list      list of files containing all snapshots"
             write(*,*) " --mode-list          list of files containing all modes for reconstruction"
             write(*,*) " --components         number of components in statevector"
@@ -696,74 +682,18 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
 
-    do i = 1, command_argument_count()
-      call get_command_argument(i,args)
-      !-------------------------------
-      ! order of predictor
-      if ( index(args,"--order=")==1 ) then
-        read(args(9:len_trim(args)),* ) order
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! MEMORY AVAILABLE
-      if ( index(args,"--memory=")==1 ) then
-              read(args(10:len_trim(args)-2),* ) maxmem
-              n_opt_args = n_opt_args + 1
-      endif
-      !-------------------------------
-      ! ADAPTION
-      if ( index(args,"--adapt=")==1 ) then
-        read(args(9:len_trim(args)),* ) eps
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! SAVE Additional data to files
-      if ( index(args,"--save_all")==1 ) then
-        save_all = .true.
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! Number of components in statevector
-      if ( index(args,"--components=")==1 ) then
-        read(args(14:len_trim(args)),* ) n_components
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--snapshot-list")==1 ) then
-        allocate(fsnapshot_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fsnapshot_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-      !-------------------------------
-      ! TIMESTEP
-      if ( index(args,"--iteration=")==1 ) then
-        N_snapshots = 1
-        read(args(13:len_trim(args)),* ) iteration
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--mode-list")==1 ) then
-        allocate(fmode_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fmode_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-      !-------------------------------
-      ! TEMPORAL COEFFS
-      if ( index(args,"--POD-error")==1 ) then
-        call get_command_argument(i+1, fname_acoefs)
-        if (params%rank==0) write(*,*) "Temporal coefficients are read from: ", fname_acoefs
-        n_opt_args = n_opt_args + 1
-      end if
+    call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
+    call get_cmd_arg_str_vct( "--mode-list", fmode_list )
+    call get_cmd_arg_str( "--time_coefficients", fname_acoefs, default= "acoefs.txt" )
+    call get_cmd_arg( "--memory", args, default="2GB")
+    read(args(1:len_trim(args)-2),* ) maxmem
+    call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--components", n_components, default=1_ik)
+    call get_cmd_arg( "--iteration", iteration, default=1_ik)
 
-    end do
 
     if ( iteration>0 ) then
       if ( params%rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
@@ -787,14 +717,9 @@ contains
     params%threshold_mask=.False.
     params%n_eqn=n_components
 
-    if (order == "2") then
-        params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
-    else
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    end if
-    if ( eps > 0) then
+    call set_wavelet_params(params, order )
+
+    if ( eps > 0.0_rk) then
       ! adapt the mesh if possible
       params%adapt_mesh = .True.! .False.!.True.
       params%eps=eps
@@ -934,7 +859,7 @@ contains
     ! allocate data
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
    call reset_forest(lgt_block, lgt_active(:, 1), &
    params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
@@ -964,8 +889,8 @@ contains
     ! --------------------
     ! Compute the L2 norm
     !---------------------
-    L2norm_snapshots = compute_L2norm(params, lgt_block, hvy_block, hvy_active, &
-                        hvy_n, N_snapshots, verbose)
+    L2norm_snapshots = compute_L2norm(params, tree_n, lgt_n, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, &
+                            hvy_neighbor, lgt_active, lgt_sortednumlist ,N_snapshots, verbose)
     Volume = product(domain(1:params%dim))
     if (params%rank==0) then
         write(*,'(80("-"))')
@@ -1048,11 +973,10 @@ contains
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
         ! compute L2 norm
-        do dF = 1, params%n_eqn
-          norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
-                              tree_id_opt=reconst_tree_id, verbosity=verbose)
-          L2norm = L2norm + norm**2
-        end do
+        norm = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
+                                    lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
+                                     hvy_active, hvy_n, hvy_tmp, reconst_tree_id, verbose )
+        L2norm = L2norm + norm**2
       end do
       L2error(r) = L2norm/L2norm_snapshots**2
     end do
@@ -1082,42 +1006,54 @@ contains
 
   !##############################################################
   !> Compute the L2 norm of the snapshotmatrix
-  function compute_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n,  &
-                              N_snapshots, verbosity) result(L2norm)
+  function compute_L2norm(params, tree_n, lgt_n, lgt_block, hvy_block, hvy_active, hvy_n, &
+                          hvy_tmp, hvy_neighbor, lgt_active, lgt_sortednumlist ,N_snapshots, verbosity) &
+                          result(L2norm)
 
       implicit none
       !-----------------------------------------------------------------
       ! inputs:
-      type (type_params), intent(in) :: params   !< params structure
-      integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
-      real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-      integer(kind=ik), intent(in)   :: lgt_block(:, :)
-      integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
-      integer(kind=ik), intent(in)   :: N_snapshots !< number of snapshots
-      logical, intent(in),optional   :: verbosity !< if true aditional stdout is printed
+      type (type_params), intent(in)  :: params
+      integer(kind=ik), intent(in)      :: N_snapshots
+      !> light data array
+      integer(kind=ik),  intent(inout):: lgt_block(:, :)
+      !> size of active lists
+      integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
+      !> heavy data array - block data
+      real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+      !> heavy temp data: needed in blockxfer which is called in add_two_trees
+      real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
+      !> neighbor array (heavy data)
+      integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
+      !> list of active blocks (light data)
+      integer(kind=ik), intent(inout) :: lgt_active(:, :)
+      !> list of active blocks (light data)
+      integer(kind=ik), intent(inout) :: hvy_active(:, :)
+      !> sorted list of numerical treecodes, used for block finding
+      integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+      logical, intent(in),optional      :: verbosity !< if true: additional information of processing
       !-----------------------------------------------------------------
       ! result
       real(kind=rk) :: L2norm
       !-----------------------------------------------------------------
       integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
-      integer(kind=ik)    :: k, N, rank, g, Bs(3), dF=1
+      integer(kind=ik)    :: k, rank, g, Bs(3), dF=1
       real(kind=rk) :: norm, x0(3), dx(3), Volume
       logical :: verbose=.false.
 
       if (present(verbosity)) verbose = verbosity
       rank = params%rank
-      N = params%number_blocks
       Bs= params%Bs
       g = params%n_ghosts
       Volume = product(params%domain_size(1:params%dim))
       L2norm = 0.0_rk
       ! Loop over the active hvy_data
       do tree_id =1, N_snapshots
-        do dF = 1, params%n_eqn
-          norm = compute_tree_L2norm(params, lgt_block, hvy_block, hvy_active, hvy_n, dF_opt=dF, &
-                              tree_id_opt=tree_id, verbosity=verbose)
+          norm = compute_tree_L2norm( params, tree_n, &
+                                      lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                                      hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp, &
+                                      tree_id, verbose)
           L2norm = L2norm + norm**2
-        end do
       end do
 
       L2norm =sqrt(L2norm)
@@ -1156,21 +1092,13 @@ contains
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
-    integer(kind=ik) :: tree_id1, tree_id2, free_tree_id, Jmax, Bs(3), g, &
-                        N_snapshots, N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: C_val, Volume, t_elapse, t_inc(2)
-    real(kind=rk) :: x0(3), dx(3)
+    integer(kind=ik)  :: tree_id1, tree_id2, N_snapshots, rank
+    real(kind=rk)     :: C_val, Volume, t_elapse, t_inc(2)
 
     t_elapse = MPI_wtime()
     N_snapshots = size(C,1)
-    N = params%number_blocks
     rank = params%rank
-    Jmax = params%max_treelevel
-    g = params%n_ghosts
-    Bs= params%Bs
     Volume = product(params%domain_size(1:params%dim))
-    if (params%forest_size < N_snapshots + 1 ) call abort(030319,"Forest is to small")
-    free_tree_id = N_snapshots + 1
     ! We loop over all snapshots X_i, i=1,...,N to calculate the values of the symmetric
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
     do tree_id1 = 1, N_snapshots
@@ -1181,7 +1109,7 @@ contains
         C_val = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        tree_id2, tree_id2)
+                        tree_id1, tree_id2)
 
         ! Construct symmetric correlation matrix
         C(tree_id1, tree_id2) = C_val
@@ -1200,9 +1128,7 @@ contains
     C = C / real(N_snapshots,kind=rk)
 
     call toc( "compute_covariance_matrix", MPI_WTIME() - t_elapse )
-    !if (rank==0)then
-      !call print_mat(C)
-    !endif
+
   end subroutine
   !##############################################################
 
@@ -1225,9 +1151,9 @@ contains
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
     character(len=80), allocatable :: file_in(:,:), fname_list(:)
-    character(len=80) :: fname_acoefs, tmp_name, file_out, args
+    character(len=80) :: fname_acoefs, tmp_name, file_out, args, order
     integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:), hvy_active(:, :), mode_number(:)
     integer(kind=ik), allocatable           :: lgt_active(:,:), lgt_n(:), hvy_n(:)
@@ -1240,7 +1166,6 @@ contains
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
-    character(len=2)  :: order
     logical :: verbosity = .false., save_all = .false.
 
     rank = params%rank
@@ -1252,12 +1177,13 @@ contains
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " RECONSTRUCTION OF SNAPSHOTS WITH wPOD MODES "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) " CALL: ./wabbit-post --POD-reconstruct a_coef.txt --components=3 "
-            write(*,*) "                     --list POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]"
+            write(*,*) " CALL: ./wabbit-post --POD-reconstruct --time_coefficients=a_coefs.txt --components=3 "
+            write(*,*) "                     --mode-list=POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]"
             write(*,*) "                     [--save_all --iteration=10 --order=[2|4] --nmodes=3 --adapt=0.1] "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
+            write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --components         number of components in statevector"
+            write(*,*) " --mode-list          textfiles including the path to a mode computed with --POD for each component"
             write(*,*) " --save_all           reconstruct all snapshots"
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) " --nmodes             number of modes used for reconstruction"
@@ -1271,72 +1197,17 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
+    call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str_vct( "--mode-list", fname_list )
+    call get_cmd_arg_str( "--time_coefficients", fname_acoefs, default= "a_coefs.txt" )
+    call get_cmd_arg( "--memory", args, default="2GB")
+    read(args(1:len_trim(args)-2),* ) maxmem
+    call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--components", n_components, default=1_ik)
+    call get_cmd_arg( "--iteration", iteration, default=1_ik)
+    call get_cmd_arg( "--nmodes", N_modes_used, default=1_ik)
 
-    do i = 1, command_argument_count()
-      call get_command_argument(i,args)
-      !-------------------------------
-      ! order of predictor
-      if ( index(args,"--order=")==1 ) then
-        read(args(9:len_trim(args)),* ) order
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! MEMORY AVAILABLE
-      if ( index(args,"--memory=")==1 ) then
-              read(args(10:len_trim(args)-2),* ) maxmem
-              n_opt_args = n_opt_args + 1
-      endif
-      !-------------------------------
-      ! ADAPTION
-      if ( index(args,"--adapt=")==1 ) then
-        read(args(9:len_trim(args)),* ) eps
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! SAVE Additional data to files
-      if ( index(args,"--save_all")==1 ) then
-        save_all = .true.
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! TEMPORAL COEFFS
-      if ( index(args,"--POD-reconstruct")==1 ) then
-        call get_command_argument(i+1, fname_acoefs)
-        if (rank==0) write(*,*) "Temporal coefficients are read from", fname_acoefs
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! TIMESTEP
-      if ( index(args,"--iteration=")==1 ) then
-        N_snapshots = 1
-        read(args(13:len_trim(args)),* ) iteration
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! TRUNCATION RANK
-      if ( index(args,"--nmodes=")==1 ) then
-        read(args(10:len_trim(args)),* ) N_modes_used
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! Number of components in statevector
-      if ( index(args,"--components=")==1 ) then
-        read(args(14:len_trim(args)),* ) n_components
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--list")==1 ) then
-        n_opt_args = n_opt_args + 1
-        allocate(fname_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fname_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-
-    end do
 
     if ( iteration>0 ) then
       if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
@@ -1365,15 +1236,9 @@ contains
     !----------------------------------
     ! some wabbit params
     !----------------------------------
+    call set_wavelet_params(params, order )
 
-    if (order == "2") then
-        params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
-    else
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    end if
-    if ( eps > 0) then
+    if ( eps > 0.0_rk ) then
       ! adapt the mesh if possible
       params%adapt_mesh = .True.! .False.!.True.
       params%eps=eps
@@ -1457,7 +1322,7 @@ contains
     ! allocate data
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
 
     do tree_id = 1, fsize
@@ -1693,13 +1558,13 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) ::  filename, args
+    character(len=80) ::  filename, args, order
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
     character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
-    real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
+    real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
     real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
     integer(kind=ik), allocatable :: hvy_neighbor(:,:), hvy_active(:, :)
     integer(kind=ik), allocatable :: lgt_active(:,:), lgt_n(:), hvy_n(:)
@@ -1709,11 +1574,10 @@ contains
     real(kind=rk), dimension(3)      :: domain
     integer(hsize_t), dimension(2)   :: dims_treecode
     integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes
-    integer(kind=ik) :: i,it, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
+    integer(kind=ik) :: i,it, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
     integer(kind=ik) :: j, n_components=1, io_error, free_tree_id,pod_mode_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
-    character(len=2)  :: order
     logical :: verbose = .false., save_all = .false.
 
     call get_command_argument(2, args)
@@ -1724,8 +1588,8 @@ contains
             write(*,*) " Compute Temporal coefficients of POD BASIS"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "Call mpi_command -n number_procs ./wabbit-post --POD-time --components=3"
-            write(*,*) "                                --snapshot-list list_u1.txt [list_u2.txt] [list_u3.txt]"
-            write(*,*) "                                --mode-list     list_m1.txt [list_m2.txt] [list_m3.txt]"
+            write(*,*) "                                --snapshot-list='list_u1.txt [list_u2.txt] [list_u3.txt]'"
+            write(*,*) "                                --mode-list='list_m1.txt [list_m2.txt] [list_m3.txt]'"
             write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB --iteration=1]"
             write(*,*) "                                [--save_all]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -1749,74 +1613,16 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-    n_opt_args = 1 ! counting all extra arguments, which are not *h5 files
 
-    do i = 1, command_argument_count()
-      call get_command_argument(i,args)
-      !-------------------------------
-      ! order of predictor
-      if ( index(args,"--order=")==1 ) then
-        read(args(9:len_trim(args)),* ) order
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! MEMORY AVAILABLE
-      if ( index(args,"--memory=")==1 ) then
-              read(args(10:len_trim(args)-2),* ) maxmem
-              n_opt_args = n_opt_args + 1
-      endif
-      !-------------------------------
-      ! ADAPTION
-      if ( index(args,"--adapt=")==1 ) then
-        read(args(9:len_trim(args)),* ) eps
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! SAVE Additional data to files
-      if ( index(args,"--save_all")==1 ) then
-        save_all = .true.
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! Number of components in statevector
-      if ( index(args,"--components=")==1 ) then
-        read(args(14:len_trim(args)),* ) n_components
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--snapshot-list")==1 ) then
-        allocate(fsnapshot_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fsnapshot_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-      !-------------------------------
-      ! TIMESTEP
-      if ( index(args,"--iteration=")==1 ) then
-        N_snapshots = 1
-        read(args(13:len_trim(args)),* ) iteration
-        n_opt_args = n_opt_args + 1
-      end if
-      !-------------------------------
-      ! List of files
-      if ( index(args,"--mode-list")==1 ) then
-        allocate(fmode_list(n_components))
-        do j = 1, n_components
-          call get_command_argument(i+j, fmode_list(j))
-          n_opt_args = n_opt_args + 1
-        end do
-      end if
-      !-------------------------------
-      ! TEMPORAL COEFFS
-      if ( index(args,"--POD-time")==1 ) then
-       ! call get_command_argument(i+1, fname_acoefs)
-       ! if (params%rank==0) write(*,*) "Temporal coefficients are read from: ", fname_acoefs
-        n_opt_args = n_opt_args + 1
-      end if
-
-    end do
+    call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
+    call get_cmd_arg_str_vct( "--mode-list", fmode_list )
+    call get_cmd_arg( "--memory", args, default="2GB")
+    read(args(1:len_trim(args)-2),* ) maxmem
+    call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--components", n_components, default=1_ik)
+    call get_cmd_arg( "--iteration", iteration, default=1)
 
     if ( iteration>0 ) then
       if ( params%rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
@@ -1840,14 +1646,9 @@ contains
     params%threshold_mask=.False.
     params%n_eqn=n_components
 
-    if (order == "2") then
-        params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
-    else
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-    end if
-    if ( eps > 0) then
+    call set_wavelet_params(params, order )
+
+    if ( eps > 0.0_rk) then
       ! adapt the mesh if possible
       params%adapt_mesh = .True.! .False.!.True.
       params%eps=eps
@@ -1985,7 +1786,7 @@ contains
     ! allocate data
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
    call reset_forest(lgt_block, lgt_active(:, 1), &
    params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
@@ -2015,8 +1816,8 @@ contains
     ! --------------------
     ! Compute the L2 norm
     !---------------------
-    L2norm_snapshots = compute_L2norm(params, lgt_block, hvy_block, hvy_active, &
-                        hvy_n, N_snapshots, verbose)
+    L2norm_snapshots = compute_L2norm(params, tree_n, lgt_n, lgt_block, hvy_block, hvy_active, hvy_n, hvy_tmp, &
+                            hvy_neighbor, lgt_active, lgt_sortednumlist ,N_snapshots, verbose)
     Volume = product(domain(1:params%dim))
     if (params%rank==0) then
         write(*,'(80("-"))')
@@ -2087,6 +1888,33 @@ contains
   end subroutine
   !###############################################################
 
+
+  subroutine set_wavelet_params(params, order )
+    implicit none
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+    !> order of the wavelt
+    character(len=80), intent(in)    :: order
+
+      ! Check parameters for correct inputs:
+      if (order == "CDF20") then
+          params%harten_multiresolution = .true.
+          params%order_predictor = "multiresolution_2nd"
+          params%n_ghosts = 2_ik
+      elseif (order == "CDF40") then
+          params%harten_multiresolution = .true.
+          params%order_predictor = "multiresolution_4th"
+          params%n_ghosts = 6_ik ! we need 6 ghost since scalarproduct needs 6
+      elseif (order == "CDF44") then
+          params%harten_multiresolution = .false.
+          params%wavelet_transform_type = 'biorthogonal'
+          params%order_predictor = "multiresolution_4th"
+          params%wavelet='CDF4,4'
+          params%n_ghosts = 6_ik
+      else
+          call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
+      end if
+  end subroutine set_wavelet_params
 
 
 

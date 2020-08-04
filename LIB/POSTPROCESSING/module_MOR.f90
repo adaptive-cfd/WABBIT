@@ -471,6 +471,7 @@ contains
     else
       fsize = 2*N_snapshots + 2 !we need some extra fields for storing etc
     end if
+
     params%forest_size = fsize
     number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
     params%n_eqn = n_components
@@ -480,6 +481,7 @@ contains
       params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
     endif
 
+    call adjust_n_ghosts_for_scalarproduct(params)
     !----------------------------------
     ! allocate data
     !----------------------------------
@@ -690,7 +692,7 @@ contains
     call get_cmd_arg_str( "--time_coefficients", fname_acoefs, default= "acoefs.txt" )
     call get_cmd_arg( "--memory", args, default="2GB")
     read(args(1:len_trim(args)-2),* ) maxmem
-    call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--save_all", save_all, default=.False.)
     call get_cmd_arg( "--components", n_components, default=1_ik)
     call get_cmd_arg( "--iteration", iteration, default=1_ik)
 
@@ -855,6 +857,7 @@ contains
       params%number_blocks = ceiling( 4.0_rk *fsize * number_dense_blocks / params%number_procs )
     endif
 
+    call adjust_n_ghosts_for_scalarproduct(params)
     !----------------------------------
     ! allocate data
     !----------------------------------
@@ -1318,6 +1321,7 @@ contains
       params%number_blocks = ceiling( 4.0_rk * fsize * number_dense_blocks / params%number_procs )
     endif
 
+    call adjust_n_ghosts_for_scalarproduct(params)
     !----------------------------------
     ! allocate data
     !----------------------------------
@@ -1782,6 +1786,7 @@ contains
       params%number_blocks = ceiling( 4.0_rk *fsize * number_dense_blocks / params%number_procs )
     endif
 
+    call adjust_n_ghosts_for_scalarproduct(params)
     !----------------------------------
     ! allocate data
     !----------------------------------
@@ -1904,7 +1909,7 @@ contains
       elseif (order == "CDF40") then
           params%harten_multiresolution = .true.
           params%order_predictor = "multiresolution_4th"
-          params%n_ghosts = 6_ik ! we need 6 ghost since scalarproduct needs 6
+          params%n_ghosts = 4_ik ! we need 6 ghost since scalarproduct needs 6
       elseif (order == "CDF44") then
           params%harten_multiresolution = .false.
           params%wavelet_transform_type = 'biorthogonal'
@@ -1914,8 +1919,31 @@ contains
       else
           call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
       end if
+
+
   end subroutine set_wavelet_params
 
+  subroutine adjust_n_ghosts_for_scalarproduct(params)
+    !> This routine increases the number of ghost nodes if it is allowed by the
+    !> block size. This is needed in order to make use of the scaling functions
+    !> autocorrelation in the scalarproduct. The autocorrelation function has
+    !> a support size of 10 points (5 in each direction)
+    implicit none
+    !> params structure of WABBIT
+    type(type_params),intent(inout)  :: params
+    integer(kind=ik) :: Bs(3)
 
+    Bs = params%Bs
+
+    if (params%order_predictor == "multiresolution_4th" .and. params%n_ghosts<5) then
+      if (params%dim == 3) then
+        ! note setting n_ghosts to 5 is only allowed if the block is big enough
+        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2 .and. 5<(Bs(3)+1)/2) params%n_ghosts = 5
+      else
+        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2) params%n_ghosts = 5
+      endif
+    endif
+
+end subroutine
 
 end module module_MOR

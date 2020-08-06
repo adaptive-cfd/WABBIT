@@ -539,7 +539,7 @@ contains
           if (index(string_trim, ",") /= 0) separator=","
           if (index(string_trim, ";") /= 0) separator=";"
         endif
-        
+
         if (.not. allocated(string_list)) then
           call count_entries(string_trim, n_elements, separator)
           allocate(string_list(n_elements))
@@ -553,7 +553,7 @@ contains
                 string_list(count_separator) = trim(adjustl(string_trim(j:i-1)))
                 j = i + 1
             end if
-        end do  
+        end do
         count_separator = count_separator + 1
         string_list(count_separator) = trim(adjustl(string_trim(j:)))
 
@@ -678,7 +678,7 @@ contains
         character(len=80), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
-        character(len=120) :: args
+        character(len=600) :: args
         character(len=10) :: frmt
 
 

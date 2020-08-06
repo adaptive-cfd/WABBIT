@@ -1606,20 +1606,35 @@ function scalar_product_two_trees( params, tree_n, &
     ! https://moodle.polymtl.ca/pluginfile.php/47880/mod_resource/content/0/week7.pdf
     ! The matrix M_ij = <phi_i,phi_j> where the phis are the lagrange basis elements
         if (params%order_predictor == "multiresolution_4th" ) then
-            ! cubic lagrange polynomials
-            Nord = 6
-            if (.not. allocated(M) ) then
-                allocate( M(Nord))
-                M  = (/ 0.8009680404299244, &
-                    0.13704178233326222, &
-                    -0.04024485728521606, &
-                    0.002795127767100863, &
-                    -7.592473960186964e-05, &
-                    -1.482905070349005e-07 /)
+            ! NORMALLY multiresolution_4th ONLY NEEDS 4 GHOST POINTS, BUT
+            ! FOR THE WAVELET WEIGHTED SCALAR PRODUCT WE NEED 6
+            ! ANYHOW IF ON CHOOSES TO HAVE ONLY 4 GHOST POINTS WE STILL COMPUTE
+            ! THE SCALAR PRODUCT WITH A WARNING
+            if (params%n_ghosts < 5) then
+                Nord = 1
+                if(.not.allocated(M)) then
+                    allocate( M(Nord))
+                    M(1) = 1
+                    if (rank==0) write(*,*) " "
+                    if (rank==0) write(*,*) "--------------------------------------------"
+                    if (rank==0) write(*,*) "WARNING! this scalar product is imprecise,"
+                    if (rank==0) write(*,*) "because we do not make use of scaling functions properties,"
+                    if (rank==0) write(*,*) "Increase ghost nodes to n_ghosts=5 for ussage!!,"
+                    if (rank==0) write(*,*) "--------------------------------------------"
 
-                    if (params%n_ghosts .ne. 6) then
-                        call abort(09421, "for using the scalarproduct n_ghost must be at least 6!")
-                    endif
+
+                endif
+            else
+                Nord = 6
+                if (.not. allocated(M) ) then
+                    allocate( M(Nord))
+                    M  = (/ 0.8009680404299244, &
+                        0.13704178233326222, &
+                        -0.04024485728521606, &
+                        0.002795127767100863, &
+                        -7.592473960186964e-05, &
+                        -1.482905070349005e-07 /)
+                endif
             endif
         elseif (params%order_predictor == "multiresolution_2nd" ) then
             ! linear lagrange polynomials
@@ -1660,12 +1675,12 @@ function scalar_product_two_trees( params, tree_n, &
     t_inc(2) = MPI_WTIME()
 
     sprod = 0.0_rk
-    do k1 = 1, hvy_n(tree_id1)
+    loop_tree1: do k1 = 1, hvy_n(tree_id1)
         hvy_id1 = hvy_active(k1,tree_id1)
         call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
         level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
         treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-        do k2 = 1, hvy_n(tree_id2)
+        loop_tree2: do k2 = 1, hvy_n(tree_id2) !loop over all treecodes in 2.tree to find the same block
             hvy_id2 = hvy_active(k2,tree_id2)
             call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
             level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
@@ -1684,7 +1699,7 @@ function scalar_product_two_trees( params, tree_n, &
                                 tmp = 0.0_rk
                                 do delta1 = -Nord+1, Nord-1
                                  do delta2 = -Nord+1, Nord-1
-                                     tmp = tmp+ M(abs(delta1)+1)* M(abs(delta2)+1) *hvy_block(ix-delta1,iy-delta2,1,iq,hvy_id2)
+                                     tmp = tmp+ M(abs(delta1)+1) * M(abs(delta2)+1) *hvy_block(ix-delta1,iy-delta2,1,iq,hvy_id2)
                                  end do
                                 end do
                                 !    sprod_block = sprod_block + hvy_block(ix,iy,1,iq,hvy_id1) * &
@@ -1701,8 +1716,19 @@ function scalar_product_two_trees( params, tree_n, &
                         do iz = g+1, Bs(3) + g
                             do iy = g+1, Bs(2) + g
                                 do ix = g+1, Bs(1) + g
-                                    sprod_block = sprod_block + hvy_block(ix,iy,iz,iq,hvy_id1) * &
-                                    hvy_block(ix,iy,iz,iq,hvy_id2)
+                                    tmp = 0.0_rk
+                                    do delta1 = -Nord+1, Nord-1
+                                        do delta2 = -Nord+1, Nord-1
+                                            do delta3 = -Nord+1, Nord-1
+                                                tmp = tmp+ &
+                                                    M(abs(delta1)+1) * &
+                                                    M(abs(delta2)+1) * &
+                                                    M(abs(delta3)+1) * &
+                                                    hvy_block(ix-delta1,iy-delta2,iz-delta3,iq,hvy_id2)
+                                            end do
+                                        end do
+                                    end do
+                                    sprod_block = sprod_block + hvy_block(ix,iy,iz,iq,hvy_id1) * tmp
                                 end do
                             end do
                         end do
@@ -1710,10 +1736,10 @@ function scalar_product_two_trees( params, tree_n, &
                     !##########################################
                 endif
                 sprod =sprod + product(dx(1:params%dim))*sprod_block
-                exit
+                exit loop_tree2
             endif
-         end do
-    end do
+        end do loop_tree2
+    end do loop_tree1
 
     t_inc(1) = t_inc(2)-t_inc(1)
     t_inc(2) = MPI_wtime()-t_inc(2)

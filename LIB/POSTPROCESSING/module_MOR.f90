@@ -1095,8 +1095,21 @@ contains
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
-    integer(kind=ik)  :: tree_id1, tree_id2, N_snapshots, rank
+    integer(kind=ik)  :: tree_id1, tree_id2, N_snapshots, rank, N_blocks_refined
     real(kind=rk)     :: C_val, Volume, t_elapse, t_inc(2)
+    integer(kind=ik)  , allocatable :: lgt_active_tmp(:,:), lgt_block_tmp(:,:),lgt_n_tmp(:)
+
+    allocate(lgt_block_tmp(size(lgt_block,1),size(lgt_block,2)))
+    allocate(lgt_n_tmp(size(lgt_n,1)))
+    allocate(lgt_active_tmp(size(lgt_active,1), size(lgt_active,2)))
+
+    !-----------------------------------
+    ! copy light data:
+    ! Is very expensive but we dont do it offen
+    lgt_active_tmp= lgt_active
+    lgt_block_tmp = lgt_block
+    lgt_n_tmp     = lgt_n
+    !-----------------------------------
 
     t_elapse = MPI_wtime()
     N_snapshots = size(C,1)
@@ -1107,12 +1120,28 @@ contains
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
         t_inc(1) = MPI_wtime()
-
         ! L2 scalarproduct between tree 1 and tree 2
         C_val = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
                         tree_id1, tree_id2)
+
+        if ( params%adapt_mesh .and. tree_id1 .ne. tree_id2) then
+           N_blocks_refined  = lgt_n(tree_id1) - lgt_n_tmp(tree_id1) &
+                             + lgt_n(tree_id2) - lgt_n_tmp(tree_id2)
+           ! trees have to be coarsende again since scalar product refines
+           !in favour for the details of the other tree
+           ! note: we could call adapt mesh here. but it is more expensive
+           call coarse_tree_2_reference_mesh(params, tree_n, &
+                 lgt_block, lgt_active,lgt_n, lgt_sortednumlist, &
+                 lgt_block_tmp, lgt_active_tmp,lgt_n_tmp, &
+                 hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
+          call coarse_tree_2_reference_mesh(params, tree_n, &
+                 lgt_block, lgt_active,lgt_n, lgt_sortednumlist, &
+                 lgt_block_tmp, lgt_active_tmp,lgt_n_tmp, &
+                 hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+        end if
+
 
         ! Construct symmetric correlation matrix
         C(tree_id1, tree_id2) = C_val
@@ -1120,8 +1149,8 @@ contains
         !
         t_inc(1) = MPI_WTIME() - t_inc(1)
         if (rank == 0) then
-          write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
-          tree_id1, tree_id2, t_inc(1)
+          write(*,'("Matrixelement (i,j)= (", i3,",", i3, ") constructed in t_cpu=",es10.2, "sec  Nblocks refined/total: ", i5, "/", i10)') &
+          tree_id1, tree_id2, t_inc(1), N_blocks_refined, sum(lgt_n(1:N_snapshots))
         endif
       end do
     end do

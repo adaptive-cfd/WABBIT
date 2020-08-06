@@ -55,22 +55,22 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
   !-----------------------------------------------------------------------------
   if (Insect%RightWing == "yes") then
       call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, &
-      Insect%M_body, Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w )
+      Insect%M_body, Insect%M_wing_r, Insect%x_pivot_r_b, Insect%rot_rel_wing_r_w, "R" )
   endif
 
   if (Insect%LeftWing == "yes") then
       call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l, &
-      Insect%M_body, Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w )
+      Insect%M_body, Insect%M_wing_l, Insect%x_pivot_l_b, Insect%rot_rel_wing_l_w, "L" )
   endif
 
   if (Insect%RightWing2 == "yes") then
       call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r2, &
-      Insect%M_body, Insect%M_wing_r2, Insect%x_pivot_r2_b, Insect%rot_rel_wing_r2_w )
+      Insect%M_body, Insect%M_wing_r2, Insect%x_pivot_r2_b, Insect%rot_rel_wing_r2_w, "R" )
   endif
 
   if (Insect%LeftWing2 == "yes") then
       call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_l2, &
-      Insect%M_body, Insect%M_wing_l2, Insect%x_pivot_l2_b, Insect%rot_rel_wing_l2_w )
+      Insect%M_body, Insect%M_wing_l2, Insect%x_pivot_l2_b, Insect%rot_rel_wing_l2_w, "L" )
   endif
 
   !-----------------------------------------------------------------------------
@@ -125,7 +125,7 @@ end subroutine
 
 ! Wing wrapper for different wing shapes
 subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,&
-    M_wing, x_pivot_b, rot_rel_wing_w)
+    M_wing, x_pivot_b, rot_rel_wing_w, side)
   implicit none
 
   type(diptera),intent(inout) :: Insect
@@ -135,6 +135,9 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
   integer(kind=2),intent(in) :: color_wing
   real(kind=rk), intent(in)::M_body(1:3,1:3),M_wing(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
+  ! NOTE: for a corrugated wing, up- and downside are different, and therefore a distinction between the 
+  ! left- and right wing has to be made, essentially inverting the sign of the z_wing coordinate.
+  character(len=1), intent(in) :: side ! can be R or L
   character(len=strlen) :: wingshape_str
   integer(kind=2) :: wingID
 
@@ -178,13 +181,13 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
           case ("fourier")
               ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
               call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b,rot_rel_wing_w)
+              x_pivot_b, rot_rel_wing_w, side)
 
           case ("kleemeier")
               ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
               ! membrane is bad for the fourier series.
               call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b,rot_rel_wing_w)
+              x_pivot_b, rot_rel_wing_w)
 
           case default
               call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
@@ -202,7 +205,7 @@ end subroutine draw_wing
 ! datastructure, so the function Set_Wing_Fourier_coefficients must be called
 ! before calling this subroutine. Fourier series is evaluated in
 ! Radius_Fourier
-subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w)
+subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, x_pivot_b, rot_rel_wing_w, side)
   implicit none
 
   type(diptera), intent(inout) :: Insect
@@ -212,19 +215,29 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
   integer(kind=2), intent(in) :: color_wing
   real(kind=rk),intent(in) :: M_body(1:3,1:3), M_wing(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
+  ! NOTE: for a corrugated wing, up- and downside are different, and therefore a distinction between the 
+  ! left- and right wing has to be made, essentially inverting the sign of the z_wing coordinate.
+  character(len=1), intent(in) :: side
 
   integer :: ix,iy,iz,j
   integer(kind=2) :: wingID
   real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3)
   real(kind=rk) :: R, R0, R_tmp, zz0
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
-  real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
+  real(kind=rk) :: v_tmp(1:3), mask_tmp, theta, sign
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
   if ((Insect%wing_file_type(wingID)) /= "fourier") call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
 
+  if (side == "R") then
+      sign = +1.0_rk
+  elseif (side == "L") then
+      sign = -1.0_rk
+  else
+      call abort(290720, "neither R nor L wing??")
+  endif
 
   s = Insect%safety
   do iz = g, size(mask,3)-1-g
@@ -268,6 +281,8 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                               ! no corrugation - the wing is a flat surface
                               zz0 = 0.0_pr
                           endif
+
+                          zz0 = zz0 * sign
 
                           ! wing thickness
                           if ( Insect%wing_thickness_distribution=="variable") then

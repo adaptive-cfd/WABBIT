@@ -21,7 +21,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_insects.f90 module_boundary_conditions.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90 \
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90 module_mask.f90 \
-	module_t_files.f90
+	module_t_files.f90 module_saving.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -66,9 +66,10 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
 # timing flags for gfortran:
-FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
-FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
-FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
+FFLAGS += -fbounds-check -g
+#FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
+#FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
+#FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
@@ -180,7 +181,7 @@ $(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_
 $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o \
 	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 \
 	wings_motion.f90 stroke_plane.f90 pointcloud.f90 fractal_trees.f90 insect_init_clean.f90 \
-	kineloader.f90 active_grid_winglets.f90 $(OBJDIR)/module_t_files.o
+	kineloader.f90 active_grid_winglets.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o
@@ -214,7 +215,8 @@ $(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_precision.o 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_physics_metamodule.o \
-	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_params.o $(OBJDIR)/module_params.o
+	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_forest.o $(OBJDIR)/module_params.o $(OBJDIR)/module_params.o \
+	$(OBJDIR)/module_IO.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
@@ -307,8 +309,8 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o get_nei
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
-	save_data.f90 write_field.f90 read_field.f90 forest_IO.f90 \
-	read_mesh.f90 read_attributes.f90 read_file_flusi.f90 $(OBJDIR)/module_mask.o
+	write_field.f90 read_field.f90 forest_IO.f90 \
+	read_mesh.f90 read_attributes.f90 read_file_flusi.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
@@ -322,6 +324,11 @@ $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/modul
 
 $(OBJDIR)/module_forest.o: module_forest.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_saving.o: module_saving.f90 \
+	$(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mesh.o \
+	save_data.f90 $(OBJDIR)/module_mask.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90 $(OBJDIR)/module_forest.o $(OBJDIR)/module_IO.o \

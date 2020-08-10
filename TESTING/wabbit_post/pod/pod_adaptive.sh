@@ -5,21 +5,18 @@
 #-------------------------------------------------------------------------------
 # what parameter file
 dir="./TESTING/wabbit_post/pod/"
-params=${dir}"insect.ini"
 happy=0
 sad=0
 echo "testing wabbit_post -POD"
 
 # list of prefixes the test generates
-prefixes=(mode1 mode2 mode3)
+prefixes=(u mode1)
 # list of possible times (no need to actually have them)
 times=(000000000001 000000000002 000000000003 )
 
 # run actual test
-cp $dir/bumblebee_new_kinematics.ini .
-${mpi_command} ./wabbit ${params} ${memory}
-${mpi_command} ./wabbit-post --POD --components=3 --adapt=0.1 --nmodes=3 --list ${dir}ux_list.txt ${dir}uy_list.txt ${dir}uz_list.txt ${memory}
-rm bumblebee_new_kinematics.ini
+${mpi_command} ./wabbit-post --generate_forest --Jmax=6
+${mpi_command} ./wabbit-post --POD --components=1 --adapt=0.01 --nmodes=3 --list=${dir}u_list.txt ${memory}
 
 echo "============================"
 echo "run done, analyzing data now"

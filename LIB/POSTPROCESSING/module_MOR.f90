@@ -1119,6 +1119,7 @@ contains
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
+        N_blocks_refined = 0
         t_inc(1) = MPI_wtime()
         ! L2 scalarproduct between tree 1 and tree 2
         C_val = scalar_product_two_trees( params, tree_n, &
@@ -1375,13 +1376,6 @@ contains
       !----------------------------------
       ! Adapt the data to the given eps
       !----------------------------------
-      if (params%adapt_mesh) then
-          ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
-          ! adapt-mesh also performs neighbor and active lists updates
-           call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
-           lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
-           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
-      endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
       !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &

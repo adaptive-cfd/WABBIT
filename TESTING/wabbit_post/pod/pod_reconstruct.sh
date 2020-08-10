@@ -11,16 +11,14 @@ sad=0
 echo "testing wabbit_post -POD"
 
 # list of prefixes the test generates
-prefixes=(reconst1 reconst2 reconst3)
+prefixes=(reconst1)
 # list of possible times (no need to actually have them)
-times=(000000000002)
+times=( 000000000001 000000000002 000000000012 000000000019)
 
 # run actual test
-cp $dir/bumblebee_new_kinematics.ini .
-${mpi_command} ./wabbit ${params} ${memory}
-${mpi_command} ./wabbit-post --POD --components=3 --adapt=0.1 --nmodes=5 --list ${dir}ux_list.txt ${dir}uy_list.txt ${dir}uz_list.txt ${memory}
-${mpi_command} ./wabbit-post --POD-reconstruct ${dir}a_coefs.txt --timestep=2 --components=3 --adapt=0.1 --list ${dir}uxmode_list.txt ${dir}uymode_list.txt ${dir}uzmode_list.txt ${memory}
-rm bumblebee_new_kinematics.ini
+${mpi_command} ./wabbit-post --generate_forest
+${mpi_command} ./wabbit-post --POD --components=1 --adapt=0.1 --nmodes=5 --list=${dir}u_list.txt ${memory}
+${mpi_command} ./wabbit-post --POD-reconstruct --time_coefficients=a_coefs.txt --nmodes=5 --iteration=2 --components=1 --adapt=0.1 --mode-list=${dir}mode_list.txt ${memory}
 
 echo "============================"
 echo "run done, analyzing data now"

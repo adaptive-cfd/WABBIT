@@ -648,6 +648,9 @@ contains
 
         if (present(verbosity)) verbose=verbosity
 
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active(:, tree_id), lgt_n(tree_id), &
+        lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id), tree_id)
+
         ! The Trees can only be added when their grids are identical. At present we
         ! try to keep the finest levels of all trees. This means we refine
         ! all blocks which are not on the same level.
@@ -710,7 +713,7 @@ contains
                 end do ! loop over tree2
             end do ! loop over tree1
 
-            ! Decide if trees have the same treestructure or not (i.e. exit loop or refine)
+            ! Decide if trees have the same treestructure or not (i.e. exit loop or coarse)
             if (Nblocks_2coarsen == 0) then
                 exit   ! EXIT the (while true) loop when nothing has to be refined anymore
             else
@@ -732,7 +735,8 @@ contains
         end do
 
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id), hvy_n(tree_id))
-
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:, tree_id), lgt_n(tree_id), &
+        lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id), tree_id )
     end subroutine
 
 

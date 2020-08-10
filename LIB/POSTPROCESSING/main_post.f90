@@ -66,14 +66,14 @@ program main_post
     select case(mode)
     case ("--denoising")
         call post_denoising(params)
-        
+
     case ("--prune-tree")
         call post_prune_tree(params)
 
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks", "--add", "--subtract", "--multiply")
+    case ("--add-two-masks", "--add", "--subtract", "--multiply", "--test_operations")
         call post_add_two_masks(params)
 
     case ("--stl2dist")

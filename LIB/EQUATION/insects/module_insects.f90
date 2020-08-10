@@ -3,6 +3,7 @@ module module_insects
   ! makes this module here independent of that
   use module_insects_integration_flusi_wabbit
   use module_t_files
+  use module_stl_file_reader
 
   implicit none
 
@@ -141,6 +142,7 @@ module module_insects
     real(kind=rk) :: mass, gravity=0.d0
     ! variables to decide whether to draw the body or not.
     character(len=strlen) :: body_moves="yes"
+    character(len=strlen) :: BodySuperSTLfile="none.superstl"
     logical :: body_already_drawn = .false.
     ! second wing pair exists or not
     logical :: second_wing_pair

@@ -216,6 +216,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     Insect%kine_wing_r2%initialized = .false.
 
     call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
+    call read_param_mpi(PARAMS,"Insects","BodySuperSTLfile",Insect%BodySuperSTLfile,"none.superstl")
     call read_param_mpi(PARAMS,"Insects","HasDetails",Insect%HasDetails,"all")
     call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
     call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")

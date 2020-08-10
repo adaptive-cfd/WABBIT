@@ -509,16 +509,65 @@ contains
 
     end subroutine merge_blanks
 
+    !-------------------------------------------------------------------------!
+    !> @brief count number of vector elements in a string
+    subroutine split_string(string_in, string_list, separator_optional)
+        ! only to be used after merged blaks
+        ! this routine splits a string for given seperator (optional)
+        ! if seperator is not given then the routine looks for ";" " " or ","
 
+        implicit none
+        character(len=1) :: separator
+        character(len=1), intent(in), optional :: separator_optional
+        character(len=*), intent(in) :: string_in
+        character(len=*),allocatable, intent(out) :: string_list(:)
+        integer(kind=ik) :: j,i, l_string, count_separator, n_elements
+        character(len=len_trim(adjustl(string_in))):: string_trim
+
+        string_trim = trim(adjustl( string_in ))
+        call merge_blanks(string_trim)
+        string_trim = trim(adjustl( string_trim ))
+
+        l_string = len_trim(string_trim)
+
+        ! we now have reduced the number of b blanks to at most one at the time: "hdj    aa" => "hdj aa"
+        ! NOW: we figure out if the values are separated by spaces " " or commas "," or ";"
+        if (present(separator_optional)) then
+          separator = separator_optional
+        else
+          separator = " "
+          if (index(string_trim, ",") /= 0) separator=","
+          if (index(string_trim, ";") /= 0) separator=";"
+        endif
+
+        if (.not. allocated(string_list)) then
+          call count_entries(string_trim, n_elements, separator)
+          allocate(string_list(n_elements))
+        endif
+
+        count_separator=0
+        j=1
+        do i = 1, l_string
+            if (string_trim(i:i) == separator) then
+                count_separator = count_separator + 1
+                string_list(count_separator) = trim(adjustl(string_trim(j:i-1)))
+                j = i + 1
+            end if
+        end do
+        count_separator = count_separator + 1
+        string_list(count_separator) = trim(adjustl(string_trim(j:)))
+
+      end subroutine split_string
 
     !-------------------------------------------------------------------------!
     !> @brief count number of vector elements in a string
-    subroutine count_entries(string_cnt, n_entries)
+    subroutine count_entries(string_cnt, n_entries, separator_optional)
         ! only to be used after merged blaks
         ! this routine counts the separators and gives back this value +1
 
         implicit none
         character(len=1) :: separator
+        character(len=1), intent(in), optional :: separator_optional
         character(len=*), intent(in) :: string_cnt
         integer(kind=ik), intent(out) :: n_entries
         integer(kind=ik) :: count_separator, i, l_string
@@ -532,9 +581,13 @@ contains
 
         ! we now have reduced the number of b blanks to at most one at the time: "hdj    aa" => "hdj aa"
         ! NOW: we figure out if the values are separated by spaces " " or commas "," or ";"
-        separator = " "
-        if (index(string_trim, ",") /= 0) separator=","
-        if (index(string_trim, ";") /= 0) separator=";"
+        if (present(separator_optional)) then
+          separator = separator_optional
+        else
+          separator = " "
+          if (index(string_trim, ",") /= 0) separator=","
+          if (index(string_trim, ";") /= 0) separator=";"
+        endif
 
         count_separator = 0
         do i = 1, l_string
@@ -625,7 +678,8 @@ contains
         character(len=80), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
-        character(len=120) :: args
+        character(len=600) :: args
+        character(len=10) :: frmt
 
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -649,13 +703,15 @@ contains
                 if (n == 1) then
                     read(args, '(A)') value(1)(:)
                 else
-                    read(args, *) value
+                    ! previous version using only read(args,*) value doesnt work with filepaths
+                    ! because fortran interprets / as the end of string
+                    call split_string(args,value)
                 end if
 
                 if (rank == 0) then
                     write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
-                    write(*,'(A)') args
-                    write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
+                    !write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
+                    write(*,'(A,1x)') ( trim(adjustl(value(1))), k=1, n)
                 endif
 
                 return
@@ -910,7 +966,7 @@ contains
       read (str,*, iostat=iostat) round_one_digit
 
       if (iostat /= 0) write(*,*) a, str
-    end
+    end function
 
 
 end module module_helpers

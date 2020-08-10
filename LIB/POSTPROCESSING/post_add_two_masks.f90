@@ -27,7 +27,7 @@ subroutine post_add_two_masks(params)
     integer :: hvy_id, lgt_id, fsize, j, tree_id
 
     integer(kind=ik) :: iteration, Bs(1:3), tc_length1, dim, tc_length2, N1, N2, tree_N
-    real(kind=rk) :: time, domain(1:3)
+    real(kind=rk) :: time, domain(1:3), norm
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -62,7 +62,11 @@ subroutine post_add_two_masks(params)
     call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim)
 
 
-    params%number_blocks = 2*max(N1,N2) ! just to get some memory:
+    if (mode=="--test_operations") then
+        params%number_blocks = 5*max(N1,N2) ! just to get some memory:
+    else
+        params%number_blocks = 2*max(N1,N2) ! just to get some memory:
+    end if
     params%domain_size = domain
     params%max_treelevel = max( tc_length2, tc_length1 )
     params%min_treelevel = 1
@@ -112,6 +116,46 @@ subroutine post_add_two_masks(params)
     case ("--multiply")
         call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
+    case ("--test_operations")
+        ! this tests inplace vs out of place operations
+        ! z = x*y + x
+        ! norm(w)
+        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, dest_tree_id=3, verbosity=.True.)
+        call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=3, dest_tree_id=4, verbosity=.True.)
+        ! y <- x*y + y
+        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+        call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+        ! w = z-y
+        call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=4, dest_tree_id=3)
+
+        norm =  scalar_product_two_trees( params, tree_n, &
+                                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                                       tree_id1=4, tree_id2=4)
+        if (params%rank==0) then
+            write(*,*) "Norm (should be not 0): ", norm
+        end if
+        norm =  scalar_product_two_trees( params, tree_n, &
+                              lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                              hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                              tree_id1=2, tree_id2=2)
+        if (params%rank==0) then
+          write(*,*) "Norm (should be not 0): ", norm
+        end if
+
+
+        norm =  scalar_product_two_trees( params, tree_n, &
+                                   lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                                   hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                                   tree_id1=3, tree_id2=3)
+        if (params%rank==0) then
+            write(*,*) "Norm (should be 0): ", norm
+        end if
 
     case default
         call abort(301219,"unkown mode...")

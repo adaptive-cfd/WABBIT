@@ -169,25 +169,25 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   case default
       ! if all other options fail, we still might load coefficients from file:
       wingshape_str = Insect%WingShape(wingID)
-      ! if (index(wingshape_str,"from_file::bristled") /= 0) then
-      !     ! wing blade shape is read from ini-file and bristles are hardcoded
-      !     call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-      !     x_pivot_b,rot_rel_wing_w)
-      !
-      ! else
-          ! we assume the default to be defined in fourier coefficients, the subroutine
-          ! yells if it does not recongnize the wing.
-          select case (Insect%wing_file_type(wingID))
-          case ("fourier")
-              ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
-              call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b, rot_rel_wing_w, side)
 
-          case ("kleemeier")
-              ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
-              ! membrane is bad for the fourier series.
-              call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b, rot_rel_wing_w)
+      ! we assume the default to be defined in fourier coefficients, the subroutine
+      ! yells if it does not recongnize the wing.
+      select case (Insect%wing_file_type(wingID))
+      case ("fourier")
+          ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
+          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w, side)
+
+      case ("fourierY")
+          ! fourier series for the y coordinate (used for the blade of a bristled wing)
+          call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w)
+
+      case ("kleemeier")
+          ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
+          ! membrane is bad for the fourier series.
+          call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w)
 
           case default
               call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
@@ -229,7 +229,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
-  if ((Insect%wing_file_type(wingID)) /= "fourier") call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
+  if ( ((Insect%wing_file_type(wingID)) /= "fourier") .and. ((Insect%wing_file_type(wingID)) /= "fourierY") ) call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
 
   if (side == "R") then
       sign = +1.0_rk
@@ -1858,8 +1858,8 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
   ! check if this file seem to be valid:
   call read_param_mpi(ifile, "Wing", "type", Insect%wing_file_type(wingID), "none")
 
-  if (Insect%wing_file_type(wingID) /= "fourier" .and. Insect%wing_file_type(wingID) /= "kleemeier" ) then
-    call abort(6652, "ini file for wing does not seem to be fourier series...")
+  if (Insect%wing_file_type(wingID) /= "fourier" .and. Insect%wing_file_type(wingID) /= "fourierY" .and. Insect%wing_file_type(wingID) /= "kleemeier" ) then
+    call abort(6652, "ini file for wing does not seem to be correct type...")
   endif
 
   if (Insect%wing_file_type(wingID) == "kleemeier" ) then
@@ -1869,7 +1869,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
   !-----------------------------------------------------------------------------
   ! Read fourier coeffs for wing radius
   !-----------------------------------------------------------------------------
-  if (Insect%wing_file_type(wingID) == "fourier") then
+  if (Insect%wing_file_type(wingID) == "fourier" .or. Insect%wing_file_type(wingID) == "fourierY") then
       call read_param_mpi( ifile, "Wing", "a0_wings", Insect%a0_wings(wingID), 0.d0)
 
       ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays

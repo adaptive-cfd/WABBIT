@@ -238,11 +238,13 @@ contains
 
     t_elapse = MPI_WTIME() - t_elapse
     if (rank == 0) then
-          write(*,'("POD mode ", i4," constructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
+          write(*,'("POD mode ", i4," constructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"] Nblocks=",i12)') &
           N_modes, t_elapse,&
           min_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
-          max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) )
+          max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
+          sum(lgt_n(1:N_snapshots))
     endif
+
   end do
   ! the truncation_rank can be lower then the default (N_snapshots) or input value,
   ! when the singular values are smaller as the desired presicion! Therefore we update
@@ -587,7 +589,7 @@ contains
         M(i,j) = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        N_snapshots+i, N_snapshots+j)
+                        N_snapshots+i, N_snapshots+j)/Volume
       end do
     end do
 
@@ -1097,6 +1099,19 @@ contains
     !---------------------------------------------------------------
     integer(kind=ik)  :: tree_id1, tree_id2, N_snapshots, rank
     real(kind=rk)     :: C_val, Volume, t_elapse, t_inc(2)
+    integer(kind=ik)  , allocatable :: lgt_active_tmp(:,:), lgt_block_tmp(:,:),lgt_n_tmp(:)
+
+    allocate(lgt_block_tmp(size(lgt_block,1),size(lgt_block,2)))
+    allocate(lgt_n_tmp(size(lgt_n,1)))
+    allocate(lgt_active_tmp(size(lgt_active,1), size(lgt_active,2)))
+
+    !-----------------------------------
+    ! copy light data:
+    ! Is very expensive but we dont do it offen
+    lgt_active_tmp= lgt_active
+    lgt_block_tmp = lgt_block
+    lgt_n_tmp     = lgt_n
+    !-----------------------------------
 
     t_elapse = MPI_wtime()
     N_snapshots = size(C,1)
@@ -1107,7 +1122,6 @@ contains
     do tree_id1 = 1, N_snapshots
       do tree_id2 = tree_id1, N_snapshots
         t_inc(1) = MPI_wtime()
-
         ! L2 scalarproduct between tree 1 and tree 2
         C_val = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
@@ -1120,7 +1134,7 @@ contains
         !
         t_inc(1) = MPI_WTIME() - t_inc(1)
         if (rank == 0) then
-          write(*,'("Matrixelement (i,j)= (", i4,",", i4, ") constructed in t_cpu=",es12.4, "sec")') &
+          write(*,'("Matrixelement (i,j)= (", i3,",", i3, ") constructed in t_cpu=",es10.2, "sec ")') &
           tree_id1, tree_id2, t_inc(1)
         endif
       end do
@@ -1265,7 +1279,6 @@ contains
     params%physics_type="POD"
     params%eps_normalized=.True. ! normalize the statevector before thresholding
     params%coarsening_indicator="threshold-state-vector"
-    params%coarsening_indicator="threshold-state-vector"
     params%threshold_mask=.False.
     ! read ini-file and save parameters in struct
     allocate(params%input_files(params%n_eqn))
@@ -1346,13 +1359,6 @@ contains
       !----------------------------------
       ! Adapt the data to the given eps
       !----------------------------------
-      if (params%adapt_mesh) then
-          ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
-          ! adapt-mesh also performs neighbor and active lists updates
-           call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
-           lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
-           hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
-      endif
       !tmp_name = "adapted"
       !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
       !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
@@ -1909,7 +1915,7 @@ contains
       elseif (order == "CDF40") then
           params%harten_multiresolution = .true.
           params%order_predictor = "multiresolution_4th"
-          params%n_ghosts = 4_ik ! we need 6 ghost since scalarproduct needs 6
+          params%n_ghosts = 4_ik
       elseif (order == "CDF44") then
           params%harten_multiresolution = .false.
           params%wavelet_transform_type = 'biorthogonal'
@@ -1938,9 +1944,9 @@ contains
     if (params%order_predictor == "multiresolution_4th" .and. params%n_ghosts<5) then
       if (params%dim == 3) then
         ! note setting n_ghosts to 5 is only allowed if the block is big enough
-        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2 .and. 5<(Bs(3)+1)/2) params%n_ghosts = 5
+        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2 .and. 5<(Bs(3)+1)/2) params%n_ghosts = 6 ! however we adjust it to 6 because its even
       else
-        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2) params%n_ghosts = 5
+        if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2) params%n_ghosts = 6
       endif
     endif
 

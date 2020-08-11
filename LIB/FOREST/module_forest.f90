@@ -26,7 +26,7 @@ module module_forest
     ! These are the important routines that are visible to WABBIT:
     !**********************************************************************************************
     PUBLIC :: add_two_trees, substract_two_trees, count_tree_hvy_n, average_trees, &
-    copy_tree, multiply_two_trees, multiply_tree_with_scalar, &
+    copy_tree, multiply_two_trees, multiply_tree_with_scalar, coarse_tree_2_reference_mesh, &
     compute_tree_L2norm, delete_tree, scalar_product_two_trees, scalar_product_two_trees_old, &
     same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree
     !**********************************************************************************************
@@ -610,6 +610,169 @@ contains
     !##############################################################
 
 
+    !##############################################################
+    !> This function coarses a tree to its reference mesh.
+    !> The reference mesh is saved in lgt_..._ref and stores the treecode and
+    !> all necessary light data.
+    !> All blocks on the actual tree are coarsened to have the same
+    !> treecode structure as the reference.
+    !> This routine is usefull, when trying to go back to a old
+    !> treestructure, after calling for example refine_trees2sametreelevel.
+    subroutine coarse_tree_2_reference_mesh(params, tree_n, &
+        lgt_block, lgt_active,lgt_n, lgt_sortednumlist, &
+        lgt_block_ref, lgt_active_ref,lgt_n_ref, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id, verbosity)
+
+        implicit none
+        !-----------------------------------------------------------------
+        type (type_params), intent(in) :: params   !< params structure
+        integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
+        integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
+        integer(kind=ik), intent(in)      :: tree_id !< number of the tree
+        integer(kind=ik), intent(inout)   :: lgt_n,lgt_n_ref !< number of light active blocks
+        integer(kind=ik), intent(inout)   :: lgt_block(:, : ), lgt_block_ref(:, : )  !< light data array
+        real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+        integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
+        integer(kind=ik), intent(inout)   :: lgt_active(:), lgt_active_ref(:), hvy_active(:) !< active lists
+        integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
+        real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
+        logical, intent(in),optional      :: verbosity
+        !-----------------------------------------------------------------
+        integer(kind=ik)    :: rank, level_ref, level, Jmax, lgt_id_ref, lgt_id, fsize
+        integer(kind=ik)    :: k1, k2, Nblocks_2coarsen, level_min
+        integer(kind=tsize) :: treecode_ref, treecode
+        logical :: verbose = .false.
+
+        Jmax = params%max_treelevel ! max treelevel
+        fsize= params%forest_size   ! maximal number of trees in forest
+
+        if (present(verbosity)) verbose=verbosity
+
+        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+
+        ! The Trees can only be added when their grids are identical. At present we
+        ! try to keep the finest levels of all trees. This means we refine
+        ! all blocks which are not on the same level.
+
+        ! Operations (addition, multiplication, etc) using two trees (=grids) require both trees (=grids)
+        ! to be identical. Therefore, this routine modifies both trees such that for any position x in space
+        ! the resolution is the higher
+
+        ! loop until both trees have the same grid structure, meaning that no block has to be refined anymore
+        do while( .true. )
+            Nblocks_2coarsen = 0
+
+            ! Loop over the active light data of both trees and compare the meshlevels
+            do k1 = 1, lgt_n_ref
+                !--------
+                ! TREE 1
+                !--------
+                lgt_id_ref = lgt_active_ref(k1)
+                level_ref  = lgt_block_ref(lgt_id_ref, Jmax + IDX_MESH_LVL)
+
+                do k2 = 1, lgt_n
+                    !--------
+                    ! TREE 2
+                    !--------
+                    lgt_id  = lgt_active(k2)
+                    ! Skip this block if it is already tagged for coarsening.
+                    if ( lgt_block(lgt_id, Jmax+IDX_REFINE_STS) == -1 ) then
+                        cycle
+                    endif
+                    level = lgt_block(lgt_id, Jmax + IDX_MESH_LVL)
+
+                    ! The treecodes can only be compared if they have the same size
+                    ! (i.e. treecode length).
+                    level_min = min(level_ref,level)
+                    treecode_ref = treecode2int( lgt_block_ref(lgt_id_ref, 1:level_min) )
+                    treecode     = treecode2int( lgt_block(lgt_id, 1:level_min) )
+                    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                    ! Comparison of the trees:
+                    ! - Compare the treecodes up to the smallest level both blocks share (level_min)
+                    ! - check if they are already on the same level. in this case, they are identical
+                    !   and nothing needs to be done (the block exists in both trees already)
+                    ! - If the treecodes agree and they are not on both the same level, mark the finner
+                    !   block for coarsening. As there may well be more than one level difference between
+                    !   both blocks, this process potentially has to be repeated afterwards.
+                    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+                    if ((treecode_ref == treecode)) then
+                        if (level_ref < level) then
+                            Nblocks_2coarsen = Nblocks_2coarsen + 1
+                            ! now tag the block for coarsening
+                            lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                        elseif (level_ref == level) then
+                            ! treecode comparison okay and both blocks on same level: they're the same block
+                            exit  ! exit the inner loop (TREE2)
+                        else !level_ref > level
+                            call abort(20200806, "Something went wrong: Block on reference tree1 should be coarser!!!")
+                        end if
+                    end if
+                    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                end do ! loop over tree2
+            end do ! loop over tree1
+
+            ! Decide if trees have the same treestructure or not (i.e. exit loop or coarse)
+            if (Nblocks_2coarsen == 0) then
+                exit   ! EXIT the (while true) loop when nothing has to be refined anymore
+            else
+                !----------------------------
+                ! coarse the tagged blocks
+                !----------------------------
+                if (params%rank == 0 .and. verbose) write(*,'("Number of blocks marked for coarsening: ",i9)') Nblocks_2coarsen
+
+                call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+                lgt_sortednumlist, hvy_active, hvy_n )
+
+                call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, &
+                lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+
+                call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+                lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+
+            endif
+        end do
+
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_id )
+    end subroutine
+
+
+    subroutine store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                                lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
+
+       implicit none
+       !-----------------------------------------------------------------
+       integer(kind=ik), intent(in)      :: tree_id1, tree_id2
+       integer(kind=ik), intent(in)      :: lgt_n(:), lgt_block(:, : ), lgt_active(:,:)
+       integer(kind=ik), allocatable, intent(inout) ::  lgt_block_ref(:, : ), lgt_active_ref(:,:)
+       integer(kind=ik), intent(inout)   ::lgt_n_ref(2)
+
+       !-----------------------------------------------------------------
+       integer(kind=ik) :: k1
+       if (maxval(lgt_n_ref) < max(lgt_n(tree_id1),lgt_n(tree_id2))) then
+         lgt_n_ref(1) = lgt_n(tree_id1)
+         lgt_n_ref(2) = lgt_n(tree_id2)
+         if (allocated(lgt_active_ref)) deallocate(lgt_block_ref,lgt_active_ref)
+         allocate(lgt_block_ref(2*maxval(lgt_n_ref), size(lgt_block,2)))
+         allocate(lgt_active_ref(2*maxval(lgt_n_ref), 2))
+       else
+         lgt_n_ref(1) = lgt_n(tree_id1)
+         lgt_n_ref(2) = lgt_n(tree_id2)
+       endif
+
+       do k1 = 1, lgt_n(tree_id1)
+         lgt_block_ref(k1,:) = lgt_block(lgt_active(k1,tree_id1), :)
+         lgt_active_ref(k1,1)    = k1
+       end do
+       do k1 = 1, lgt_n(tree_id2)
+         lgt_block_ref(k1+lgt_n_ref(1),:) = lgt_block(lgt_active(k1,tree_id2), :)
+         lgt_active_ref(k1,2)    = k1 + lgt_n_ref(1)
+       end do
+
+     end subroutine
 
     !##############################################################
     !> This function takes two trees and refines their treestructures
@@ -757,16 +920,16 @@ contains
                 !call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
                 !lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
 
-                ! update neighbor relations
+                ! update neighbor relations and synchronice ghosts of 1st tree
                 call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
                 lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:, tree_id1), hvy_n(tree_id1) )
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
 
+                ! update neighbor relations and synchronice ghosts of 2nd tree
                 call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id2), &
                 lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:, tree_id2), hvy_n(tree_id2) )
-
-                ! synchronize ghosts
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id2), hvy_n(tree_id2))
+
             endif
         end do
     end subroutine
@@ -888,6 +1051,8 @@ contains
         integer(kind=tsize) :: treecode1, treecode2
         real (kind=rk) :: t_elapse
         character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
+        integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+        integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
 
         Jmax = params%max_treelevel ! max treelevel
         fsize= params%forest_size   ! maximal number of trees in forest
@@ -919,33 +1084,29 @@ contains
         ! try to keep the finest levels of all trees. This means we refine
         ! all blocks which are not on the same level.
 
-        t_elapse = MPI_WTIME()
-        call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
-        call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+        if (tree_id1 .ne. tree_id2) then
+          call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                                lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
-        ! because all trees have the same treestructrue thier hilbertcurve is identical
-        ! and therefore balance the load will try to distribute blocks with the same
-        ! treecode (but on different trees) at the same rank.
-        t_elapse = MPI_WTIME()
-        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-        lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-        hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
+          t_elapse = MPI_WTIME()
+          call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+          call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
 
-        ! since lgt_block was synced we have to create the active lists again
-        ! call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
-        ! lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
-        ! lgt_sortednumlist(:,:,tree_id1), tree_id1 )
+          ! because all trees have the same treestructrue thier hilbertcurve is identical
+          ! and therefore balance the load will try to distribute blocks with the same
+          ! treecode (but on different trees) at the same rank.
+          t_elapse = MPI_WTIME()
+          call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+          lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+          hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
 
-        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-        lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
+          call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+          lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+          hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
 
-        ! since lgt_block was synced we have to create the active lists again
-        ! call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
-        ! lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
-        ! lgt_sortednumlist(:,:,tree_id2), tree_id2 )
-        call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+          call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+        end if
         !=================================================
         ! Decide which pointwice arithmetic shell be used
         !=================================================
@@ -1387,6 +1548,24 @@ contains
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+          !
+          if (tree_id1 .ne. tree_id2) then
+            call coarse_tree_2_reference_mesh(params, tree_n, &
+                  lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+                  lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
+                  hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
+            call coarse_tree_2_reference_mesh(params, tree_n, &
+                  lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+                  lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+                  hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+          endif
+        else
+          if (tree_id1 .ne. tree_id2) then
+            call coarse_tree_2_reference_mesh(params, tree_n, &
+                  lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+                  lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+                  hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+          endif
         endif
 
     end subroutine
@@ -1553,6 +1732,11 @@ contains
 ! This function returns an scalar computed from the L2 scalar
 ! prodcut for 2 different trees
 !  <f(x),g(x)> = int f(x) * g(x) dx
+!!!!! Caution!!!!!
+! The trees will be at finer levels after calling this routine, because
+! we compute a unified grid of both trees to compute the scalarproduct.
+! So you might call adapt_mesh after this routine or
+! all coarse_tree_2_reference_mesh.
 function scalar_product_two_trees( params, tree_n, &
                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
@@ -1591,6 +1775,9 @@ function scalar_product_two_trees( params, tree_n, &
     real(kind=rk), allocatable , save ::  M(:)
     real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
     real(kind=rk) :: x0(3), dx(3)
+
+    integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+    integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
 
     if (present(verbosity)) verbose=verbosity
 
@@ -1658,9 +1845,13 @@ function scalar_product_two_trees( params, tree_n, &
     ! try to keep the finest levels of all trees. This means we refine
     ! all blocks which are not on the same level.
     if (tree_id1 .ne. tree_id2) then
+        ! first we save the old tree structure because it will be lost after
+        ! unification of both meshes
+        call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                              lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
+
         call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
-
         ! because all trees have the same treestructrue thier hilbertcurve is identical
         ! and therefore balance the load will try to distribute blocks with the same
         ! treecode (but on different trees) at the same rank.
@@ -1748,6 +1939,25 @@ function scalar_product_two_trees( params, tree_n, &
     !----------------------------------------------------
     call MPI_ALLREDUCE(MPI_IN_PLACE, sprod, 1, MPI_DOUBLE_PRECISION, &
                        MPI_SUM,WABBIT_COMM, mpierr)
+    !
+    ! call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
+    ! lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
+    ! hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
+    !
+    !
+    ! call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+    ! lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+    ! hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
+    if (tree_id1 .ne. tree_id2) then
+      call coarse_tree_2_reference_mesh(params, tree_n, &
+            lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+            lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
+            hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
+      call coarse_tree_2_reference_mesh(params, tree_n, &
+            lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+            lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+            hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+    endif
 
     t_elapse = MPI_WTIME() - t_elapse
 
@@ -1756,6 +1966,9 @@ function scalar_product_two_trees( params, tree_n, &
     call toc( "scalra prod (total)", t_elapse )
 end function
 !##############################################################
+
+
+
 
 
 !##############################################################

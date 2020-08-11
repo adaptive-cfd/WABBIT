@@ -23,7 +23,7 @@ subroutine post_generate_forest(params)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
-    integer :: hvy_id, lgt_id, fsize, j, tree_id, seed(8)=(/1,0,0,0,0,0,0,0/)
+    integer :: hvy_id, lgt_id, fsize, j, tree_id
     integer(kind=ik) :: it,ix,iy,iz,k,p,n,m, Bs(1:3)=16, tree_N=0,g=4,i,f
     real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt
     integer(kind=ik) :: freq(15**2) = (/(i, i=1,15**2)/)
@@ -76,7 +76,7 @@ subroutine post_generate_forest(params)
     hvy_n = 0
     dt = 2*pi/real(tree_N+1,kind=rk)
     ! generate random shuffle of frequencies
-    call random_seed(put=seed) ! always use same seed
+    call random_seed() ! always use same seed
     do i = 15**2, 1, -1
         j = i * rand() + 1
         k = freq(i)

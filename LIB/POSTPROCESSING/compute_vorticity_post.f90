@@ -186,6 +186,7 @@ subroutine compute_vorticity_post(params)
     end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_tmp, hvy_neighbor, hvy_active, hvy_n )
 
 
     if (operator == "--vorticity") then

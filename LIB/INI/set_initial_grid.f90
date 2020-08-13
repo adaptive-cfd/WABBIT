@@ -188,6 +188,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! grid adaptation
         !---------------------------------------------------------------------------
         if (adapt) then
+            if (params%rank==0) write(*,'("INIT: initial grid is adaptive")')
             ! we have to repeat the adapation process until the grid has reached a final
             ! state. Since we start on the coarsest level, in each iteration we cannot loose
             ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
@@ -236,7 +237,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
                 iter = iter + 1
                 if (params%rank == 0) then
-                    write(*,'(" did ",i2," mesh adaptation for the initial condition. Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') iter, lgt_n(tree_ID_flow), &
+                    write(*,'("INIT: did ",i2," mesh adaptation for the initial condition. Nblocks=",i7, " Jmin=",i2, " Jmax=",i2)') iter, lgt_n(tree_ID_flow), &
                     min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
                     max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
                 endif

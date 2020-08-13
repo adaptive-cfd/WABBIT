@@ -63,6 +63,8 @@ module module_insects
   !-----------------------------------------------------------------------------
   ! stuff for the fractal tree
   real(kind=rk), allocatable, save :: treedata(:,:)
+  ! array for superSTL file for the body
+  real(kind=rk), allocatable, save :: xyz_nxnynz(:,:)
 
 
   !-----------------------------------------------------------------------------

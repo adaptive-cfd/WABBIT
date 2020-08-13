@@ -1492,7 +1492,6 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
     real(kind=rk), allocatable, save :: tmp_block(:,:,:)
-    real(kind=rk), allocatable, save :: xyz_nxnynz(:, :)
 
     integer :: safety, i, ntri, Bs(1:3)
     integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax
@@ -1518,28 +1517,6 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     Bs(1) = size(mask,1) - 2*g
     Bs(2) = size(mask,2) - 2*g
     Bs(3) = size(mask,3) - 2*g
-
-    if (.not. allocated(xyz_nxnynz)) then
-        ! No scaling or origin shift is applied: we assume you did that when generating
-        ! the superSTL file. The data is thus understood in the body coordinate system.
-        scale = 1.0_rk
-        origin = 0.0_rk
-        call count_lines_in_ascii_file_mpi(fname_stl, ntri, 0)
-        allocate( xyz_nxnynz(1:ntri,1:30) )
-        call read_array_from_ascii_file_mpi(fname_stl, xyz_nxnynz, 0)
-        xyz_nxnynz(:,1:9) = xyz_nxnynz(:,1:9) !/ scale
-        xyz_nxnynz(:,1) = xyz_nxnynz(:,1) !+  origin(1)
-        xyz_nxnynz(:,4) = xyz_nxnynz(:,4) !+  origin(1)
-        xyz_nxnynz(:,7) = xyz_nxnynz(:,7) !+  origin(1)
-
-        xyz_nxnynz(:,2) = xyz_nxnynz(:,2) !+  origin(2)
-        xyz_nxnynz(:,5) = xyz_nxnynz(:,5) !+  origin(2)
-        xyz_nxnynz(:,8) = xyz_nxnynz(:,8) !+  origin(2)
-
-        xyz_nxnynz(:,3) = xyz_nxnynz(:,3) !+  origin(3)
-        xyz_nxnynz(:,6) = xyz_nxnynz(:,6) !+  origin(3)
-        xyz_nxnynz(:,9) = xyz_nxnynz(:,9) !+  origin(3)
-    endif
 
     ! initialize signed distance as very far away
     tmp_block = 9.0e6_rk ! distance as far away
@@ -1625,7 +1602,7 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             enddo
         enddo
     enddo
-
+    
     ! mask = tmp_block
 
     ! ! store final resut, do not erase existing data in array

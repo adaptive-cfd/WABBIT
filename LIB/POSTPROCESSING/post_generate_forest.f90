@@ -25,7 +25,7 @@ subroutine post_generate_forest(params)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
     integer :: hvy_id, lgt_id, fsize, j, tree_id
     integer(kind=ik) :: it,ix,iy,iz,k,p,n,m, Bs(1:3)=16, tree_N=0,g=4,i,f
-    real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt
+    real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt, rand
     integer(kind=ik) :: freq(15**2) = (/(i, i=1,15**2)/)
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -78,7 +78,8 @@ subroutine post_generate_forest(params)
     ! generate random shuffle of frequencies
     call random_seed() ! always use same seed
     do i = 15**2, 1, -1
-        j = i * rand() + 1
+        call random_number(rand)
+        j = i * rand + 1
         k = freq(i)
         freq(i) = freq(j)
         freq(j) = k

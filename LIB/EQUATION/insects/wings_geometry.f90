@@ -175,7 +175,7 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
       select case (Insect%wing_file_type(wingID))
       case ("fourier")
           ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
-          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, 
+          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
           x_pivot_b,rot_rel_wing_w, side)
 
       case ("fourierY")

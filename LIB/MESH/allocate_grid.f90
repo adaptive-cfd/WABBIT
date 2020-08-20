@@ -596,25 +596,41 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "lgt_active", size(lgt_block,1), params%forest_size
+    endif     
     allocate( lgt_active( size(lgt_block,1), params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
     endif
 
-    allocate( lgt_n(params%forest_size ) )
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "lgt_n", params%forest_size
+    endif
+    allocate( lgt_n( params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_n", product(real(shape(lgt_n)))*4.0e-9, shape(lgt_n)
     endif
 
-    allocate( hvy_n(params%forest_size ) )
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "hvy_n", params%forest_size
+    endif
+    allocate( hvy_n( params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)
     endif
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "hvy_active", size(hvy_block, 5), params%forest_size
+    endif
     allocate( hvy_active( size(hvy_block, 5), params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &

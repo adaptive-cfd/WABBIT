@@ -8,13 +8,14 @@
 ! = log ======================================================================================
 !
 !> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
-!-----------------------------------------------------------------------------------------------------
+!---------------------------------------mpirun -np 2 /home/phil/develop/WABBIT/wabbit-post --vorticity ./adapt_files/ux-eps_7.7e-02_000504000000.h5 ./adapt_files/uy-eps_7.7e-02_000504000000.h5 4--------------------------------------------------------------
 
 subroutine compute_vorticity_post(params)
     use module_precision
     use module_mesh
     use module_params
     use module_IO
+    use module_forest
     use module_mpi
     use module_operators
 
@@ -127,11 +128,13 @@ subroutine compute_vorticity_post(params)
     lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
     ! read mesh and field
-    call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
-    call read_field(file_ux, 1, params, hvy_block, hvy_n)
-    call read_field(file_uy, 2, params, hvy_block, hvy_n)
-    if (params%dim == 3) call read_field(file_uz, 3, params, hvy_block, hvy_n)
-
+    if (params%dim == 2) then
+        call read_tree((/file_ux,file_uy/), 2, params, lgt_n, lgt_block, &
+        hvy_block, hvy_tmp, tree_id_optional=1)
+    else
+        call read_tree((/file_ux,file_uy,file_uz/), 3, params, lgt_n, lgt_block, &
+        hvy_block, hvy_tmp, tree_id_optional=1)
+    end if
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
@@ -183,6 +186,7 @@ subroutine compute_vorticity_post(params)
     end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_tmp, hvy_neighbor, hvy_active, hvy_n )
 
 
     if (operator == "--vorticity") then

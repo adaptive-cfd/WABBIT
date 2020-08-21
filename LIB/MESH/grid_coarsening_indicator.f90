@@ -166,7 +166,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     endif
 
     ! HACK
-    if (params%physics_type == "ACM-new") norm(1:params%dim) = maxval(norm(1:params%dim))
+    if (params%physics_type == "ACM-new" .and. size(norm,1)>1) norm(1:params%dim) = maxval(norm(1:params%dim))
     ! write(*,*) "norm", norm
     !---------------------------------------------------------------------------
     !> evaluate coarsening criterion on all blocks

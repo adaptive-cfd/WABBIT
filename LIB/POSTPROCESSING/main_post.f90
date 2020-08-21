@@ -137,6 +137,8 @@ program main_post
   case ("--POD-time")
     call post_timecoef_POD(params)
 
+case ("--generate_forest")
+    call post_generate_forest(params)
     case default
 
         if (params%rank==0) then

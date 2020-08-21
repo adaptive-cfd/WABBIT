@@ -24,7 +24,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     type(inifile) :: PARAMS
     real(kind=rk),dimension(1:3)::defaultvec
     character(len=strlen) :: DoF_string, dummystr
-    integer :: j, tmp, mpirank, mpicode
+    integer :: j, tmp, mpirank, mpicode, ntri
     integer(kind=2) :: wingID, Nwings
 
     ! in this module, we use the logical ROOT to avoid the integer comparison mpirank==0
@@ -244,7 +244,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     call read_param_mpi(PARAMS,"Insects","pointcloudfile",Insect%pointcloudfile,"none")
 
 
-
     ! degrees of freedom for free flight solver. The string from ini file contains
     ! 6 characters 1 or 0 that turn on/off x,y,z,yaw,pitch,roll degrees of freedom
     ! by multiplying the respective RHS by zero, keeping the value thus constant
@@ -327,6 +326,27 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! clean ini file
     call clean_ini_file_mpi(PARAMS)
 
+    !---------------------------------------------------------------------------
+    ! initialization for superSTl body
+    !---------------------------------------------------------------------------
+    if (Insect%BodyType == "superSTL") then
+        if (.not. allocated(xyz_nxnynz)) then
+            if (root) write(*,'("INSECTS: STL: init start")')
+            if (root) write(*,'("INSECTS: STL: file=",A)') Insect%BodySuperSTLfile
+
+            call count_lines_in_ascii_file_mpi(Insect%BodySuperSTLfile, ntri, 0)
+
+            if (root) write(*,'("INSECTS: STL: file length is ntri=", i7 )') ntri
+
+            allocate( xyz_nxnynz(1:ntri,1:30) )
+
+            ! No scaling or origin shift is applied: we assume you did that when generating
+            ! the superSTL file. The data is thus understood in the body coordinate system.
+            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, xyz_nxnynz, 0)
+
+            if (root) write(*,'("INSECTS: STL: read from file...done! We are good to go.")')
+        endif
+    endif
 
 
     !-----------------------------------------------------------------------------

@@ -482,7 +482,7 @@ end subroutine read_intarray_from_ascii_file
 
     integer :: n, m, iostat
     character(len=maxcolumns) :: value
-    character(len=14)::formatstring
+    character(len=15)::formatstring
 
     n = size(params_vector,1)
     ! empty vector??
@@ -495,7 +495,7 @@ end subroutine read_intarray_from_ascii_file
       endif
     endif
 
-    write(formatstring,'("(",i2.2,"(g10.3,1x))")') n
+    write(formatstring,'("(",i3.3,"(g10.3,1x))")') n
 
     call GetValue(PARAMS, section, keyword, value)
 

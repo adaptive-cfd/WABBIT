@@ -98,6 +98,7 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
 FFLAGS += -FR -O3 -heap-arrays
+FFLAGS += -xcore-avx2
 # timing flags: attention they might disable all optimization!
 ##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
 FFLAGS += -module $(OBJDIR) # specify directory for modules.

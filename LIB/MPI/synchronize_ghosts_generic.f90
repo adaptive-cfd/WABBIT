@@ -63,11 +63,18 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         end do
     end if
 
+    !--------------------------------------------------------------
+    ! level_diff   |   round   |   remark
+    !--------------------------------------------------------------
+    !    -1        |     1     |   recv is finer: interpolation
+    !     0        |     2     |   same level: copy
+    !    +1        |     3     |   recv is coarser: decimation
+    !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
+    !--------------------------------------------------------------
 
-    ! Stage I: send the data for entrySortInRound= 2,3,4 and effectively do the rounds 2,3,4
-    !          afterwards, the ghost nodes on coarser block, including the redundant nodes, should be fine
-    ! Stage II: send the data for entrySortInRound = 1 (interpolation) and do the complete sort in again 1,2,3,4
-    !           the data for rounds 2,3,4 is not changed, so it is taken from the buffer for the first stage.
+
+
+    ! The definition of the two stages depends on coarseWins or fineWins, see below.
     do istage = 1, 2
 
         !***************************************************************************
@@ -114,7 +121,6 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists
                 if ( hvy_neighbor( sender_hvy_id, neighborhood ) /= -1 ) then
-! make if-statement for detecting domain boundary at this stage
                     !  ----------------------------  determin the core ids and properties of neighbor  ------------------------------
                     ! TODO: check if info available  when searching neighbor and store it in hvy_neighbor
                     ! neighbor light data id
@@ -182,27 +188,69 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         call isend_irecv_data_2( params, int_send_buffer, new_send_buffer, int_recv_buffer, &
         new_recv_buffer, communication_counter, istage )
 
-        !***************************************************************************
-        ! (iv) Unpack received data in the ghost node layers
-        !***************************************************************************
-
-        ! sort data in, ordering is important to keep dominance rules within ghost nodes.
-        ! the redundant nodes owned by two blocks only should be taken care by bounds_type (include_redundant. exclude_redundant )
-
-        if (istage == 1) Then
-            entrySortInRound_end = 3
-            ! We will perform these unpack rounds in the current stage, in this order...
-            rounds = (/2, 3, 4, 0/)
-            ! ... and take the date from those buffers
-            istage_buffer = (/1, 1, 1, 0/)
+        !---------------------------------------------------------------------------------------------------------------
+        ! Stages definition: interpolation can be performed correctly only after
+        ! the coarse ghost nodes are filled, hence we require two stages. First, coarser and same
+        ! level ghosts are filled, then, interpolation is done.
+        !---------------------------------------------------------------------------------------------------------------
+        ! In our grid definition with redundant points, at the coarse-fine interface values of one of the
+        ! blocks need to be overwritten with the values from the other one. There are two choices:
+        !   (1) overwrite coarser block with (decimated) fine block values (the solution until April 2020)
+        !   (2) overwrite fine block with (interpolated) coarser block values (the new solution)
+        ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
+        ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
+        ! and (1) appears to be more stable.
+        !---------------------------------------------------------------------------------------------------------------
+        if ( params%ghost_nodes_redundant_point_coarseWins ) then
+            ! coarseWins (fine block is overwritten with coarse block)
+            if (istage == 1) then
+                entrySortInRound_end = 2
+                ! We will perform these unpack rounds in the current stage, in this order...
+                rounds = (/3, 2, -1, -1/)
+                ! ... and take the data from those buffers
+                istage_buffer = (/1, 1, -1, -1/)
+            else
+                entrySortInRound_end = 1
+                rounds = (/1, -1, -1, -1/)
+                istage_buffer = (/2, -1, -1, -1/)
+            endif
         else
-            entrySortInRound_end = 4
-            ! We will perform these unpack rounds in the current stage, in this order...
-            rounds = (/1, 2, 3, 4/)
-            ! ... and take the date from those buffers
-            istage_buffer = (/2, 1, 1, 1/)
+            ! fineWins (coarse block is overwritten with fine block)
+            if (istage == 1) then
+                entrySortInRound_end = 3
+                rounds = (/2, 3, 4, -1/)
+                istage_buffer = (/1, 1, 1, -1/)
+            else
+                entrySortInRound_end = 4
+                rounds = (/1, 2, 3, 4/)
+                istage_buffer = (/2, 1, 1, 1/)
+            endif
         endif
 
+        !--------------------------------------------------------------
+        ! level_diff   |   round   |   remark
+        !--------------------------------------------------------------
+        !    -1        |     1     |   recv is finer: interpolation
+        !     0        |     2     |   same level: copy
+        !    +1        |     3     |   recv is coarser: decimation
+        !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
+        !--------------------------------------------------------------
+
+        !***********************************************************************
+        ! (iv) Unpack received data in the ghost node layers
+        !***********************************************************************
+
+        ! Unpacking of data. Recall there are two rules:
+        !   (1) primary rule: coarseWins or fineWins
+        !   (2) secondary rule: higher lightID wins
+        ! Even though we specifiy INCLUDE_REDUNDANT and EXCLUDE_REDUNDANT when packing the data,
+        ! this alone is not enough (which is very counter-intuitive). The point is that with the
+        ! redundant points, sometimes a point can coexist on two different levels, so it can either be
+        ! copied or interpolated. This ambiguity is bad, as the values are different then. The problem
+        ! is visible in 2D at the corner of a coarser block with 3 fine neighbors. It is not the redundant
+        ! points which have the problem: one of the ghost nodes is different on the fine blocks.
+        ! The rounds concept deals with that, this is why in the fineWins case we need to unpack values
+        ! twice.
         do iround = 1,  entrySortInRound_end ! rounds depend on stages, see above
             currentSortInRound = rounds(iround)
 
@@ -245,52 +293,81 @@ subroutine set_bounds_according_to_ghost_dominance_rules( params, bounds_type, e
     logical :: senderHistoricFine, recieverHistoricFine, receiverIsCoarser
     logical :: receiverIsOnSameLevel, lgtIdSenderIsHigher
 
-    ! define level difference: sender - receiver, so +1 means sender on higher level
+    !--------------------------------------------------------------
+    ! level_diff   |   round   |   remark
+    !--------------------------------------------------------------
+    !    -1        |     1     |   recv is finer: interpolation
+    !     0        |     2     |   same level: copy
+    !    +1        |     3     |   recv is coarser: decimation
+    !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
+    !--------------------------------------------------------------
+
     level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
-
-    ! the criteria
-    senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
-    recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
-    receiverIsCoarser       = ( level_diff>0_ik )
-    receiverIsOnSameLevel   = ( level_diff==0_ik )
-    lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
-
-    bounds_type = EXCLUDE_REDUNDANT  ! default value, may be changed below
     ! in what round in the extraction process will this neighborhood be unpacked?
     entrySortInRound = level_diff + 2  ! now has values 1,2,3 ; is overwritten with 4 if sender is historic fine
 
-    ! here we decide who dominates. would be simple without the historic fine
-    if (senderHistoricFine) then
-        ! the 4th unpack round is the last one, so setting 4 ensures that historic fine always wins
-        entrySortInRound = 4
-        if (recieverHistoricFine) then
-            if (lgtIdSenderIsHigher)  then
-                ! both are historic fine, the redundant nodes are overwritten using secondary criterion
-                bounds_type = INCLUDE_REDUNDANT
-            end if
-        else
-            ! receiver not historic fine, so sender always sends redundant nodes, no further
-            ! checks on refinement level are required
+    if ( params%ghost_nodes_redundant_point_coarseWins ) then
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! coarseWins
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        receiverIsOnSameLevel = ( level_diff==0_ik )
+        lgtIdSenderIsHigher   = ( neighbor_lgt_id < sender_lgt_id )
+        bounds_type           = EXCLUDE_REDUNDANT  ! default value, may be changed below
+
+        ! first rule, overwrite finer ghost nodes...modif
+        if (level_diff == -1_ik)  then ! receiver is finer
             bounds_type = INCLUDE_REDUNDANT
         end if
 
-    else  ! sender NOT historic fine,
-
-        ! what about the neighbor/receiver, historic fine?
-        if ( .not. recieverHistoricFine) then
-            ! neither one is historic fine, so just do the basic rules
-
-            ! first rule, overwrite cosarser ghost nodes
-            if (receiverIsCoarser)  then ! receiver is coarser
-                bounds_type = INCLUDE_REDUNDANT
-            end if
-
-            ! secondary rule: on same level decide using light id
-            if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then
-                bounds_type = INCLUDE_REDUNDANT
-            end if
+        ! secondary rule: on same level decide using light id
+        if (receiverIsOnSameLevel .and. lgtIdSenderIsHigher) then
+            bounds_type = INCLUDE_REDUNDANT
         end if
-    end if  ! else  senderHistoricFine
+    else
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! fineWins
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! the criteria
+        senderHistoricFine      = ( lgt_block( sender_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
+        recieverHistoricFine    = ( lgt_block(neighbor_lgt_id, params%max_treelevel + IDX_REFINE_STS)==11 )
+        receiverIsCoarser       = ( level_diff>0_ik )
+        receiverIsOnSameLevel   = ( level_diff==0_ik )
+        lgtIdSenderIsHigher     = ( neighbor_lgt_id < sender_lgt_id )
+        bounds_type             = EXCLUDE_REDUNDANT  ! default value, may be changed below
+
+        ! here we decide who dominates. would be simple without the historic fine
+        if (senderHistoricFine) then
+            ! the 4th unpack round is the last one, so setting 4 ensures that historic fine always wins
+            entrySortInRound = 4
+            if (recieverHistoricFine) then
+                if (lgtIdSenderIsHigher)  then
+                    ! both are historic fine, the redundant nodes are overwritten using secondary criterion
+                    bounds_type = INCLUDE_REDUNDANT
+                end if
+            else
+                ! receiver not historic fine, so sender always sends redundant nodes, no further
+                ! checks on refinement level are required
+                bounds_type = INCLUDE_REDUNDANT
+            end if
+
+        else  ! sender NOT historic fine,
+
+            ! what about the neighbor/receiver, historic fine?
+            if ( .not. recieverHistoricFine) then
+                ! neither one is historic fine, so just do the basic rules
+
+                ! first rule, overwrite cosarser ghost nodes
+                if (receiverIsCoarser)  then ! receiver is coarser
+                    bounds_type = INCLUDE_REDUNDANT
+                end if
+
+                ! secondary rule: on same level decide using light id
+                if (receiverIsOnSameLevel.and.lgtIdSenderIsHigher) then
+                    bounds_type = INCLUDE_REDUNDANT
+                end if
+            end if
+        end if  ! else  senderHistoricFine
+    endif
 
 end subroutine
 

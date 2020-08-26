@@ -94,6 +94,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     character(len=80) :: arg
     type(INIFILE) :: FILE
 
+    logical, parameter :: save_ghosts = .False.
+
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
@@ -115,7 +117,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+    if (save_ghosts) then
+        allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n ), stat=status)
+    else
+        allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+    endif
     if (status /= 0) then
         call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
     endif
@@ -162,6 +168,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! (note zero-based offset):
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n/) - 1
+        if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n/) - 1
 
     else
 
@@ -170,6 +177,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
+        if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n/) - 1
 
     endif
 
@@ -192,7 +200,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
             if ( params%dim == 3 ) then
                 ! 3D
-                myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                if (save_ghosts) then
+                    myblockbuffer(:,:,:,l) = hvy_block( :, :, :, dF, hvy_id)
+                else
+                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(3)
@@ -202,11 +214,21 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 coords_spacing(2,l) = ddx(2)
                 coords_spacing(3,l) = ddx(1)
 
+                if (save_ghosts) then
+                    coords_origin(1,l) = xx0(3) -dble(g)*ddx(3)
+                    coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
+                    coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
+                endif
+
                 ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             else
                 ! 2D
-                myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                if (save_ghosts) then
+                    myblockbuffer(:,:,1,l) = hvy_block(:, :, 1, dF, hvy_id)
+                else
+                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
                 coords_origin(1,l) = xx0(2)
@@ -214,6 +236,10 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 coords_spacing(1,l) = ddx(2)
                 coords_spacing(2,l) = ddx(1)
 
+                if (save_ghosts) then
+                    coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
+                    coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
+                endif
                 ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
             endif

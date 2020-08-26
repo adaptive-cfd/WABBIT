@@ -97,9 +97,19 @@ module module_params
         ! files we want to read for inital cond.
         character(len=80), dimension(:), allocatable  :: input_files
 
+
         ! grid parameter
         integer(kind=ik), dimension(3)               :: Bs=(/ 0, 0, 0 /)      ! number of block nodes
         integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
+
+        ! In our grid definition with redundant points, at the coarse-fine interface values of one of the
+        ! blocks need to be overwritten with the values from the other one. There are two choices:
+        !   (1) overwrite coarser block with (decimated) fine block values (the solution until April 2020)
+        !   (2) overwrite fine block with (interpolated) coarser block values (the new solution)
+        ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
+        ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
+        ! and (1) appears to be more stable.
+        logical :: ghost_nodes_redundant_point_coarseWins = .false.
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.

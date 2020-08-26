@@ -167,6 +167,9 @@ subroutine init_ghost_nodes( params )
             endif
         endif
 
+        ! this can be fixed by merging with the newGhostNodes branch, where this actually does work.
+        if ( g == 1 ) call abort(20200826, "Unfortunately, this code version currently does not support setting n_ghosts=1")
+
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
         ! max neighbor number: 2D = 12, 3D = 56
@@ -282,6 +285,11 @@ subroutine init_ghost_nodes( params )
         ! of IF-THEN clauses).
         ! This arrays indices are:
         ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [idata_bounds_type], [isendrecv])
+
+        if (params%rank==0) then
+            open(16,file='neighbor_blocks2D.dat',status='replace')
+            close(16)
+        endif
 
         ijkGhosts = 1
         do ineighbor = 1, Nneighbor

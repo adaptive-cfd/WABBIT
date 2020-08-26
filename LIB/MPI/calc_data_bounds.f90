@@ -134,6 +134,12 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         endif
     enddo
 
+    if (params%rank == 0 .and. TYPE==1) then ! the TYPE==1 is just to reduce the data: the blocks are idential for 1,2,3
+        open(16, file='neighbor_blocks2D.dat', status='unknown', position='append')
+        write(16,*) dir, leveldiff, x0_send, dx_send, x0_recv, dx_recv
+        close(16)
+    endif
+
 
     !***********************************************************************
     ! extend sender bounds as required by interpolation

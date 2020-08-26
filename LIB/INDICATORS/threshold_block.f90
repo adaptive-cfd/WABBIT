@@ -89,11 +89,17 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     ! then, re-interpolate to the initial level (prediciton)
                     call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
-                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                    do i = 1, Bs(1)+2*g
-                        do j = 1, Bs(2)+2*g
-                            do l = 1, Bs(3)+2*g
+                    ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
+                    ! Notes:
+                    !          Previous versions were more conservative: they checked all details in the ghost
+                    !          node layer, which included using one-sided interpolation stencils. This was
+                    !          maybe too much: blocks were refined quite long before they became significant.
+                    !          Also note, that the first detail is using points from the ghost nodes for interpolation
+                    !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
+                    !          in any case.
+                    do l = g+1, Bs(3)+g
+                        do j = g+1, Bs(2)+g
+                            do i = g+1, Bs(1)+g
                                 detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                             end do
                         end do
@@ -141,10 +147,16 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     ! then, re-interpolate to the initial level (prediciton)
                     call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
-                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    ! NOTE: the error (or detail) is evaluated on the entire block, INCLUDING the ghost nodes layer
-                    do i = 1, Bs(1)+2*g
-                        do j = 1, Bs(2)+2*g
+                    ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
+                    ! Notes:
+                    !          Previous versions were more conservative: they checked all details in the ghost
+                    !          node layer, which included using one-sided interpolation stencils. This was
+                    !          maybe too much: blocks were refined quite long before they became significant.
+                    !          Also note, that the first detail is using points from the ghost nodes for interpolation
+                    !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
+                    !          in any case.
+                    do j = g+1, Bs(2)+g
+                        do i = g+1, Bs(1)+g
                             detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
                         end do
                     end do

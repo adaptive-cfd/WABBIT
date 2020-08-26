@@ -78,106 +78,6 @@ contains
     end subroutine
 
 
-    ! Please note applying a filter requires also manipulating the ghost nodes
-        subroutine restriction_lowPassFilter_2D_x(block_data, block_data_filtered, wavelet)
-            implicit none
-
-            real(kind=rk), dimension(1:,1:), intent(in) :: block_data
-            real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-            character(len=80), intent(in) :: wavelet
-            integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
-            real(kind=rk), allocatable, save :: HD(:)
-            real(kind=rk) :: block_tmp(1:size(block_data,1), 1:size(block_data,2))
-
-            nx = size(block_data,1)
-            ny = size(block_data,2)
-
-            ! initialize filter according to wavelet
-            if (.not. allocated(HD)) then
-                select case(wavelet)
-                case("CDF4,4", "CDF44")
-                    ! H TILDE filter
-                    allocate( HD(-6:6) )
-                    HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                    87.0d0*2.0d0**(-7.d0), &
-                    9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
-
-                case("CDF2,2", "CDF22")
-                    ! H TILDE filter
-                    allocate( HD(-2:2) )
-                    HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-                case default
-                    call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
-
-                end select
-            endif
-
-            a = lbound(HD, dim=1)
-            b = ubound(HD, dim=1)
-
-            ! block_data_filtered(:, :) = 0.0_rk
-            block_data_filtered(:, :) = block_data
-            block_data_filtered(-a+1:nx-b, :) = 0.0_rk
-
-            ! apply the filter
-            do ix = -a+1, nx-b
-                do shift = a, b
-                    block_data_filtered(ix, :) = block_data_filtered(ix, :) + block_data(ix+shift, :)*HD(shift)
-                enddo
-            enddo
-        end subroutine
-
-
-        ! Please note applying a filter requires also manipulating the ghost nodes
-        subroutine restriction_lowPassFilter_2D_y(block_data, block_data_filtered, wavelet)
-            implicit none
-
-            real(kind=rk), dimension(1:,1:), intent(in) :: block_data
-            real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-            character(len=80), intent(in) :: wavelet
-            integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
-            real(kind=rk), allocatable, save :: HD(:)
-
-            nx = size(block_data,1)
-            ny = size(block_data,2)
-
-            ! initialize filter according to wavelet
-            if (.not. allocated(HD)) then
-                select case(wavelet)
-                case("CDF4,4", "CDF44")
-                    ! H TILDE filter
-                    allocate( HD(-6:6) )
-                    HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                    87.0d0*2.0d0**(-7.d0), &
-                    9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
-
-                case("CDF2,2", "CDF22")
-                    ! H TILDE filter
-                    allocate( HD(-2:2) )
-                    HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-                case default
-                    call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
-
-                end select
-            endif
-
-            a = lbound(HD, dim=1)
-            b = ubound(HD, dim=1)
-
-            ! block_data_filtered(:, :) = 0.0_rk
-            block_data_filtered(:, :) = block_data
-            block_data_filtered(:, -a+1:ny-b) = 0.0_rk
-
-            ! apply the filter
-            do iy = -a+1, ny-b ! the x-loop runs only over interior nodes (excluding the ghost nodes)
-                do shift = a, b
-                    ! the filter is applied in all y positions, INCLUDING the ghost nodes (this was a bug, fix: Thomas, 08 Jun 2020)
-                    block_data_filtered(:,iy) = block_data_filtered(:,iy) + block_data(:,iy+shift)*HD(shift)
-                enddo
-            enddo
-        end subroutine
 
     subroutine restriction_prefilter_3D(fine, fine_filtered2, wavelet)
         implicit none
@@ -185,75 +85,14 @@ contains
         real(kind=rk), dimension(1:,1:,1:), intent(in) :: fine
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: fine_filtered2
         character(len=80), intent(in) :: wavelet
-        real(kind=rk), allocatable, save :: fine_filtered(:,:,:)
+        real(kind=rk), dimension(1:size(fine,1),1:size(fine,2),1:size(fine,3)) :: fine_filtered
         real(kind=rk), allocatable, save :: HD(:)
         integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
 
-        nx = size(fine,1)
-        ny = size(fine,2)
-        nz = size(fine,3)
-
-        if (.not.allocated(fine_filtered)) allocate(fine_filtered(1:nx,1:ny,1:nz))
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4")
-                allocate( HD(-6:6) )
-
-                ! H TILDE filter ( from Sweldens 1996 paper)
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
-
-                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
-                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
-                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                HD  = HD*2.0d0
-
-            case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        ! note: ghost node layer is returned as original values.
-
-        ! copy (to fill ghost nodes with original data)
-        fine_filtered2(:, :, :) = fine
-        fine_filtered2(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
-
-        ! apply the filter (first in x-direction)
-        do ix = -a+1, nx-b
-            do shift = a, b
-                fine_filtered2(ix, -a+1:ny-b, -a+1:nz-b) = fine_filtered2(ix, -a+1:ny-b, -a+1:nz-b) + fine(ix+shift, -a+1:ny-b, -a+1:nz-b)*HD(shift)
-            enddo
-        enddo
-
-        ! copy (to fill ghost nodes with original data)
-        fine_filtered(:, :, :) = fine
-        fine_filtered(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
-
-        ! then in y-direction
-        do iy = -a+1, ny-b
-            do shift = a, b
-                fine_filtered(-a+1:nx-b, iy, -a+1:nz-b) = fine_filtered(-a+1:nx-b, iy, -a+1:nz-b) + fine_filtered2(-a+1:nx-b, iy+shift, -a+1:nz-b)*HD(shift)
-            enddo
-        enddo
-
-        ! copy (to fill ghost nodes with original data)
-        fine_filtered2(:, :, :) = fine
-        fine_filtered2(-a+1:nx-b, -a+1:ny-b, -a+1:nz-b) = 0.0_rk
-
-        ! then in z-direction
-        do iz = -a+1, nz-b
-            do shift = a, b
-                fine_filtered2(-a+1:nx-b, -a+1:ny-b, iz) = fine_filtered2(-a+1:nx-b, -a+1:ny-b, iz) + fine_filtered(-a+1:nx-b, -a+1:ny-b, iz+shift)*HD(shift)
-            enddo
-        enddo
+        call restriction_lowPassFilter_3D_x(fine, fine_filtered, wavelet)
+        call restriction_lowPassFilter_3D_y(fine_filtered, fine_filtered2, wavelet)
+        call restriction_lowPassFilter_3D_z(fine_filtered2, fine_filtered, wavelet)
+        fine_filtered2 = fine_filtered
     end subroutine
 
 
@@ -596,5 +435,312 @@ contains
     !     end do
     !
     ! end subroutine prediction1D
+
+
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine restriction_lowPassFilter_2D_x(block_data, block_data_filtered, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:), intent(in) :: block_data
+        real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
+        character(len=80), intent(in) :: wavelet
+        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
+        real(kind=rk), allocatable, save :: HD(:)
+        real(kind=rk) :: block_tmp(1:size(block_data,1), 1:size(block_data,2))
+
+        nx = size(block_data,1)
+        ny = size(block_data,2)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                ! H TILDE filter
+                allocate( HD(-6:6) )
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
+
+            case ("CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                ! H TILDE filter
+                allocate( HD(-2:2) )
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! block_data_filtered(:, :) = 0.0_rk
+        block_data_filtered(:, :) = block_data
+        block_data_filtered(-a+1:nx-b, :) = 0.0_rk
+
+        ! apply the filter
+        do ix = -a+1, nx-b
+            do shift = a, b
+                block_data_filtered(ix, :) = block_data_filtered(ix, :) + block_data(ix+shift, :)*HD(shift)
+            enddo
+        enddo
+    end subroutine
+
+
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine restriction_lowPassFilter_2D_y(block_data, block_data_filtered, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:), intent(in) :: block_data
+        real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
+        character(len=80), intent(in) :: wavelet
+        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
+        real(kind=rk), allocatable, save :: HD(:)
+
+        nx = size(block_data,1)
+        ny = size(block_data,2)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                ! H TILDE filter
+                allocate( HD(-6:6) )
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
+
+            case ("CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                ! H TILDE filter
+                allocate( HD(-2:2) )
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! block_data_filtered(:, :) = 0.0_rk
+        block_data_filtered(:, :) = block_data
+        block_data_filtered(:, -a+1:ny-b) = 0.0_rk
+
+        ! apply the filter
+        do iy = -a+1, ny-b ! the x-loop runs only over interior nodes (excluding the ghost nodes)
+            do shift = a, b
+                ! the filter is applied in all y positions, INCLUDING the ghost nodes (this was a bug, fix: Thomas, 08 Jun 2020)
+                block_data_filtered(:,iy) = block_data_filtered(:,iy) + block_data(:,iy+shift)*HD(shift)
+            enddo
+        enddo
+    end subroutine
+
+
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine restriction_lowPassFilter_3D_x(block_data, block_data_filtered, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
+        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), allocatable, save :: HD(:)
+        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
+
+        nx = size(block_data,1)
+        ny = size(block_data,2)
+        nz = size(block_data,3)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                allocate( HD(-6:6) )
+
+                ! H TILDE filter ( from Sweldens 1996 paper)
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
+
+                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
+                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
+                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
+                ! HD  = HD*2.0d0
+            case ("CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                allocate( HD(-2:2) )  ! H TILDE
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! block_data_filtered(:, :, :) = 0.0_rk
+        block_data_filtered(:, :, :) = block_data
+        block_data_filtered(-a+1:nx-b, :, :) = 0.0_rk
+
+        do ix = -a+1, nx-b
+            do shift = a, b
+                block_data_filtered(ix, :, :) = block_data_filtered(ix, :, :) + block_data(ix+shift, :, :)*HD(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine restriction_lowPassFilter_3D_y(block_data, block_data_filtered, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
+        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), allocatable, save :: HD(:)
+        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
+
+        nx = size(block_data,1)
+        ny = size(block_data,2)
+        nz = size(block_data,3)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                allocate( HD(-6:6) )
+
+                ! H TILDE filter ( from Sweldens 1996 paper)
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
+
+                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
+                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
+                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
+                ! HD  = HD*2.0d0
+            case ("CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                allocate( HD(-2:2) )  ! H TILDE
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! block_data_filtered(:, :, :) = 0.0_rk
+        block_data_filtered(:, :, :) = block_data
+        block_data_filtered(:, -a+1:ny-b, :) = 0.0_rk
+
+        do iy = -a+1, ny-b
+            do shift = a, b
+                block_data_filtered(:, iy, :) = block_data_filtered(:, iy, :) + block_data(:, iy+shift, :)*HD(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine restriction_lowPassFilter_3D_z(block_data, block_data_filtered, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
+        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), allocatable, save :: HD(:)
+        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
+
+        nx = size(block_data,1)
+        ny = size(block_data,2)
+        nz = size(block_data,3)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                allocate( HD(-6:6) )
+
+                ! H TILDE filter ( from Sweldens 1996 paper)
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
+
+                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
+                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
+                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
+                ! HD  = HD*2.0d0
+            case ("CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                allocate( HD(-2:2) )  ! H TILDE
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+        a = lbound(HD, dim=1)
+        b = ubound(HD, dim=1)
+
+        ! block_data_filtered(:, :, :) = 0.0_rk
+        block_data_filtered(:, :, :) = block_data
+        block_data_filtered(:, :, -a+1:nz-b) = 0.0_rk
+
+        do iz = -a+1, nz-b
+            do shift = a, b
+                block_data_filtered(:, :, iz) = block_data_filtered(:, :, iz) + block_data(:, :, iz+shift)*HD(shift)
+            enddo
+        enddo
+    end subroutine
+
+
+
 
 end module

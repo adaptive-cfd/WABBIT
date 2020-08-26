@@ -130,6 +130,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'penalization', params%penalization, .false.)
     call read_param_mpi(FILE, 'VPM', 'mask_time_dependent_part', params%mask_time_dependent_part, .true.)
     call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
+    call read_param_mpi(FILE, 'VPM', 'dont_use_pruned_tree_mask', params%dont_use_pruned_tree_mask, .false.)
 
     ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
     ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)

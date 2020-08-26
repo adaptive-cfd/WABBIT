@@ -61,6 +61,7 @@ contains
         force_all_parts = .false.
         if (present(all_parts)) force_all_parts = all_parts
         if (params%dim == 2) force_all_parts = .true.
+        if (params%dont_use_pruned_tree_mask) force_all_parts = .true.
 
         !-----------------------------------------------------------------------
         ! complete generation of all parts, if required

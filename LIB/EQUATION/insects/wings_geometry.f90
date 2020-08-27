@@ -1977,7 +1977,7 @@ end subroutine Setup_Wing_from_inifile
 subroutine set_wing_bounding_box_fourier( Insect, wingID )
   implicit none
   type(diptera),intent(inout) :: Insect
-  real(kind=rk) :: theta, xmin,xmax, ymin, ymax, R, x, y, theta_prime
+  real(kind=rk) :: theta, xmin,xmax, ymin, ymax, R, x, y, theta_prime, tmp
   integer(kind=2), intent(in) :: wingID ! wing id number
 
   theta = 0.d0
@@ -2039,6 +2039,13 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
       Insect%wing_bounding_box(6,wingID) =  maxval(wing_thickness_profile / 2.0_pr)
     endif
   end if
+
+  ! Mirror the bounding box for left wings
+  if ( (wingID == 1) .or. (wingID == 3) ) then
+    tmp = Insect%wing_bounding_box(6,wingID)
+    Insect%wing_bounding_box(6,wingID) = Insect%wing_bounding_box(5,wingID)
+    Insect%wing_bounding_box(5,wingID) = tmp
+  endif
 
   if (root) then
     write(*,'("Effective (=the real surface) wing lengths are:")')

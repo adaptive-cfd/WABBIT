@@ -734,9 +734,9 @@ contains
             endif
         end do
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_id )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
     end subroutine
 
 
@@ -1565,6 +1565,7 @@ contains
                   lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
                   lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
                   hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
           endif
         endif
 

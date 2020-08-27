@@ -1227,6 +1227,7 @@ contains
 
 
     if ( iteration>0 ) then
+      save_all = .False.
       if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
     else
       save_all = .True.

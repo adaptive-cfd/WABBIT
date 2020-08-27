@@ -2043,8 +2043,8 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
   ! Mirror the bounding box for left wings
   if ( (wingID == 1) .or. (wingID == 3) ) then
     tmp = Insect%wing_bounding_box(6,wingID)
-    Insect%wing_bounding_box(6,wingID) = Insect%wing_bounding_box(5,wingID)
-    Insect%wing_bounding_box(5,wingID) = tmp
+    Insect%wing_bounding_box(6,wingID) = -Insect%wing_bounding_box(5,wingID)
+    Insect%wing_bounding_box(5,wingID) = -tmp
   endif
 
   if (root) then

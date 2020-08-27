@@ -11,7 +11,7 @@
 ! = log ======================================================================================
 !
 !> \date 02/02/18 - create
-subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim)
+subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, verbosity)
 
     implicit none
     !> file name
@@ -30,6 +30,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     integer(kind=ik), intent(out)                 :: dim
     !> domain size
     real(kind=rk), dimension(3), intent(out)      :: domain
+    logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
 
     integer(kind=ik), dimension(1)                :: iiteration, number_blocks,version
     real(kind=rk), dimension(1)                   :: ttime
@@ -37,6 +38,9 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     integer(kind=ik)                              :: datarank, Nb, rank, ierr
     integer(kind=hsize_t)                         :: size_field(1:4)
     integer(hsize_t), dimension(2)                :: dims_treecode
+    logical :: verbose = .true.
+
+    if (present(verbosity)) verbose=verbosity
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call check_file_exists(fname)
@@ -125,7 +129,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 
-    if (rank == 0) then
+    if (rank == 0 .and. verbose) then
         write(*,'(80("~"))')
         write(*,*) "read_attributes.f90: Read important numbers from a file."
         write(*,'(80("~"))')

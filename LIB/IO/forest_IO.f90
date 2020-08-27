@@ -6,7 +6,7 @@
 !> the heavy data for you.
 subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity)
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(inout) :: params           !< params structure
@@ -21,10 +21,14 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_active(:,:), hvy_active(:,:) !< active lists
     integer(kind=tsize), ALLOCATABLE, intent(inout):: lgt_sortednumlist(:,:,:)
     real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
+    logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
     !-------------------------------- ---------------------------------
     integer(kind=ik)  :: iteration, dF, tc_length, dim, i, lgt_n_tmp, &
     rank, level, Bs(3), fsize, number_dense_blocks
     real(kind=rk)     :: time, domain(3)
+    logical :: verbose = .true.
+
+    if (present(verbosity)) verbose=verbosity
 
     ! set MPI parameter
     rank  = params%rank
@@ -41,7 +45,8 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     ! From any file (here: 1st in list), we read the essential parameters of the tree:
     ! most importantly Bs, dim, length of treecodes. NOTE: all trees in the forest must
     ! have the same Bs.
-    call read_attributes(fnames(1), lgt_n_tmp, time, iteration, domain, Bs, tc_length, dim)
+    call read_attributes(fnames(1), lgt_n_tmp, time, iteration, domain, Bs, &
+                         tc_length, dim, verbosity=verbose)
 
     ! Check if one tree already exists in the forest:
     ! If it doesnt initialize some important parameters like the Block size Bs
@@ -74,7 +79,7 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
 
 
     ! read treecode from first input file
-    call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_id)
+    call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_id, verbosity=verbose)
 
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
@@ -95,7 +100,8 @@ end subroutine read_field2tree
 !
 !
 !-------------------------------------------------------------------------------
-subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, tree_id_optional)
+subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, &
+    tree_id_optional, verbosity)
     implicit none
 
     !-------------------------------- ---------------------------------
@@ -107,7 +113,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     ! and mustnt neccessarily be done in the caller
     integer(kind=ik), intent(inout) :: lgt_n !< number of active blocks (heavy and light data)
     integer(kind=ik), intent(inout) :: lgt_block(:,:) !< light data array
-
+    logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
     integer(kind=ik), optional, intent(in) :: tree_id_optional !< index of the tree you want to save the data in
     real(kind=rk), intent(inout) :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     real(kind=rk), intent(inout) :: hvy_tmp(:, :, :, :, :) !< heavy data array - block data
@@ -119,6 +125,9 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     integer(hid_t)        :: file_id
     character(len = 80) :: fname
+    logical :: verbose = .true.
+
+    if (present(verbosity)) verbose=verbosity
 
     if (present(tree_id_optional)) then
         tree_id = tree_id_optional
@@ -134,7 +143,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     Bs           = params%Bs
     g            = params%n_ghosts
 
-    if (params%rank==0) write(*,*) "read_tree tries to read lgt_n=", lgt_n, "from file ", trim(adjustl(fname))
+    if (params%rank==0 .and. verbose) write(*,*) "read_tree tries to read lgt_n=", lgt_n, "from file ", trim(adjustl(fname))
 
     ! open the file
     call check_file_exists(fname)
@@ -207,7 +216,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
         end do
     end do
 
-    if ( rank == 0 ) then
+    if ( rank == 0 .and. verbose) then
         write(*,'("Stored in Tree_id: ",i3)') tree_id
         write(*,'("Nblocks=",i6," (on all cpus)")') lgt_n
     end if
@@ -222,7 +231,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     ! it is useful to print out the information on active levels in the file
     ! to get an idea how it looks like and if the desired dense level is larger
     ! or smaller
-    if (params%rank==0) then
+    if (params%rank==0 .and. verbose ) then
         write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
         max_active_level( lgt_block )
     endif

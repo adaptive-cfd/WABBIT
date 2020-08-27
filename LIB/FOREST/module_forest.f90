@@ -1084,11 +1084,11 @@ contains
         ! try to keep the finest levels of all trees. This means we refine
         ! all blocks which are not on the same level.
 
-        if (tree_id1 .ne. tree_id2) then
+        if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
+          t_elapse = MPI_WTIME()
           call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
                                 lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
-          t_elapse = MPI_WTIME()
           call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
           hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
           call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
@@ -1543,13 +1543,14 @@ contains
         end select
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
+        t_elapse = MPI_Wtime()
         if (present(dest_tree_id)) then
           ! we have to synchronize lgt data since we were updating it locally on this procesor
           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
           !
-          if (tree_id1 .ne. tree_id2) then
+          if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
             call coarse_tree_2_reference_mesh(params, tree_n, &
                   lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
                   lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
@@ -1560,7 +1561,7 @@ contains
                   hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
           endif
         else
-          if (tree_id1 .ne. tree_id2) then
+          if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
             call coarse_tree_2_reference_mesh(params, tree_n, &
                   lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
                   lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
@@ -1568,7 +1569,7 @@ contains
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
           endif
         endif
-
+        call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", MPI_Wtime()-t_elapse )
     end subroutine
     !##############################################################
 

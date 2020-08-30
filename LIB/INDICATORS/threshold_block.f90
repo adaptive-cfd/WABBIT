@@ -113,9 +113,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
 
                     ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    do i = g+1, Bs(1)+g
-                        do j = g+1, Bs(2)+g
-                            do l = g+1, Bs(3)+g
+                    do l = g+1, Bs(3)+g
+                        do i = g+1, Bs(1)+g
+                            do j = g+1, Bs(2)+g
                                 detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                             end do
                         end do

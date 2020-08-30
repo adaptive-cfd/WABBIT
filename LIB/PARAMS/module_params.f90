@@ -109,7 +109,7 @@ module module_params
         ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
         ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
         ! and (1) appears to be more stable.
-        logical :: ghost_nodes_redundant_point_coarseWins = .false.
+        logical :: ghost_nodes_redundant_point_coarseWins = .true.
 
         ! switch for mesh adaption
         logical                                      :: adapt_mesh=.false., adapt_inicond=.false.

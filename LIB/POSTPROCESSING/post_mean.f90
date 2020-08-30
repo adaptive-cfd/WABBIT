@@ -29,7 +29,7 @@ subroutine post_mean(params)
     integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim, g
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
@@ -38,9 +38,9 @@ subroutine post_mean(params)
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
 
     real(kind=rk)    :: x,y,z
-    real(kind=rk)    :: maxi,mini,squari,meani,qi
+    real(kind=rk)    :: maxi,mini,squari,meani,qi,inti
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, g, tc_length
+    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, tc_length
 
 
 
@@ -65,8 +65,8 @@ subroutine post_mean(params)
 
     params%Bs = Bs
     params%n_eqn = 1
-    params%n_ghosts = 0
-    g = 0
+    params%n_ghosts = 2_ik
+    params%order_predictor = "multiresolution_2nd"
     params%max_treelevel = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
@@ -79,8 +79,13 @@ subroutine post_mean(params)
     call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
     call read_field(fname, 1, params, hvy_block, hvy_n )
 
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+    ! create lists of active blocks (light and heavy data)
+    ! update list of sorted nunmerical treecodes, used for finding blocks
+    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    ! update neighbor relations
+    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -90,13 +95,13 @@ subroutine post_mean(params)
         nz = 1
     end if
 
-
     meanl = 0.0_rk
 
+    g = params%n_ghosts
     do k = 1,hvy_n
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
+        
         if (params%dim == 3) then
             meanl = meanl + sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
         else
@@ -108,18 +113,20 @@ subroutine post_mean(params)
 
     if (params%dim == 3) then
         meani = meani / (params%domain_size(1)*params%domain_size(2)*params%domain_size(3))
+        inti = meani*product(domain)
     else
         meani = meani / (params%domain_size(1)*params%domain_size(2))
+        inti = meani*product(domain(1:2))
     endif
 
     if (rank == 0) then
         write(*,*) "Computed mean value is: ", meani
-        write(*,*) "Computed integral value is: ", meani*product(domain)
+        write(*,*) "Computed integral value is: ", inti
 
         ! write volume integral to disk
         call get_command_argument(3,fname_out)
         open(14,file=fname_out, status='replace')
-        write(14,*) meani*product(domain)
+        write(14,*) inti        
         close(14)
     endif
 end subroutine post_mean

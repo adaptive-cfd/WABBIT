@@ -34,7 +34,7 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_vorticity, divergence, compute_Qcriterion, component_wise_tree_norm
+PUBLIC :: compute_vorticity, divergence, gradient, compute_Qcriterion, component_wise_tree_norm
 
 
 contains
@@ -42,6 +42,7 @@ contains
 #include "compute_Qcriterion.f90"
 #include "compute_vorticity.f90"
 #include "divergence.f90"
+#include "gradient.f90"
 
 
 subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, which_norm, norm)

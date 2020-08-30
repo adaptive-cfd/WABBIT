@@ -98,7 +98,7 @@ subroutine write_field22( fname, time, iteration, dF, params, lgt_block, hvy_blo
         sparsity_Jcurrent = dble(lgt_n) / dble(2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim
         sparsity_Jmax = dble(lgt_n) / dble(2**params%max_treelevel)**dim
 
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
+        write(*,'("MESH-IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
         time, trim(adjustl(fname)), lgt_n, 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
     endif
 

@@ -95,9 +95,14 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! read data for the first pair of wings
     call read_param_mpi(PARAMS,"Insects","WingShape",Insect%WingShape(1),"none")
     Insect%WingShape(2) = Insect%WingShape(1)
+    ! The following two lines take effect if WingShapeL or WingShapeR are set
+    call read_param_mpi(PARAMS,"Insects","WingShapeL",Insect%WingShape(1),Insect%WingShape(1))
+    call read_param_mpi(PARAMS,"Insects","WingShapeR",Insect%WingShape(2),Insect%WingShape(2))
+    ! Rectangular wing parameters
     call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.d0)
     call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.d0)
     call read_param_mpi(PARAMS,"Insects","L_span",Insect%L_span, 0.d0)
+    ! Kinematics
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_right",Insect%FlappingMotion_right,"none")
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_left",Insect%FlappingMotion_left,"none")
     ! this file is used in old syntax form for both wings:
@@ -159,6 +164,10 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
         ! note that only Fourier wing shape can be different from first wings
         call read_param_mpi(PARAMS,"Insects","WingShape2",Insect%WingShape(3),"none")
         Insect%WingShape(4) = Insect%WingShape(3)
+        ! The following two lines take effect if WingShape2L or WingShape2R are set
+        call read_param_mpi(PARAMS,"Insects","WingShape2L",Insect%WingShape(3),Insect%WingShape(3))
+        call read_param_mpi(PARAMS,"Insects","WingShape2R",Insect%WingShape(4),Insect%WingShape(4))
+        ! Kinematics
         call read_param_mpi(PARAMS,"Insects","FlappingMotion_right2",Insect%FlappingMotion_right2,"none")
         call read_param_mpi(PARAMS,"Insects","FlappingMotion_left2",Insect%FlappingMotion_left2,"none")
         ! this file is used in old syntax form for both wings:
@@ -385,7 +394,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
         ! exclude wings that are hard-coded, otherwise, call initialization routine
         if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
             Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
-            Insect%WingShape(wingID)/="TwoEllipses") then
+            Insect%WingShape(wingID)/="TwoEllipses" .and. (Insect%wing_file_type(wingID)) /= "kleemeier") then
 
             ! we have some pre-defined, hard-coded data, but also can read the wing shape
             ! from INI files.

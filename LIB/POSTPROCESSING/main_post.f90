@@ -82,7 +82,7 @@ program main_post
     case("--compute-rhs")
         call post_rhs(params)
 
-    case("--mult-mask")
+    case("--mult-mask", "--mult-mask-direct", "--mult-mask-inverse")
         call mult_mask(params)
 
     !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
@@ -107,6 +107,9 @@ program main_post
 
     case("--vorticity", "--divergence", "--vor-abs", "--Q")
         call compute_vorticity_post(params)
+
+    case("--gradient")
+        call compute_scalar_field_post(params)
 
     case("--keyvalues")
         call get_command_argument(2,filename)
@@ -147,6 +150,7 @@ case ("--generate_forest")
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
             write(*,*) "--Q"
+            write(*,*) "--gradient"            
             write(*,*) "--keyvalues"
             write(*,*) "--dry-run"
             write(*,*) "--compare-keys"
@@ -157,6 +161,9 @@ case ("--generate_forest")
             write(*,*) "--POD-time"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
+            write(*,*) "--mult-mask"
+            write(*,*) "--mult-mask-direct"
+            write(*,*) "--mult-mask-inverse"
             write(*,*) "--post_rhs"
             write(*,*) "--average"
 

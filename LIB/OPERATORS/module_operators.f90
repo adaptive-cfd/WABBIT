@@ -112,7 +112,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
             do p = 1, n_eqn
                 ! yes, we can include the ghost nodes: it does not matter for the infty
                 ! norm.
-                norm(p) = max( norm(p), maxval(hvy_block(:,:,:,p,hvy_id)) )
+                norm(p) = max( norm(p), maxval( abs(hvy_block(:,:,:,p,hvy_id))) )
             enddo
         enddo
 

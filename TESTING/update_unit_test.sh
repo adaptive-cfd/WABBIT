@@ -44,12 +44,12 @@ echo "with the current version of the code"
 echo "be very very sure what you are doing!! you need to know EXACTLY why the test fails"
 echo "and that this is either a bugfix or a new feature."
 echo " Do you understand? (yes,no)"
-#read understood
+read understood
 
-#if [ ! "$understood" == "yes" ];
-#then
-#    exit 4
-#fi
+if [ ! "$understood" == "yes" ];
+then
+    exit 4
+fi
 
 
 echo -e "curren directory" ${Cyan}${curdir}${Color_Off}

@@ -46,9 +46,6 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id, N
     integer(kind=ik), dimension(3) ::  bound1, bound2, boundm, Bs
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-
     ! number of blocks to be merged
     N_merge = size(lgt_blocks_to_merge,1)
     Bs = params%Bs
@@ -57,7 +54,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     ! level of merged block
     level = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_MESH_LVL )
     tree_id = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_TREE_ID )
-    !  write(*,*) "level= ",level
+
     if ( N_merge /= 4 .and. N_merge /= 8) then
         call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
     endif

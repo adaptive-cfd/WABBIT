@@ -13,7 +13,7 @@
 ! performance is better. note you have to wait somewhere! always!
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
-subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_block2 )
+subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_block2, msg )
     implicit none
 
     !> user defined parameter structure
@@ -30,33 +30,51 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     !! simultaneously coarsen the flow grid and the corresponding mask grid.
     !! Note the secondary array can have different #components.
     real(kind=rk), intent(inout), optional :: hvy_block2(:, :, :, :, :)
+    character(len=*), intent(in), optional :: msg
 
-    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank
+    integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
+    logical :: xfer_started(1:N_xfers)
+    logical :: source_block_deleted(1:N_xfers)
 
     ! array of mpi requests, taken from stack. for extremely large N_xfers, that can cause stack problems
     integer(kind=ik) :: requests(1:2*N_xfers)
     integer(kind=ik) :: ireq
 
     logical :: not_enough_memory
-    integer(kind=ik) :: counter, k_start
+    integer(kind=ik) :: counter
+    real(kind=rk) :: t0
+    character(len=40) :: msg2
 
     ! if the list of xfers is empty, then we just return.
     if (N_xfers==0) return
 
+    t0 = MPI_wtime()
     myrank = params%rank
     counter = 0
-    k_start = 1
+    xfer_started = .false.
+    source_block_deleted = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 
     if (present(hvy_block2)) npoints2 = size(hvy_block2,1)*size(hvy_block2,2)*size(hvy_block2,3)*size(hvy_block2,4)
 
+    Nxfer_done = 0
+    Nxfer_total = N_xfers
+
+    msg2 = ""
+    if (present(msg)) msg2=msg
+
 ! the routine can resume from the next line on (like in the olden days, before screens were invented)
 1   ireq = 0
     not_enough_memory = .false.
 
-    do k = k_start, N_xfers
+    Nxfer_notPossibleNow = 0
+
+    do k = 1, N_xfers
+        ! if this xfer has already been started, we are happy and go to the next one.
+        if (xfer_started(k)) cycle
+
         ! we will transfer this block:
         lgt_id = xfer_list(k,3)
 
@@ -72,11 +90,16 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         ! the idea is now if we do not have enough memory (ie no free block on target rank) we can
         ! wait until the current requests are finnished. Then we retry the loop.
         if (lgt_id_new == -1) then
-            k_start = k
             not_enough_memory = .true.
-            counter = counter + 1
-            ! interrupt do loop
-            exit
+            ! this marks that we can NOT delete the source block after waiting for MPI xfer
+            xfer_started(k) = .false.
+            Nxfer_notPossibleNow = Nxfer_notPossibleNow + 1
+            ! skip this xfer (it will be treated in the next iteration)
+            cycle
+        else
+            ! this marks that we can delete the source block after waiting for MPI xfer
+            xfer_started(k) = .true.
+            Nxfer_done = Nxfer_done + 1
         endif
 
 
@@ -96,7 +119,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
             tag, WABBIT_COMM, requests(ireq), ierr)
 
-            if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
+            if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
@@ -106,7 +129,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
                 call MPI_irecv( hvy_block2(:,:,:,:,hvy_id_new), npoints2, MPI_DOUBLE_PRECISION, mpirank_sender, &
                 tag, WABBIT_COMM, requests(ireq), ierr)
 
-                if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] MPI_irecv failed!")
+                if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
             endif
 
             ! Am I the owner of this block, so will I have to send data?
@@ -125,7 +148,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
             WABBIT_COMM, requests(ireq), ierr)
 
-            if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] MPI_isend failed!")
+            if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
@@ -135,7 +158,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
                 call MPI_isend( hvy_block2(:,:,:,:,hvy_id), npoints2, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
                 WABBIT_COMM, requests(ireq), ierr)
 
-                if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] MPI_isend failed!")
+                if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
             endif
         endif
 
@@ -147,17 +170,27 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         ! note you mut NOT delete the original block now. only after xfer is completed.
     enddo
 
-    ! wait for all my xfers to be completed.
+    ! wait for all my xfers to be completed. (ireq is different on each mpirank)
+    ! both send/recv are waited for
     if (ireq > 0) then
         call MPI_waitall( ireq, requests(1:ireq), MPI_STATUSES_IGNORE, ierr )
-        if (ierr /= MPI_SUCCESS) call abort(1809181533, "[block_xfer.f90] MPI_waitall failed!")
+        if (ierr /= MPI_SUCCESS) call abort(1809181533, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_waitall failed!")
     endif
 
+
     ! now all data is transfered on this rank, and we will no longer change it.
-    ! so now, we can safely delete the original blocks
-    do k = 1, N_xfers
+    ! so now, we can safely delete the original blocks, if their xfer was started.
+    ! Note that the waiting is different for each rank, and they do arrive here at different times,
+    ! but they all eventually delete the source blocks only after they have been transfered.
+    do i = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
-        lgt_block( xfer_list(k,3), : ) = -1
+        if (xfer_started(i) .and. .not. source_block_deleted(i)) then
+            lgt_block( xfer_list(i,3), : ) = -1
+            ! pay attention here: you must not delete the block twice. after the first delete, it is
+            ! free and can be used for a newly xferd block: then it is no longer free and must not be
+            ! deleted again
+            source_block_deleted(i) = .true.
+        endif
     enddo
 
     ! it may happen that we cannot execute a xfer because the target ranks has no more memory left
@@ -165,12 +198,18 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     ! we waited once for all xfers and the temporary blocks are freed. Now we can try again! We count
     ! to avoid infinite loops - in this case, we simply *really* ran out of memory.
     if (not_enough_memory) then
-        if (counter < 10) then
+        if (counter < 200000) then
+            counter = counter + 1
+            if (myrank==0) then
+                ! t0 is just an identifier for the call
+                call append_t_file( "block_xfer.t", (/t0, real(counter,kind=rk), real(Nxfer_total,kind=rk), &
+                real(Nxfer_done,kind=rk), real(Nxfer_notPossibleNow,kind=rk) /) )
+            endif
             ! like in the golden age of computer programming:
             goto 1
         else
-            call abort(1909181808, "[block_xfer.f90]: we tried but we simply do not have enough memory to complete transfer. &
-            & you need to allocate more --memory")
+            call close_all_t_files()
+            call abort(1909181808, "[block_xfer.f90]: "//trim(adjustl(msg2))//" not enough memory to complete transfer.")
         endif
     endif
 

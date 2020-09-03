@@ -9,34 +9,17 @@
 !
 !> \brief refinement and coarsening subroutines
 !
-!>
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4 \n
-!! 03/02/17 - create subroutines for 3D
-!
 ! ********************************************************************************************
 
 module module_interpolation
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    ! global parameters
     use module_params
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
 
     implicit none
 
     PRIVATE
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
+
 
 contains
 
@@ -400,41 +383,41 @@ contains
     end subroutine prediction_3D
 
 
-    ! subroutine prediction1D(coarse, fine)
-    !
-    !     implicit none
-    !
-    !     real(kind=rk), dimension(1:), intent(out) :: fine
-    !     real(kind=rk), dimension(1:), intent(in) :: coarse
-    !
-    !     integer(kind=ik) :: k, nfine, ncoarse
-    !     real(kind=rk) :: a, b
-    !
-    !     ncoarse = size(coarse,1)
-    !     nfine = size(fine,1)
-    !
-    !     if ( 2*ncoarse-1 /= nfine ) then
-    !       call abort(888197,"ERROR: prediction1d: arrays wrongly sized..")
-    !     endif
-    !
-    !     ! this is the multiresolution predition operator.
-    !     ! it pushes a signal from a coarser level to the next higher by
-    !     ! interpolation
-    !
-    !     fine(1:nfine:2) = coarse(:)
-    !
-    !     ! fourth order:
-    !     a = 9.0_rk/16.0_rk
-    !     b =-1.0_rk/16.0_rk
-    !
-    !     fine(2)     = (5.0_rk/16.0_rk)*coarse(1)+(15.0_rk/16.0_rk)*coarse(2)-(5.0_rk/16.0_rk)*coarse(3)+(1.0_rk/16.0_rk)*coarse(4)
-    !     fine(nfine-1) = (1.0_rk/16.0_rk)*coarse(ncoarse-3) -(5.0_rk/16.0_rk)*coarse(ncoarse-2) +(15.0_rk/16.0_rk)*coarse(ncoarse-1) +(5.0_rk/16.0_rk)*coarse(ncoarse)
-    !
-    !     do k = 2, ncoarse-2
-    !         fine(2*k) = a*coarse(k)+a*coarse(k+1)+b*coarse(k-1)+b*coarse(k+2)
-    !     end do
-    !
-    ! end subroutine prediction1D
+    subroutine setup_CDF_lowPassFilters(wavelet, HD)
+        implicit none
+        character(len=80), intent(in) :: wavelet
+        real(kind=rk), allocatable, intent(inout) :: HD(:)
+
+        ! initialize filter according to wavelet
+        if (.not. allocated(HD)) then
+            select case(wavelet)
+            case("CDF4,4", "CDF44")
+                ! H TILDE filter
+                allocate( HD(-6:6) )
+                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+                87.0d0*2.0d0**(-7.d0), &
+                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
+
+            case ("CDF4,2","CDF42")
+                allocate( HD(-4:4) )
+                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+
+            case ("CDF4,0","CDF40")
+                allocate( HD(-1:1) )
+                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+
+            case("CDF2,2", "CDF22")
+                ! H TILDE filter
+                allocate( HD(-2:2) )
+                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+
+            case default
+                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+
+            end select
+        endif
+
+    end subroutine
 
 
     ! Please note applying a filter requires also manipulating the ghost nodes
@@ -461,11 +444,11 @@ contains
                 87.0d0*2.0d0**(-7.d0), &
                 9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
 
-            case ("CDF42")
+            case ("CDF4,2","CDF42")
                 allocate( HD(-4:4) )
                 HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
 
-            case ("CDF40")
+            case ("CDF4,0","CDF40")
                 allocate( HD(-1:1) )
                 HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
 

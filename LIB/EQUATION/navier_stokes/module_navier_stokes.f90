@@ -23,7 +23,7 @@ module module_navier_stokes
   !---------------------------------------------------------------------------------------------
   ! modules
   use module_navier_stokes_params
-  use module_helpers, only: block_contains_NaN, component_wise_max_norm
+  use module_helpers, only: block_contains_NaN
   use module_ns_penalization
   use module_navier_stokes_cases
   use module_operators
@@ -42,7 +42,7 @@ module module_navier_stokes
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSTOKES, PREPARE_SAVE_DATA_NSTOKES, RHS_NSTOKES, GET_DT_BLOCK_NSTOKES, &
             INICOND_NSTOKES, FIELD_NAMES_NStokes, PREPARE_THRESHOLDFIELD_NStokes,&
-            NORM_THRESHOLDFIELD_NStokes, STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES, &
+            STATISTICS_NStokes,FILTER_NSTOKES,create_mask_NSTOKES, &
             INITIALIZE_ASCII_FILES_Nstokes
   !**********************************************************************************************
   ! parameters for this module. they should not be seen outside this physics module
@@ -945,35 +945,6 @@ subroutine create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
 
 end subroutine create_mask_NSTOKES
 
-
-     !-----------------------------------------------------------------------------
-    ! WABBIT will call this routine on all blocks and perform MPI_ALLREDUCE with
-    ! MPI_MAX 
-    ! To stay consistent all physicsmodules should use the maxnorm for block thresholding
-    !-----------------------------------------------------------------------------
-    subroutine NORM_THRESHOLDFIELD_NStokes( thresholdfield_block , norm)
-        implicit none
-        !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-        real(kind=rk), intent(in)        :: thresholdfield_block(:, :, :, :)
-        ! component index
-       real(kind=rk), intent(inout) :: norm(:) 
-
-
-        select case (params_ns%coarsening_indicator)
-        
-        case ("threshold-vorticity")
-          ! loop over my active hvy data
-          norm(1) =  maxval(abs(thresholdfield_block(:, :, :, 1))) 
-        
-        case("primary-variables", "threshold-state-vector")
-          call component_wise_max_norm( thresholdfield_block(:,:,:,1:params_ns%n_eqn), norm)
-
-        case default
-          call abort(0201019, "dude somethings wrong, please help!")
-
-        endselect
-    end subroutine
-
      !-----------------------------------------------------------------------------
      ! Adaptation is dependent on the different physics application. 
      ! Every physics module can choose its own coarsening indicator.
@@ -1041,18 +1012,6 @@ end subroutine create_mask_NSTOKES
         endif
 
         select case (params_ns%coarsening_indicator)
-
-        case ("threshold-vorticity" )
-    
-             call compute_vorticity( threshold_field(:,:,:,1), threshold_field(:,:,:,2),&
-               threshold_field(:,:,:,3), dx, params_ns%Bs, g, params_ns%discretization, &
-               threshold_field(:,:,:,1:3) )
-
-             if (params_ns%dim==3) then
-              N_thresholding_components = 3
-             else
-              N_thresholding_components = 1
-             endif
 
         case( "primary-variables", "threshold-state-vector")
             N_thresholding_components = params_ns%dim + 2

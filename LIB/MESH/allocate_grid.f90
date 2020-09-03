@@ -175,11 +175,15 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'("INIT: nwork=",i6)') nwork
         write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') &
         Bs(1),Bs(2),Bs(3), params%number_blocks, params%number_blocks*params%number_procs
-        write(*,'("INIT: Allocating a ",i1,"D case.")') params%dim
+        write(*,'("INIT: allocate_tree: Allocating a ",i1,"D case.")') params%dim
     endif
 
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+        "hvy_block", nx, ny, nz, Neqn, params%number_blocks
+    endif
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -189,6 +193,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",7(i9,1x),")")') &
+            "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
+        endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -197,6 +205,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     end if
 
     if ( present(hvy_tmp) ) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
+        endif    
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -205,6 +217,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
+        endif        
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
 
         if (rank==0) then
@@ -213,6 +229,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         endif
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_mask", 1, 1, 1, 1, 1
+        endif        
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
 
         if (rank==0) then
@@ -222,6 +242,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "hvy_neighbor", params%number_blocks, max_neighbors
+    endif        
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -229,6 +253,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     !---------------------------------------------------------------------------)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
+    endif   
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -236,6 +264,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "lgt_sortednumlist", size(lgt_block,1), 2
+    endif   
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -243,6 +275,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "lgt_active", size(lgt_block, 1)
+    endif   
     allocate( lgt_active( size(lgt_block, 1) ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -251,6 +287,10 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "hvy_active", size(hvy_block, 5)
+    endif   
     allocate( hvy_active( size(hvy_block, 5) ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -359,7 +399,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
 
-    nwork = max( 2*Neqn, params%N_fields_saved)
+    nwork = max( 2*Neqn, params%N_fields_saved) ! why 2*Neqn? which routine requieres minimum of 2*Neqn?
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -461,11 +501,15 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'("INIT: nwork=",i6)') nwork
         write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') &
         Bs(1),Bs(2),Bs(3), params%number_blocks, params%number_blocks*params%number_procs
-        write(*,'("INIT: Allocating a ",i1,"D case.")') params%dim
+        write(*,'("INIT: allocate_forest: Allocating a ",i1,"D case.")') params%dim
     endif
 
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+        "hvy_block", nx, ny, nz, Neqn, params%number_blocks
+    endif    
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -475,6 +519,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",6(i9,1x),")")') &
+            "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
+        endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -483,6 +531,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     end if
 
     if ( present(hvy_tmp) ) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
+        endif  
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -491,6 +543,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
+        endif     
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -499,6 +555,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
+        if (rank==0) then
+            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            "hvy_mask", 1, 1, 1, 1, 1
+        endif           
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
 
         if (rank==0) then
@@ -508,6 +568,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "hvy_neighbor", params%number_blocks, max_neighbors
+    endif      
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -515,6 +579,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------)
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
+    endif     
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -522,6 +590,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",3(i9,1x),")")') &
+        "lgt_sortednumlist", size(lgt_block,1), 2, params%forest_size
+    endif 
     allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -529,18 +601,30 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "lgt_active", size(lgt_block,1), params%forest_size
+    endif     
     allocate( lgt_active( size(lgt_block,1), params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
     endif
 
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "lgt_n", params%forest_size
+    endif
     allocate( lgt_n(params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_n", product(real(shape(lgt_n)))*4.0e-9, shape(lgt_n)
     endif
 
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
+        "hvy_n", params%forest_size
+    endif
     allocate( hvy_n(params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -548,6 +632,10 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
+        "hvy_active", size(hvy_block, 5), params%forest_size
+    endif
     allocate( hvy_active( size(hvy_block, 5), params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &

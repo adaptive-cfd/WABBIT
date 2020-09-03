@@ -36,13 +36,6 @@
 ! ********************************************************************************************
 
 subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> file name
@@ -103,13 +96,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
-    ! set MPI parameters
     rank = params%rank
-
-    ! grid parameter
     Bs   = params%Bs
     g    = params%n_ghosts
     dim  = params%dim
@@ -282,6 +270,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
 
     ! add additional annotations
+    call write_attribute(file_id, "blocks", "version", (/20200902/)) ! this is used to distinguish wabbit file formats
+    call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n/))

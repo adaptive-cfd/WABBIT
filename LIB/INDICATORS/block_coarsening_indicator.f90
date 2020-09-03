@@ -26,7 +26,7 @@
 ! ********************************************************************************************
 
 subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, indicator, &
-    iteration, refinement_status, norm, block_mask)
+    iteration, refinement_status, norm, level, block_mask)
 
     implicit none
     !> user defined parameter structure
@@ -49,6 +49,10 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !> coarsening iteration index. coarsening is done until the grid has reached
     !! the steady state; therefore, this routine is called several times for
     integer(kind=ik), intent(in)        :: iteration
+    ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+    ! we pass the level to this routine
+    integer(kind=ik), intent(in)        :: level
+
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !
@@ -63,19 +67,15 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     logical :: tmp_threshold(1:20) ! just take a larger one...lazy tommy
     real(kind=rk) :: nnorm2(1:20) ! just take a larger one...lazy tommy
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     Jmax = params%max_treelevel
     Bs = params%Bs
     g = params%n_ghosts
 
 
-!---------------------------------------------------------------------------------------------
-! main body
 
-    !> This routine sets the -1 coarsening flat on a block. it uses different methods to
-    !! decide where to coarsen, each act on one block. Note due to gradedness and completeness
+    !> This routine sets the -1 coarsening flag on a block. it uses different methods to
+    !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
     !! this status may be revoked later in the computation.
     select case (indicator)
     case ("everywhere")
@@ -83,19 +83,13 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         ! if the iteration loop is on (you can bypass that behavior using external_loop=.true.)
         refinement_status = -1
 
-    case ("threshold-vorticity")
-        !! use thresholding, but on the vorticity rather than the state vector.
-        !! this should allow to consider only the rotational part, not the divergent one.
-
-        thresholding_component = .false.
-        if (params%dim == 3) then
-            thresholding_component(1:3) = .true.
-        else
-            thresholding_component(1) = .true.
+    case ("mask-allzero-noghosts")
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
+            refinement_status = -1
         endif
-
-        !! note we assume block_work contains the vorticity
-        call threshold_block( params, block_work, thresholding_component, refinement_status, norm )
+        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )>=1.0_rk- 1.0e-9_rk ) then
+            refinement_status = -1
+        endif
 
     case ("threshold-state-vector", "primary-variables")
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
@@ -107,7 +101,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm )
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level )
 
     case ("random")
         !! randomly coarse some blocks. used for testing. note we tag for coarsening
@@ -137,7 +131,7 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         ! level. hence, here we set a small value (just for this call) to be sure that the
         ! mask interface is on Jmax
         call threshold_block( params, block_mask, tmp_threshold(1:size(block_mask,4)), &
-        refinement_status_mask, nnorm2(1:size(block_mask,4)), eps=1.0e-4_rk )
+        refinement_status_mask, nnorm2(1:size(block_mask,4)), level, eps=1.0e-4_rk )
 
         ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0

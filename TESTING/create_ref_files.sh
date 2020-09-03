@@ -20,8 +20,8 @@ do
   mv ${file%%.h5}.key ${file%%.h5}.ref
 done
 
-echo "delete h5 files? [Y,n]"
-read answer
-if [ ! "$answer" == "n" ]; then
+#echo "delete h5 files? [Y,n]"
+#read answer
+#if [ ! "$answer" == "n" ]; then
   rm *.h5
-fi
+#fi

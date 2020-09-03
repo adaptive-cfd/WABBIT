@@ -41,6 +41,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
     if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_3D_ACM called but ACM not initialized"
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ! mask function and boundary values
@@ -94,6 +95,14 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
                 mask(:,:,:,5) = real(mask_color, kind=rk)
             endif
 
+            ! we can also simulate an insect together with a fractal tree as turbulence
+            ! generators. This part is time-independent as the tree does not move.
+            if (Insect%fractal_tree) then
+                call draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+                ! store the mask color array as double
+                mask(:,:,:,5) = real(mask_color, kind=rk)
+            endif
+
         case ("time-dependent-part")
             if (Insect%body_moves == "no") then
                 ! wings
@@ -103,6 +112,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
                 ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
                 call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
             endif
+
             ! store the mask color array as double
             mask(:,:,:,5) = real(mask_color, kind=rk)
 
@@ -110,6 +120,12 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
             ! wings and body
             ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
             call Draw_Insect( time, Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4) )
+
+            ! we can also simulate an insect together with a fractal tree as turbulence
+            ! generators. This part is time-independent as the tree does not move.
+            if (Insect%fractal_tree) then
+                call draw_fractal_tree(Insect, x0-dble(g)*dx, dx, mask(:,:,:,1), mask_color, mask(:,:,:,2:4))
+            endif
 
             ! store the mask color array as double
             mask(:,:,:,5) = real(mask_color, kind=rk)
@@ -172,6 +188,8 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if (.not. params_acm%penalization) return
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_2D_ACM called but ACM not initialized"
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values

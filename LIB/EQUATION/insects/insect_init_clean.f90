@@ -24,7 +24,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   type(inifile) :: PARAMS
   real(kind=rk),dimension(1:3)::defaultvec
   character(len=strlen) :: DoF_string, dummystr
-  integer :: j, tmp, mpirank, mpicode
+  integer :: j, tmp, mpirank, mpicode, ntri
   integer(kind=2) :: wingID, Nwings
 
   ! in this module, we use the logical ROOT to avoid the integer comparison mpirank==0
@@ -39,36 +39,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! header information
   if (root) then
       write(*,*) "---------------------------------------------------------------------------------------"
-      write(*,*) "                                                                                       "
-      write(*,*) "                                                                                       "
-      write(*,*) "                                                                          .*#@@@%      "
-      write(*,*) "                                                                   (@.            (@   "
-      write(*,*) "                                   @                             (&                 @  "
-      write(*,*) "                                     @                          @                    & "
-      write(*,*) "                                      %@                       @                     @ "
-      write(*,*) "Initializing                            %%                    @                      @ "
-      write(*,*) "                                          @*.                @                      #  "
-      write(*,*) "        Insect-module                 *@      @             @                      #&  "
-      write(*,*) "                              %*      @          @         &                     @&    "
-      write(*,*) "                                @@@%(&@           @@@@@@,  @                  @@       "
-      write(*,*) "                                       @          @        @@              #@          "
-      write(*,*) "                                        @       @@           *%       &@@              "
-      write(*,*) "                                          (@@@@,   @             @@,                   "
-      write(*,*) "                                                    @  ,           ,@                  "
-      write(*,*) "                                                 %@@%                .@                "
-      write(*,*) "                                             %@                        @               "
-      write(*,*) "                                          *@                  @         @              "
-      write(*,*) "                                        @*                   /@          @             "
-      write(*,*) "                                     %(                     .@   @@# ## @,             "
-      write(*,*) "                        /&@@@@      #.                      @                          "
-      write(*,*) "                                    @                      @                           "
-      write(*,*) "                                    @                     @                            "
-      write(*,*) "                   #@@&,            @                    @                             "
-      write(*,*) "#%%%#(*.                            &                  (&                              "
-      write(*,*) "                                     &/              &@                                "
-      write(*,*) "                                       .@@#%@@@@@@(                                    "
-      write(*,*) "                                                                                       "
-      write(*,*) "                                                                                       "
+        write(*,*) "      .==-.                   .-==."
+        write(*,*) "       \()8`-._  `.   .'  _.-'8()/"
+        write(*,*) "       (88'   ::.  \./  .::   '88)"
+        write(*,*) "        \_.'`-::::.(#).::::-'`._/"
+        write(*,*) "          `._... .q(_)p. ..._.'        Initializing"
+        write(*,*) "            ''-..-'|=|`-..-''    "
+        write(*,*) "            .''' .'|=|`. `''.   Insect"
+        write(*,*) "          ,':8(o)./|=|\.(o)8:`.  "
+        write(*,*) "         (O :8 ::/ \_/ \:: 8: O)       Module!"
+        write(*,*) "          \O `::/       \::' O/  "
+        write(*,*) "           ''--'         `--''   "
       write(*,*) "---------------------------------------------------------------------------------------"
       write(*,*) "Initializing insect module!"
       write(*,*) "*.ini file is: "//trim(adjustl(fname_ini))
@@ -114,9 +95,14 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! read data for the first pair of wings
   call read_param_mpi(PARAMS,"Insects","WingShape",Insect%WingShape(1),"none")
   Insect%WingShape(2) = Insect%WingShape(1)
+  ! The following two lines take effect if WingShapeL or WingShapeR are set
+  call read_param_mpi(PARAMS,"Insects","WingShapeL",Insect%WingShape(1),Insect%WingShape(1))
+  call read_param_mpi(PARAMS,"Insects","WingShapeR",Insect%WingShape(2),Insect%WingShape(2))
+  ! Rectangular wing parameters
   call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.d0)
   call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.d0)
   call read_param_mpi(PARAMS,"Insects","L_span",Insect%L_span, 0.d0)
+  ! Kinematics
   call read_param_mpi(PARAMS,"Insects","FlappingMotion_right",Insect%FlappingMotion_right,"none")
   call read_param_mpi(PARAMS,"Insects","FlappingMotion_left",Insect%FlappingMotion_left,"none")
   ! this file is used in old syntax form for both wings:
@@ -178,6 +164,10 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! note that only Fourier wing shape can be different from first wings
     call read_param_mpi(PARAMS,"Insects","WingShape2",Insect%WingShape(3),"none")
     Insect%WingShape(4) = Insect%WingShape(3)
+    ! The following two lines take effect if WingShape2L or WingShape2R are set
+    call read_param_mpi(PARAMS,"Insects","WingShape2L",Insect%WingShape(3),Insect%WingShape(3))
+    call read_param_mpi(PARAMS,"Insects","WingShape2R",Insect%WingShape(4),Insect%WingShape(4))
+    ! Kinematics
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_right2",Insect%FlappingMotion_right2,"none")
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_left2",Insect%FlappingMotion_left2,"none")
     ! this file is used in old syntax form for both wings:
@@ -235,6 +225,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   Insect%kine_wing_r2%initialized = .false.
 
   call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
+  call read_param_mpi(PARAMS,"Insects","BodySuperSTLfile",Insect%BodySuperSTLfile,"none.superstl")
   call read_param_mpi(PARAMS,"Insects","HasDetails",Insect%HasDetails,"all")
   call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
   call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")
@@ -276,8 +267,14 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
   ! wing FSI section
   call read_param_mpi(PARAMS,"Insects","wing_fsi",Insect%wing_fsi,"no")
-  call read_param_mpi(PARAMS,"Insects","init_alpha_phi_theta",&
-  Insect%init_alpha_phi_theta, (/0.d0, 0.d0, 0.d0 /) )
+    call read_param_mpi(PARAMS, "Insects", "init_alpha_phi_theta", Insect%init_alpha_phi_theta, (/0.d0, 0.d0, 0.d0/) )
+
+
+    ! section for additional fractal tree
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree", Insect%fractal_tree, .false.)
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_file", Insect%fractal_tree_file, "tree_data.in")
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_x0", Insect%fractal_tree_x0, (/0.0d0, 0.0d0, 0.0d0/) )
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_scaling", Insect%fractal_tree_scaling, 1.0_rk )
 
 
   ! wing inertia tensor (we currently assume two identical wings)
@@ -296,7 +293,8 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
   ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
   ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
-  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"global")
+  ! NOTE: 05/2020 Thomas, I changed the default back to local.
+  call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
   Insect%smooth = 1.0d0*dx_reference
   Insect%safety = 3.5d0*Insect%smooth
 
@@ -338,9 +336,38 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   ! clean ini file
   call clean_ini_file_mpi(PARAMS)
 
+    !---------------------------------------------------------------------------
+    ! initialization for superSTl body
+    !---------------------------------------------------------------------------
+    if (Insect%BodyType == "superSTL") then
+        if (.not. allocated(xyz_nxnynz)) then
+            if (root) write(*,'("INSECTS: STL: init start")')
+            if (root) write(*,'("INSECTS: STL: file=",A)') Insect%BodySuperSTLfile
+
+            call count_lines_in_ascii_file_mpi(Insect%BodySuperSTLfile, ntri, 0)
+
+            if (root) write(*,'("INSECTS: STL: file length is ntri=", i7 )') ntri
+
+            allocate( xyz_nxnynz(1:ntri,1:30) )
+
+            ! No scaling or origin shift is applied: we assume you did that when generating
+            ! the superSTL file. The data is thus understood in the body coordinate system.
+            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, xyz_nxnynz, 0)
+
+            if (root) write(*,'("INSECTS: STL: read from file...done! We are good to go.")')
+        endif
+    endif
+
+
   !-----------------------------------------------------------------------------
   ! other initialization
   !-----------------------------------------------------------------------------
+
+    if (Insect%fractal_tree) then
+        ! we can also simulate an insect together with a fractal tree as turbulence
+        ! generators.
+        call fractal_tree_init(Insect)
+    endif
 
   ! If required, initialize rigid solid dynamics solver
   if (Insect%BodyMotion=="free_flight") then
@@ -368,12 +395,13 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
       ! exclude wings that are hard-coded, otherwise, call initialization routine
       if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
           Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
-          Insect%WingShape(wingID)/="TwoEllipses") then
+            Insect%WingShape(wingID)/="TwoEllipses" .and. (Insect%wing_file_type(wingID)) /= "kleemeier") then
 
           ! we have some pre-defined, hard-coded data, but also can read the wing shape
           ! from INI files.
           call Setup_Wing_Fourier_coefficients(Insect, wingID)
       endif
+
   enddo
 
 
@@ -382,6 +410,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     write(*,*) "Insect initialization is complete."
     write(*,'(80("<"))')
   endif
+    Insect%initialized = .true.
 
 end subroutine insect_init
 

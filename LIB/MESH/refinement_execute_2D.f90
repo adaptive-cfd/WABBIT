@@ -30,12 +30,6 @@
 
 subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -65,11 +59,6 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! mesh level
     integer(kind=ik)                    :: level, tree_id
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     N = params%number_blocks
     ! set MPI parameter
@@ -88,10 +77,8 @@ subroutine refinement_execute_2D( params, lgt_block, hvy_block, hvy_active, hvy_
     ! will become four blocks), without the ghost nodes.
     if (.not. allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, N_MAX_COMPONENTS) )
 
-!---------------------------------------------------------------------------------------------
-! main body
 
-    ! every proc loop over his active heavy data array
+    ! every proc loop over its active heavy data array
     do k = 1, hvy_n
 
         ! calculate light id

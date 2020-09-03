@@ -161,6 +161,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
 
 end subroutine read_field_flusi_MPI
 
+
 subroutine get_attributes_flusi(fname, nxyz, time, domain)
 
     implicit none
@@ -188,13 +189,6 @@ subroutine get_attributes_flusi(fname, nxyz, time, domain)
     call close_file_hdf5(file_id)
 end subroutine get_attributes_flusi
 
-character(len=80)  function get_dsetname(fname)
-    implicit none
-    character(len=*), intent(in) :: fname
-    ! extract dsetname (from "/" until "_", excluding both)
-    get_dsetname  = fname  ( index(fname,'/',.true.)+1:index( fname, '_',.true. )-1 )
-    return
-end function get_dsetname
 
 integer(kind=ik) function end_bound(start, Bs, Bs_f)
   implicit none

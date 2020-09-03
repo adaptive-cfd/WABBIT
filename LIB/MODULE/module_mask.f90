@@ -6,6 +6,7 @@ module module_mask
     use module_params
     use module_precision
     use module_globals
+    use module_MPI
 
     implicit none
 
@@ -277,10 +278,8 @@ contains
 
 
             if (params%rank==0) then
-                write(*,'("Did one iteration for time-independent mask. Now: Jmax=",i2, " Nb=",i7,&
-                &" lgt_n=",(4(i6,1x)))') &
-                max_active_level(lgt_block,lgt_active(:,tree_ID_mask),lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), &
-                lgt_n
+                write(*,'("Did refinement for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
+                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
             endif
 
             ! the constant part needs to be generated on Jmax (where RHS is computed)
@@ -288,15 +287,34 @@ contains
                 hvy_id = hvy_active(k, tree_ID_mask)
 
                 ! NOTE: if I am not mistaken, we could at this point also escape zero-valued blocks (Thomas, Yokohama, 23 Oct 2019)
-                if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
+                ! ==> you are mistaken. some blocks contain garbage and will not be removed
+                ! probably you could set those blocks to zero but until we use the µCT really, we should not bother.
+                ! if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
                     call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
                     hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
-                endif
+                ! endif
             enddo
 
+            ! we found that sometimes, we end up with more blocks than expected
+            ! and some zero-blocks can be coarsened again. doing that turned out to be
+            ! important for large-scale simulations
+            call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
+            lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
+            lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
+            hvy_n(tree_ID_mask), tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, external_loop=.false., ignore_maxlevel=.true.)
+
+
+            if (params%rank==0) then
+                write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
+                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
+            endif
         enddo
+
+        ! required strictly speaking only if we intent to save TREE_ID_MASK separately to disk.
+        ! is called only once so performance does not matter here.
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
         ! we need the mask function both on Jmax (during the RHS) and Jmax-1
         ! (during saving after coarsening)
@@ -311,11 +329,11 @@ contains
         hvy_n(tree_ID_mask_coarser), tree_ID_mask_coarser, "everywhere", hvy_tmp, external_loop=.true.)
 
         ! prune both masks
-        if (params%rank==0) write(*,*) "Pruning mask tree (on Jmax)"
+        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask)
 
-        if (params%rank==0) write(*,*) "Pruning mask tree (on Jmax-1)"
+        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask_coarser)
 

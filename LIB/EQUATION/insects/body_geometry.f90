@@ -58,34 +58,43 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
         return
     case ("suzuki_thin_rod")
         call draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
+
+    case ("superSTL")
+        call draw_body_superSTL( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("jerry","Jerry")
         call draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("hawkmoth","Hawkmoth")
         call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
-    case ("particle")
-        call draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("platicle")
         call draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("coin")
         call draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("sphere","SPHERE","Sphere")
         call draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("drosophila_maeda","drosophila_slim")
         call draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("bumblebee")
         call draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("paratuposa_simple")
         call draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("mosquito_iams")
         call draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
-    case ("pyramid")
-        call draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("cone")
         call draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
-    case ("birch_seed")
-        call draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect)
+
     case default
         call abort(10623, "Insect::draw_insect_body::Insect%BodyType unknown..."//trim(adjustl(Insect%BodyType)))
+
     end select
 
     !---------------------------------------------------------------------------
@@ -786,200 +795,6 @@ subroutine draw_cylinder( xp,x1,y1,z1,x2,y2,z2,R0,mask_val,color_val,icolor,safe
 
 end subroutine
 
-
-
-!-------------------------------------------------------------------------------
-subroutine draw_body_particle( xx0, ddx, mask, mask_color, us, Insect)
-    implicit none
-
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-
-    real(kind=rk) :: R0,R,a_body, projected_length
-    real(kind=rk) :: x_body(1:3), x_glob(1:3), x_part(1:3), n_part(1:3)
-    integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
-    real(kind=rk)   :: M_body(1:3,1:3)
-    integer(kind=2) :: color_body
-
-    color_body = Insect%color_body
-    M_body     = Insect%M_body
-
-    ! NOTE HACK
-    ! this routine is deprecated, its functionality is in the STL and pointcloud ideas.
-
-    !   !-----------------------------------------------------------------------------
-    !   ! initialization phase, executed only once
-    !   !-----------------------------------------------------------------------------
-    !   if (.not.allocated(particle_points)) then
-    !     ! initialization, this is the first call to the routine.
-    !     if (root) then
-    !       open(37, file='particle.in', form='formatted', status='old')
-    !       read(37,*) npoints
-    !       write(*,'("reading particle with ",i7," points")') npoints
-    !     endif
-    !     call MPI_BCAST( npoints,1,MPI_INTEGER,0,MPI_COMM_WORLD,mpicode )
-    !     allocate ( particle_points(1:npoints,1:6) )
-    !
-    !     if (root) then
-    !       do ix = 1,npoints
-    !         read(37,*) particle_points(ix,:)
-    !       enddo
-    !       write(*,*) "done reading particle.in (that is excellent news!)"
-    !       close(37)
-    !     endif
-    !     ! make sure all cpu know the particle well
-    !     call MPI_BCAST( particle_points(:,1),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !     call MPI_BCAST( particle_points(:,2),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !     call MPI_BCAST( particle_points(:,3),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !     call MPI_BCAST( particle_points(:,4),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !     call MPI_BCAST( particle_points(:,5),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !     call MPI_BCAST( particle_points(:,6),npoints,MPI_DOUBLE_PRECISION,0,&
-    !     MPI_COMM_WORLD,mpicode )
-    !   endif
-    !
-    !   ! initialize signed distance as very far away
-    !   mask = 1.d8
-    !
-    !   !-----------------------------------------------------------------------------
-    !   ! now, we are sure that all CPU know all points on the particle, and we can
-    !   ! proceed to draw it
-    !   !-----------------------------------------------------------------------------
-    !   npoints = size(particle_points,1)
-    !   ! loop over the marker points
-    !   do ip = 1, npoints
-    !     ! coordinate of surface point (in body system)
-    !     x_part = particle_points(ip,1:3)
-    !     ! normal vector of surface point (in body system)
-    !     n_part = particle_points(ip,4:6)
-    !
-    !     ! go to laboratory frame:
-    !     x_glob = matmul( transpose(M_body), x_part) + Insect%xc_body_g
-    !     ! periodize:
-    !     if (x_glob(1)<0.0) x_glob(1)=x_glob(1)+xl
-    !     if (x_glob(2)<0.0) x_glob(2)=x_glob(2)+yl
-    !     if (x_glob(3)<0.0) x_glob(3)=x_glob(3)+zl
-    !     if (x_glob(1)>=xl) x_glob(1)=x_glob(1)-xl
-    !     if (x_glob(2)>=yl) x_glob(2)=x_glob(2)-yl
-    !     if (x_glob(3)>=zl) x_glob(3)=x_glob(3)-zl
-    !
-    !     ! coordinate (global) in integer space:
-    !     ijk = nint( x_glob/dx )
-    !     ! size of box around markers
-    !     box = 1
-    !
-    !     ! loop over neigborhood of marker
-    !     do iz = ijk(3)-box, ijk(3)+box
-    !       do iy = ijk(2)-box, ijk(2)+box
-    !         do ix = ijk(1)-box, ijk(1)+box
-    !           ! check if this point is on my rank. note this also checks implicitly
-    !           ! if we're in the domain at all
-    ! !          if ( on_proc( (/ix,iy,iz/)  ) ) then
-    !             ! x_glob is in the global coordinate system
-    !             x_glob = (/ xx0(1)+dble(ix)*ddx(1), xx0(2)+dble(iy)*ddx(2), xx0(3)+dble(iz)*ddx(3) /)
-    !             x_glob = periodize_coordinate(x_glob - Insect%xc_body_g, (/xl,yl,zl/))
-    !             ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
-    !             x_body = matmul( M_body, x_glob )
-    !
-    !             ! unsigned distance to point
-    !             R = dsqrt(  (x_body(1)-x_part(1))*(x_body(1)-x_part(1)) + &
-    !                         (x_body(2)-x_part(2))*(x_body(2)-x_part(2)) + &
-    !                         (x_body(3)-x_part(3))*(x_body(3)-x_part(3)) )
-    !
-    !             if ( R<=abs(mask(ix,iy,iz)) ) then
-    !               ! this is closer, so we overwrite
-    !               mask(ix,iy,iz) = R
-    !               mask_color(ix,iy,iz) = color_body
-    !               ! compute scalar product of difference vector and outward pointing normal
-    !               projected_length = (x_body(1)-x_part(1))*n_part(1) + &
-    !                                  (x_body(2)-x_part(2))*n_part(2) + &
-    !                                  (x_body(3)-x_part(3))*n_part(3)
-    !
-    !               if ( projected_length <= 0.d0  ) then
-    !                 ! we're inside the particle
-    !                 mask(ix,iy,iz) = -R!mask(ix,iy,iz)
-    !               endif
-    !             endif
-    !
-    ! !          endif ! on_proc
-    !         enddo ! nx
-    !       enddo ! ny
-    !     enddo ! nz
-    !   enddo ! np
-    !
-    !
-    !   ! do iz = g, size(mask,3)-1-g
-    !   !   do iy = g, size(mask,2)-1-g
-    !   !     do ix = g, size(mask,1)-1-g
-    !   !       if (mask(ix,iy,iz) < 0.d0) then
-    !   !         R=0.d0
-    !   !         do k=iz-1,iz+1
-    !   !           do j=iy-1,iy+1
-    !   !             do i=ix-1,ix+1
-    !   !               R=R+mask( per(i,nx),per(j,ny),per(k,nz) )
-    !   !             enddo
-    !   !           enddo
-    !   !         enddo
-    !   !         R=R-mask(ix,iy,iz)
-    !   !         if (R>26.5e8) mask(ix,iy,iz) = 1.0d8
-    !   !
-    !   !       endif
-    !   !     enddo
-    !   !   enddo
-    !   ! enddo
-    !
-    !   !-----------------------------------------------------------------------------
-    !   ! fill the interior of the particle with "-" signs (the above concentrates
-    !   ! on the interface!)
-    !   ! we exploit the fact that the x-direction is continuous in memory and not
-    !   ! split among processes
-    !   !-----------------------------------------------------------------------------
-    !   ! we start at a point which is surely not inside
-    !   ! the particle. the algorithm cannot start on interior
-    !   ! points.
-    !   ! start = per(nint( (Insect%xc_body_g(1)-0.5*xl)/dx), nx)
-    !   ! if(root) write(*,*) "point is", Insect%xc_body_g(1)-0.5*xl
-    ! start =0
-    !   do iz = g, size(mask,3)-1-g
-    !     do iy = g, size(mask,2)-1-g
-    !       do ix = start, start+nx ! we run all points, still
-    !         ! is the point not yet touched (i.e. large value)?
-    !         if (mask(per(ix,nx),iy,iz) > 99.99e6) then
-    !           ! is either of the neighbors inside (e.g. negative)
-    !           if (mask(per(ix+1,nx),iy,iz)<0.d0.or.mask(per(ix-1,nx),iy,iz)<0.d0) then
-    !             mask(per(ix,nx),iy,iz) = -mask(per(ix,nx),iy,iz)
-    !             mask_color(per(ix,nx),iy,iz) = color_body
-    !           endif
-    !         endif
-    !       enddo
-    !     enddo
-    !   enddo
-    !
-    !   ! call save_field_hdf5(0.d0,'./mask_00',mask)
-    !   ! stop
-    !
-    !   !-----------------------------------------------------------------------------
-    !   ! convert signed distance function to mask function chi
-    !   !-----------------------------------------------------------------------------
-    !   do iz = g, size(mask,3)-1-g
-    !     do iy = g, size(mask,2)-1-g
-    !       do ix = g, size(mask,1)-1-g
-    !         mask(ix,iy,iz) = steps( mask(ix,iy,iz),0.d0 )
-    !       enddo
-    !     enddo
-    !   enddo
-
-
-end subroutine draw_body_particle
-
-
 !-------------------------------------------------------------------------------
 ! In our terminology, a macroscopic particle is an insect without wings and no
 ! flapping motion in free flight. Therefore, the insect module contains nowadays
@@ -1454,165 +1269,6 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
     enddo
 end subroutine draw_body_cone
 
-
-subroutine draw_birch_seed( xx0, ddx, mask, mask_color, us, Insect)
-    implicit none
-
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-
-    real(kind=rk) :: R0,R,a,H, alpha, thick, a_body
-    real(kind=rk) :: x_body(1:3), x_glob(1:3), Id(1:3,1:3)
-    integer :: ix,iy,iz
-    logical, save :: informed = .false.
-    real(kind=rk)   :: M_body(1:3,1:3)
-    integer(kind=2) :: color_body
-
-    color_body = Insect%color_body
-    M_body     = Insect%M_body
-
-    ! if (root ) then
-    !    if (informed .eqv. .false. ) then
-    !     write(*,'("Conical flyer H=",g12.4," alpha=",g12.4," a=",g12.4)') H, alpha*180.d0/pi, a
-    !     informed = .true.
-    !   endif
-    ! endif
-
-    Insect%b_body = 0.09d0
-    a_body = 0.17d0
-
-    !-----------------------------------------------------------------------------
-    ! The seed's core is an ellipsoid
-    !-----------------------------------------------------------------------------
-    do iz = g, size(mask,3)-1-g
-        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = g, size(mask,2)-1-g
-            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = g, size(mask,1)-1-g
-                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
-
-                ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
-                x_body = matmul( M_body, x_glob)
-                ! check if inside the surrounding box (save comput. time)
-                if ( dabs(x_body(2)) <= Insect%b_body + Insect%safety ) then
-                    if ( dabs(x_body(3)) <= Insect%b_body + Insect%safety ) then
-                        ! check for length inside ellipsoid:
-                        if ( dabs(x_body(1) ) < Insect%L_body/2 + Insect%safety ) then
-                            R  = dsqrt ( x_body(2)**2 + x_body(3)**2 )
-                            ! this gives the R(x) shape
-                            if ( (x_body(1)/a_body)**2 <= 1.d0) then
-                                R0 = dsqrt( Insect%b_body**2 *(1.d0- (x_body(1)/a_body)**2 ) )
-                                if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
-                                    mask_color(ix,iy,iz) = color_body
-                                endif
-                            endif
-                        endif
-                    endif
-                endif
-            enddo
-        enddo
-    enddo
-
-    Id = 0.d0
-    Id(1,1) = 1.d0; Id(2,2) = 1.d0; Id(3,3) = 1.0d0
-
-    call draw_wing_fourier(xx0, ddx, mask, mask_color, us,Insect,color_body,M_body,Id,(/0.d0,0.d0,0.d0/),(/0.d0,0.d0,0.d0/))
-
-end subroutine draw_birch_seed
-
-!-------------------------------------------------------------------------------
-! The flying pyramid, optimistically termed "bug" from the paper
-! Liu, Ristroph, Weathers, Childress, Zhang, Intrinsic Stability of a Body hovering in an
-! oscillating airflow, Phys. Rev. Lett. 2012
-! The HEIGHT is Insect%L_body
-! The SIDELENGTH is INsect%b_body
-!-------------------------------------------------------------------------------
-subroutine draw_body_pyramid( xx0, ddx, mask, mask_color, us, Insect)
-    implicit none
-
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
-
-    real(kind=rk) :: R0,R,a,H,b, alpha, thick, di(1:4)
-    real(kind=rk) :: x_body(1:3), x_glob(1:3)
-    integer :: ix,iy,iz
-    logical, save :: informed = .false.
-    real(kind=rk)   :: M_body(1:3,1:3)
-    integer(kind=2) :: color_body
-
-    color_body = Insect%color_body
-    M_body     = Insect%M_body
-
-    ! a is the sidelength of the pyramid
-    a = Insect%b_body
-    ! alpha is HALF the opening angle
-    alpha = Insect%eta0
-    ! heigh is defined by alpha and a
-    H = a * dcos(alpha)
-    ! we draw a shell here, and this is its thickness
-    thick = Insect%WingThickness
-
-    if (root) then
-        if (informed .eqv. .false.) then
-            write(*,'("Pyramid flyer H=",g12.4," alpha=",g12.4," a=",g12.4)') H, alpha*180.d0/pi, a
-            informed = .true.
-        endif
-    endif
-
-    do iz = g, size(mask,3)-1-g
-        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = g, size(mask,2)-1-g
-            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = g, size(mask,1)-1-g
-                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
-
-                ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
-                x_body = matmul( M_body, x_glob)
-                ! shift x body to the center of gravity
-                x_body(3) = x_body(3) + H/3.d0
-
-                ! check if inside the surrounding box (save comput. time)
-                if ( dabs(x_body(1)) <= a/2.d0 + Insect%safety ) then
-                    if ( dabs(x_body(2)) <= a/2.d0 + Insect%safety ) then
-                        !  note we shifted the system to the center of gravity therefore -H/3 <= z <= 2H/3
-                        if ( dabs(x_body(3)) <= H*2.d0/3.d0 + Insect%safety .and. x_body(3)>-Insect%safety-H/3.d0) then
-                            ! realizing that the pyramid consists of 4 triangles, we can use the pointTriangleDistance function from
-                            ! the stl_file_reader module to compute, for all points within the bounding box, the distance to the
-                            ! pyramid. This is more elegant than the old solution, since it nicely smoothes the surface and edges.
-                            ! note we do use the NORMAL only to distinguish between in/out, it's not required to be correct
-                            di(1) = pointTriangleDistance2( (/+a/2.d0,-a/2.d0,-H/3.d0/), (/+a/2.d0,+a/2.d0,-H/3.d0/) ,&
-                            (/0.d0,0.d0,2.d0*H/3.d0/), x_body, (/1.d0,0.d0,0.d0/) )
-                            di(2) = pointTriangleDistance2( (/+a/2.d0,+a/2.d0,-H/3.d0/), (/-a/2.d0,+a/2.d0,-H/3.d0/) ,&
-                            (/0.d0,0.d0,2.d0*H/3.d0/), x_body, (/0.d0,1.d0,0.d0/) )
-                            di(3) = pointTriangleDistance2( (/-a/2.d0,+a/2.d0,-H/3.d0/), (/-a/2.d0,-a/2.d0,-H/3.d0/) ,&
-                            (/0.d0,0.d0,2.d0*H/3.d0/), x_body, (/-1.d0,0.d0,0.d0/) )
-                            di(4) = pointTriangleDistance2( (/-a/2.d0,-a/2.d0,-H/3.d0/), (/+a/2.d0,-a/2.d0,-H/3.d0/) ,&
-                            (/0.d0,0.d0,2.d0*H/3.d0/), x_body, (/0.d0,-1.d0,0.d0/) )
-
-                            ! note maxval(di) is the union of all the triangles' interiors (thus a solid filled pyramid results),
-                            ! and abs(maxval(di))-t/2 is the shell operator which gives us just the shell (negative values are inside the solid, by convention)
-                            ! we also directly take the CHI(delta) here.
-                            mask(ix,iy,iz)= steps( abs(maxval(di)) -thick/2.d0, 0.d0, Insect%smooth)
-                            mask_color(ix,iy,iz) = color_body
-                            ! please note that the solid body velocity will be added elsewhere in the code
-                        endif
-                    endif
-                endif
-            enddo
-        enddo
-    enddo
-end subroutine draw_body_pyramid
-
-
 !-------------------------------------------------------------------------------
 ! draw a cylinder defined by GLOBALS points (x1,y1,z1), (x2,y2,z2) and radius R0
 ! At the start/end point, we add a sphere.
@@ -1817,296 +1473,141 @@ subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
 end subroutine
 
 
-! This function is used in body type pyramid
-real(kind=rk) function pointTriangleDistance2(tri1,tri2,tri3,point,normal)
-    ! calculate distance between a point and a triangle in 3D
-    ! SYNTAX
-    !   dist = pointTriangleDistance2(TRI,P)
-    !   [dist,PP0] = pointTriangleDistance2(TRI,P)
-    !
-    ! DESCRIPTION
-    !   Calculate the distance of a given point P from a triangle TRI.
-    !   Point P is a row vector of the form 1x3. The triangle is a matrix
-    !   formed by three rows of points TRI = [P1P2P3] each of size 1x3.
-    !   dist = pointTriangleDistance2(TRI,P) returns the distance of the point P
-    !   to the triangle TRI.
-    !   [dist,PP0] = pointTriangleDistance2(TRI,P) additionally returns the
-    !   closest point PP0 to P on the triangle TRI.
-    !
-    ! Author: Gwendolyn Fischer
-    ! Release: 1.0
-    ! Release date: 09/02/02
-    ! Release: 1.1 Fixed Bug because of normalization
-    ! Release: 1.2 Fixed Bug because of typo in region 5 20101013
-    ! Release: 1.3 Fixed Bug because of typo in region 2 20101014
 
-    ! Possible extention could be a version tailored not to return the distance
-    ! and additionally the closest point, but instead return only the closest
-    ! point. Could lead to a small speed gain.
-
-    ! Example:
-    ! !! The Problem
-    ! P0 = [0.5 -0.3 0.5]
-    !
-    ! P1 = [0 -1 0]
-    ! P2 = [1  0 0]
-    ! P3 = [0  0 0]
-    !
-    ! vertices = [P1 P2 P3]
-    ! faces = [1 2 3]
-    !
-    ! !! The Engine
-    ! [dist,PP0] = pointTriangleDistance([P1P2P3],P0)
-    !
-    ! !! Visualization
-    ! [x,y,z] = sphere(20)
-    ! x = dist*x+P0(1)
-    ! y = dist*y+P0(2)
-    ! z = dist*z+P0(3)
-    !
-    ! figure
-    ! hold all
-    ! patch('Vertices',vertices,'Faces',faces,'FaceColor','r','FaceAlpha',0.8)
-    ! plot3(P0(1),P0(2),P0(3),'b*')
-    ! plot3(PP0(1),PP0(2),PP0(3),'*g')
-    ! surf(x,y,z,'FaceColor','b','FaceAlpha',0.3)
-    ! view(3)
-
-    ! The algorithm is based on
-    ! "David Eberly, 'Distance Between Point and Triangle in 3D',
-    ! Geometric Tools, LLC, (1999)"
-    ! http:\\www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
-    !
-    !        ^t
-    !  \     |
-    !   \reg2|
-    !    \   |
-    !     \  |
-    !      \ |
-    !       \|
-    !        *P2
-    !        |\
-    !        | \
-    !  reg3  |  \ reg1
-    !        |   \
-    !        |reg0\
-    !        |     \
-    !        |      \ P1
-    ! -------*-------*------->s
-    !        |P0      \
-    !  reg4  | reg5    \ reg6
+!-------------------------------------------------------------------------------
+! Draw a body from SUPERSTL file.
+! A superstl is just a list of triangles with all face-, edge- and vertex normals precomputed
+!
+! No scaling or origin shift is applied: we assume you did that when generating
+! the superSTL file. The data is thus understood in the body coordinate system.
+!
+!-------------------------------------------------------------------------------
+subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     implicit none
-    real(kind=rk), dimension(1:3), intent(in) :: tri1,tri2,tri3,point,normal
-    real(kind=rk), dimension(1:3) :: BB,EE0,EE1,DD
-    real(kind=rk) :: a,b,c,d,e,f,det,s,t,sqrDistance,tmp0,tmp1,numer,denom,invDet
 
-    ! rewrite triangle in normal form
-    BB = tri1
-    EE0 = tri2-BB
-    EE1 = tri3-BB
+    type(diptera),intent(inout) :: Insect
+    real(kind=rk),intent(in)    :: x0(1:3), dx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
+    real(kind=rk), allocatable, save :: tmp_block(:,:,:)
 
-    DD = BB - point
-    a = dot_product(EE0,EE0)
-    b = dot_product(EE0,EE1)
-    c = dot_product(EE1,EE1)
-    d = dot_product(EE0,DD)
-    e = dot_product(EE1,DD)
-    f = dot_product(DD,DD)
+    integer :: safety, i, ntri, Bs(1:3)
+    integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax
+    integer(kind=2) :: color_body
 
+    real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal
+    real(kind=rk), dimension(1:3) :: vertex2_normal, vertex3_normal, face_normal, edge1_normal, edge2_normal, edge3_normal
+    real(kind=rk) :: M_body(1:3,1:3), M_body_inv(1:3,1:3)
+    real(kind=rk) :: scale, origin(1:3), tmp, x, y, z
+    real(kind=rk) :: x_glob(1:3), x_body(1:3)
+    character(len=strlen) :: fname_stl
 
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
+    M_body_inv = transpose(Insect%M_body)
+    fname_stl  = Insect%BodySuperSTLfile
 
-    det = a*c - b*b ! do we have to use abs here?
-    s   = b*e - c*d
-    t   = b*d - a*e
-
-    if (det < 1.0d-11) then
-        pointTriangleDistance2 = 9.0d9
-        return
+    ! we work on a work block because we add the body to existing masks
+    if (.not. allocated(tmp_block)) then
+        allocate( tmp_block(0:size(mask,1)-1, 0:size(mask,2)-1, 0:size(mask,3)-1) )
     endif
 
+    Bs(1) = size(mask,1) - 2*g
+    Bs(2) = size(mask,2) - 2*g
+    Bs(3) = size(mask,3) - 2*g
 
-    ! write(*,'(12(es12.4,1x))') tri1,tri2,tri3,point
-    ! write(*,'(12(es12.4,1x))') a,b,c,d,e,f,det,s,t
+    ! initialize signed distance as very far away
+    tmp_block = 9.0e6_rk ! distance as far away
+    safety = 6
+    ntri = size(xyz_nxnynz, 1)
 
-    ! Terible tree of conditionals to determine in which region of the diagram
-    ! shown above the projection of the point into the triangle-plane lies.
-    if ((s+t) <= det) then
-        if (s < 0.d0) then
-            if (t < 0.d0) then
-                !region4
-                if (d < 0.d0) then
-                    t = 0.d0
-                    if (-d >= a) then
-                        s = 1.d0
-                        sqrDistance = a + 2.d0*d + f
-                    else
-                        s = -d/a
-                        sqrDistance = d*s + f
+    ! loop over all triangles
+    do i = 1, ntri
+        vertex1        = matmul(M_body_inv, xyz_nxnynz(i, 1:3)) + Insect%xc_body_g
+        vertex2        = matmul(M_body_inv, xyz_nxnynz(i, 4:6)) + Insect%xc_body_g
+        vertex3        = matmul(M_body_inv, xyz_nxnynz(i, 7:9)) + Insect%xc_body_g
+        face_normal    = matmul(M_body_inv, xyz_nxnynz(i, 10:12))
+        vertex1_normal = matmul(M_body_inv, xyz_nxnynz(i, 13:15))
+        vertex2_normal = matmul(M_body_inv, xyz_nxnynz(i, 16:18))
+        vertex3_normal = matmul(M_body_inv, xyz_nxnynz(i, 19:21))
+        edge1_normal   = matmul(M_body_inv, xyz_nxnynz(i, 22:24))
+        edge2_normal   = matmul(M_body_inv, xyz_nxnynz(i, 25:27))
+        edge3_normal   = matmul(M_body_inv, xyz_nxnynz(i, 28:30))
+
+        xmin = floor( ( minval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) - safety
+        ymin = floor( ( minval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) - safety
+        zmin = floor( ( minval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) - safety
+
+        xmax = ceiling( ( maxval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) + safety
+        ymax = ceiling( ( maxval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) + safety
+        zmax = ceiling( ( maxval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) + safety
+
+        ! note these guys are zero based indexing....
+        xmin = max(xmin, 0)
+        ymin = max(ymin, 0)
+        zmin = max(zmin, 0)
+
+        xmax = min(xmax, size(mask,1)-1)
+        ymax = min(ymax, size(mask,2)-1)
+        zmax = min(zmax, size(mask,3)-1)
+
+
+        vertex1        = xyz_nxnynz(i, 1:3)
+        vertex2        = xyz_nxnynz(i, 4:6)
+        vertex3        = xyz_nxnynz(i, 7:9)
+        face_normal    = xyz_nxnynz(i, 10:12)
+        vertex1_normal = xyz_nxnynz(i, 13:15)
+        vertex2_normal = xyz_nxnynz(i, 16:18)
+        vertex3_normal = xyz_nxnynz(i, 19:21)
+        edge1_normal   = xyz_nxnynz(i, 22:24)
+        edge2_normal   = xyz_nxnynz(i, 25:27)
+        edge3_normal   = xyz_nxnynz(i, 28:30)
+
+        do iz = zmin, zmax
+            x_glob(3) = x0(3) + dble(iz)*dx(3) - Insect%xc_body_g(3)
+            do iy = ymin, ymax
+                x_glob(2) = x0(2) + dble(iy)*dx(2) - Insect%xc_body_g(2)
+                do ix = xmin, xmax
+                    x_glob(1) = x0(1) + dble(ix)*dx(1) - Insect%xc_body_g(1)
+
+                    if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                    ! x_body is in the body coordinate system
+                    x_body = matmul(M_body, x_glob)
+
+                    ! the distance to the current triangle:
+                    tmp = pointTriangleDistance( vertex1, vertex2, vertex3, x_body, face_normal, &
+                    vertex1_normal, vertex2_normal, vertex3_normal, edge1_normal, edge2_normal, edge3_normal)
+
+                    ! if closer (in abs value!) then use this now
+                    if ( abs(tmp) < abs(tmp_block(ix,iy,iz)) ) then !.and. abs(tmp)<=dble(safety)*dx(1) ) then
+                        tmp_block(ix,iy,iz) = tmp
                     endif
-                else
-                    s = 0.d0
-                    if (e >= 0.d0) then
-                        t = 0.d0
-                        sqrDistance = f
-                    else
-                        if (-e >= c) then
-                            t = 1.d0
-                            sqrDistance = c + 2.d0*e + f
-                        else
-                            t = -e/c
-                            sqrDistance = e*t + f
-                        endif
-                    endif
-                endif !of region 4
-            else
-                ! region 3
-                s = 0.d0
-                if (e >= 0.d0) then
-                    t = 0.d0
-                    sqrDistance = f
-                else
-                    if (-e >= c) then
-                        t = 1.d0
-                        sqrDistance = c + 2.d0*e +f
-                    else
-                        t = -e/c
-                        sqrDistance = e*t + f
-                    endif
+                enddo
+            enddo
+        enddo
+    enddo ! loop over triangles
+    !
+    ! signed distance to mask function
+    do iz = 0, size(mask,3)-1
+        do iy = 0, size(mask,2)-1
+            do ix = 0, size(mask,1)-1
+                tmp = smoothstep( tmp_block(ix,iy,iz), 0.0_rk, 1.5_rk*dx(1) )
+
+                if (mask(ix,iy,iz) <= tmp) then
+                    mask(ix,iy,iz) = tmp
+                    mask_color(ix,iy,iz) = color_body
                 endif
-            endif !of region 3
-        else
-            if (t < 0.d0) then
-                ! region 5
-                t = 0.d0
-                if (d >= 0.d0) then
-                    s = 0.d0
-                    sqrDistance = f
-                else
-                    if (-d >= a) then
-                        s = 1.d0
-                        sqrDistance = a + 2.d0*d + f! GF 20101013 fixed typo d*s ->2*d
-                    else
-                        s = -d/a
-                        sqrDistance = d*s + f
-                    endif
-                endif
-            else
-                ! region 0
-                invDet = 1.d0/det
-                s = s*invDet
-                t = t*invDet
-                sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                + t*(b*s + c*t + 2.d0*e) + f
-            endif
-        endif
-    else
-        if (s < 0.d0) then
-            ! region 2
-            tmp0 = b + d
-            tmp1 = c + e
-            if (tmp1 > tmp0) then ! minimum on edge s+t=1
-                numer = tmp1 - tmp0
-                denom = a - 2.d0*b + c
-                if (numer >= denom) then
-                    s = 1.d0
-                    t = 0.d0
-                    sqrDistance = a + 2.d0*d + f ! GF 20101014 fixed typo 2*b -> 2*d
-                else
-                    s = numer/denom
-                    t = 1.d0-s
-                    sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                    + t*(b*s + c*t + 2.d0*e) + f
-                endif
-            else          ! minimum on edge s=0
-                s = 0.d0
-                if (tmp1 <= 0.d0) then
-                    t = 1.d0
-                    sqrDistance = c + 2.d0*e + f
-                else
-                    if (e >= 0.d0) then
-                        t = 0.d0
-                        sqrDistance = f
-                    else
-                        t = -e/c
-                        sqrDistance = e*t + f
-                    endif
-                endif
-            endif !of region 2
-        else
-            if (t < 0.d0) then
-                !region6
-                tmp0 = b + e
-                tmp1 = a + d
-                if (tmp1 > tmp0) then
-                    numer = tmp1 - tmp0
-                    denom = a-2.d0*b+c
-                    if (numer >= denom) then
-                        t = 1.d0
-                        s = 0.d0
-                        sqrDistance = c + 2.d0*e + f
-                    else
-                        t = numer/denom
-                        s = 1.d0 - t
-                        sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                        + t*(b*s + c*t + 2.d0*e) + f
-                    endif
-                else
-                    t = 0.d0
-                    if (tmp1 <= 0) then
-                        s = 1.d0
-                        sqrDistance = a + 2.d0*d + f
-                    else
-                        if (d >= 0.d0) then
-                            s = 0.d0
-                            sqrDistance = f
-                        else
-                            s = -d/a
-                            sqrDistance = d*s + f
-                        endif
-                    endif
-                endif
-                !end region 6
-            else
-                ! region 1
-                numer = c + e - b - d
-                if (numer <= 0.d0) then
-                    s = 0.d0
-                    t = 1.d0
-                    sqrDistance = c + 2.d0*e + f
-                else
-                    denom = a - 2.d0*b + c
-                    if (numer >= denom) then
-                        s = 1.d0
-                        t = 0.d0
-                        sqrDistance = a + 2.d0*d + f
-                    else
-                        s = numer/denom
-                        t = 1-s
-                        sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                        + t*(b*s + c*t + 2.d0*e) + f
-                    endif
-                endif !of region 1
-            endif
-        endif
-    endif
+            enddo
+        enddo
+    enddo
+    
+    ! mask = tmp_block
 
-    ! account for numerical round-off error
-    if (sqrDistance < 0.d0) then
-        sqrDistance = 0.d0
-    endif
-
-
-
-    ! closest point on triangle
-    DD = BB + s*EE0 + t*EE1;
-    ! vector from target point to closest point on surface
-    DD = point-DD
-    t = dot_product(DD,normal)
-    if (t >= 0.d0) then
-        pointTriangleDistance2 = dsqrt(sqrDistance)
-    else
-        pointTriangleDistance2 = -dsqrt(sqrDistance)
-    endif
-
-end function
+    ! ! store final resut, do not erase existing data in array
+    ! where (mask <= tmp_block)
+    !     mask = tmp_block
+    !     mask_color = color_body
+    ! end where
+end subroutine

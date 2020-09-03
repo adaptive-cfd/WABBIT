@@ -49,8 +49,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set MPI parameters
     rank = params%rank
@@ -59,8 +57,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     g    = params%n_ghosts
     Bs   = params%Bs
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-!---------------------------------------------------------------------------------------------
-! main body
 
     call check_file_exists(fname)
     ! open the file
@@ -95,11 +91,11 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     if ( params%dim == 3 ) then
         ! 3D data case
         call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
-            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,dF,1:hvy_n))
+            hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, 1:hvy_n))
     else
         ! 2D data case
         call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, &
-            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,1,dF,1:hvy_n))
+            hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, 1:hvy_n))
     end if
 
     ! close file and HDF5 library

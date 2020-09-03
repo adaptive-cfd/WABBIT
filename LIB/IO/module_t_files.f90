@@ -115,7 +115,7 @@ contains
         if (.not. allocated(filenames)) call init_t_file(fname, .false.)
 
 
-        do fileID = 1, max_parallel_files
+        do fileID = 1, max_parallel_files-1
             ! entry for current file exists
             if ( filenames(fileID) == fname ) exit
         end do

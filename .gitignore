@@ -25,3 +25,9 @@ doc/output
 *.so
 *.a
 runtime_control
+*.txt
+*f90.swo
+wabbit
+wabbit-post
+*.avi
+success

@@ -23,7 +23,7 @@
 !! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, hvy_mask)
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
 
     use module_indicators
 
@@ -61,12 +61,16 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
 
+    ! for the mask generation (time-independent mask) we require the mask on the highest
+    ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
+    logical, intent(in) :: ignore_maxlevel
+
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr
+    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr, level
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
-    real(kind=rk), allocatable, save :: norm(:), block_norm(:), tmp(:)
+    real(kind=rk), allocatable, save :: norm(:)
     !> mask term for every grid point in this block
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
@@ -128,10 +132,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         N_thresholding_components = params%n_eqn
     endif
 
-    if (.not. allocated(norm)) then
-        allocate(norm(1:N_thresholding_components), block_norm(1:N_thresholding_components),&
-        tmp(1:N_thresholding_components))
-    endif
+    if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
 
 
     !---------------------------------------------------------------------------
@@ -139,51 +140,36 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
-    !! the vector of normalization factors for each qty that adaptivity will bebased on (state vector
-    !! or vorticity). We currently use the L_infty norm. I have made bad experience with L_2 norm
-    !! (to be checked...)
+    !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
+    !! or vorticity). The nor is specified in params%eps_norm, default is Linfty.
 
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
     norm = 1.0_rk
 
-    if (params%eps_normalized) then
-        ! normalizing is dependent on the variables you want to threshold!
-        ! for customized variables you need custom normalization -> physics module
-        norm = 0.0_rk
-        block_norm = 0.0_rk
-
+    if ( params%eps_normalized ) then
         if ( params%coarsening_indicator == "threshold-state-vector" ) then
             ! Apply thresholding directly to the statevector, not to derived quantities
-            do k = 1, hvy_n
-                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_block(:,:,:,:,hvy_active(k)), block_norm)
-
-                do p = 1, N_thresholding_components
-                    norm(p) = max( norm(p), block_norm(p) )
-                enddo
-            end do
+            call component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, params%eps_norm, norm)
         else
-            ! Apply thresholding to derived qtys, such as the vorticity
-            do k = 1, hvy_n
-                call NORM_THRESHOLDFIELD_meta( params%physics_type, hvy_tmp(:,:,:,:,hvy_active(k)), block_norm)
-
-                do p = 1, N_thresholding_components
-                    norm(p) = max( norm(p), block_norm(p) )
-                enddo
-            end do
+            ! use derived qtys instead
+            call component_wise_tree_norm(params, lgt_block, hvy_tmp, hvy_active, hvy_n, params%eps_norm, norm)
         endif
 
-        ! note that a check norm>1.0e-10 is in threshold-block
-        tmp = norm
-        call MPI_ALLREDUCE(tmp, norm, neq, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
+        do p = 1, N_thresholding_components
+            if (norm(p) <= 1.0e-9) norm(p) = 1.0_rk
+        enddo
 
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
     endif
 
-
+    ! HACK
+!    if (params%physics_type == "ACM-new" .and. size(norm,1)>1) norm(1:params%dim) = maxval(norm(1:params%dim))
+    ! write(*,*) "norm", norm
     !---------------------------------------------------------------------------
-    !> evaluate coarsing criterion on all blocks
+    !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------
     ! the indicator "random" requires special treatment below (it does not pass via
     ! block_coarsening_indicator)
@@ -202,11 +188,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 ! we pass the spacing and origin of the block (as we have to compute vorticity
                 ! here, this can actually be omitted.)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm,  hvy_mask(:,:,:,:,hvy_id))
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
             enddo
         else
             ! loop over all my blocks
@@ -219,11 +206,12 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 ! we pass the spacing and origin of the block (as we have to compute vorticity
                 ! here, this can actually be omitted.)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm)
+                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
             enddo
         endif
     else
@@ -261,7 +249,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !---------------------------------------------------------------------------
     !> force blocks on maximum refinement level to coarsen, if parameter is set
     !---------------------------------------------------------------------------
-    if (params%force_maxlevel_dealiasing) then
+    ! Note this behavior can be bypassed using the ignore_maxlevel switch
+    if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
         do k = 1, lgt_n
             lgt_id = lgt_active(k)
             if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then

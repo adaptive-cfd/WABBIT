@@ -12,17 +12,10 @@
 ! ********************************************************************************************
 
 program main_post
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
-    ! global parameters
     use module_params
     use module_MOR, only : post_POD, post_reconstruct, post_PODerror, post_timecoef_POD
     use module_timing
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -38,14 +31,15 @@ program main_post
     character(len=80)                   :: filename, key1, key2
 
     real(kind=rk)                       :: elapsed_time
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! init mpi
     call MPI_Init(ierr)
     ! determine process rank
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     params%rank = rank
+
+    ! this is used to document a bit (one often forgets to write down the params in the command line call)
+    call print_command_line_arguments()
 
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
@@ -74,7 +68,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks", "--add", "--subtract", "--multiply")
+    case ("--add-two-masks", "--add", "--subtract", "--multiply", "--test_operations")
         call post_add_two_masks(params)
 
     case ("--stl2dist")
@@ -83,7 +77,7 @@ program main_post
     case("--compute-rhs")
         call post_rhs(params)
 
-    case("--mult-mask")
+    case("--mult-mask", "--mult-mask-direct", "--mult-mask-inverse")
         call mult_mask(params)
 
     !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
@@ -108,6 +102,9 @@ program main_post
 
     case("--vorticity", "--divergence", "--vor-abs", "--Q")
         call compute_vorticity_post(params)
+
+    case("--gradient")
+        call compute_scalar_field_post(params)
 
     case("--keyvalues")
         call get_command_argument(2,filename)
@@ -135,6 +132,8 @@ program main_post
   case ("--POD-time")
     call post_timecoef_POD(params)
 
+    case ("--generate_forest")
+    call post_generate_forest(params)
     case default
 
         if (params%rank==0) then
@@ -146,6 +145,7 @@ program main_post
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
             write(*,*) "--Q"
+            write(*,*) "--gradient"            
             write(*,*) "--keyvalues"
             write(*,*) "--dry-run"
             write(*,*) "--compare-keys"
@@ -156,6 +156,9 @@ program main_post
             write(*,*) "--POD-time"
             write(*,*) "--stl2dist"
             write(*,*) "--add-two-masks"
+            write(*,*) "--mult-mask"
+            write(*,*) "--mult-mask-direct"
+            write(*,*) "--mult-mask-inverse"
             write(*,*) "--post_rhs"
             write(*,*) "--average"
 
@@ -178,7 +181,7 @@ program main_post
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout
-    if ( mode == "--POD") call summarize_profiling( WABBIT_COMM )
+    if ( mode(:5) == "--POD") call summarize_profiling( WABBIT_COMM )
 
     ! end mpi
     call MPI_Finalize(ierr)

@@ -43,8 +43,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank, n_xfer, ierr
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     maxtl = params%max_treelevel
     ! number of blocks to merge, 4 or 8
@@ -55,8 +53,6 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! transfer counter
     n_xfer = 0
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     !---------------------------------------------------------------------------
     ! first, prepare for xfer (gather information: which blocks are sent where)
@@ -106,9 +102,9 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         ! It can be useful to simultaneously coarsen more than one array, in most cases this
         ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
         ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask )
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask, msg="coarse_mesh" )
     else
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block )
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, msg="coarse_mesh" )
     endif
 
     ! the active lists are outdates after the transfer: we need to create

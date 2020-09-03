@@ -42,7 +42,7 @@ subroutine post_stl2dist(params)
     if (fname_ini=='--help' .or. fname_ini=='--h' .or. fname_ini=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --stl2dist --x0 2.0,3.0,4.0 --superstl vertexnormals.sstl --params PARAMS.ini --no-pruning"
+            write(*,*) "./wabbit-post --stl2dist --x0 2.0,3.0,4.0 --superstl vertexnormals.sstl --params PARAMS.ini --no-pruning --memory=10.0gb"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) " Output file name:"
             write(*,*) " -o mask_00000.h5 "
@@ -292,7 +292,7 @@ subroutine post_stl2dist(params)
 
     if (pruning) then
         if (params%rank==0) write(*,*) "now pruning!"
-        
+
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
     endif

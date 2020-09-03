@@ -13,7 +13,7 @@
 !> \date 02/02/18 - create
 !
 
-subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim)
+subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, verbosity)
 
     implicit none
     !> file name
@@ -32,19 +32,58 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     integer(kind=ik), intent(out)                 :: dim
     !> domain size
     real(kind=rk), dimension(3), intent(out)      :: domain
+    logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
 
-    integer(kind=ik), dimension(1)                :: iiteration, number_blocks
+    integer(kind=ik), dimension(1)                :: iiteration, number_blocks, version
     real(kind=rk), dimension(1)                   :: ttime
     integer(hid_t)                                :: file_id
-    integer(kind=ik)                              :: datarank, Nb
+    integer(kind=ik)                              :: datarank, Nb, rank, ierr
     integer(kind=hsize_t)                         :: size_field(1:4)
     integer(hsize_t), dimension(2)                :: dims_treecode
+    logical :: verbose = .true.
 
+    if (present(verbosity)) verbose=verbosity
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     call check_file_exists(fname)
 
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
-    ! read attributes
+
+
+    !----------------------------------------------------------------------------------
+    ! version check
+    !----------------------------------------------------------------------------------
+    ! Files created using the newGhostNodes branch (after 08 April 2020) contain a version number.
+    ! if the number is not found, version=0.
+    call read_attribute( file_id, "blocks", "version", version)
+
+    if (version(1) == 20200408 .and. rank==0) then
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "The file we are trying to read is generated with an intermediate version"
+        write(*,*) "of wabbit (after 08 April 2020). In this the file, the grid"
+        write(*,*) "definition does not include a redundant point, i.e., a block is defined"
+        write(*,*) "with spacing dx = L*2^-J / Bs. This definition was a dead-end, as it lead"
+        write(*,*) "to instabilities and other problems. Current versions of WABBIT include a redundant point again."
+        write(*,*) ""
+        write(*,*) "The newGhostNodes branch still STORED the redundant point for visualization."
+        write(*,*) "This was simply the first ghost node. If Bs was odd, this lead to an even number"
+        write(*,*) "of points, and this cannot be read with present code versions."
+        write(*,*) ""
+        write(*,*) "A workaround must be done in preprocessing: upsampling to equidistant resolution and"
+        write(*,*) "re-gridding is required. I am truely sorry for this."
+        write(*,*) ""
+        write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"
+        write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"
+        write(*,*) "have been obtained with the newGhostNodes branch"
+        write(*,*) "--------------------------------------------------------------------"
+        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+        write(*,*) "--------------------------------------------------------------------"
+    endif
+
+
     call read_attribute(file_id, "blocks", "domain-size", domain)
     call read_attribute(file_id, "blocks", "time", ttime)
     time = ttime(1)
@@ -83,6 +122,16 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
 
     endif
 
+    if (modulo(Bs(1),2) == 0) then
+        call abort(202009021, "Blocksize Bs(1) is an even number, which this code version cannot handle.")
+    endif
+    if (modulo(Bs(2),2) == 0) then
+        call abort(202009021, "Blocksize Bs(2) is an even number, which this code version cannot handle.")
+    endif
+    if (modulo(Bs(3),2) == 0) then
+        call abort(202009021, "Blocksize Bs(3) is an even number, which this code version cannot handle.")
+    endif
+
     if ( Nb /= lgt_n ) then
         ! the number of blocks stored in metadata and the dimensionality of the
         ! array do not match.
@@ -102,5 +151,22 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
+
+    if (rank == 0 .and. verbose) then
+        write(*,'(80("~"))')
+        write(*,*) "read_attributes.f90: Read important numbers from a file."
+        write(*,'(80("~"))')
+        write(*,*) "These numbers are used either for initializiation/allocation (in post-"
+        write(*,*) "processing) or to check if a file we try to load matches the"
+        write(*,*) "specification of the current simulation."
+        write(*,*) "We read:"
+        write(*,'(" file      = ",A)') trim(adjustl(fname))
+        write(*,'(" Bs        = ",3(i3,1x))') Bs
+        write(*,'(" domain    = ",3(g15.8,1x))') domain
+        write(*,'(" tc_length = ",i3)') tc_length
+        write(*,'(" lgt_n     = ",i8)') lgt_n
+        write(*,'(" dim       = ",i8)') dim
+        write(*,'(80("~"))')
+    endif
 
 end subroutine read_attributes

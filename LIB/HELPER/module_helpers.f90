@@ -10,6 +10,10 @@ module module_helpers
         module procedure smoothstep1, smoothstep2
     end interface
 
+    interface get_cmd_arg
+        module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
+    end interface
+
     ! routines of the interface should be private to hide them from outside this module
     private :: smoothstep1, smoothstep2
 
@@ -18,53 +22,50 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
-  !-----------------------------------------------------------------------------
-  !> This function computes the factorial of n
-  !-----------------------------------------------------------------------------
-  function factorial (n) result (res)
+    !-----------------------------------------------------------------------------
+    !> This function computes the factorial of n
+    !-----------------------------------------------------------------------------
+    function factorial (n) result (res)
 
-    implicit none
-    integer, intent (in) :: n
-    integer :: res
-    integer :: i
+        implicit none
+        integer, intent (in) :: n
+        integer :: res
+        integer :: i
 
-    res = product ((/(i, i = 1, n)/))
+        res = product ((/(i, i = 1, n)/))
 
-  end function factorial
+    end function factorial
 
-  !-----------------------------------------------------------------------------
-  !> This function computes the binomial coefficients
-  !-----------------------------------------------------------------------------
-  function choose (n, k) result (res)
+    !-----------------------------------------------------------------------------
+    !> This function computes the binomial coefficients
+    !-----------------------------------------------------------------------------
+    function choose (n, k) result (res)
 
-    implicit none
-    integer, intent (in) :: n
-    integer, intent (in) :: k
-    integer :: res
+        implicit none
+        integer, intent (in) :: n
+        integer, intent (in) :: k
+        integer :: res
 
-    res = factorial (n) / (factorial (k) * factorial (n - k))
+        res = factorial (n) / (factorial (k) * factorial (n - k))
 
-  end function choose
+    end function choose
 
-  !-----------------------------------------------------------------------------
-  !> This function returns 0 if name is not contained in list, otherwise the index for which
-  !> a substring
-  !-----------------------------------------------------------------------------
-  function list_contains_name (list, name) result (index)
+    !-----------------------------------------------------------------------------
+    !> This function returns 0 if name is not contained in list, otherwise the index for which
+    !> a substring
+    !-----------------------------------------------------------------------------
+    function list_contains_name (list, name) result (index)
 
-    implicit none
-    character(len=*), intent (in) :: list(:)
-    character(len=*), intent (in) :: name
-    integer :: index
+        implicit none
+        character(len=*), intent (in) :: list(:)
+        character(len=*), intent (in) :: name
+        integer :: index
 
-    do index = 1, size(list)
-      if (trim(list(index))==trim(name))  return
-    end do
-    index=0
-  end function list_contains_name
-
-
-
+        do index = 1, size(list)
+            if (trim(list(index))==trim(name))  return
+        end do
+        index=0
+    end function list_contains_name
 
     !-----------------------------------------------------------------------------
     ! This function returns, to a given filename, the corresponding dataset name
@@ -119,14 +120,14 @@ contains
     ! do not include x=1.0.
     ! a valid example is x=(0:N-1)/N
     !-------------------------------------------------------------------------------
-    subroutine hermite_eval(time,u,u_dt,ai,bi)
+    subroutine hermite_eval(time, u, u_dt, ai, bi)
         implicit none
 
         real(kind=rk), intent(in) :: time
         real(kind=rk), intent(in), dimension(1:) :: ai,bi
         real(kind=rk), intent(out) :: u, u_dt
-        real(kind=rk) :: dt,h00,h10,h01,h11,t, time_periodized
-        integer :: n, j1,j2
+        real(kind=rk) :: dt, h00, h10, h01, h11, t, time_periodized
+        integer :: n, j1, j2
 
         n = size(ai)
 
@@ -135,7 +136,7 @@ contains
             time_periodized = time_periodized - 1.0_rk
         enddo
 
-        dt = 1.d0 / dble(n)
+        dt = 1.0_rk / dble(n)
         j1 = floor(time_periodized/dt) + 1
         j2 = j1 + 1
         ! periodization
@@ -144,19 +145,19 @@ contains
         t = (time_periodized-dble(j1-1)*dt) /dt
 
         ! values of hermite interpolant
-        h00 = (1.d0+2.d0*t)*((1.d0-t)**2)
-        h10 = t*((1.d0-t)**2)
-        h01 = (t**2)*(3.d0-2.d0*t)
-        h11 = (t**2)*(t-1.d0)
+        h00 = (1.0_rk+2.0_rk*t)*((1.0_rk-t)**2)
+        h10 = t*((1.0_rk-t)**2)
+        h01 = (t**2)*(3.0_rk-2.0_rk*t)
+        h11 = (t**2)*(t-1.0_rk)
 
         ! function value
         u = h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2)
 
         ! derivative values of basis functions
-        h00 = 6.d0*t**2 - 6.d0*t
-        h10 = 3.d0*t**2 - 4.d0*t + 1.d0
-        h01 =-6.d0*t**2 + 6.d0*t
-        h11 = 3.d0*t**2 - 2.d0*t
+        h00 = 6.0_rk*t**2 - 6.0_rk*t
+        h10 = 3.0_rk*t**2 - 4.0_rk*t + 1.0_rk
+        h01 =-6.0_rk*t**2 + 6.0_rk*t
+        h11 = 3.0_rk*t**2 - 2.0_rk*t
 
         ! function derivative value
         u_dt = (h00*ai(j1) + h10*dt*bi(j1) + h01*ai(j2) + h11*dt*bi(j2) ) / dt
@@ -272,33 +273,33 @@ contains
     end function startup_conditioner
 
     !==========================================================================
-      !> \brief This subroutine returns the value f of a smooth step function \n
-      !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
-      !> h is the semi-size of the smoothing area, so \n
-      !> f is 1 if delta<=0-h \n
-      !> f is 0 if delta>0+h \n
-      !> f is variable (smooth) in between
-      !> \details
-      !> \image html maskfunction.bmp "plot of chi(delta)"
-      !> \image latex maskfunction.eps "plot of chi(delta)"
-        function smoothstep1(delta,h)
-          use module_precision
-          implicit none
-          real(kind=rk), intent(in)  :: delta,h
-          real(kind=rk)              :: smoothstep1,f
-          !-------------------------------------------------
-          ! cos shaped smoothing (compact in phys.space)
-          !-------------------------------------------------
-          if (delta<=-h) then
+    !> \brief This subroutine returns the value f of a smooth step function \n
+    !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if delta<=0-h \n
+    !> f is 0 if delta>0+h \n
+    !> f is variable (smooth) in between
+    !> \details
+    !> \image html maskfunction.bmp "plot of chi(delta)"
+    !> \image latex maskfunction.eps "plot of chi(delta)"
+    function smoothstep1(delta,h)
+        use module_precision
+        implicit none
+        real(kind=rk), intent(in)  :: delta,h
+        real(kind=rk)              :: smoothstep1,f
+        !-------------------------------------------------
+        ! cos shaped smoothing (compact in phys.space)
+        !-------------------------------------------------
+        if (delta<=-h) then
             f = 1.0_rk
-          elseif ( -h<delta .and. delta<+h  ) then
+        elseif ( -h<delta .and. delta<+h  ) then
             f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-          else
+        else
             f = 0.0_rk
-          endif
+        endif
 
-          smoothstep1=f
-        end function smoothstep1
+        smoothstep1=f
+    end function smoothstep1
     !==========================================================================
 
 
@@ -336,11 +337,16 @@ contains
 
         character (len=*), intent(in) :: fname
         logical :: exist1
+        integer :: mpirank, mpicode
 
-        inquire ( file=fname, exist=exist1 )
-        if ( exist1 .eqv. .false.) then
-            write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
-            call abort( 191919, "File not found...."//trim(adjustl(fname)) )
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            inquire ( file=fname, exist=exist1 )
+            if ( exist1 .eqv. .false.) then
+                write (*,'("ERROR! file: ",A," not found")') trim(adjustl(fname))
+                call abort( 191919, "File not found...."//trim(adjustl(fname)) )
+            endif
         endif
 
     end subroutine check_file_exists
@@ -391,72 +397,576 @@ contains
         enddo
     end subroutine
 
+
+
+
     !-------------------------------------------------------------------------------
     ! runtime control routines
     ! flusi regularily reads from a file runtime_control.ini if it should do some-
     ! thing, such as abort, reload_params or save data.
     !-------------------------------------------------------------------------------
     subroutine Initialize_runtime_control_file()
-      ! overwrites the file again with the standard runtime_control file
-      implicit none
+        ! overwrites the file again with the standard runtime_control file
+        implicit none
+        integer :: mpirank, mpicode
+        character(len=80) :: file
 
-      open  (14,file='runtime_control',status='replace')
-      write (14,'(A)') "# This is wabbit's runtime control file"
-      write (14,'(A)') "# Stop the run but makes a backup first"
-      write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
-      write (14,'(A)') "#       runtime_control=save_stop;"
-      write (14,'(A)') ""
-      write (14,'(A)') "[runtime_control]"
-      write (14,'(A)') "runtime_control=nothing;"
-      close (14)
+        file = "runtime_control"
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            open  (14,file=file, status='replace')
+            write (14,'(A)') "# This is wabbit's runtime control file"
+            write (14,'(A)') "# Stops the run but makes a backup first"
+            write (14,'(A)') "# Memory is properly dealloacted, unlike KILL"
+            write (14,'(A)') "#       runtime_control=save_stop;"
+            write (14,'(A)') ""
+            write (14,'(A)') "[runtime_control]"
+            write (14,'(A)') "runtime_control=nothing;"
+            close (14)
+        endif
 
     end subroutine Initialize_runtime_control_file
 
 
     logical function runtime_control_stop(  )
-      ! reads runtime control command
-      use module_ini_files_parser_mpi
+        ! reads runtime control command
+        use module_ini_files_parser_mpi
+        implicit none
+        character(len=80) :: command
+        character(len=80) :: file
+        type(inifile) :: CTRL_FILE
+        logical :: exists
+        integer :: mpirank, mpicode
+
+        file ="runtime_control"
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            inquire(file=file, exist=exists)
+            if (.not. exists) then
+                call Initialize_runtime_control_file()
+            endif
+        endif
+
+        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+        if (.not. exists) then
+            runtime_control_stop = .false.
+            return
+        endif
+
+        ! root reads in the control file
+        ! and fetched the command
+        call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
+        call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
+        call clean_ini_file_mpi( CTRL_FILE )
+
+        if (command == "save_stop") then
+            runtime_control_stop = .true.
+        else
+            runtime_control_stop = .false.
+        endif
+
+    end function runtime_control_stop
+
+
+    ! source: http://fortranwiki.org/fortran/show/String_Functions
+    FUNCTION str_replace_text (s,text,rep)  RESULT(outs)
+        CHARACTER(*)        :: s,text,rep
+        CHARACTER(LEN(s)+100) :: outs     ! provide outs with extra 100 char len
+        INTEGER             :: i, nt, nr
+
+        outs = s ; nt = LEN_TRIM(text) ; nr = LEN_TRIM(rep)
+        DO
+            i = INDEX(outs,text(:nt)) ; IF (i == 0) EXIT
+            outs = outs(:i-1) // rep(:nr) // outs(i+nt:)
+        END DO
+    END FUNCTION str_replace_text
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief remove (multiple) blancs as separators in a string
+    subroutine merge_blanks(string_merge)
+        ! this routine removes blanks at the beginning and end of an string
+        ! and multiple blanks which are right next to each other
+
+        implicit none
+        character(len=*), intent(inout) :: string_merge
+        integer(kind=ik) :: i, j, len_str, count
+
+        len_str = len(string_merge)
+        count = 0
+
+        string_merge = string_merge
+        do i=1,len_str-1
+            if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
+                count = count + 1
+                string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+            end if
+        end do
+
+        string_merge = adjustl(string_merge)
+
+    end subroutine merge_blanks
+
+    !-------------------------------------------------------------------------!
+    !> @brief count number of vector elements in a string
+    subroutine split_string(string_in, string_list, separator_optional)
+        ! only to be used after merged blaks
+        ! this routine splits a string for given seperator (optional)
+        ! if seperator is not given then the routine looks for ";" " " or ","
+
+        implicit none
+        character(len=1) :: separator
+        character(len=1), intent(in), optional :: separator_optional
+        character(len=*), intent(in) :: string_in
+        character(len=*),allocatable, intent(out) :: string_list(:)
+        integer(kind=ik) :: j,i, l_string, count_separator, n_elements
+        character(len=len_trim(adjustl(string_in))):: string_trim
+
+        string_trim = trim(adjustl( string_in ))
+        call merge_blanks(string_trim)
+        string_trim = trim(adjustl( string_trim ))
+
+        l_string = len_trim(string_trim)
+
+        ! we now have reduced the number of b blanks to at most one at the time: "hdj    aa" => "hdj aa"
+        ! NOW: we figure out if the values are separated by spaces " " or commas "," or ";"
+        if (present(separator_optional)) then
+          separator = separator_optional
+        else
+          separator = " "
+          if (index(string_trim, ",") /= 0) separator=","
+          if (index(string_trim, ";") /= 0) separator=";"
+        endif
+
+        if (.not. allocated(string_list)) then
+          call count_entries(string_trim, n_elements, separator)
+          allocate(string_list(n_elements))
+        endif
+
+        count_separator=0
+        j=1
+        do i = 1, l_string
+            if (string_trim(i:i) == separator) then
+                count_separator = count_separator + 1
+                string_list(count_separator) = trim(adjustl(string_trim(j:i-1)))
+                j = i + 1
+            end if
+        end do
+        count_separator = count_separator + 1
+        string_list(count_separator) = trim(adjustl(string_trim(j:)))
+
+      end subroutine split_string
+
+    !-------------------------------------------------------------------------!
+    !> @brief count number of vector elements in a string
+    subroutine count_entries(string_cnt, n_entries, separator_optional)
+        ! only to be used after merged blaks
+        ! this routine counts the separators and gives back this value +1
+
+        implicit none
+        character(len=1) :: separator
+        character(len=1), intent(in), optional :: separator_optional
+        character(len=*), intent(in) :: string_cnt
+        integer(kind=ik), intent(out) :: n_entries
+        integer(kind=ik) :: count_separator, i, l_string
+        character(len=len_trim(adjustl(string_cnt))):: string_trim
+
+        string_trim = trim(adjustl( string_cnt ))
+        call merge_blanks(string_trim)
+        string_trim = trim(adjustl( string_trim ))
+
+        l_string = len_trim(string_trim)
+
+        ! we now have reduced the number of b blanks to at most one at the time: "hdj    aa" => "hdj aa"
+        ! NOW: we figure out if the values are separated by spaces " " or commas "," or ";"
+        if (present(separator_optional)) then
+          separator = separator_optional
+        else
+          separator = " "
+          if (index(string_trim, ",") /= 0) separator=","
+          if (index(string_trim, ";") /= 0) separator=";"
+        endif
+
+        count_separator = 0
+        do i = 1, l_string
+            if (string_trim(i:i) == separator) then
+                count_separator = count_separator + 1
+            end if
+        end do
+
+        n_entries = count_separator + 1
+
+    end subroutine count_entries
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_str( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        character(len=*), intent(in) :: default
+        character(len=80), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+
+        value = default
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            ! is the string '--name=' in the argument?
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                ! remove the string '--name='
+                value = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove quotation marks, if any
+                value = str_replace_text( value, '"', '')
+
+                if (rank == 0) then
+                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
+                endif
+
+                return
+            endif
+
+        enddo
+
+        if (rank == 0) then
+            write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
+        endif
+
+    end subroutine
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_str_vct( name, value )
+        implicit none
+        character(len=*), intent(in) :: name
+        character(len=80), intent(out), ALLOCATABLE :: value(:)
+
+        integer :: i, rank, ierr, n, k
+        character(len=600) :: args
+        character(len=10) :: frmt
+
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
+        do i = 1, command_argument_count()
+            call get_command_argument(i, args)
+
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                ! remove the string "--name="
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove str delimiter "
+                args = str_replace_text( args, '"', '')
+                ! count number of vector entries
+                call count_entries(args, n)
+
+                allocate( value(1:n) )
+
+                if (n == 1) then
+                    read(args, '(A)') value(1)(:)
+                else
+                    ! previous version using only read(args,*) value doesnt work with filepaths
+                    ! because fortran interprets / as the end of string
+                    call split_string(args,value)
+                end if
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
+                    !write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
+                    write(*,'(A,1x)') ( trim(adjustl(value(1))), k=1, n)
+                endif
+
+                return
+            endif
+
+        enddo
+
+    end subroutine
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_int( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        integer(kind=ik), intent(in) :: default
+        integer(kind=ik), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                args = str_replace_text( args, '"', '')
+
+                read(args, *, iostat=iostat) value
+
+                if (iostat /= 0) then
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(200302018, "Failed to convert to INTEGER.")
+                endif
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
+                endif
+
+                return
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",i8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    subroutine get_cmd_arg_dbl( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        real(kind=rk), intent(in) :: default
+        real(kind=rk), intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                args = str_replace_text( args, '"', '')
+
+                read(args, *, iostat=iostat) value
+
+                if (iostat /= 0) then
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(200302017, "Failed to convert to DOUBLE.")
+                endif
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
+                endif
+
+                return
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+
+    !---------------------------------------------------------------------------
+    ! Command-line argument parser. You can parse stuff like:
+    ! ./program --hallo=10.4
+    ! ./program --deine="10.4"
+    ! ./program --mutter="ux_00.h5, uy_00.h5"
+    ! ./program --vater="ux_00.h5,uy_00.h5"
+    ! ./program --kind="ux_00.h5 uy_00.h5"
+    !---------------------------------------------------------------------------
+    ! There is no "ordering" so the args can be put in any order when calling the program.
+    ! You can pass a default value which is used if the parameter is not given in the call.
+    ! The parser removes quotes " from the data
+    !---------------------------------------------------------------------------
+    ! The case logical is special:
+    ! --name=1
+    ! --name=[yes, 1, true, TRUE, .true.]
+    ! --name
+    ! are identical and return true.
+    !---------------------------------------------------------------------------
+    ! Form in command line:
+    ! --name=3.0    (returns 3.0)
+    ! alternatively:
+    ! --name="3.0, 7.0"  (returns 3.0, 7.0) (remove delimiters)
+    !---------------------------------------------------------------------------
+    subroutine get_cmd_arg_bool( name, value, default )
+        implicit none
+        character(len=*), intent(in) :: name
+        logical, intent(in) :: default
+        logical, intent(out) :: value
+
+        integer :: i, rank, ierr
+        character(len=120) :: args
+        integer :: iostat
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+        ! loop over all command line arguments (therefore, the orderng does not matter)
+        ! this may be not the most efficient way, but command line parsing is done only
+        ! once on startup, hence performance does not matter.
+        do i = 1, command_argument_count()
+            call get_command_argument(i,args)
+
+            ! is the string '--name=' in the argument?
+            if (index(args, trim(adjustl(name))//"=") /= 0) then
+                ! remove the string '--name='
+                args = str_replace_text( args, trim(adjustl(name))//"=", "")
+                ! remove quoatiion marks, if any
+                args = str_replace_text( args, '"', '')
+                ! now args is just the substring left of the '=' sign.
+
+                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.") then
+                    value = .true.
+                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.") then
+                    value = .false.
+                else
+                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    call abort(200302017, "Failed to convert to LOGICAL.")
+                endif
+
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                endif
+
+                return
+
+
+            elseif ( args == name ) then
+                ! in the case of logical, we can also call '--name', which also returns TRUE.
+                value = .true.
+
+                if (rank == 0) then
+                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                endif
+
+                return
+            endif
+
+        enddo
+
+        value = default
+        if (rank == 0) then
+            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+        endif
+
+    end subroutine
+
+    ! this routine simply prints the entire command line call with all arguments.
+    ! that is a useful part of documentation (to recall later what parameters were
+    ! used). Used mostly for postprocessing, but WABBIT also uses it.
+    subroutine print_command_line_arguments()
+        implicit none
+        integer :: i, rank, ierr
+        character(len=120) :: args
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+        if (rank == 0) then
+            write(*,'(80("~"))')
+            write(*,*) "INFORMATION: The command line call was:"
+            write(*,'(80("~"))')
+
+            do i = 0, command_argument_count()
+                call get_command_argument(i,args)
+                write(*,'(A,1x)', advance="no") trim(adjustl(args))
+            enddo
+            write(*,*) " "
+
+            write(*,'(80("~"))')
+        endif
+
+    end subroutine
+
+    !-------------------------------------------------------------------------------
+    ! Truncate = round a real number to one significant digit, i.e. from 1.246262e-2
+    ! to 1.2e-2. This slightly modifies the CFL condition (if the time step is
+    ! dictated by CFL and not by penalization), but allows to keep the time step
+    ! constant over more time steps, which is more efficient.
+    !-------------------------------------------------------------------------------
+    real(kind=rk) function round_one_digit(a)
       implicit none
-      character(len=80) :: command
-      character(len=80) :: file
-      type(inifile) :: CTRL_FILE
 
-      file ="runtime_control"
+      real(kind=rk),intent(in)::a
+      character(len=9) :: str
+      integer :: iostat
 
-      ! root reads in the control file
-      ! and fetched the command
-      call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
-      call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
-      call clean_ini_file_mpi( CTRL_FILE )
+      write (str,'(es9.1)') a
+      read (str,*, iostat=iostat) round_one_digit
 
-      if (command == "save_stop") then
-          runtime_control_stop = .true.
-      else
-          runtime_control_stop = .false.
-      endif
-  end function runtime_control_stop
+      if (iostat /= 0) write(*,*) a, str
+    end function
 
- !-------------------------------------------------------------------------------
- !> This function computes the max norm of each vector component.
- !>   \f$ (\vec{u}_{max})_n = \mathrm{max}_{\vec{x}\in\Omega_\mathrm{Block}}(|u_n(\vec{x})|) \f$ for \f$n=1,\dots, N_\mathrm{eqn}\f$
- !-------------------------------------------------------------------------------
-  subroutine component_wise_max_norm( block_data, block_norm)
-     implicit none
-     !------------------------------------------------------------------------
-     !> heavy data - this routine is called on one block only,
-     !> not on the entire grid. hence th 4D array.
-     real(kind=rk), intent(in)    :: block_data(:, :, :, :)
-     !> norm of the block
-     real(kind=rk), intent(inout) :: block_norm(:)
-     !------------------------------------------------------------------------
-     integer(kind=ik) :: n_eqn, n
-
-     n_eqn = size(block_data,4)
-
-     do n= 1, n_eqn
-       block_norm(n) = maxval(abs(block_data(:,:,:,n)) )
-     end do
-
-  end subroutine
 
 end module module_helpers

@@ -34,6 +34,8 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
     ! loop variables
     integer(kind=ik) :: ix, iy
 
+    if (.not. params_acm%initialized) write(*,*) "WARNING: sponge_2D called but ACM not initialized"
+
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
         do iy = g+1, Bs(2)+g
@@ -91,9 +93,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
     ! auxiliary variables
-    real(kind=rk)     :: x, y, z, tmp, p, offset
+    real(kind=rk)     :: x, y, z, tmp, p, offset, pinv
     ! loop variables
     integer(kind=ik)  :: ix, iy, iz
+
+    if (.not. params_acm%initialized) write(*,*) "WARNING: sponge_3D called but ACM not initialized"
 
 
     if (params_acm%sponge_type == "rect") then
@@ -136,17 +140,18 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         endif
 
         p = params_acm%p_sponge
+        pinv = 1.0_rk / p
         offset = 0.5_rk * params_acm%domain_size(1)
 
         do iz = g+1, Bs(3)+g
-            z = dble(iz-(g+1)) * dx(3) + x0(3) - offset
+            z = (dble(iz-(g+1)) * dx(3) + x0(3) - offset)**p
             do iy = g+1, Bs(2)+g
-                y = dble(iy-(g+1)) * dx(2) + x0(2) - offset
+                y = (dble(iy-(g+1)) * dx(2) + x0(2) - offset)**p
                 do ix = g+1, Bs(1)+g
-                    x = dble(ix-(g+1)) * dx(1) + x0(1) - offset
+                    x = (dble(ix-(g+1)) * dx(1) + x0(1) - offset)**p
 
                     ! distance to borders of domain
-                    tmp = -( (x**p + y**p + z**p)**(1.0_rk/p) - offset)
+                    tmp = -( (x + y + z)**pinv - offset)
 
                     sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
                     0.5_rk*params_acm%L_sponge)

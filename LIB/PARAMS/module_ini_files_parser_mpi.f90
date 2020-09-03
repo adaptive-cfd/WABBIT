@@ -165,6 +165,7 @@ contains
         logical, intent(in) :: verbose
         logical, optional, intent(in) ::  remove_comments
         integer :: mpirank, mpicode
+        logical :: exists
 
         ! check if communicator is set
         if (WABBIT_COMM==-1) then
@@ -175,6 +176,14 @@ contains
         call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
 
         if (mpirank==0) then
+            inquire ( file=file, exist=exists )
+
+            ! check if the specified file exists
+            if (.not. exists) then
+              write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
+              call abort(30302020,"INI file not found")
+            endif
+
             if (present(remove_comments)) then
                 call read_ini_file( PARAMS, file, verbose, remove_comments )
             else

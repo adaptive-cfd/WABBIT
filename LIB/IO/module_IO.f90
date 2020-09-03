@@ -16,10 +16,6 @@
 ! ********************************************************************************************
 
 module module_IO
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     use hdf5
     ! global parameters
@@ -40,35 +36,17 @@ module module_IO
     use module_ini_files_parser_mpi
 
     use module_helpers, only : check_file_exists, block_contains_NaN
-    use module_mask
+    use module_forest
 
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
-
 contains
 
-    ! create list of active blocks (light data)
-#include "save_data.f90"
-
-    ! write fields to disk
 #include "write_field.f90"
-
-    ! read mesh properties and time from input file
 #include "read_mesh.f90"
-
-    ! read field from input file
 #include "read_field.f90"
-
 #include "read_attributes.f90"
-
 #include "read_file_flusi.f90"
 #include "forest_IO.f90"
 

@@ -27,6 +27,7 @@ module module_params
     use module_ini_files_parser_mpi
     ! MPI general bridge module
     use module_bridge
+    use module_helpers
 
     use module_t_files
 !---------------------------------------------------------------------------------------------
@@ -59,7 +60,7 @@ module module_params
         ! data writing frequency
         character(len=80)                            :: write_method="fixed_time"
         ! data writing frequency
-        real(kind=rk)                                :: write_time=0.1_rk
+        real(kind=rk)                                :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk
         ! data next write time, store here the next time for output data
         real(kind=rk)                                :: next_write_time=0.0_rk
         ! this number is used when generating random grids.
@@ -76,6 +77,7 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
         logical                                      :: eps_normalized=.false.
+        character(len=80) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
         logical :: harten_multiresolution = .true.
@@ -112,7 +114,8 @@ module module_params
         logical :: ghost_nodes_redundant_point_coarseWins = .true.
 
         ! switch for mesh adaption
-        logical                                      :: adapt_mesh=.false., adapt_inicond=.false.
+        logical :: adapt_mesh=.false., adapt_inicond=.false.
+        logical :: out_of_memory = .false.
         ! number of allocated heavy data fields per process
         integer(kind=ik)                             :: number_blocks=0_ik
         ! number of allocated data fields in heavy data array, number of fields

@@ -68,7 +68,7 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "       for 3D data:"
         write(*,*) "       ./wabbit-post --flusi-to-wabbit mask_00000.h5 wabbit_000000000.h5 33 33 33"
         write(*,*) "       for 2D data:"
-        write(*,*) "       ./wabbit-post --flusi-to-wabbit mask_00000.h5 wabbit_000000000.h5 33 33 1"
+        write(*,*) "       ./wabbit-post --flusi-to-wabbit --input=mask_00000.h5 --output=wabbit_000000000.h5 --Bs=33"
         write(*,*) ""
         write(*,*) "NOTES: * Even though anisotropic resolution would be possible, it is not implemented yet"
         write(*,*) "       * The blocksize BS is isotropic"
@@ -77,23 +77,12 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     end if
 
+    call get_cmd_arg( "--input", file_in, default="none" )
+    call get_cmd_arg( "--output", file_out, default="none" )
+    call get_cmd_arg( "--bs", Bs(1), default=33 )
 
-    ! get values from command line (filename and desired blocksize)
     call check_file_exists(trim(file_in))
-    call get_command_argument(3, file_out)
 
-    ! /todo to be checked (l66-72)
-
-    call get_command_argument(4, dummy)
-    read(dummy,*) Bs(1)
-    call get_command_argument(5, dummy)
-    read(dummy,*) Bs(2)
-    call get_command_argument(6, dummy)
-    read(dummy,*) Bs(3)
-    if (mod(Bs(1),2)==0 .or. mod(Bs(2),2)==0 .or. mod(Bs(3),2)==0) then
-        write(*,*) Bs
-        call abort(7844, "ERROR: For WABBIT we need an odd blocksize!")
-    endif
 
     ! read attributes such as number of discretisation points, time, domain size
     call get_attributes_flusi(file_in, nxyz, time, domain)
@@ -114,6 +103,8 @@ subroutine flusi_to_wabbit(params)
         !-----------------------------------------------------------------------
         params%dim = 3
 
+        bs(1:params%dim) = bs(1)
+
         if (mod(nxyz(1),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
         if (mod(nxyz(2),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
         if (mod(nxyz(3),2)/=0) call abort(8324, "ERROR: nx, ny, nz need to be even!")
@@ -123,6 +114,8 @@ subroutine flusi_to_wabbit(params)
         ! 2D
         !-----------------------------------------------------------------------
         params%dim = 2
+        bs(1:params%dim) = bs(1)
+        bs(3) = 1
 
         ! there is a goofy shift. in flusi, 2D runs ALWAYS need to set the x-direction to
         ! 1 point (that is a memory consistency requirement)
@@ -154,7 +147,7 @@ subroutine flusi_to_wabbit(params)
     endif
 
     ! this would actually now be possible but needs to be implemented:
-    !if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
+    if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
     do k = 1, params%dim
         if (mod(nxyz(k),(Bs(k)-1)) /=0 ) then

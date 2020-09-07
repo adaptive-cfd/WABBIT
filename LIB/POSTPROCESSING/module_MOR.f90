@@ -489,11 +489,11 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1_ik
-    lgt_n = 0_ik ! reset number of acitve light blocks
     tree_n= 0_ik ! reset number of trees in forest
     !----------------------------------
     ! READ ALL SNAPSHOTS
@@ -865,8 +865,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
@@ -1205,7 +1206,7 @@ contains
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
-    logical :: verbosity = .false., save_all = .false.
+    logical :: verbosity = .false., save_all
 
     rank = params%rank
     call get_command_argument(2, args)
@@ -1244,7 +1245,7 @@ contains
     read(args(1:len_trim(args)-2),* ) maxmem
     call get_cmd_arg( "--save_all", save_all, default=.true.)
     call get_cmd_arg( "--components", n_components, default=1_ik)
-    call get_cmd_arg( "--iteration", iteration, default=1_ik)
+    call get_cmd_arg( "--iteration", iteration, default=-1_ik)
     call get_cmd_arg( "--nmodes", N_modes_used, default=1_ik)
 
 
@@ -1364,11 +1365,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
 
-    do tree_id = 1, fsize
-    call reset_forest(lgt_block, lgt_active(:, tree_id), &
-              params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
-    enddo
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -1821,8 +1820,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks

@@ -69,8 +69,11 @@ ln -s $curdir/../wabbit
 ln -s $curdir/../wabbit-post
 ln -s $curdir/create_ref_files.sh
 
-
-$mpi ./wabbit $inifile ${memory}
+if [[ $inifile == "pod.sh" ]]; then
+    sh $inifile
+else
+    $mpi ./wabbit $inifile ${memory}
+fi
 
 ./create_ref_files.sh
 

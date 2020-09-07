@@ -5,27 +5,23 @@
 #-------------------------------------------------------------------------------
 # what parameter file
 dir="./TESTING/wabbit_post/pod/"
-params=${dir}"insect.ini"
 happy=0
 sad=0
 echo "testing wabbit_post -POD"
 
 # list of prefixes the test generates
-prefixes=(mode1 mode2 mode3)
+prefixes=(u mode1 reconst1-005)
 # list of possible times (no need to actually have them)
-times=(000000000001 000000000002 000000000003 )
+times=( 000000000001 000000000002 000000000010 000000000012)
 
 # run actual test
-cp $dir/bumblebee_new_kinematics.ini .
-${mpi_command} ./wabbit ${params} ${memory}
-${mpi_command} ./wabbit-post --POD --components=3 --adapt=0.1 --nmodes=3 --list ${dir}ux_list.txt ${dir}uy_list.txt ${dir}uz_list.txt ${memory}
-rm bumblebee_new_kinematics.ini
+sh ${dir}/pod.sh $dir
 
 echo "============================"
 echo "run done, analyzing data now"
 echo "============================"
 
-# loop over all HDF5 files and generate keyvalues using wabbit
+# loop over all HDF5 files and generate TESTING/wabbit_post/pod/pod_test.shkeyvalues using wabbit
 for p in ${prefixes[@]}
 do
   for t in ${times[@]}

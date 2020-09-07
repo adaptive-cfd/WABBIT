@@ -46,9 +46,13 @@ module module_insects
   ! this will hold the surface markers and their normals used for particles:
   real(kind=rk), allocatable, dimension(:,:) :: particle_points
   ! wing thickness profile
-  real(kind=rk), allocatable, dimension(:,:) :: wing_thickness_profile
+  real(kind=rk), allocatable, dimension(:,:,:) :: wing_thickness_profile
+  ! wing thickness profile array dimensions
+  integer, dimension(1:4), save :: wing_thickness_a, wing_thickness_b
   ! wing corrugation profile
-  real(kind=rk), allocatable, dimension(:,:) :: corrugation_profile
+  real(kind=rk), allocatable, dimension(:,:,:) :: corrugation_profile
+  ! wing corrugation profile array dimensions
+  integer, dimension(1:4), save :: corrugation_a, corrugation_b
 
   ! wing signed distance function, if the 3d-interpolation approach is used.
   ! This is useful for highly complex wings, where one generates the mask only once
@@ -208,7 +212,7 @@ module module_insects
     character(len=strlen) :: pointcloudfile = "none"
     character(len=strlen) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
     logical :: corrugated(1:4) = .false.
-    real(kind=rk) :: corrugation_array_bbox(1:4)
+    real(kind=rk) :: corrugation_array_bbox(1:4,1:4)
     logical :: bristles(1:4) = .false.
     logical :: bristles_simplex(1:4) = .false.
     integer :: n_bristles(1:4)
@@ -298,12 +302,40 @@ contains
     character(len=*), intent(in) :: array_name
     integer, intent(in) :: a, b
     type(diptera), intent(inout) :: Insect
+    integer :: a_old, b_old
+    real(kind=rk), allocatable, dimension(:,:,:) :: profile_tmp
 
     select case ( array_name )
     case ("wing_thickness_profile")
-        if (.not.allocated(wing_thickness_profile)) allocate(wing_thickness_profile(1:a,1:b))
+        if (.not.allocated(wing_thickness_profile)) then 
+            allocate(wing_thickness_profile(1:a,1:b,1:4))
+        else
+            a_old = size(wing_thickness_profile,1)
+            b_old = size(wing_thickness_profile,2)
+            if ( (a_old<a) .or. (b_old<b) ) then
+                allocate(profile_tmp(1:a_old,1:b_old,1:4))
+                profile_tmp(:,:,:) = wing_thickness_profile(:,:,:)
+                deallocate(wing_thickness_profile)
+                allocate(wing_thickness_profile(1:a,1:b,1:4))
+                wing_thickness_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+                deallocate(profile_tmp)
+            endif
+        endif
     case ("corrugation_profile")
-        if (.not.allocated(corrugation_profile)) allocate(corrugation_profile(1:a,1:b))
+        if (.not.allocated(corrugation_profile)) then
+            allocate(corrugation_profile(1:a,1:b,1:4))
+        else
+            a_old = size(corrugation_profile,1)
+            b_old = size(corrugation_profile,2)
+            if ( (a_old<a) .or. (b_old<b) ) then
+                allocate(profile_tmp(1:a_old,1:b_old,1:4))
+                profile_tmp(:,:,:) = corrugation_profile(:,:,:)
+                deallocate(corrugation_profile)
+                allocate(corrugation_profile(1:a,1:b,1:4))
+                corrugation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+                deallocate(profile_tmp)
+            endif
+        endif
     case default
     endselect
 

@@ -170,29 +170,28 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
       ! if all other options fail, we still might load coefficients from file:
       wingshape_str = Insect%WingShape(wingID)
 
-      ! we assume the default to be defined in fourier coefficients, the subroutine
-      ! yells if it does not recongnize the wing.
-      select case (Insect%wing_file_type(wingID))
-      case ("fourier")
-          ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
-          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          ! we assume the default to be defined in fourier coefficients, the subroutine
+          ! yells if it does not recongnize the wing.
+          select case (Insect%wing_file_type(wingID))
+          case ("fourier")
+              ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
+              call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
           x_pivot_b,rot_rel_wing_w, side)
 
       case ("fourierY")
           ! fourier series for the y coordinate (used for the blade of a bristled wing)
           call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-          x_pivot_b,rot_rel_wing_w)
+              x_pivot_b,rot_rel_wing_w)
 
-      case ("kleemeier")
-          ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
-          ! membrane is bad for the fourier series.
-          call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-          x_pivot_b,rot_rel_wing_w)
+          case ("kleemeier")
+              ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
+              ! membrane is bad for the fourier series.
+              call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+              x_pivot_b,rot_rel_wing_w)
 
           case default
               call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
           end select
-      ! end if
 
   end select
 
@@ -855,7 +854,7 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
   real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3)
   real(kind=rk) :: R, R0, R_tmp
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, y_left, y_right
-  real(kind=rk) :: v_tmp(1:3), mask_tmp, theta, x_top, x_bot
+  real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
 
   ! wing shape (determine between which x-values (x_bot, x_top) the wing is
   ! these values depend on the spanwise direction (which is y)
@@ -866,67 +865,66 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
   y_left = 0.0d0
 
   do iz = g, size(mask,3)-1-g
-      x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-      do iy = g, size(mask,2)-1-g
-          x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-          do ix = g, size(mask,1)-1-g
-              x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+    x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+    do iy = g, size(mask,2)-1-g
+      x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+      do ix = g, size(mask,1)-1-g
+        x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
-              !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+        !-- define the various coordinate systems we are going to use
+        if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
-              x_body = matmul(M_body,x)
-              x_wing = matmul(M_wing,x_body-x_pivot_b)
+        x_body = matmul(M_body,x)
+        x_wing = matmul(M_wing,x_body-x_pivot_b)
 
-              ! spanwise length:
+        ! spanwise length:
               if ((x_wing(2)>=y_left-Insect%safety).and.(x_wing(2)<=y_right+Insect%safety)) then
-                  ! thickness: (note left and right wing have a different orientation of the z-axis
-                  ! but this does not matter since this is the same.
-                  if (dabs(x_wing(3))<=0.5*Insect%WingThickness + Insect%safety) then
+          ! thickness: (note left and right wing have a different orientation of the z-axis
+          ! but this does not matter since this is the same.
+          if (dabs(x_wing(3))<=0.5*Insect%WingThickness + Insect%safety) then
 
-                      ! in the x-direction, the actual wing shape plays.
-                      if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
-                          !-- smooth length
+            ! in the x-direction, the actual wing shape plays.
+            if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
+              !-- smooth length
                           if ( x_wing(2) < 0.5d0*(y_left+y_right) ) then
                               y_tmp = steps(-(x_wing(2)-y_left), 0.d0, Insect%smooth)
-                          else
+              else
                               y_tmp = steps( (x_wing(2)-y_left), y_right-y_left, Insect%smooth)
-                          endif
+              endif
 
-                          !-- smooth height
-                          z_tmp = steps(dabs(x_wing(3)),0.5d0*Insect%WingThickness, Insect%smooth) ! thickness
+              !-- smooth height
+              z_tmp = steps(dabs(x_wing(3)), 0.5d0*Insect%WingThickness, Insect%smooth) ! thickness
 
-                          !-- smooth shape
-                          if (x_wing(1) < 0.d0) then
-                              x_tmp = steps(-x_wing(1),-x_bot, Insect%smooth)
-                          else
-                              x_tmp = steps( x_wing(1), x_top, Insect%smooth)
-                          endif
+              !-- smooth shape
+              if (x_wing(1)<0.d0) then
+                x_tmp = steps(-x_wing(1),-x_bot, Insect%smooth)
+              else
+                x_tmp = steps( x_wing(1), x_top, Insect%smooth)
+              endif
 
-                          mask_tmp = z_tmp*y_tmp*x_tmp
+              mask_tmp = z_tmp*y_tmp*x_tmp
 
                           if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0d0)) then
-                              mask(ix,iy,iz) = mask_tmp
-                              mask_color(ix,iy,iz) = color_wing
-                              !------------------------------------------------
-                              ! solid body rotation
-                              ! Attention: the Matrix transpose(M) brings us back to the body
-                              ! coordinate system, not to the inertial frame. this is done in
-                              ! the main routine Draw_Insect
-                              !------------------------------------------------
-                              v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
-                              v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
-                              v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+                mask(ix,iy,iz) = mask_tmp
+                mask_color(ix,iy,iz) = color_wing
+                !------------------------------------------------
+                ! solid body rotation
+                ! Attention: the Matrix transpose(M) brings us back to the body
+                ! coordinate system, not to the inertial frame. this is done in
+                ! the main routine Draw_Insect
+                !------------------------------------------------
+                v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
+                v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
+                v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
 
-                              ! note we set this only if it is a part of the wing
-                              us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
-                          endif
-
-                      endif
-                  endif
+                ! note we set this only if it is a part of the wing
+                us(ix,iy,iz,1:3) = matmul(transpose(M_wing), v_tmp)
               endif
-          enddo
+            endif
+          endif
+        endif
       enddo
+    enddo
   enddo
 end subroutine draw_wing_rectangular
 
@@ -1828,7 +1826,7 @@ end subroutine Setup_Wing_Fourier_coefficients
 !-------------------------------------------------------------------------------
 subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
   implicit none
-  type(diptera), intent(inout) :: Insect
+  type(diptera),intent(inout) :: Insect
   character(len=*), intent(in) :: fname
 
   type(inifile) :: ifile
@@ -1907,7 +1905,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       else
          init_thickness = 0.05d0 ! This is the defauls value otherwise, because we may not know dx here
       endif
-
+      
       call read_param_mpi(ifile,"Wing","wing_thickness_value",Insect%WingThickness, init_thickness)
 
   elseif ( Insect%wing_thickness_distribution(wingID) == "variable") then
@@ -1936,7 +1934,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       Insect%n_bristles(wingID) = a
 
       ! check memory allocation
-      if ( .not. allocated(Insect%bristles_coords) ) then
+      if (.not. allocated(Insect%bristles_coords)) then
           allocate(Insect%bristles_coords(1:4, 1:a, 1:b)) ! four wings...
       elseif ( size(Insect%bristles_coords, 2) .ne. a ) then
           call abort(76237, " Unequal number of bristles not yet supported. Modify wing shape files.")
@@ -2045,7 +2043,7 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
     tmp = Insect%wing_bounding_box(6,wingID)
     Insect%wing_bounding_box(6,wingID) = -Insect%wing_bounding_box(5,wingID)
     Insect%wing_bounding_box(5,wingID) = -tmp
-  endif
+  end if
 
   if (root) then
     write(*,'("Effective (=the real surface) wing lengths are:")')

@@ -80,13 +80,13 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     lgt_n_old = 0
     iteration = 0
 
-    if(present(ignore_maxlevel)) then
+    if (present(ignore_maxlevel)) then
         ignore_maxlevel2 = ignore_maxlevel
     else
         ignore_maxlevel2 = .false.
     endif
 
-    if ( params%dim == 3 ) then
+    if (params%dim == 3) then
         max_neighbors = 56
     else
         max_neighbors = 12
@@ -196,6 +196,26 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             if (external_loop) exit ! exit loop
         endif
     end do
+
+    ! The grid adaptation is done now, the blocks that can be coarsened are coarser.
+    ! If a block is on Jmax now, we assign it the status +11.
+    !
+    ! NOTE: Consider two blocks, a coarse on Jmax-1 and a fine on Jmax. If you refine only
+    ! the coarse one (Jmax-1 -> Jmax), because you cannot refine the other one anymore
+    ! (by defintion of Jmax), then the redundant layer in both blocks is different.
+    ! To corrent that, you need to know which of the blocks results from interpolation and
+    ! which one has previously been at Jmax. This latter one gets the 11 status.
+    !
+    ! NOTE: If the flag ghost_nodes_redundant_point_coarseWins is true, then the +11 status is useless
+    ! because the redundant points are overwritten on the fine block with the coarser values
+    if ( .not. params%ghost_nodes_redundant_point_coarseWins ) then
+        do k = 1, lgt_n
+            lgt_id = lgt_active(k)
+            if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
+                lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
+            end if
+        end do
+    end if
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer

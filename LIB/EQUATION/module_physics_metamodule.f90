@@ -277,9 +277,9 @@ contains
 
 
 
-    !-----------------------------------------------------------------------------
-    ! Adaptation is dependent on the different physics application.
-    ! Every physics module can choose its own coarsening indicator.
+     !-----------------------------------------------------------------------------
+     ! Adaptation is dependent on the different physics application.
+     ! Every physics module can choose its own coarsening indicator.
     !-----------------------------------------------------------------------------
     subroutine PREPARE_THRESHOLDFIELD_meta( physics, time, u, g, x0, dx, &
                                             thresholdfield_block, mask, &

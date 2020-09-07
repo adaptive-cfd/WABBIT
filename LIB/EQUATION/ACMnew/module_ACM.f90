@@ -309,7 +309,7 @@ end subroutine
         ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
-    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
 
     dx_min = minval( ddx(1:params_acm%dim) )
     nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )

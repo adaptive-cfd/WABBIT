@@ -104,8 +104,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
                 dV2 = dV * 0.5_rk
 
                 iz = 1
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
+                    do ix = g+1, Bs(1)+g-1
                         ! note dV2 contains the 0.5 from energy as well as the spacing
                         params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) )
 
@@ -116,9 +116,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
                 dV = dx(1)*dx(2)*dx(3)
                 dV2 = dV * 0.5_rk
 
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+                    do iy = g+1, Bs(2)+g-1
+                        do ix = g+1, Bs(1)+g-1
                             ! note dV2 contains the 0.5 from energy as well as the spacing
                             params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) &
                             + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
@@ -245,8 +245,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     eps         = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
-    dx_inv  = 1.0_rk / dx(1)
-    dy_inv  = 1.0_rk / dx(2)
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 

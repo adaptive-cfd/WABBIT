@@ -78,13 +78,14 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling create_mask_tree if the mask is not stored is supposed
     ! to be small)
-    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, hvy_neighbor, &
-         hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
+        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+
 
     ! preparatory step. The physics modules have to copy everything they want to
     ! save to disk to the work array. missing qty's shall be computed.
     do k = 1, hvy_n(tree_ID_flow)
-        hvy_id = hvy_active(k, tree_ID_flow)
+        hvy_id = hvy_active(k,tree_ID_flow)
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
 
@@ -105,10 +106,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
     enddo
 
-    ! Derived qtys need to be sync'ed before saving (because the code saves on additional point, the first ghost node
-    ! which is equivalent to the old redundant node)
-    call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:params%N_fields_saved,:), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-
     ! actual saving step. one file per component.
     ! loop over components/qty's:
     do k = 1, params%N_fields_saved
@@ -123,7 +120,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         else
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
         endif
-
+        
         ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow))

@@ -74,6 +74,6 @@ $mpi ./wabbit $inifile ${memory}
 
 ./create_ref_files.sh
 
-rm -f *times.dat *.t *.dat *.xmf runtime* suc*
+rm -f *times.dat
 
 rm wabbit wabbit-post create_ref_files.sh

@@ -117,7 +117,7 @@ contains
     ! check if the file already exists
     call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
     if (mpirank==0) then
-        inquire ( file=filename, exist=exist )
+    inquire ( file=filename, exist=exist )
     endif
     call MPI_BCAST( exist, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
 

@@ -272,6 +272,24 @@ program main
         t2 = MPI_wtime()
 
         !***********************************************************************
+        ! check redundant nodes
+        !***********************************************************************
+        t4 = MPI_wtime()
+        if (params%check_redundant_nodes) then
+            ! run the internal test for the ghost nodes.
+            call check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), &
+            hvy_n(tree_ID_flow), test_failed)
+
+            if (test_failed) then
+                call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+                lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
+                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
+            endif
+        endif
+        call toc( "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
+
+
+        !***********************************************************************
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then
@@ -354,7 +372,7 @@ program main
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs)
+                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
                 lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
@@ -463,6 +481,21 @@ program main
 17  if (rank==0) write(*,*) "This is the end of the main time loop!"
 
 
+    !*******************************************************************
+    ! statistics ( last time )
+    !*******************************************************************
+    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        ! we need to sync ghost nodes for some derived qtys, for sure
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+
+        call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
+    endif
+
+
+    ! close and flush all existings *.t files
+    call close_all_t_files()
+
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -479,23 +512,6 @@ program main
         call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
     end if
-
-
-    !*******************************************************************
-    ! statistics ( last time )
-    !*******************************************************************
-    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
-        ! we need to sync ghost nodes for some derived qtys, for sure
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), n_ghosts=params%n_ghosts_rhs)
-
-        call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
-    endif
-
-
-    ! close and flush all existings *.t files
-    call close_all_t_files()
-
 
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)

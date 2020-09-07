@@ -74,8 +74,8 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
 
 
-    !> This routine sets the -1 coarsening flat on a block. it uses different methods to
-    !! decide where to coarsen, each act on one block. Note due to gradedness and completeness
+    !> This routine sets the -1 coarsening flag on a block. it uses different methods to
+    !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
     !! this status may be revoked later in the computation.
     select case (indicator)
     case ("everywhere")

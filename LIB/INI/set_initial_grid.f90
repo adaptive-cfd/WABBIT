@@ -189,6 +189,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         !---------------------------------------------------------------------------
         if (adapt) then
             if (params%rank==0) write(*,'("INIT: initial grid is adaptive")')
+
             ! we have to repeat the adapation process until the grid has reached a final
             ! state. Since we start on the coarsest level, in each iteration we cannot loose
             ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.

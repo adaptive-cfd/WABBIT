@@ -39,7 +39,7 @@ subroutine sparse_to_dense(params)
     character(len=2)                        :: level_in, order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: treecode_size, number_dense_blocks
+    integer(kind=ik)                        :: number_dense_blocks
 !-----------------------------------------------------------------------------------------------------
 
     call get_command_argument(2, file_in)
@@ -57,9 +57,9 @@ subroutine sparse_to_dense(params)
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
-            write(*,*) "  (default is the max treelevel of the source file) "
+            write(*,*) "  (default is the max treelevel of the source file) " 
             write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
-            write(*,*) "  (default is preditor order 4) "
+            write(*,*) "  (default is preditor order 4) " 
             write(*,*)
             write(*,*)
         end if
@@ -73,7 +73,7 @@ subroutine sparse_to_dense(params)
     if (len_trim(file_out)==0) then
       call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
-
+    
     ! check if optional arguments are specified
     if (command_argument_count()<4) then
       ! set defaults
@@ -169,50 +169,8 @@ subroutine sparse_to_dense(params)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-    ! refine/coarse to attain desired level, respectively
-    !coarsen
-    do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
-        ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = -1
-        end do
-        ! this might not be necessary since we start from an admissible grid
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
-
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, tree_ID=1)
-
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-    end do
-    ! refine
-    do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
-        ! check where refinement is actually needed
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = 1
-        end do
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
-        if ( params%dim == 3 ) then
-            ! 3D:
-            call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
-        else
-            ! 2D:
-            call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active, hvy_n )
-        end if
-
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    end do
-
-    call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1 )
+    call to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, target_level=level)
 
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
         hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)

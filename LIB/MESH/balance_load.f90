@@ -159,7 +159,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     t1 = MPI_wtime()
     ! proc_dist_id: process responsible for current part of sfc
     ! proc_data_id: process who stores data of sfc element
-
+            
     ! we start the loop on the root rank (0), then assign the first elements
     ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
     proc_dist_id = 0

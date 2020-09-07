@@ -35,6 +35,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
 
     real(kind=rk)      :: maxmem, mem_per_block
+    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)  :: memstring
     integer(kind=ik)   :: i
 
@@ -72,7 +73,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
 
-    nwork = max(2*Neqn, params%N_fields_saved)
+    nwork = max( 2*Neqn, params%N_fields_saved)
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -108,8 +109,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
@@ -118,7 +119,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                        mem_per_block = mem_per_block + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_work
@@ -129,8 +130,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
-                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) .and. params%N_mask_components>0  ) then
@@ -139,7 +140,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                        mem_per_block = mem_per_block + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_work
@@ -193,7 +194,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
         if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            write(*,'("INIT: ALLOCATING ",A19,"(",7(i9,1x),")")') &
             "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
         endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
@@ -221,6 +222,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
         endif        
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
+
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
@@ -232,6 +234,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
             "hvy_mask", 1, 1, 1, 1, 1
         endif        
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
+
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
@@ -361,6 +364,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
 
     real(kind=rk)      :: maxmem, mem_per_block
+    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=80)  :: memstring
     integer(kind=ik)   :: i
 
@@ -431,8 +435,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) ) then
@@ -452,8 +456,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
-                    + 2.0 * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) ) then
@@ -516,7 +520,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
         if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
+            write(*,'("INIT: ALLOCATING ",A19,"(",6(i9,1x),")")') &
             "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
         endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
@@ -556,6 +560,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
             "hvy_mask", 1, 1, 1, 1, 1
         endif           
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
+
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
             "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
@@ -589,7 +594,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'("INIT: ALLOCATING ",A19,"(",3(i9,1x),")")') &
         "lgt_sortednumlist", size(lgt_block,1), 2, params%forest_size
     endif 
-    allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )    
+    allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
@@ -610,7 +615,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
         "lgt_n", params%forest_size
     endif
-    allocate( lgt_n( params%forest_size ) )
+    allocate( lgt_n(params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "lgt_n", product(real(shape(lgt_n)))*4.0e-9, shape(lgt_n)
@@ -620,7 +625,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
         "hvy_n", params%forest_size
     endif
-    allocate( hvy_n( params%forest_size ) )
+    allocate( hvy_n(params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
         "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)

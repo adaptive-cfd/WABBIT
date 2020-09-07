@@ -704,10 +704,10 @@ contains
       if (params_ns%dim==2) then
         ! compute density and pressure only in physical domain
         tmp(1:5) =0.0_rk
-        
-        do iy=g+1, Bs(2)+g
+        ! we do not want to sum over redudant points so exclude Bs+g!!!
+        do iy=g+1, Bs(2)+g-1
           y = dble(iy-(g+1)) * dx(2) + x0(2)
-          do ix=g+1, Bs(1)+g
+          do ix=g+1, Bs(1)+g-1
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             if (mask(ix,iy,1)<1e-10) then
                   tmp(1) = tmp(1)   + u(ix,iy, 1, rhoF)**2
@@ -946,7 +946,7 @@ subroutine create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
 end subroutine create_mask_NSTOKES
 
      !-----------------------------------------------------------------------------
-     ! Adaptation is dependent on the different physics application.
+     ! Adaptation is dependent on the different physics application. 
      ! Every physics module can choose its own coarsening indicator.
     !-----------------------------------------------------------------------------
     subroutine PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, threshold_field, &
@@ -967,10 +967,10 @@ end subroutine create_mask_NSTOKES
 
         ! output. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: threshold_field(1:,1:,1:,1:)
-
+        
         integer(kind=ik), intent(out):: N_thresholding_components
         integer(kind=ik) :: Bs(3),ix,iy,iz
-
+       
         Bs = params_ns%Bs
 
         if (params_ns%dim == 3) then
@@ -1021,7 +1021,7 @@ end subroutine create_mask_NSTOKES
 
         endselect
 
-    end subroutine
+    end subroutine 
 
 
 

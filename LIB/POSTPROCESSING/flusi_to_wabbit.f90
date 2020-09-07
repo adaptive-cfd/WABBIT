@@ -81,8 +81,8 @@ subroutine flusi_to_wabbit(params)
     call get_cmd_arg( "--output", file_out, default="none" )
     call get_cmd_arg( "--bs", Bs(1), default=33 )
 
-    ! get values from command line (filename and desired blocksize)
     call check_file_exists(trim(file_in))
+
 
     ! read attributes such as number of discretisation points, time, domain size
     call get_attributes_flusi(file_in, nxyz, time, domain)
@@ -135,7 +135,7 @@ subroutine flusi_to_wabbit(params)
     level = 0
     do k = 1, params%dim
         if (Bs(k)==1) call abort(11021903, "ERROR: Blocksize cannot be one! (Even though that is an odd number)")
-        level_tmp(k) = log(dble(nxyz(k))/dble(Bs(k))) / log(2.0_rk)
+        level_tmp(k) = log(dble(nxyz(k))/dble(Bs(k)-1)) / log(2.0_rk)
         level(k) = int(level_tmp(k))
     enddo
 
@@ -150,7 +150,7 @@ subroutine flusi_to_wabbit(params)
     if (nxyz(1)/=nxyz(2)) call abort(8724, "ERROR: nx and ny differ. This is not possible for WABBIT")
 
     do k = 1, params%dim
-        if (mod(nxyz(k), Bs(k)) /=0 ) then
+        if (mod(nxyz(k),(Bs(k)-1)) /=0 ) then
             call abort(11021901, "The input data size and your choice of BS are not compatible.")
         endif
         ! non-integer levels indicate the resolution is not a multiple of Bs
@@ -161,7 +161,7 @@ subroutine flusi_to_wabbit(params)
 
 
     ! set important parameters
-    params%max_treelevel = max(max(level(1),level(2)),max(level(2),level(3)))
+    params%max_treelevel=max(max(level(1),level(2)),max(level(2),level(3)))
     params%domain_size = domain
     params%Bs = Bs
     params%n_ghosts = 1_ik
@@ -181,6 +181,19 @@ subroutine flusi_to_wabbit(params)
     ! read the field from flusi file and organize it in WABBITs blocks
     call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
     hvy_active, params, nxyz)
+    ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
+    ! they will therefore send their redundant points to the last blocks in x,y and z-direction
+    do k = 1, lgt_n
+        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
+        start_x = nint(x0(1)/dx(1))
+        start_y = nint(x0(2)/dx(2))
+        if (params%dim == 3) then
+            start_z = nint(x0(3)/dx(3))
+        else
+            start_z = 0_ik
+        end if
+        lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
+    end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
@@ -189,3 +202,20 @@ subroutine flusi_to_wabbit(params)
     hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
 
 end subroutine flusi_to_wabbit
+
+function refinement_status(start_x, start_y, start_z, Bs_f, Bs)
+    use module_precision
+    implicit none
+    integer(kind=ik), intent(in) :: start_x, start_y, start_z
+    integer(kind=ik), dimension(3), intent(in) :: Bs, Bs_f
+    integer(kind=ik) :: refinement_status
+
+    ! if I'm the last block in x,y and/or z-direction,
+    ! set my refinement refinement_status to 0, otherwise to 11 (historic fine)
+    if (((start_x==Bs_f(1)-Bs(1)+1) .or. (start_y==Bs_f(2)-Bs(2)+1)) .or. (start_z==Bs_f(3)-Bs(3)+1)) then
+        refinement_status = 0_ik
+    else
+        refinement_status = 11_ik
+    end if
+
+end function refinement_status

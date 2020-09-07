@@ -6,7 +6,7 @@ f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
 compute_vorticity_post.f90 compute_scalar_field_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90 \
-post_superstl.f90 post_dry_run.f90 performance_test.f90 post_denoising.f90 post_generate_forest.f90
+post_superstl.f90 post_dry_run.f90 performance_test.f90 post_generate_forest.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -66,10 +66,10 @@ FFLAGS += -O3 -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
 # timing flags for gfortran:
-FFLAGS += -fbounds-check -g
-#FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
-#FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
-#FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
+#FFLAGS += -fbounds-check -g
+FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
+FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -finit-real=nan -finit-integer=-99999
+FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 HDF_LIB = $(HDF_ROOT)/lib
@@ -298,7 +298,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	find_sisters.f90 max_active_level.f90 min_active_level.f90 get_free_local_light_id.f90 \
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 grid_coarsening_indicator.f90 \
 	create_equidistant_grid.f90 create_random_grid.f90 allocate_grid.f90 reset_grid.f90 block_xfer_nonblocking.f90 \
-	update_grid_metadata.f90 write_field22.f90
+	update_grid_metadata.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

@@ -71,7 +71,7 @@ subroutine mult_mask(params)
             write(*,*) "------------------------------------------------------------------"
         elseif (operation == "--mult-mask-direct") then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "Mutliplying field with 1-mask: result = mask*input"
+            write(*,*) "Mutliplying field with mask: result = mask*input"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) "input= ", trim(adjustl(fname_input))
             write(*,*) "mask=  ", trim(adjustl(fname_mask))

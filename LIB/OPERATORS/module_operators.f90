@@ -82,7 +82,8 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, p, hvy_id )**2 )
+                    ! attention: exclude redundant point here
+                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, p, hvy_id )**2 )
                 enddo
             enddo
         else
@@ -94,7 +95,8 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, hvy_id )**2 )
+                    ! attention: exclude redundant point here
+                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, p, hvy_id )**2 )
                 enddo
             enddo
         endif
@@ -110,7 +112,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
             do p = 1, n_eqn
                 ! yes, we can include the ghost nodes: it does not matter for the infty
                 ! norm.
-                norm(p) = max( norm(p), maxval(hvy_block(:,:,:,p,hvy_id)) )
+                norm(p) = max( norm(p), maxval( abs(hvy_block(:,:,:,p,hvy_id))) )
             enddo
         enddo
 

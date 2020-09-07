@@ -49,7 +49,6 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
     integer(kind=ik) :: k, Jmax, max_blocks, ierr
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
-    logical :: used(1:size(hvy_block,4))
     integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
     real(kind=rk) :: a, b
 
@@ -85,29 +84,20 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
             nnorm = 1.0_rk
-            ! threshold only the first component of the vector (which is the mask, the others
-            ! are forcing values, colors, sponges, etc)
-            used = .false.
-            used(1) = .true.
 
-            ! this version requires ghost nodes to be sync'ed before the routine is called (otherwise
-            ! it may refine also constant one blocks if the in the ghost nodes 0 is saved)
-            a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            ! a = minval(hvy_block(:, :, :, 1, hvy_id))
-            ! b = maxval(hvy_block(:, :, :, 1, hvy_id))
+            if (params%dim == 3) then
+                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
+                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
+            else
+                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
+                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
+            endif
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
             if ( abs(a - b)>1.0e-7_rk ) then
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
             endif
-
-            ! call threshold_block( params, hvy_block(:,:,:,:, hvy_id), used, &
-            ! lgt_block(lgt_id, Jmax + IDX_REFINE_STS), nnorm, level, eps=1.0e-10_rk )
-            !
-            ! ! hack: currently, threshold_block assigns only -1 or 0
-            ! lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = lgt_block(lgt_id, Jmax + IDX_REFINE_STS) + 1
         enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.

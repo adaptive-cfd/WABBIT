@@ -69,11 +69,10 @@ subroutine keyvalues(fname, params)
     params%Bs = Bs
     params%max_treelevel = tc_length
     params%n_eqn = 1
-    params%n_ghosts = 1
+    params%n_ghosts = 0
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%order_predictor = "multiresolution_2nd"
     ! make sure there is enough memory allocated
     params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
 
@@ -89,8 +88,6 @@ subroutine keyvalues(fname, params)
 
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-
-    ! call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)

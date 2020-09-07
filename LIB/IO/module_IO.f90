@@ -16,7 +16,6 @@
 ! ********************************************************************************************
 
 module module_IO
-
     use mpi
     use hdf5
     ! global parameters
@@ -38,15 +37,11 @@ module module_IO
 
     use module_helpers, only : check_file_exists, block_contains_NaN
     use module_forest
-    ! use module_mask
 
 
     implicit none
 
-
 contains
-
-
 
 #include "write_field.f90"
 #include "read_mesh.f90"

@@ -34,7 +34,7 @@ module module_indicators
     ! required, therefore use module_MPI.
     use module_MPI
 
-implicit none
+    implicit none
 
 
 contains

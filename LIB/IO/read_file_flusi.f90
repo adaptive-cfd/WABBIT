@@ -190,7 +190,6 @@ subroutine get_attributes_flusi(fname, nxyz, time, domain)
 end subroutine get_attributes_flusi
 
 
-
 integer(kind=ik) function end_bound(start, Bs, Bs_f)
   implicit none
   integer(kind=ik), intent(in) :: start, Bs, Bs_f

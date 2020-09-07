@@ -244,7 +244,6 @@ contains
           max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
           sum(lgt_n(1:N_snapshots))
     endif
-
   end do
   ! the truncation_rank can be lower then the default (N_snapshots) or input value,
   ! when the singular values are smaller as the desired presicion! Therefore we update
@@ -361,7 +360,7 @@ contains
         if ( params%rank==0 ) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-            write(*,*) "[--save_all --order=[2|4] --nmodes=3 --error=1e-9 --adapt=0.1]"
+            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Wavelet adaptive Snapshot POD "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -649,12 +648,12 @@ contains
     integer(hid_t)                   :: file_id
     real(kind=rk), dimension(3)      :: domain
     integer(hsize_t), dimension(2)   :: dims_treecode
-    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes
+    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes, min_lvl
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
     integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
-    logical :: verbose = .false., save_all = .false.
+    logical :: verbose = .false., save_all = .false., all_snapshots_dense=.True.
 
     call get_command_argument(2, args)
     if ( args== '--help' .or. args == '--h') then
@@ -878,8 +877,20 @@ contains
     do tree_id = 1, N_snapshots
       call read_field2tree(params,snapshot_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
-                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.true.)
     end do
+
+    min_lvl = min_active_level(lgt_block)
+    if (min_lvl == params%max_treelevel) then
+      all_snapshots_dense = .True.
+      params%min_treelevel= params%max_treelevel
+      ! it is faster to bring all modes to the same mesh at this point,
+      ! since otherwise they will be refined and coarsed when reconstructing
+      ! the snapshots. this produces a lot of overhead and makes the calculations slow
+      if ( params%rank==0 ) write(*,*) '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+      if ( params%rank==0 ) write(*,*) "All modes will be refined to dense grid !!"
+      if ( params%rank==0 ) write(*,*) '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    endif
     !----------------------------------
     ! READ ALL MODES
     !----------------------------------
@@ -887,10 +898,21 @@ contains
       tree_id = N_snapshots+j
       call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
-                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.false.)
+      ! it is faster to bring all modes to the same mesh at this point,
+      ! since otherwise they will be refined and coarsed when reconstructing
+      ! the snapshots. this produces a lot of overhead and makes the calculations slow
+      if ( all_snapshots_dense ) then
+        call to_dense_mesh(params, lgt_block, lgt_active(:,tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
+                        hvy_block, hvy_active(:,tree_id), hvy_n(tree_id), hvy_tmp, hvy_neighbor, target_level=params%max_treelevel)
+      endif
+      if ( params%rank == 0 ) then
+        write(*,'("Mode", i3," Stored in Tree_id: ",i3)') j, tree_id
+        write(*,'("Number blocks ",i12)') lgt_n(tree_id)
+      endif
     end do
 
-
+    if ( all_snapshots_dense ) params%min_treelevel = params%max_treelevel
     ! --------------------
     ! Compute the L2 norm
     !---------------------
@@ -1227,6 +1249,7 @@ contains
 
 
     if ( iteration>0 ) then
+      save_all = .False.
       if ( rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
     else
       save_all = .True.
@@ -1410,7 +1433,7 @@ contains
         ! Snapshot
         !----------------------------------
         do j = 1, n_components
-          write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+          write( file_out, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') j, N_modes_used, iteration
           call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
             lgt_n, hvy_n, hvy_active, j, reconst_tree_id , real(iteration,kind=rk) , iteration )
         end do
@@ -1425,7 +1448,7 @@ contains
       ! Snapshot
       !----------------------------------
       do j = 1, n_components
-        write( file_out, '("reconst",i1,"_", i12.12, ".h5")') j, iteration
+        write( file_out, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') j, N_modes_used, iteration
         call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
           lgt_n, hvy_n, hvy_active, j, reconst_tree_id ,real(iteration,kind=rk) , iteration )
       end do
@@ -1521,7 +1544,6 @@ contains
                                     free_tree_id, a)
     call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, dest_tree_id, free_tree_id)
-
 
   end do
   !---------------------------------------------------------------------------

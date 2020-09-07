@@ -226,7 +226,7 @@ contains
         integer(kind=ik), intent(inout)     :: lgt_n(:)
         !> sorted list of numerical treecodes, used for block finding
         integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-        integer :: k, hvy_id, Bs(1:3), g, Jmax, tree_n, iter, lgt_id, Jmin
+        integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, tree_n, iter, lgt_id, Jmin
         real(kind=rk) :: x0(1:3), dx(1:3)
 
         if (params%rank==0) then
@@ -237,6 +237,7 @@ contains
 
         Bs = params%Bs
         g  = params%n_ghosts
+        Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
         Jmax = params%max_treelevel
         Jmin = params%min_treelevel
         tree_n = params%forest_size ! used only for resetting at this point
@@ -274,6 +275,7 @@ contains
             lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
             lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
             hvy_n(tree_ID_mask), "mask-threshold", tree_ID_mask )
+
 
             if (params%rank==0) then
                 write(*,'("Did refinement for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
@@ -340,5 +342,6 @@ contains
             write(*,*) "DONE creating time-independent part!"
             write(*,'(80("~"))')
         endif
+
     end subroutine
 end module

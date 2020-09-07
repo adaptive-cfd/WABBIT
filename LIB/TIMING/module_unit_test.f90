@@ -16,10 +16,6 @@
 ! ********************************************************************************************
 
 module module_unit_test
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     ! global parameters
     use module_params
@@ -30,22 +26,12 @@ module module_unit_test
     ! time step module
     use module_time_step
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
-    ! ghost nodes unit test
 #include "unit_test_ghost_nodes_synchronization.f90"
-
 #include "unit_test_treecode.f90"
 
 end module module_unit_test

@@ -13,11 +13,10 @@
 
 program main_post
     use mpi
-    ! global parameters
     use module_params
     use module_MOR, only : post_POD, post_reconstruct, post_PODerror, post_timecoef_POD
     use module_timing
-    use module_helpers
+
     implicit none
 
     ! MPI error variable
@@ -32,7 +31,6 @@ program main_post
     character(len=80)                   :: filename, key1, key2
 
     real(kind=rk)                       :: elapsed_time
-
 
     ! init mpi
     call MPI_Init(ierr)
@@ -64,9 +62,6 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
-    case ("--denoising")
-        call post_denoising(params)
-
     case ("--prune-tree")
         call post_prune_tree(params)
 
@@ -137,7 +132,7 @@ program main_post
   case ("--POD-time")
     call post_timecoef_POD(params)
 
-case ("--generate_forest")
+    case ("--generate_forest")
     call post_generate_forest(params)
     case default
 
@@ -186,7 +181,7 @@ case ("--generate_forest")
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout
-    if ( mode == "--POD") call summarize_profiling( WABBIT_COMM )
+    if ( mode(:5) == "--POD") call summarize_profiling( WABBIT_COMM )
 
     ! end mpi
     call MPI_Finalize(ierr)

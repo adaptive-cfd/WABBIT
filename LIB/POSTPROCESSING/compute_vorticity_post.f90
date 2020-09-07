@@ -8,7 +8,7 @@
 ! = log ======================================================================================
 !
 !> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
-!---------------------------------------mpirun -np 2 /home/phil/develop/WABBIT/wabbit-post --vorticity ./adapt_files/ux-eps_7.7e-02_000504000000.h5 ./adapt_files/uy-eps_7.7e-02_000504000000.h5 4--------------------------------------------------------------
+!-----------------------------------------------------------------------------------------------------
 
 subroutine compute_vorticity_post(params)
     use module_precision
@@ -217,8 +217,6 @@ subroutine compute_vorticity_post(params)
         enddo
 
         write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
-
-        call sync_ghosts( params, lgt_block, hvy_tmp, hvy_neighbor, hvy_active, hvy_n )
 
         call write_field(fname, time, iteration, 1, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )

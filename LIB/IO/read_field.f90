@@ -49,8 +49,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set MPI parameters
     rank = params%rank
@@ -59,8 +57,6 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     g    = params%n_ghosts
     Bs   = params%Bs
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-
-    if (g == 0) call abort(20200409, "Current code versions require g>=1, but you set g=0")
 
     call check_file_exists(fname)
     ! open the file
@@ -72,7 +68,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/0,0,0,sum(actual_blocks_per_proc(0:rank-1))/)
-        ubounds3D = (/Bs(1),Bs(2),Bs(3),lbounds3D(4)+hvy_n-1/)
+        ubounds3D = (/Bs(1)-1,Bs(2)-1,Bs(3)-1,lbounds3D(4)+hvy_n-1/)
 
     else
 
@@ -80,7 +76,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/0,0,sum(actual_blocks_per_proc(0:rank-1))/)
-        ubounds2D = (/Bs(1),Bs(2),lbounds2D(3)+hvy_n-1/)
+        ubounds2D = (/Bs(1)-1,Bs(2)-1,lbounds2D(3)+hvy_n-1/)
 
     endif
 
@@ -95,11 +91,11 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     if ( params%dim == 3 ) then
         ! 3D data case
         call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
-            hvy_block(g+1:Bs(1)+g+1,g+1:Bs(2)+g+1,g+1:Bs(3)+g+1,dF,1:hvy_n))
+            hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, 1:hvy_n))
     else
         ! 2D data case
         call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, &
-            hvy_block(g+1:Bs(1)+g+1,g+1:Bs(2)+g+1,1,dF,1:hvy_n))
+            hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, 1:hvy_n))
     end if
 
     ! close file and HDF5 library

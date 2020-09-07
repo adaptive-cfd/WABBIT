@@ -216,7 +216,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        eps2 = eps2 * ( 2.0_rk**(-dble(level*params%dim)/2.0_rk) )
+        eps2 = eps2 * ( 2.0_rk**(-dble((level-params%max_treelevel)*params%dim)/2.0_rk) )
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity

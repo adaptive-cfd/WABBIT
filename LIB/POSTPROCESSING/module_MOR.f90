@@ -653,7 +653,7 @@ contains
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
     integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
-    real(kind=rk)    :: unused_var
+    real(kind=rk)    :: unused_var, t_elapse
     logical :: verbose = .false., save_all = .false., all_snapshots_dense=.True.
 
     call get_command_argument(2, args)
@@ -1205,6 +1205,7 @@ contains
     integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
+    integer(kind=ik) :: min_lvl
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
     logical :: verbosity = .false., save_all = .false.
 
@@ -1389,6 +1390,12 @@ contains
           !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id )
     end do
 
+    min_lvl = min_active_level(lgt_block)
+    if (min_lvl == params%max_treelevel) then
+      params%min_treelevel= params%max_treelevel
+    endif
+
+
       if (params%rank==0) then
         write(*,'(80("-"))')
         write(*,*) "WABBIT POD-reconstruction."
@@ -1448,6 +1455,7 @@ contains
       ! Save components of reconstructed
       ! Snapshot
       !----------------------------------
+
       do j = 1, n_components
         write( file_out, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') j, N_modes_used, iteration
         call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
@@ -1522,6 +1530,7 @@ contains
       write(*, *)
     endif
 
+    t_elapse = MPI_wtime()
     ! in this algorithm we need at least N_mode trees plus 2 additional fields for
     ! saving the reconstructed field and a temporary field
     if ( params%forest_size < N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
@@ -1534,7 +1543,6 @@ contains
   !---------------------------------------------------------------------------
   ! reconstruct field
   !---------------------------------------------------------------------------
-  t_elapse = MPI_wtime()
   do i = 2, N_modes
 
     a = a_coefs(iteration, i)
@@ -1557,6 +1565,8 @@ contains
      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
      lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
      hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
+  else
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
   endif
 
   t_elapse = MPI_WTIME() - t_elapse

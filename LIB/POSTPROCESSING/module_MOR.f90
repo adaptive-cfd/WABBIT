@@ -1202,7 +1202,7 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n, min_lvl
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
@@ -1378,14 +1378,14 @@ contains
       call read_field2tree(params, file_in(tree_id,:), params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-      !----------------------------------
-      ! Adapt the data to the given eps
-      !----------------------------------
-      !tmp_name = "adapted"
-      !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
-      !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id )
     end do
+
+    min_lvl = min_active_level(lgt_block)
+    if (min_lvl == params%max_treelevel) then
+      params%min_treelevel= params%max_treelevel
+    endif
+
+
 
       if (params%rank==0) then
         write(*,'(80("-"))')
@@ -1548,14 +1548,16 @@ contains
   !---------------------------------------------------------------------------
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
-  if ( params%adapt_mesh) then
-     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
-        lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
+  call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
+  lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
 
+  if ( params%adapt_mesh) then
      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
      lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
      hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
-  endif
+   else
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
+   endif
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then

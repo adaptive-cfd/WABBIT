@@ -4,7 +4,7 @@ FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt_id_to_hvy_id.f90 hvy_id_to_lgt_id.f90 lgt_id_to_proc_rank.f90 \
 f_xy_2D.f90 f_xyz_3D.f90 init_random_seed.f90 \
 startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
-compute_vorticity_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
+compute_vorticity_post.f90 compute_scalar_field_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90 \
 post_superstl.f90 post_dry_run.f90 performance_test.f90 post_denoising.f90 post_generate_forest.f90
 # Object and module directory:
@@ -98,6 +98,7 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
 FFLAGS += -FR -O3 -heap-arrays
+##FFLAGS += -xcore-avx2  # use avx2
 # timing flags: attention they might disable all optimization!
 ##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
 FFLAGS += -module $(OBJDIR) # specify directory for modules.

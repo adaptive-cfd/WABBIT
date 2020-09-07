@@ -287,8 +287,8 @@ subroutine post_stl2dist(params)
     hvy_n(1), 1, params%coarsening_indicator, hvy_block )
 
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    call create_active_and_sorted_lists_tree( params, lgt_block, lgt_active(:,1), &
+    lgt_n(1), hvy_active(:,1), hvy_n(1), lgt_sortednumlist(:,:,1), tree_id=1)
 
     if (pruning) then
         if (params%rank==0) write(*,*) "now pruning!"

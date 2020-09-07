@@ -204,12 +204,14 @@ module module_insects
     real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
     ! wing inertia (TODO: adapt for 4 wings)
     real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
-    character(len=strlen) :: wing_thickness_distribution = "constant"
+    character(len=strlen) :: wing_thickness_distribution(1:4) = "constant"
     character(len=strlen) :: pointcloudfile = "none"
     character(len=strlen) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
-    logical :: corrugated = .false.
+    logical :: corrugated(1:4) = .false.
     real(kind=rk) :: corrugation_array_bbox(1:4)
-    logical :: bristles = .false.
+    logical :: bristles(1:4) = .false.
+    logical :: bristles_simplex(1:4) = .false.
+    integer :: n_bristles(1:4)
     real(kind=rk), ALLOCATABLE :: bristles_coords(:,:,:)
     ! used for rectangular part of bristled model wings (Kleemeier)
     real(kind=rk) :: B_membrane(1:4), L_membrane(1:4)

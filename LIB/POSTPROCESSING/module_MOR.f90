@@ -360,9 +360,15 @@ contains
         if ( params%rank==0 ) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1]"
+            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1 --eps-norm=[L2|Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Wavelet adaptive Snapshot POD "
+            write(*,*) " --list               list of files containing all snapshots"
+            write(*,*) " --components         number of components in statevector"
+            write(*,*) " --save_all           reconstruct all snapshots (default is false)"
+            write(*,*) " --order              order of the predictor"
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
+            write(*,*) " --eps-norm           normalization of wavelets"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
@@ -372,6 +378,7 @@ contains
     ! read parameters
     !----------------------------------
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
     call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
@@ -666,7 +673,7 @@ contains
             write(*,*) '                                --snapshot-list="list_u1.txt [list_u2.txt] [list_u3.txt]"'
             write(*,*) '                                --mode-list="list_m1.txt [list_m2.txt] [list_m3.txt]"'
             write(*,*) "                                [--order=[CDF40] --adapt=0.1 --memory=2GB --iteration=1]"
-            write(*,*) "                                [--save_all]"
+            write(*,*) "                                [--save_all ,--eps-norm=[L2|Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --snapshot-list      list of files containing all snapshots"
@@ -676,6 +683,7 @@ contains
             write(*,*) " --iteration          reconstruct single snapshot (default is no snapshots)"
             write(*,*) " --order              order of the predictor"
             write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
+            write(*,*) " --eps-norm           normalization of wavelets"
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
@@ -685,7 +693,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
@@ -1220,6 +1228,7 @@ contains
             write(*,*) " CALL: ./wabbit-post --POD-reconstruct --time_coefficients=a_coefs.txt --components=3 "
             write(*,*) "                     --mode-list=POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]"
             write(*,*) "                     [--save_all --iteration=10 --order=[2|4] --nmodes=3 --adapt=0.1] "
+            write(*,*) "                     [--eps-norm=[L2,Linfty]] "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --components         number of components in statevector"
@@ -1237,6 +1246,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--mode-list", fname_list )
@@ -1624,7 +1634,7 @@ contains
             write(*,*) "                                --snapshot-list='list_u1.txt [list_u2.txt] [list_u3.txt]'"
             write(*,*) "                                --mode-list='list_m1.txt [list_m2.txt] [list_m3.txt]'"
             write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB --iteration=1]"
-            write(*,*) "                                [--save_all]"
+            write(*,*) "                                [--save_all, --eps-norm=[L2,Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " returns:"
             write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
@@ -1646,7 +1656,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )

@@ -54,7 +54,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! error catching (10 Sep 2020, Thomas)
     ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
-    allocate(blocks_per_mpirank(0:params%number_procs))
+    allocate(blocks_per_mpirank(0:params%number_procs-1))
     blocks_per_mpirank = -99
     blocks_per_mpirank(rank) = params%number_blocks
     call MPI_allreduce( MPI_IN_PLACE, blocks_per_mpirank, number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, mpierr)
@@ -393,7 +393,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     ! error catching (10 Sep 2020, Thomas)
     ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
-    allocate(blocks_per_mpirank(0:params%number_procs))
+    allocate(blocks_per_mpirank(0:params%number_procs-1))
     blocks_per_mpirank = -99
     blocks_per_mpirank(rank) = params%number_blocks
     call MPI_allreduce( MPI_IN_PLACE, blocks_per_mpirank, number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, mpierr)

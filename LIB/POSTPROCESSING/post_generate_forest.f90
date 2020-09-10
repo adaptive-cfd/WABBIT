@@ -80,7 +80,7 @@ subroutine post_generate_forest(params)
     ! generate random shuffle of frequencies
     call srand(10067) ! always use same seed
     do i = 15**2, 1, -1
-        r=rand()
+        r=rand_nbr()
         j = i * r + 1
         k = freq(i)
         freq(i) = freq(j)

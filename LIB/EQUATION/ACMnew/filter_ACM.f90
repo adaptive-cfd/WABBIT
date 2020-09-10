@@ -121,7 +121,7 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
       ! apply wavelet filter to all components of state vector
       ! NOTE: this is a filter that removes all details.
       do i = 1, size(u,4)
-          call wavelet_filter(params_acm%order_predictor, Bs, g, u(:,:,:,i))
+          call wavelet_filter(u(:,:,:,i), Bs, g )
       enddo
 
   end select
@@ -135,35 +135,56 @@ end subroutine
 !=====================================================================
 !  WAVELET FILTER
 !=====================================================================
-subroutine wavelet_filter(order_predictor, Bs, g, block_data)
-    use module_interpolation, only :  restriction_3D, restriction_2D, prediction_2D, prediction_3D
+subroutine wavelet_filter(block_data, Bs, g )
+    use module_interpolation
 
     implicit none
-    !> params structure of navier stokes
-    character(len=*), intent(in) :: order_predictor
+    !> heavy data array - block data
+    real(kind=rk), intent(inout) :: block_data(:, :, :)
     !> mesh params
     integer(kind=ik), dimension(3), intent(in) :: Bs
     integer(kind=ik), intent(in) :: g
-    !> heavy data array - block data
-    real(kind=rk), intent(inout) :: block_data(:, :, :)
     real(kind=rk), allocatable, save :: u3(:,:,:)
+    real(kind=rk), allocatable, save :: u2(:,:,:)
 
 
-    if ( size(block_data,3)>1 ) then
+    if (params_acm%dim == 3) then
         ! ********** 3D **********
+        if (.not.allocated(u2)) allocate(u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ))
         if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,(Bs(3)+1)/2+g))
-        ! now, coarsen array u1 (restriction)
-        call restriction_3D( block_data, u3 )  ! fine, coarse
-        ! then, re-interpolate to the initial level (prediciton)
-        call prediction_3D ( u3, block_data, order_predictor )  ! coarse, fine
+
+        if (params_acm%harten_multiresolution) then
+            ! now, coarsen array u1 (restriction)
+            call restriction_3D( block_data, u3 )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_3D ( u3, block_data, params_acm%order_predictor )  ! coarse, fine
+        else
+            ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+            call restriction_prefilter_3D( block_data(:, :, :), u2(:,:,:), params_acm%wavelet )
+            ! now, coarsen array u1 (restriction)
+            call restriction_3D( u2, u3 )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_3D ( u3, block_data, params_acm%order_predictor )  ! coarse, fine
+        endif
 
     else
         ! ********** 2D **********
+        if (.not.allocated(u2)) allocate(u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ))
         if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,1))
-        ! now, coarsen array u1 (restriction)
-        call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
-        ! then, re-interpolate to the initial level (prediciton)
-        call prediction_2D ( u3(:,:,1), block_data(:,:,1), order_predictor )  ! coarse, fine
+
+        if (params_acm%harten_multiresolution) then
+            ! now, coarsen array u1 (restriction)
+            call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_2D ( u3(:,:,1), block_data(:,:,1), params_acm%order_predictor )  ! coarse, fine
+        else
+            ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+            call restriction_prefilter_2D(block_data(:, :, 1), u2(:,:,1), params_acm%wavelet)
+            ! now, coarsen array u1 (restriction)
+            call restriction_2D( u2(:,:,1), u3(:,:,1) )  ! fine, coarse
+            ! then, re-interpolate to the initial level (prediciton)
+            call prediction_2D ( u3(:,:,1), block_data(:,:,1), params_acm%order_predictor )  ! coarse, fine
+        endif
 
     end if
 

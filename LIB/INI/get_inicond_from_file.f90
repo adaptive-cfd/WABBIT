@@ -27,11 +27,6 @@
 ! ********************************************************************************************
 
 subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
     !> user defined parameter structure
@@ -54,8 +49,6 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! loop variable
     integer(kind=ik)                      :: dF, tc_length, dim
     integer(kind=ik), dimension(3)        :: Bs
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! number of files to read from
     N_files = params%n_eqn
@@ -63,8 +56,6 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     t0 = MPI_wtime()
 
     if (params%rank==0) write(*,*) "Reading initial condition from file"
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! read time, iteration, domain size and total number of blocks from first input file
     call read_attributes(params%input_files(1), lgt_n, time, iteration, domain, Bs, tc_length, dim)

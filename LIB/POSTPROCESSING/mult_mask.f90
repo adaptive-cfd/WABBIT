@@ -35,7 +35,7 @@ subroutine mult_mask(params)
 
     ! does the user need help?
     call get_command_argument(2, fname_input)
-    
+
     if (fname_input=='--help' .or. fname_input=='--h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
@@ -59,7 +59,7 @@ subroutine mult_mask(params)
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname_input, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
-    
+
     if (params%rank==0) then
         if (operation == "--mult-mask" .or. operation == "--mult-mask-inverse") then
             write(*,*) "------------------------------------------------------------------"
@@ -94,7 +94,6 @@ subroutine mult_mask(params)
     ! only (4* , for safety) lgt_n/number_procs blocks necessary
     !> \todo change that for 3d case
     params%number_blocks = 4_ik*lgt_n/params%number_procs
-    if (params%rank==0) params%number_blocks = params%number_blocks + mod(lgt_n, params%number_procs)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &

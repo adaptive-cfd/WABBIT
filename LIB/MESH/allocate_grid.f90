@@ -32,7 +32,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
-    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
+    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
+    integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
@@ -50,6 +51,18 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
+
+    ! error catching (10 Sep 2020, Thomas)
+    ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
+    allocate(blocks_per_mpirank(0:params%number_procs))
+    blocks_per_mpirank = -99
+    blocks_per_mpirank(rank) = params%number_blocks
+    call MPI_allreduce( MPI_IN_PLACE, blocks_per_mpirank, number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, mpierr)
+    if (maxval(blocks_per_mpirank) /= minval(blocks_per_mpirank)) then
+        call abort(20200910, "WABBIT coding error: params%number_blocks not identical on all mpiranks.")
+    endif
+    deallocate(blocks_per_mpirank)
+
 
     if (params%dim==2) then
         nz = 1
@@ -208,7 +221,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
-        endif    
+        endif
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -220,7 +233,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
-        endif        
+        endif
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
 
         if (rank==0) then
@@ -232,7 +245,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_mask", 1, 1, 1, 1, 1
-        endif        
+        endif
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
 
         if (rank==0) then
@@ -245,7 +258,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "hvy_neighbor", params%number_blocks, max_neighbors
-    endif        
+    endif
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -256,7 +269,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
-    endif   
+    endif
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -267,7 +280,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "lgt_sortednumlist", size(lgt_block,1), 2
-    endif   
+    endif
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -278,7 +291,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
         "lgt_active", size(lgt_block, 1)
-    endif   
+    endif
     allocate( lgt_active( size(lgt_block, 1) ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -290,7 +303,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
         "hvy_active", size(hvy_block, 5)
-    endif   
+    endif
     allocate( hvy_active( size(hvy_block, 5) ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -361,7 +374,8 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
-    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors
+    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
+    integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
@@ -376,6 +390,17 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
+
+    ! error catching (10 Sep 2020, Thomas)
+    ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
+    allocate(blocks_per_mpirank(0:params%number_procs))
+    blocks_per_mpirank = -99
+    blocks_per_mpirank(rank) = params%number_blocks
+    call MPI_allreduce( MPI_IN_PLACE, blocks_per_mpirank, number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, mpierr)
+    if (maxval(blocks_per_mpirank) /= minval(blocks_per_mpirank)) then
+        call abort(20200910, "WABBIT coding error: params%number_blocks not identical on all mpiranks.")
+    endif
+    deallocate(blocks_per_mpirank)
 
     if (params%dim==2) then
         nz = 1
@@ -509,7 +534,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
         "hvy_block", nx, ny, nz, Neqn, params%number_blocks
-    endif    
+    endif
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -534,7 +559,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
-        endif  
+        endif
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -546,7 +571,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
-        endif     
+        endif
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
         if (rank==0) then
             write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -558,7 +583,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         if (rank==0) then
             write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
             "hvy_mask", 1, 1, 1, 1, 1
-        endif           
+        endif
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
 
         if (rank==0) then
@@ -571,7 +596,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "hvy_neighbor", params%number_blocks, max_neighbors
-    endif      
+    endif
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -582,7 +607,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
-    endif     
+    endif
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -593,7 +618,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",3(i9,1x),")")') &
         "lgt_sortednumlist", size(lgt_block,1), 2, params%forest_size
-    endif 
+    endif
     allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
@@ -604,7 +629,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank==0) then
         write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
         "lgt_active", size(lgt_block,1), params%forest_size
-    endif     
+    endif
     allocate( lgt_active( size(lgt_block,1), params%forest_size ) )
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &

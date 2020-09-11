@@ -78,10 +78,9 @@ subroutine post_generate_forest(params)
     hvy_n = 0
     dt = 2*pi/real(tree_N+1,kind=rk)
     ! generate random shuffle of frequencies
-    call srand(10067) ! always use same seed
     do i = 15**2, 1, -1
         r=rand_nbr()
-        j = i * r + 1
+        j = modulo(i**2, 15**2)+1
         k = freq(i)
         freq(i) = freq(j)
         freq(j) = k

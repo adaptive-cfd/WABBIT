@@ -580,24 +580,24 @@ end subroutine
           "   rot_dt_r_w_x", &
           "   rot_dt_r_w_y", &
           "   rot_dt_r_w_z", &
-          "        alpha_l2", &
-          "          phi_l2", &
-          "        theta_l2", &
-          "        alpha_r2", &
-          "          phi_r2", &
-          "        theta_r2", &
-          "  rot_rel_l2_w_x", &
-          "  rot_rel_l2_w_y", &
-          "  rot_rel_l2_w_z", &
-          "  rot_rel_r2_w_x", &
-          "  rot_rel_r2_w_y", &
-          "  rot_rel_r2_w_z", &
-          "   rot_dt_l2_w_x", &
-          "   rot_dt_l2_w_y", &
-          "   rot_dt_l2_w_z", &
-          "   rot_dt_r2_w_x", &
-          "   rot_dt_r2_w_y", &
-          "   rot_dt_r2_w_z"/) )
+          "       alpha_l2", &
+          "         phi_l2", &
+          "       theta_l2", &
+          "       alpha_r2", &
+          "         phi_r2", &
+          "       theta_r2", &
+          " rot_rel_l2_w_x", &
+          " rot_rel_l2_w_y", &
+          " rot_rel_l2_w_z", &
+          " rot_rel_r2_w_x", &
+          " rot_rel_r2_w_y", &
+          " rot_rel_r2_w_z", &
+          "  rot_dt_l2_w_x", &
+          "  rot_dt_l2_w_y", &
+          "  rot_dt_l2_w_z", &
+          "  rot_dt_r2_w_x", &
+          "  rot_dt_r2_w_y", &
+          "  rot_dt_r2_w_z"/) )
       else
           call init_t_file('kinematics.t', overwrite, (/&
           "           time", &

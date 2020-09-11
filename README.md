@@ -18,7 +18,7 @@ git clone https://github.com/adaptive-cfd/WABBIT
 
 2. Compile the code running make.
 
-     Note that WABBI requires:
+     Note that WABBIT requires:
   
      + [MPI library](https://www.open-mpi.org/)
      + [HDF5 library](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code")

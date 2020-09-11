@@ -94,7 +94,6 @@ subroutine mult_mask(params)
     ! only (4* , for safety) lgt_n/number_procs blocks necessary
     !> \todo change that for 3d case
     params%number_blocks = 4_ik*lgt_n/params%number_procs
-    if (params%rank==0) params%number_blocks = params%number_blocks + mod(lgt_n, params%number_procs)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &

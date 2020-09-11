@@ -65,6 +65,9 @@ program main_post
     case ("--prune-tree")
         call post_prune_tree(params)
 
+    case ("--remesh")
+        call post_remesh(params)
+
     case ("--superstl")
         call post_superstl(params)
 
@@ -145,7 +148,7 @@ program main_post
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
             write(*,*) "--Q"
-            write(*,*) "--gradient"            
+            write(*,*) "--gradient"
             write(*,*) "--keyvalues"
             write(*,*) "--dry-run"
             write(*,*) "--compare-keys"

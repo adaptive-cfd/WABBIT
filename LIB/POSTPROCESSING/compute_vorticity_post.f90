@@ -120,8 +120,6 @@ subroutine compute_vorticity_post(params)
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
-    if (params%rank==0) params%number_blocks = params%number_blocks + &
-    mod(lgt_n, params%number_procs)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
@@ -129,12 +127,14 @@ subroutine compute_vorticity_post(params)
 
     ! read mesh and field
     if (params%dim == 2) then
-        call read_tree((/file_ux,file_uy/), 2, params, lgt_n, lgt_block, &
+        call read_tree((/file_ux, file_uy/), 2, params, lgt_n, lgt_block, &
         hvy_block, hvy_tmp, tree_id_optional=1)
     else
-        call read_tree((/file_ux,file_uy,file_uz/), 3, params, lgt_n, lgt_block, &
+        call read_tree((/file_ux, file_uy, file_uz/), 3, params, lgt_n, lgt_block, &
         hvy_block, hvy_tmp, tree_id_optional=1)
     end if
+
+
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &

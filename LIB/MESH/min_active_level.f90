@@ -16,13 +16,6 @@
 ! ********************************************************************************************
 
 function min_active_level( lgt_block, lgt_active, lgt_n )
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> light data array
@@ -37,8 +30,6 @@ function min_active_level( lgt_block, lgt_active, lgt_n )
     integer(kind=ik)                    :: k, Jmin, max_treelevel
 
     max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
-    !---------------------------------------------------------------------------------------------
-    ! main body
     Jmin = max_treelevel
 
     if (present(lgt_active) .and. present(lgt_n)) then

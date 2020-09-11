@@ -18,7 +18,7 @@ subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, lgt
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> block distribution lists. Note 1-based indexing.
+    !> block distribution lists. Note zero-based indexing. (as in MPI library)
     integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_n
@@ -150,4 +150,3 @@ subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_
     end if
 
 end subroutine
-

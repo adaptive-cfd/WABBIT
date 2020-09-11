@@ -67,25 +67,32 @@ end subroutine reset_tree
 !> Resets the light data. After calling this function
 !> only one tree is left in the forest, and all blocks are inactive with
 !> refinement status 0
-subroutine reset_forest(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sortednumlist)
+subroutine reset_forest(params, lgt_block, lgt_active, lgt_n,&
+     hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     implicit none
 
+    !> user defined parameter structure
+    type (type_params), intent(in)       :: params
     !> light data array
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
     !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(inout),optional:: lgt_n
+    integer(kind=ik), intent(inout),optional:: lgt_n(:)
+    !> list of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)         :: hvy_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout),optional :: lgt_sortednumlist(:,:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik)  , intent(in)         :: max_treelevel
-
+    integer(kind=tsize), intent(inout) :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik),  intent(inout),optional        :: tree_n
+    integer(kind=ik) :: i, max_treelevel, n_trees
 
     ! lgt_block = -1 ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
     ! lgt_active = -1
-
+    n_trees = params%forest_size
+    max_treelevel = params%max_treelevel
     ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:,:) = -1
@@ -97,11 +104,17 @@ subroutine reset_forest(lgt_block, lgt_active, max_treelevel, lgt_n, lgt_sortedn
     lgt_block(:, max_treelevel+IDX_REFINE_STS) = 0
 
     ! reset sorted list of numerical treecodes
-    if ( present(lgt_sortednumlist) ) then
-      lgt_sortednumlist = -1
-    end if
-    if ( present(lgt_n) ) then
-      lgt_n = size(lgt_active,1)
-    end if
+    do i =1,size(lgt_active,2)
+            lgt_sortednumlist(:,:,i) = -1
+            lgt_n(i) = size(lgt_active(:,i),1)
+            hvy_n(i) = size(hvy_active(:,i),1)
+    end do
 
+    if (present(tree_n)) then
+        call create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+               lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    else
+        call create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+               lgt_n, hvy_active, hvy_n, lgt_sortednumlist, n_trees)
+    end if
 end subroutine reset_forest

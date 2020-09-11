@@ -60,7 +60,7 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
 
     if (error2) then
         write(*,*) "DUMPING DEBUG DATA TO *_ERROR.dat"
-        call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
+        ! call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
         call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
 
         call MPI_barrier(WABBIT_COMM, mpierror)

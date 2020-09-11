@@ -24,6 +24,7 @@ doc/output
 *.un~
 *.so
 *.a
+*.key
 runtime_control
 *.txt
 *f90.swo

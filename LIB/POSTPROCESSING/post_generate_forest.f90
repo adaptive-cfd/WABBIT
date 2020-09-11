@@ -24,12 +24,12 @@ subroutine post_generate_forest(params)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
     integer :: hvy_id, lgt_id, fsize, j, tree_id
-    integer(kind=ik) :: it,ix,iy,iz,k,p,n,m, Bs(1:3)=16, tree_N=0,g=4,i,f
-    real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt, rand
+    integer(kind=ik) :: it,ix,iy,iz,k,p,n,m, Bs(1:3)=17, tree_N,g=4,i,f
+    real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt, r
     integer(kind=ik) :: freq(15**2) = (/(i, i=1,15**2)/)
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
-    call get_command_argument(1, mode)
+    call get_command_argument(2, mode)
 
     ! does the user need help?
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
@@ -67,6 +67,8 @@ subroutine post_generate_forest(params)
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist)
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
@@ -76,15 +78,14 @@ subroutine post_generate_forest(params)
     hvy_n = 0
     dt = 2*pi/real(tree_N+1,kind=rk)
     ! generate random shuffle of frequencies
-    call random_seed() ! always use same seed
+    call srand(10067) ! always use same seed
     do i = 15**2, 1, -1
-        call random_number(rand)
-        j = i * rand + 1
+        r=rand_nbr()
+        j = i * r + 1
         k = freq(i)
         freq(i) = freq(j)
         freq(j) = k
     end do
-
 
     tree: do it = 1, tree_N
         call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active(:,it), lgt_n(it), &
@@ -96,8 +97,8 @@ subroutine post_generate_forest(params)
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             if (params%dim == 2) then
-                do ix = 1,Bs(1)+2*g
-                    do iy = 1,Bs(2)+2*g
+                do ix = g+1,Bs(1)+g
+                    do iy = g+1,Bs(2)+g
                         hvy_block(ix,iy,1,1,hvy_id) = 0.0_rk
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -110,7 +111,7 @@ subroutine post_generate_forest(params)
                             yrel = y - ( 2* n - 1 )
                             ! set actual inicond gauss blob
                             hvy_block(ix,iy,1,1,hvy_id) =hvy_block(ix,iy,1,1,hvy_id)+ &
-                            exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(xrel)*bump(yrel)
+                            exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2))
                         end do
                     end do
                 end do
@@ -132,7 +133,7 @@ subroutine post_generate_forest(params)
                                 zrel = z - ( 2* n - 1 )
                                 ! set actual inicond gauss blob
                                 hvy_block(ix,iy,iz,1,hvy_id) =hvy_block(ix,iy,iz,1,hvy_id)+ &
-                                exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(xrel)*bump(yrel)*bump(zrel)
+                                exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2 + zrel**2))
                             end do
                         end do
                     end do

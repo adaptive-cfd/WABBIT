@@ -360,9 +360,15 @@ contains
         if ( params%rank==0 ) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1]"
+            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1 --eps-norm=[L2|Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Wavelet adaptive Snapshot POD "
+            write(*,*) " --list               list of files containing all snapshots"
+            write(*,*) " --components         number of components in statevector"
+            write(*,*) " --save_all           reconstruct all snapshots (default is false)"
+            write(*,*) " --order              order of the predictor"
+            write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
+            write(*,*) " --eps-norm           normalization of wavelets"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
@@ -372,6 +378,7 @@ contains
     ! read parameters
     !----------------------------------
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
     call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
@@ -489,11 +496,11 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1_ik
-    lgt_n = 0_ik ! reset number of acitve light blocks
     tree_n= 0_ik ! reset number of trees in forest
     !----------------------------------
     ! READ ALL SNAPSHOTS
@@ -666,7 +673,7 @@ contains
             write(*,*) '                                --snapshot-list="list_u1.txt [list_u2.txt] [list_u3.txt]"'
             write(*,*) '                                --mode-list="list_m1.txt [list_m2.txt] [list_m3.txt]"'
             write(*,*) "                                [--order=[CDF40] --adapt=0.1 --memory=2GB --iteration=1]"
-            write(*,*) "                                [--save_all]"
+            write(*,*) "                                [--save_all ,--eps-norm=[L2|Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --snapshot-list      list of files containing all snapshots"
@@ -676,6 +683,7 @@ contains
             write(*,*) " --iteration          reconstruct single snapshot (default is no snapshots)"
             write(*,*) " --order              order of the predictor"
             write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
+            write(*,*) " --eps-norm           normalization of wavelets"
             write(*,*) " --iteration          reconstruct single snapshot"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
@@ -685,7 +693,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
@@ -865,8 +873,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
@@ -1201,11 +1210,11 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n
+    integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n, min_lvl
     integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
-    logical :: verbosity = .false., save_all = .false.
+    logical :: verbosity = .false., save_all
 
     rank = params%rank
     call get_command_argument(2, args)
@@ -1219,6 +1228,7 @@ contains
             write(*,*) " CALL: ./wabbit-post --POD-reconstruct --time_coefficients=a_coefs.txt --components=3 "
             write(*,*) "                     --mode-list=POD_mode1.txt [POD_mode2.txt] [POD_mode3.txt]"
             write(*,*) "                     [--save_all --iteration=10 --order=[2|4] --nmodes=3 --adapt=0.1] "
+            write(*,*) "                     [--eps-norm=[L2,Linfty]] "
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " --time_coefficients  list of temporal coefficients for all modes"
             write(*,*) " --components         number of components in statevector"
@@ -1236,6 +1246,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--mode-list", fname_list )
@@ -1244,7 +1255,7 @@ contains
     read(args(1:len_trim(args)-2),* ) maxmem
     call get_cmd_arg( "--save_all", save_all, default=.true.)
     call get_cmd_arg( "--components", n_components, default=1_ik)
-    call get_cmd_arg( "--iteration", iteration, default=1_ik)
+    call get_cmd_arg( "--iteration", iteration, default=-1_ik)
     call get_cmd_arg( "--nmodes", N_modes_used, default=1_ik)
 
 
@@ -1364,11 +1375,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
 
-    do tree_id = 1, fsize
-    call reset_forest(lgt_block, lgt_active(:, tree_id), &
-              params%max_treelevel, lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id))
-    enddo
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks
     tree_n= 0 ! reset number of trees in forest
@@ -1379,14 +1388,14 @@ contains
       call read_field2tree(params, file_in(tree_id,:), params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-      !----------------------------------
-      ! Adapt the data to the given eps
-      !----------------------------------
-      !tmp_name = "adapted"
-      !write( file_out, '(a, "_", i12.12, ".h5")') trim(adjustl(tmp_name)), tree_id
-      !call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          !lgt_n, hvy_n, hvy_active, params%n_eqn, tree_id , time(tree_id) , tree_id )
     end do
+
+    min_lvl = min_active_level(lgt_block)
+    if (min_lvl == params%max_treelevel) then
+      params%min_treelevel= params%max_treelevel
+    endif
+
+
 
       if (params%rank==0) then
         write(*,'(80("-"))')
@@ -1549,14 +1558,16 @@ contains
   !---------------------------------------------------------------------------
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
-  if ( params%adapt_mesh) then
-     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
-        lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
+  call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
+  lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
 
+  if ( params%adapt_mesh) then
      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
      lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
      hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
-  endif
+   else
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
+   endif
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then
@@ -1623,7 +1634,7 @@ contains
             write(*,*) "                                --snapshot-list='list_u1.txt [list_u2.txt] [list_u3.txt]'"
             write(*,*) "                                --mode-list='list_m1.txt [list_m2.txt] [list_m3.txt]'"
             write(*,*) "                                [--order=[2|4] --adapt=0.1 --memory=2GB --iteration=1]"
-            write(*,*) "                                [--save_all]"
+            write(*,*) "                                [--save_all, --eps-norm=[L2,Linfty]]"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " returns:"
             write(*,*) " a_coef.txt           list of temporal coefficients for all modes"
@@ -1645,7 +1656,7 @@ contains
     !----------------------------------
     ! read predefined params
     !----------------------------------
-
+    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--order", order, default="CDF40" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
@@ -1821,8 +1832,9 @@ contains
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-   call reset_forest(lgt_block, lgt_active(:, 1), &
-   params%max_treelevel, lgt_n(1), lgt_sortednumlist(:,:,1))
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
+
 
     hvy_neighbor = -1
     lgt_n = 0 ! reset number of acitve light blocks

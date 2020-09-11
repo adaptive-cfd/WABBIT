@@ -83,11 +83,13 @@ module module_acm
     logical :: set_mask_on_ghost_nodes = .false.
     logical :: absorbing_sponge = .true.
 
+    logical :: harten_multiresolution = .true.
+
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=80) :: sponge_type=""
-    character(len=80) :: coarsening_indicator=""
+    character(len=80) :: coarsening_indicator="", wavelet="CDF4,0", wavelet_transform_type='harten-multiresolution'
     character(len=80), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
@@ -221,6 +223,18 @@ end subroutine
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
     call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
+
+    ! used for wavelet filtering...
+    call read_param_mpi(FILE, 'Wavelet', 'transform_type', params_acm%wavelet_transform_type, 'harten-multiresolution')
+    if (params_acm%wavelet_transform_type == 'harten-multiresolution') then
+        params_acm%harten_multiresolution = .true.
+
+    elseif (params_acm%wavelet_transform_type == 'biorthogonal') then
+        params_acm%harten_multiresolution = .false.
+        call read_param_mpi(FILE, 'Wavelet', 'wavelet', params_acm%wavelet, 'CDF4,4')
+
+    endif
+
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")
 

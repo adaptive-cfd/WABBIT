@@ -93,8 +93,6 @@ subroutine compute_scalar_field_post(params)
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
-    if (params%rank==0) params%number_blocks = params%number_blocks + &
-    mod(lgt_n, params%number_procs)
 
     ! allocate data
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &

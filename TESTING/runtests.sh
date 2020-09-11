@@ -28,8 +28,7 @@ end_color=$'\033[0m'
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=( "---post---"
-#        "TESTING/wabbit_post/pod/pod_bumblebee_adaptive.sh"
-#        "TESTING/wabbit_post/pod/pod_reconstruct_bumblebee.sh"
+        "TESTING/wabbit_post/pod/pod_test.sh"
         "---convection---"
         "TESTING/conv/blob_convection_2nd_zcurve/blob-conv-adaptive-2nd-zcurve.sh"
         "TESTING/conv/blob_3D_equi/blob3d.sh"

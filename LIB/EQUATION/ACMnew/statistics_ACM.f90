@@ -403,6 +403,16 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
                 ! kinematics data ('kinematics.t')
                 if (Insect%second_wing_pair) then
+                    ! second left wing
+                    color = Insect%color_l2
+                    call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color)/) )
+
+                    ! second right wing
+                    color = Insect%color_r2
+                    call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color)/) )
+
                     call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
                     Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
                     Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &

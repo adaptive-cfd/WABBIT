@@ -26,7 +26,8 @@ subroutine performance_test(params)
 
     ! perform 20 time steps per mesh.
     integer, parameter :: N_timesteps = 15
-    integer, parameter :: N_grids = 100
+    integer, parameter :: N_grids = 50
+    real(kind=rk), parameter :: target_grid_density = 0.11
 
     integer(kind=ik)                    :: number_procs, ierr, rank
     real(kind=rk)                       :: t0_timesteps(1:N_timesteps)
@@ -77,7 +78,7 @@ subroutine performance_test(params)
     call init_ghost_nodes( params )
 
 
-    params%max_grid_density = 0.10 / real(N_grids)
+    params%max_grid_density = target_grid_density / real(N_grids)
 
     do a = 1, N_grids
 
@@ -139,8 +140,8 @@ subroutine performance_test(params)
             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
         endif
 
-        ! next grid will be denser, but not more than 10% th
-        params%max_grid_density = min( params%max_grid_density + 0.08 / real(N_grids), 0.10 )
+        ! next grid will be denser
+        params%max_grid_density = params%max_grid_density + target_grid_density / real(N_grids)
     enddo
 
 

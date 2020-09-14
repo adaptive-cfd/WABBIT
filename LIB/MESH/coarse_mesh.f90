@@ -56,6 +56,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
     !---------------------------------------------------------------------------
     ! first, prepare for xfer (gather information: which blocks are sent where)
+    ! COLLECTIVE OPERATION
     !---------------------------------------------------------------------------
     do k = 1, lgt_n
         ! Check if the block will be coarsened.

@@ -159,7 +159,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     t1 = MPI_wtime()
     ! proc_dist_id: process responsible for current part of sfc
     ! proc_data_id: process who stores data of sfc element
-            
+
     ! we start the loop on the root rank (0), then assign the first elements
     ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
     proc_dist_id = 0
@@ -168,7 +168,8 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! in a long list
     com_i = 0
 
-    ! loop over sfc_list
+    ! prepare lists for transfering of blocks
+    ! COLLECTIVE OPERATION
     do k = 1, lgt_n
         ! if the current owner of the SFC is supposed to have zero blocks
         ! then it does not really own this part of the SFC. So we look for the

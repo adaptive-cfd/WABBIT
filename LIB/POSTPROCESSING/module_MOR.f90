@@ -379,7 +379,7 @@ contains
     !----------------------------------
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
-    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str( "--order", order, default="CDF44" )
     call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
     call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
     call get_cmd_arg_str_vct( "--list", fname_list )
@@ -557,6 +557,8 @@ contains
         write(*,'("Nblocks (if all trees dense)=",i9)') number_dense_blocks
         write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
+        write(*,'("wavelet=",A)') params%wavelet
+        write(*,'("Number ghosts=",i2)') params%n_ghosts
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
@@ -642,7 +644,7 @@ contains
     !--------------------------------------------
     character(len=80) :: fname_acoefs, filename, args, order
     character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
-    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
+    character(len=100),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
@@ -695,7 +697,7 @@ contains
     !----------------------------------
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
-    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str( "--order", order, default="CDF44" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
     call get_cmd_arg_str_vct( "--mode-list", fmode_list )
     call get_cmd_arg_str( "--time_coefficients", fname_acoefs, default= "acoefs.txt" )
@@ -957,6 +959,8 @@ contains
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
         write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
+        write(*,'("wavelet=",A)') params%wavelet
+        write(*,'("Number ghosts=",i2)') params%n_ghosts
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
@@ -1893,6 +1897,8 @@ contains
         write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
         write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
         write(*,'("Predictor=",A)') params%order_predictor
+        write(*,'("wavelet=",A)') params%wavelet
+        write(*,'("Number ghosts=",i2)') params%n_ghosts
         write(*,'("block_distribution=",A)') params%block_distribution
         write(*,'(80("-"))')
     endif
@@ -1942,15 +1948,17 @@ contains
     character(len=80), intent(in)    :: order
 
       ! Check parameters for correct inputs:
-      if (order == "CDF20") then
+      if (order == "CDF20" .or. order == "CDF2,0") then
           params%harten_multiresolution = .true.
           params%order_predictor = "multiresolution_2nd"
+          params%wavelet='CDF2,0'
           params%n_ghosts = 2_ik
-      elseif (order == "CDF40") then
+      elseif (order == "CDF40" .or. order == "CDF4,0") then
           params%harten_multiresolution = .true.
           params%order_predictor = "multiresolution_4th"
+          params%wavelet='CDF4,0'
           params%n_ghosts = 4_ik
-      elseif (order == "CDF44") then
+      elseif (order == "CDF44" .or. order == "CDF4,4") then
           params%harten_multiresolution = .false.
           params%wavelet_transform_type = 'biorthogonal'
           params%order_predictor = "multiresolution_4th"

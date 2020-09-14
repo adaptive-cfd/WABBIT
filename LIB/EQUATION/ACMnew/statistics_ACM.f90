@@ -49,6 +49,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: CFL, CFL_eta, CFL_nu
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
+    real(kind=rk), dimension(1:3,1:4) :: iwmoment
     real(kind=rk), save :: umag, umax, dx_min
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
@@ -354,7 +355,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             Insect%PartIntegrals( Insect%color_r )%Torque = params_acm%moment_color(1:3, Insect%color_r )
 
             call aero_power (Insect, apowtotal)
-            call inert_power(Insect, ipowtotal)
+            call inert_power(Insect, ipowtotal, iwmoment)
         endif
 
         !-------------------------------------------------------------------------
@@ -394,15 +395,25 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! left wing
                 color = Insect%color_l
                 call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color)/) )
-                call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color)/) )
+                call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,1)/) )
 
                 ! right wing
                 color = Insect%color_r
                 call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
-                call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color)/) )
+                call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,2)/) )
 
                 ! kinematics data ('kinematics.t')
                 if (Insect%second_wing_pair) then
+                    ! second left wing
+                    color = Insect%color_l2
+                    call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,3)/) )
+
+                    ! second right wing
+                    color = Insect%color_r2
+                    call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,4)/) )
+
                     call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
                     Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
                     Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &

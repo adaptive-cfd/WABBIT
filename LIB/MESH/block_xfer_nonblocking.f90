@@ -33,7 +33,8 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     character(len=*), intent(in), optional :: msg
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
-    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, ierr, tag, npoints2
+    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, npoints2
+    integer :: ierr, tag
     logical :: xfer_started(1:N_xfers)
     logical :: source_block_deleted(1:N_xfers)
 
@@ -113,7 +114,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call lgt_id_to_hvy_id( hvy_id_new, lgt_id_new, myrank, params%number_blocks )
 
             ireq = ireq + 1
-            tag = k ! use unique tag for each message
+            tag = 2*k ! use unique tag for each message
 
             ! open channel to receive one block.
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
@@ -123,7 +124,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
-                tag = -k ! recall tag must be unique..
+                tag = 2*k+1 ! recall tag must be unique..
 
                 ! open channel to receive one block.
                 call MPI_irecv( hvy_block2(:,:,:,:,hvy_id_new), npoints2, MPI_DOUBLE_PRECISION, mpirank_sender, &
@@ -141,7 +142,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             call lgt_id_to_hvy_id( hvy_id, lgt_id, mpirank_sender, params%number_blocks )
 
             ireq = ireq + 1
-            tag = k ! use unique tag for each message
+            tag = 2*k ! use unique tag for each message
 
             ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
             ! we have to wait for the MPI_REQUEST to be finnished.
@@ -152,7 +153,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
 
             if (present(hvy_block2)) then
                 ireq = ireq + 1
-                tag = -k ! recall tag must be unique..
+                tag = 2*k+1 ! recall tag must be unique..
                 ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
                 ! we have to wait for the MPI_REQUEST to be finnished.
                 call MPI_isend( hvy_block2(:,:,:,:,hvy_id), npoints2, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &

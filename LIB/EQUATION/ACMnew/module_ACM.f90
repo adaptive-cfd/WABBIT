@@ -549,8 +549,55 @@ end subroutine
       call init_t_file('kinematics.t', overwrite)
 
       if (Insect%second_wing_pair) then
-          ! TODO
-          call init_t_file('kinematics.t', overwrite)
+          call init_t_file('forces_leftwing2.t', overwrite)
+          call init_t_file('moments_leftwing2.t', overwrite)
+          call init_t_file('forces_rightwing2.t', overwrite)
+          call init_t_file('moments_rightwing2.t', overwrite)
+          call init_t_file('kinematics.t', overwrite, (/&
+          "           time", &
+          "    xc_body_g_x", &
+          "    xc_body_g_y", &
+          "    xc_body_g_z", &
+          "            psi", &
+          "           beta", &
+          "          gamma", &
+          "     eta_stroke", &
+          "        alpha_l", &
+          "          phi_l", &
+          "        theta_l", &
+          "        alpha_r", &
+          "          phi_r", &
+          "        theta_r", &
+          "  rot_rel_l_w_x", &
+          "  rot_rel_l_w_y", &
+          "  rot_rel_l_w_z", &
+          "  rot_rel_r_w_x", &
+          "  rot_rel_r_w_y", &
+          "  rot_rel_r_w_z", &
+          "   rot_dt_l_w_x", &
+          "   rot_dt_l_w_y", &
+          "   rot_dt_l_w_z", &
+          "   rot_dt_r_w_x", &
+          "   rot_dt_r_w_y", &
+          "   rot_dt_r_w_z", &
+          "       alpha_l2", &
+          "         phi_l2", &
+          "       theta_l2", &
+          "       alpha_r2", &
+          "         phi_r2", &
+          "       theta_r2", &
+          " rot_rel_l2_w_x", &
+          " rot_rel_l2_w_y", &
+          " rot_rel_l2_w_z", &
+          " rot_rel_r2_w_x", &
+          " rot_rel_r2_w_y", &
+          " rot_rel_r2_w_z", &
+          "  rot_dt_l2_w_x", &
+          "  rot_dt_l2_w_y", &
+          "  rot_dt_l2_w_z", &
+          "  rot_dt_r2_w_x", &
+          "  rot_dt_r2_w_y", &
+          "  rot_dt_r2_w_z"/) )
       else
           call init_t_file('kinematics.t', overwrite, (/&
           "           time", &

@@ -206,8 +206,10 @@ module module_insects
     logical, dimension(1:4) :: wings_radius_table_ready = .false.
     ! wing bounding box (xmin, xmax, ymin, ymax, zmin, zmax)
     real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
-    ! wing inertia (TODO: adapt for 4 wings)
+    ! wing inertia 
     real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
+    ! wing inertia of the second pair of wings
+    real(kind=rk) :: Jxx2=0.d0,Jyy2=0.d0,Jzz2=0.d0,Jxy2=0.d0
     character(len=strlen) :: wing_thickness_distribution(1:4) = "constant"
     character(len=strlen) :: pointcloudfile = "none"
     character(len=strlen) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
@@ -661,6 +663,7 @@ contains
   !       Insect%rot_dt_wing_l_w (global): left wing angular acceleration
   !       Insect%rot_dt_wing_r_w (global): right wing angular acceleration
   !       Insect%Jxx,Jyy,Jxy,Jzz (global) Wing inertia
+  !       Insect%Jxx2,Jyy2,Jxy2,Jzz2 (global) Wing inertia of the second pair
   ! MATHEMATICS:
   !       P_inertia = omega*( J*omega_dt + omega \cross (J*omega) )
   !                 = omega*( a + omega \cross b )
@@ -735,13 +738,13 @@ contains
       color_r2 = Insect%color_r2
 
       ! second left wing
-      a(1) = Insect%Jxx * Insect%rot_dt_wing_l2_w(1) + Insect%Jxy * Insect%rot_dt_wing_l2_w(2)
-      a(2) = Insect%Jxy * Insect%rot_dt_wing_l2_w(1) + Insect%Jyy * Insect%rot_dt_wing_l2_w(2)
-      a(3) = Insect%Jzz * Insect%rot_dt_wing_l2_w(3)
+      a(1) = Insect%Jxx2 * Insect%rot_dt_wing_l2_w(1) + Insect%Jxy2 * Insect%rot_dt_wing_l2_w(2)
+      a(2) = Insect%Jxy2 * Insect%rot_dt_wing_l2_w(1) + Insect%Jyy2 * Insect%rot_dt_wing_l2_w(2)
+      a(3) = Insect%Jzz2 * Insect%rot_dt_wing_l2_w(3)
 
-      b(1) = Insect%Jxx * Insect%rot_rel_wing_l2_w(1) + Insect%Jxy * Insect%rot_rel_wing_l2_w(2)
-      b(2) = Insect%Jxy * Insect%rot_rel_wing_l2_w(1) + Insect%Jyy * Insect%rot_rel_wing_l2_w(2)
-      b(3) = Insect%Jzz * Insect%rot_rel_wing_l2_w(3)
+      b(1) = Insect%Jxx2 * Insect%rot_rel_wing_l2_w(1) + Insect%Jxy2 * Insect%rot_rel_wing_l2_w(2)
+      b(2) = Insect%Jxy2 * Insect%rot_rel_wing_l2_w(1) + Insect%Jyy2 * Insect%rot_rel_wing_l2_w(2)
+      b(3) = Insect%Jzz2 * Insect%rot_rel_wing_l2_w(3)
 
       iwmoment(1,3) = (a(1)+Insect%rot_rel_wing_l2_w(2)*b(3)-Insect%rot_rel_wing_l2_w(3)*b(2))
       iwmoment(2,3) = (a(2)+Insect%rot_rel_wing_l2_w(3)*b(1)-Insect%rot_rel_wing_l2_w(1)*b(3))
@@ -753,13 +756,13 @@ contains
       Insect%rot_rel_wing_l2_w(3) * iwmoment(3,3)
 
       ! second right wing
-      a(1) = Insect%Jxx * Insect%rot_dt_wing_r2_w(1) + Insect%Jxy * Insect%rot_dt_wing_r2_w(2)
-      a(2) = Insect%Jxy * Insect%rot_dt_wing_r2_w(1) + Insect%Jyy * Insect%rot_dt_wing_r2_w(2)
-      a(3) = Insect%Jzz * Insect%rot_dt_wing_r2_w(3)
+      a(1) = Insect%Jxx2 * Insect%rot_dt_wing_r2_w(1) + Insect%Jxy2 * Insect%rot_dt_wing_r2_w(2)
+      a(2) = Insect%Jxy2 * Insect%rot_dt_wing_r2_w(1) + Insect%Jyy2 * Insect%rot_dt_wing_r2_w(2)
+      a(3) = Insect%Jzz2 * Insect%rot_dt_wing_r2_w(3)
 
-      b(1) = Insect%Jxx * Insect%rot_rel_wing_r2_w(1) + Insect%Jxy * Insect%rot_rel_wing_r2_w(2)
-      b(2) = Insect%Jxy * Insect%rot_rel_wing_r2_w(1) + Insect%Jyy * Insect%rot_rel_wing_r2_w(2)
-      b(3) = Insect%Jzz * Insect%rot_rel_wing_r2_w(3)
+      b(1) = Insect%Jxx2 * Insect%rot_rel_wing_r2_w(1) + Insect%Jxy2 * Insect%rot_rel_wing_r2_w(2)
+      b(2) = Insect%Jxy2 * Insect%rot_rel_wing_r2_w(1) + Insect%Jyy2 * Insect%rot_rel_wing_r2_w(2)
+      b(3) = Insect%Jzz2 * Insect%rot_rel_wing_r2_w(3)
 
       iwmoment(1,4) = (a(1)+Insect%rot_rel_wing_r2_w(2)*b(3)-Insect%rot_rel_wing_r2_w(3)*b(2))
       iwmoment(2,4) = (a(2)+Insect%rot_rel_wing_r2_w(3)*b(1)-Insect%rot_rel_wing_r2_w(1)*b(3))

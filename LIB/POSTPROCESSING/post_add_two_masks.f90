@@ -65,16 +65,22 @@ subroutine post_add_two_masks(params)
     if (mode=="--test_operations") then
         params%number_blocks = 5*max(N1,N2) ! just to get some memory:
     else
-        params%number_blocks = 2*max(N1,N2) ! just to get some memory:
+        params%number_blocks = 3*max(N1,N2) ! just to get some memory:
     end if
     params%domain_size = domain
     params%max_treelevel = max( tc_length2, tc_length1 )
     params%min_treelevel = 1
     params%n_eqn = 1
-    params%n_ghosts = 4
+
+    allocate(params%threshold_state_vector_component(params%n_eqn))
+    params%threshold_state_vector_component(1:params%n_eqn)=.True.
+    params%harten_multiresolution = .false.
+    params%wavelet_transform_type = 'biorthogonal'
+    params%order_predictor = "multiresolution_4th"
+    params%wavelet='CDF4,4'
+    params%n_ghosts = 6_ik
     params%forest_size = 20
     fsize = params%forest_size
-    params%order_predictor = "multiresolution_4th"
     params%block_distribution = "sfc_hilbert"
     params%time_step_method = 'none'
 
@@ -87,7 +93,9 @@ subroutine post_add_two_masks(params)
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
-    hvy_neighbor = -1
+
+    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    lgt_sortednumlist,tree_n)
     lgt_n = 0 ! reset number of active light blocks
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
@@ -107,7 +115,7 @@ subroutine post_add_two_masks(params)
     select case(mode)
     case ("--add")
         call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, verbosity=.true.)
 
     case ("--subtract")
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
@@ -120,30 +128,30 @@ subroutine post_add_two_masks(params)
         ! this tests inplace vs out of place operations
         ! z = x*y + x
         ! norm(w)
-        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, dest_tree_id=3, verbosity=.True.)
-        call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=3, dest_tree_id=4, verbosity=.True.)
-        ! y <- x*y + y
-        call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
-        call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
-        ! w = z-y
-        call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=4, dest_tree_id=3)
-
+         call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, dest_tree_id=3, verbosity=.True.)
+         call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=3, dest_tree_id=4, verbosity=.True.)
+        ! y <- x*y + x
+         call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+         call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+         ! w = z-y
+         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=4, dest_tree_id=3)
+        !
         norm =  scalar_product_two_trees( params, tree_n, &
                                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                                       tree_id1=4, tree_id2=4)
+                                       tree_id1=2, tree_id2=2)
         if (params%rank==0) then
             write(*,*) "Norm (should be not 0): ", norm
         end if
         norm =  scalar_product_two_trees( params, tree_n, &
                               lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                               hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                              tree_id1=2, tree_id2=2)
+                              tree_id1=4, tree_id2=4)
         if (params%rank==0) then
           write(*,*) "Norm (should be not 0): ", norm
         end if
@@ -175,7 +183,6 @@ subroutine post_add_two_masks(params)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
     lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
-
 
     call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )

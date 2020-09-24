@@ -53,6 +53,10 @@ module module_insects
   real(kind=rk), allocatable, dimension(:,:,:) :: corrugation_profile
   ! wing corrugation profile array dimensions
   integer, dimension(1:4), save :: corrugation_a, corrugation_b
+  ! wing damage mask
+  real(kind=rk), allocatable, dimension(:,:,:) :: damage_mask
+  ! wing damage mask array dimensions
+  integer, dimension(1:4), save :: damage_a, damage_b
 
   ! wing signed distance function, if the 3d-interpolation approach is used.
   ! This is useful for highly complex wings, where one generates the mask only once
@@ -219,6 +223,7 @@ module module_insects
     real(kind=rk), ALLOCATABLE :: bristles_coords(:,:,:)
     ! used for rectangular part of bristled model wings (Kleemeier)
     real(kind=rk) :: B_membrane(1:4), L_membrane(1:4)
+    logical :: damaged(1:4)
 
     !--------------------------------------------------------------
     ! Wing kinematics
@@ -333,6 +338,21 @@ contains
                 deallocate(corrugation_profile)
                 allocate(corrugation_profile(1:a,1:b,1:4))
                 corrugation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+                deallocate(profile_tmp)
+            endif
+        endif
+    case ("damage_mask")
+        if (.not.allocated(damage_mask)) then
+            allocate(damage_mask(1:a,1:b,1:4))
+        else
+            a_old = size(damage_mask,1)
+            b_old = size(damage_mask,2)
+            if ( (a_old<a) .or. (b_old<b) ) then
+                allocate(profile_tmp(1:a_old,1:b_old,1:4))
+                profile_tmp(:,:,:) = damage_mask(:,:,:)
+                deallocate(damage_mask)
+                allocate(damage_mask(1:a,1:b,1:4))
+                damage_mask(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                 deallocate(profile_tmp)
             endif
         endif

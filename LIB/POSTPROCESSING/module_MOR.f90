@@ -1169,8 +1169,8 @@ contains
         !
         t_inc(1) = MPI_WTIME() - t_inc(1)
         if (rank == 0) then
-          write(*,'("Matrixelement (i,j)= (", i3,",", i3, ") constructed in t_cpu=",es10.2, "sec ")') &
-          tree_id1, tree_id2, t_inc(1)
+          write(*,'("Matrixelement (i,j)= (", i3,",", i3, ") constructed in t_cpu=",es10.2, "sec Nblocks=",i10)') &
+          tree_id1, tree_id2, t_inc(1), sum(lgt_n(1:N_snapshots))
         endif
       end do
     end do
@@ -1433,7 +1433,7 @@ contains
     endif
 
     !----------------------------------
-    ! COMPUTE POD Modes
+    ! reconstruct iteration
     !----------------------------------
     reconst_tree_id = tree_n + 1
     if (save_all) then

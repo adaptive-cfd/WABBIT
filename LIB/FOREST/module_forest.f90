@@ -1553,26 +1553,31 @@ contains
           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
           !
-          if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
-            call coarse_tree_2_reference_mesh(params, tree_n, &
-                  lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-                  lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
-                  hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
-            call coarse_tree_2_reference_mesh(params, tree_n, &
-                  lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-                  lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
-                  hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+          ! update neighbor relations and synchronice ghosts of 1st tree
+          call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, dest_tree_id), &
+          lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:, dest_tree_id), hvy_n(dest_tree_id) )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
+          if (tree_id1 .ne. tree_id2) then
+              call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
+              lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
+              hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
+
+              call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+              lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+              hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
           endif
-        else
-          if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
-            call coarse_tree_2_reference_mesh(params, tree_n, &
-                  lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-                  lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
-                  hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
-          endif
-        endif
-        call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", MPI_Wtime()-t_elapse )
+      else
+
+          ! update neighbor relations and synchronice ghosts of 1st tree
+          call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
+          lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:, tree_id1), hvy_n(tree_id1) )
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
+
+          call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+          lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+          hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
+      end if
+      call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", MPI_Wtime()-t_elapse )
     end subroutine
     !##############################################################
 
@@ -1778,11 +1783,11 @@ function scalar_product_two_trees( params, tree_n, &
     integer(kind=ik)    :: ix, iy, iz, iq, k1, k2, Nord, delta1, delta2, delta3
 
     real(kind=rk), allocatable , save ::  M(:)
-    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
+    real(kind=8) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
     real(kind=rk) :: x0(3), dx(3)
 
-    integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
-    integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
+    ! integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+    ! integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
 
     if (present(verbosity)) verbose=verbosity
 
@@ -1852,8 +1857,8 @@ function scalar_product_two_trees( params, tree_n, &
     if (tree_id1 .ne. tree_id2) then
         ! first we save the old tree structure because it will be lost after
         ! unification of both meshes
-        call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
-                              lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
+        ! call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+        !                       lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
         call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
@@ -1890,8 +1895,8 @@ function scalar_product_two_trees( params, tree_n, &
                     !##########################################
                     ! 2d
                     do iq = 1, params%N_eqn
-                        do iy = g+1, Bs(2) + g
-                            do ix = g+1, Bs(1) + g
+                        do iy = g+1, Bs(2) + g - 1
+                            do ix = g+1, Bs(1) + g - 1
                                 tmp = 0.0_rk
                                 do delta1 = -Nord+1, Nord-1
                                  do delta2 = -Nord+1, Nord-1
@@ -1909,9 +1914,9 @@ function scalar_product_two_trees( params, tree_n, &
                     !##########################################
                     ! 3D
                     do iq = 1, params%N_eqn
-                        do iz = g+1, Bs(3) + g
-                            do iy = g+1, Bs(2) + g
-                                do ix = g+1, Bs(1) + g
+                        do iz = g+1, Bs(3) + g - 1
+                            do iy = g+1, Bs(2) + g - 1
+                                do ix = g+1, Bs(1) + g - 1
                                     tmp = 0.0_rk
                                     do delta1 = -Nord+1, Nord-1
                                         do delta2 = -Nord+1, Nord-1
@@ -1942,26 +1947,19 @@ function scalar_product_two_trees( params, tree_n, &
     !----------------------------------------------------
     ! sum over all Procs
     !----------------------------------------------------
-    call MPI_ALLREDUCE(MPI_IN_PLACE, sprod, 1, MPI_DOUBLE_PRECISION, &
+    sprod_block = sprod
+    call MPI_ALLREDUCE(sprod_block, sprod, 1, MPI_DOUBLE, &
                        MPI_SUM,WABBIT_COMM, mpierr)
-    !
-    ! call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
-    ! lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
-    ! hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
-    !
-    !
-    ! call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
-    ! lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
-    ! hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
-    if (tree_id1 .ne. tree_id2) then
-      call coarse_tree_2_reference_mesh(params, tree_n, &
-            lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-            lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
-            hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
-      call coarse_tree_2_reference_mesh(params, tree_n, &
-            lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-            lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
-            hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+
+    if (tree_id1 .ne. tree_id2 .and. params%adapt_mesh) then
+        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
+        lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
+        hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
+
+
+        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+        lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+        hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
     endif
 
     t_elapse = MPI_WTIME() - t_elapse

@@ -48,8 +48,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     real(kind=rk), intent(in), optional :: eps
 
     integer(kind=ik)                    :: dF, i, j, l
-    real(kind=rk)                       :: detail( size(block_data,4) )
-    integer(kind=ik)                    :: g
+    real(kind=rk)                       :: detail( size(block_data,4) ), dx_min(3)
+    integer(kind=ik)                    :: g, dim, Jmax
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
     real(kind=rk), allocatable, save    :: u2(:,:,:), u3(:,:,:)
@@ -57,6 +57,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     t0 = MPI_Wtime()
     Bs = params%Bs
     g  = params%n_ghosts
+    dim = params%dim
+    Jmax = params%max_treelevel
     detail = -1.0_rk
 
     ! --------------------------- 3D -------------------------------------------
@@ -226,7 +228,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        eps2 = eps2 * ( 2.0_rk**(-dble((level-params%max_treelevel)*params%dim)/2.0_rk) )
+        dx_min(1:dim) = 2.0_rk**(-Jmax) *params%domain_size(1:dim) / real( Bs(1:dim)-1, kind=rk )
+        eps2 = eps2 * ( 2.0_rk**(-dble((level)*params%dim)/2.0_rk) )/product(dx_min(1:dim))
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity

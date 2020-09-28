@@ -59,7 +59,7 @@ module module_acm
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3), urms(1:3), div_max, div_min
     ! forces for the different colors
-    real(kind=rk) :: force_color(1:3,0:5), moment_color(1:3,0:5)
+    real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     ! gamma_p
     real(kind=rk) :: gamma_p
     ! want to add forcing?

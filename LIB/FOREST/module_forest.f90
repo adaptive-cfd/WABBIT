@@ -523,6 +523,7 @@ contains
 
         call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id_dest),&
         lgt_n(tree_id_dest), lgt_sortednumlist(:,:,tree_id_dest), hvy_active(:,tree_id_dest), hvy_n(tree_id_dest) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id_dest), hvy_n(tree_id_dest))
 
         call toc( "copy_tree (copy synchronize hvy and lgt)", MPI_Wtime()-t_elapse )
 
@@ -574,7 +575,7 @@ contains
         implicit none
         !-----------------------------------------------------------------
         ! inputs:
-        type (type_params), intent(in)  :: params
+        type (type_params), intent(inout)  :: params
         integer(kind=ik), intent(in)      :: tree_id
         !> light data array
         integer(kind=ik),  intent(inout):: lgt_block(:, :)
@@ -734,9 +735,9 @@ contains
             endif
         end do
 
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
         call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_id )
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
     end subroutine
 
 
@@ -1034,7 +1035,7 @@ contains
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(inout) :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
@@ -1056,7 +1057,7 @@ contains
         character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
         integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
-
+        logical :: MR
         Jmax = params%max_treelevel ! max treelevel
         fsize= params%forest_size   ! maximal number of trees in forest
         N    = params%number_blocks ! number of blocks per rank
@@ -1089,24 +1090,24 @@ contains
 
         if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
         t_elapse = MPI_WTIME()
-          call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
-                                lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
+            call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                                    lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
-        call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
-        call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+            call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
+            call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
 
-        ! because all trees have the same treestructrue thier hilbertcurve is identical
-        ! and therefore balance the load will try to distribute blocks with the same
-        ! treecode (but on different trees) at the same rank.
-        t_elapse = MPI_WTIME()
-        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-        lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
-        hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
+            ! because all trees have the same treestructrue thier hilbertcurve is identical
+            ! and therefore balance the load will try to distribute blocks with the same
+            ! treecode (but on different trees) at the same rank.
+            t_elapse = MPI_WTIME()
+            call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+            lgt_active(:, tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+            hvy_active(:, tree_id1), hvy_n(tree_id1), tree_id1, .true. )
 
-        call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
-        lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
-        hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
+            call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
+            lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+            hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
 
           call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
         end if
@@ -1547,36 +1548,73 @@ contains
         call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
 
         t_elapse = MPI_Wtime()
+
+        !!! Attention we should not use prefilter of CDF44 wavelets here. Because
+        !!! it will change the original data!!!
+        MR = params%harten_multiresolution
+        params%harten_multiresolution = .True.
         if (present(dest_tree_id)) then
-          ! we have to synchronize lgt data since we were updating it locally on this procesor
-          call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
-          call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-          lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
-          !
-          ! update neighbor relations and synchronice ghosts of 1st tree
-          call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, dest_tree_id), &
-          lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:, dest_tree_id), hvy_n(dest_tree_id) )
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
-          if (tree_id1 .ne. tree_id2) then
-              call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
-              lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
-              hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
+           ! we have to synchronize lgt data since we were updating it locally on this procesor
+           call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+           call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+           !
+           if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
+             call coarse_tree_2_reference_mesh(params, tree_n, &
+                   lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+                   lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
+                   hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
+             call coarse_tree_2_reference_mesh(params, tree_n, &
+                   lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+                   lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+                   hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+           endif
+         else
+           if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
+             call coarse_tree_2_reference_mesh(params, tree_n, &
+                   lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+                   lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+                   hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+           endif
+           call update_grid_metadata( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id1), lgt_n(tree_id1),&
+           lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1),tree_id1 )
+           call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
+         endif
+         params%harten_multiresolution=MR
 
-              call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
-              lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
-              hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
-          endif
-      else
 
-          ! update neighbor relations and synchronice ghosts of 1st tree
-          call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
-          lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:, tree_id1), hvy_n(tree_id1) )
-          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
 
-          call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
-          lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
-          hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
-      end if
+      !   if (present(dest_tree_id)) then
+      !     ! we have to synchronize lgt data since we were updating it locally on this procesor
+      !     call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+      !     call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+      !     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+      !     !
+      !     ! update neighbor relations and synchronice ghosts of 1st tree
+      !     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, dest_tree_id), &
+      !     lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:, dest_tree_id), hvy_n(dest_tree_id) )
+      !     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
+      !     if (tree_id1 .ne. tree_id2) then
+      !         call coarse_tree_2_reference_mesh(params, tree_n, &
+      !             lgt_block, lgt_active(:,tree_id1),lgt_n, lgt_sortednumlist(:,:,tree_id1), &
+      !             lgt_block_ref, lgt_active_ref,lgt_n_ref, &
+      !             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id, verbosity)
+      !
+      !         call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+      !         lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+      !         hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
+      !     endif
+      ! else
+      !
+      !     ! update neighbor relations and synchronice ghosts of 1st tree
+      !     call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:, tree_id1), &
+      !     lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:, tree_id1), hvy_n(tree_id1) )
+      !     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
+      !
+      !     call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
+      !     lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
+      !     hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
+      ! end if
       call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", MPI_Wtime()-t_elapse )
     end subroutine
     !##############################################################
@@ -1755,7 +1793,7 @@ function scalar_product_two_trees( params, tree_n, &
 
     !-----------------------------------------------------------------
     !> user defined parameter structure
-    type (type_params), intent(in)  :: params
+    type (type_params), intent(inout)  :: params
     integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
     !> light data array
     integer(kind=ik),  intent(inout):: lgt_block(:, :)
@@ -1775,7 +1813,7 @@ function scalar_product_two_trees( params, tree_n, &
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !---------------------------------------------------------------
-    logical :: verbose=.false.
+    logical :: verbose=.false.,MR
     integer(kind=ik)    :: free_tree_id, Jmax, Bs(3), g, &
                          N, k, rank, i, mpierr
     integer(kind=ik)    :: level1, level2, hvy_id1, hvy_id2, lgt_id1, lgt_id2
@@ -1786,8 +1824,8 @@ function scalar_product_two_trees( params, tree_n, &
     real(kind=8) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
     real(kind=rk) :: x0(3), dx(3)
 
-    ! integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
-    ! integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
+    integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+    integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
 
     if (present(verbosity)) verbose=verbosity
 
@@ -1857,8 +1895,8 @@ function scalar_product_two_trees( params, tree_n, &
     if (tree_id1 .ne. tree_id2) then
         ! first we save the old tree structure because it will be lost after
         ! unification of both meshes
-        ! call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
-        !                       lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
+        call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                              lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
         call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
@@ -1950,17 +1988,21 @@ function scalar_product_two_trees( params, tree_n, &
     sprod_block = sprod
     call MPI_ALLREDUCE(sprod_block, sprod, 1, MPI_DOUBLE, &
                        MPI_SUM,WABBIT_COMM, mpierr)
-
-    if (tree_id1 .ne. tree_id2 .and. params%adapt_mesh) then
-        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id1), &
-        lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), &
-        hvy_n(tree_id1), tree_id1, params%coarsening_indicator, hvy_tmp )
-
-
-        call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id2), &
-        lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), hvy_active(:,tree_id2), &
-        hvy_n(tree_id2), tree_id2, params%coarsening_indicator, hvy_tmp )
-    endif
+    !!! Attention we should not use prefilter of CDF44 wavelets here. Because
+    !!! it will change the original data!!!
+   MR = params%harten_multiresolution
+   params%harten_multiresolution=.True.
+   if (tree_id1 .ne. tree_id2) then
+     call coarse_tree_2_reference_mesh(params, tree_n, &
+           lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
+           lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
+           hvy_block, hvy_active(:,tree_id1), hvy_n(tree_id1), hvy_tmp, hvy_neighbor, tree_id1, verbosity=.False.)
+     call coarse_tree_2_reference_mesh(params, tree_n, &
+           lgt_block, lgt_active(:,tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
+           lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
+           hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
+   endif
+   params%harten_multiresolution=MR
 
     t_elapse = MPI_WTIME() - t_elapse
 
@@ -1986,7 +2028,7 @@ function scalar_product_two_trees_old( params, tree_n, &
 
     !-----------------------------------------------------------------
     !> user defined parameter structure
-    type (type_params), intent(in)  :: params
+    type (type_params), intent(inout)  :: params
     integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
     !> for the multiplication we need an additional tree as a buffer. If
     !> no tree is passed as additional argument we will create a new tree
@@ -2100,7 +2142,7 @@ end function
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in)    :: params   !< params structure
+        type (type_params), intent(inout)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:) !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
@@ -2142,7 +2184,7 @@ end function
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(inout) :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree

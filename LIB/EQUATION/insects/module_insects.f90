@@ -796,11 +796,11 @@ contains
 
     ! transform into the laboratory reference frame
     !iwmoment_g(:,color_b) = matmul(Insect%M_body_inv,iwmoment(:,color_b))
-    iwmoment_g(:,color_l) = matmul(Insect%M_body_inv,matmul(Insect%M_body_inv,iwmoment(:,color_l)))
-    iwmoment_g(:,color_r) = matmul(Insect%M_body_inv,matmul(Insect%M_body_inv,iwmoment(:,color_r)))
+    iwmoment_g(:,color_l) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_l),iwmoment(:,color_l)))
+    iwmoment_g(:,color_r) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_r),iwmoment(:,color_r)))
     if (Insect%second_wing_pair) then
-        iwmoment_g(:,color_l2) = matmul(Insect%M_body_inv,matmul(Insect%M_body_inv,iwmoment(:,color_l2)))
-        iwmoment_g(:,color_r2) = matmul(Insect%M_body_inv,matmul(Insect%M_body_inv,iwmoment(:,color_r2)))
+        iwmoment_g(:,color_l2) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_l2),iwmoment(:,color_l2)))
+        iwmoment_g(:,color_r2) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_r2),iwmoment(:,color_r2)))
     endif
 
   end subroutine inert_power

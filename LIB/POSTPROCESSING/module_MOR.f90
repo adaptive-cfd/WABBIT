@@ -74,7 +74,7 @@ contains
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !> number of POD modes
     integer(kind=ik),optional, intent(inout)     :: truncation_rank
-    !> Threshold value for truncating POD modes. If the singular value is smaller,
+    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk), optional, intent(in)     :: truncation_error
     !> if true we write out all temporal coefficients and eigenvalues
@@ -223,18 +223,15 @@ contains
       call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
 
+      ! adapt POD MODE
+
     end do
 
-    ! adapt POD MODE
     if ( params%adapt_mesh) then
-      call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id),&
-      lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), hvy_n(pod_mode_tree_id) )
-
       call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
       lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
       hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
     endif
-
 
     t_elapse = MPI_WTIME() - t_elapse
     if (rank == 0) then
@@ -509,7 +506,7 @@ contains
     do tree_id = 1, N_snapshots
       call read_field2tree(params,file_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
-                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor,  verbosity=.false.)
       !----------------------------------
       ! Adapt the data to the given eps
       !----------------------------------
@@ -662,7 +659,7 @@ contains
     integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
-    logical :: verbose = .false., save_all = .false., all_snapshots_dense=.True.
+    logical :: verbose = .false., save_all = .false., all_snapshots_dense = .false.
 
     call get_command_argument(2, args)
     if ( args== '--help' .or. args == '--h') then
@@ -888,19 +885,23 @@ contains
     do tree_id = 1, N_snapshots
       call read_field2tree(params,snapshot_in(tree_id,:) , params%n_eqn, tree_id, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
-                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.true.)
+                  hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.false.)
     end do
 
     min_lvl = min_active_level(lgt_block)
     if (min_lvl == params%max_treelevel) then
       all_snapshots_dense = .True.
       params%min_treelevel= params%max_treelevel
+      params%adapt_mesh=.False.
       ! it is faster to bring all modes to the same mesh at this point,
       ! since otherwise they will be refined and coarsed when reconstructing
       ! the snapshots. this produces a lot of overhead and makes the calculations slow
+      ! The results will stay the same.
       if ( params%rank==0 ) write(*,*) '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
       if ( params%rank==0 ) write(*,*) "All modes will be refined to dense grid !!"
       if ( params%rank==0 ) write(*,*) '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    else
+      all_snapshots_dense = .False.
     endif
     !----------------------------------
     ! READ ALL MODES
@@ -1053,7 +1054,7 @@ contains
       implicit none
       !-----------------------------------------------------------------
       ! inputs:
-      type (type_params), intent(in)  :: params
+      type (type_params), intent(inout)  :: params
       integer(kind=ik), intent(in)      :: N_snapshots
       !> light data array
       integer(kind=ik),  intent(inout):: lgt_block(:, :)
@@ -1112,7 +1113,7 @@ contains
 
     !-----------------------------------------------------------------
     !> user defined parameter structure
-    type (type_params), intent(in)  :: params
+    type (type_params), intent(inout)  :: params
     !> Covariance matrix for snapshot POD
     real(kind=rk),  intent(inout)   :: C(:,:)
     !> light data array
@@ -1252,7 +1253,7 @@ contains
     !----------------------------------
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
-    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str( "--order", order, default="CDF44" )
     call get_cmd_arg_str_vct( "--mode-list", fname_list )
     call get_cmd_arg_str( "--time_coefficients", fname_acoefs, default= "a_coefs.txt" )
     call get_cmd_arg( "--memory", args, default="2GB")
@@ -1662,7 +1663,7 @@ contains
     !----------------------------------
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
-    call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str( "--order", order, default="CDF44" )
     call get_cmd_arg_str_vct( "--snapshot-list", fsnapshot_list )
     call get_cmd_arg_str_vct( "--mode-list", fmode_list )
     call get_cmd_arg( "--memory", args, default="2GB")

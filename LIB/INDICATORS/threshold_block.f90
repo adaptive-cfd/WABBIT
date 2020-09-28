@@ -228,7 +228,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        dx_min(1:dim) = 2.0_rk**(-Jmax) *params%domain_size(1:dim) / real( Bs(1:dim)-1, kind=rk )
+        dx_min(1:dim) = sqrt(2.0_rk**(-Jmax) *params%domain_size(1:dim)/ real( Bs(1:dim)-1, kind=rk ))
         eps2 = eps2 * ( 2.0_rk**(-dble((level)*params%dim)/2.0_rk) )/product(dx_min(1:dim))
 
     case ("H1")

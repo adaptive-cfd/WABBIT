@@ -1003,7 +1003,7 @@ contains
             !                   - componentnumber dF
             !                   - number of modes used for reconstruction r
             !                   - time of reconstructed snapshot
-            if (params%rank == 0) write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
+            write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
             call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
             lgt_n, hvy_n, hvy_active, dF, reconst_tree_id ,time(j), iter_list(j) )
           end do

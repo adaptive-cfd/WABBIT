@@ -889,9 +889,8 @@ contains
     end do
 
     min_lvl = min_active_level(lgt_block)
-    if (min_lvl == params%max_treelevel) then
+    if (min_lvl==params%max_treelevel) then
       all_snapshots_dense = .True.
-      params%min_treelevel= params%max_treelevel
       params%adapt_mesh=.False.
       ! it is faster to bring all modes to the same mesh at this point,
       ! since otherwise they will be refined and coarsed when reconstructing
@@ -1004,7 +1003,7 @@ contains
             !                   - componentnumber dF
             !                   - number of modes used for reconstruction r
             !                   - time of reconstructed snapshot
-            write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
+            if (params%rank == 0) write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
             call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
             lgt_n, hvy_n, hvy_active, dF, reconst_tree_id ,time(j), iter_list(j) )
           end do
@@ -1020,6 +1019,17 @@ contains
         L2norm = L2norm + norm**2
       end do
       L2error(r) = L2norm/L2norm_snapshots**2
+
+      if (params%rank == 0) then
+        write(*, *)
+        write(*,'(80("-"))')
+        write(*,'(30("#"), " Error using Nmodes = ", i4 ,30("#"))') r
+        write(*,'(80("-"))')
+        write(*,'("relative L2 error ",f12.8)') L2error(r)
+        write(*,'(80("-"))')
+        write(*, *)
+      endif
+
     end do
 
     !--------------------------
@@ -1572,7 +1582,7 @@ contains
      hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
    else
       call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
-   endif
+  endif
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then

@@ -1089,14 +1089,16 @@ contains
         ! all blocks which are not on the same level.
 
         if (tree_id1 .ne. tree_id2 .and. params%max_treelevel .ne. params%min_treelevel) then
-        t_elapse = MPI_WTIME()
+            t_elapse = MPI_WTIME()
             call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
                                     lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id1, tree_id2)
 
             call refine_trees2same_lvl(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2)
             call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+        end if
 
+        if (tree_id1 .ne. tree_id2) then
             ! because all trees have the same treestructrue thier hilbertcurve is identical
             ! and therefore balance the load will try to distribute blocks with the same
             ! treecode (but on different trees) at the same rank.
@@ -1108,9 +1110,10 @@ contains
             call balance_load( params, lgt_block, hvy_block,  hvy_neighbor, &
             lgt_active(:, tree_id2), lgt_n(tree_id2), lgt_sortednumlist(:,:,tree_id2), &
             hvy_active(:, tree_id2), hvy_n(tree_id2), tree_id2, .true. )
-
-          call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
         end if
+
+        call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+
         !=================================================
         ! Decide which pointwice arithmetic shell be used
         !=================================================

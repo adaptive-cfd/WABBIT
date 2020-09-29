@@ -13,7 +13,7 @@ module module_timing
     !**********************************************************************************************
     ! These are the important routines that are visible to other modules:
     !**********************************************************************************************
-    PUBLIC :: toc, summarize_profiling
+    PUBLIC :: toc, summarize_profiling, reset_all_timings
     !*********************************************************************************************
 
     ! precision of reals in this module. we use this separated precision in order for
@@ -31,6 +31,11 @@ module module_timing
     character(len=100), dimension(:), allocatable :: name_comp_time
 
 contains
+
+    subroutine reset_all_timings()
+        implicit none
+        if (allocated(comp_time)) comp_time = 0.0_dp
+    end subroutine
 
 
     !> For a given NAME, increase the function call counter by one and store the

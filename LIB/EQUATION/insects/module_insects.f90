@@ -675,9 +675,9 @@ contains
   ! when flapping its wings in vacuum.
   ! OUTPUT:
   !       ipowtotal: total inertial power
-  !       iwmoment: inertial force moment components of the wings about the hinge
+  !       iwmoment_g: inertial force moment components of the wings about the hinge in the laboratory reference frame
   !                          first index - component: x, y, z
-  !                          second index - wing: left, right 2nd left, 2nd right
+  !                          second index - 1:body (unused), 2:left wing, 3:right wing, 4:2nd left wing, 5:2nd right wing
   !       Insect%PartIntegrals%IPow: (global): individual inertial power
   ! INPUT:
   !       Insect%rot_dt_wing_l_w (global): left wing angular acceleration
@@ -695,16 +695,18 @@ contains
   !       Berman, Wang: Energy minimizing kinematics in hovering insect flight
   !       (JFM 582, 2007), eqn 2.22 (looks a bit different)
   !-------------------------------------------------------------------------------
-  subroutine inert_power(Insect,ipowtotal,iwmoment)
+  subroutine inert_power(Insect,ipowtotal,iwmoment_g)
     implicit none
 
     real(kind=rk), intent(out) :: ipowtotal
-    real(kind=rk), dimension(1:3,1:4), intent(out) :: iwmoment
+    real(kind=rk), dimension(1:3,1:5), intent(out) :: iwmoment_g
     real(kind=rk), dimension(1:3) :: a,b
+    real(kind=rk), dimension(1:3,1:5) :: iwmoment
     integer(kind=2) :: color_body, color_l, color_r, color_l2, color_r2
     type(diptera),intent(inout)::Insect
 
     iwmoment = 0
+    iwmoment_g = 0
 
     ! colors for Diptera (one body, two wings)
     color_body = Insect%color_body
@@ -720,14 +722,14 @@ contains
     b(2) = Insect%Jxy * Insect%rot_rel_wing_l_w(1) + Insect%Jyy * Insect%rot_rel_wing_l_w(2)
     b(3) = Insect%Jzz * Insect%rot_rel_wing_l_w(3)
 
-    iwmoment(1,1) = (a(1)+Insect%rot_rel_wing_l_w(2)*b(3)-Insect%rot_rel_wing_l_w(3)*b(2))
-    iwmoment(2,1) = (a(2)+Insect%rot_rel_wing_l_w(3)*b(1)-Insect%rot_rel_wing_l_w(1)*b(3))
-    iwmoment(3,1) = (a(3)+Insect%rot_rel_wing_l_w(1)*b(2)-Insect%rot_rel_wing_l_w(2)*b(1))
+    iwmoment(1,color_l) = (a(1)+Insect%rot_rel_wing_l_w(2)*b(3)-Insect%rot_rel_wing_l_w(3)*b(2))
+    iwmoment(2,color_l) = (a(2)+Insect%rot_rel_wing_l_w(3)*b(1)-Insect%rot_rel_wing_l_w(1)*b(3))
+    iwmoment(3,color_l) = (a(3)+Insect%rot_rel_wing_l_w(1)*b(2)-Insect%rot_rel_wing_l_w(2)*b(1))
 
     Insect%PartIntegrals(color_l)%IPow = &
-    Insect%rot_rel_wing_l_w(1) * iwmoment(1,1) + &
-    Insect%rot_rel_wing_l_w(2) * iwmoment(2,1) + &
-    Insect%rot_rel_wing_l_w(3) * iwmoment(3,1)
+    Insect%rot_rel_wing_l_w(1) * iwmoment(1,color_l) + &
+    Insect%rot_rel_wing_l_w(2) * iwmoment(2,color_l) + &
+    Insect%rot_rel_wing_l_w(3) * iwmoment(3,color_l)
 
     !-- RIGHT WING
     a(1) = Insect%Jxx * Insect%rot_dt_wing_r_w(1) + Insect%Jxy * Insect%rot_dt_wing_r_w(2)
@@ -738,14 +740,14 @@ contains
     b(2) = Insect%Jxy * Insect%rot_rel_wing_r_w(1) + Insect%Jyy * Insect%rot_rel_wing_r_w(2)
     b(3) = Insect%Jzz * Insect%rot_rel_wing_r_w(3)
 
-    iwmoment(1,2) = (a(1)+Insect%rot_rel_wing_r_w(2)*b(3)-Insect%rot_rel_wing_r_w(3)*b(2))
-    iwmoment(2,2) = (a(2)+Insect%rot_rel_wing_r_w(3)*b(1)-Insect%rot_rel_wing_r_w(1)*b(3))
-    iwmoment(3,2) = (a(3)+Insect%rot_rel_wing_r_w(1)*b(2)-Insect%rot_rel_wing_r_w(2)*b(1))
+    iwmoment(1,color_r) = (a(1)+Insect%rot_rel_wing_r_w(2)*b(3)-Insect%rot_rel_wing_r_w(3)*b(2))
+    iwmoment(2,color_r) = (a(2)+Insect%rot_rel_wing_r_w(3)*b(1)-Insect%rot_rel_wing_r_w(1)*b(3))
+    iwmoment(3,color_r) = (a(3)+Insect%rot_rel_wing_r_w(1)*b(2)-Insect%rot_rel_wing_r_w(2)*b(1))
 
     Insect%PartIntegrals(color_r)%IPow = &
-    Insect%rot_rel_wing_r_w(1) * iwmoment(1,2) + &
-    Insect%rot_rel_wing_r_w(2) * iwmoment(2,2) + &
-    Insect%rot_rel_wing_r_w(3) * iwmoment(3,2)
+    Insect%rot_rel_wing_r_w(1) * iwmoment(1,color_r) + &
+    Insect%rot_rel_wing_r_w(2) * iwmoment(2,color_r) + &
+    Insect%rot_rel_wing_r_w(3) * iwmoment(3,color_r)
 
     ipowtotal = Insect%PartIntegrals(color_r)%IPow + Insect%PartIntegrals(color_l)%IPow
 
@@ -766,14 +768,14 @@ contains
       b(2) = Insect%Jxy2 * Insect%rot_rel_wing_l2_w(1) + Insect%Jyy2 * Insect%rot_rel_wing_l2_w(2)
       b(3) = Insect%Jzz2 * Insect%rot_rel_wing_l2_w(3)
 
-      iwmoment(1,3) = (a(1)+Insect%rot_rel_wing_l2_w(2)*b(3)-Insect%rot_rel_wing_l2_w(3)*b(2))
-      iwmoment(2,3) = (a(2)+Insect%rot_rel_wing_l2_w(3)*b(1)-Insect%rot_rel_wing_l2_w(1)*b(3))
-      iwmoment(3,3) = (a(3)+Insect%rot_rel_wing_l2_w(1)*b(2)-Insect%rot_rel_wing_l2_w(2)*b(1))
+      iwmoment(1,color_l2) = (a(1)+Insect%rot_rel_wing_l2_w(2)*b(3)-Insect%rot_rel_wing_l2_w(3)*b(2))
+      iwmoment(2,color_l2) = (a(2)+Insect%rot_rel_wing_l2_w(3)*b(1)-Insect%rot_rel_wing_l2_w(1)*b(3))
+      iwmoment(3,color_l2) = (a(3)+Insect%rot_rel_wing_l2_w(1)*b(2)-Insect%rot_rel_wing_l2_w(2)*b(1))
 
       Insect%PartIntegrals(color_l2)%IPow = &
-      Insect%rot_rel_wing_l2_w(1) * iwmoment(1,3) + &
-      Insect%rot_rel_wing_l2_w(2) * iwmoment(2,3) + &
-      Insect%rot_rel_wing_l2_w(3) * iwmoment(3,3)
+      Insect%rot_rel_wing_l2_w(1) * iwmoment(1,color_l2) + &
+      Insect%rot_rel_wing_l2_w(2) * iwmoment(2,color_l2) + &
+      Insect%rot_rel_wing_l2_w(3) * iwmoment(3,color_l2)
 
       ! second right wing
       a(1) = Insect%Jxx2 * Insect%rot_dt_wing_r2_w(1) + Insect%Jxy2 * Insect%rot_dt_wing_r2_w(2)
@@ -784,19 +786,43 @@ contains
       b(2) = Insect%Jxy2 * Insect%rot_rel_wing_r2_w(1) + Insect%Jyy2 * Insect%rot_rel_wing_r2_w(2)
       b(3) = Insect%Jzz2 * Insect%rot_rel_wing_r2_w(3)
 
-      iwmoment(1,4) = (a(1)+Insect%rot_rel_wing_r2_w(2)*b(3)-Insect%rot_rel_wing_r2_w(3)*b(2))
-      iwmoment(2,4) = (a(2)+Insect%rot_rel_wing_r2_w(3)*b(1)-Insect%rot_rel_wing_r2_w(1)*b(3))
-      iwmoment(3,4) = (a(3)+Insect%rot_rel_wing_r2_w(1)*b(2)-Insect%rot_rel_wing_r2_w(2)*b(1))
+      iwmoment(1,color_r2) = (a(1)+Insect%rot_rel_wing_r2_w(2)*b(3)-Insect%rot_rel_wing_r2_w(3)*b(2))
+      iwmoment(2,color_r2) = (a(2)+Insect%rot_rel_wing_r2_w(3)*b(1)-Insect%rot_rel_wing_r2_w(1)*b(3))
+      iwmoment(3,color_r2) = (a(3)+Insect%rot_rel_wing_r2_w(1)*b(2)-Insect%rot_rel_wing_r2_w(2)*b(1))
 
       Insect%PartIntegrals(color_r)%IPow = &
-      Insect%rot_rel_wing_r2_w(1) * iwmoment(1,4) + &
-      Insect%rot_rel_wing_r2_w(2) * iwmoment(2,4) + &
-      Insect%rot_rel_wing_r2_w(3) * iwmoment(3,4)
+      Insect%rot_rel_wing_r2_w(1) * iwmoment(1,color_r2) + &
+      Insect%rot_rel_wing_r2_w(2) * iwmoment(2,color_r2) + &
+      Insect%rot_rel_wing_r2_w(3) * iwmoment(3,color_r2)
 
       ! total
       ipowtotal = ipowtotal + Insect%PartIntegrals(color_r2)%IPow + &
           Insect%PartIntegrals(color_l2)%IPow
     endif
+
+    ! TODO: calculate and include rot_dt_body_b in the insect module
+    !-- BODY
+    !a(1) = Insect%Jroll_body * Insect%rot_dt_body_b(1)
+    !a(2) = Insect%Jpitch_body * Insect%rot_dt_body_b(2)
+    !a(3) = Insect%Jyaw_body * Insect%rot_dt_body_b(3)
+
+    !b(1) = Insect%Jroll_body * Insect%rot_body_b(1)
+    !b(2) = Insect%Jpitch_body * Insect%rot_body_b(2)
+    !b(3) = Insect%Jyaw_body * Insect%rot_body_b(3)
+
+    !iwmoment(1,color_b) = (a(1)+Insect%rot_body_b(2)*b(3)-Insect%rot_body_b(3)*b(2))
+    !iwmoment(2,color_b) = (a(2)+Insect%rot_body_b(3)*b(1)-Insect%rot_body_b(1)*b(3))
+    !iwmoment(3,color_b) = (a(3)+Insect%rot_body_b(1)*b(2)-Insect%rot_body_b(2)*b(1))
+
+    ! transform into the laboratory reference frame
+    !iwmoment_g(:,color_b) = matmul(Insect%M_body_inv,iwmoment(:,color_b))
+    iwmoment_g(:,color_l) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_l),iwmoment(:,color_l)))
+    iwmoment_g(:,color_r) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_r),iwmoment(:,color_r)))
+    if (Insect%second_wing_pair) then
+        iwmoment_g(:,color_l2) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_l2),iwmoment(:,color_l2)))
+        iwmoment_g(:,color_r2) = matmul(Insect%M_body_inv,matmul(transpose(Insect%M_wing_r2),iwmoment(:,color_r2)))
+    endif
+
   end subroutine inert_power
 
   !-----------------------------------------------------------------------------

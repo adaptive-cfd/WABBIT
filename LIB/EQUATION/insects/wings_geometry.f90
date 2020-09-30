@@ -170,28 +170,28 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
       ! if all other options fail, we still might load coefficients from file:
       wingshape_str = Insect%WingShape(wingID)
 
-          ! we assume the default to be defined in fourier coefficients, the subroutine
-          ! yells if it does not recongnize the wing.
-          select case (Insect%wing_file_type(wingID))
-          case ("fourier")
-              ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
-              call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+      ! we assume the default to be defined in fourier coefficients, the subroutine
+      ! yells if it does not recongnize the wing.
+      select case (Insect%wing_file_type(wingID))
+      case ("fourier")
+          ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
+          call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
           x_pivot_b,rot_rel_wing_w, side)
 
       case ("fourierY")
           ! fourier series for the y coordinate (used for the blade of a bristled wing)
           call draw_wing_bristled(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b,rot_rel_wing_w, side)
+          x_pivot_b,rot_rel_wing_w, side)
 
-          case ("kleemeier")
-              ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
-              ! membrane is bad for the fourier series.
-              call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
-              x_pivot_b,rot_rel_wing_w)
+      case ("kleemeier")
+          ! kleemeier wings is bristles with rectangular central membrane. it is separated because the rectangular
+          ! membrane is bad for the fourier series.
+          call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
+          x_pivot_b,rot_rel_wing_w)
 
-          case default
-              call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
-          end select
+      case default
+          call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
+      end select
 
   end select
 
@@ -222,8 +222,9 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   integer(kind=2) :: wingID
   real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3)
   real(kind=rk) :: R, R0, R_tmp, zz0
-  real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
+  real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t, D
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta, wsign
+  logical :: variable_wing_thickness(1:4)
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
@@ -236,6 +237,11 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
       wsign = -1.0_rk
   else
       call abort(290720, "neither R nor L wing??")
+  endif
+
+  variable_wing_thickness(wingID) = .false.
+  if (Insect%wing_thickness_distribution(wingID)=="variable") then
+      variable_wing_thickness(wingID) = .true.
   endif
 
   s = Insect%safety
@@ -275,7 +281,8 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                           if ( Insect%corrugated(wingID) ) then
                               ! if the wing is corrugated, its height profile is read from ini file
                               ! and interpolated at the position on the wing
-                              zz0 = interp2_nonper( x_wing(1), x_wing(2), corrugation_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
+                              zz0 = interp2_nonper( x_wing(1), x_wing(2), corrugation_profile(:,:,wingID), &
+                              Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
                           else
                               ! no corrugation - the wing is a flat surface
                               zz0 = 0.0_pr
@@ -284,17 +291,28 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                           zz0 = zz0 * wsign
 
                           ! wing thickness
-                          if ( Insect%wing_thickness_distribution(wingID)=="variable") then
+                          if ( variable_wing_thickness(wingID) ) then
                               ! variable wing thickness is read from an array in the wing.ini file
                               ! and interpolated linearly at the x_wing position.
-                              t = interp2_nonper( x_wing(1), x_wing(2), wing_thickness_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), wing_thickness_a(wingID), wing_thickness_b(wingID) )
+                              t = interp2_nonper( x_wing(1), x_wing(2), wing_thickness_profile(:,:,wingID), &
+                              Insect%corrugation_array_bbox(1:4,wingID), wing_thickness_a(wingID), wing_thickness_b(wingID) )
                           else
                               ! constant thickness, read from main params.ini file
                               t = Insect%WingThickness
                           endif
 
-                          z_tmp = steps( dabs(x_wing(3)-zz0), 0.5d0*t, Insect%smooth ) ! thickness
-                          mask_tmp = z_tmp*R_tmp
+                          ! wing damage: apply a mask [0,1] (including possibly smoothing)
+                          ! to the wing
+                          if ( Insect%damaged(wingID) ) then
+                              D = interp2_nonper( x_wing(1), x_wing(2), damage_mask(:,:,wingID), &
+                              Insect%corrugation_array_bbox(1:4,wingID), damage_a(wingID), damage_b(wingID) )
+                          else
+                              D = 1.0_rk
+                          endif
+
+                          z_tmp = steps( dabs(x_wing(3)-zz0), 0.5d0*t, Insect%smooth )
+                          ! mask function approximated as product of 1D mask functions:
+                          mask_tmp = z_tmp*R_tmp*D
 
                           !-----------------------------------------
                           ! set new value for mask and velocity us
@@ -1902,6 +1920,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       call read_param_mpi(ifile, "Wing", "B_membrane", Insect%B_membrane(wingID), 8.6_rk/130.0_rk)
       call read_param_mpi(ifile, "Wing", "L_membrane", Insect%L_membrane(wingID), 100.0_rk/130.0_rk)
   endif
+
   !-----------------------------------------------------------------------------
   ! Read fourier coeffs for wing radius
   !-----------------------------------------------------------------------------
@@ -2008,6 +2027,24 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       if (root) write(*,*) "wing is flat (non-corrugated), z==0"
   endif
 
+  !-----------------------------------------------------------------------------
+  ! wing damage
+  !-----------------------------------------------------------------------------
+  call read_param_mpi(ifile, "Wing", "damaged", Insect%damaged(wingID), .false.)
+  if (Insect%damaged(wingID)) then
+      if (root) write(*,*) "wing is damaged, D=D(x,y)"
+      ! read matrix from ini file, see comments on SXF90 compiler
+      call param_matrix_size_mpi(ifile, "Wing", "damage_mask", a, b)
+      damage_a(wingID) = a
+      damage_b(wingID) = b
+      call Allocate_Arrays(Insect, "damage_mask", a, b)
+      call param_matrix_read_mpi(ifile, "Wing", "damage_mask", damage_mask(:,:,wingID))
+
+  else
+      if (root) write(*,*) "wing is intact (non-damaged)"
+  endif
+
+
   call read_param_mpi(ifile,"Wing","corrugation_array_bbox",Insect%corrugation_array_bbox(1:4,wingID), (/0.0_rk,0.0_rk,0.0_rk,0.0_rk/))
 
 end subroutine Setup_Wing_from_inifile
@@ -2022,86 +2059,86 @@ end subroutine Setup_Wing_from_inifile
 ! NOTE: This code is executed only once.
 !-------------------------------------------------------------------------------
 subroutine set_wing_bounding_box_fourier( Insect, wingID )
-  implicit none
-  type(diptera),intent(inout) :: Insect
-  real(kind=rk) :: theta, xmin,xmax, ymin, ymax, R, x, y, theta_prime, tmp
-  integer(kind=2), intent(in) :: wingID ! wing id number
+    implicit none
+    type(diptera),intent(inout) :: Insect
+    real(kind=rk) :: theta, xmin,xmax, ymin, ymax, R, x, y, theta_prime, tmp
+    integer(kind=2), intent(in) :: wingID ! wing id number
 
-  theta = 0.d0
-  xmin = 999.d9
-  ymin = 999.d9
-  xmax = -999.d9
-  ymax = -999.d9
+    theta = 0.d0
+    xmin = 999.d9
+    ymin = 999.d9
+    xmax = -999.d9
+    ymax = -999.d9
 
-  ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
-  ! note flusi uses a normalized angle between [0,1)
-  do while ( theta < 1.d0 )
-    ! note this is normalized angle
-    R = Radius_Fourier( theta, Insect, wingID )
+    ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
+    ! note flusi uses a normalized angle between [0,1)
+    do while ( theta < 1.d0 )
+        ! note this is normalized angle
+        R = Radius_Fourier( theta, Insect, wingID )
 
-    theta_prime = 2.d0*pi*theta - pi
-    x = Insect%xc(wingID) + R * cos( theta_prime )
-    y = Insect%yc(wingID) + R * sin( theta_prime )
+        theta_prime = 2.d0*pi*theta - pi
+        x = Insect%xc(wingID) + R * cos( theta_prime )
+        y = Insect%yc(wingID) + R * sin( theta_prime )
 
-    ! NOTE: A word on theta_prime: it is the angle described with the positve x-axis
-    ! and indeed rotates in positve z-direction. That means in the plane
-    !
-    !  ^ x_wing
-    !  |
-    !  o-------> y_wing
-    !
-    ! It rotates CLOCKWISE, starting from the x_wing axis (zero is the x-axis, vertical)
+        ! NOTE: A word on theta_prime: it is the angle described with the positve x-axis
+        ! and indeed rotates in positve z-direction. That means in the plane
+        !
+        !  ^ x_wing
+        !  |
+        !  o-------> y_wing
+        !
+        ! It rotates CLOCKWISE, starting from the x_wing axis (zero is the x-axis, vertical)
 
-    xmin = min( xmin, x )
-    ymin = min( ymin, y )
+        xmin = min( xmin, x )
+        ymin = min( ymin, y )
 
-    xmax = max( xmax, x )
-    ymax = max( ymax, y )
+        xmax = max( xmax, x )
+        ymax = max( ymax, y )
 
-    theta = theta + 1.0d-3
-  end do
+        theta = theta + 1.0d-3
+    end do
 
-  Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
+    Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
 
-  ! the bounding box in z-direction depends on the wing thicnkess (constant or not)
-  ! and the corrugation
-  if ( Insect%wing_thickness_distribution(wingID) == "constant" ) then
-    if ( Insect%corrugated(wingID) ) then
-      Insect%wing_bounding_box(5,wingID) = minval(corrugation_profile(:,:,wingID)) - Insect%WingThickness / 2.0_pr
-      Insect%wing_bounding_box(6,wingID) = maxval(corrugation_profile(:,:,wingID)) + Insect%WingThickness / 2.0_pr
+    ! the bounding box in z-direction depends on the wing thicnkess (constant or not)
+    ! and the corrugation
+    if ( Insect%wing_thickness_distribution(wingID) == "constant" ) then
+        if ( Insect%corrugated(wingID) ) then
+            Insect%wing_bounding_box(5,wingID) = minval(corrugation_profile(:,:,wingID)) - Insect%WingThickness / 2.0_pr
+            Insect%wing_bounding_box(6,wingID) = maxval(corrugation_profile(:,:,wingID)) + Insect%WingThickness / 2.0_pr
+        else
+            ! constant thickness, no corrugation is the classical flat case:
+            Insect%wing_bounding_box(5,wingID) = -Insect%WingThickness / 2.0_pr
+            Insect%wing_bounding_box(6,wingID) = +Insect%WingThickness / 2.0_pr
+        endif
     else
-      ! constant thickness, no corrugation is the classical flat case:
-      Insect%wing_bounding_box(5,wingID) = -Insect%WingThickness / 2.0_pr
-      Insect%wing_bounding_box(6,wingID) = +Insect%WingThickness / 2.0_pr
-    endif
-  else
-    if ( Insect%corrugated(wingID) ) then
-      ! minimum of lower surface
-      Insect%wing_bounding_box(5,wingID) = minval(corrugation_profile(:,:,wingID)-wing_thickness_profile(:,:,wingID)/2.0_pr)
-      ! maximum of upper surface
-      Insect%wing_bounding_box(6,wingID) = maxval(corrugation_profile(:,:,wingID)+wing_thickness_profile(:,:,wingID)/2.0_pr)
-    else
-      ! bounding box is +- largest thickness  simply
-      Insect%wing_bounding_box(5,wingID) = -maxval(wing_thickness_profile(:,:,wingID) / 2.0_pr)
-      Insect%wing_bounding_box(6,wingID) =  maxval(wing_thickness_profile(:,:,wingID) / 2.0_pr)
-    endif
-  end if
+        if ( Insect%corrugated(wingID) ) then
+            ! minimum of lower surface
+            Insect%wing_bounding_box(5,wingID) = minval(corrugation_profile(:,:,wingID)-wing_thickness_profile(:,:,wingID)/2.0_pr)
+            ! maximum of upper surface
+            Insect%wing_bounding_box(6,wingID) = maxval(corrugation_profile(:,:,wingID)+wing_thickness_profile(:,:,wingID)/2.0_pr)
+        else
+            ! bounding box is +- largest thickness  simply
+            Insect%wing_bounding_box(5,wingID) = -maxval(wing_thickness_profile(:,:,wingID) / 2.0_pr)
+            Insect%wing_bounding_box(6,wingID) =  maxval(wing_thickness_profile(:,:,wingID) / 2.0_pr)
+        endif
+    end if
 
-  ! Mirror the bounding box for left wings
-  if ( (wingID == 1) .or. (wingID == 3) ) then
-    tmp = Insect%wing_bounding_box(6,wingID)
-    Insect%wing_bounding_box(6,wingID) = -Insect%wing_bounding_box(5,wingID)
-    Insect%wing_bounding_box(5,wingID) = -tmp
-  end if
+    ! Mirror the bounding box for left wings
+    if ( (wingID == 1) .or. (wingID == 3) ) then
+        tmp = Insect%wing_bounding_box(6,wingID)
+        Insect%wing_bounding_box(6,wingID) = -Insect%wing_bounding_box(5,wingID)
+        Insect%wing_bounding_box(5,wingID) = -tmp
+    end if
 
-  if (root) then
-    write(*,'("Effective (=the real surface) wing lengths are:")')
-    write(*,'("Lspan=",es15.8,"Lchord=",es15.8)') ymax-ymin, xmax-xmin
-    write(*,'("Bounding box is:")')
-    write(*,'("xwmin=",es15.8," xwmax=",es15.8)') Insect%wing_bounding_box(1:2,wingID)
-    write(*,'("ywmin=",es15.8," ywmax=",es15.8)') Insect%wing_bounding_box(3:4,wingID)
-    write(*,'("zwmin=",es15.8," zwmax=",es15.8)') Insect%wing_bounding_box(5:6,wingID)
-  endif
+    if (root) then
+        write(*,'("Effective (=the real surface) wing lengths are:")')
+        write(*,'("Lspan=",es15.8,"Lchord=",es15.8)') ymax-ymin, xmax-xmin
+        write(*,'("Bounding box is:")')
+        write(*,'("xwmin=",es15.8," xwmax=",es15.8)') Insect%wing_bounding_box(1:2,wingID)
+        write(*,'("ywmin=",es15.8," ywmax=",es15.8)') Insect%wing_bounding_box(3:4,wingID)
+        write(*,'("zwmin=",es15.8," zwmax=",es15.8)') Insect%wing_bounding_box(5:6,wingID)
+    endif
 end subroutine set_wing_bounding_box_fourier
 
 

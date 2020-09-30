@@ -91,6 +91,7 @@ subroutine performance_test(params)
             call random_data( hvy_block(:, :, :, :, hvy_active(k, tree_ID_flow) ) )
         enddo
 
+        call reset_all_timings()
 
         do j = 1, N_timesteps
             t0 = MPI_wtime()
@@ -139,6 +140,8 @@ subroutine performance_test(params)
             min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
         endif
+
+        call summarize_profiling( WABBIT_COMM )
 
         ! next grid will be denser
         params%max_grid_density = params%max_grid_density + target_grid_density / real(N_grids)

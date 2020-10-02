@@ -711,8 +711,7 @@ contains
 
                 if (rank == 0) then
                     write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
-                    !write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
-                    write(*,'(A,1x)') ( trim(adjustl(value(1))), k=1, n)
+                    write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
                 endif
 
                 return

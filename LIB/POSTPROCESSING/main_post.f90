@@ -97,6 +97,9 @@ program main_post
     case ("--performance-test")
         call performance_test(params)
 
+    case ("--adaption-test")
+          call adaption_test(params)
+
     case("--dense-to-sparse")
         call dense_to_sparse(params)
 
@@ -135,7 +138,7 @@ program main_post
   case ("--POD-time")
     call post_timecoef_POD(params)
 
-    case ("--generate_forest")
+  case ("--generate_forest")
     call post_generate_forest(params)
     case default
 
@@ -144,6 +147,8 @@ program main_post
             write(*,*) "--sparse-to-dense"
             write(*,*) "--dense-to-sparse"
             write(*,*) "--mean"
+            write(*,*) "--performance_test"
+            write(*,*) "--adaption_test"
             write(*,*) "--vorticity"
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
@@ -164,6 +169,7 @@ program main_post
             write(*,*) "--mult-mask-inverse"
             write(*,*) "--post_rhs"
             write(*,*) "--average"
+            write(*,*) "--generate_forest"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

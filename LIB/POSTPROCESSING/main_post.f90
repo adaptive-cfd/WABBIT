@@ -148,7 +148,7 @@ program main_post
             write(*,*) "--dense-to-sparse"
             write(*,*) "--mean"
             write(*,*) "--performance_test"
-            write(*,*) "--adaption_test"
+            write(*,*) "--adaption-test"
             write(*,*) "--vorticity"
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"

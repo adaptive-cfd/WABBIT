@@ -132,7 +132,7 @@ subroutine post_generate_forest(params)
                                 zrel = z - ( 2* n - 1 )
                                 ! set actual inicond gauss blob
                                 hvy_block(ix,iy,iz,1,hvy_id) =hvy_block(ix,iy,iz,1,hvy_id)+ &
-                                exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2 + zrel**2))
+                                exp(-f/3.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2 + zrel**2))
                             end do
                         end do
                     end do

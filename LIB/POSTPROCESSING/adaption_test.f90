@@ -26,7 +26,7 @@ subroutine adaption_test(params)
   real(kind=rk), dimension(3)     :: domain
   integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id_input, tree_id_adapt
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
-  integer(kind=ik) :: j, n_components=1, io_error,tree_n, lgt_n_tmp,Jmin, Jmax
+  integer(kind=ik) :: j, n_components=1, tree_n, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
   logical :: verbose = .false., save_all = .true.
   character(len=30) :: rowfmt
@@ -64,6 +64,9 @@ subroutine adaption_test(params)
   !-------------------------------
   ! Set some wabbit specific params
   !-------------------------------
+  rank = params%rank
+  n_components = size(params%input_files)
+  n_eps = size(eps_str_list)
   params%block_distribution="sfc_hilbert"
   params%time_step_method="none"
   params%min_treelevel=1
@@ -72,6 +75,8 @@ subroutine adaption_test(params)
   params%adapt_mesh = .True.! .False.!.True.
   params%coarsening_indicator="threshold-state-vector"
   params%threshold_mask=.False.
+  params%n_eqn = n_components
+  params%forest_size = 3
 
   ! Check parameters for correct inputs:
   if (order == "CDF20" .or. order == "CDF2,0") then
@@ -94,30 +99,20 @@ subroutine adaption_test(params)
       call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
   end if
 
+  allocate(error(n_eps))
+  allocate(Nb_adapt(n_eps))
+
   !-------------------------------
   ! check if files exists:
   !-------------------------------
-  ! fname_list is the name of the file which contains a list of files you want to
-  ! read in (i.e. rho_000000000.h5 rho_000000001.h5 ... etc)
   if (.not. allocated(params%input_files)) call abort(207191,"you must pass at least one file list! Use: --list my_filelist.txt")
   do j = 1, n_components
      call check_file_exists ( params%input_files(j) )
      if (params%rank==0) write(*,*) "Reading list of files from "//params%input_files(j)
   enddo
-
-
   !-----------------------------------------------------------------------------
   ! read in the file, loop over lines
   !-----------------------------------------------------------------------------
-  n_components = size(params%input_files)
-  n_eps = size(eps_str_list)
-  allocate(error(n_eps))
-  allocate(Nb_adapt(n_eps))
-  params%n_eqn = n_components
-  params%forest_size = 3
-  rank = params%rank
-  io_error = 0
-  i = 1
   do j = 1, n_components
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
                        params%Bs, params%max_treelevel, params%dim)
@@ -181,11 +176,10 @@ subroutine adaption_test(params)
 
     ! give some output
     if (rank == 0) then
-       write(*,'("Field adapted to eps=",es10.3," rel err=", f6.2,"% Nblocks=", i6," Nb_adapt/Nb_dense=",f6.1,"% Nb_adapt/Nb_input=",f5.1,"% [Jmin,Jmax]=[",i2,",",i2,"]")') &
-              params%eps, error(i)*100, lgt_n_tmp, &
-                100.0*dble(lgt_n_tmp)/dble( (2**params%max_treelevel)**params%dim ), &
+       write(*,'("Field adapted to eps=",es10.2," rel err=", es10.2," Nblocks=", i6," Nb_adapt/Nb_dense=",f6.1,"% Nb_adapt/Nb_input=",f5.1,"% [Jmin,Jmax]=[",i2,",",i2,"]")') &
+              params%eps, error(i), lgt_n_tmp, &
+              100.0*dble(lgt_n_tmp)/dble( (2**params%max_treelevel)**params%dim ), &
               100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_id_input)), Jmin, Jmax
-
     endif
   end do
   ! elapsed time for reading and coarsening the data
@@ -199,7 +193,7 @@ subroutine adaption_test(params)
     open(14,file=file_out, status='replace')
     write(14,'("eps", 1x, " L2error", 1x ,"Nb blocks", 1x , "Nb_adapt/Nb_input")')
     do i = 1, n_eps
-      write(14,FMT='(A," ",es15.8," ",i7," ",f8.3)') &
+      write(14,FMT='(A," ",es15.8," ",i7," ",es10.3)') &
       trim(adjustl(eps_str_list(i))),error(i),Nb_adapt(i), 1.0_rk*dble(Nb_adapt(i))/dble(lgt_n(tree_id_input))
     enddo
     close(14)

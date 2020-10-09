@@ -36,7 +36,7 @@ subroutine adaption_test(params)
       if ( params%rank==0 ) then
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
           write(*,*) "mpi_command -n number_procs ./wabbit-post --adaption_test --eps-list='1e-5 1e-4' --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-          write(*,*) "[--order=CDF[22|44|40] --eps-norm=[L2|Linfty]]"
+          write(*,*) "[--order=CDF[22|44|40] --eps-norm=[L2|Linfty] --save_all]"
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
           write(*,*) " Wavelet adaption test "
           write(*,*) " --list               list of files containing all snapshots"
@@ -45,6 +45,7 @@ subroutine adaption_test(params)
           write(*,*) " --order              order of the predictor"
           write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
           write(*,*) " --eps-norm           normalization of wavelets"
+          write(*,*) " --save_all           saves adapted snapshots"
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       end if
       return
@@ -53,6 +54,7 @@ subroutine adaption_test(params)
   !----------------------------------
   ! read parameters
   !----------------------------------
+      call get_cmd_arg( "--save_all", save_all, default=.false.)
   call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
   call get_cmd_arg_str( "--order", order, default="CDF44" )
   call get_cmd_arg( "--list", params%input_files )
@@ -164,6 +166,16 @@ subroutine adaption_test(params)
     lgt_n_tmp = lgt_n(tree_id_adapt)
     Jmin = min_active_level( lgt_block, lgt_active(:,tree_id_adapt), lgt_n(tree_id_adapt) )
     Jmax = max_active_level( lgt_block, lgt_active(:,tree_id_adapt), lgt_n(tree_id_adapt) )
+
+    if (save_all) then
+      do j = 1, n_components
+          write( file_out, '("u",i1,"-eps", A,"_",i12.12 ,".h5")') j, trim(adjustl(eps_str_list(i))), nint(time * 1.0e6_rk)
+
+          call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, j, tree_id_adapt , time , iteration )
+      end do
+    end if
+
     ! compare to original data:
     call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id_adapt, tree_id_input)

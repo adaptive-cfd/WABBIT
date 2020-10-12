@@ -103,7 +103,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         ! norm = sqrt( norm )
-        norm = sqrt( norm / product(params%domain_size(1:D)) )
+        norm = sqrt( norm )
 
     case ("Linfty")
         norm = -1.0_rk

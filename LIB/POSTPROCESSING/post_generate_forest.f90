@@ -35,7 +35,7 @@ subroutine post_generate_forest(params)
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --generate_forest --Jmax=[5] --Ntrees=[20]"
+            write(*,*) "./wabbit-post --generate_forest --Jmax=[5] --Ntrees=[20] --dim=[2,3]"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) ""
             write(*,*) ""
@@ -56,7 +56,7 @@ subroutine post_generate_forest(params)
     params%min_treelevel = 1
     params%n_eqn = 1
     params%n_ghosts = g
-    params%forest_size = tree_N+10
+    params%forest_size = tree_N+2
     fsize = params%forest_size
     params%order_predictor = "multiresolution_4th"
     params%block_distribution = "sfc_hilbert"
@@ -132,7 +132,7 @@ subroutine post_generate_forest(params)
                                 zrel = z - ( 2* n - 1 )
                                 ! set actual inicond gauss blob
                                 hvy_block(ix,iy,iz,1,hvy_id) =hvy_block(ix,iy,iz,1,hvy_id)+ &
-                                exp(-f/100.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2 + zrel**2))
+                                exp(-f/3.0_rk)*sin(pi*f*dt*it)* bump(sqrt(xrel**2 + yrel**2 + zrel**2))
                             end do
                         end do
                     end do

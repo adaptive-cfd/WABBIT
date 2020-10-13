@@ -1310,7 +1310,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     integer :: xmin,xmax,ymin,ymax,zmin,zmax
     integer :: Nsafety
 
-    safety = 2.0*Insect%safety
+    safety = 1.5*Insect%safety
     Nsafety = ceiling(safety / minval(ddx))
 
     ! bounds of the current patch of data

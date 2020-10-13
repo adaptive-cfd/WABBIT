@@ -40,13 +40,25 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
 
 
     if (delete) then
-        where (mask_color==Insect%color_body)
+        if (grid_time_dependent) then
+            ! The grid is time-dependent. In this case, the separation between
+            ! time-dependent (wings, moving body) and time-independent (fixed body)
+            ! is done elsewhere, so deleting means delete entire block
             mask = 0.00_rk
             us(:,:,:,1) = 0.00_rk
             us(:,:,:,2) = 0.00_rk
             us(:,:,:,3) = 0.00_rk
             mask_color = 0
-        end where
+        else
+            ! for the fixed-grid codes, delete only the body.
+            where (mask_color==Insect%color_body)
+                mask = 0.00_rk
+                us(:,:,:,1) = 0.00_rk
+                us(:,:,:,2) = 0.00_rk
+                us(:,:,:,3) = 0.00_rk
+                mask_color = 0
+            end where
+        endif
     endif
 
     !---------------------------------------------------------------------------
@@ -1298,8 +1310,8 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     integer :: xmin,xmax,ymin,ymax,zmin,zmax
     integer :: Nsafety
 
-    safety = Insect%safety
-    Nsafety = nint(safety / minval(ddx))
+    safety = 2.0*Insect%safety
+    Nsafety = ceiling(safety / minval(ddx))
 
     ! bounds of the current patch of data
     lbounds = g
@@ -1422,13 +1434,15 @@ subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
     integer :: Nsafety
 
     ! periodization: if the center point is out of the domain, then correct that
-    if (xc(1)<0.0) xc(1)=xc(1)+xl
-    if (xc(2)<0.0) xc(2)=xc(2)+yl
-    if (xc(3)<0.0) xc(3)=xc(3)+zl
+    if (periodic_insect) then
+        if (xc(1)<0.0) xc(1)=xc(1)+xl
+        if (xc(2)<0.0) xc(2)=xc(2)+yl
+        if (xc(3)<0.0) xc(3)=xc(3)+zl
 
-    if (xc(1)>=xl) xc(1)=xc(1)-xl
-    if (xc(2)>=yl) xc(2)=xc(2)-yl
-    if (xc(3)>=zl) xc(3)=xc(3)-zl
+        if (xc(1)>=xl) xc(1)=xc(1)-xl
+        if (xc(2)>=yl) xc(2)=xc(2)-yl
+        if (xc(3)>=zl) xc(3)=xc(3)-zl
+    endif
 
     Nsafety = nint( (R0+Insect%safety) / minval(ddx))
 
@@ -1602,7 +1616,7 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             enddo
         enddo
     enddo
-    
+
     ! mask = tmp_block
 
     ! ! store final resut, do not erase existing data in array

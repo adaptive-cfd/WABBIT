@@ -33,7 +33,7 @@ module module_mesh
 
     ! interface generalising the mono-tree to multi-trees
     interface create_active_and_sorted_lists
-        module procedure create_active_and_sorted_lists_tree, &
+        module procedure create_active_and_sorted_lists_tree_old, &
                          create_active_and_sorted_lists_forest
     end interface
 

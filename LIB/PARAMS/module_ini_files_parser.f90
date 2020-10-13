@@ -1203,7 +1203,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write(*,'("Read ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
+                write(*,'("Reading    ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
             endif
         end subroutine param_matrix_read
 

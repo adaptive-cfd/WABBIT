@@ -170,7 +170,7 @@ contains
       write(*,'( "Eigenvectors saved to file: ", A30 )') filename
       open(14, file=filename, status='replace')
       do i = 1, N_snapshots
-         write(14,FMT=rowfmt) V(:, i)
+         write(14,FMT=rowfmt) V(i, :)
       enddo
       close(14)
   end if

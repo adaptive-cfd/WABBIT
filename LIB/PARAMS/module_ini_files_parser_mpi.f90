@@ -13,7 +13,7 @@ use mpi
 ! type and the dimensionality. vectors can be read without setting a default.
 interface read_param_mpi
     module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_str_mpi, &
-        param_bool_mpi, param_matrix_mpi, param_vct_str_mpi, param_boolvct_mpi
+        param_bool_mpi, param_vct_str_mpi, param_boolvct_mpi, param_matrix_mpi
     end interface
 
     !!!!!!!!

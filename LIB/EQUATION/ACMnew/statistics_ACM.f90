@@ -201,67 +201,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     do ix = g+1, Bs(1)+g-1
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
-                        ! get this points color
-                        color = int( mask(ix, iy, iz, 5), kind=2 )
-
                         ! compute mean flow for output in statistics
                         meanflow_block(1:3) = meanflow_block(1:3) + u(ix,iy,iz,1:3)
-
-                        ! volume of mask (useful to see if it is properly generated)
-                        ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
-                        tmp_volume = tmp_volume + mask(ix, iy, iz, 1)
-                        tmp_volume2 = tmp_volume2 + mask(ix, iy, iz, 6)
-
-                        ! penalization term
-                        penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
-
-                        ! forces acting on this color
-                        force_block(1:3, color) = force_block(1:3, color) - penal
-
-                        ! moments. For insects, we compute the total moment wrt to the body center, and
-                        ! the wing moments wrt to the hinge points. The latter two are used to compute the
-                        ! aerodynamic power. Makes sense only in 3D.
-                        if (is_insect) then
-
-                            ! point of reference for the moments
-                            x0_moment = 0.0_rk
-                            ! body moment
-                            x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
-                            ! left wing
-                            x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
-                            ! right wing
-                            x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
-                            ! second left and second right wings
-                            if (Insect%second_wing_pair) then
-                              x0_moment(1:3, Insect%color_l2) = Insect%x_pivot_l2_g
-                              x0_moment(1:3, Insect%color_r2) = Insect%x_pivot_r2_g
-                            endif
-
-                            ! exclude walls, trees, etc...
-                            if (color > 0_2) then
-                                ! moment with color-dependent lever
-                                x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
-
-                                ! is the obstacle is near the boundary, parts of it may cross the periodic
-                                ! boundary. therefore, ensure that xlev is periodized:
-                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-
-                                ! Compute moments relative to each part
-                                moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
-
-                                ! in the seventh color, we compute the total moment for the whole
-                                ! insect wrt the center point (body+wings)
-                                x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
-                                moment_block(:,6)  = moment_block(:,6) - cross(x_lev, penal)
-                            endif
-
-                        endif
-
-                        ! residual velocity in the solid domain
-                        residual_block(1) = max( residual_block(1), (u(ix,iy,iz,1)-mask(ix,iy,iz,2))*mask(ix,iy,iz,1) )
-                        residual_block(2) = max( residual_block(2), (u(ix,iy,iz,2)-mask(ix,iy,iz,3))*mask(ix,iy,iz,1) )
-                        residual_block(3) = max( residual_block(3), (u(ix,iy,iz,3)-mask(ix,iy,iz,4))*mask(ix,iy,iz,1) )
-
                         ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
 
                         ! maximum of velocity in the field
@@ -270,6 +211,65 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! maximum/min divergence in velocity field
                         params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
                         params_acm%div_min = min( params_acm%div_min, div(ix,iy,iz) )
+
+                        ! volume of mask (useful to see if it is properly generated)
+                        ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
+                        tmp_volume = tmp_volume + mask(ix, iy, iz, 1)
+                        tmp_volume2 = tmp_volume2 + mask(ix, iy, iz, 6)
+
+                        ! get this points color
+                        color = int( mask(ix, iy, iz, 5), kind=2 )
+
+                        if (color>0_2 .and. color < 6_2) then
+                            ! penalization term
+                            penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+
+                            ! forces acting on this color
+                            force_block(1:3, color) = force_block(1:3, color) - penal
+
+                            ! moments. For insects, we compute the total moment wrt to the body center, and
+                            ! the wing moments wrt to the hinge points. The latter two are used to compute the
+                            ! aerodynamic power. Makes sense only in 3D.
+                            if (is_insect) then
+                                ! point of reference for the moments
+                                x0_moment = 0.0_rk
+                                ! body moment
+                                x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
+                                ! left wing
+                                x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
+                                ! right wing
+                                x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
+                                ! second left and second right wings
+                                if (Insect%second_wing_pair) then
+                                  x0_moment(1:3, Insect%color_l2) = Insect%x_pivot_l2_g
+                                  x0_moment(1:3, Insect%color_r2) = Insect%x_pivot_r2_g
+                                endif
+
+                                ! exclude walls, trees, etc...
+                                if (color > 0_2) then
+                                    ! moment with color-dependent lever
+                                    x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
+
+                                    ! is the obstacle is near the boundary, parts of it may cross the periodic
+                                    ! boundary. therefore, ensure that xlev is periodized:
+                                    ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+
+                                    ! Compute moments relative to each part
+                                    moment_block(:,color) = moment_block(:,color) - cross(x_lev, penal)
+
+                                    ! in the seventh color, we compute the total moment for the whole
+                                    ! insect wrt the center point (body+wings)
+                                    x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
+                                    moment_block(:,6)  = moment_block(:,6) - cross(x_lev, penal)
+                                endif
+
+                            endif
+
+                            ! residual velocity in the solid domain
+                            residual_block(1) = max( residual_block(1), (u(ix,iy,iz,1)-mask(ix,iy,iz,2))*mask(ix,iy,iz,1) )
+                            residual_block(2) = max( residual_block(2), (u(ix,iy,iz,2)-mask(ix,iy,iz,3))*mask(ix,iy,iz,1) )
+                            residual_block(3) = max( residual_block(3), (u(ix,iy,iz,3)-mask(ix,iy,iz,4))*mask(ix,iy,iz,1) )
+                        endif
                     enddo
                 enddo
             enddo

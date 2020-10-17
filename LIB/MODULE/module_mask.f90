@@ -111,13 +111,6 @@ contains
 
         ! create "time-dependent-part" here, add the existing "time-independent-part"
         ! if it is available, return the complete mask incl. all parts
-
-        ! read in time-indepent
-        ! call read_field2tree(params, (/"chi_00.h5"/), 1, 2, tree_n, &
-        ! lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        ! hvy_mask, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-        !
-
         if ( params%mask_time_dependent_part ) then
             do k = 1, hvy_n(tree_ID_flow)
                 hvy_id = hvy_active(k, tree_ID_flow)
@@ -127,6 +120,10 @@ contains
 
                 ! get block spacing for RHS
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+                ! 11 Oct 2020: this seems to be required, as the mask array can rarely
+                ! contain some garbage which is not deleted by the create_mask subroutines
+                hvy_mask(:,:,:,:,hvy_id) = 0.0_rk
 
                 ! note the meta-routine also resets to zero (the entire mask)
                 call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &

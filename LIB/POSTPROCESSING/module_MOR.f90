@@ -220,8 +220,8 @@ contains
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk), optional, intent(in)     :: truncation_error
     !---------------------------------------------------------------
-    real(kind=rk) ::  max_err, t_elapse, Volume, a_coefs(tree_n,tree_n)
-    real(kind=rk) ,allocatable ::  alpha(:)
+    real(kind=rk) ::  max_err, t_elapse, Volume
+    real(kind=rk) ,allocatable ::  alpha(:), a_coefs(:,:)
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                       free_tree_id, tree_id, N_modes, max_nr_pod_modes, it, j
     character(len=80):: filename
@@ -230,7 +230,7 @@ contains
     !---------------------------------------------------------------------------
     rank= params%rank
     N_snapshots=size(eigenvalues)
-    allocate(alpha(N_snapshots))
+    allocate(alpha(N_snapshots),a_coefs(N_snapshots,N_snapshots))
 
     if (present(truncation_rank)) then
       max_nr_pod_modes=truncation_rank
@@ -244,7 +244,7 @@ contains
       max_err=0.0_rk
     endif
 
-    if ( params%forest_size <= N_snapshots + truncation_rank) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if ( params%forest_size <= N_snapshots + 3) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
     if (rank == 0) then
       write(*,*) "----v eigenvalues v-----"
       do i = 1, N_snapshots
@@ -335,7 +335,11 @@ contains
 
   Volume = product(params%domain_size(1:params%dim))
   ! V is the matrix of eigenvectors
-  a_coefs = a_coefs / Volume
+  if (Volume>0.0_rk) then
+    a_coefs = a_coefs / Volume
+  else
+    call abort(012301,"something wrong")
+  end if
   ! the truncation_rank can be lower then the default (N_snapshots) or input value,
   ! when the singular values are smaller as the desired presicion! Therefore we update
   ! the truncation rank here.
@@ -575,9 +579,9 @@ contains
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
-
-    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
-    lgt_sortednumlist,tree_n)
+    !
+    ! call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    ! lgt_sortednumlist,tree_n)
 
 
     hvy_neighbor = -1_ik

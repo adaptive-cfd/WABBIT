@@ -541,7 +541,7 @@ contains
         integer(kind=ik), intent(in)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(in)   :: tree_id !< all data from tree_id2 gets copied to tree_id1
         real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-        real(kind=rk), intent(in)      :: alpha !< heavy data array - block data
+        real(kind=rk), intent(in)      :: alpha !<prefactor
         integer(kind=ik), intent(in)   :: hvy_active(:, :) !< active lists
         logical, intent(in),optional   :: verbosity !< if true aditional stdout is printed
         !-----------------------------------------------------------------
@@ -1031,7 +1031,7 @@ contains
     ! (done with png to ascii)
     subroutine tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, &
-        operation, dest_tree_id)
+        operation, dest_tree_id,a,b)
 
         implicit none
         !-----------------------------------------------------------------
@@ -1048,12 +1048,13 @@ contains
         real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
         character (len=*), intent(in)  :: operation !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik),optional, intent(in)::dest_tree_id !< optional for saving results to destination tree id
+        real(kind=rk), intent(in),optional      :: a,b ! scalar factors for addition: result = a * tree_id1 + b *tree_id2
         !-----------------------------------------------------------------
         integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize
         integer(kind=ik)    :: k1, k2, N, iq, iz, iy, ix, &
         hvy_id1, hvy_id2, Bs(3), g, lgt_id_dest, hvy_id_dest
         integer(kind=tsize) :: treecode1, treecode2
-        real (kind=rk) :: t_elapse
+        real (kind=rk) :: t_elapse, alpha(2)
         character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
         integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
@@ -1081,6 +1082,10 @@ contains
         else
           op = trim(operation)
         endif
+
+        alpha = (/1 , 1/)
+        if(present(a)) alpha(1) = a
+        if(present(b)) alpha(2) = b
         !=============================================
         ! Prepare the trees for pointwise arithmentic
         !=============================================
@@ -1160,8 +1165,8 @@ contains
                             do iq = 1, params%N_eqn
                                 do iy = g+1, Bs(2) + g
                                     do ix = g+1, Bs(1) + g
-                                        hvy_block(ix,iy,1,iq,hvy_id_dest) = hvy_block(ix,iy,1,iq,hvy_id1) + &
-                                        hvy_block(ix,iy,1,iq,hvy_id2)
+                                        hvy_block(ix,iy,1,iq,hvy_id_dest) =alpha(1) * hvy_block(ix,iy,1,iq,hvy_id1) + &
+                                                                           alpha(2) * hvy_block(ix,iy,1,iq,hvy_id2)
                                     end do
                                 end do
                             end do
@@ -1173,8 +1178,8 @@ contains
                                 do iz = g+1, Bs(3) + g
                                     do iy = g+1, Bs(2) + g
                                         do ix = g+1, Bs(1) + g
-                                            hvy_block(ix,iy,iz,iq,hvy_id_dest) = hvy_block(ix,iy,iz,iq,hvy_id1) + &
-                                            hvy_block(ix,iy,iz,iq,hvy_id2)
+                                            hvy_block(ix,iy,iz,iq,hvy_id_dest) = alpha(1) * hvy_block(ix,iy,iz,iq,hvy_id1) + &
+                                                                                 alpha(2) * hvy_block(ix,iy,iz,iq,hvy_id2)
                                         end do
                                     end do
                                 end do
@@ -1210,8 +1215,8 @@ contains
                             do iq = 1, params%N_eqn
                                 do iy = g+1, Bs(2) + g
                                     do ix = g+1, Bs(1) + g
-                                        hvy_block(ix,iy,1,iq,hvy_id1) = hvy_block(ix,iy,1,iq,hvy_id1) + &
-                                        hvy_block(ix,iy,1,iq,hvy_id2)
+                                        hvy_block(ix,iy,1,iq,hvy_id1) = alpha(1) * hvy_block(ix,iy,1,iq,hvy_id1) + &
+                                                                        alpha(2) * hvy_block(ix,iy,1,iq,hvy_id2)
                                     end do
                                 end do
                             end do
@@ -1223,8 +1228,8 @@ contains
                                 do iz = g+1, Bs(3) + g
                                     do iy = g+1, Bs(2) + g
                                         do ix = g+1, Bs(1) + g
-                                            hvy_block(ix,iy,iz,iq,hvy_id1) = hvy_block(ix,iy,iz,iq,hvy_id1) + &
-                                            hvy_block(ix,iy,iz,iq,hvy_id2)
+                                            hvy_block(ix,iy,iz,iq,hvy_id1) = alpha(1) * hvy_block(ix,iy,iz,iq,hvy_id1) + &
+                                                                             alpha(2) * hvy_block(ix,iy,iz,iq,hvy_id2)
                                         end do
                                     end do
                                 end do
@@ -1707,7 +1712,7 @@ contains
 
     !##############################################################
     subroutine add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, dest_tree_id, verbosity)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2, dest_tree_id, verbosity,a,b)
 
         implicit none
         !-----------------------------------------------------------------
@@ -1725,18 +1730,23 @@ contains
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
         integer(kind=ik), intent(in), optional:: dest_tree_id !< if specified result of addition will be saved here
                                                                 !< otherwise result will overwrite tree_id1
+        real(kind=rk), intent(in),optional      :: a,b ! scalar factors for addition: result = a * tree_id1 + b *tree_id2
         !-----------------------------------------------------------------
         logical :: verbose=.false.
+        real(kind=rk) :: alpha(2)
 
+        alpha = (/1 , 1/)
+        if (present(a)) alpha(1) = a
+        if (present(b)) alpha(2) = b
         if (present(verbosity)) verbose=verbosity
         if (params%rank == 0 .and. verbose) write(*,'("Adding trees: ",i4,",",i4)') tree_id1, tree_id2
 
         if(present(dest_tree_id))then
           call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+",dest_tree_id)
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+",dest_tree_id,a=alpha(1),b=alpha(2))
         else
           call tree_pointwise_arithmetic(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+")
+          hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1, tree_id2,"+",a = alpha(1),b = alpha(2))
         endif
     end subroutine
     !########################################################### ###

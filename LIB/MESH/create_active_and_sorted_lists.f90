@@ -389,7 +389,7 @@ end subroutine create_active_and_sorted_lists_tree_old
 !> lgt_n(:,tree_id)            | number of active blocks in tree
 !> -------------------------------------------------------------
 !> \author PKrah
-subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+subroutine create_active_and_sorted_lists_forest_comm( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     implicit none
@@ -538,7 +538,7 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
     if (tree_n > fsize) call abort(1402192, "Too many trees in the forest!!" )
 
     call toc("create_active_and_sorted_lists_forest", MPI_wtime()-t0)
-end subroutine create_active_and_sorted_lists_forest
+end subroutine create_active_and_sorted_lists_forest_comm
 
 
 
@@ -568,7 +568,7 @@ end subroutine create_active_and_sorted_lists_forest
 !> lgt_n(:,tree_id)            | number of active blocks in tree
 !> -------------------------------------------------------------
 !> \author PKrah
-subroutine create_active_and_sorted_lists_forest_old( params, lgt_block, lgt_active, &
+subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
            lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     implicit none
@@ -678,4 +678,4 @@ subroutine create_active_and_sorted_lists_forest_old( params, lgt_block, lgt_act
     if (tree_n > fsize) call abort(1402192, "Too many trees in the forest!!" )
 
     call toc("create_active_and_sorted_lists_forest", MPI_wtime()-t0)
-end subroutine create_active_and_sorted_lists_forest_old
+end subroutine create_active_and_sorted_lists_forest

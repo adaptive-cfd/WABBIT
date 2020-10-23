@@ -427,25 +427,27 @@ contains
     !##############################################################
     !> deletes the lgt_block data of tree with given tree_id
     !> CAUTION: active lists will be outdated!!!
-    subroutine delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
+    subroutine delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, tree_id)
 
         implicit none
         !-----------------------------------------------------------------
         type (type_params), intent(in)   :: params    !< user defined parameter structure
         integer(kind=ik), intent(inout)  :: lgt_block(:, :)!< light data array
-        integer(kind=ik), intent(in)     :: lgt_active(:,:)!< list of active blocks (light data)
-        integer(kind=ik), intent(in)     :: lgt_n(:)!< number of active blocks (light data)
+        integer(kind=ik), intent(inout)     :: lgt_active(:,:), hvy_active(:,:)!< list of active blocks (light data)
+        integer(kind=ik), intent(inout)     :: lgt_n(:), hvy_n(:)!< number of active blocks (light data)
         integer(kind=ik), intent(in)     :: tree_id!< highest tree id
         !-----------------------------------------------------------------
-        integer(kind=ik)                 :: k, lgt_id
+        integer(kind=ik)                 :: k, lgt_id, hvy_id
 
         ! loop over active list of tree
         do k = 1, lgt_n(tree_id)
             lgt_id = lgt_active(k, tree_id)
             lgt_block(lgt_id, :) = -1_ik
         end do
-
-
+        lgt_active(1:lgt_n(tree_id),tree_id)=-1_ik
+        lgt_n(tree_id)=0_ik
+        hvy_active(1:hvy_n(tree_id),tree_id)=-1_ik
+        hvy_n(tree_id)=0_ik
     end subroutine delete_tree
     !##############################################################
 
@@ -484,12 +486,12 @@ contains
 
         ! first we delete tree_id_dest if it is already allocated.
         ! tree_id_dest only exists if it is in the list of active trees, i.e. tree_id_dest <= tree_n
-        if (tree_id_dest <= tree_n) then
-            ! Caution: active lists will be outdated
-            call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id_dest)
-
+        if (lgt_n(tree_id_dest) > 0 ) then
+            call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, tree_id_dest)
         end if
 
+        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+        lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
         ! Loop over the active hvy_data
         t_elapse = MPI_WTIME()
@@ -1073,7 +1075,8 @@ contains
             ! tree_id_dest only exists if it is in the list of active trees, i.e. tree_id_dest <= tree_n
             if (dest_tree_id <= tree_n) then
                 ! Caution: active lists will be outdated
-                call delete_tree(params, lgt_block, lgt_active, lgt_n, dest_tree_id)
+                call delete_tree(params, lgt_block, lgt_active, lgt_n, &
+                hvy_active,hvy_n, dest_tree_id)
 
                 !call create_active_and_sorted_lists( params, lgt_block, lgt_active,&
                 !lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n )
@@ -2127,7 +2130,7 @@ function scalar_product_two_trees_old( params, tree_n, &
                        MPI_SUM,WABBIT_COMM, mpierr)
 
     if (.not. present(buffer_tree_id)) then
-       call delete_tree(params, lgt_block, lgt_active, lgt_n, free_tree_id)
+       call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active,hvy_n, free_tree_id)
     endif
 end function
 !##############################################################

@@ -170,7 +170,7 @@ contains
       write(*,'( "Eigenvectors saved to file: ", A30 )') filename
       open(14, file=filename, status='replace')
       do i = 1, N_snapshots
-         write(14,FMT=rowfmt) V(:, i)
+         write(14,FMT=rowfmt) V(i, :)
       enddo
       close(14)
   end if
@@ -223,7 +223,7 @@ contains
     real(kind=rk) ::  max_err, t_elapse, Volume
     real(kind=rk) ,allocatable ::  alpha(:), a_coefs(:,:)
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                      free_tree_id, tree_id, N_modes, max_nr_pod_modes, it, j
+                       tree_id, N_modes, max_nr_pod_modes, it, j
     character(len=80):: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
@@ -231,6 +231,8 @@ contains
     rank= params%rank
     N_snapshots=size(eigenvalues)
     allocate(alpha(N_snapshots),a_coefs(N_snapshots,N_snapshots))
+    alpha=0.0_rk
+    a_coefs=0.0_rk
 
     if (present(truncation_rank)) then
       max_nr_pod_modes=truncation_rank
@@ -251,7 +253,6 @@ contains
         write(*,'(1(es12.4,1x))') eigenvalues(i)
       enddo
       write(*,*) "----^ eigenvalues ^-----"
-      write(*,*)
       write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
       write(*,*)
     endif
@@ -260,7 +261,6 @@ contains
   !---------------------------------------------------------------------------
   N_modes = 0
   pod_mode_tree_id= N_snapshots + 1
-  free_tree_id = N_snapshots + 2
   if ( rank == 0 ) write(*,*) "Constructing POD modes (X*V)"
   do i = N_snapshots, 1, -1
   ! compute normalized eigenvectors. If eigenvalues are to small discard modes
@@ -282,16 +282,8 @@ contains
 
     ! Linear Combination of the snapshots to build the i-th POD MODE
     do tree_id = 2, N_snapshots
-      call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id)
-
-      call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
-                                      free_tree_id, alpha(tree_id))
-
       call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
-      ! adapt POD MODE
-
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, tree_id, b=alpha(tree_id))
     end do
 
     if ( params%adapt_mesh) then

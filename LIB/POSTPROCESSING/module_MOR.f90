@@ -84,7 +84,7 @@ contains
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
                     eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse, Volume
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                      free_tree_id, tree_id, N_modes, max_nr_pod_modes, it
+                      free_tree_id, tree_id, max_nr_pod_modes, it
     character(len=80):: filename
     character(len=30) :: rowfmt
     !---------------------------------------------------------------------------
@@ -152,16 +152,7 @@ contains
 
     if (ierr /= 0) call abort(333,"The eigenvalue solver failed...")
 
-    if (rank == 0) then
-      write(*,*) "----v eigenvalues v-----"
-      do i = 1, N_snapshots
-        write(*,'(1(es12.4,1x))') eigenvalues(i)
-      enddo
-      write(*,*) "----^ eigenvalues ^-----"
-      write(*,*)
-      write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
-      write(*,*)
-    endif
+
     if (save_all .and. rank==0) then
     ! Save Eigenvalues if requested:
       filename ="eigenvalues.txt"
@@ -179,7 +170,7 @@ contains
       write(*,'( "Eigenvectors saved to file: ", A30 )') filename
       open(14, file=filename, status='replace')
       do i = 1, N_snapshots
-         write(14,FMT=rowfmt) V(:, i)
+         write(14,FMT=rowfmt) V(i, :)
       enddo
       close(14)
   end if
@@ -187,9 +178,89 @@ contains
   !---------------------------------------------------------------------------
   ! construct POD basis functions (modes)
   !---------------------------------------------------------------------------
+  call construct_modes( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                       truncation_error, truncation_rank, V, eigenvalues)
+
+  end subroutine snapshot_POD
+  !##############################################################
+
+
+
+!##############################################################
+  subroutine construct_modes( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                       truncation_error, truncation_rank, eigenbasis, eigenvalues)
+    implicit none
+
+    !-----------------------------------------------------------------
+    !> user defined parameter structure
+    type (type_params), intent(inout)     :: params
+    !> light data array
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
+    !> size of active lists
+    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n(:)
+    !> heavy data array - block data
+    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk),  intent(inout)           :: hvy_tmp(:, :, :, :, :)
+    !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)
+    !> list of active blocks (light data)
+    integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
+    !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
+    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    !> POD eigenvalues and eigenbasis to construct modes
+    real(kind=rk),  intent(in)           :: eigenvalues(:), eigenbasis(:, :)
+    !> number of POD modes
+    integer(kind=ik),optional, intent(inout)     :: truncation_rank
+    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
+    !> then the given treshold we discard the corresponding POD MODE.
+    real(kind=rk), optional, intent(in)     :: truncation_error
+    !---------------------------------------------------------------
+    real(kind=rk) ::  max_err, t_elapse, Volume
+    real(kind=rk) ,allocatable ::  alpha(:), a_coefs(:,:)
+    integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
+                       tree_id, N_modes, max_nr_pod_modes, it, j
+    character(len=80):: filename
+    !---------------------------------------------------------------------------
+    ! check inputs and set default values
+    !---------------------------------------------------------------------------
+    rank= params%rank
+    N_snapshots=size(eigenvalues)
+    allocate(alpha(N_snapshots),a_coefs(N_snapshots,N_snapshots))
+    alpha=0.0_rk
+    a_coefs=0.0_rk
+
+    if (present(truncation_rank)) then
+      max_nr_pod_modes=truncation_rank
+    else
+      max_nr_pod_modes=N_snapshots
+    endif
+
+    if (present(truncation_error)) then
+      max_err=truncation_error
+    else
+      max_err=0.0_rk
+    endif
+
+    if ( params%forest_size <= N_snapshots + 3) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
+    if (rank == 0) then
+      write(*,*) "----v eigenvalues v-----"
+      do i = 1, N_snapshots
+        write(*,'(1(es12.4,1x))') eigenvalues(i)
+      enddo
+      write(*,*) "----^ eigenvalues ^-----"
+      write(*,'("sum(eigs) = ", g18.8)') sum(eigenvalues)
+      write(*,*)
+    endif
+  !---------------------------------------------------------------------------
+  ! construct POD basis functions (modes)
+  !---------------------------------------------------------------------------
   N_modes = 0
-  pod_mode_tree_id= N_snapshots
-  free_tree_id = N_snapshots + 1
+  pod_mode_tree_id= N_snapshots + 1
   if ( rank == 0 ) write(*,*) "Constructing POD modes (X*V)"
   do i = N_snapshots, 1, -1
   ! compute normalized eigenvectors. If eigenvalues are to small discard modes
@@ -202,29 +273,17 @@ contains
     t_elapse = MPI_wtime()
 
     N_modes = N_modes +1
-    alpha = V(:,i)/sqrt(dble(N_snapshots)*eigenvalues(i))
+    alpha = eigenbasis(:,i)/sqrt(dble(N_snapshots)*eigenvalues(i))
     ! calculate pod modes:
-    pod_mode_tree_id = pod_mode_tree_id + 1
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
             hvy_block, hvy_active, hvy_n, hvy_neighbor, pod_mode_tree_id, 1)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
                                     pod_mode_tree_id, alpha(1))
 
-    free_tree_id = free_tree_id + 1
-
     ! Linear Combination of the snapshots to build the i-th POD MODE
     do tree_id = 2, N_snapshots
-      call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id, tree_id)
-
-      call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
-                                      free_tree_id, alpha(tree_id))
-
       call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, free_tree_id)
-
-      ! adapt POD MODE
-
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, tree_id, b=alpha(tree_id))
     end do
 
     if ( params%adapt_mesh) then
@@ -239,40 +298,52 @@ contains
           N_modes, t_elapse,&
           min_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
           max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
-          sum(lgt_n(1:N_snapshots))
+          sum(lgt_n(1:N_snapshots+2))
     endif
+    !----------------------------------
+    ! Save Modes
+    !----------------------------------
+    do j = 1, params%n_eqn
+        write( filename, '("mode",i1,"_", i12.12, ".h5")') j, N_modes
+        call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
+          lgt_n, hvy_n, hvy_active, j, tree_id , 0.0_rk , N_modes )
+    end do
+
+    !---------------------------------------------------------------------------
+    ! temporal coefficients
+    !---------------------------------------------------------------------------
+    t_elapse = MPI_WTIME()
+    do it = 1, N_snapshots
+         a_coefs(it,N_modes) = scalar_product_two_trees( params, tree_n, &
+                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                         it, pod_mode_tree_id)
+    enddo
+    t_elapse = MPI_WTIME() - t_elapse
+    if ( rank == 0 ) write(*,'("Time Coefficient Mode ",i3," computed in t_cpu=" es12.4, "sec" )') &
+                    N_modes, t_elapse
+
   end do
+
+  Volume = product(params%domain_size(1:params%dim))
+  ! V is the matrix of eigenvectors
+  if (Volume>0.0_rk) then
+    a_coefs = a_coefs / Volume
+  else
+    call abort(012301,"something wrong")
+  end if
   ! the truncation_rank can be lower then the default (N_snapshots) or input value,
   ! when the singular values are smaller as the desired presicion! Therefore we update
   ! the truncation rank here.
   truncation_rank = N_modes
-  !---------------------------------------------------------------------------
-  ! temporal coefficients
-  !---------------------------------------------------------------------------
-  if (rank ==0) write(*,*) "Computing temporal coefficients a"
 
-  do it = 1, N_snapshots
-    do i = 1, N_modes
-       ! scalar product (inner product)
-       pod_mode_tree_id = N_snapshots + i
-       V(it,i) = scalar_product_two_trees( params, tree_n, &
-                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                       it, pod_mode_tree_id)
-    enddo
-  enddo
-
-  Volume = product(params%domain_size(1:params%dim))
-  ! V is the matrix of eigenvectors
-  V = V / Volume
-
-  if (rank==0 .and. save_all) then
+  if (rank==0) then
     write(*,*)
     filename = "a_coefs.txt"
     write(*,'( "Temporal coefficients saved to file: ", A30 )') filename
     open(14, file=filename, status='replace')
     do i = 1, N_snapshots
-      write(14,'(400(es15.8,1x))') V(i, 1:N_modes)
+      write(14,'(400(es15.8,1x))') a_coefs(i, 1:truncation_rank)
     enddo
     close(14)
   end if
@@ -291,8 +362,9 @@ contains
       write(*, *)
   endif
 
-  end subroutine snapshot_POD
+  end subroutine
   !##############################################################
+
 
 
     subroutine  print_mat(Mat)
@@ -330,9 +402,9 @@ contains
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
     character(len=80)      :: file_out, args,order
-    character(len=80),dimension(:), allocatable :: fname_list
+    character(len=80),dimension(:), allocatable :: fname_list,  eigenbasis_files
     character(len=80),dimension(:,:), allocatable :: file_in
-    real(kind=rk)   , allocatable :: time(:),M(:,:)
+    real(kind=rk)   , allocatable :: time(:),M(:,:),eigenvectors(:, :), eigenvalues(:,:)
     integer(kind=ik), allocatable :: iteration(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
@@ -349,7 +421,7 @@ contains
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=0.0_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
                      eps=-1.0_rk, L2norm, Volume,t_elapse(2)
-    logical :: verbose = .false., save_all = .true.
+    logical :: verbose = .false., save_all = .true., start_from_eigenbasis=.false.
     character(len=30) :: rowfmt
 
     call get_command_argument(2, args)
@@ -357,7 +429,7 @@ contains
         if ( params%rank==0 ) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "mpi_command -n number_procs ./wabbit-post --POD --components=3 --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1 --eps-norm=[L2|Linfty]]"
+            write(*,*) "[--save_all --order=CDF[2|4]0 --nmodes=3 --error=1e-9 --adapt=0.1 --eps-norm=[L2|Linfty] --start_from_eigenbasis='eigenvalues.txt,eigenvectors.txt']"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) " Wavelet adaptive Snapshot POD "
             write(*,*) " --list               list of files containing all snapshots"
@@ -366,6 +438,8 @@ contains
             write(*,*) " --order              order of the predictor"
             write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
             write(*,*) " --eps-norm           normalization of wavelets"
+            write(*,*) "--start_from_eigenbasis  when you want to restart the computation of the modes but you"
+            write(*,*) "                         have allready computed the diagonlaized covariance matrix."
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         end if
         return
@@ -375,16 +449,16 @@ contains
     ! read parameters
     !----------------------------------
     call get_cmd_arg_dbl( "--adapt", eps, default=-1.0_rk )
-    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
-    call get_cmd_arg_str( "--order", order, default="CDF44" )
+    call get_cmd_arg( "--eps-norm", params%eps_norm, default="L2" )
+    call get_cmd_arg( "--order", order, default="CDF44" )
     call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
     call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
-    call get_cmd_arg_str_vct( "--list", fname_list )
+    call get_cmd_arg( "--list", fname_list )
     call get_cmd_arg( "--memory", args, default="2GB")
     read(args(1:len_trim(args)-2),* ) maxmem
     call get_cmd_arg( "--save_all", save_all, default=.true.)
+    call get_cmd_arg( "--start_from_eigenbasis", eigenbasis_files)
     call get_cmd_arg( "--components", n_components, default=1_ik)
-
 
     !-------------------------------
     ! Set some wabbit specific params
@@ -411,15 +485,15 @@ contains
       params%eps = 0.0_rk
     endif
 
-
     !-------------------------------
     ! set defaults for POD truncation
     !-------------------------------
     if (truncation_rank_in /=-1) truncation_rank = truncation_rank_in
     if (truncation_error_in >0.0_rk ) truncation_error = truncation_error_in
+    if (allocated(eigenbasis_files)) start_from_eigenbasis = .True.
 
-
-    !-------------------------------
+    call count_lines_in_ascii_file_mpi(fname_list(1), N_snapshots, n_header=0)
+    !--------------------------
     ! check if files exists:
     !-------------------------------
     ! fname_list is the name of the file which contains a list of files you want to
@@ -430,17 +504,22 @@ contains
        if (params%rank==0) write(*,*) "Reading list of files from "//fname_list(j)
     enddo
 
-
+    if (start_from_eigenbasis) then
+      if (params%rank==0) write(*,*) "Eigenbasis read from: "
+      do j = 1, 2
+        call check_file_exists ( eigenbasis_files(j) )
+        if (params%rank==0) write(*,*) trim(eigenbasis_files(j))
+      enddo
+    endif
     !-----------------------------------------------------------------------------
     ! read in the file, loop over lines
     !-----------------------------------------------------------------------------
-    call count_lines_in_ascii_file_mpi(fname_list(1), N_snapshots, n_header=0)
-
-
     allocate(params%input_files(n_components))
     allocate(file_in(N_snapshots,n_components))
     allocate(time(N_snapshots))
     allocate(iteration(N_snapshots))
+    if (start_from_eigenbasis) allocate(eigenvalues(N_snapshots, 2), &
+                                        eigenvectors(N_snapshots,N_snapshots))
     !-------------------------------------------
     ! check and find common params in all h5-files
     !-------------------------------------------
@@ -492,9 +571,9 @@ contains
     !----------------------------------
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
-
-    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
-    lgt_sortednumlist,tree_n)
+    !
+    ! call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    ! lgt_sortednumlist,tree_n)
 
 
     hvy_neighbor = -1_ik
@@ -564,54 +643,22 @@ contains
     ! COMPUTE POD Modes
     !----------------------------------
     t_elapse(2) = MPI_WTIME()
-    call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+    if (start_from_eigenbasis) then
+        ! eigenvalues.txt contains the number of the eigenvalue in the first column and its value in the second
+        call read_array_from_ascii_file_mpi(eigenbasis_files(1), eigenvalues, n_header=0_ik)
+        call read_array_from_ascii_file_mpi(eigenbasis_files(2), eigenvectors, n_header=0_ik)
+        call construct_modes(params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
+                       hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
+                       truncation_error, truncation_rank, eigenvectors, eigenvalues(:,2))
+    else
+        call snapshot_POD( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
                        truncation_error, truncation_rank, save_all)
+    endif
     t_elapse(2) = MPI_Wtime()-t_elapse(2)
     call toc( "post_POD (read + coarse): ", t_elapse(1) )
     call toc( "post_POD (snapshot_POD): ", t_elapse(2) )
     call toc( "post_POD (total wPOD algo): ", t_elapse(1) + t_elapse(2) )
-    !----------------------------------
-    ! Save Modes
-    !----------------------------------
-    do tree_id = N_snapshots+1, N_snapshots + truncation_rank
-      i = tree_id - N_snapshots
-      do j = 1, n_components
-        write( file_out, '("mode",i1,"_", i12.12, ".h5")') j, i
-
-      call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, tree_id , 0.0_rk , i )
-      end do
-
-    end do
-
-    !----------------------------------
-    ! check orthonormality
-    !----------------------------------
-    allocate(M(truncation_rank,truncation_rank))
-    do i = 1, truncation_rank
-      do j = 1, truncation_rank
-        M(i,j) = scalar_product_two_trees( params, tree_n, &
-                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        N_snapshots+i, N_snapshots+j)/Volume
-      end do
-    end do
-
-    ! Save covariance matrix
-    if (save_all .and. params%rank==0) then
-      file_out ="scalarprod.txt"
-      write(*,'( "scalarproducts are saved to file: ", A30 )') file_out
-      write(*,*)
-      write(rowfmt,'(A,I4,A)') '(',truncation_rank,'(es15.8,1x))'
-      open(14,file=file_out, status='replace')
-      do i = 1,truncation_rank
-        write(14,FMT=rowfmt) M(i,:)
-      enddo
-      close(14)
-    end if
-
-
 
   end subroutine
   !##############################################################

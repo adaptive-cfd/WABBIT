@@ -48,7 +48,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     real(kind=rk), intent(in), optional :: eps
 
     integer(kind=ik)                    :: dF, i, j, l
-    real(kind=rk)                       :: detail( size(block_data,4) ), dx_min(3)
+    real(kind=rk)                       :: detail( size(block_data,4) )
     integer(kind=ik)                    :: g, dim, Jmax
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
@@ -228,8 +228,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        dx_min(1:dim) = sqrt(2.0_rk**(-Jmax) *params%domain_size(1:dim)/ real( Bs(1:dim)-1, kind=rk ))
-        eps2 = eps2 * ( 2.0_rk**(-dble((level)*params%dim)/2.0_rk) )/product(dx_min(1:dim))
+        eps2 = eps2 * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
+        if (params%dim==2) eps2 = eps2*0.1
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity

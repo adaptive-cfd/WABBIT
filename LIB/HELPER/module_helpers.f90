@@ -472,15 +472,22 @@ contains
 
 
     ! source: http://fortranwiki.org/fortran/show/String_Functions
-    FUNCTION str_replace_text (s,text,rep)  RESULT(outs)
-        CHARACTER(*)        :: s,text,rep
-        CHARACTER(LEN(s)+100) :: outs     ! provide outs with extra 100 char len
-        INTEGER             :: i, nt, nr
+    ! Modified to correctly work with blanks (ie replace "a " by "b", note the blank after a)
+    FUNCTION str_replace_text (strInput, strFind, strReplace)  RESULT(strOutput)
+        CHARACTER(*) :: strInput, strFind, strReplace
+        CHARACTER(LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
+        INTEGER :: i, nt
 
-        outs = s ; nt = LEN_TRIM(text) ; nr = LEN_TRIM(rep)
+        ! copy
+        strOutput = strInput
+        nt = LEN(strFind)
+
+        ! loop until you find no more existing instances
         DO
-            i = INDEX(outs,text(:nt)) ; IF (i == 0) EXIT
-            outs = outs(:i-1) // rep(:nr) // outs(i+nt:)
+            i = INDEX(strOutput, strFind(:nt))
+            IF (i == 0) EXIT ! no more things to replace..
+            ! concatenate output string
+            strOutput = strOutput(:i-1) // strReplace // strOutput(i+nt:)
         END DO
     END FUNCTION str_replace_text
 
@@ -711,8 +718,7 @@ contains
 
                 if (rank == 0) then
                     write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
-                    !write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
-                    write(*,'(A,1x)') ( trim(adjustl(value(1))), k=1, n)
+                    write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
                 endif
 
                 return

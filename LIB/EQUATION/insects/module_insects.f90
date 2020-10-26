@@ -23,7 +23,7 @@ module module_insects
 
   ! we use this so only root prints write statements...
   logical :: root = .false.
-  logical :: periodic_insect = .true.
+  logical :: periodic_insect = .false.
 
   ! ghost nodes. If the insect module is used in a finite-differences code, then
   ! the data that we have often has ghost nodes, i.e. points that overlap and exist
@@ -210,7 +210,7 @@ module module_insects
     logical, dimension(1:4) :: wings_radius_table_ready = .false.
     ! wing bounding box (xmin, xmax, ymin, ymax, zmin, zmax)
     real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
-    ! wing inertia 
+    ! wing inertia
     real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
     ! wing inertia of the second pair of wings
     real(kind=rk) :: Jxx2=0.d0,Jyy2=0.d0,Jzz2=0.d0,Jxy2=0.d0

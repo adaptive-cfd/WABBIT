@@ -22,18 +22,31 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
       call abort (08021902,"Insects: arrays have wrong size..")
   endif
 
+
   if (delete) then
-      where (mask_color==Insect%color_r .or. mask_color==Insect%color_l .or. &
-             mask_color==Insect%color_r2 .or. mask_color==Insect%color_l2)
+      if (grid_time_dependent) then
+          ! The grid is time-dependent. In this case, the separation between
+          ! time-dependent (wings, moving body) and time-independent (fixed body)
+          ! is done elsewhere, so deleting means delete entire block
           mask = 0.00_rk
           us(:,:,:,1) = 0.00_rk
           us(:,:,:,2) = 0.00_rk
           us(:,:,:,3) = 0.00_rk
           mask_color = 0
-      end where
+      else
+          ! for the fixed-grid codes, delete only the body.
+          where (mask_color==Insect%color_r .or. mask_color==Insect%color_l .or. &
+                 mask_color==Insect%color_r2 .or. mask_color==Insect%color_l2)
+              mask = 0.00_rk
+              us(:,:,:,1) = 0.00_rk
+              us(:,:,:,2) = 0.00_rk
+              us(:,:,:,3) = 0.00_rk
+              mask_color = 0
+          end where
+      endif
   endif
 
-  if ((dabs(Insect%time-time)>1.0d-10).and.root) then
+  if ((dabs(Insect%time-time)>1.0d-10) .and. root) then
       write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
       write(*,'("Did you call Update_Insect before draw_insect_wings?")')
   endif
@@ -1953,6 +1966,12 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
       ! wing mid-point (of course in wing system..)
       call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
       call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
+
+      if (root) then
+          write(*,*) "wingID", wingID
+          write(*,*) "ai", Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID)
+          write(*,*) "bi", Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID)
+      endif
   endif
 
   !-----------------------------------------------------------------------------

@@ -36,7 +36,7 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
 
     if (tree_id <= tree_n) then
         ! the tree altready exists: to overwrite it, we first delete the existing one
-        call delete_tree(params, lgt_block, lgt_active, lgt_n, tree_id)
+        call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, tree_id)
 
         call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)

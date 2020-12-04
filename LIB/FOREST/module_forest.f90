@@ -910,7 +910,6 @@ contains
                     ! 2D:
                     call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
                     hvy_active(:,tree_id1), hvy_n(tree_id1) )
-
                     call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
                     hvy_active(:,tree_id2), hvy_n(tree_id2) )
                 end if
@@ -919,7 +918,6 @@ contains
                 call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id1),&
                 lgt_n(tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1), &
                 lgt_sortednumlist(:,:,tree_id1), tree_id1 )
-
                 call create_active_and_sorted_lists( params, lgt_block, lgt_active(:,tree_id2),&
                 lgt_n(tree_id2), hvy_active(:,tree_id2), hvy_n(tree_id2), &
                 lgt_sortednumlist(:,:,tree_id2), tree_id2 )

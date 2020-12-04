@@ -210,6 +210,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_two_cylinders( mask(:,:,1), x0, dx, Bs, g )
         endif
 
+    case ('two-moving-cylinders')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_two_moving_cylinders( time, mask(:,:,1), x0, dx, Bs, g )
+        endif
+
     case ('cavity')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             call draw_cavity( mask, x0, dx, Bs, g )
@@ -506,3 +511,96 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
 
 end subroutine draw_two_cylinders
+
+
+subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+    ! auxiliary variables
+    real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
+    cy2, r_1, r_2, h, mask1, mask2, freq
+    !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
+    ! loop variables
+    integer(kind=ik)      :: ix, iy
+
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+    mask1 = 0.0_rk
+    mask2 = 0.0_rk
+    !---------------------------------------------------------------------------------------------
+    ! main body
+    ! radius of the cylinders
+    R1 = 1.0_rk * params_acm%R_cyl
+    R2 = 1.0_rk * params_acm%R_cyl
+    ! Here we set the frequency of the 2. cylinder oscillating up and down behind
+    ! the 1. cyl. It should be choosen such that the characteristic time scale of
+    ! the vortex shedding is larger then the movement!
+    ! Reynolds Number:
+    ! Re1 = 2 * params_acm%u_mean_set(1) * R1/ params_acm%nu
+    ! Re2 = 2 * params_acm%u_mean_set(1) * R2/ params_acm%nu
+    ! ! strouhal number: (see: https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street)
+    ! St1 = 0.198 * (1-19.7/Re1)
+    ! St2 = 0.198 * (1-19.7/Re2)
+    ! ! vortex shedding frequency
+    ! f1 = St1*params_acm%u_mean_set(1)/(2*R1)
+    ! f2 = St2*params_acm%u_mean_set(1)/(2*R2)
+    ! ! make cylinder movement slow in comparison to vortex shedding frequency:
+    ! freq = min(f1,f2) / 50
+    freq = 1e-3
+    ! center of the first cylinder
+    cx1 = 0.125_rk * params_acm%domain_size(1)
+    cy1 = 0.500_rk * params_acm%domain_size(2)
+    ! center of the second cylinder (oscillates behind 1. cylinder)
+    cx2 = 3*cx1
+    cy2 = cy1 + 0.25_rk*params_acm%domain_size(2) * sin(2*pi*freq * time)
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+
+    do iy=1, Bs(2)+2*g
+        y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
+        y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
+        do ix=1, Bs(1)+2*g
+            x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
+            x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
+            ! distance from center of cylinder 1
+            r_1 = dsqrt(x1*x1 + y1*y1)
+            ! distance from center of cylinder 2
+            r_2 = dsqrt(x2*x2 + y2*y2)
+            if (params_acm%smooth_mask) then
+                mask1 = smoothstep( r_1, R1, h)
+                mask2 = smoothstep( r_2, R2, h)
+                mask(ix,iy) = mask1 + mask2
+            else
+                ! if point is inside one of the cylinders, set mask to 1
+                if (r_1 <= R1) then
+                    mask(ix,iy) = 1.0_rk
+                elseif ( r_2 <= R2) then
+                    mask(ix,iy) = 1.0_rk
+                else
+                    mask(ix,iy) = 0.0_rk
+                end if
+            end if
+        end do
+    end do
+
+
+end subroutine draw_two_moving_cylinders

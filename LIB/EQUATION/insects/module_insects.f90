@@ -109,6 +109,8 @@ module module_insects
     real(kind=rk), dimension(1:3) :: xc_body_g=0.d0, vc_body_g=0.d0
     ! initial or tethered position, velocity and yawpitchroll angles:
     real(kind=rk), dimension(1:3) :: x0=0.d0, v0=0.d0, yawpitchroll_0=0.d0
+    ! first harmonic components of the yawpitchroll angles
+    real(kind=rk), dimension(1:3) :: yawpitchroll_a1=0.d0, yawpitchroll_b1=0.d0
     ! roll pitch yaw angles and their time derivatives
     real(kind=rk) :: psi=0.d0, beta=0.d0, gamma=0.d0, psi_dt=0.d0, beta_dt=0.d0, gamma_dt=0.d0, eta0=0.d0
     ! body pitch angle, if it is constant (used in forward flight and hovering)

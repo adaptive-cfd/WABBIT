@@ -245,8 +245,14 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
   call read_param_mpi(PARAMS,"Insects","v0",Insect%v0, (/0.d0, 0.d0, 0.d0/))
   call read_param_mpi(PARAMS,"Insects","yawpitchroll_0",Insect%yawpitchroll_0,&
   (/0.d0, 0.d0, 0.d0/))
+  call read_param_mpi(PARAMS,"Insects","yawpitchroll_a1",Insect%yawpitchroll_a1,&
+  (/0.d0, 0.d0, 0.d0/))
+  call read_param_mpi(PARAMS,"Insects","yawpitchroll_b1",Insect%yawpitchroll_b1,&
+  (/0.d0, 0.d0, 0.d0/))
   ! convert yawpitchroll to radiants
   Insect%yawpitchroll_0 = Insect%yawpitchroll_0 * (pi/180.d0)
+  Insect%yawpitchroll_a1 = Insect%yawpitchroll_a1 * (pi/180.d0)
+  Insect%yawpitchroll_b1 = Insect%yawpitchroll_b1 * (pi/180.d0)
   call read_param_mpi(PARAMS,"Insects","eta0",Insect%eta0, 0.0d0)
   Insect%eta0 = Insect%eta0*(pi/180.d0)
 

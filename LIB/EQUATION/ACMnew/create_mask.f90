@@ -212,7 +212,12 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
 
     case ('two-moving-cylinders')
         if (stage == "time-dependent-part" .or. stage == "all-parts") then
-            call draw_two_moving_cylinders( time, mask(:,:,1), x0, dx, Bs, g )
+            call draw_two_moving_cylinders( time, mask(:,:,:), x0, dx, Bs, g )
+        endif
+
+    case ('flapping-wings')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_2d_flapping_wings( time, mask(:,:,:), x0, dx, Bs, g )
         endif
 
     case ('cavity')
@@ -524,14 +529,14 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     integer(kind=ik), intent(in) :: g
     integer(kind=ik), dimension(3), intent(in) :: Bs
     !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: mask
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
     !> simulation time
     real(kind=rk), intent(in) :: time
     ! auxiliary variables
     real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
-    cy2, r_1, r_2, h, mask1, mask2, freq
+    cy2, r_1, r_2, h, mask1, mask2, freq, vy2
     !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
     ! loop variables
     integer(kind=ik)      :: ix, iy
@@ -550,7 +555,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! main body
     ! radius of the cylinders
     R1 = 1.0_rk * params_acm%R_cyl
-    R2 = 1.0_rk * params_acm%R_cyl
+    R2 = 0.5_rk * params_acm%R_cyl
     ! Here we set the frequency of the 2. cylinder oscillating up and down behind
     ! the 1. cyl. It should be choosen such that the characteristic time scale of
     ! the vortex shedding is larger then the movement!
@@ -565,13 +570,15 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! f2 = St2*params_acm%u_mean_set(1)/(2*R2)
     ! ! make cylinder movement slow in comparison to vortex shedding frequency:
     ! freq = min(f1,f2) / 50
-    freq = 1e-3
+    freq = 2e-3
     ! center of the first cylinder
     cx1 = 0.125_rk * params_acm%domain_size(1)
     cy1 = 0.500_rk * params_acm%domain_size(2)
     ! center of the second cylinder (oscillates behind 1. cylinder)
-    cx2 = 3*cx1
+    cx2 = 4*cx1
     cy2 = cy1 + 0.25_rk*params_acm%domain_size(2) * sin(2*pi*freq * time)
+    ! velocity of moving cylinder
+    vy2 = 0.25_rk * params_acm%domain_size(2) * 2 * pi * freq * cos(2*pi*freq*time)
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
@@ -588,15 +595,18 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
             if (params_acm%smooth_mask) then
                 mask1 = smoothstep( r_1, R1, h)
                 mask2 = smoothstep( r_2, R2, h)
-                mask(ix,iy) = mask1 + mask2
+                if (mask2>0.0) mask(ix,iy,3) = vy2
+                mask(ix,iy,1) = mask1 + mask2
             else
                 ! if point is inside one of the cylinders, set mask to 1
                 if (r_1 <= R1) then
-                    mask(ix,iy) = 1.0_rk
+                    mask(ix,iy,1) = 1.0_rk
                 elseif ( r_2 <= R2) then
-                    mask(ix,iy) = 1.0_rk
+                    mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,2) = 0.0_rk
+                    mask(ix,iy,3) = vy2
                 else
-                    mask(ix,iy) = 0.0_rk
+                    mask(ix,iy,:) = 0.0_rk
                 end if
             end if
         end do
@@ -604,3 +614,154 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 
 
 end subroutine draw_two_moving_cylinders
+
+
+subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
+    ! simple 2D insect
+    ! taken from publication:
+    !       Fluid Dyn. Res. 44 (2012), Keigo Ota, Kosuke Suzuki
+    !       and Takaji Inamuro
+    ! Reynolds number is given by:
+    !  Re = u_tip*L/nu
+    !  time-averaged tip speed u_tip, chord length L, cinematic viscousity nu
+    !  u_tip = 4 * L * freq * A   (freq ... frequency, A... max(theta))
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !          wing_l     wing_r
+    !             \       /
+    !              \     /
+    !               \   /
+    !                \ /
+    !                 O        theta is angle between x and wing_r/wing_l
+    !                body
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+    ! auxiliary variables
+    real(kind=rk)         :: x1, x2, y1, y2, R, cxr, cxl, cyr, cyl, c, K, L, b2,&
+                             r_wing_r, r_wing_l,r_body, h, mask_wing_r, x, y, xb, yb, &
+                             mask_wing_l, mask_body, freq, x_bodycenter(2), theta, theta_dt, &
+                             cos_theta, sin_theta, uwing_x, uwing_y, ubody_x, ubody_y, A
+    integer(kind=ik)            :: ix, iy
+    integer(kind=2), parameter  :: color_l=2, color_r=3
+    integer(kind=2)             :: color
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+    mask_wing_r = 0.0_rk ! right wing
+    mask_wing_l = 0.0_rk ! left wing
+    mask_body = 0.0_rk
+    ! ---------------
+    ! body center of cylinder
+    x_bodycenter = params_acm%x_cntr(1:2)
+    ! size of the body
+    R = params_acm%R_cyl
+    ! chord length
+    c = params_acm%length
+    ! the wings are elipsoids, center is half of the chord length + radius of the body
+    L = c/2 + R
+    !frequency
+    freq = params_acm%freq
+    ! half axis ration of elipsoid
+    b2 = 0.1**2
+    ! angle between wing and x axis
+    A = pi*0.25
+    theta = A * cos(2.0_rk*pi*freq*time)
+    ! angular velocity
+    theta_dt = -2.0_rk*pi*freq*A*sin(2.0_rk*pi*freq*time)
+    ! precompute cosinus and sinus
+    cos_theta = cos(theta)
+    sin_theta = sin(theta)
+    ! velocity of body
+    ubody_x = 0.0_rk
+    ubody_y = 0.0_rk
+    ! centers of wing elipsoids
+    ! right wing
+    cxr = x_bodycenter(1) + L * cos_theta
+    cyr = x_bodycenter(2) + L * sin_theta
+    ! left wing
+    cxl = x_bodycenter(1) - L * cos_theta
+    cyl = x_bodycenter(2) + L * sin_theta
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+    do iy=1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        do ix=1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! rotate elipsoid of wing right
+            x1 =  cos_theta * (x - cxr) + sin_theta * (y - cyr)
+            y1 = -sin_theta * (x - cxr) + cos_theta * (y - cyr)
+            ! rotate elipsoid of wing left
+            x2 =  cos_theta * (x - cxl) - sin_theta * (y - cyl)
+            y2 =  sin_theta * (x - cxl) + cos_theta * (y - cyl)
+            ! calculate center of body
+            xb = x - x_bodycenter(1)
+            yb = y - x_bodycenter(2)
+            ! distance from center of wing 1
+            r_wing_r = dsqrt(x1*x1 + y1*y1/b2)
+            ! distance from center of wing 2
+            r_wing_l = dsqrt(x2*x2 + y2*y2/b2)
+            ! body
+            r_body = dsqrt(xb*xb + yb*yb)
+            ! compute velocity at the wings
+            ! Note that due to symmetry of the movement,
+            ! only the x component switches sign from wing_r to wing_l
+            uwing_x = -sin_theta * (theta_dt * r_body)
+            uwing_y = cos_theta * (theta_dt * r_body)
+            ! reset color
+            color = 0
+            ! draw mask
+            if (params_acm%smooth_mask) then
+                mask_wing_r = smoothstep( r_wing_r, c*0.5_rk, h)
+                mask_wing_l = smoothstep( r_wing_l, c*0.5_rk, h)
+                mask_body = smoothstep( r_body, R, h)
+                mask(ix,iy,1) = mask_wing_r + mask_wing_l + mask_body
+                if (mask_wing_r>0.0_rk) color = color_r
+                if (mask_wing_l>0.0_rk) color = color_l
+            else
+                ! if point is inside one of the cylinders, set mask to 1
+                if (r_wing_r <= c*0.5_rk ) then
+                    mask(ix,iy,1) = 1.0_rk
+                    color = color_r
+                elseif ( r_wing_l <= c*0.5_rk ) then
+                    mask(ix,iy,1) = 1.0_rk
+                    color = color_l
+                elseif ( r_body <= R ) then
+                    mask(ix,iy,1) = 1.0_rk
+                else
+                    mask(ix,iy,:) = 0.0_rk
+                end if
+            end if
+
+            ! set the velocity values inside the rigid body domain
+            if (color == color_r) then
+                mask(ix,iy,2) = ubody_x + uwing_x
+                mask(ix,iy,3) = ubody_y + uwing_y
+            elseif (color == color_l) then
+                mask(ix,iy,2) = ubody_x - uwing_x ! minus because of oposit wing movement direction
+                mask(ix,iy,3) = ubody_y + uwing_y
+            else
+                mask(ix,iy,2) = ubody_x
+                mask(ix,iy,3) = ubody_y
+            end if
+        end do
+    end do
+
+
+end subroutine draw_2d_flapping_wings

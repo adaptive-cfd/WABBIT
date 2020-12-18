@@ -57,7 +57,8 @@ module module_acm
     ! nu
     real(kind=rk) :: nu
     real(kind=rk) :: dx_min = -1.0_rk
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3), urms(1:3), div_max, div_min
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
+                     urms(1:3), div_max, div_min, freq
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     ! gamma_p
@@ -246,6 +247,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
+        call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )

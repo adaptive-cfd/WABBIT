@@ -159,6 +159,18 @@ subroutine BodyMotion(time, Insect)
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
+    case ("yawpitchroll_param")
+        ! Harmonic yaw, pitch and roll oscillation
+        psi      = Insect%yawpitchroll_0(3) + Insect%yawpitchroll_a1(3)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(3)*sin(2.d0*pi*time) ! roll
+        beta     = Insect%yawpitchroll_0(2) + Insect%yawpitchroll_a1(2)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(2)*sin(2.d0*pi*time) ! pitch
+        gamma    = Insect%yawpitchroll_0(1) + Insect%yawpitchroll_a1(1)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(1)*sin(2.d0*pi*time) ! yaw
+        psi_dt   = ( - Insect%yawpitchroll_a1(3)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(3)*cos(2.d0*pi*time) )*2.d0*pi
+        beta_dt  = ( - Insect%yawpitchroll_a1(2)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(2)*cos(2.d0*pi*time) )*2.d0*pi
+        gamma_dt = ( - Insect%yawpitchroll_a1(1)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(1)*cos(2.d0*pi*time) )*2.d0*pi
+        xc = Insect%x0
+        vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
+        Insect%body_moves = "yes"
+
     case ("tethered")
         psi      = Insect%yawpitchroll_0(3) ! roll
         beta     = Insect%yawpitchroll_0(2) ! pitch

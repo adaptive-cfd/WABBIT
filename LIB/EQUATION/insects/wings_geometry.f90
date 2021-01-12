@@ -2534,7 +2534,7 @@ function f_same_side_point(x1,y1,x2,y2,x3,y3,x4,y4)
     implicit none
 
     real(kind=rk), intent(in) :: x1,y1,x2,y2,x3,y3,x4,y4
-    real(kind=rk) :: rr,dx21,m1,b1,b3,b4
+    real(kind=rk) :: rr,dx21,dy21,m1,b1,b3,b4
     integer :: f_same_side_point
 
     ! Initialize the result
@@ -2542,7 +2542,7 @@ function f_same_side_point(x1,y1,x2,y2,x3,y3,x4,y4)
 
     ! Denominator in the slope of the line
     dx21 = (x2-x1)
-
+    dy21 = (y2-y1)
     ! If the slope is small enough
     if (dabs(dx21) > 1.0d-5) then
         m1 = (y2-y1)/dx21
@@ -2553,8 +2553,8 @@ function f_same_side_point(x1,y1,x2,y2,x3,y3,x4,y4)
             rr = 1
         endif
     ! If the slope is close to 90deg, swap x and y
-    else
-        m1 = dx21/(y2-y1)
+    elseif (dabs(dx21) > 1.0d-5) then
+        m1 = dx21/dy21
         b1 = x1-m1*y1
         b3 = x3-m1*y3
         b4 = x4-m1*y4

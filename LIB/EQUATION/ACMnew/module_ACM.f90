@@ -96,7 +96,7 @@ module module_acm
     ! the error compared to an analytical solution (e.g. taylor-green)
     real(kind=rk) :: error(1:6)
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation, vortex_stretching, penalpower
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -528,8 +528,13 @@ end subroutine
 
       call init_t_file('meanflow.t', overwrite)
       call init_t_file('forces.t', overwrite)
+      call init_t_file('penalpower.t', overwrite)
       call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
-      call init_t_file('enstrophy.t', overwrite)
+      call init_t_file('enstrophy.t', overwrite, &
+      (/"           time",&
+        "      enstrophy",&
+        " vortex_stretch"/))
+
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)
       ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"

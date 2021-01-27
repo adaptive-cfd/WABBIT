@@ -65,6 +65,9 @@ program main_post
     case ("--prune-tree")
         call post_prune_tree(params)
 
+    case ("--enstrophy-eqn-contributions", "--EEC")
+        call enstrophy_eqn_contributions(params)
+
     case ("--remesh")
         call post_remesh(params)
 

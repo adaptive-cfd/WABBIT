@@ -37,7 +37,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
         ! the file containes the radius of the cylinder
         R = treedata(i,7)*Insect%fractal_tree_scaling
 
-        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(1,kind=2))
+        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(0,kind=2))
     end do
 
 end subroutine draw_fractal_tree

@@ -7,16 +7,12 @@
 !
 ! ********************************************************************************************
 subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
     !> origin and spacing of the block
     real(kind=rk), dimension(3), intent(in)        :: dx
-    !> local datafields
+    !> velocity components (input, 3 scalars)
     real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w
-    !> vorticity
+    !> vorticity (output, vector)
     real(kind=rk), dimension(:,:,:,:), intent(out) :: vorticity
     character(len=*), intent(in)                   :: discretization
     !> grid parameters
@@ -30,22 +26,23 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
     integer(kind=ik)                               :: ix, iy, iz
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     vorticity = 0.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
-    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-        0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     if (size(u,3)>2) then ! 3D case
+
+        if (size(vorticity,4) < 3) then
+            write(*,*) size(vorticity)
+            call abort(231120,"Not enough work arrays to compute 3D vorticity")
+        endif
+
         dz_inv = 1.0_rk / dx(3)
         if (discretization == "FD_2nd_central" ) then
             do ix = g+1, Bs(1)+g
@@ -62,40 +59,40 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
                         vorticity(ix,iy,iz,2) = u_dz - w_dx
                         vorticity(ix,iy,iz,3) = v_dx - u_dy
                     end do
-                 end do
+                end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs(1)+g
                 do iy = g+1, Bs(2)+g
                     do iz = g+1, Bs(3)+g
                         u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + &
-                            a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz)&
-                       +  a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) + &
-                       a(+3)*u(ix,iy+3,iz))*dy_inv
+                        a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz)&
+                        +  a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) + &
+                        a(+3)*u(ix,iy+3,iz))*dy_inv
 
                         u_dz = (a(-3)*u(ix,iy,iz-3) + a(-2)*u(ix,iy,iz-2) &
-                            + a(-1)*u(ix,iy,iz-1) + a(0)*u(ix,iy,iz)&
-                      +  a(+1)*u(ix,iy,iz+1) + a(+2)*u(ix,iy,iz+2) +&
-                      a(+3)*u(ix,iy,iz+3))*dz_inv
+                        + a(-1)*u(ix,iy,iz-1) + a(0)*u(ix,iy,iz)&
+                        +  a(+1)*u(ix,iy,iz+1) + a(+2)*u(ix,iy,iz+2) +&
+                        a(+3)*u(ix,iy,iz+3))*dz_inv
 
                         v_dx = (a(-3)*v(ix-3,iy,iz) + a(-2)*v(ix-2,iy,iz) &
-                            + a(-1)*v(ix-1,iy,iz) + a(0)*v(ix,iy,iz)&
-                      +  a(+1)*v(ix+1,iy,iz) + a(+2)*v(ix+2,iy,iz) +&
-                      a(+3)*v(ix+3,iy,iz))*dx_inv
+                        + a(-1)*v(ix-1,iy,iz) + a(0)*v(ix,iy,iz)&
+                        +  a(+1)*v(ix+1,iy,iz) + a(+2)*v(ix+2,iy,iz) +&
+                        a(+3)*v(ix+3,iy,iz))*dx_inv
 
                         v_dz = (a(-3)*v(ix,iy,iz-3) + a(-2)*v(ix,iy,iz-2) &
-                            + a(-1)*v(ix,iy,iz-1) + a(0)*v(ix,iy,iz)&
-                      +  a(+1)*v(ix,iy,iz+1) + a(+2)*v(ix,iy,iz+2) +&
-                      a(+3)*v(ix,iy,iz+3))*dz_inv
+                        + a(-1)*v(ix,iy,iz-1) + a(0)*v(ix,iy,iz)&
+                        +  a(+1)*v(ix,iy,iz+1) + a(+2)*v(ix,iy,iz+2) +&
+                        a(+3)*v(ix,iy,iz+3))*dz_inv
 
                         w_dx = (a(-3)*w(ix-3,iy,iz) + a(-2)*w(ix-2,iy,iz)&
-                            + a(-1)*w(ix-1,iy,iz) + a(0)*w(ix,iy,iz)&
-                      +  a(+1)*w(ix+1,iy,iz) + a(+2)*w(ix+2,iy,iz) + &
-                      a(+3)*w(ix+3,iy,iz))*dx_inv
+                        + a(-1)*w(ix-1,iy,iz) + a(0)*w(ix,iy,iz)&
+                        +  a(+1)*w(ix+1,iy,iz) + a(+2)*w(ix+2,iy,iz) + &
+                        a(+3)*w(ix+3,iy,iz))*dx_inv
                         w_dy = (a(-3)*w(ix,iy-3,iz) + a(-2)*w(ix,iy-2,iz)&
-                            + a(-1)*w(ix,iy-1,iz) + a(0)*w(ix,iy,iz)&
-                     +  a(+1)*w(ix,iy+1,iz) + a(+2)*w(ix,iy+2,iz) +&
-                     a(+3)*w(ix,iy+3,iz))*dy_inv
+                        + a(-1)*w(ix,iy-1,iz) + a(0)*w(ix,iy,iz)&
+                        +  a(+1)*w(ix,iy+1,iz) + a(+2)*w(ix,iy+2,iz) +&
+                        a(+3)*w(ix,iy+3,iz))*dy_inv
 
                         vorticity(ix,iy,iz,1) = w_dy - v_dz
                         vorticity(ix,iy,iz,2) = u_dz - w_dx
@@ -114,18 +111,19 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
                 do iy = g+1, Bs(2)+g
                     u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
                     v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv*0.5_rk
+
                     vorticity(ix,iy,1,1) = v_dx - u_dy
-                 end do
+                end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs(1)+g
                 do iy = g+1, Bs(2)+g
-                    u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + &
-                        a(-1)*u(ix,iy-1,1) + a(0)*u(ix,iy,1)&
-                  +  a(+1)*u(ix,iy+1,1) + a(+2)*u(ix,iy+2,1) + a(+3)*u(ix,iy+3,1))*dy_inv
+                    u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + a(-1)*u(ix,iy-1,1) + a(0)*u(ix,iy,1)&
+                    +  a(+1)*u(ix,iy+1,1) + a(+2)*u(ix,iy+2,1) + a(+3)*u(ix,iy+3,1))*dy_inv
                     v_dx = (a(-3)*v(ix-3,iy,1) + a(-2)*v(ix-2,iy,1) + &
-                        a(-1)*v(ix-1,iy,1) + a(0)*v(ix,iy,1)&
-                  +  a(+1)*v(ix+1,iy,1) + a(+2)*v(ix+2,iy,1) + a(+3)*v(ix+3,iy,1))*dx_inv
+                    a(-1)*v(ix-1,iy,1) + a(0)*v(ix,iy,1)&
+                    +  a(+1)*v(ix+1,iy,1) + a(+2)*v(ix+2,iy,1) + a(+3)*v(ix+3,iy,1))*dx_inv
+
                     vorticity(ix,iy,1,1) = v_dx - u_dy
                 end do
             end do

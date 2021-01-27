@@ -133,7 +133,7 @@ module module_params
         character(len=80) :: physics_type=""
 
         ! domain length
-        real(kind=rk)     :: domain_size(3)=0.0_rk
+        real(kind=rk)     :: domain_size(3)=0.0_rk, C_eta=1.0_rk
 
         ! use third dimension
         integer(kind=ik)  :: dim=2 ! can be 2 or 3
@@ -177,7 +177,8 @@ module module_params
         character(len=80), allocatable, dimension(:) :: field_names
         logical ::use_iteration_as_fileid = .false.
 
-
+! HACK
+real(kind=rk) :: nu_acm
 
         ! -------------------------------------------------------------------------------------
         ! unit test

@@ -136,9 +136,6 @@ program main
     output_time   = 0.0_rk
     iteration     = 0
 
-!---------------------------------------------------------------------------------------------
-! main body
-
     ! init mpi
     call MPI_Init(ierr)
     ! determine process rank
@@ -164,7 +161,7 @@ program main
     tstart = MPI_wtime()
 
     !---------------------------------------------------------------------------
-    ! Initialize parameters,bridge and grid
+    ! Initialize parameters, bridge and grid
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     ! get the second command line argument: this should be the ini-file name
@@ -314,7 +311,7 @@ program main
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
-            ! Snych'ing becomes much mor expensive one the grid is refined.
+            ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
             ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
@@ -332,8 +329,8 @@ program main
         ! internal loop over time steps: if desired, we perform more than one time step
         ! before adapting the grid again. this can further reduce the overhead of adaptivity.
         ! Note: the non-linear terms can create finer scales than resolved on the grid. they
-        ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
-        ! on the grid, consider using a filter.
+        ! are usually filtered by the coarsening/refinement round-trip. So if you do more than one time step
+        ! on the grid, consider using a filter, unless high viscosity damps out high-frequency parts
         do it = 1, params%N_dt_per_grid
             !*******************************************************************
             ! advance in time (make one time step)

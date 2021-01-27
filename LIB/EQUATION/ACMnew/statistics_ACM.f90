@@ -44,7 +44,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     integer(kind=ik) :: mpierr, ix, iy, iz, k
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2
-    real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
+    real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3), penalpower_block
     real(kind=rk) :: x0_moment(1:3,0:6), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
@@ -64,6 +64,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     integer(kind=2) :: color
     logical :: is_insect
+    !> coefficients for Tam&Webb
+    real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    real(kind=rk) :: ux_dx, ux_dy, ux_dz, uy_dx, uy_dy, uy_dz, uz_dx, uz_dy, uz_dz, &
+    vorx, vory, vorz, vortex_stretching, dx_inv, dy_inv, dz_inv
+
+
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
@@ -82,7 +88,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         dV = dx(1)*dx(2)
     endif
 
-    ! save some computing time by using a logical and not comparing every time
+    ! save some computing time by using a logical and not comparing strings every time
     is_insect = .false.
     if (params_acm%geometry == "Insect") is_insect = .true.
 
@@ -102,9 +108,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%enstrophy = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
+        params_acm%vortex_stretching = 0.0_rk
         params_acm%u_residual = 0.0_rk
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk
+        params_acm%penalpower = 0.0_rk
         dx_min = 90.0e9_rk
 
         if (is_insect) then
@@ -136,6 +144,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ekin_block = 0.0_rk
         tmp_volume = 0.0_rk
         tmp_volume2 = 0.0_rk
+        penalpower_block = 0.0_rk
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
@@ -181,6 +190,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 params_acm%div_min = min( params_acm%div_min, div(ix,iy,1) )
             enddo
             enddo
+
+            ! this is a 2D case and u has only two components: the 3rd one (in fact thats the pressure)
+            ! is ignored by the vorticity routine.
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+
+            ! compute mean enstrophy over the entire domain (including the solid body, in case of penalization)
+            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g-1,g+1:Bs(2)+g-1,1,1)**2)*dx(1)*dx(2)
+
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
             C_eta_inv = 1.0_rk / params_acm%C_eta
@@ -220,9 +237,16 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! get this points color
                         color = int( mask(ix, iy, iz, 5), kind=2 )
 
+                        ! this is a bugfix: if the color is smaller 0 or greater 6, something
+                        ! went wrong with mask color (happens when not actually using penalization, for instance)
                         if (color>0_2 .and. color < 6_2) then
                             ! penalization term
                             penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+
+                            ! penalization power: the contribution to the energy eqn from the penalization
+                            ! (ie moving boundarys act as energy sink/source)
+                            ! is the scalar product of penalization term and u (see Engels et al J. Comp. Phys 2015) eqn.34
+                            penalpower_block = penalpower_block + sum( penal*u(ix,iy,iz,1:3) )
 
                             ! forces acting on this color
                             force_block(1:3, color) = force_block(1:3, color) - penal
@@ -273,28 +297,81 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     enddo
                 enddo
             enddo
-        endif
+
+            ! For the enstrophy equation, we require the vorticity:
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+
+            ! compute mean enstrophy over the entire domain (including the solid body, in case of penalization)
+            params_acm%enstrophy = params_acm%enstrophy + sum( work(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1:3)**2 )*dx(1)*dx(2)*dx(3)
+
+            ! hack only for 4th order scheme
+            if (params_acm%discretization == "FD_4th_central_optimized") then
+                dx_inv = 1.0_rk / dx(1)
+                dy_inv = 1.0_rk / dx(2)
+                dz_inv = 1.0_rk / dx(3)
+
+                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+                    do iy = g+1, Bs(2)+g-1
+                        do ix = g+1, Bs(1)+g-1
+                            ! vorx = work(ix,iy,iz,1)
+                            ! vory = work(ix,iy,iz,2)
+                            ! vorz = work(ix,iy,iz,3)
+                            !
+                            ! ux = u(ix,iy,iz,1)
+                            ! uy = u(ix,iy,iz,1)
+                            ! uz = u(ix,iy,iz,1)
+
+                            ux_dx = (a(-3)*u(ix-3,iy,iz,1) + a(-2)*u(ix-2,iy,iz,1) + a(-1)*u(ix-1,iy,iz,1) + a(0)*u(ix,iy,iz,1) &
+                                  +  a(+1)*u(ix+1,iy,iz,1) + a(+2)*u(ix+2,iy,iz,1) + a(+3)*u(ix+3,iy,iz,1))*dx_inv
+                            ux_dy = (a(-3)*u(ix,iy-3,iz,1) + a(-2)*u(ix,iy-2,iz,1) + a(-1)*u(ix,iy-1,iz,1) + a(0)*u(ix,iy,iz,1) &
+                                  +  a(+1)*u(ix,iy+1,iz,1) + a(+2)*u(ix,iy+2,iz,1) + a(+3)*u(ix,iy+3,iz,1))*dy_inv
+                            ux_dz = (a(-3)*u(ix,iy,iz-3,1) + a(-2)*u(ix,iy,iz-2,1) + a(-1)*u(ix,iy,iz-1,1) + a(0)*u(ix,iy,iz,1) &
+                                  +  a(+1)*u(ix,iy,iz+1,1) + a(+2)*u(ix,iy,iz+2,1) + a(+3)*u(ix,iy,iz+3,1))*dz_inv
+
+                            uy_dx = (a(-3)*u(ix-3,iy,iz,2) + a(-2)*u(ix-2,iy,iz,2) + a(-1)*u(ix-1,iy,iz,2) + a(0)*u(ix,iy,iz,2) &
+                                  +  a(+1)*u(ix+1,iy,iz,2) + a(+2)*u(ix+2,iy,iz,2) + a(+3)*u(ix+3,iy,iz,2))*dx_inv
+                            uy_dy = (a(-3)*u(ix,iy-3,iz,2) + a(-2)*u(ix,iy-2,iz,2) + a(-1)*u(ix,iy-1,iz,2) + a(0)*u(ix,iy,iz,2) &
+                                  +  a(+1)*u(ix,iy+1,iz,2) + a(+2)*u(ix,iy+2,iz,2) + a(+3)*u(ix,iy+3,iz,2))*dy_inv
+                            uy_dz = (a(-3)*u(ix,iy,iz-3,2) + a(-2)*u(ix,iy,iz-2,2) + a(-1)*u(ix,iy,iz-1,2) + a(0)*u(ix,iy,iz,2) &
+                                  +  a(+1)*u(ix,iy,iz+1,2) + a(+2)*u(ix,iy,iz+2,2) + a(+3)*u(ix,iy,iz+3,2))*dz_inv
+
+                            uz_dx = (a(-3)*u(ix-3,iy,iz,3) + a(-2)*u(ix-2,iy,iz,3) + a(-1)*u(ix-1,iy,iz,3) + a(0)*u(ix,iy,iz,3) &
+                                  +  a(+1)*u(ix+1,iy,iz,3) + a(+2)*u(ix+2,iy,iz,3) + a(+3)*u(ix+3,iy,iz,3))*dx_inv
+                            uz_dy = (a(-3)*u(ix,iy-3,iz,3) + a(-2)*u(ix,iy-2,iz,3) + a(-1)*u(ix,iy-1,iz,3) + a(0)*u(ix,iy,iz,3) &
+                                  +  a(+1)*u(ix,iy+1,iz,3) + a(+2)*u(ix,iy+2,iz,3) + a(+3)*u(ix,iy+3,iz,3))*dy_inv
+                            uz_dz = (a(-3)*u(ix,iy,iz-3,3) + a(-2)*u(ix,iy,iz-2,3) + a(-1)*u(ix,iy,iz-1,3) + a(0)*u(ix,iy,iz,3) &
+                                  +  a(+1)*u(ix,iy,iz+1,3) + a(+2)*u(ix,iy,iz+2,3) + a(+3)*u(ix,iy,iz+3,3))*dz_inv
+
+                            vorx = uz_dy - uy_dz
+                            vory = ux_dz - uz_dx
+                            vorz = uy_dx - ux_dy
+
+                            vortex_stretching = vorx*vorx*ux_dx + vorx*vory*ux_dy + vorx*vorz*ux_dz + &
+                                                vory*vorx*uy_dx + vory*vory*uy_dy + vory*vorz*uy_dz + &
+                                                vorz*vorx*uz_dx + vorz*vory*uz_dy + vorz*vorz*uz_dz
+
+                            work(ix,iy,iz,1) = vortex_stretching
+                        enddo
+                    enddo
+                enddo
+
+                ! sum up block values (process-local, MPI_ALLREDUCE will follow later)
+                ! Note: skip redundant points (integration)
+                params_acm%vortex_stretching = params_acm%vortex_stretching + sum( work(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1) ) * dV
+            endif
+
+        endif ! 2D / 3D case
 
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
-        params_acm%u_residual = params_acm%u_residual + residual_block * dV
-        params_acm%mean_flow = params_acm%mean_flow + meanflow_block * dV
-        params_acm%mask_volume = params_acm%mask_volume + tmp_volume * dV
+        params_acm%u_residual    = params_acm%u_residual    + residual_block * dV
+        params_acm%mean_flow     = params_acm%mean_flow     + meanflow_block * dV
+        params_acm%penalpower    = params_acm%penalpower    + penalpower_block * dV
+        params_acm%mask_volume   = params_acm%mask_volume   + tmp_volume * dV
         params_acm%sponge_volume = params_acm%sponge_volume + tmp_volume2 * dV
-        params_acm%force_color = params_acm%force_color + force_block * dV
-        params_acm%moment_color = params_acm%moment_color + moment_block * dV
-        params_acm%e_kin = params_acm%e_kin + ekin_block * dV
-
-        !-------------------------------------------------------------------------
-        ! compute enstrophy in the whole domain (including penalized regions)
-        call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
-
-        if (params_acm%dim ==2) then
-            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g-1,g+1:Bs(2)+g-1,1,1)**2)*dx(1)*dx(2)
-        else
-            params_acm%enstrophy = 0.0_rk
-            ! call abort(6661,"ACM 3D not implemented.")
-        end if
+        params_acm%force_color   = params_acm%force_color   + force_block * dV
+        params_acm%moment_color  = params_acm%moment_color  + moment_block * dV
+        params_acm%e_kin         = params_acm%e_kin         + ekin_block * dV
 
     case ("post_stage")
         !-------------------------------------------------------------------------
@@ -324,10 +401,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         !-------------------------------------------------------------------------
         ! volume of mask (useful to see if it is properly generated)
-        tmp(1) = params_acm%mask_volume
-        call MPI_ALLREDUCE(tmp(1), params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        tmp(1) = params_acm%sponge_volume
-        call MPI_ALLREDUCE(tmp(1), params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penalpower, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic energy
@@ -344,8 +420,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         !-------------------------------------------------------------------------
         ! kinetic enstrophy
-        tmp(1)= params_acm%enstrophy
-        call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%vortex_stretching, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         tmp(1) = dx_min ! minium spacing of current grid, not smallest possible one.
         call MPI_ALLREDUCE(tmp(1), dx_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
@@ -442,7 +518,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             endif
 
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
-            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy, params_acm%vortex_stretching/) )
+            call append_t_file( 'penalpower.t', (/time, params_acm%penalpower/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
         end if

@@ -1,36 +1,7 @@
-
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \file
-!> \callgraph
-!> \brief wrapper for RHS call in time step function, computes RHS in work array
-!! (inplace)
-!> \version 0.5
-!> \author sm
-!! \date 23/05/17 - create
-!!
-!
-!>\details
-!! calls RHS depending on physics
-!!
-!! butcher table, e.g.
-!!
-!! |   |    |    |   |
-!! |---|----|----|---|
-!! | 0 | 0  | 0  |  0|
-!! |c2 | a21| 0  |  0|
-!! |c3 | a31| a32|  0|
-!! | 0 | b1 | b2 | b3|
-!!
-!!
-!
-!**********************************************************************************************
-
 subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
 
-   implicit none
+    implicit none
 
     !> time variable
     real(kind=rk), intent(in)           :: time, dt
@@ -73,12 +44,17 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
     call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
     hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
 
+    ! ! HACK for computing enstrophy time evolution
+    ! if (params%physics_type == "ACM-new") then
+    !     call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+    ! endif
+
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1,tree_ID_flow)), g, x0, dx,&
-        hvy_tmp(:,:,:,:,hvy_active(1,tree_ID_flow)), "init_stage", hvy_mask(:,:,:,:, hvy_active(1,tree_ID_flow)))
+    hvy_tmp(:,:,:,:,hvy_active(1,tree_ID_flow)), "init_stage", hvy_mask(:,:,:,:, hvy_active(1,tree_ID_flow)))
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -89,13 +65,13 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
     ! modules cannot see the grid, (they only see blocks), in order to encapsulate
     ! them nicer, two RHS stages have to be defined: integral / local stage.
     do k = 1, hvy_n(tree_ID_flow)
-      ! convert given hvy_id to lgt_id for block spacing routine
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
-      ! get block spacing for RHS
-      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        ! convert given hvy_id to lgt_id for block spacing routine
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
+        ! get block spacing for RHS
+        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-      call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(k,tree_ID_flow)), g, x0, dx,&
-          hvy_tmp(:,:,:,:,hvy_active(k,tree_ID_flow)), "integral_stage", hvy_mask(:,:,:,:, hvy_active(k,tree_ID_flow)))
+        call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(k,tree_ID_flow)), g, x0, dx,&
+        hvy_tmp(:,:,:,:,hvy_active(k,tree_ID_flow)), "integral_stage", hvy_mask(:,:,:,:, hvy_active(k,tree_ID_flow)))
     enddo
 
 
@@ -104,7 +80,5 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
     !-------------------------------------------------------------------------
     ! in rhs module, used for example for MPI_REDUCES
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_active(1,tree_ID_flow)), g, x0, dx,&
-        hvy_tmp(:,:,:,:,hvy_active(1,tree_ID_flow)), "post_stage", hvy_mask(:,:,:,:, hvy_active(1,tree_ID_flow)))
-
-
+    hvy_tmp(:,:,:,:,hvy_active(1,tree_ID_flow)), "post_stage", hvy_mask(:,:,:,:, hvy_active(1,tree_ID_flow)))
 end subroutine statistics_wrapper

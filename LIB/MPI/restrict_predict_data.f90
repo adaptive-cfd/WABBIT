@@ -23,9 +23,6 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
     if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
-
     if ( level_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
         call predict_data( params, res_pre_data, ijk, hvy_block, hvy_id )

@@ -111,7 +111,7 @@ subroutine dense_to_sparse(params)
     ! check and find common params in all h5-files
     !-------------------------------------------
     call read_attributes(params%input_files(1), lgt_n_tmp, time, iteration, params%domain_size, &
-    params%Bs,params%max_treelevel, params%dim)
+    params%Bs,params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     do i = 1, params%n_eqn
         file_in = params%input_files(i)

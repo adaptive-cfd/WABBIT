@@ -52,7 +52,7 @@
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,
@@ -144,7 +144,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     !> datafields
     real(kind=rk), intent(inout)                   :: phi(:,:,:,:)
     real(kind=rk), intent(inout)                   :: rhs(:,:,:,:)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,
@@ -203,10 +203,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             ! create the advection velocity field, which may be time and space dependent
             u0 = 0.0_rk
             call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
-            ! sets the ghost node layer of the boundary blocks according to the specified BC
-            if (.not. ALL(boundary_flag(:)==0)) then
-              call compute_boundary_2D( time, g, Bs, dx, x0, phi(:,:,1,:), u0(:,:,1,1:2), i, boundary_flag)
-            endif
 
             select case(params_convdiff%discretization)
             case("FD_2nd_central")
@@ -491,88 +487,4 @@ subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')
     end select
-end subroutine
-
-
-!> This function computes the boundary values for the ghost node layer of the
-!> boundary blocks
-subroutine compute_boundary_2D( time, g, Bs, dx, x0, phi, u0, i, boundary_flag)
-    implicit none
-    real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, i
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
-    !> datafields, and velocity field
-    real(kind=rk), intent(inout) :: phi(:,:,:), u0(:,:,:)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
-    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-    ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-    ! boundary_flag(i) can be either 0, 1, -1,
-    !  0: no boundary in the direction +/-e_i
-    !  1: boundary in the direction +e_i
-    ! -1: boundary in the direction - e_i
-    integer(kind=2), intent(in):: boundary_flag(3)
-
-    integer(kind=ik) :: ix,iy
-    real(kind=rk)   :: phi_boundary(4,Bs(1)+2*g)
-
-  !##################################################
-  ! compute the boundary values
-  !##################################################
-  select case(params_convdiff%boundary_type)
-  case("constant-inflow")
-    if ( params_convdiff%velocity(i) == "constant" ) then
-      ! Boundary conditions for outflow extrapolation
-      phi_boundary(1,:)=phi(g+1,:,i)
-      phi_boundary(2,:)=phi(Bs(1)+g,:,i)
-      if (params_convdiff%u0x(i)>0) then
-          phi_boundary(1,:)=params_convdiff%phi_boundary(i)
-      else
-          phi_boundary(2,:)=params_convdiff%phi_boundary(i)
-      endif
-      ! Boundary conditions for outflow extrapolation
-      phi_boundary(3,:)=phi(:,g+1,i)
-      phi_boundary(4,:)=phi(:,Bs(2)+g,i)
-      if (params_convdiff%u0y(i)>0) then
-          phi_boundary(3,:)=params_convdiff%phi_boundary(i)
-      else
-          phi_boundary(4,:)=params_convdiff%phi_boundary(i)
-      endif
-    else
-      call abort(81020182,"no boundary conditions for velocity field: "// params_convdiff%velocity(i))
-    end if
-
-  case default
-    call abort(81020162,"OHHHH no, Unknown Boundary Condition: "// params_convdiff%boundary_type)
-  end select
-
-
-  !##################################################
-  ! set the actual BC
-  !##################################################
-  if (boundary_flag(1) .ne. 0) then
-    if (boundary_flag(1)==-1) then
-      ! loop over the boundary layer
-      do ix = 1, g
-        phi(ix,:,i)= phi_boundary(1,:)
-      end do
-    else ! (boundary_flag(1)==1)
-      do ix = 1, g
-        phi(Bs(1)+g+ix,:,i)= phi_boundary(2,:)
-      end do
-     endif
-  endif
-
-  if (boundary_flag(2) .ne. 0) then
-    if (boundary_flag(2)==-1) then
-      do iy = 1, g
-        phi(:,iy,i)= phi_boundary(3,:)
-      end do
-    else ! (boundary_flag(2)==1)
-      do iy = Bs(2)+g+1, Bs(2)+2*g
-        phi(:,iy,i)= phi_boundary(4,:)
-      end do
-    endif
-  endif
-
 end subroutine

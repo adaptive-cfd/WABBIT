@@ -19,19 +19,13 @@
 ! ********************************************************************************************
 
 module module_params
-
-!---------------------------------------------------------------------------------------------
-! modules
     use mpi
     ! ini file parser module
     use module_ini_files_parser_mpi
     ! MPI general bridge module
     use module_bridge
     use module_helpers
-
     use module_t_files
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -73,6 +67,8 @@ module module_params
         real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
 
         logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false., dont_use_pruned_tree_mask=.false.
+
+        character(len=1), dimension(:), ALLOCATABLE :: symmetry_vector_component
 
         ! threshold for wavelet indicator
         real(kind=rk)                                :: eps=0.0_rk
@@ -198,7 +194,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------
-        logical,dimension(3)                        :: periodic_BC = .true.
+        logical,dimension(3) :: periodic_BC = .true., symmetry_BC = .false.
 
     end type type_params
 

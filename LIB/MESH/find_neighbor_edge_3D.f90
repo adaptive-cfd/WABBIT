@@ -59,13 +59,7 @@
 ! ********************************************************************************************
 
 subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treelevel, dir, hvy_neighbor, &
-    lgt_n, lgt_sortednumlist, error)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
+    lgt_n, lgt_sortednumlist, error, n_domain)
 
     implicit none
     !> user defined parameter structure
@@ -87,6 +81,7 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     logical, intent(inout)              :: error
+    integer(kind=2), intent(in) :: n_domain(1:3)
 
     ! auxiliary variables
     integer(kind=ik)                    :: neighborID_sameLevel, neighborID_coarserLevel
@@ -108,12 +103,6 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
     ! variable to show if there is a valid edge neighbor
     logical                             :: lvl_down_neighbor
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     my_treecode= lgt_block( lgt_id, 1:max_treelevel )
     level      = lgt_block( lgt_id, max_treelevel + IDX_MESH_LVL )
     tree_id    = lgt_block( lgt_id, max_treelevel + IDX_TREE_ID )
@@ -124,8 +113,6 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
 
     lvl_down_neighbor = .false.
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! set auxiliary variables
     select case(dir)
@@ -399,8 +386,7 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
     ! calculate treecode for neighbor on same level
     call adjacent_block_3D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block and find light data id
-    call does_block_exist(neighbor, exists, neighbor_light_id, &
-                         lgt_sortednumlist, lgt_n, tree_id)
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
     if (exists) then
         ! neighbor on same level
@@ -411,15 +397,14 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
         ! neighbor could be one level down  (coarser)
         neighbor( level ) = -1
         ! check existence of neighbor block
-        call does_block_exist(neighbor, exists, neighbor_light_id, &
-                         lgt_sortednumlist, lgt_n, tree_id)
+        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down (coarser)
             ! save neighborID_coarserLevel
             hvy_neighbor( heavy_id, neighborID_coarserLevel ) = neighbor_light_id
 
-        elseif ( .not.(exists) ) then
+        elseif ( .not.(exists) .and. (level/=params%max_treelevel)) then
             ! 2 neighbors one level up
             ! loop over all 2 possible neighbors
 
@@ -432,19 +417,21 @@ subroutine find_neighbor_edge_3D(params, heavy_id, lgt_id, lgt_block, max_treele
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_block_3D( virt_treecode, neighbor, dir, level+1, max_treelevel)
                 ! check existence of neighbor block
-                call does_block_exist(neighbor, exists, neighbor_light_id, &
-                         lgt_sortednumlist, lgt_n, tree_id)
+                call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
                 if (exists) then
                     ! neigbor is one level up
                     ! write data
                     hvy_neighbor( heavy_id, neighborID_finerLevel(k) ) = neighbor_light_id
-
-                else
-                    ! error case
-                    write(*,*) "find_neighbor_edge_3D: my treecode", my_treecode, "dir", dir, "neighbor treecode", neighbor
-                    error = .true.
                 end if
+
+                ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
+                ! because symmetry conditions are used.
+                if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
+                    write(*,*) "edge", neighborID_sameLevel, neighborID_coarserLevel, "-", neighborID_finerLevel, "lgt_id=", lgt_id
+                    ! call abort(202102021, "Grid error (no neighboring block found!)")
+                    error = .true.
+                endif
 
             end do
 

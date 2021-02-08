@@ -25,6 +25,22 @@
 !!
 ! -------------------------------------------------------------------------------------------------------------------------
 !>  dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
+! 1 __N
+! 2 __E
+! 3 __S
+! 4 __W
+! 5 _NE
+! 6 _NW
+! 7 _SE
+! 8 _SW
+! 9 NNE
+! 10 NNW
+! 11 SSE
+! 12 SSW
+! 13 ENE
+! 14 ESE
+! 15 WNW
+! 16 WSW
 ! -------------------------------------------------------------------------------------------------------------------------
 !> \details
 !! = log ======================================================================================
@@ -34,13 +50,7 @@
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
 subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_treelevel, dir, &
-    hvy_neighbor, lgt_n, lgt_sortednumlist, error)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
+    hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
 
     implicit none
 
@@ -63,6 +73,7 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     logical, intent(inout)              :: error
+    integer(kind=2), intent(in) :: n_domain(1:3)
 
     ! mesh level
     integer(kind=ik)                    :: level
@@ -77,24 +88,13 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
     ! neighbor light data id
     integer(kind=ik)                    :: neighbor_light_id, tree_id
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     my_treecode = lgt_block( light_id, 1:max_treelevel )
     level       = lgt_block( light_id, max_treelevel + IDX_MESH_LVL )
     tree_id     = lgt_block( light_id, max_treelevel + IDX_TREE_ID )
-
     lvl_down_neighbor = .false.
-
     virt_code = -1
     list_id   = -1
 
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! find id in light data list, set virt_code and lvl_down_neighbor
     select case(dir)
@@ -132,44 +132,28 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
 
     end select
 
+    !---------------------------------------------------------------------------
+    ! Does the neighbor on the same level exist ?
+    !---------------------------------------------------------------------------
     ! calculate treecode for neighbor on same level
     call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block and find light data id
-    call does_block_exist(neighbor, exists, neighbor_light_id, &
-                         lgt_sortednumlist, lgt_n, tree_id)
-
-    ! +++++++++++++++
-    ! non periodic B
-    ! +++++++++++++++
-    ! is a boundary of the domain in this direction? If yes then please dont add block to the neighborlist
-    if ( .not. All(params%periodic_BC) ) then
-        if ( block_is_adjacent_to_boundary(params,dir,my_treecode,neighbor,level,max_treelevel) ) then
-            neighbor_light_id = -1
-            ! write(*,('("my=",2(i1)," neigbor ",2(i1)," dir=",A3)')) my_treecode,neighbor,dir
-        end if
-    end if
-    ! +++++++++++++
-
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
     if (exists) then
-
-        ! neighbor on same level
-        ! write data
+        ! we found the neighbor on same level in the direction "dir", so we're done.
         hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
-
     else
-
         ! neighbor could be one level down
         neighbor( level ) = -1
         ! check existence of neighbor block
-        call does_block_exist(neighbor, exists, neighbor_light_id, &
-                             lgt_sortednumlist, lgt_n, tree_id)
+        call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
         if ( exists .and. lvl_down_neighbor ) then
             ! neigbor is one level down
             hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
 
-        elseif ( .not.(exists) ) then
+        elseif ( .not.(exists) .and. (level/=params%max_treelevel)) then
             ! neighbor could be on level up
             ! virtual treecode, one level up
             virt_treecode = my_treecode
@@ -178,21 +162,24 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
-            call does_block_exist(neighbor, exists, neighbor_light_id, &
-                             lgt_sortednumlist, lgt_n, tree_id)
+            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
             if (exists) then
                 ! neigbor is one level up
                 hvy_neighbor( heavy_id, list_id ) = neighbor_light_id
-
-            else
-                ! error case
-                write(*,*) "find_neighbor_corner_2D: my treecode", lgt_block( light_id, : ), "dir", dir, "neighbor treecode", virt_treecode
-                error = .true.
             end if
+
+            ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
+            ! because symmetry conditions are used.
+            if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
+                write(*,*) "Corner neighbor not found!"
+                error = .true.
+            endif
 
         end if
 
     end if
+
+
 
 end subroutine find_neighbor_corner_2D

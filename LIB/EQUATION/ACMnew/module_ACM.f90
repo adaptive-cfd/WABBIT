@@ -70,6 +70,7 @@ module module_acm
     logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
     character(len=80) :: eps_norm
+    logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -197,6 +198,11 @@ end subroutine
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    params_acm%periodic_BC = .true.
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_acm%periodic_BC, params_acm%periodic_BC )
+
+    params_acm%symmetry_BC = .not. params_acm%periodic_BC
+    call read_param_mpi(FILE, 'Domain', 'symmetry_BC', params_acm%symmetry_BC, params_acm%symmetry_BC )
 
     ! --- saving ----
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_acm%N_fields_saved, 3 )

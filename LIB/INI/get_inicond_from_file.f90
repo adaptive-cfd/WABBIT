@@ -47,8 +47,9 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     ! number of files to read from
     integer(kind=ik)                      :: N_files
     ! loop variable
-    integer(kind=ik)                      :: dF, tc_length, dim
+    integer(kind=ik)                      :: dF, tc_length, dim, i
     integer(kind=ik), dimension(3)        :: Bs
+    logical                               :: periodic_BC(1:3), symmetry_BC(1:3)
 
     ! number of files to read from
     N_files = params%n_eqn
@@ -58,7 +59,8 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     if (params%rank==0) write(*,*) "Reading initial condition from file"
 
     ! read time, iteration, domain size and total number of blocks from first input file
-    call read_attributes(params%input_files(1), lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    call read_attributes(params%input_files(1), lgt_n, time, iteration, domain, Bs, &
+    tc_length, dim, periodic_BC=periodic_BC, symmetry_BC=symmetry_BC)
 
     ! print time, iteration and domain on screen
     if (params%rank==0) then
@@ -77,8 +79,20 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
             write (*,'(A)') "proceed, with fingers crossed."
         end if
     end if
-    if (lgt_n > size(lgt_block,1)) &
+
+    do i = 1, params%dim
+        if (periodic_BC(i).eqv.params%periodic_BC(i)) then
+            if (params%rank==0) write(*,*) "WARNING WARNING WARNING periodic_BC in inifile and HDF5 file are different!"
+        endif
+
+        if (symmetry_BC(i).eqv.params%symmetry_BC(i)) then
+            if (params%rank==0) write(*,*) "WARNING WARNING WARNING symmetry_BC in inifile and HDF5 file are different!"
+        endif
+    enddo
+
+    if (lgt_n > size(lgt_block,1)) then
         call abort(743734, 'ERROR: Not enough memory allocated for the saved field!')
+    endif
 
     ! read treecode from first input file
     call read_mesh(params%input_files(1), params, lgt_n, hvy_n, lgt_block)

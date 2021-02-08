@@ -58,8 +58,8 @@ subroutine post_add_two_masks(params)
 
     call get_command_argument(4, fname_out)
 
-    call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim)
-    call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim)
+    call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
     if (mode=="--test_operations") then

@@ -46,7 +46,7 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     ! most importantly Bs, dim, length of treecodes. NOTE: all trees in the forest must
     ! have the same Bs.
     call read_attributes(fnames(1), lgt_n_tmp, time, iteration, domain, Bs, &
-                         tc_length, dim, verbosity=verbose)
+    tc_length, dim, verbosity=verbose, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     ! Check if one tree already exists in the forest:
     ! If it doesnt initialize some important parameters like the Block size Bs

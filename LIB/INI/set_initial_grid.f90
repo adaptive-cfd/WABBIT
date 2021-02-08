@@ -33,9 +33,6 @@
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_mask, hvy_tmp)
 
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -68,14 +65,10 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     logical :: tmp
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
     lgt_n_old = 9999999
     iter = 0
     time = 0.0_rk
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
     if (params%rank==0) then
         write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
         write(*,*) "Setting initial condition on all blocks."

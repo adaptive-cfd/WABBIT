@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
 ! from that. Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
+subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -38,6 +38,17 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage )
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
+
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
+    integer(kind=2), intent(in) :: n_domain(3)
 
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
 

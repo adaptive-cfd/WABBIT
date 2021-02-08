@@ -27,11 +27,7 @@
 !> \image html update_neighbors2D.svg "Update Neighbors" width=400
 
 subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist,  &
-    hvy_active, hvy_n, error)
-
-!---------------------------------------------------------------------------------------------
-! variables
-
+    hvy_active, hvy_n, error, skip_diagonal_neighbors)
     implicit none
 
     !> user defined parameter structure
@@ -51,6 +47,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
     logical, intent(inout)              :: error
+    logical, intent(in), optional       :: skip_diagonal_neighbors ! currently not working (Thomas, 02-2021) [unused]
 
     ! number of blocks per proc
     integer(kind=ik)                    :: N
@@ -62,25 +59,12 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
 
     ! loop variable
     integer(kind=ik)                    :: k, lgt_id
+    integer(kind=2) :: n_domain(1:3)
 
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    ! set MPI parameters
-    rank         = params%rank
-
+    rank = params%rank
+    max_treelevel = params%max_treelevel
     ! number of blocks per proc
     N = params%number_blocks
-
-    ! max treelevel
-    max_treelevel = params%max_treelevel
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! special case:
     ! if there is only one block => all neighbors are this block
@@ -98,23 +82,30 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
         ! light id
         call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
 
+        call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+        params%domain_size, params%Bs, params%dim, n_domain )
+
         ! north
-        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! east
-        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__E', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! south
-        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__S', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! west
-        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_edge_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__W', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+
+        if (PRESENT(skip_diagonal_neighbors)) then
+            if (skip_diagonal_neighbors) cycle
+        endif
 
         ! northeast
-        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! northwest
-        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_NW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! southeast
-        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
         ! southwest
-        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist, error)
+        call find_neighbor_corner_2D( params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
 
     end do
 

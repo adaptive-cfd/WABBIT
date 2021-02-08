@@ -16,12 +16,10 @@ module module_mesh
     use module_timing
     ! interpolation routines
     use module_interpolation
-    ! use MPI module, since thrshold_block needs to synch ghosts
+    ! use MPI module, since threshold_block needs to synch ghosts
     use module_MPI
     ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
     use module_treelib
-    !
-    use module_boundary_conditions
     use module_operators, only: component_wise_tree_norm
     ! used in coarse_mesh
     use module_helpers, only: most_common_element
@@ -141,7 +139,7 @@ contains
 
     ! lgt_block synchronization
 #include "check_lgt_block_synchronization.f90"
-
+#include "remove_nonperiodic_neighbors.f90"
 
 ! check if we still have enough memory left: for very large simulations
 ! we cannot affort to have them fail without the possibility to resume them

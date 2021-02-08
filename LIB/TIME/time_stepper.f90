@@ -89,9 +89,6 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save    :: rk_coeffs(:,:)
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     Neqn = params%n_eqn
     Bs    = params%Bs
     g     = params%n_ghosts
@@ -109,8 +106,9 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     ! set rk_coeffs
     rk_coeffs = params%butcher_tableau
 
-!---------------------------------------------------------------------------------------------
-! main body
+    ! currently not working (Thomas, 02-2021)
+    ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+    ! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.true.)
 
     if ( .not. All(params%periodic_BC) ) then
         !!! if we have NON-PERIODIC boundary conditions it is important to reset hvy_work.
@@ -192,6 +190,11 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
         call abort(19101816, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
 
     end select
+
+
+! currently not working (Thomas, 02-2021)
+! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.false.)
 
     ! increase time variable after all RHS substeps
     time = time + dt

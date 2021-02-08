@@ -62,6 +62,9 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case ("--dump-neighbors")
+        call post_dump_neighbors(params)
+
     case ("--prune-tree")
         call post_prune_tree(params)
 

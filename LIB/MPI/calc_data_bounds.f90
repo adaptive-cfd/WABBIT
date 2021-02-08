@@ -290,13 +290,6 @@ end subroutine get_block_spacing_origin
 
 
 subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_bounds_type, sender_or_receiver)
-
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -317,9 +310,6 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, data_
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: sh_start, sh_end
 
-    !---------------------------------------------------------------------------------------------
-
-    ! grid parameter
     Bs    = params%Bs
     g     = params%n_ghosts
 

@@ -62,7 +62,7 @@ subroutine compute_scalar_field_post(params)
     call check_file_exists(trim(file_fld))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_fld, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
+    call read_attributes(file_fld, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     call get_command_argument(3, order)
 

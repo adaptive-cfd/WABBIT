@@ -1,25 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_initialization.f90
-!> \version 0.4
-!> \author msr
-!
-!> \brief module for all init subroutines
-!
-!!\details
-!! \date 24/11/16 - create
-!! \date 04/04/17 - rename to module_initialization (as specific iniconds are in the module module_initital_conditions.f90)
-!!            here we provide interfaces for mesh creation and inicond setting
-! ********************************************************************************************
-
 module module_initialization
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use mpi
     ! global parameters
     use module_params
@@ -33,17 +12,9 @@ module module_initialization
     use module_physics_metamodule
 
     use module_mask
-
-!---------------------------------------------------------------------------------------------
-! variables
+    use module_treelib
 
     implicit none
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 

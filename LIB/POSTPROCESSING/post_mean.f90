@@ -61,7 +61,7 @@ subroutine post_mean(params)
     call check_file_exists( fname )
 
     ! add some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     params%Bs = Bs
     params%n_eqn = 1

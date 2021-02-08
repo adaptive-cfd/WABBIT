@@ -85,7 +85,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
     do k = 1, hvy_n
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists
-            if ( hvy_neighbor( hvy_active(k), neighborhood ) /= -1 ) then
+            if ( hvy_neighbor( hvy_active(k), neighborhood ) > 0 ) then
 
                 neighbor_lgt_id = hvy_neighbor( hvy_active(k), neighborhood )
                 call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )

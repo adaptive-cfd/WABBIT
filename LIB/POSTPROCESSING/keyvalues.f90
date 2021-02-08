@@ -64,7 +64,7 @@ subroutine keyvalues(fname, params)
     if (rank==0) write (*,'("analyzing file ",a20," for keyvalues")') trim(adjustl(fname))
 
     ! get some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim)
+    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
     params%dim = dim
     params%Bs = Bs
     params%max_treelevel = tc_length
@@ -91,7 +91,7 @@ subroutine keyvalues(fname, params)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
-    if (dim==2) Bs(3)=1
+    if (params%dim==2) Bs(3)=1
 
     allocate(tree(1:params%max_treelevel))
     allocate(sum_tree(1:params%max_treelevel))

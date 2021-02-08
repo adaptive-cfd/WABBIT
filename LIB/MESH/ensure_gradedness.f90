@@ -34,12 +34,6 @@
 subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n )
 
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -81,8 +75,6 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
     N = params%number_blocks
     Jmax = params%max_treelevel
-
-    ! set MPI parameter
     rank = params%rank
 
     if ( params%dim == 3 ) then
@@ -145,7 +137,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             if ( lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == -1) then
                 ! loop over all neighbors
                 do i = 1, neighbor_num
-                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                    if ( hvy_neighbor( hvy_id, i ) > 0 ) then
                         ! check neighbor treelevel
                         mylevel         = lgt_block( lgt_id, Jmax + IDX_MESH_LVL )
                         neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + IDX_MESH_LVL )
@@ -214,7 +206,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     ! neighbor exists ? If not, this is a bad error
-                    if ( hvy_neighbor( hvy_id, i ) /= -1 ) then
+                    if ( hvy_neighbor( hvy_id, i ) > 0 ) then
                         mylevel     = lgt_block( lgt_id, Jmax + IDX_MESH_LVL )
                         neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + IDX_MESH_LVL )
                         neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + IDX_REFINE_STS )

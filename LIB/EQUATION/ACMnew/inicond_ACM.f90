@@ -1,7 +1,7 @@
 !-----------------------------------------------------------------------------
 ! main level wrapper for setting the initial condition on a block
 !-----------------------------------------------------------------------------
-subroutine INICOND_ACM( time, u, g, x0, dx )
+subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -19,6 +19,17 @@ subroutine INICOND_ACM( time, u, g, x0, dx )
     ! for each block, you'll need to know where it lies in physical space. The first
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
+    integer(kind=2), intent(in) :: n_domain(3)
 
     real(kind=rk)    :: x, y, z
     integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar

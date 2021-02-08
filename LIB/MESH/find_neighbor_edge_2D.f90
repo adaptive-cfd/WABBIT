@@ -34,13 +34,7 @@
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
 subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
-            max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist, error)
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
+            max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
     implicit none
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
@@ -61,6 +55,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     logical, intent(inout)              :: error
+    integer(kind=2), intent(in) :: n_domain(1:3)
 
     ! auxiliary variables
     integer(kind=ik)                    :: neighborID_sameLevel, virt_code1, neighborID_finerLevel1, virt_code2, neighborID_finerLevel2, neighborID_coarserLevel
@@ -74,13 +69,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
     ! neighbor light data id, and id of the tree in the forest
     integer(kind=ik)                    :: neighbor_light_id, tree_id
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    my_treecode= lgt_block( light_id, 1:max_treelevel )
+    my_treecode = lgt_block( light_id, 1:max_treelevel )
     level      = lgt_block( light_id, max_treelevel + IDX_MESH_LVL )
     tree_id    = lgt_block( light_id, max_treelevel + IDX_TREE_ID )
     neighborID_sameLevel    = -1
@@ -90,8 +79,6 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
     neighborID_finerLevel2  = -1
     neighborID_coarserLevel = -1
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! set virt_code and lvl_down_neighbor
     select case(dir)
@@ -156,22 +143,8 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
     ! calculate treecode for neighbor on same level
     call adjacent_block_2D( my_treecode, neighbor, dir, level, max_treelevel)
     ! check existence of neighbor block and find light data id
-    call does_block_exist(neighbor, exists, neighbor_light_id, &
-                         lgt_sortednumlist, lgt_n, tree_id)
+    call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
-    ! ++++++++++++++++++++++++++++++++++++++++++++
-    ! non periodic boundary
-    ! ++++++++++++++++++++++++++++++++++++++++++++
-    ! is a boundary of the domain in this direction? If yes then please dont communicate
-    ! in this direction
-    if ( .not. All(params%periodic_BC) ) then
-        if ( block_is_adjacent_to_boundary(params,dir,my_treecode,neighbor,level,max_treelevel) ) then
-
-            neighbor_light_id=-1
-            ! write(*,('("my=",2(i1)," neigbor ",2(i1)," dir=",A3)')) my_treecode,neighbor,dir
-        endif
-    end if
-    ! ++++++++++++++++++++++++++++++++++++++++++++
 
     if (exists) then
         ! neighbor on same level
@@ -190,7 +163,7 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
             ! save neighborID_coarserLevel
             hvy_neighbor( heavy_id, neighborID_coarserLevel ) = neighbor_light_id
 
-        elseif ( .not.(exists) ) then
+        elseif ( .not.(exists) .and. (level/=params%max_treelevel)) then
             ! 2 neighbors one level up
 
             ! first neighbor virtual treecode, one level up
@@ -200,20 +173,20 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
-            call does_block_exist(neighbor, exists, neighbor_light_id, &
-                                 lgt_sortednumlist, lgt_n, tree_id)
+            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
             if (exists) then
                 ! neigbor is one level up
                 ! write data
                 hvy_neighbor( heavy_id, neighborID_finerLevel1 ) = neighbor_light_id
-
-            else
-                ! error case
-                print*, "for this block:", my_treecode
-                print*, "I cannot find: ", neighbor
-                call abort(363791, 'ERROR: can not find edge neighbor')
             end if
+
+            ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
+            ! because symmetry conditions are used.
+            if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
+                write(*,*) "Edge neighbor not found"
+                error = .true.
+            endif
 
             ! second neighbor virtual treecode, one level up
             virt_treecode = my_treecode
@@ -222,19 +195,12 @@ subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
             ! calculate treecode for neighbor on same level (virtual level)
             call adjacent_block_2D( virt_treecode, neighbor, dir, level+1, max_treelevel)
             ! check existence of neighbor block
-            call does_block_exist(neighbor, exists, neighbor_light_id, &
-                                lgt_sortednumlist, lgt_n, tree_id)
+            call does_block_exist(neighbor, exists, neighbor_light_id, lgt_sortednumlist, lgt_n, tree_id)
 
             if (exists) then
                 ! neigbor is one level up
                 ! write data
                 hvy_neighbor( heavy_id, neighborID_finerLevel2 ) = neighbor_light_id
-
-            else
-                ! error case
-                write(*,*) "find_neighbor_edge_2D: my treecode", my_treecode, "dir", dir, "neighbor treecode", neighbor
-                error = .true.
-
             end if
 
         end if

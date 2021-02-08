@@ -37,6 +37,7 @@ module module_IO
 
     use module_helpers, only : check_file_exists, block_contains_NaN
     use module_forest
+    use module_treelib
 
 
     implicit none

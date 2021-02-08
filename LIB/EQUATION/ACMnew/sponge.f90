@@ -118,6 +118,25 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
             end do
         end do
 
+        ! sponge for using with symmetry_BC
+        ! insect is supposed to be at y=0
+    elseif (params_acm%sponge_type == "rect-symmetry-y") then
+        ! rectangular sponge with 45deg edges
+        do iz = g+1, Bs(3)+g
+            z = dble(iz-(g+1)) * dx(3) + x0(3)
+            do iy = g+1, Bs(2)+g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                do ix = g+1, Bs(1)+g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                    ! distance to borders of domain
+                    tmp = minval( (/x,z,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
+
+                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                end do
+            end do
+        end do
+
     elseif (params_acm%sponge_type == "inlet-outlet-x") then
         ! outlet sponge in x-direction
         do ix = g+1, Bs(1)+g

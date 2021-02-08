@@ -10,7 +10,7 @@
 !       No synchronization step is required afterwards.
 !
 subroutine update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, skip_diagonal_neighbors)
     implicit none
 
     !> user defined parameter structure
@@ -30,16 +30,19 @@ subroutine update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(out)       :: hvy_n
     integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in), optional       :: skip_diagonal_neighbors ! unused currently
 
     real(kind=rk) :: t0
 
     t0 = MPI_wtime()
 
-    call create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
-           lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+    call create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
-    call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n)
+    if (present(skip_diagonal_neighbors)) then
+        call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, skip_diagonal_neighbors)
+    else
+        call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+    endif
 
     call toc( "update_grid_metadata (lists+neighbors)", MPI_wtime()-t0 )
 end subroutine

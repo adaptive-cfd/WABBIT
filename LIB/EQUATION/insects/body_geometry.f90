@@ -880,7 +880,7 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    real(kind=rk) :: R0,R,a_body, projected_length
+    real(kind=rk) :: R0,R,projected_length
     real(kind=rk) :: x_body(1:3), x(1:3), xc(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
     real(kind=rk)   :: M_body(1:3,1:3)
@@ -1301,21 +1301,22 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
     integer(kind=2),intent(in) :: color_val
 
-    real(kind=rk),dimension(1:3) ::  cb, rb, ab, u, vp
-    real(kind=rk),dimension(1:3) :: x_glob, e_x, tmp, e_r, e_3
-    real(kind=rk)::ceta1, ceta2, ceta3, R, RR0, clength, safety, t
-    integer :: ix,iy,iz
+    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_tmp!, e_3, e_tmp
+    real(kind=rk),dimension(1:3,1:3) :: M_phi
+    real(kind=rk):: R, RR0, clength, safety, t, phi
+    integer :: ix,iy,iz, Nphi
 
     integer, dimension(1:3) :: lbounds, ubounds
     integer :: xmin,xmax,ymin,ymax,zmin,zmax
-    integer :: Nsafety
+    integer :: Nsafety, i
 
     safety = 1.5*Insect%safety
     Nsafety = ceiling(safety / minval(ddx))
 
     ! bounds of the current patch of data
-    lbounds = g
-    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+    lbounds = g ! note zero based indexing
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
 
     RR0 = R0 + safety
 
@@ -1334,34 +1335,39 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     enddo
     e_r = e_r / norm2(e_r)
 
-    ! third (also radial) unit vector, simply the cross product of the others
-    e_3 = cross(e_x,e_r)
-    e_3 = e_3 / norm2(e_3)
+    ! ! third (also radial) unit vector, simply the cross product of the others
+    ! e_3 = cross(e_x, e_r)
+    ! e_3 = e_3 / norm2(e_3)
 
-    ! bounding box of the vicinity of the cylinder.
-    t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
+    ! bounding box
+    xmin = 9999999
+    ymin = 9999999
+    zmin = 9999999
+    xmax = 0
+    ymax = 0
+    zmax = 0
 
-    t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
+    ! note for cylinders that are arbitrarily aligned, checking 4 points is not enough
+    ! to accurately determine the bounding box
+    Nphi=30
+    do i = 0, Nphi
+        phi = real(i)/real(Nphi) * 2.0_rk * pi
+        call Rx(M_phi, phi)
 
-    t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
+        e_tmp = matmul(M_phi, e_r)
 
-    t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+        p1 = (x1 + RR0*e_tmp - xx0) / ddx
+        p2 = (x2 + RR0*e_tmp - xx0) / ddx
 
-    t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+        xmin = min(xmin, minval((/nint(p1(1)), nint(p2(1))/))) - Nsafety
+        ymin = min(ymin, minval((/nint(p1(2)), nint(p2(2))/))) - Nsafety
+        zmin = min(zmin, minval((/nint(p1(3)), nint(p2(3))/))) - Nsafety
 
-    t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+        xmax = max(xmax, maxval((/nint(p1(1)), nint(p2(1))/))) + Nsafety
+        ymax = max(ymax, maxval((/nint(p1(2)), nint(p2(2))/))) + Nsafety
+        zmax = max(zmax, maxval((/nint(p1(3)), nint(p2(3))/))) + Nsafety
+    enddo
+
 
 
     ! first we draw the cylinder, then the endpoint spheres
@@ -1373,6 +1379,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
 
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+
                 ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! cb is the distance to the cylinder mid-point
@@ -1381,7 +1388,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
                 rb = x1 - x2
 
                 ! this is a spherical bounding box, centered around the mid-point
-                if ( sum(cb**2) < 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
+                if ( sum(cb**2) <= 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
                     ab = x_glob - x1
                     u = x2 - x1
 

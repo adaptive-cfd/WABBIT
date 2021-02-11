@@ -48,6 +48,7 @@ contains
 #include "final_stage_RK.f90"
 #include "krylov.f90"
 #include "calculate_time_step.f90"
-#include "rkc.f90"
+#include "runge_kutta_chebychev.f90"
+#include "runge_kutta_generic.f90"
 
 end module module_time_step

@@ -80,6 +80,8 @@ subroutine ini_file_to_params( params, filename )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
     call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
+    call read_param_mpi(FILE, 'Discretization', 'filter_all_except_maxlevel', params%filter_all_except_maxlevel, .false. )
+
     if (params%filter_type /= "no_filter") then
         call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
     endif

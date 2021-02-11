@@ -212,7 +212,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                     ! what happens on very coarse grids is that the first coarsening interation removes
                     ! the mask completely...
                     ! we therefore outsource the iteration loop here. (argument external_loop to
-                    ! adapt_mesh)
+                    ! adapt_mesh). This loop iterates until the grid does no longer change, then lgt_n_tmp = lgt_n(tree_ID_flow)
                     do while ( lgt_n_tmp /= lgt_n(tree_ID_flow) )
                         lgt_n_tmp = lgt_n(tree_ID_flow)
 

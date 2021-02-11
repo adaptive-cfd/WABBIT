@@ -56,7 +56,10 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_activ
         ! level of the block:
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
-        if ((params%filter_only_maxlevel .and. level==params%max_treelevel) .or. .not. params%filter_only_maxlevel) then
+        if ((params%filter_only_maxlevel .and. level==params%max_treelevel) &
+        .or. (.not.params%filter_only_maxlevel.and..not.params%filter_all_except_maxlevel) .or. &
+        (params%filter_all_except_maxlevel.and.(level/=params%max_treelevel)) ) then
+
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 

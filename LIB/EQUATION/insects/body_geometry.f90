@@ -1289,7 +1289,7 @@ end subroutine draw_body_cone
 ! insect%xc) is added in the main insect drawing routine.
 ! The color of the new cylinder will be what you pass in color_val
 !-------------------------------------------------------------------------------
-subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val)
+subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val, bounding_box)
     implicit none
 
     real(kind=rk),dimension(1:3),intent(inout )::x1,x2
@@ -1300,9 +1300,11 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
     integer(kind=2),intent(in) :: color_val
+    ! (/xmin,ymin,zmin,xmax,ymax,zmax/) of cylinder (in global coordinates)
+    real(kind=rk),optional,intent(in) :: bounding_box(1:6)
 
     real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
-    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_tmp!, e_3, e_tmp
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_3
     real(kind=rk),dimension(1:3,1:3) :: M_phi
     real(kind=rk):: R, RR0, clength, safety, t, phi
     integer :: ix,iy,iz, Nphi
@@ -1318,55 +1320,66 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     lbounds = g ! note zero based indexing
     ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
 
-    RR0 = R0 + safety
+    if (present(bounding_box)) then
+        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn, fractal tree)
+        xmin = nint( (bounding_box(1)-xx0(1))/ddx(1) ) - Nsafety
+        ymin = nint( (bounding_box(2)-xx0(2))/ddx(2) ) - Nsafety
+        zmin = nint( (bounding_box(3)-xx0(3))/ddx(3) ) - Nsafety
 
-    ! unit vector in cylinder axis direction and cylinder length
-    e_x = x2 - x1
-    clength = norm2(e_x)
-    e_x = e_x / clength
+        xmax = nint( (bounding_box(4)-xx0(1))/ddx(1) ) + Nsafety
+        ymax = nint( (bounding_box(5)-xx0(2))/ddx(2) ) + Nsafety
+        zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
 
-    ! radial unit vector
-    ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
-    ! it does not really matter which one. however, we must be sure that the vector
-    ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-    e_r = (/0.d0,0.d0,0.d0/)
-    do while ( norm2(e_r) <= 1.0d-12 )
-        e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
-    enddo
-    e_r = e_r / norm2(e_r)
+    else
 
-    ! ! third (also radial) unit vector, simply the cross product of the others
-    ! e_3 = cross(e_x, e_r)
-    ! e_3 = e_3 / norm2(e_3)
+        ! unit vector in cylinder axis direction and cylinder length
+        e_x = x2 - x1
+        clength = norm2(e_x)
+        e_x = e_x / clength
 
-    ! bounding box
-    xmin = 9999999
-    ymin = 9999999
-    zmin = 9999999
-    xmax = 0
-    ymax = 0
-    zmax = 0
+        ! radial unit vector
+        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
+        ! it does not really matter which one. however, we must be sure that the vector
+        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
+        e_r = (/0.d0,0.d0,0.d0/)
+        do while ( norm2(e_r) <= 1.0d-12 )
+            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
+        enddo
+        e_r = e_r / norm2(e_r)
 
-    ! note for cylinders that are arbitrarily aligned, checking 4 points is not enough
-    ! to accurately determine the bounding box
-    Nphi=30
-    do i = 0, Nphi
-        phi = real(i)/real(Nphi) * 2.0_rk * pi
-        call Rx(M_phi, phi)
+        ! third (also radial) unit vector, simply the cross product of the others
+        e_3 = cross(e_x,e_r)
+        e_3 = e_3 / norm2(e_3)
+        RR0 = R0 + safety
 
-        e_tmp = matmul(M_phi, e_r)
+        ! bounding box of the vicinity of the cylinder.
+        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
+        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
+        ! we do it in preprocessing and only once per cylinder
+        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
 
-        p1 = (x1 + RR0*e_tmp - xx0) / ddx
-        p2 = (x2 + RR0*e_tmp - xx0) / ddx
+        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
 
-        xmin = min(xmin, minval((/nint(p1(1)), nint(p2(1))/))) - Nsafety
-        ymin = min(ymin, minval((/nint(p1(2)), nint(p2(2))/))) - Nsafety
-        zmin = min(zmin, minval((/nint(p1(3)), nint(p2(3))/))) - Nsafety
+        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
 
-        xmax = max(xmax, maxval((/nint(p1(1)), nint(p2(1))/))) + Nsafety
-        ymax = max(ymax, maxval((/nint(p1(2)), nint(p2(2))/))) + Nsafety
-        zmax = max(zmax, maxval((/nint(p1(3)), nint(p2(3))/))) + Nsafety
-    enddo
+        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+
+        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+
+        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+    endif
 
 
 

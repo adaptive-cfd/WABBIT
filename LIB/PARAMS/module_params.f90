@@ -189,7 +189,7 @@ module module_params
         integer(kind=ik)                            :: filter_freq=-1
         ! save filter strength sigma
         logical :: save_filter_strength
-        logical :: filter_only_maxlevel = .false.
+        logical :: filter_only_maxlevel = .false., filter_all_except_maxlevel = .false.
 
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions

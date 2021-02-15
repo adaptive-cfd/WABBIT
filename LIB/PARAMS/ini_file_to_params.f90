@@ -1,27 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name ini_file_to_params.f90
-!> \version 0.5
-!> \author msr
-!
-!> \brief distribute blocks at start => create light data array
-!
-!>
-!! input:    - filename \n
-!! output:   - filled parameter struct \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 25/01/17    - create \n
-!! 29/01/17    - add filter parameter \n
-!! 30/01/17    - add automatic memory management
-!
-! ********************************************************************************************
-
+! initialize params struct from INI file
 subroutine ini_file_to_params( params, filename )
     implicit none
 
@@ -59,6 +36,9 @@ subroutine ini_file_to_params( params, filename )
     call ini_blocks(params,FILE)
     call ini_time(params,FILE)
 
+    allocate(params%symmetry_vector_component(1:params%n_eqn))
+    params%symmetry_vector_component = "0"
+    call read_param_mpi(FILE, 'Domain', 'symmetry_vector_component', params%symmetry_vector_component, params%symmetry_vector_component )
 
     !**************************************************************************
     ! read INITIAL CONDITION parameters
@@ -100,6 +80,8 @@ subroutine ini_file_to_params( params, filename )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
     call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
+    call read_param_mpi(FILE, 'Discretization', 'filter_all_except_maxlevel', params%filter_all_except_maxlevel, .false. )
+
     if (params%filter_type /= "no_filter") then
         call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
     endif
@@ -212,6 +194,7 @@ end subroutine ini_file_to_params
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
 
+    integer :: i
 
     if (params%rank==0) then
       write(*,*)
@@ -233,8 +216,16 @@ end subroutine ini_file_to_params
                                                        params%domain_size(1:params%dim) )
 
     params%periodic_BC = .true.
-    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC(1:params%dim), &
-                                                       params%periodic_BC(1:params%dim) )
+    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
+
+    params%symmetry_BC = .not. params%periodic_BC
+    call read_param_mpi(FILE, 'Domain', 'symmetry_BC', params%symmetry_BC, params%symmetry_BC )
+
+     do i = 1, 3
+         if (.not. (params%periodic_BC(i) .xor. params%symmetry_BC(i)) ) then
+             call abort(92841123, "Get your crowbar: the arrays for periodic_BC and symmetry_BC are incompatible.")
+         endif
+     enddo
   end subroutine ini_domain
 
 

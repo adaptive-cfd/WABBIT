@@ -51,6 +51,7 @@ subroutine post_dry_run
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
+    type(inifile) :: FILE
 
     !---------------------------------------------------------------------------
     ! If called with '--help' or '-h', print a help message and exit.
@@ -106,15 +107,20 @@ subroutine post_dry_run
 
 
 
-    ! modifications to parameters
+    ! modifications to parameters (because we use hvy_block instead of hvy_mask, NEQN set
+    ! in ini file is not correct)
     deallocate( params%butcher_tableau )
     allocate( params%butcher_tableau(1,1) )
     ! mask, usx,usy,usz, color, sponge = 6 components
     params%n_eqn = 6
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component=0_ik
-    params%threshold_state_vector_component(1)=1_ik
+    params%threshold_state_vector_component = .false.
+    params%threshold_state_vector_component(1) = .true.
+
+    deallocate(params%symmetry_vector_component)
+    allocate(params%symmetry_vector_component(1:params%n_eqn))
+    params%symmetry_vector_component = "0"
 
     ! it is generally desired to create the mask on Jmax, which is the finest
     ! level used in the simulation. This is where the RHS is computed. If the dealiasing
@@ -249,10 +255,6 @@ subroutine post_dry_run
         call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
         hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
         Nmask = lgt_n(tree_ID_flow)
-
-        ! sync is a requirement of the new grid definition, which includes saving the first ghost
-        ! node, to keep postprocessing routines intact (in particular paraview)
-        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
         call WRITE_INSECT_DATA(time)
 

@@ -23,7 +23,7 @@
 !
 ! ********************************************************************************************
 subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n)
+    lgt_sortednumlist, hvy_active, hvy_n, skip_diagonal_neighbors)
 
     implicit none
 
@@ -43,35 +43,54 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    ! currently not working (Thomas, 02-2021) [unused]
+    logical, intent(in), optional       :: skip_diagonal_neighbors
 
     logical :: error = .false., error2 = .false.
-    integer(kind=ik ) :: mpierror
+    integer(kind=ik ) :: mpierror, k
+    real(kind=rk) :: x0(1:3), dx(1:3)
 
     if ( params%dim == 3 ) then
-        ! 3D:
-        call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
+        if (present(skip_diagonal_neighbors)) then
+            call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error, skip_diagonal_neighbors)
+        else
+            call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
+        endif
     else
-        ! 2D:
-        call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
+        if (present(skip_diagonal_neighbors)) then
+            call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error, skip_diagonal_neighbors)
+        else
+            call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
+        endif
     end if
 
+    if (error) then
+        ! open(14, file="lgt_block.txt", status='replace')
+        ! do k = 1, lgt_n
+        !     write(14,'(20(i5,1x))') lgt_block(lgt_active(k),:)
+        ! enddo
+        ! close(14)
+        !
+        ! open(14, file="hvy_neighbors.txt", status='replace')
+        ! do k = 1, lgt_n
+        !     write(74,'(90(i5,1x))') hvy_neighbor(lgt_active(k),:)
+        ! enddo
+        ! close(14)
+        !
+        ! open(14, file="x0_dx.txt", status='replace')
+        ! do k = 1, lgt_n
+        !     write(*,*) "dumping", k, lgt_active(k)
+        !     call get_block_spacing_origin( params,lgt_active(k) , lgt_block, x0, dx )
+        !     write(14,'(6(es15.6,1x))') x0, dx
+        ! enddo
+        ! close(14)
 
-    call MPI_Allreduce(error, error2, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierror )
-
-    if (error2) then
-        write(*,*) "DUMPING DEBUG DATA TO *_ERROR.dat"
-        ! call write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, 'neighbors_ERROR.dat')
-        call write_lgt_data(params, lgt_block, 'lgt_block_ERROR.dat')
-
-        call MPI_barrier(WABBIT_COMM, mpierror)
-
-        call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
-        & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
+        call abort(71737, "Grid error: we did not find a neighboring block. Either your data is corrupt (reading from file) or you found a bug.")
     endif
 
-    if (error) then
-        call abort(31375162, "Grid error. This is very nasty: some neighbor-updates failed. the specific error message above &
-        & is probably not very useful. We dump the entire light data to *.dat in the hope this helps you find the problem.")
+    ! Is there any non-periodic boundary ?
+    if ( .not. All(params%periodic_BC) ) then
+        call remove_nonperiodic_neighbors(params, lgt_block, hvy_neighbor, hvy_active, hvy_n)
     endif
 
 end subroutine update_neighbors

@@ -116,7 +116,7 @@ contains
     ! NOTE that as we have way more work arrays than actual state variables (typically
     ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
     !-----------------------------------------------------------------------------
-    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask ,boundary_flag)
+    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask, n_domain)
         implicit none
         character(len=*), intent(in) :: physics
 
@@ -144,25 +144,25 @@ contains
         ! level. All parts of the mask shall be included: chi, boundary values, sponges.
         ! On input, the mask array is correctly filled. You cannot create the full mask here.
         real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
-        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-        ! boundary_flag(i) can be either 0, 1, -1,
+        ! The n_domain tells you if the local field is adjacent to a domain boundary:
+        ! n_domain(i) can be either 0, 1, -1,
         !  0: no boundary in the direction +/-e_i
         !  1: boundary in the direction +e_i
         ! -1: boundary in the direction - e_i
         ! currently only acessible in the local stage
-        integer(kind=2)          , intent(in):: boundary_flag(3)
+        integer(kind=2), intent(in) :: n_domain(3)
 
         select case(physics)
         case ('ACM-new')
-            call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
+            call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
 
         case ('ConvDiff-new')
             call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
 
         case ('navier_stokes')
-            call PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work, boundary_flag )
+            call PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work, n_domain )
 
         case default
             call abort(88119, "[PREPARE_SAVE_DATA (metamodule)] unknown physics....")
@@ -211,7 +211,7 @@ contains
     ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
     ! from that. Ghost nodes are assumed to be sync'ed.
     !-----------------------------------------------------------------------------
-    subroutine RHS_META( physics, time, u, g, x0, dx, rhs, mask, stage, boundary_flag)
+    subroutine RHS_META( physics, time, u, g, x0, dx, rhs, mask, stage, n_domain)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -248,25 +248,25 @@ contains
         ! use these integral qtys for the actual RHS evaluation.
         character(len=*), intent(in) :: stage
 
-        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-        ! boundary_flag(i) can be either 0, 1, -1,
+        ! The n_domain tells you if the local field is adjacent to a domain boundary:
+        ! n_domain(i) can be either 0, 1, -1,
         !  0: no boundary in the direction +/-e_i
         !  1: boundary in the direction +e_i
         ! -1: boundary in the direction - e_i
         ! currently only acessible in the local stage
-        integer(kind=2), optional, intent(in):: boundary_flag(3)
+        integer(kind=2), optional, intent(in):: n_domain(3)
 
         select case(physics)
         case ("ACM-new")
-            call RHS_ACM( time, u, g, x0, dx,  rhs, mask, stage )
+            call RHS_ACM( time, u, g, x0, dx,  rhs, mask, stage, n_domain )
 
         case ("ConvDiff-new")
-            call RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag )
+            call RHS_convdiff( time, u, g, x0, dx, rhs, stage, n_domain )
 
         case ("navier_stokes")
-            call RHS_NStokes( time, u, g, x0, dx, rhs, stage, boundary_flag )
+            call RHS_NStokes( time, u, g, x0, dx, rhs, stage, n_domain )
 
         case default
             call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
@@ -482,7 +482,7 @@ contains
     !-----------------------------------------------------------------------------
     ! main level wrapper for setting the initial condition on a block
     !-----------------------------------------------------------------------------
-    subroutine INICOND_meta( physics, time, u, g, x0, dx, boundary_flag)
+    subroutine INICOND_meta( physics, time, u, g, x0, dx, n_domain)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -502,26 +502,26 @@ contains
         ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
         real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-        ! boundary_flag(i) can be either 0, 1, -1,
+        ! The n_domain tells you if the local field is adjacent to a domain boundary:
+        ! n_domain(i) can be either 0, 1, -1,
         !  0: no boundary in the direction +/-e_i
         !  1: boundary in the direction +e_i
         ! -1: boundary in the direction - e_i
         ! currently only acessible in the local stage
-        integer(kind=2)          , intent(in):: boundary_flag(3)
+        integer(kind=2), intent(in) :: n_domain(3)
 
 
         select case (physics)
         case ("ACM-new")
-            call INICOND_ACM( time, u, g, x0, dx)
+            call INICOND_ACM( time, u, g, x0, dx, n_domain)
 
         case ("ConvDiff-new")
             call INICOND_ConvDiff( time, u, g, x0, dx )
 
         case ("navier_stokes")
-            call INICOND_NStokes( time, u, g, x0, dx, boundary_flag )
+            call INICOND_NStokes( time, u, g, x0, dx, n_domain )
 
         case default
             call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")
@@ -539,7 +539,7 @@ contains
     ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
     ! Ghost nodes are assumed to be sync'ed.
     !-----------------------------------------------------------------------------
-    subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array, boundary_flag)
+    subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array, n_domain)
         implicit none
         !> physics type
         character(len=*), intent(in) :: physics
@@ -560,15 +560,15 @@ contains
         ! the work array is an additional array which can be used to store temporal
         ! values of the statevector field
         real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
-        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-        ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
-        ! boundary_flag(i) can be either 0, 1, -1,
+        ! The n_domain tells you if the local field is adjacent to a domain boundary:
+        ! n_domain(i) can be either 0, 1, -1,
         !  0: no boundary in the direction +/-e_i
         !  1: boundary in the direction +e_i
         ! -1: boundary in the direction - e_i
         ! currently only acessible in the local stage
-        integer(kind=2), optional, intent(in):: boundary_flag(3)
+        integer(kind=2), optional, intent(in):: n_domain(3)
 
         select case(physics)
         case ("ACM-new")
@@ -578,7 +578,7 @@ contains
             call abort(1009181817, "filter not implemented for convection-diffusion.")
 
         case ("navier_stokes")
-            call filter_NStokes( time, u, g, x0, dx, work_array, boundary_flag)
+            call filter_NStokes( time, u, g, x0, dx, work_array, n_domain)
 
         case default
             call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))

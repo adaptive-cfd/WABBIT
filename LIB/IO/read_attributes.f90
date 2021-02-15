@@ -13,7 +13,7 @@
 !> \date 02/02/18 - create
 !
 
-subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, verbosity)
+subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, periodic_BC, symmetry_BC, verbosity)
 
     implicit none
     !> file name
@@ -32,12 +32,13 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     integer(kind=ik), intent(out)                 :: dim
     !> domain size
     real(kind=rk), dimension(3), intent(out)      :: domain
-    logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
+    logical, intent(in), optional                 :: verbosity !< if verbosity==True generates log output
+    logical, intent(inout), optional              :: periodic_BC(1:3), symmetry_BC(1:3)
 
     integer(kind=ik), dimension(1)                :: iiteration, number_blocks, version
     real(kind=rk), dimension(1)                   :: ttime
     integer(hid_t)                                :: file_id
-    integer(kind=ik)                              :: datarank, Nb, rank, ierr
+    integer(kind=ik)                              :: datarank, Nb, rank, ierr, tmp1(1:3), tmp2(1:3)
     integer(kind=hsize_t)                         :: size_field(1:4)
     integer(hsize_t), dimension(2)                :: dims_treecode
     logical :: verbose = .true.
@@ -83,6 +84,22 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         write(*,*) "--------------------------------------------------------------------"
     endif
 
+    if (present(periodic_BC)) then
+        call read_attribute(file_id, "blocks", "periodic_BC", tmp1, (/1_ik, 1_ik, 1_ik/))
+
+        periodic_BC = .false.
+        where (tmp1 > 0_ik)
+            periodic_BC = .true.
+        end where
+    endif
+    if (present(symmetry_BC)) then
+        call read_attribute(file_id, "blocks", "symmetry_BC", tmp2, (/0_ik, 0_ik, 0_ik/))
+
+        symmetry_BC = .false.
+        where (tmp2 > 0_ik)
+            symmetry_BC = .true.
+        end where
+    endif
 
     call read_attribute(file_id, "blocks", "domain-size", domain)
     call read_attribute(file_id, "blocks", "time", ttime)
@@ -160,12 +177,14 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         write(*,*) "processing) or to check if a file we try to load matches the"
         write(*,*) "specification of the current simulation."
         write(*,*) "We read:"
-        write(*,'(" file      = ",A)') trim(adjustl(fname))
-        write(*,'(" Bs        = ",3(i3,1x))') Bs
-        write(*,'(" domain    = ",3(g15.8,1x))') domain
-        write(*,'(" tc_length = ",i3)') tc_length
-        write(*,'(" lgt_n     = ",i8)') lgt_n
-        write(*,'(" dim       = ",i8)') dim
+        write(*,'(" file         = ",A)') trim(adjustl(fname))
+        write(*,'(" Bs           = ",3(i3,1x))') Bs
+        write(*,'(" domain       = ",3(g15.8,1x))') domain
+        write(*,'(" tc_length    = ",i3)') tc_length
+        write(*,'(" lgt_n        = ",i8)') lgt_n
+        write(*,'(" dim          = ",i8)') dim
+        if (present(periodic_BC)) write(*,'(" periodic_BC  = ",3(L1))') periodic_BC
+        if (present(symmetry_BC)) write(*,'(" symmetry_BC  = ",3(L1))') symmetry_BC
         write(*,'(80("~"))')
     endif
 

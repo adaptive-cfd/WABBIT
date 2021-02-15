@@ -539,7 +539,7 @@ contains
         if ( i == 1 .and. j == 1 ) then
           ! read all geometric parameters of grid
           call read_attributes(file_in(i,j), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
-                         params%Bs, params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(file_in(i,j), lgt_n_tmp, time(i), iteration(i), domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
@@ -842,7 +842,7 @@ contains
         if ( i == 1 .and. j == 1 ) then
           ! read all geometric parameters of grid
           call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(1), iter_list(1), params%domain_size, &
-                         params%Bs, params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(i), iter_list(i), domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
@@ -1405,7 +1405,7 @@ contains
         if ( i == 1 .and. j == 1 ) then
           ! read all geometric parameters of grid
           call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(1), params%domain_size, &
-                         params%Bs, params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(i), domain, bs, level, dim)
       params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
@@ -1817,7 +1817,7 @@ contains
         if ( i == 1 .and. j == 1 ) then
           ! read all geometric parameters of grid
           call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(1), iter_list(1), params%domain_size, &
-                         params%Bs, params%max_treelevel, params%dim)
+                         params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(i), iter_list(i), domain, bs, level, dim)
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot

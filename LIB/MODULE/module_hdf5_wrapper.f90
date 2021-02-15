@@ -1895,12 +1895,13 @@ end subroutine read_attrib_dble
 ! OUTPUT:
 !   attribute the values read from file
 !-------------------------------------------------------------------------------
-subroutine read_attrib_int(file_id,dsetname,aname,attribute)
+subroutine read_attrib_int(file_id, dsetname, aname, attribute, default_value)
   implicit none
 
   integer(hid_t), intent(in)                     :: file_id
   character(len=*), intent (in)                  :: dsetname, aname
   integer(kind=ik), DIMENSION(:), intent (inout) :: attribute
+  integer(kind=ik), DIMENSION(1:size(attribute)), intent (in), optional :: default_value
 
   integer             :: dim
   integer             :: error  ! error flags
@@ -1921,17 +1922,21 @@ subroutine read_attrib_int(file_id,dsetname,aname,attribute)
   call h5aexists_f(dset_id, aname, exists, error)
 
   if (exists) then
-    ! open attribute
-    call h5aopen_f(dset_id, aname, attr_id, error)
-    ! Get dataspace for attribute
-    call h5aget_space_f(attr_id, aspace_id, error)
-    ! read attribute data
-    call h5aread_f( attr_id, H5T_NATIVE_INTEGER, attribute, adims, error)
-    ! close attribute
-    call h5aclose_f(attr_id,error) ! Close the attribute.
-    call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
+      ! open attribute
+      call h5aopen_f(dset_id, aname, attr_id, error)
+      ! Get dataspace for attribute
+      call h5aget_space_f(attr_id, aspace_id, error)
+      ! read attribute data
+      call h5aread_f( attr_id, H5T_NATIVE_INTEGER, attribute, adims, error)
+      ! close attribute
+      call h5aclose_f(attr_id,error) ! Close the attribute.
+      call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
   else
-    attribute = 0
+      if (present(default_value)) then
+          attribute = default_value
+      else
+          attribute = 0
+      endif
   endif
 
   call h5dclose_f(dset_id,error)

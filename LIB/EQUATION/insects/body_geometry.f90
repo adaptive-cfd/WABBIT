@@ -880,7 +880,7 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    real(kind=rk) :: R0,R,a_body, projected_length
+    real(kind=rk) :: R0,R,projected_length
     real(kind=rk) :: x_body(1:3), x(1:3), xc(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
     real(kind=rk)   :: M_body(1:3,1:3)
@@ -1289,7 +1289,7 @@ end subroutine draw_body_cone
 ! insect%xc) is added in the main insect drawing routine.
 ! The color of the new cylinder will be what you pass in color_val
 !-------------------------------------------------------------------------------
-subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val)
+subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val, bounding_box)
     implicit none
 
     real(kind=rk),dimension(1:3),intent(inout )::x1,x2
@@ -1300,68 +1300,87 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
     integer(kind=2),intent(in) :: color_val
+    ! (/xmin,ymin,zmin,xmax,ymax,zmax/) of cylinder (in global coordinates)
+    real(kind=rk),optional,intent(in) :: bounding_box(1:6)
 
-    real(kind=rk),dimension(1:3) ::  cb, rb, ab, u, vp
-    real(kind=rk),dimension(1:3) :: x_glob, e_x, tmp, e_r, e_3
-    real(kind=rk)::ceta1, ceta2, ceta3, R, RR0, clength, safety, t
-    integer :: ix,iy,iz
+    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_3
+    real(kind=rk),dimension(1:3,1:3) :: M_phi
+    real(kind=rk):: R, RR0, clength, safety, t, phi
+    integer :: ix,iy,iz, Nphi
 
     integer, dimension(1:3) :: lbounds, ubounds
     integer :: xmin,xmax,ymin,ymax,zmin,zmax
-    integer :: Nsafety
+    integer :: Nsafety, i
 
     safety = 1.5*Insect%safety
     Nsafety = ceiling(safety / minval(ddx))
 
     ! bounds of the current patch of data
-    lbounds = g
-    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+    lbounds = g ! note zero based indexing
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
 
-    RR0 = R0 + safety
+    if (present(bounding_box)) then
+        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn, fractal tree)
+        xmin = nint( (bounding_box(1)-xx0(1))/ddx(1) ) - Nsafety
+        ymin = nint( (bounding_box(2)-xx0(2))/ddx(2) ) - Nsafety
+        zmin = nint( (bounding_box(3)-xx0(3))/ddx(3) ) - Nsafety
 
-    ! unit vector in cylinder axis direction and cylinder length
-    e_x = x2 - x1
-    clength = norm2(e_x)
-    e_x = e_x / clength
+        xmax = nint( (bounding_box(4)-xx0(1))/ddx(1) ) + Nsafety
+        ymax = nint( (bounding_box(5)-xx0(2))/ddx(2) ) + Nsafety
+        zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
 
-    ! radial unit vector
-    ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
-    ! it does not really matter which one. however, we must be sure that the vector
-    ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-    e_r = (/0.d0,0.d0,0.d0/)
-    do while ( norm2(e_r) <= 1.0d-12 )
-        e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
-    enddo
-    e_r = e_r / norm2(e_r)
+    else
 
-    ! third (also radial) unit vector, simply the cross product of the others
-    e_3 = cross(e_x,e_r)
-    e_3 = e_3 / norm2(e_3)
+        ! unit vector in cylinder axis direction and cylinder length
+        e_x = x2 - x1
+        clength = norm2(e_x)
+        e_x = e_x / clength
 
-    ! bounding box of the vicinity of the cylinder.
-    t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
+        ! radial unit vector
+        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
+        ! it does not really matter which one. however, we must be sure that the vector
+        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
+        e_r = (/0.d0,0.d0,0.d0/)
+        do while ( norm2(e_r) <= 1.0d-12 )
+            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
+        enddo
+        e_r = e_r / norm2(e_r)
 
-    t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                  x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-    xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
+        ! third (also radial) unit vector, simply the cross product of the others
+        e_3 = cross(e_x,e_r)
+        e_3 = e_3 / norm2(e_3)
+        RR0 = R0 + safety
 
-    t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
+        ! bounding box of the vicinity of the cylinder.
+        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
+        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
+        ! we do it in preprocessing and only once per cylinder
+        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
 
-    t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                  x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-    ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
 
-    t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
 
-    t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                  x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-    zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+
+        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+
+        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+    endif
+
 
 
     ! first we draw the cylinder, then the endpoint spheres
@@ -1373,6 +1392,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
 
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+
                 ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! cb is the distance to the cylinder mid-point
@@ -1381,7 +1401,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
                 rb = x1 - x2
 
                 ! this is a spherical bounding box, centered around the mid-point
-                if ( sum(cb**2) < 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
+                if ( sum(cb**2) <= 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
                     ab = x_glob - x1
                     u = x2 - x1
 

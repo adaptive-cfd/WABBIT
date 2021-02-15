@@ -33,9 +33,6 @@
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_n, hvy_n, lgt_sortednumlist, adapt, time, iteration, hvy_mask, hvy_tmp)
 
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -68,14 +65,10 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     logical :: tmp
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
     lgt_n_old = 9999999
     iter = 0
     time = 0.0_rk
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
     if (params%rank==0) then
         write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
         write(*,*) "Setting initial condition on all blocks."
@@ -219,7 +212,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                     ! what happens on very coarse grids is that the first coarsening interation removes
                     ! the mask completely...
                     ! we therefore outsource the iteration loop here. (argument external_loop to
-                    ! adapt_mesh)
+                    ! adapt_mesh). This loop iterates until the grid does no longer change, then lgt_n_tmp = lgt_n(tree_ID_flow)
                     do while ( lgt_n_tmp /= lgt_n(tree_ID_flow) )
                         lgt_n_tmp = lgt_n(tree_ID_flow)
 

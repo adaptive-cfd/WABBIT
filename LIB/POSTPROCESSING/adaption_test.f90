@@ -54,7 +54,7 @@ subroutine adaption_test(params)
   !----------------------------------
   ! read parameters
   !----------------------------------
-      call get_cmd_arg( "--save_all", save_all, default=.false.)
+  call get_cmd_arg( "--save_all", save_all, default=.false.)
   call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
   call get_cmd_arg_str( "--order", order, default="CDF44" )
   call get_cmd_arg( "--list", params%input_files )
@@ -117,7 +117,7 @@ subroutine adaption_test(params)
   !-----------------------------------------------------------------------------
   do j = 1, n_components
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
-                       params%Bs, params%max_treelevel, params%dim)
+                       params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
   end do
 
   number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize

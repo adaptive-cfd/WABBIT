@@ -43,17 +43,15 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
     ! process rank
     integer(kind=ik)                        :: rank, number_procs
-    ! coordinates vectors
-    real(kind=rk), allocatable              :: coord_x(:), coord_y(:), coord_z(:)
     ! spacing
     real(kind=rk)                           :: ddx(1:3), xx0(1:3)
 
     ! grid parameter
-    integer(kind=ik)                        :: g, number_blocks
+    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk)                           :: Lx, Ly, Lz, x, y, z
     ! data dimensionality
-    integer(kind=ik)                        :: d, dF, max_neighbors
+    integer(kind=ik)                        :: d,  max_neighbors
     ! frequency of sin functions for testing:
     real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
@@ -64,30 +62,18 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     integer(kind=ik)                        :: ierr
     logical::test
 
-    !---------------------------------------------------------------------------------------------
-    ! interfaces
-
-    !---------------------------------------------------------------------------------------------
-    ! variables initialization
-
-    ! set MPI parameters
     rank = params%rank
-
-    ! grid parameter
     Lx = params%domain_size(1)
     Ly = params%domain_size(2)
     Lz = params%domain_size(3)
 
     d = params%dim
-    ! set data dimension
     if ( params%dim == 3 ) then
         max_neighbors = 74
     else
         max_neighbors = 12
     endif
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -96,7 +82,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
 
     Bs = params%Bs
     g  = params%n_ghosts
-    dF = params%n_eqn
     number_procs  = params%number_procs
     number_blocks = params%number_blocks
 
@@ -111,7 +96,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     !---------------------------------------------------------------------------
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
-    params%max_grid_density = 0.02_rk
+    params%max_grid_density = 0.10_rk
     ! perform 5 iterations of random refinement/coarsening
     l = 5
     call create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
@@ -124,6 +109,12 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         write(*,'(" ready for testing.")')
     endif
 
+
+    if (max_active_level( lgt_block, lgt_active, lgt_n ) == min_active_level( lgt_block, lgt_active, lgt_n )) then
+        if (params%rank==0) write(*,*) "By chance, generated an equidistant mesh: skipping ghost nodes test"
+        return
+    endif
+
     !---------------------------------------------------------------------------
     ! Step 2: Actual testing of ghost node routines
     !---------------------------------------------------------------------------
@@ -131,7 +122,6 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     ! equivalent to using different block sizes, but way easier to program.
     ! These frequencies are tested:
     frequ=(/1.0_rk , 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
-    allocate( coord_x( Bs(1) + 2*g ), coord_y( Bs(2) + 2*g ), coord_z( Bs(3) + 2*g ) )
 
     ! loop over frequencies
     do ifrequ = 1 , size(frequ)
@@ -147,32 +137,45 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
             ! compute block spacing and origin from treecode
             call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
-            ! fill coordinate arrays, of course including ghost nodes
-            do l = 1, Bs(1)+2*g
-                coord_x(l) = real(l-(g+1), kind=rk) * ddx(1) + xx0(1)
-            enddo
-            do l = 1, Bs(2)+2*g
-                coord_y(l) = real(l-(g+1), kind=rk) * ddx(2) + xx0(2)
-            enddo
-            do l = 1, Bs(3)+2*g
-                coord_z(l) = real(l-(g+1), kind=rk) * ddx(3) + xx0(3)
-            enddo
-
             ! calculate f(x,y,z) for first datafield
             if ( params%dim == 3 ) then
                 ! 3D:
-                call f_xyz_3D( coord_x, coord_y, coord_z, hvy_block(:, :, :, 1, hvy_id), Bs, g, Lx, Ly, Lz, frequ(ifrequ) )
+                do iz = 1, Bs(3)+2*g
+                    z = real(iz-(g+1), kind=rk) * ddx(3) + xx0(3)
+                    do iy = 1, Bs(2)+2*g
+                        y = real(iy-(g+1), kind=rk) * ddx(2) + xx0(2)
+                        do ix = 1, Bs(1)+2*g
+                            x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
+
+                            ! use cos functions because theyre symmetric (symmetry BC)
+                            hvy_block(ix, iy, iz, 1, hvy_id) &
+                            = cos(frequ(ifrequ)*x/Lx * 2.0_rk*pi) &
+                            * cos(frequ(ifrequ)*y/Ly * 2.0_rk*pi) &
+                            * cos(frequ(ifrequ)*z/Lz * 2.0_rk*pi)
+                        enddo
+                    enddo
+                enddo
             else
                 ! 2D:
-                call f_xy_2D( coord_x, coord_y, hvy_block(:, :, 1, 1, hvy_id), Bs, g, Lx, Ly, frequ(ifrequ)  )
+                do iy = 1, Bs(2)+2*g
+                    y = real(iy-(g+1), kind=rk) * ddx(2) + xx0(2)
+                    do ix = 1, Bs(1)+2*g
+                        x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
+
+                        ! use cos functions because theyre symmetric (symmetry BC)
+                        hvy_block(ix, iy, 1, 1, hvy_id) &
+                        = cos(frequ(ifrequ)*x/Lx * 2.0_rk*pi) &
+                        * cos(frequ(ifrequ)*y/Ly * 2.0_rk*pi)
+                    enddo
+                enddo
             end if
 
+            ! now the entire block (incl ghost nodes) holds the exact solution: make a
+            ! copy of the block for later comparison, but use work arrays usually used for RK4 substages
+            ! so no additional memory is used.
+            hvy_work(:,:,:,1,hvy_id,1) = hvy_block(:,:,:,1,hvy_id)
         end do
 
-        ! now the entire grid (incl ghost nodes) holds the exact solution: make a
-        ! copy of the grid for later comparison, but use work arrays usually used for RK4 substages
-        ! so no additional memory is used.
-        hvy_work(:,:,:,1,:,1) = hvy_block(:,:,:,1,:)
 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
@@ -224,9 +227,5 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         write(*,'(" done - Linfty convergence order was ",6(g12.4,1x))')  sqrt(error2(2:6) / error2(1:5))
         write(*,'(" done - Linfty mean convergence order was ",g12.4)')  sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
     endif
-
-    !---------------------------------------------------------------------------------------------
-    ! last: clean up
-    deallocate(coord_x, coord_y, coord_z)
 
 end subroutine unit_test_ghost_nodes_synchronization

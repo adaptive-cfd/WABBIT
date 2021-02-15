@@ -9,7 +9,60 @@ contains
 
 #include "get_neighbor_treecode.f90"
 
-!> \file
+
+!-----------------------------------------------------------------------------
+!> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
+!> \details
+!>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)
+!>   - The surface normal is computed from the treecode
+subroutine get_adjacent_boundary_surface_normal(treecode, domain_size, Bs, dim, n_surface)
+    implicit none
+    integer(kind=ik), intent(in) :: treecode(1:), Bs(1:3), dim
+    real(kind=rk), intent(in) :: domain_size(1:3)
+    ! The normal on the domain indicates (if non-periodic BC are used), if a block
+    ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
+    ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
+    ! is way at the back and its boundary normal points in +x, and in z, its at the bottom (z=0), thus
+    ! its normal points downwards.
+    integer(kind=2), intent(out) :: n_surface(3)
+
+    real(kind=rk), dimension(1:3) :: x0, dx
+    real(kind=rk) :: tolerance
+
+    call get_block_spacing_origin2( treecode, domain_size, Bs, dim, x0, dx )
+
+    tolerance = 1.0e-3_rk * minval(dx(1:dim))
+
+    if (abs(x0(1)-0.0_rk) < tolerance ) then !x==0
+        n_surface(1) = -1
+    elseif (abs(x0(1)+dx(1)*real(Bs(1)-1,kind=rk) - domain_size(1)) < tolerance) then !x==L
+        n_surface(1) = +1
+    else
+        n_surface(1) = 0
+    endif
+
+    if (abs(x0(2)-0.0_rk) < tolerance ) then !y==0
+        n_surface(2) = -1
+    elseif (abs(x0(2)+dx(2)*real(Bs(2)-1,kind=rk) - domain_size(2)) < tolerance) then !y==L
+        n_surface(2) = +1
+    else
+        n_surface(2) = 0
+    endif
+
+    if (dim == 3) then
+        if (abs(x0(3)-0.0_rk) < tolerance ) then !z==0
+            n_surface(3) = -1
+        elseif (abs(x0(3)+dx(3)*real(Bs(3)-1,kind=rk) - domain_size(3)) < tolerance) then !z==L
+            n_surface(3) = +1
+        else
+            n_surface(3) = 0
+        endif
+    else
+        n_surface(3) = 0
+    endif
+end subroutine get_adjacent_boundary_surface_normal
+
+
 !> \author engels
 !> \brief For any block lgt_id this routine computes, from the treecode stored in
 !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing

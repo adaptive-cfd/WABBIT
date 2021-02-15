@@ -22,13 +22,6 @@
 ! ********************************************************************************************
 
 subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> user defined parameter structure
@@ -44,18 +37,9 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)     :: Bs
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    ! grid parameter
     Bs = params%Bs
     g  = params%n_ghosts
 
-!---------------------------------------------------------------------------------------------
-! main body
     ! delete layer of ghost nodes for all blocks (not just active ones)
 
     !-- x-direction

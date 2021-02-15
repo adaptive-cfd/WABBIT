@@ -67,13 +67,14 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     character(len=80)     :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)         :: t0, x0(1:3), dx(1:3)
-    integer(kind=2)       :: surface(3)=0
+    integer(kind=2)       :: n_domain(1:3)
 
     t0 = MPI_Wtime()
     if (params%rank == 0) then
         write(*,'("IO: Saving data triggered, time=",g15.8)')  time
     endif
 
+    n_domain = 0
 
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling create_mask_tree if the mask is not stored is supposed
@@ -91,9 +92,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
 
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            params%domain_size, params%Bs, params%dim, n_domain )
         endif
 
         ! call preparatory routines. this routine saves the variables to be stored
@@ -101,8 +104,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
         call PREPARE_SAVE_DATA_meta(params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
-        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), &
-        boundary_flag=surface)
+        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), n_domain)
 
     enddo
 
@@ -120,7 +122,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         else
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
         endif
-        
+
         ! actual writing
         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
         lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow))

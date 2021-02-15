@@ -191,7 +191,7 @@ contains
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in)       :: stage
 
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,
@@ -317,7 +317,7 @@ contains
         real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
         !> datafields, and velocity field
         real(kind=rk), intent(inout) :: phi(:,:,:)
-        ! when implementing boundary conditions, it is necessary to now if the local field (block)
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
         ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
         ! boundary_flag(i) can be either 0, 1, -1,
@@ -868,7 +868,7 @@ contains
 
     ! output. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,

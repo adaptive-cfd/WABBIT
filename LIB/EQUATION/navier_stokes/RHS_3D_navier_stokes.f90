@@ -40,7 +40,7 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     real(kind=rk), intent(in)                              :: phi(:, :, :, :)
     ! rhs array
     real(kind=rk),intent(inout)                               :: rhs(:, :, :,:)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,

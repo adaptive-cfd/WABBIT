@@ -28,7 +28,7 @@
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,

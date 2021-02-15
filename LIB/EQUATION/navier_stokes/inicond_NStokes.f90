@@ -28,7 +28,7 @@
     real(kind=rk)             :: x,y_rel,tmp(1:3),b,mach,T_init,x_cntr(3),sigma,&
                                 left(size(u,4)),right(size(u,4)),phi_init(size(u,4))
     real(kind=rk),allocatable:: mask(:,:,:) ! we dont save this datafield, since it is only called once
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,

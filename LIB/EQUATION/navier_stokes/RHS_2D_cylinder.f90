@@ -39,7 +39,7 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
     real(kind=rk), dimension(2), intent(in) :: x0, dx        !< grid coordinates
     real(kind=rk), intent(inout)               :: phi(:, :, :)  !< statevector
     real(kind=rk), intent(inout)            :: rhs(:, :, :)  !< rhs array
-    ! when implementing boundary conditions, it is necessary to now if the local field (block)
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
     ! boundary_flag(i) can be either 0, 1, -1,

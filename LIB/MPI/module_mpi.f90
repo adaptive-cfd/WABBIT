@@ -17,8 +17,6 @@
 !! 18/07/2018 - remove all old ghost node routines, build in JR's improved version of MSR's new ghost nodes
 module module_MPI
 
-!---------------------------------------------------------------------------------------------
-! modules
 
     use mpi
     ! global parameters
@@ -30,8 +28,6 @@ module module_MPI
     use module_treelib
 
     implicit none
-!---------------------------------------------------------------------------------------------
-! variables
 
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
     ! that everything within the module is private unless explicitly marked public.
@@ -91,7 +87,7 @@ module module_MPI
     integer(kind=ik) :: dim = 2_ik
 
     ! we use this flag to call the allocation routine only once.
-    logical          :: ghost_nodes_module_ready = .false.
+    logical :: ghost_nodes_module_ready = .false.
 
     ! two shift parameters (asymmetric and symmetric ) used for selection of interpolation
     ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
@@ -117,6 +113,7 @@ contains
 #include "check_redundant_nodes.f90"
 #include "calc_data_bounds.f90"
 #include "restrict_predict_data.f90"
+#include "sync_ghosts_symmetry_condition.f90"
 
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,

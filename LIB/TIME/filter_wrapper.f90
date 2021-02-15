@@ -13,13 +13,6 @@
 !**********************************************************************************************
 
 subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
-
-!----------------------------------------------------------------------------------------------
-! modules
-
-!----------------------------------------------------------------------------------------------
-! variables
-
    implicit none
 
     !> time variable
@@ -48,35 +41,37 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_activ
     integer(kind=ik)                    :: g
     integer(kind=ik), dimension(3)      :: Bs
     !  surface normal
-    integer(kind=2) :: surface(3)=0
+    integer(kind=2) :: n_domain(1:3)
     integer         :: level
 
-
-    ! grid parameter
     Bs    = params%Bs
     g     = params%n_ghosts
+    n_domain = 0
 
 
     do k = 1, hvy_n
-      ! convert given hvy_id to lgt_id for block spacing routine
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        ! convert given hvy_id to lgt_id for block spacing routine
+        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
 
-      ! level of the block:
-      level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+        ! level of the block:
+        level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
-      if ((params%filter_only_maxlevel .and. level==params%max_treelevel) .or. .not. params%filter_only_maxlevel) then
+        if ((params%filter_only_maxlevel .and. level==params%max_treelevel) &
+        .or. (.not.params%filter_only_maxlevel.and..not.params%filter_all_except_maxlevel) .or. &
+        (params%filter_all_except_maxlevel.and.(level/=params%max_treelevel)) ) then
 
-          ! get block spacing for RHS
-          call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            ! get block spacing for RHS
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-          if ( .not. All(params%periodic_BC) ) then
-            ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal(params, lgt_id, lgt_block, params%max_treelevel, surface)
-          endif
+            if ( .not. All(params%periodic_BC) ) then
+                ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+                call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+                params%domain_size, params%Bs, params%dim, n_domain )
+            endif
 
-          call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
-              hvy_tmp(:,:,:,:,hvy_active(k)),surface)
-      endif
+            call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
+            hvy_tmp(:,:,:,:,hvy_active(k)), n_domain)
+        endif
     enddo
 
 end subroutine filter_wrapper

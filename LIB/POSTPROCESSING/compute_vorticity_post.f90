@@ -83,7 +83,8 @@ subroutine compute_vorticity_post(params)
     call check_file_exists(trim(file_uy))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim)
+    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     if (params%dim == 3) then
         call get_command_argument(4, file_uz)
@@ -117,6 +118,14 @@ subroutine compute_vorticity_post(params)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
+
+    allocate(params%symmetry_vector_component(1:params%n_eqn))
+    params%symmetry_vector_component(1) = "x"
+    params%symmetry_vector_component(2) = "y"
+    if (params%dim==3) then
+        params%symmetry_vector_component(3) = "z"
+    endif
+
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )

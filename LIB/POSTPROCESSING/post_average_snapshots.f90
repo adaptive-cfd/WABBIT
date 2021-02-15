@@ -56,7 +56,7 @@ subroutine post_average_snapshots(params)
     N_snapshots = Nargs - 2
     allocate(fname_in(N_snapshots))
     allocate(Nblocks(N_snapshots))
-    
+
     ! get names and attributes of input files
     do i = 1, N_snapshots
 
@@ -66,10 +66,10 @@ subroutine post_average_snapshots(params)
       !! read attributes
       if ( i == 1 ) then
           call read_attributes(fname_in(i), Nblocks(1), time, iteration, &
-               params%domain_size, params%Bs, params%max_treelevel, params%dim)
+               params%domain_size, params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
       endif
       call read_attributes(fname_in(i), Nblocks(i), time, iteration, &
-           domain, bs, level, dim)
+           domain, bs, level, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
       ! check attributes for consistency
       params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot

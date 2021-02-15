@@ -9,7 +9,7 @@
 ! NOTE that as we have way more work arrays than actual state variables (typically
 ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
 !-----------------------------------------------------------------------------
-subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
+subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -36,6 +36,17 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask )
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
+
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
+    integer(kind=2), intent(in) :: n_domain(3)
 
     ! local variables
     integer(kind=ik)  :: neqn, nwork, k, iscalar

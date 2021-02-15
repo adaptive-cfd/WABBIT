@@ -82,7 +82,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     ! offset variables
     integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
-    integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D
+    integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D, periodic_BC, symmetry_BC
 
     character(len=80) :: arg
     type(INIFILE) :: FILE
@@ -101,6 +101,16 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     Bs   = params%Bs
     g    = params%n_ghosts
     dim  = params%dim
+    periodic_BC = 0_ik
+    symmetry_BC = 0_ik
+
+    where (params%periodic_BC)
+        periodic_BC = 1_ik
+    end where
+
+    where (params%symmetry_BC)
+        symmetry_BC = 1_ik
+    end where
 
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
@@ -125,8 +135,6 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     if (lgt_n < 1 ) call abort(291019, "you try to save an empty mesh.")
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! first: check if field contains NaNs
     do k = 1, hvy_n
@@ -250,6 +258,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! 3D data case
         call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2), params%domain_size(3)/))
+        call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
+        call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%max_treelevel-1,ubounds3D(4)/), block_treecode)
@@ -260,6 +270,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! 2D data case
         call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2)/))
+        call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
+        call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%max_treelevel-1,ubounds2D(3)/), block_treecode)

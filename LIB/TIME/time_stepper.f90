@@ -81,36 +81,11 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
 
-    ! loop variables
-    integer(kind=ik)                    :: k, j, Neqn, g, z1, z2, hvy_id
-    integer(kind=ik), dimension(3) :: Bs
-    ! time step, dx
-    real(kind=rk)                       :: t
-    ! array containing Runge-Kutta coefficients
-    real(kind=rk), allocatable, save    :: rk_coeffs(:,:)
+    integer(kind=ik) :: k
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    Neqn = params%n_eqn
-    Bs    = params%Bs
-    g     = params%n_ghosts
-
-    if (params%dim==2) then
-        z1 = 1
-        z2 = 1
-    else
-        z1 = g+1
-        z2 = Bs(3)+g
-    endif
-
-    if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
-    dt = 9.0e9_rk
-    ! set rk_coeffs
-    rk_coeffs = params%butcher_tableau
-
-!---------------------------------------------------------------------------------------------
-! main body
+    ! currently not working (Thomas, 02-2021)
+    ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+    ! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.true.)
 
     if ( .not. All(params%periodic_BC) ) then
         !!! if we have NON-PERIODIC boundary conditions it is important to reset hvy_work.
@@ -145,53 +120,18 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
         !-----------------------------------------------------------------------
         ! runge-kutta scheme
         !-----------------------------------------------------------------------
-
-        ! synchronize ghost nodes
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-
-        ! calculate time step
-        call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
-            lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), dt)
-
-        ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
-        ! slot after the copy of the state vector (hence 2)
-        call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), &
-        hvy_mask, hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
-
-        ! save data at time t to heavy work array
-        ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
-        ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
-        ! if the copy part is above, the changes in state vector are ignored
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k, tree_ID_flow)
-            ! first slot in hvy_work is previous time step
-            hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, 1 ) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id )
-        end do
-
-
-        ! compute k_1, k_2, .... (coefficients for final stage)
-        do j = 2, size(rk_coeffs, 1) - 1
-            ! prepare input for the RK substep
-            call set_RK_input(dt, params, rk_coeffs(j,:), j, hvy_block, hvy_work, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
-            ! synchronize ghost nodes for new input
-            ! further ghost nodes synchronization, fixed grid
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-
-            ! note substeps are at different times, use temporary time "t"
-            t = time + dt*rk_coeffs(j,1)
-
-            call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp, lgt_block, &
-            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor)
-        end do
-
-        ! final stage
-        call final_stage_RK(params, dt, hvy_work, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), rk_coeffs)
+        call RungeKuttaGeneric(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
+            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
     case default
         call abort(19101816, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
 
     end select
+
+
+! currently not working (Thomas, 02-2021)
+! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
+! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.false.)
 
     ! increase time variable after all RHS substeps
     time = time + dt

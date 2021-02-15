@@ -4,20 +4,16 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/conv/blob_convection_boundary/"
-params=${dir}"blob_convection_boundary.ini"
+dir="./TESTING/conv/symmetry-blob-3d/"
+params=${dir}"PARAMS_symmetry-blob-3d.ini"
 happy=0
 sad=0
-echo "testing boundary conditions with convection only"
 
 # list of prefixes the test generates
 prefixes=(phi)
 # list of possible times (no need to actually have them)
-times=(000000000000
-000001000000
-000002000000
-000003000000
-000004000000)
+times=(000000000000 000000040000)
+
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}
 

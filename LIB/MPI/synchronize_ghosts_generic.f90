@@ -71,6 +71,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     !    +1        |     3     |   recv is coarser: decimation
     !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
     !--------------------------------------------------------------
+    ! TODO: the notation "round" is misleading: their actual order is given in "ROUNDS" array
+    ! coarseWwins : [3,2,1] = [decimation, copy, interpolation]
 
 
 
@@ -120,7 +122,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
             ! loop over all neighbors
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists
-                if ( hvy_neighbor( sender_hvy_id, neighborhood ) /= -1 ) then
+                if ( hvy_neighbor( sender_hvy_id, neighborhood ) > 0 ) then
                     !  ----------------------------  determin the core ids and properties of neighbor  ------------------------------
                     ! TODO: check if info available  when searching neighbor and store it in hvy_neighbor
                     ! neighbor light data id
@@ -235,6 +237,8 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         !    +1        |     3     |   recv is coarser: decimation
         !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
         !--------------------------------------------------------------
+        ! TODO: the notation "round" is misleading: their actual order is given in "ROUNDS" array
+        ! coarseWwins : [3,2,1] = [decimation, copy, interpolation
 
         !***********************************************************************
         ! (iv) Unpack received data in the ghost node layers
@@ -260,7 +264,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! process-internal ghost points (direct copy)
                     !---------------------------------------------------------------
                     call unpack_all_ghostlayers_currentRound_internal_neighbor( params, k, istage_buffer(iround), &
-                    currentSortInRound, hvy_block )
+                    currentSortInRound, hvy_block, hvy_neighbor )
 
                 else
                     !---------------------------------------------------------------
@@ -272,6 +276,12 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                 end if  ! process-internal or external ghost points
             end do ! mpisize
         end do ! currentSortInRound
+
+        ! needs to be here and not after the wrapper (synchronize_ghosts): only after 1st and 2nd round, we can do it.
+        ! it may be that the second call after stage=2 is not required, but it is not expensive neither
+        if ( ANY(params%symmetry_BC) ) then
+            call sync_ghosts_symmetry_condition( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        endif
     end do ! loop over stages 1,2
 end subroutine synchronize_ghosts_generic_sequence
 
@@ -301,6 +311,8 @@ subroutine set_bounds_according_to_ghost_dominance_rules( params, bounds_type, e
     !    +1        |     3     |   recv is coarser: decimation
     !     0        |     4     |   historic fine exception [This case no longer exists if coarser wins]
     !--------------------------------------------------------------
+    ! TODO: the notation "round" is misleading: their actual order is given in "ROUNDS" array
+    ! coarseWwins : [3,2,1] = [decimation, copy, interpolation
 
     level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
     ! in what round in the extraction process will this neighborhood be unpacked?
@@ -564,7 +576,7 @@ end subroutine unpack_all_ghostlayers_currentRound_external_neighbor
 
 
 subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighbor_rank, istage_buffer, &
-    currentSortInRound, hvy_block )
+    currentSortInRound, hvy_block, hvy_neighbor )
     implicit none
 
     !> user defined parameter structure
@@ -574,6 +586,7 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
     integer(kind=ik), intent(in)        :: currentSortInRound
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
 
     integer(kind=ik) :: l, hvy_id_receiver, neighborhood, level_diff_indicator, entrySortInRound
     integer(kind=ik) :: sender_hvy_id, level_diff, bounds_type
@@ -601,6 +614,12 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
 
         ! write(*,*) "Me:", params%rank, "n:", neighbor_rank-1, l, sender_hvy_id
 
+        ! if (hvy_neighbor(hvy_id_receiver, inverse_neighbor(neighborhood,2)) == -1) then
+        !     write(*,*) sender_hvy_id, "to", hvy_id_receiver, neighborhood, ":", hvy_neighbor(hvy_id_receiver, :)
+        !     call abort(777191, "ricktastic")
+        ! endif
+
+
 
         ! check if this entry is processed in this round, otherwise cycle to next
         if (entrySortInRound /= currentSortInRound) then
@@ -624,7 +643,7 @@ subroutine unpack_all_ghostlayers_currentRound_internal_neighbor( params, neighb
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, ONLY_REDUNDANT, RECVER)
 
                 tmp_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc) = &
-                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2),ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver)
+                hvy_block( ijk1(1,1):ijk1(2,1), ijk1(1,2):ijk1(2,2), ijk1(1,3):ijk1(2,3), 1:nc, hvy_id_receiver)
 
                 ! ------- step (b) -------
                 ijk1 = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
@@ -1208,7 +1227,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
         ! loop over all neighbors
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists
-            if ( hvy_neighbor( sender_hvy_id, neighborhood ) /= -1 ) then
+            if ( hvy_neighbor( sender_hvy_id, neighborhood ) > 0 ) then
                 ! neighbor light data id
                 neighbor_lgt_id = hvy_neighbor( sender_hvy_id, neighborhood )
                 ! calculate neighbor rank

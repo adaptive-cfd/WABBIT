@@ -193,49 +193,49 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(1)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
+                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 1
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(2)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
+                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 2
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(3)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
+                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 3
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(4)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
+                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 4
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(5)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(5) )
+                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 5
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(6)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(6) )
+                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 6
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(7)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(7) )
+                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
 
                 ! sister 7
                 do i = 1, size(hvy_block,4)
                     call restriction_prefilter_3D( hvy_block(:,:,:,i,heavy_ids(8)), tmpblock(:,:,:,i), params%wavelet)
                 enddo
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(8) )
+                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
             endif
         endif
 

@@ -39,13 +39,10 @@ module module_time_step
 
 contains
 
-    ! time step
 #include "time_stepper.f90"
-#include "set_RK_input.f90"
 #include "RHS_wrapper.f90"
 #include "filter_wrapper.f90"
 #include "statistics_wrapper.f90"
-#include "final_stage_RK.f90"
 #include "krylov.f90"
 #include "calculate_time_step.f90"
 #include "runge_kutta_chebychev.f90"

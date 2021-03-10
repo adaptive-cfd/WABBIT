@@ -65,6 +65,9 @@ program main_post
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
 
+    case ("--OP")
+        call operator_reconstruction(params)
+
     case ("--prune-tree")
         call post_prune_tree(params)
 
@@ -131,6 +134,9 @@ program main_post
 
   case ("--POD")
     call post_POD(params)
+
+!case ("--filter")
+!    call post_filtertest(params)
 
   case ("--POD-reconstruct")
     call post_reconstruct(params)

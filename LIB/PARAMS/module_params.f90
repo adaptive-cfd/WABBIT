@@ -120,7 +120,7 @@ module module_params
         integer(kind=ik) :: N_mask_components = 0_ik
 
         ! block distribution for load balancing (also used for start distribution)
-        character(len=80)                            :: block_distribution=""
+        character(len=80)                            :: block_distribution="sfc_hilbert"
 
         ! -------------------------------------------------------------------------------------
         ! physics

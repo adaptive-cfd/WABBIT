@@ -133,9 +133,9 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         call threshold_block( params, block_mask, tmp_threshold(1:size(block_mask,4)), &
         refinement_status_mask, nnorm2(1:size(block_mask,4)), level, eps=1.0e-4_rk )
 
-        ! refinement_status_state: -1 refinemet_status_mask: -1 ==>  -1
-        ! refinement_status_state: 0  refinemet_status_mask: -1 ==>   0
-        ! refinement_status_state: 0  refinemet_status_mask: 0  ==>   0
+        ! refinement_status_state: -1 refinement_status_mask: -1 ==>  -1
+        ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0
+        ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
 
         refinement_status = max(refinement_status, refinement_status_mask)
     endif

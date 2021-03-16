@@ -121,7 +121,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         ! so: check again if this block is REALLY active (the active list is updated later)
         !
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
-        ! ensure_gradedness removes the -1 flag if not all sister blocks share it
+        ! ensure_gradedness removes the -1 flag and sets -7 (temporarily assigned above) flag if not all sister blocks share it
         if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+IDX_REFINE_STS) == -7) then
             ! merge the four blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)

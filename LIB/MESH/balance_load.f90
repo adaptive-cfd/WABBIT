@@ -143,6 +143,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
             end do
         endif
+
+    case default
+        call abort(210309, "The block_dist is unkown"//params%block_distribution)
+        
     end select
 
 

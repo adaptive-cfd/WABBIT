@@ -1,4 +1,4 @@
-!! \author   msr, engels
+!! \author  engels
 !
 !> \brief This routine performs the coarsing of the mesh, where possible. For the given mesh
 !! we compute the details-coefficients on all blocks. If four sister blocks have maximum
@@ -14,11 +14,6 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-!
-!> \details
-!! \date 10/11/16 - switch to v0.4
-!> \image html adapt_mesh.svg width=400
-
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
@@ -93,24 +88,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     end if
 
 
-    ! 2D case:
-    !       |          |         |
-    !   1   |    2     |    3    |  4
-    !       |          |         |
-    ! -----------------------------------
-    !       |                    |
-    !   5   |                    |  6
-    !       |                    |
-    ! ------|       my_rank      |-------
-    !       |                    |
-    !   7   |                    |  8
-    !       |                    |
-    ! -----------------------------------
-    !       |          |         |
-    !   9   |    10    |    11   |  12
-    !       |          |         |
-
-    ! To avoid that the incomming hvy_neighbor array and active lists are outdated
+    ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronice them.
     t0 = MPI_Wtime()
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &

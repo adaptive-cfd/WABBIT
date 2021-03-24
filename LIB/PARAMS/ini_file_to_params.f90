@@ -125,6 +125,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
     call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .false.)
     call read_param_mpi(FILE, 'Debug', 'ghost_nodes_redundant_point_coarseWins', params%ghost_nodes_redundant_point_coarseWins, .true.)
+    call read_param_mpi(FILE, 'Debug', 'iter_ghosts', params%iter_ghosts, .false.)
 
     !***************************************************************************
     ! read MPI parameters
@@ -149,6 +150,9 @@ subroutine ini_file_to_params( params, filename )
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
     if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+        call abort("ERROR: need more ghost nodes for given derivative order")
+    end if
+    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 

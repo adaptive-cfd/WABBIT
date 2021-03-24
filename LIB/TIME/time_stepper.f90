@@ -123,6 +123,17 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
         call RungeKuttaGeneric(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
+    case("RungeKuttaGeneric-FSI")
+        ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They
+        ! are applicable only for ACM module currently
+        call RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
+            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
+
+    case("RungeKuttaChebychev-FSI")
+        ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They 
+        ! are applicable only for ACM module currently
+        call RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
+            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
     case default
         call abort(19101816, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
 

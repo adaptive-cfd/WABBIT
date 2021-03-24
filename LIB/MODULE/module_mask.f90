@@ -14,7 +14,8 @@ contains
 
     subroutine create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
         hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, all_parts)
-
+        ! to test update insect here (HACK)
+        use module_ACM
         implicit none
 
         !> user defined parameter structure
@@ -55,6 +56,13 @@ contains
         ! HACK
         if (params%physics_type /= "ACM-new") return
 
+        ! HACK:
+        ! some mask functions have initialization routines (insects) which are to be called once and not for each
+        ! block (efficiency). Usually, this would be a staging concept as well, but as only Thomas uses it anyways, cleanup
+        ! is left as FIXME
+        if (params_acm%geometry=="Insect") then
+            call Update_Insect_wrapper(time)
+        endif
 
         if (params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
 

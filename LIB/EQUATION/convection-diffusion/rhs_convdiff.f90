@@ -202,7 +202,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
         if (params_convdiff%dim == 2) then
             ! create the advection velocity field, which may be time and space dependent
             u0 = 0.0_rk
-            call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i, phi(:,:,1,i) )
 
             select case(params_convdiff%discretization)
             case("FD_2nd_central")
@@ -389,13 +389,14 @@ end subroutine RHS_convdiff_new
 
 
 
-subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
+subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
     implicit none
     real(kind=rk), intent(in) :: time
     integer(kind=ik), intent(in) :: g, i
     integer(kind=ik), dimension(3), intent(in) :: Bs
     real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
     real(kind=rk), intent(inout) :: u0(:,:,:)
+    real(kind=rk), intent(in) :: u(:,:)
     ! note you cannot change these values without recomputing the coefficients
     real(kind=rk), parameter :: tau= 0.30_rk, t0=0.0_rk, t1=0.55_rk, t2=1.0_rk, u1=1.0_rk, u2=-1.2221975311385904
     real(kind=rk) :: u_this
@@ -412,6 +413,9 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
 
 
     select case(params_convdiff%velocity(i))
+    case ("nonlinear")
+        u0(:,:,1) = u
+
     case ("cyclogenesis")
         do iy = 1, Bs(2) + 2*g
             do ix = 1, Bs(1) + 2*g

@@ -45,7 +45,7 @@ module module_acm
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
-  INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA
+  INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -54,11 +54,13 @@ module module_acm
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta
+    logical :: use_free_flight_solver = .false.
+    real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
-    real(kind=rk) :: nu
+    real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     ! gamma_p
@@ -85,7 +87,7 @@ module module_acm
     logical :: set_mask_on_ghost_nodes = .false.
     logical :: absorbing_sponge = .true.
 
-    logical :: harten_multiresolution = .true.
+    logical :: harten_multiresolution = .true., read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
@@ -96,7 +98,7 @@ module module_acm
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
-    real(kind=rk) :: error(1:6)
+    real(kind=rk) :: error(1:6), start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
     real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
     ! we need to know which mpirank prints output..
@@ -110,14 +112,16 @@ module module_acm
 
   ! parameters for this module. they should not be seen outside this physics module
   ! in the rest of the code. WABBIT does not need to know them.
-  type(type_params_acm), save :: params_acm
+  ! HACK: made them public for FSI time stepper (18 Feb 2021)
+  type(type_params_acm), public, save :: params_acm
 
   ! all parameters for insects go here:
-  type(diptera), save :: insect
+  ! HACK: made them public for FSI time stepper (18 Feb 2021)
+  type(diptera), public, save :: insect
 
 contains
 
-#include "rhs.f90"
+#include "rhs_ACM.f90"
 #include "create_mask.f90"
 #include "inicond_ACM.f90"
 #include "sponge.f90"
@@ -166,13 +170,14 @@ end subroutine
     integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min
     character(len=80) :: Bs_str, Bs_conc
+    character(len=16834) :: input_files
+    character(len=12) :: timestamp
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx
     integer(kind=ik), intent(out) :: N_mask_components
 
-    ! inifile structure
     type(inifile) :: FILE
-    integer :: g, Neqn
+    integer :: g, Neqn, i
 
     N_mask_components = 0
 
@@ -215,6 +220,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'c_0', params_acm%c_0, 10.0_rk)
     ! viscosity
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
+    call read_param_mpi(FILE, 'ACM-new', 'nu_p', params_acm%nu_p, 0.0_rk)
     ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
@@ -225,6 +231,16 @@ end subroutine
 
     ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
+    ! the free flight FSI solver needs to know if it resumes a backup or not
+    call read_param_mpi(FILE, 'Physics', 'read_from_files', params_acm%read_from_files, .false.)
+    ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
+    if (params_acm%read_from_files) then
+        call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
+        timestamp = input_files( index(input_files,'_')+1:index(input_files,'.h5') )
+        read(timestamp,*) params_acm%start_time
+        ! note this requires to have timestamp in the filename (so we cannot rename files...)
+        params_acm%start_time = params_acm%start_time * 1.0e-6
+    endif
 
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
@@ -233,13 +249,12 @@ end subroutine
 
     ! used for wavelet filtering...
     call read_param_mpi(FILE, 'Wavelet', 'transform_type', params_acm%wavelet_transform_type, 'harten-multiresolution')
+    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params_acm%wavelet, 'CDF44')
+
     if (params_acm%wavelet_transform_type == 'harten-multiresolution') then
         params_acm%harten_multiresolution = .true.
-
     elseif (params_acm%wavelet_transform_type == 'biorthogonal') then
         params_acm%harten_multiresolution = .false.
-        call read_param_mpi(FILE, 'Wavelet', 'wavelet', params_acm%wavelet, 'CDF4,4')
-
     endif
 
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
@@ -253,7 +268,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
-        call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
+    call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )
@@ -266,6 +281,7 @@ end subroutine
     call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(dble(params_acm%dim)*pi**2) )
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
     call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params_acm%nsave_stats, 999999   )
+    call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
@@ -350,7 +366,7 @@ end subroutine
       write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
       write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       if (params_acm%penalization) then
-          write(*,'("C_eta=",g12.4," K_eta=",g12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+          write(*,'("C_eta=",es12.4," K_eta=",es12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       endif
       write(*,'("N_mask_components=",i1)') N_mask_components
       write(*,'("N_scalars=",i2)') params_acm%N_scalars
@@ -358,16 +374,19 @@ end subroutine
     endif
 
     ! if used, setup insect. Note fractal tree and active grid are part of the insects: they require the same init module
-    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree" .or. params_acm%geometry=="active_grid") then
+    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree" .or. params_acm%geometry=="active_grid" &
+    .or. params_acm%geometry=="cylinder-free".or. params_acm%geometry=="sphere-free") then
         ! when computing passive scalars, we require derivatives of the mask function, which
         ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
         ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
         ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
         ! to set the mask on all points of a block (incl ghost nodes)
         if (params_acm%set_mask_on_ghost_nodes) then
-            call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, N_ghost_nodes=0)
+            call insect_init( params_acm%start_time, filename, insect, params_acm%read_from_files, "", params_acm%domain_size, &
+            params_acm%nu, dx_min, N_ghost_nodes=0)
         else
-            call insect_init( 0.0_rk, filename, insect, .false., "", params_acm%domain_size, params_acm%nu, dx_min, N_ghost_nodes=g)
+            call insect_init( params_acm%start_time, filename, insect, params_acm%read_from_files, "", params_acm%domain_size, &
+            params_acm%nu, dx_min, N_ghost_nodes=g)
         endif
     endif
 
@@ -541,8 +560,11 @@ end subroutine
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)
       ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
-      call init_t_file('CFL.t', overwrite)
-      ! write(44,'(4(A15,1x))') "%          time","CFL","CFL_nu","CFL_eta"
+      call init_t_file('CFL.t', overwrite, (/&
+      "           time", &
+      "            CFL", &
+      "         CFL_nu", &
+      "        CFL_eta"/) )
       call init_t_file('moments.t', overwrite)
       call init_t_file('aero_power.t', overwrite)
       call init_t_file('forces_body.t', overwrite)
@@ -555,6 +577,8 @@ end subroutine
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)
+      call init_t_file('insect_state_vector.t', overwrite)
+      call init_t_file('forces_rk.t', overwrite)
 
       if (Insect%second_wing_pair) then
           call init_t_file('forces_leftwing2.t', overwrite)
@@ -637,5 +661,12 @@ end subroutine
       endif
 
   end subroutine INITIALIZE_ASCII_FILES_ACM
+
+  ! this tiny wrapper avoids us to use "module_insects" as public module in some places.
+  subroutine Update_Insect_wrapper(time)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      call Update_Insect(time, Insect)
+  end subroutine
 
 end module module_acm

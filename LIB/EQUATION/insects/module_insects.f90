@@ -14,7 +14,7 @@ module module_insects
   ! functions
   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, fractal_tree_init, &
   insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
-  aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_time_step, &
+  aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
   BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
   body_rotation_matrix, wing_right_rotation_matrix, wing_left_rotation_matrix, write_kinematics_file, &
   wing_right2_rotation_matrix, wing_left2_rotation_matrix
@@ -152,7 +152,7 @@ module module_insects
     ! moments of inertia in the body reference frame
     real(kind=rk) :: Jroll_body=0.d0, Jyaw_body=0.d0, Jpitch_body=0.d0
     ! total mass of insect:
-    real(kind=rk) :: mass, gravity=0.d0
+    real(kind=rk) :: mass, gravity=0.d0, gravity_y=0.d0, gravity_x=0.d0
     ! variables to decide whether to draw the body or not.
     character(len=strlen) :: body_moves="yes"
     character(len=strlen) :: BodySuperSTLfile="none.superstl"
@@ -163,7 +163,7 @@ module module_insects
     ! for free flight solver
     !-------------------------------------------------------------
     real(kind=rk) :: time=0.d0
-    real(kind=rk), dimension(1:20) :: RHS_old=0.d0, RHS_this=0.d0
+    real(kind=rk), allocatable :: RHS(:,:)
     real(kind=rk), dimension(1:20) :: STATE=0.d0
     ! STATE(1) : x-position of body
     ! STATE(2) : y-position of body
@@ -267,7 +267,7 @@ module module_insects
     ! parameters for wing shape:
     real(kind=rk) :: b_top=0.d0, b_bot=0.d0, L_span=0.d0, WingThickness=0.d0
     ! this is a safety distance for smoothing:
-    real(kind=rk) :: safety=0.d0, smooth=0.d0
+    real(kind=rk) :: safety=0.d0, smooth=0.d0, C_smooth=1.0d0
     ! parameter for hovering:
     real(kind=rk) :: distance_from_sponge=0.d0
     ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
@@ -474,7 +474,7 @@ contains
       ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
       ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
       if (Insect%smoothing_thickness=="local") then
-          Insect%smooth = 1.0d0*maxval(ddx)
+          Insect%smooth = Insect%C_smooth*maxval(ddx)
           Insect%safety = 3.5d0*Insect%smooth
       endif
 
@@ -1152,7 +1152,9 @@ contains
       !**********************************
       ! overwrite the left wings acceleration. the right hand side 18,19,20 is the
       ! time derivative of the angular velocity, so the acceleration is readily available
-      Insect%rot_dt_wing_l_w = Insect%RHS_THIS(18:20)
+      call abort(272729, "disables sth in wabbit here will not work out of the box")
+      !!!!!!!!! which rhs to use???
+     ! Insect%rot_dt_wing_l_w = Insect%RHS_THIS(18:20)
     endif
 
   end subroutine wing_angular_accel

@@ -18,7 +18,8 @@ module module_interpolation
 
     PRIVATE
 
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, restriction_prefilter_2D, restriction_prefilter_3D
+    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, &
+    restriction_prefilter_2D, restriction_prefilter_3D, restriction_prefilter_2D_vct, restriction_prefilter_3D_vct
 
 
 contains
@@ -33,15 +34,15 @@ contains
         integer(kind=ik), dimension(2) :: nfine, ncoarse
 
         ncoarse(1) = size(coarse,1)
-        nfine(1) = size(fine,1)
         ncoarse(2) = size(coarse,2)
-        nfine(2) = size(fine,2)
+        nfine(1)   = size(fine,1)
+        nfine(2)   = size(fine,2)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
             call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
-        coarse(:, :) = fine(1:nfine(1):2,1:nfine(2):2)
+        coarse(:, :) = fine(1:nfine(1):2, 1:nfine(2):2)
 
     end subroutine restriction_2D
 
@@ -51,15 +52,30 @@ contains
 
         real(kind=rk), dimension(1:,1:), intent(in) :: fine
         real(kind=rk), dimension(1:,1:), intent(out) :: fine_filtered2
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         real(kind=rk), dimension(1:size(fine,1),1:size(fine,2)) :: fine_filtered
-        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
-        real(kind=rk), allocatable, save :: HD(:)
 
         call restriction_lowPassFilter_2D_x(fine, fine_filtered, wavelet)
         call restriction_lowPassFilter_2D_y(fine_filtered, fine_filtered2, wavelet)
     end subroutine
 
+
+    ! takes full block (4D, ix,iy,iz,ieqn) even though nz=1
+    subroutine restriction_prefilter_2D_vct(fine, fine_filtered2, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: fine
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: fine_filtered2
+        character(len=*), intent(in) :: wavelet
+        integer(kind=ik) :: i, neqn
+        integer(kind=ik), parameter :: nz=1
+
+        neqn = size(fine,4)
+
+        do i = 1, neqn
+            call restriction_prefilter_2D(fine(:,:,nz,i), fine_filtered2(:,:,nz,i), wavelet)
+        enddo
+    end subroutine
 
 
     subroutine restriction_prefilter_3D(fine, fine_filtered2, wavelet)
@@ -67,10 +83,10 @@ contains
 
         real(kind=rk), dimension(1:,1:,1:), intent(in) :: fine
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: fine_filtered2
-        character(len=80), intent(in) :: wavelet
-        real(kind=rk), dimension(1:size(fine,1),1:size(fine,2),1:size(fine,3)) :: fine_filtered
-        real(kind=rk), allocatable, save :: HD(:)
-        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
+        character(len=*), intent(in) :: wavelet
+        real(kind=rk), allocatable, save :: fine_filtered(:,:,:)
+
+        if (.not.allocated(fine_filtered)) allocate(fine_filtered(1:size(fine,1),1:size(fine,2),1:size(fine,3)))
 
         call restriction_lowPassFilter_3D_x(fine, fine_filtered, wavelet)
         call restriction_lowPassFilter_3D_y(fine_filtered, fine_filtered2, wavelet)
@@ -79,6 +95,20 @@ contains
     end subroutine
 
 
+    subroutine restriction_prefilter_3D_vct(fine, fine_filtered2, wavelet)
+        implicit none
+
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: fine
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: fine_filtered2
+        character(len=*), intent(in) :: wavelet
+        integer(kind=ik) :: i, neqn
+
+        neqn = size(fine,3)
+        do i = 1, neqn
+            call restriction_prefilter_3D(fine(:,:,:,i), fine_filtered2(:,:,:,i), wavelet)
+        enddo
+
+    end subroutine
 
     ! periodic index
     ! uses one-based indexing
@@ -107,10 +137,10 @@ contains
         integer(kind=ik), dimension(3) :: nfine, ncoarse
 
         ncoarse(1) = size(coarse,1)
-        nfine(1) = size(fine,1)
         ncoarse(2) = size(coarse,2)
-        nfine(2) = size(fine,2)
         ncoarse(3) = size(coarse,3)
+        nfine(1) = size(fine,1)
+        nfine(2) = size(fine,2)
         nfine(3) = size(fine,3)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2) .or. 2*ncoarse(3)-1 /= nfine(3) ) then
@@ -138,8 +168,8 @@ contains
         real(kind=rk) :: a(4), b(2)
 
         nxcoarse = size(coarse, 1)
-        nxfine   = size(fine  , 1)
         nycoarse = size(coarse, 2)
+        nxfine   = size(fine  , 1)
         nyfine   = size(fine  , 2)
 
         if ( (2*nxcoarse-1 /= nxfine) .or. (2*nycoarse-1 /= nyfine)) then
@@ -187,20 +217,23 @@ contains
             ! step (a)
             ! first columns (x: const y: variable )
             ! these points require one-sided interpolation.
-            fine( 2, 1:nyfine:2 ) = a(1)*fine( 1, 1:nyfine:2 ) &
+            fine( 2, 1:nyfine:2 ) = &
+              a(1)*fine( 1, 1:nyfine:2 ) &
             + a(2)*fine( 3, 1:nyfine:2 ) &
             + a(3)*fine( 5, 1:nyfine:2 ) &
             + a(4)*fine( 7, 1:nyfine:2 )
 
-            ! last columns (same as above)
-            fine( nxfine-1, 1:nyfine:2 ) = a(4)*fine( nxfine-6, 1:nyfine:2 ) &
+            ! last column (same as above)
+            fine( nxfine-1, 1:nyfine:2 ) = &
+              a(4)*fine( nxfine-6, 1:nyfine:2 ) &
             + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
             + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
             + a(1)*fine( nxfine,   1:nyfine:2 )
 
             ! interpolate regular columns
             do ixfine =  4, nxfine-3, 2
-                fine( ixfine, 1:nyfine:2 ) = b(2)*fine( ixfine-3, 1:nyfine:2 ) &
+                fine( ixfine, 1:nyfine:2 ) = &
+                  b(2)*fine( ixfine-3, 1:nyfine:2 ) &
                 + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
                 + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
                 + b(2)*fine( ixfine+3, 1:nyfine:2 )
@@ -211,16 +244,18 @@ contains
             ! so from now on, no step size 2 anymore
 
             ! first row
-            ! these points requie one-sided interpolation.
+            ! these points require one-sided interpolation.
             fine( 1:nxfine, 2 ) = a(1)*fine( 1:nxfine, 1 ) &
             + a(2)*fine( 1:nxfine, 3 ) &
             + a(3)*fine( 1:nxfine, 5 ) &
             + a(4)*fine( 1:nxfine, 7 )
+
             ! last row (same as above)
             fine( 1:nxfine, nyfine-1 ) = a(4)*fine( 1:nxfine, nyfine-6) &
             + a(3)*fine( 1:nxfine, nyfine-4 ) &
             + a(2)*fine( 1:nxfine, nyfine-2 ) &
             + a(1)*fine( 1:nxfine, nyfine )
+
             ! remaining interior rows
             do iyfine =  4, nyfine-3, 2
                 fine( 1:nxfine, iyfine ) = b(2)*fine( 1:nxfine, iyfine-3 ) &
@@ -385,8 +420,9 @@ contains
 
     subroutine setup_CDF_lowPassFilters(wavelet, HD)
         implicit none
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         real(kind=rk), allocatable, intent(inout) :: HD(:)
+        integer(kind=ik) :: rank, mpierr
 
         ! initialize filter according to wavelet
         if (.not. allocated(HD)) then
@@ -394,27 +430,46 @@ contains
             case("CDF4,4", "CDF44")
                 ! H TILDE filter
                 allocate( HD(-6:6) )
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
-
+                HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
+                87.0_rk*2.0_rk**(-7.0_rk), &
+                9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
+                !         ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
+                !         ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
+                !         ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
+                !         !!!!!!!!!!!!!!!! HD  = HD*2.0_rk
             case ("CDF4,2","CDF42")
                 allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
+                HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
 
-            case ("CDF4,0","CDF40")
+            case ("CDF4,0", "CDF40", "CDF2,0", "CDF20")
                 allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
+                HD = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             case("CDF2,2", "CDF22")
                 ! H TILDE filter
                 allocate( HD(-2:2) )
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
+                HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
+
+            case ("dummy")
+                allocate( HD(-6:6) )
+                HD = 1.0_rk
 
             case default
                 call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
 
             end select
+        else
+            call abort(210315, "setup_CDF_lowPassFilters called on already allocated filter bank")
+        endif
+
+
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpierr)
+
+        if (rank==0) then
+            write(*,'(A)') "Setup of wavelet low-pass filters complete (you may see this message several times, once for each dimension)"
+            write(*,'(A)') trim(adjustl(wavelet))
+            write(*,'("HD(",i2,":",i2,")=")') lbound(HD, dim=1), ubound(HD, dim=1)
+            write(*,'(15(es12.4,1x))') HD
         endif
 
     end subroutine
@@ -426,47 +481,19 @@ contains
 
         real(kind=rk), dimension(1:,1:), intent(in) :: block_data
         real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
         real(kind=rk), allocatable, save :: HD(:)
-        real(kind=rk) :: block_tmp(1:size(block_data,1), 1:size(block_data,2))
 
         nx = size(block_data,1)
         ny = size(block_data,2)
 
         ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                ! H TILDE filter
-                allocate( HD(-6:6) )
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
-
-            case ("CDF4,2","CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
-
-            case ("CDF4,0","CDF40")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
-
-            case("CDF2,2", "CDF22")
-                ! H TILDE filter
-                allocate( HD(-2:2) )
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-            case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
+        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
 
         a = lbound(HD, dim=1)
         b = ubound(HD, dim=1)
 
-        ! block_data_filtered(:, :) = 0.0_rk
         block_data_filtered(:, :) = block_data
         block_data_filtered(-a+1:nx-b, :) = 0.0_rk
 
@@ -485,7 +512,7 @@ contains
 
         real(kind=rk), dimension(1:,1:), intent(in) :: block_data
         real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
         real(kind=rk), allocatable, save :: HD(:)
 
@@ -493,38 +520,11 @@ contains
         ny = size(block_data,2)
 
         ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                ! H TILDE filter
-                allocate( HD(-6:6) )
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
-
-            case ("CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
-
-            case ("CDF40")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
-
-            case("CDF2,2", "CDF22")
-                ! H TILDE filter
-                allocate( HD(-2:2) )
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-            case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
+        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
 
         a = lbound(HD, dim=1)
         b = ubound(HD, dim=1)
 
-        ! block_data_filtered(:, :) = 0.0_rk
         block_data_filtered(:, :) = block_data
         block_data_filtered(:, -a+1:ny-b) = 0.0_rk
 
@@ -544,7 +544,7 @@ contains
 
         real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         real(kind=rk), allocatable, save :: HD(:)
         integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
 
@@ -553,42 +553,11 @@ contains
         nz = size(block_data,3)
 
         ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                allocate( HD(-6:6) )
-
-                ! H TILDE filter ( from Sweldens 1996 paper)
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
-
-                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
-                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
-                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                ! HD  = HD*2.0d0
-            case ("CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
-
-            case ("CDF40")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
-
-            case("CDF2,2", "CDF22")
-                allocate( HD(-2:2) )  ! H TILDE
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-            case default
-                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
+        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
 
         a = lbound(HD, dim=1)
         b = ubound(HD, dim=1)
 
-        ! block_data_filtered(:, :, :) = 0.0_rk
         block_data_filtered(:, :, :) = block_data
         block_data_filtered(-a+1:nx-b, :, :) = 0.0_rk
 
@@ -606,7 +575,7 @@ contains
 
         real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         real(kind=rk), allocatable, save :: HD(:)
         integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
 
@@ -615,42 +584,11 @@ contains
         nz = size(block_data,3)
 
         ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                allocate( HD(-6:6) )
-
-                ! H TILDE filter ( from Sweldens 1996 paper)
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
-
-                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
-                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
-                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                ! HD  = HD*2.0d0
-            case ("CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
-
-            case ("CDF40")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
-
-            case("CDF2,2", "CDF22")
-                allocate( HD(-2:2) )  ! H TILDE
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-            case default
-                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
+        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
 
         a = lbound(HD, dim=1)
         b = ubound(HD, dim=1)
 
-        ! block_data_filtered(:, :, :) = 0.0_rk
         block_data_filtered(:, :, :) = block_data
         block_data_filtered(:, -a+1:ny-b, :) = 0.0_rk
 
@@ -668,7 +606,7 @@ contains
 
         real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
         real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=80), intent(in) :: wavelet
+        character(len=*), intent(in) :: wavelet
         real(kind=rk), allocatable, save :: HD(:)
         integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
 
@@ -677,42 +615,11 @@ contains
         nz = size(block_data,3)
 
         ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                allocate( HD(-6:6) )
-
-                ! H TILDE filter ( from Sweldens 1996 paper)
-                HD = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-                87.0d0*2.0d0**(-7.d0), &
-                9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! TILDE
-
-                ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
-                ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
-                ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                ! HD  = HD*2.0d0
-            case ("CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.d0**(-6.0d0), 0.0d0, -2.0d0**(-3.0d0), 2.0d0**(-2.0d0), 23.0d0*2**(-5.0d0), 2.0d0**(-2.0d0), -2.0d0**(-3.0d0), 0.0d0, 2.0d0**(-6.0d0) /)
-
-            case ("CDF40")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0d0, 1.0d0, 0.0d0 /)
-
-            case("CDF2,2", "CDF22")
-                allocate( HD(-2:2) )  ! H TILDE
-                HD =  (-1.0d0)*(/+1.0d0/8.0d0, -1.0d0/4.0d0, -3.0d0/4.0d0, -1.0d0/4.0d0, +1.0d0/8.0d0/) ! H TILDE
-
-            case default
-                call abort(0309192, "Unknown biorthogonal wavelet specified. Set course for adventure!")
-
-            end select
-        endif
+        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
 
         a = lbound(HD, dim=1)
         b = ubound(HD, dim=1)
 
-        ! block_data_filtered(:, :, :) = 0.0_rk
         block_data_filtered(:, :, :) = block_data
         block_data_filtered(:, :, -a+1:nz-b) = 0.0_rk
 

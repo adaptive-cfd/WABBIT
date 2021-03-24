@@ -22,7 +22,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     if (Insect%smoothing_thickness == "local") then
-        Insect%smooth = 1.50d0*maxval(ddx)
+        Insect%smooth = Insect%C_smooth*maxval(ddx)
         Insect%safety = 3.5d0*Insect%smooth
     endif
 

@@ -6,7 +6,7 @@ startup_conditioner.f90 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sp
 compute_vorticity_post.f90 compute_scalar_field_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90 \
 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_remesh.f90 \
-post_dump_neighbors.f90
+post_dump_neighbors.f90 # operator_reconstruction.f90 post_filtertest.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -160,6 +160,7 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 # compile precision module
 $(OBJDIR)/module_t_files.o: module_t_files.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
 $(OBJDIR)/module_precision.o: module_precision.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -231,7 +232,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR
 		$(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_params.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
+$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_t_files.o $(OBJDIR)/module_timing.o
@@ -271,11 +272,11 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	calculate_time_step.f90 time_stepper.f90 RHS_wrapper.f90	 \
 	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90 $(OBJDIR)/module_mask.o $(OBJDIR)/module_treelib.o \
-	runge_kutta_generic.f90 runge_kutta_chebychev.f90 $(OBJDIR)/module_t_files.o
+	runge_kutta_generic.f90 runge_kutta_generic_FSI.f90 runge_kutta_chebychev.f90 runge_kutta_chebychev_FSI.f90 $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o refinement_indicator.f90 block_coarsening_indicator.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_interpolation.o refinement_indicator.f90 block_coarsening_indicator.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o

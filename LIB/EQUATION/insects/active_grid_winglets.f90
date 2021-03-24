@@ -16,7 +16,7 @@ subroutine draw_active_grid_winglets(time, Insect, xx0, ddx, mask, mask_color, u
     integer(kind=2) :: color_val
     integer :: i
 
-    Insect%smooth = 1.0d0*maxval(ddx)
+    Insect%smooth = Insect%C_smooth*maxval(ddx)
     Insect%safety = 3.5d0*Insect%smooth
 
     ! color_val = 1

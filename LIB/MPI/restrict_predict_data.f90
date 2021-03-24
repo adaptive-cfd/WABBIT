@@ -56,19 +56,47 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     ! local variables
     integer(kind=ik)                                :: ix, iy, iz, dF
 
-    do dF = 1, size(hvy_block,4)
-        do iz = ijk(1,3), ijk(2,3), 2
-            do iy = ijk(1,2), ijk(2,2), 2
-                do ix = ijk(1,1), ijk(2,1), 2
+    real(kind=rk), allocatable:: tmp_block(:,:,:)
 
-                    ! write restricted (downsampled) data
-                    res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
-                    = hvy_block( ix, iy, iz, dF, hvy_id )
+    if (filter) then
+        allocate(tmp_block(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3)))
 
+        do dF = 1, size(hvy_block,4)
+            if (params%dim==2) then
+                call restriction_prefilter_2D(hvy_block(:,:,1,dF,hvy_id), tmp_block(:,:,1), params%wavelet)
+            else
+                call restriction_prefilter_3D(hvy_block(:,:,:,dF,hvy_id), tmp_block(:,:,:), params%wavelet)
+            endif
+
+            do iz = ijk(1,3), ijk(2,3), 2
+                do iy = ijk(1,2), ijk(2,2), 2
+                    do ix = ijk(1,1), ijk(2,1), 2
+
+                        ! write restricted (downsampled) data
+                        res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
+                        = tmp_block( ix, iy, iz )
+
+                    end do
                 end do
             end do
         end do
-    end do
+
+        deallocate(tmp_block)
+    else
+        do dF = 1, size(hvy_block,4)
+            do iz = ijk(1,3), ijk(2,3), 2
+                do iy = ijk(1,2), ijk(2,2), 2
+                    do ix = ijk(1,1), ijk(2,1), 2
+
+                        ! write restricted (downsampled) data
+                        res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
+                        = hvy_block( ix, iy, iz, dF, hvy_id )
+
+                    end do
+                end do
+            end do
+        end do
+    endif
 
 end subroutine restrict_data
 

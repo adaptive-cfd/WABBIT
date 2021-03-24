@@ -36,6 +36,11 @@ module module_MPI
     ! everything is save by default
     SAVE
 
+!!!!!!!!!!!!
+logical :: filter = .false.
+!!!!!!!!!!!!
+
+
     ! We require two stages: first, we fill all ghost nodes which are simple copy,
     ! then in the second stage we can use interpolation and fill the remaining ones.
     ! In order not to send ALL data in both stages, we allocate one buffer for each stage.

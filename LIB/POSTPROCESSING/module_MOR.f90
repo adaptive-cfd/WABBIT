@@ -320,7 +320,7 @@ contains
                          it, pod_mode_tree_id)
     enddo
     t_elapse = MPI_WTIME() - t_elapse
-    if ( rank == 0 ) write(*,'("Time Coefficient Mode ",i3," computed in t_cpu=" es12.4, "sec" )') &
+    if ( rank == 0 ) write(*,'("Time Coefficient Mode ",i3," computed in t_cpu=", es12.4, "sec" )') &
                     N_modes, t_elapse
 
   end do

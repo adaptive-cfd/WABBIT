@@ -15,13 +15,6 @@
 ! ********************************************************************************************
 
 subroutine read_field(fname, dF, params, hvy_block, hvy_n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> file name
@@ -49,11 +42,7 @@ subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
 
-
-    ! set MPI parameters
     rank = params%rank
-
-    ! grid parameter
     g    = params%n_ghosts
     Bs   = params%Bs
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))

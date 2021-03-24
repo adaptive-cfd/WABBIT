@@ -135,8 +135,8 @@ program main_post
   case ("--POD")
     call post_POD(params)
 
-!case ("--filter")
-!    call post_filtertest(params)
+case ("--filter")
+   call post_filtertest(params)
 
   case ("--POD-reconstruct")
     call post_reconstruct(params)

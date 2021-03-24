@@ -4,7 +4,7 @@
 ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
 ! Ghost nodes are assumed to be sync'ed.
 !-----------------------------------------------------------------------------
-subroutine filter_ACM( time, u, g, x0, dx, work_array )
+subroutine filter_ACM( time, u, g, x0, dx, work_array, mask )
   implicit none
   ! it may happen that some source terms have an explicit time-dependency
   ! therefore the general call has to pass time
@@ -22,8 +22,11 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
   ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
   real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-  ! output. Note assumed-shape arrays
+  ! work array. Note assumed-shape arrays
   real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
+
+  ! penalization mask function
+  real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
   ! local variables
   integer(kind=ik) :: i
@@ -116,79 +119,11 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array )
   case ("no_filter")
       ! do nothing (this routine should not be called if "no_filter" is set)
 
-
-  case ("wavelet_filter")
-      ! apply wavelet filter to all components of state vector
-      ! NOTE: this is a filter that removes all details.
-      do i = 1, size(u,4)
-          call wavelet_filter(u(:,:,:,i), Bs, g )
-      enddo
+  case default
+      call abort(772637,"unknown filter_type="//trim(adjustl(params_acm%filter_type)))
 
   end select
-
-
 end subroutine
-
-
-
-
-!=====================================================================
-!  WAVELET FILTER
-!=====================================================================
-subroutine wavelet_filter(block_data, Bs, g )
-    use module_interpolation
-
-    implicit none
-    !> heavy data array - block data
-    real(kind=rk), intent(inout) :: block_data(:, :, :)
-    !> mesh params
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    integer(kind=ik), intent(in) :: g
-    real(kind=rk), allocatable, save :: u3(:,:,:)
-    real(kind=rk), allocatable, save :: u2(:,:,:)
-
-
-    if (params_acm%dim == 3) then
-        ! ********** 3D **********
-        if (.not.allocated(u2)) allocate(u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ))
-        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,(Bs(3)+1)/2+g))
-
-        if (params_acm%harten_multiresolution) then
-            ! now, coarsen array u1 (restriction)
-            call restriction_3D( block_data, u3 )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_3D ( u3, block_data, params_acm%order_predictor )  ! coarse, fine
-        else
-            ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-            call restriction_prefilter_3D( block_data(:, :, :), u2(:,:,:), params_acm%wavelet )
-            ! now, coarsen array u1 (restriction)
-            call restriction_3D( u2, u3 )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_3D ( u3, block_data, params_acm%order_predictor )  ! coarse, fine
-        endif
-
-    else
-        ! ********** 2D **********
-        if (.not.allocated(u2)) allocate(u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ))
-        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,1))
-
-        if (params_acm%harten_multiresolution) then
-            ! now, coarsen array u1 (restriction)
-            call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_2D ( u3(:,:,1), block_data(:,:,1), params_acm%order_predictor )  ! coarse, fine
-        else
-            ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-            call restriction_prefilter_2D(block_data(:, :, 1), u2(:,:,1), params_acm%wavelet)
-            ! now, coarsen array u1 (restriction)
-            call restriction_2D( u2(:,:,1), u3(:,:,1) )  ! fine, coarse
-            ! then, re-interpolate to the initial level (prediciton)
-            call prediction_2D ( u3(:,:,1), block_data(:,:,1), params_acm%order_predictor )  ! coarse, fine
-        endif
-
-    end if
-
-end subroutine wavelet_filter
 
 
 
@@ -203,10 +138,6 @@ end subroutine wavelet_filter
 !! \date 27/03/17 - create
 !! \date 02/05/17 - return filtered value separatly
 subroutine filter_1D(phi, phi_tilde, a)
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     !> datafield
@@ -222,17 +153,8 @@ subroutine filter_1D(phi, phi_tilde, a)
     ! old values
     real(kind=rk)                       :: phi_old(size(phi,1))
 
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     phi_old   = phi
     phi_tilde = 0.0_rk
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! check filter stencil
     if ( size(phi) /= size(a) ) then

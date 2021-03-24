@@ -181,7 +181,7 @@ contains
 
     if (params_convdiff%dim == 2) then
         if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
-            call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+            call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1, u(:,:,1,1) )
         endif
     elseif (params_convdiff%dim == 3) then
         if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
@@ -260,7 +260,7 @@ contains
 
     do i = 1, params_convdiff%N_scalars
         if (params_convdiff%dim == 2) then
-            call create_velocity_field_2d( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            call create_velocity_field_2d( time, g, Bs, dx, x0, u0(:,:,1,1:2), i, u(:,:,1,1) )
             unorm = maxval( u0(:,:,1,1)*u0(:,:,1,1) + u0(:,:,1,2)*u0(:,:,1,2) )
         else
             call create_velocity_field_3d( time, g, Bs, dx, x0, u0, i )

@@ -5,6 +5,7 @@ subroutine operator_reconstruction(params)
     use module_IO
     use module_forest
     use module_mpi
+    use module_acm
     use module_bridge_interface, only : initialize_communicator
     use module_time_step, only: filter_wrapper
 
@@ -48,8 +49,6 @@ subroutine operator_reconstruction(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
-    params%wavelet = "CDF40" ! not used
-    params%wavelet_transform_type = "harten-multiresolution" ! not used
     params%max_treelevel = tc_length
     params%n_eqn = 2
     params%domain_size = domain
@@ -78,8 +77,12 @@ subroutine operator_reconstruction(params)
     ! params%order_discretization = "FD_2nd_central"
     ! params%order_predictor = "multiresolution_2nd"
 
-    params%order_discretization = "CDF44"!"FD_4th_central_optimized"
+    params%order_discretization = "FD_4th_central_optimized"
     params%order_predictor = "multiresolution_4th"
+    params%wavelet = "CDF44"
+    params%wavelet_transform_type = "biorthogonal"!"harten-multiresolution"
+
+    params%iter_ghosts = .true.
     !---------------------------------------------------------------------------
 
 
@@ -211,6 +214,18 @@ subroutine operator_reconstruction(params)
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+                params_acm%filter_type = "wavelet_filter"
+                params_acm%order_predictor = params%order_predictor
+                params_acm%wavelet = params%wavelet
+                params_acm%harten_multiresolution = params%harten_multiresolution
+                do k = 1, hvy_n
+                    call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                    call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+                    call filter_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), g, x0, dx, &
+                    hvy_block(:,:,:,:,hvy_active(k)), hvy_block(:,:,:,:,hvy_active(k)) )
+                end do
+
 
                 !---------------------------------------------------------------
                 ! Now compute the derivative
@@ -251,6 +266,11 @@ subroutine operator_reconstruction(params)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
 
                 do k = 1, hvy_n
                     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)

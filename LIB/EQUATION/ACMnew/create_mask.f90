@@ -47,6 +47,11 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! mask function and boundary values
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     select case (params_acm%geometry)
+    case ('sphere-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_free_sphere(x0, dx, Bs, g, mask )
+        endif
+
     case ('fractal_tree')
         !-----------------------------------------------------------------------
         ! FRACTAL TREE
@@ -80,9 +85,14 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
         !-----------------------------------------------------------------------
         ! the insects require us to determine their state vector before they can be drawn
         ! as this is to do only once, not for all blocks
-        if ( abs(time-Insect%time) >= 1.0e-13_rk) then
-            call Update_Insect(time, Insect)
-        endif
+        ! 18 Feb 2021: deactivated the call here because it is (more efficiently) done in module_mask.f90
+        ! This is important as for FSI problems the mask function at TIME may have to be recomputed even if we
+        ! already computed it at this time!! Think of RK substeps, where several RHS evaluations are to be done
+        ! at the same time level but with different input data. Hence, the check below is NOT sufficient in those
+        ! cases.
+        ! if (abs(time-Insect%time) >= 1.0e-13_rk) then
+        !     call Update_Insect(time, Insect)
+        ! endif
 
         select case(stage)
         case ("time-independent-part")
@@ -195,9 +205,19 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! Mask function and forcing values
     !---------------------------------------------------------------------------
     select case (params_acm%geometry)
+    case ('rotating-rod')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_rotating_rod( time, mask, x0, dx, Bs, g )
+        endif
+
     case ('cylinder')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             call draw_cylinder( mask, x0, dx, Bs, g )
+        endif
+
+    case ('cylinder-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_free_cylinder( mask, x0, dx, Bs, g )
         endif
 
     case ('rotating_cylinder')
@@ -300,6 +320,166 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     end do
 
 end subroutine draw_cylinder
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    params_acm%u_vert = Insect%STATE(5)
+    params_acm%z_vert = Insect%STATE(2)
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%z_vert
+        do ix = 1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5*params_acm%domain_size(1)
+            ! distance from center of cylinder
+            r = dsqrt(x*x + y*y)
+
+            tmp = smoothstep(r, params_acm%R_cyl, h)
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = params_acm%u_vert
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_free_cylinder
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_free_sphere(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx)
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - Insect%STATE(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - Insect%STATE(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - Insect%STATE(1)
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y + z*z)
+
+                mask(ix,iy,iz,1) = smoothstep(r, params_acm%R_cyl, h)
+                mask(ix,iy,iz,2) = Insect%STATE(4)
+                mask(ix,iy,iz,3) = Insect%STATE(5)
+                mask(ix,iy,iz,4) = Insect%STATE(6)
+                ! color
+                mask(ix,iy,iz,5) = 1.0_rk
+            end do
+        end do
+    end do
+
+end subroutine draw_free_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_cylinderz(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx)
+
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%domain_size(3)/2.0
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                mask(ix,iy,iz,1) = smoothstep(r, params_acm%R_cyl, h)
+                ! color
+                mask(ix,iy,iz,5) = 1.0_rk
+            end do
+        end do
+    end do
+
+end subroutine draw_cylinderz
 
 !-------------------------------------------------------------------------------
 
@@ -513,8 +693,6 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
             end if
         end do
     end do
-
-
 end subroutine draw_two_cylinders
 
 
@@ -765,3 +943,76 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
 
 
 end subroutine draw_2d_flapping_wings
+
+subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+
+    integer :: ix, iy, iz, mpicode
+    real (kind=rk) :: x2, y2, vx2, vy2, vx2t, vy2t, anglez2, omz2, omz2t, x00, y00
+    real (kind=rk) :: x, y, xref, yref, xlev, ylev, tmp, N, rref, rmax, hsmth, Am, alpham
+    real (kind=rk) :: Af, Sxf, Syf, Jf, forcex, forcey, torquez
+
+    ! reset everything
+    mask = 0.0_rk
+
+    N = Insect%C_smooth ! smoothing coefficient
+    hsmth = N*minval(dx) ! smoothing layer thickness
+    rmax = 0.5d0
+
+    x00 = params_acm%domain_size(1)/2.0_rk
+    y00 = params_acm%domain_size(2)/2.0_rk
+
+    ! Flapping parameters
+    Am = 1.00d0
+    alpham = 0.25d0*pi
+
+    ! Update kinematics
+    x2 = x00 + Am * dcos(time/Am)
+    y2 = y00
+    anglez2 = 0.5d0*pi + alpham * dsin(time/Am)
+    vx2 = - dsin(time/Am)
+    vy2 = 0.0d0
+    omz2 = alpham/Am * dcos(time/Am)
+    vx2t = - 1.0/Am * cos(time/Am)
+    vy2t = 0.0d0
+    omz2t = - alpham/Am**2 * sin(time/Am)
+
+    ! For all grid points of this subdomain
+    do iy = g+1, Bs(2)+g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - y2
+
+        do ix = g+1, Bs(1)+g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - x2
+
+            xref = x*dcos(anglez2) + y*dsin(anglez2)
+            yref = y*dcos(anglez2) - x*dsin(anglez2)
+            rref = dsqrt( xref**2 + 4.0d0**2 * yref**2 ) ! Radius in cylindrical coordinates
+
+            tmp = smoothstep(rref, rmax-0.0d0*hsmth, hsmth)
+            ! call SmoothStep (tmp, rref, rmax-0.0d0*hsmth, hsmth)
+
+
+            mask(ix,iy,1) = tmp
+            mask(ix,iy,2) = -omz2*y + vx2
+            mask(ix,iy,3) = +omz2*x + vy2
+            mask(ix,iy,4) = 0.0_rk
+            mask(ix,iy,5) = 1.0_rk
+
+        enddo
+    enddo
+
+
+end subroutine draw_rotating_rod

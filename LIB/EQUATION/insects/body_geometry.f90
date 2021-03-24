@@ -24,7 +24,7 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
     if (Insect%smoothing_thickness=="local" .or. .not. grid_time_dependent) then
-        Insect%smooth = 1.0d0*maxval(ddx)
+        Insect%smooth = Insect%C_smooth*maxval(ddx)
         Insect%safety = 3.5d0*Insect%smooth
     endif
 

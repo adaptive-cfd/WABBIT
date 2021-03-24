@@ -131,7 +131,7 @@ subroutine BodyMotion(time, Insect)
         psi_dt   = 0.d0
         !beta_dt  = - 15.d0  *pi/180.d0*sin(2.d0*pi*time)*2.d0*pi
         beta_dt  = ( - 5.39d0*sin(2.d0*pi*time) + 12.75d0*cos(2.d0*pi*time) )*2.d0*pi*pi/180.d0 ! Paratuposa #5
-        
+
         gamma_dt = 0.d0
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
@@ -214,10 +214,10 @@ subroutine BodyMotion(time, Insect)
         beta_dt  = 0.0d0
         gamma_dt = 0.0d0
 
-        if (Insect%wing_fsi /= "yes") then
-            ! output on screen
-            if(root) write(*,'("free--flight: ",f12.4,2x,9(es12.4,1x))') time, xc, vc, Insect%rot_body_b
-        endif
+        ! if (Insect%wing_fsi /= "yes") then
+        !     ! output on screen
+        !     if(root) write(*,'("free--flight: ",f12.4,2x,9(es12.4,1x))') time, xc, vc, Insect%rot_body_b
+        ! endif
 
     case default
         if (Insect%BodyMotion(1:11) == "from_file::") then

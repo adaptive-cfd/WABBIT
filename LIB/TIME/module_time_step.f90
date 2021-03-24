@@ -46,6 +46,8 @@ contains
 #include "krylov.f90"
 #include "calculate_time_step.f90"
 #include "runge_kutta_chebychev.f90"
+#include "runge_kutta_chebychev_FSI.f90"
 #include "runge_kutta_generic.f90"
+#include "runge_kutta_generic_FSI.f90"
 
 end module module_time_step

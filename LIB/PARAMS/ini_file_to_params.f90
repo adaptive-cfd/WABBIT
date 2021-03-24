@@ -140,16 +140,16 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%n_ghosts < 3) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%n_ghosts < 6) .and. (params%wavelet == 'CDF4,4') .and. (params%wavelet_transform_type == 'biorthogonal') ) then
+    if ( (params%n_ghosts < 6) .and. (params%wavelet == 'CDF44') .and. (params%wavelet_transform_type == 'biorthogonal') ) then
         call abort(050920194, "ERROR: for CDF44 wavelet, 6 ghost nodes are required")
     end if
     if ( (params%n_ghosts < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+    if ( (params%n_ghosts < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
     if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central') ) then

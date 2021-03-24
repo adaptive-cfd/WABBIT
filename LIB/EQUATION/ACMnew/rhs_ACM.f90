@@ -56,7 +56,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     ! local variables
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
+    integer(kind=2) :: color
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: RHS_ACM called but ACM not initialized"
 
@@ -83,6 +84,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         endif
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+
+        if (params_acm%use_free_flight_solver) then
+            ! reset forces, we compute their value now
+            params_acm%force_insect_g = 0.0_rk
+            params_acm%moment_insect_g = 0.0_rk
+        endif
 
     case ("integral_stage")
         !-------------------------------------------------------------------------
@@ -143,6 +150,75 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             endif ! NOTE: MPI_SUM is perfomed in the post_stage.
         endif
 
+
+        ! if (params_acm%geometry == "Insect".and. params_acm%use_free_flight_solver) then
+        if (params_acm%use_free_flight_solver) then
+            if (dim == 2) then
+                dV = dx(1)*dx(2)
+                C_eta_inv = 1.0_rk / params_acm%C_eta
+                f_block = 0.0_rk
+
+
+                do iy = g+1, Bs(2)+g-1
+                    y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
+                    do ix = g+1, Bs(1)+g-1
+                        x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+
+                        ! get this points color
+                        color = int( mask(ix, iy, 1, 5), kind=2 )
+
+                        ! exclude walls, trees, etc... (they have color 0)
+                        ! if (color>0_2 .and. color < 6_2) then
+                        ! penalization term
+                        penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
+
+                        f_block = f_block - penal
+                        f_block(3) = 0.0_rk
+
+                        ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+
+                        ! moments. For insects, we compute the total moment wrt to the body center
+                        ! params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
+                        ! endif
+                    enddo
+                enddo
+
+                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
+            else
+                dV = dx(1)*dx(2)*dx(3)
+                C_eta_inv = 1.0_rk / params_acm%C_eta
+                f_block = 0.0_rk
+
+                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+                    z = x0(3) + dble(iz-(g+1)) * dx(3) - Insect%xc_body_g(3) ! note: x-xc insect
+                    do iy = g+1, Bs(2)+g-1
+                        y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
+                        do ix = g+1, Bs(1)+g-1
+                            x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+
+                            ! get this points color
+                            color = int( mask(ix, iy, iz, 5), kind=2 )
+
+                            ! exclude walls, trees, etc... (they have color 0)
+                            ! if (color>0_2 .and. color < 6_2) then
+                                ! penalization term
+                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+
+                                f_block = f_block - penal
+
+                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+
+                                ! moments. For insects, we compute the total moment wrt to the body center
+                                params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
+                            ! endif
+                        enddo
+                    enddo
+                enddo
+                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
+            endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+
+        endif
+
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -154,8 +230,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         if (params_acm%use_HIT_linear_forcing) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
+        endif
+
+        if (params_acm%use_free_flight_solver) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         endif
 
     case ("local_stage")
@@ -242,17 +322,21 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p
     ! loop variables
     integer(kind=rk) :: ix, iy, idir
-    ! coefficients for Tam&Webb
-    real(kind=rk) :: a(-3:3)
-    real(kind=rk) :: b(-2:2)
+    ! coefficients for Tam&Webb (4th order 1st derivative)
+    real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    ! coefficients for a standard centered 4th order 1st derivative
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+    ! 4th order coefficients for second derivative
+    real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
 
     ! set parameters for readability
     c_0         = params_acm%c_0
     nu          = params_acm%nu
+    nu_p          = params_acm%nu_p
     eps         = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
@@ -267,14 +351,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
 
-    ! Tam & Webb, 4th order optimized (for first derivative)
-    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-
-    ! 4th order coefficients for second derivative
-    b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-
-
-    if (order_discretization == "FD_2nd_central" ) then
+    select case(order_discretization)
+    case ("FD_2nd_central")
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
@@ -307,27 +385,28 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
             end do
         end do
 
-    else if (order_discretization == "FD_4th_central_optimized") then
+    case("FD_4th_central_optimized")
         !-----------------------------------------------------------------------
-        ! 4th order
+        ! 4th order (Tam&web optimized scheme)
         !-----------------------------------------------------------------------
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
                 ! first derivatives of u, v, p
+                ! Note: a(0) does NOT appear (it is zero...)
                 u_dx = (a(-3)*phi(ix-3,iy,1) + a(-2)*phi(ix-2,iy,1) + a(-1)*phi(ix-1,iy,1) &
-                     +  a(0 )*phi(ix,iy,1) + a(+1)*phi(ix+1,iy,1) + a(+2)*phi(ix+2,iy,1) + a(+3)*phi(ix+3,iy,1))*dx_inv
+                     + a(+1)*phi(ix+1,iy,1) + a(+2)*phi(ix+2,iy,1) + a(+3)*phi(ix+3,iy,1))*dx_inv
                 u_dy = (a(-3)*phi(ix,iy-3,1) + a(-2)*phi(ix,iy-2,1) + a(-1)*phi(ix,iy-1,1) &
-                     +  a(0 )*phi(ix,iy,1) + a(+1)*phi(ix,iy+1,1) + a(+2)*phi(ix,iy+2,1) + a(+3)*phi(ix,iy+3,1))*dy_inv
+                     + a(+1)*phi(ix,iy+1,1) + a(+2)*phi(ix,iy+2,1) + a(+3)*phi(ix,iy+3,1))*dy_inv
 
                 v_dx = (a(-3)*phi(ix-3,iy,2) + a(-2)*phi(ix-2,iy,2) + a(-1)*phi(ix-1,iy,2) &
-                     +  a(0 )*phi(ix,iy,2) + a(+1)*phi(ix+1,iy,2) + a(+2)*phi(ix+2,iy,2) + a(+3)*phi(ix+3,iy,2))*dx_inv
+                     + a(+1)*phi(ix+1,iy,2) + a(+2)*phi(ix+2,iy,2) + a(+3)*phi(ix+3,iy,2))*dx_inv
                 v_dy = (a(-3)*phi(ix,iy-3,2) + a(-2)*phi(ix,iy-2,2) + a(-1)*phi(ix,iy-1,2) &
-                     +  a(0 )*phi(ix,iy,2) + a(+1)*phi(ix,iy+1,2) + a(+2)*phi(ix,iy+2,2) + a(+3)*phi(ix,iy+3,2))*dy_inv
+                     + a(+1)*phi(ix,iy+1,2) + a(+2)*phi(ix,iy+2,2) + a(+3)*phi(ix,iy+3,2))*dy_inv
 
                 p_dx = (a(-3)*phi(ix-3,iy,3) + a(-2)*phi(ix-2,iy,3) + a(-1)*phi(ix-1,iy,3) &
-                     +  a(0 )*phi(ix,iy,3) + a(+1)*phi(ix+1,iy,3) + a(+2)*phi(ix+2,iy,3) + a(+3)*phi(ix+3,iy,3))*dx_inv
+                     + a(+1)*phi(ix+1,iy,3) + a(+2)*phi(ix+2,iy,3) + a(+3)*phi(ix+3,iy,3))*dx_inv
                 p_dy = (a(-3)*phi(ix,iy-3,3) + a(-2)*phi(ix,iy-2,3) + a(-1)*phi(ix,iy-1,3) &
-                     +  a(0 )*phi(ix,iy,3) + a(+1)*phi(ix,iy+1,3) + a(+2)*phi(ix,iy+2,3) + a(+3)*phi(ix,iy+3,3))*dy_inv
+                     + a(+1)*phi(ix,iy+1,3) + a(+2)*phi(ix,iy+2,3) + a(+3)*phi(ix,iy+3,3))*dy_inv
 
                 ! second derivatives of u and v
                 u_dxdx = (b(-2)*phi(ix-2,iy,1) + b(-1)*phi(ix-1,iy,1) + b(0)*phi(ix,iy,1) &
@@ -340,6 +419,11 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 v_dydy = (b(-2)*phi(ix,iy-2,2) + b(-1)*phi(ix,iy-1,2) + b(0)*phi(ix,iy,2) &
                        +  b(+1)*phi(ix,iy+1,2) + b(+2)*phi(ix,iy+2,2))*dy2_inv
 
+                p_dxdx = (b(-2)*phi(ix-2,iy,3) + b(-1)*phi(ix-1,iy,3) + b(0)*phi(ix,iy,3) &
+                       +  b(+1)*phi(ix+1,iy,3) + b(+2)*phi(ix+2,iy,3))*dx2_inv
+                p_dydy = (b(-2)*phi(ix,iy-2,3) + b(-1)*phi(ix,iy-1,3) + b(0)*phi(ix,iy,3) &
+                       +  b(+1)*phi(ix,iy+1,3) + b(+2)*phi(ix,iy+2,3))*dy2_inv
+
                 div_U = u_dx + v_dy
 
                 penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
@@ -347,13 +431,57 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                 rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                 rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
-                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3) + nu_p*(p_dxdx + p_dydy)
             end do
         end do
 
-    else
+    case("FD_4th_central")
+        !-----------------------------------------------------------------------
+        ! 4th order (standard)
+        !-----------------------------------------------------------------------
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                ! first derivatives of u, v, p
+                ! Note: a(0) does NOT appear (it is zero...)
+                u_dx = (a_FD4(-2)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,1))*dx_inv
+                u_dy = (a_FD4(-2)*phi(ix,iy-2,1) + a_FD4(-1)*phi(ix,iy-1,1) + a_FD4(+1)*phi(ix,iy+1,1) + a_FD4(+2)*phi(ix,iy+2,1))*dy_inv
+
+                v_dx = (a_FD4(-2)*phi(ix-2,iy,2) + a_FD4(-1)*phi(ix-1,iy,2) + a_FD4(+1)*phi(ix+1,iy,2) + a_FD4(+2)*phi(ix+2,iy,2))*dx_inv
+                v_dy = (a_FD4(-2)*phi(ix,iy-2,2) + a_FD4(-1)*phi(ix,iy-1,2) + a_FD4(+1)*phi(ix,iy+1,2) + a_FD4(+2)*phi(ix,iy+2,2))*dy_inv
+
+                p_dx = (a_FD4(-2)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,3))*dx_inv
+                p_dy = (a_FD4(-2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,3))*dy_inv
+
+                ! second derivatives of u and v
+                u_dxdx = (b(-2)*phi(ix-2,iy,1) + b(-1)*phi(ix-1,iy,1) + b(0)*phi(ix,iy,1) &
+                       +  b(+1)*phi(ix+1,iy,1) + b(+2)*phi(ix+2,iy,1))*dx2_inv
+                u_dydy = (b(-2)*phi(ix,iy-2,1) + b(-1)*phi(ix,iy-1,1) + b(0)*phi(ix,iy,1) &
+                       +  b(+1)*phi(ix,iy+1,1) + b(+2)*phi(ix,iy+2,1))*dy2_inv
+
+                v_dxdx = (b(-2)*phi(ix-2,iy,2) + b(-1)*phi(ix-1,iy,2) + b(0)*phi(ix,iy,2) &
+                       +  b(+1)*phi(ix+1,iy,2) + b(+2)*phi(ix+2,iy,2))*dx2_inv
+                v_dydy = (b(-2)*phi(ix,iy-2,2) + b(-1)*phi(ix,iy-1,2) + b(0)*phi(ix,iy,2) &
+                       +  b(+1)*phi(ix,iy+1,2) + b(+2)*phi(ix,iy+2,2))*dy2_inv
+
+                p_dxdx = (b(-2)*phi(ix-2,iy,3) + b(-1)*phi(ix-1,iy,3) + b(0)*phi(ix,iy,3) &
+                       +  b(+1)*phi(ix+1,iy,3) + b(+2)*phi(ix+2,iy,3))*dx2_inv
+                p_dydy = (b(-2)*phi(ix,iy-2,3) + b(-1)*phi(ix,iy-1,3) + b(0)*phi(ix,iy,3) &
+                       +  b(+1)*phi(ix,iy+1,3) + b(+2)*phi(ix,iy+2,3))*dy2_inv
+
+                div_U = u_dx + v_dy
+
+                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3) + nu_p*(p_dxdx + p_dydy)
+            end do
+        end do
+
+    case default
         call abort(441166, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
-    end if
+    end select
 
 
     ! --------------------------------------------------------------------------
@@ -423,6 +551,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     integer(kind=rk) :: ix, iy, iz
     !> coefficients for Tam&Webb
     real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
     ! 4th order coefficients for second derivative
     real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
@@ -443,7 +572,8 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     eps_inv = 1.0_rk / eps
 
-    if (order_discretization == "FD_2nd_central" ) then
+    select case(order_discretization)
+    case("FD_2nd_central")
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
@@ -500,40 +630,108 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
             end do
         end do
 
-    else if (order_discretization == "FD_4th_central_optimized") then
+    case("FD_4th_central")
         !-----------------------------------------------------------------------
-        ! 4th order
+        ! 4th order (standard scheme)
         !-----------------------------------------------------------------------
+        ! Note: a(0) does NOT appear (it is zero...)
         do iz = g+1, Bs(3)+g
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
                     ! first derivatives of u, v, p
-                    u_dx = (a(-3)*phi(ix-3,iy,iz,1) + a(-2)*phi(ix-2,iy,iz,1) + a(-1)*phi(ix-1,iy,iz,1) + a(0)*phi(ix,iy,iz,1) &
+                    u_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,1))*dx_inv
+                    u_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1) +a_FD4(-1)*phi(ix,iy-1,iz,1) +a_FD4(+1)*phi(ix,iy+1,iz,1) +a_FD4(+2)*phi(ix,iy+2,iz,1))*dy_inv
+                    u_dz = (a_FD4(-2)*phi(ix,iy,iz-2,1) +a_FD4(-1)*phi(ix,iy,iz-1,1) +a_FD4(+1)*phi(ix,iy,iz+1,1) +a_FD4(+2)*phi(ix,iy,iz+2,1))*dz_inv
+
+                    v_dx = (a_FD4(-2)*phi(ix-2,iy,iz,2) +a_FD4(-1)*phi(ix-1,iy,iz,2) +a_FD4(+1)*phi(ix+1,iy,iz,2) +a_FD4(+2)*phi(ix+2,iy,iz,2))*dx_inv
+                    v_dy = (a_FD4(-2)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,2))*dy_inv
+                    v_dz = (a_FD4(-2)*phi(ix,iy,iz-2,2) +a_FD4(-1)*phi(ix,iy,iz-1,2) +a_FD4(+1)*phi(ix,iy,iz+1,2) +a_FD4(+2)*phi(ix,iy,iz+2,2))*dz_inv
+
+                    w_dx = (a_FD4(-2)*phi(ix-2,iy,iz,3) +a_FD4(-1)*phi(ix-1,iy,iz,3) +a_FD4(+1)*phi(ix+1,iy,iz,3) +a_FD4(+2)*phi(ix+2,iy,iz,3))*dx_inv
+                    w_dy = (a_FD4(-2)*phi(ix,iy-2,iz,3) +a_FD4(-1)*phi(ix,iy-1,iz,3) +a_FD4(+1)*phi(ix,iy+1,iz,3) +a_FD4(+2)*phi(ix,iy+2,iz,3))*dy_inv
+                    w_dz = (a_FD4(-2)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,3))*dz_inv
+
+                    p_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4) +a_FD4(-1)*phi(ix-1,iy,iz,4) +a_FD4(+1)*phi(ix+1,iy,iz,4) +a_FD4(+2)*phi(ix+2,iy,iz,4))*dx_inv
+                    p_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4) +a_FD4(-1)*phi(ix,iy-1,iz,4) +a_FD4(+1)*phi(ix,iy+1,iz,4) +a_FD4(+2)*phi(ix,iy+2,iz,4))*dy_inv
+                    p_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4) +a_FD4(-1)*phi(ix,iy,iz-1,4) +a_FD4(+1)*phi(ix,iy,iz+1,4) +a_FD4(+2)*phi(ix,iy,iz+2,4))*dz_inv
+
+                    ! second derivatives of u, v and w
+                    u_dxdx = (b(-2)*phi(ix-2,iy,iz,1) + b(-1)*phi(ix-1,iy,iz,1) + b(0)*phi(ix,iy,iz,1)&
+                           +  b(+1)*phi(ix+1,iy,iz,1) + b(+2)*phi(ix+2,iy,iz,1))*dx2_inv
+                    u_dydy = (b(-2)*phi(ix,iy-2,iz,1) + b(-1)*phi(ix,iy-1,iz,1) + b(0)*phi(ix,iy,iz,1)&
+                           +  b(+1)*phi(ix,iy+1,iz,1) + b(+2)*phi(ix,iy+2,iz,1))*dy2_inv
+                    u_dzdz = (b(-2)*phi(ix,iy,iz-2,1) + b(-1)*phi(ix,iy,iz-1,1) + b(0)*phi(ix,iy,iz,1)&
+                           +  b(+1)*phi(ix,iy,iz+1,1) + b(+2)*phi(ix,iy,iz+2,1))*dz2_inv
+
+                    v_dxdx = (b(-2)*phi(ix-2,iy,iz,2) + b(-1)*phi(ix-1,iy,iz,2) + b(0)*phi(ix,iy,iz,2)&
+                           +  b(+1)*phi(ix+1,iy,iz,2) + b(+2)*phi(ix+2,iy,iz,2))*dx2_inv
+                    v_dydy = (b(-2)*phi(ix,iy-2,iz,2) + b(-1)*phi(ix,iy-1,iz,2) + b(0)*phi(ix,iy,iz,2)&
+                           +  b(+1)*phi(ix,iy+1,iz,2) + b(+2)*phi(ix,iy+2,iz,2))*dy2_inv
+                    v_dzdz = (b(-2)*phi(ix,iy,iz-2,2) + b(-1)*phi(ix,iy,iz-1,2) + b(0)*phi(ix,iy,iz,2)&
+                           +  b(+1)*phi(ix,iy,iz+1,2) + b(+2)*phi(ix,iy,iz+2,2))*dz2_inv
+
+                    w_dxdx = (b(-2)*phi(ix-2,iy,iz,3) + b(-1)*phi(ix-1,iy,iz,3) + b(0)*phi(ix,iy,iz,3)&
+                           +  b(+1)*phi(ix+1,iy,iz,3) + b(+2)*phi(ix+2,iy,iz,3))*dx2_inv
+                    w_dydy = (b(-2)*phi(ix,iy-2,iz,3) + b(-1)*phi(ix,iy-1,iz,3) + b(0)*phi(ix,iy,iz,3)&
+                           +  b(+1)*phi(ix,iy+1,iz,3) + b(+2)*phi(ix,iy+2,iz,3))*dy2_inv
+                    w_dzdz = (b(-2)*phi(ix,iy,iz-2,3) + b(-1)*phi(ix,iy,iz-1,3) + b(0)*phi(ix,iy,iz,3)&
+                           +  b(+1)*phi(ix,iy,iz+1,3) + b(+2)*phi(ix,iy,iz+2,3))*dz2_inv
+
+                    div_U = u_dx + v_dy + w_dz
+
+                    u = phi(ix, iy, iz, 1)
+                    v = phi(ix, iy, iz, 2)
+                    w = phi(ix, iy, iz, 3)
+                    p = phi(ix, iy, iz, 4)
+
+                    chi = mask(ix,iy,iz,1) * eps_inv
+                    penalx = -chi * (u - mask(ix,iy,iz,2))
+                    penaly = -chi * (v - mask(ix,iy,iz,3))
+                    penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                    rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                    rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                    rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                    rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
+                end do
+            end do
+        end do
+
+    case("FD_4th_central_optimized")
+        !-----------------------------------------------------------------------
+        ! 4th order (tam&web optimized scheme)
+        !-----------------------------------------------------------------------
+        ! Note: a(0) does NOT appear (it is zero...)
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    u_dx = (a(-3)*phi(ix-3,iy,iz,1) + a(-2)*phi(ix-2,iy,iz,1) + a(-1)*phi(ix-1,iy,iz,1)  &
                          +  a(+1)*phi(ix+1,iy,iz,1) + a(+2)*phi(ix+2,iy,iz,1) + a(+3)*phi(ix+3,iy,iz,1))*dx_inv
-                    u_dy = (a(-3)*phi(ix,iy-3,iz,1) + a(-2)*phi(ix,iy-2,iz,1) + a(-1)*phi(ix,iy-1,iz,1) + a(0)*phi(ix,iy,iz,1) &
+                    u_dy = (a(-3)*phi(ix,iy-3,iz,1) + a(-2)*phi(ix,iy-2,iz,1) + a(-1)*phi(ix,iy-1,iz,1)  &
                          +  a(+1)*phi(ix,iy+1,iz,1) + a(+2)*phi(ix,iy+2,iz,1) + a(+3)*phi(ix,iy+3,iz,1))*dy_inv
-                    u_dz = (a(-3)*phi(ix,iy,iz-3,1) + a(-2)*phi(ix,iy,iz-2,1) + a(-1)*phi(ix,iy,iz-1,1) + a(0)*phi(ix,iy,iz,1) &
+                    u_dz = (a(-3)*phi(ix,iy,iz-3,1) + a(-2)*phi(ix,iy,iz-2,1) + a(-1)*phi(ix,iy,iz-1,1)  &
                          +  a(+1)*phi(ix,iy,iz+1,1) + a(+2)*phi(ix,iy,iz+2,1) + a(+3)*phi(ix,iy,iz+3,1))*dz_inv
 
-                    v_dx = (a(-3)*phi(ix-3,iy,iz,2) + a(-2)*phi(ix-2,iy,iz,2) + a(-1)*phi(ix-1,iy,iz,2) + a(0)*phi(ix,iy,iz,2) &
+                    v_dx = (a(-3)*phi(ix-3,iy,iz,2) + a(-2)*phi(ix-2,iy,iz,2) + a(-1)*phi(ix-1,iy,iz,2)  &
                          +  a(+1)*phi(ix+1,iy,iz,2) + a(+2)*phi(ix+2,iy,iz,2) + a(+3)*phi(ix+3,iy,iz,2))*dx_inv
-                    v_dy = (a(-3)*phi(ix,iy-3,iz,2) + a(-2)*phi(ix,iy-2,iz,2) + a(-1)*phi(ix,iy-1,iz,2) + a(0)*phi(ix,iy,iz,2) &
+                    v_dy = (a(-3)*phi(ix,iy-3,iz,2) + a(-2)*phi(ix,iy-2,iz,2) + a(-1)*phi(ix,iy-1,iz,2)  &
                          +  a(+1)*phi(ix,iy+1,iz,2) + a(+2)*phi(ix,iy+2,iz,2) + a(+3)*phi(ix,iy+3,iz,2))*dy_inv
-                    v_dz = (a(-3)*phi(ix,iy,iz-3,2) + a(-2)*phi(ix,iy,iz-2,2) + a(-1)*phi(ix,iy,iz-1,2) + a(0)*phi(ix,iy,iz,2) &
+                    v_dz = (a(-3)*phi(ix,iy,iz-3,2) + a(-2)*phi(ix,iy,iz-2,2) + a(-1)*phi(ix,iy,iz-1,2)  &
                          +  a(+1)*phi(ix,iy,iz+1,2) + a(+2)*phi(ix,iy,iz+2,2) + a(+3)*phi(ix,iy,iz+3,2))*dz_inv
 
-                    w_dx = (a(-3)*phi(ix-3,iy,iz,3) + a(-2)*phi(ix-2,iy,iz,3) + a(-1)*phi(ix-1,iy,iz,3) + a(0)*phi(ix,iy,iz,3) &
+                    w_dx = (a(-3)*phi(ix-3,iy,iz,3) + a(-2)*phi(ix-2,iy,iz,3) + a(-1)*phi(ix-1,iy,iz,3)  &
                          +  a(+1)*phi(ix+1,iy,iz,3) + a(+2)*phi(ix+2,iy,iz,3) + a(+3)*phi(ix+3,iy,iz,3))*dx_inv
-                    w_dy = (a(-3)*phi(ix,iy-3,iz,3) + a(-2)*phi(ix,iy-2,iz,3) + a(-1)*phi(ix,iy-1,iz,3) + a(0)*phi(ix,iy,iz,3) &
+                    w_dy = (a(-3)*phi(ix,iy-3,iz,3) + a(-2)*phi(ix,iy-2,iz,3) + a(-1)*phi(ix,iy-1,iz,3)  &
                          +  a(+1)*phi(ix,iy+1,iz,3) + a(+2)*phi(ix,iy+2,iz,3) + a(+3)*phi(ix,iy+3,iz,3))*dy_inv
-                    w_dz = (a(-3)*phi(ix,iy,iz-3,3) + a(-2)*phi(ix,iy,iz-2,3) + a(-1)*phi(ix,iy,iz-1,3) + a(0)*phi(ix,iy,iz,3) &
+                    w_dz = (a(-3)*phi(ix,iy,iz-3,3) + a(-2)*phi(ix,iy,iz-2,3) + a(-1)*phi(ix,iy,iz-1,3)  &
                          +  a(+1)*phi(ix,iy,iz+1,3) + a(+2)*phi(ix,iy,iz+2,3) + a(+3)*phi(ix,iy,iz+3,3))*dz_inv
 
-                    p_dx = (a(-3)*phi(ix-3,iy,iz,4) + a(-2)*phi(ix-2,iy,iz,4) + a(-1)*phi(ix-1,iy,iz,4) + a(0)*phi(ix,iy,iz,4) &
+                    p_dx = (a(-3)*phi(ix-3,iy,iz,4) + a(-2)*phi(ix-2,iy,iz,4) + a(-1)*phi(ix-1,iy,iz,4)  &
                          +  a(+1)*phi(ix+1,iy,iz,4) + a(+2)*phi(ix+2,iy,iz,4) + a(+3)*phi(ix+3,iy,iz,4))*dx_inv
-                    p_dy = (a(-3)*phi(ix,iy-3,iz,4) + a(-2)*phi(ix,iy-2,iz,4) + a(-1)*phi(ix,iy-1,iz,4) + a(0)*phi(ix,iy,iz,4) &
+                    p_dy = (a(-3)*phi(ix,iy-3,iz,4) + a(-2)*phi(ix,iy-2,iz,4) + a(-1)*phi(ix,iy-1,iz,4)  &
                          +  a(+1)*phi(ix,iy+1,iz,4) + a(+2)*phi(ix,iy+2,iz,4) + a(+3)*phi(ix,iy+3,iz,4))*dy_inv
-                    p_dz = (a(-3)*phi(ix,iy,iz-3,4) + a(-2)*phi(ix,iy,iz-2,4) + a(-1)*phi(ix,iy,iz-1,4) + a(0)*phi(ix,iy,iz,4) &
+                    p_dz = (a(-3)*phi(ix,iy,iz-3,4) + a(-2)*phi(ix,iy,iz-2,4) + a(-1)*phi(ix,iy,iz-1,4)  &
                          +  a(+1)*phi(ix,iy,iz+1,4) + a(+2)*phi(ix,iy,iz+2,4) + a(+3)*phi(ix,iy,iz+3,4))*dz_inv
 
 
@@ -579,9 +777,10 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
             end do
         end do
 
-    else
+    case default
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
-    end if
+
+    end select
 
     ! --------------------------------------------------------------------------
     ! HIT linear forcing
@@ -657,12 +856,14 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     !> coefficients for Tam&Webb
     real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+    ! 4th order coefficients for second derivative
+    real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
+
     real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux,uy,uz,&
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
-    ! 4th order coefficients for second derivative
-    real(kind=rk), parameter :: b(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: source(:,:,:)
@@ -679,10 +880,11 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     nu = params_acm%nu
 
-    if (order_discretization == "FD_2nd_central" ) then
+    select case(order_discretization)
+    case("FD_2nd_central")
         call abort(2208191, "passive scalar implemented only with 4th order....sorry, I am lazy")
 
-    else if (order_discretization == "FD_4th_central_optimized") then
+    case("FD_4th_central_optimized")
         !-----------------------------------------------------------------------
         ! 4th order
         !-----------------------------------------------------------------------
@@ -875,9 +1077,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
         end do ! loop over scalars
 
 
-    else
+    case default
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
-    end if
+    end select
 end subroutine RHS_3D_scalar
 
 

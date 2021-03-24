@@ -1,5 +1,5 @@
 subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask)
+    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp)
 
     implicit none
 
@@ -18,6 +18,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
+    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     !> list of active blocks (light data)
@@ -32,7 +33,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: effective_memory
-    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
+    integer(kind=ik)    :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
@@ -51,6 +52,12 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
+
+    if (present(neqn_hvy_tmp)) then
+        nwork = neqn_hvy_tmp
+    else
+        nwork = max(2*Neqn, params%N_fields_saved)
+    endif
 
     ! error catching (10 Sep 2020, Thomas)
     ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
@@ -74,9 +81,9 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
     ! Hence, nrhs_slots is number of slots for RHS saving:
-    if (params%time_step_method == "RungeKuttaGeneric") then
+    if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
         nrhs_slots = size(params%butcher_tableau,1)
-    elseif (params%time_step_method == "RungeKuttaChebychev") then
+    elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
         nrhs_slots = 6
     elseif (params%time_step_method == "Krylov") then
         nrhs_slots = params%M_krylov +3
@@ -86,7 +93,6 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
     endif
 
-    nwork = max( 2*Neqn, params%N_fields_saved)
 
     if (rank == 0) then
         write(*,'(80("_"))')
@@ -132,7 +138,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_work
@@ -153,7 +159,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_work
@@ -340,7 +346,7 @@ end subroutine allocate_tree
 !-------------------------------------------------------------------------------
 
 subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
+    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n, neqn_hvy_tmp)
     implicit none
 
     !> user defined parameter structure
@@ -361,6 +367,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     !> neighbor array (heavy data)
     integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
+    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp
     !> list of active blocks (light data)
     integer(kind=ik), allocatable, intent(out)          :: lgt_active(:,:)
     !> list of active blocks (light data)
@@ -391,6 +398,12 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
 
+    if (present(neqn_hvy_tmp)) then
+        nwork = neqn_hvy_tmp
+    else
+        nwork = max(2*Neqn, params%N_fields_saved)
+    endif
+
     ! error catching (10 Sep 2020, Thomas)
     ! check if params%number_blocks is identical on all mpiranks (was not always the case in postprocessing)
     allocate(blocks_per_mpirank(0:params%number_procs-1))
@@ -412,9 +425,9 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
     ! Hence, nrhs_slots is number of slots for RHS saving:
-    if (params%time_step_method == "RungeKuttaGeneric") then
+    if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
         nrhs_slots = size(params%butcher_tableau,1)
-    elseif (params%time_step_method == "RungeKuttaChebychev") then
+    elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
         nrhs_slots = 6
     elseif (params%time_step_method == "Krylov") then
         nrhs_slots = params%M_krylov +3
@@ -470,7 +483,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max( 2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
                     ! hvy_work
@@ -491,7 +504,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                     ! hvy_tmp
                     if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(max(2*Neqn, params%N_fields_saved)) * real((Bs(1)+2*g)*(Bs(2)+2*g))
+                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
                     endif
 
                     ! hvy_work

@@ -164,10 +164,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
     endif
-
-    ! HACK
-!    if (params%physics_type == "ACM-new" .and. size(norm,1)>1) norm(1:params%dim) = maxval(norm(1:params%dim))
-    ! write(*,*) "norm", norm
+    
     !---------------------------------------------------------------------------
     !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------

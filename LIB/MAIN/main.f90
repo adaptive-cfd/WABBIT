@@ -130,14 +130,10 @@ program main
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
     logical                             :: overwrite
 
-
     ! init time loop
     time          = 0.0_rk
     output_time   = 0.0_rk
     iteration     = 0
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! init mpi
     call MPI_Init(ierr)
@@ -361,8 +357,9 @@ program main
             if (params%filter_type /= "no_filter") then
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
                     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-
-                    call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+                    
+                    call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, hvy_active(:,tree_ID_flow), &
+                    hvy_n(tree_ID_flow), hvy_neighbor)
                 end if
             end if
             call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
@@ -433,10 +430,10 @@ program main
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=(",i6,"/",i6,") Jmin=",i2," Jmax=",i2)') &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=(",i6,"/",i6,") Jmin=",i2," Jmax=",i2, " dt=",es8.1)') &
              iteration, time, t2, Nblocks_rhs, Nblocks, &
              min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
-             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
+             max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), dt
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
@@ -503,7 +500,8 @@ program main
 
         ! filter before write out
         if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+            call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, hvy_active(:,tree_ID_flow), &
+            hvy_n(tree_ID_flow), hvy_neighbor)
         end if
 
         ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These

@@ -34,7 +34,7 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_vorticity, divergence, gradient, compute_Qcriterion, component_wise_tree_norm
+PUBLIC :: compute_vorticity, compute_vorticity_abs, divergence, gradient, compute_Qcriterion, component_wise_tree_norm
 
 
 contains
@@ -60,7 +60,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
     !> which norm to use ? "L2", "Linfty"
     character(len=*), intent(in) :: which_norm
     !> the computed norm for each component of the vector
-    real(kind=rk), intent(inout)   :: norm(:)
+    real(kind=rk), intent(inout) :: norm(:)
     real(kind=rk) :: x0(1:3), dx(1:3)
     integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g, p, mpierr, lgt_id, D, J
 

@@ -40,8 +40,7 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
     fld_dz = 0.0_rk
 
     ! Tam & Webb, 4th order optimized (for first derivative)
-    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-        0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
@@ -81,7 +80,7 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
                         + a(-1)*fld(ix,iy-1,iz) + a(0)*fld(ix,iy,iz)&
                         + a(+1)*fld(ix,iy+1,iz) + a(+2)*fld(ix,iy+2,iz) &
                         + a(+3)*fld(ix,iy+3,iz))*dy_inv
-                        
+
                         fld_dz = (a(-3)*fld(ix,iy,iz-3) + a(-2)*fld(ix,iy,iz-2) &
                         + a(-1)*fld(ix,iy,iz-1) + a(0)*fld(ix,iy,iz) &
                         + a(+1)*fld(ix,iy,iz+1) + a(+2)*fld(ix,iy,iz+2) &

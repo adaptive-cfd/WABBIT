@@ -1,6 +1,9 @@
 # WABBIT
 ## (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nteractions with (T)urbulence
 
+New in 05/2021: please see this video for an introduction to the code's datastructures: https://www.youtube.com/watch?v=qBBIW2-ktgo
+
+
 With WABBIT it is possible to solve partial differential equations on block-based adaptive grids. Calculations in 2D and 3D are possible and is performed fully parallel. As in WABBIT the set of PDE is encapsulated from the rest of the code the PDE implementation is similar to calculatoins with single domain code. Solvable PDEs are of type
 
 <a href="http://www.codecogs.com/eqnedit.php?latex=\partial_t&space;\phi&space;=&space;N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?\partial_t&space;\phi&space;=&space;N(\phi)" title="\partial_t \phi = N(\phi)" /></a>

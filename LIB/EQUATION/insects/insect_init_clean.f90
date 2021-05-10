@@ -313,8 +313,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     Insect%safety = 3.5d0*Insect%smooth
 
     ! position vector of the head
-    call read_param_mpi(PARAMS,"Insects","x_head",&
-    Insect%x_head, (/0.5d0*Insect%L_body,0.d0,0.d0 /) )
+    call read_param_mpi(PARAMS, "Insects", "x_head", Insect%x_head, (/0.5d0*Insect%L_body,0.d0,0.d0 /) )
 
     ! eyes
     defaultvec = Insect%x_head+sin(45.d0*pi/180.d0)*Insect%R_head*0.8d0*(/1.0d0,+1.0d0,1.0d0/)

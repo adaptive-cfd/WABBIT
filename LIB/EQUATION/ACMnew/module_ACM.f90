@@ -27,7 +27,7 @@ module module_acm
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
   use module_params, only : read_bs
-  use module_helpers, only : startup_conditioner, smoothstep, random_data
+  use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval
   use module_timing
 
   !---------------------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ module module_acm
     ! sponge term:
     logical :: use_sponge = .false.
     logical :: use_HIT_linear_forcing = .false.
-    real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0
+    real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0, C_smooth=1.5_rk
     character(len=80) :: eps_norm
     logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
 
@@ -91,7 +91,7 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
+    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor="", wingsection_inifile=""
     character(len=80) :: sponge_type=""
     character(len=80) :: coarsening_indicator="", wavelet="CDF4,0", wavelet_transform_type='harten-multiresolution'
     character(len=80), allocatable :: names(:)
@@ -128,6 +128,7 @@ contains
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
 #include "filter_ACM.f90"
+#include "2D_wingsection.f90"
 
 ! this routine is public, even though it is non-standard for all physics modules.
 ! it is used in "dry-run" mode, which we use to create insect mask functions without
@@ -265,10 +266,12 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
+    call read_param_mpi(FILE, 'VPM', 'wingsection_inifile', params_acm%wingsection_inifile, "none")
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
+    call read_param_mpi(FILE, 'VPM', 'C_smooth', params_acm%C_smooth, 1.5_rk )
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )

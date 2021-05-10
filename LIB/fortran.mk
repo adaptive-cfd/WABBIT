@@ -232,7 +232,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR
 		$(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_params.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
+$(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D_wingsection.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_t_files.o $(OBJDIR)/module_timing.o

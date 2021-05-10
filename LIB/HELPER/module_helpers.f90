@@ -86,30 +86,41 @@ contains
     ! at the time "time", return the function value "u" and its
     ! time derivative "u_dt". Uses assumed-shaped arrays, requires an interface.
     !-------------------------------------------------------------------------------
-    subroutine fseries_eval(time,u,u_dt,a0,ai,bi)
+    ! nfft=1 means we expect one value for each of ai,bi (and the constant a0)
+    ! The Fourier series evaluation in WABBIT/FLUSI is :
+    ! Q = a0_Q / 2 + ( a1_Q*sin(1*2*pi*t) + b1_Q*sin(1*2*pi*t) )
+    !              + ( a2_Q*sin(2*2*pi*t) + b2_Q*sin(2*2*pi*t) )
+    !              + ....
+    ! Note the unfortunate division of a0 by 2, which is an historic artifact.
+    !-------------------------------------------------------------------------------
+    subroutine fseries_eval(time, u, u_dt, a0, ai, bi)
         implicit none
 
         real(kind=rk), intent(in) :: a0, time
         real(kind=rk), intent(in), dimension(:) :: ai,bi
         real(kind=rk), intent(out) :: u, u_dt
-        real(kind=rk) :: c,s,f
+        real(kind=rk) :: c, s, f
         integer :: nfft, i
 
-        nfft=size(ai)
+        nfft = size(ai)
+        ! mean values
+        ! Note the unfortunate division of a0 by 2, which is an historic artifact.
+        u = 0.5_rk*a0
+        ! mean derivative of any periodic function is zero.
+        u_dt = 0.0_rk
 
-        ! frequency factor
-        f = 2.d0*pi
+        do i = 1, nfft
+            ! angular frequency of this mode
+            f = 2.0_rk * pi * real(i, kind=rk)
 
-        u = 0.5d0*a0
-        u_dt = 0.d0
+            s = sin(f*time)
+            c = cos(f*time)
 
-        do i=1,nfft
-            s = dsin(f*dble(i)*time)
-            c = dcos(f*dble(i)*time)
             ! function value
-            u    = u + ai(i)*c + bi(i)*s
-            ! derivative (in time)
-            u_dt = u_dt + f*dble(i)*(-ai(i)*s + bi(i)*c)
+            u = u + ai(i)*c + bi(i)*s
+
+            ! derivative value (in time)
+            u_dt = u_dt + f*(-ai(i)*s + bi(i)*c)
         enddo
     end subroutine fseries_eval
 

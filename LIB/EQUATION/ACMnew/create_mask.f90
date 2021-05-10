@@ -245,6 +245,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_cavity( mask, x0, dx, Bs, g )
         endif
 
+    case ('2D-wingsection')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_2d_wingsection( time, mask, x0, dx, Bs, g )
+        endif
+
     case ('none')
         mask = 0.0_rk
 

@@ -89,6 +89,7 @@ module module_params
         ! order of spatial discretization
         character(len=80)                            :: order_discretization=""
         character(len=80)                            :: coarsening_indicator="threshold-state-vector"
+        character(len=80)                            :: coarsening_indicator_inicond="threshold-state-vector"
         logical, allocatable                         :: threshold_state_vector_component(:)
         ! deside if WABBIT should start from input files
         logical                                       :: read_from_files

@@ -78,6 +78,19 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
     !! this status may be revoked later in the computation.
     select case (indicator)
+    case ("maxval-eps")
+        ! debug indicator (useful for grid generation tests)
+        ! coarsen a block if the maxval of its first component is smaller 0.9 (for passive scalars)
+        if (params%dim==2) then
+            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) ) <= 0.9_rk ) then
+                refinement_status = -1
+            endif
+        else
+            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) ) <= 0.9_rk ) then
+                refinement_status = -1
+            endif
+        endif
+
     case ("everywhere")
         ! simply coarsen the entire grid. Note that this means that adapt_mesh will coarsen down to Jmin
         ! if the iteration loop is on (you can bypass that behavior using external_loop=.true.)

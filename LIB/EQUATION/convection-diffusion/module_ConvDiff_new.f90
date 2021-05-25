@@ -20,6 +20,7 @@ module module_convdiff_new
   ! from a file.
   use module_ini_files_parser_mpi
   use mpi
+  use module_t_files
   !---------------------------------------------------------------------------------------------
   ! variables
 
@@ -32,14 +33,15 @@ module module_convdiff_new
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, INICOND_convdiff, FIELD_NAMES_convdiff
+  PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
+  INICOND_convdiff, FIELD_NAMES_convdiff, statistics_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094
-    real(kind=rk) :: domain_size(3)=0.0_rk
+    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=80), allocatable :: names(:), inicond(:), velocity(:)
@@ -55,6 +57,7 @@ module module_convdiff_new
 
 contains
 
+#include "statistics_convdiff.f90"
 #include "rhs_convdiff.f90"
 
   !-----------------------------------------------------------------------------

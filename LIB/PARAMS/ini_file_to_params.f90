@@ -282,6 +282,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "sfc_hilbert" )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
+    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator_inicond', params%coarsening_indicator_inicond, params%coarsening_indicator )
     call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
     call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
     call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )

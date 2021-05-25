@@ -221,12 +221,12 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
                         call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                         lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                        tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
+                        tree_ID_flow, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
                     enddo
                 else
                     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
                     lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-                    tree_ID_flow, params%coarsening_indicator, hvy_tmp )
+                    tree_ID_flow, params%coarsening_indicator_inicond, hvy_tmp )
                 endif
 
                 iter = iter + 1

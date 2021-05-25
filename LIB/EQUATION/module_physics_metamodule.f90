@@ -15,6 +15,7 @@ module module_physics_metamodule
     use module_ConvDiff_new
     use module_acm
     use module_navier_stokes
+    use module_t_files
 
     implicit none
 
@@ -383,8 +384,7 @@ contains
             call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs, mask )
 
         case ("ConvDiff-new")
-            ! not implemented yet.
-            !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
+            call STATISTICS_convdiff( time, dt, u, g, x0, dx, stage )
 
         case ("navier_stokes")
             call STATISTICS_NStokes( time, u, g, x0, dx, stage )
@@ -415,8 +415,7 @@ contains
             call INITIALIZE_ASCII_FILES_ACM( time, overwrite )
 
         case ("ConvDiff-new")
-            ! not implemented yet.
-            !  call INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
+            call init_t_file('scalar_integral.t', overwrite)
 
         case ("navier_stokes")
             call INITIALIZE_ASCII_FILES_NStokes( time, overwrite )

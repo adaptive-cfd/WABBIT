@@ -414,7 +414,7 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
 
     select case(params_convdiff%velocity(i))
     case ("nonlinear")
-        u0(:,:,1) = u
+        u0(:,:,1) = u+params_convdiff%u_const
 
     case ("cyclogenesis")
         do iy = 1, Bs(2) + 2*g

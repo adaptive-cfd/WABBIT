@@ -53,6 +53,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
     real(kind=rk), allocatable, save    :: u2(:,:,:), u3(:,:,:)
+    logical :: harten_multiresolution
 
     t0 = MPI_Wtime()
     Bs = params%Bs
@@ -60,6 +61,15 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     dim = params%dim
     Jmax = params%max_treelevel
     detail = -1.0_rk
+
+    select case(params%wavelet_transform_type)
+    case ("harten-multiresolution")
+        harten_multiresolution = .true.
+    case ("biorthogonal")
+        harten_multiresolution = .false.
+    case default
+        call abort(21052813, "params%wavelet_transform_type="//trim(adjustl(params%wavelet_transform_type))//" is not known!")
+    end select
 
     ! --------------------------- 3D -------------------------------------------
 
@@ -76,7 +86,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
             if (thresholding_component(dF)) then
                 if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
 
-                if (params%harten_multiresolution) then
+                if (harten_multiresolution) then
                     ! coarsen block data (restriction)
                     call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
                     ! then, re-interpolate to the initial level (prediciton)
@@ -138,7 +148,7 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                 if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
 
                 ! Harten multiresolution or biorthogonal?
-                if (params%harten_multiresolution) then
+                if (harten_multiresolution) then
                     ! coarsen block data (restriction)
                     call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
                     ! then, re-interpolate to the initial level (prediciton)

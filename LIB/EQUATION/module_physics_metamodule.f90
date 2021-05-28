@@ -322,16 +322,16 @@ contains
 
         select case(physics)
         case ("ACM-new")
-            call PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, thresholdfield_block, &
-                               N_thresholding_components)
+            call abort(2105289, "Thresholding of derived qtys not implemented for this module")
 
         case ("ConvDiff-new")
+            call abort(2105288, "Thresholding of derived qtys not implemented for this module")
 
         case ("navier_stokes")
             call PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, thresholdfield_block, &
                                N_thresholding_components)
         case default
-            call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+            call abort(2152000, "[PREPARE_THRESHOLDFIELD_meta.f90]: physics_type is unknown"//physics)
 
         end select
 

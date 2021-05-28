@@ -19,13 +19,13 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     t0 = MPI_wtime()
 
     ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-    if (params%harten_multiresolution) then
+    if (params%wavelet_transform_type == "harten-multiresolution") then
         filter = .false.
         call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
     else
         filter = .false.
         call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-        
+
         if (params%iter_ghosts) then
             filter = .true.
             call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )

@@ -75,8 +75,11 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:,:,:,:)
+    logical :: consider_hvy_tmp
 
-
+    ! in the default case we threshold all statevector components
+    N_thresholding_components = params%n_eqn
+    consider_hvy_tmp = .false.
     Jmax = params%max_treelevel
     neq = params%n_eqn
     Bs = params%Bs
@@ -88,6 +91,14 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
+    ! the indicator primary-variables is for compressible Navier-Stokes and first
+    ! converts the actual state vector to "traditional" quantities (the primary variables)
+    ! and then applies thresholding to that. The result is stored in hvy_tmp
+    ! and hence we use this for thresholding
+    if ( indicator == "primary-variables" ) then
+        consider_hvy_tmp = .true.
+    endif
+
     !---------------------------------------------------------------------------
     !> Preparation for thresholding (if required)
     !---------------------------------------------------------------------------
@@ -98,10 +109,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !! block_coarsening_indicator, where it should be. but after computing it, we have to
     !! sync its ghost nodes in order to apply the detail operator to the entire
     !! derived field (incl gost nodes).
-    if (params%coarsening_indicator /= "threshold-state-vector") then
+    if (consider_hvy_tmp) then
         ! case with derived quantities.
-
-        ! loop over my active hvy data
+        ! loop over my active hvy data:
         do k = 1, hvy_n
             hvy_id = hvy_active(k)
 
@@ -122,17 +132,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
         if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
         call abort(2801191,"your thresholding does not work with threshold-mask.")
-
-    else
-        ! case without derived quantities. NOTE: while it would be nicer to have
-        ! PREPARE_THRESHOLDFIELD_meta simply copy the relevant components to HVY_TMP,
-        ! this overhead slows down the code and must be avoided.
-
-        ! in the default case we threshold all statevector components
-        N_thresholding_components = params%n_eqn
     endif
 
-    if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
 
 
     !---------------------------------------------------------------------------
@@ -145,32 +146,77 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
+    if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
     norm = 1.0_rk
 
-    if ( params%eps_normalized ) then
-        if ( params%coarsening_indicator == "threshold-state-vector" ) then
-            ! Apply thresholding directly to the statevector, not to derived quantities
+    ! if we coarsen randomly or everywhere, well, why compute the norm ?
+    if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
+        if ( .not. consider_hvy_tmp ) then
+            ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
             call component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, params%eps_norm, norm)
         else
-            ! use derived qtys instead
+            ! use derived qtys instead (hvy_tmp)
             call component_wise_tree_norm(params, lgt_block, hvy_tmp, hvy_active, hvy_n, params%eps_norm, norm)
         endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
         do p = 1, N_thresholding_components
-            if (norm(p) <= 1.0e-9) norm(p) = 1.0_rk
+            if (norm(p) <= 1.0e-9_rk) norm(p) = 1.0_rk
         enddo
 
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
     endif
-    
+
     !---------------------------------------------------------------------------
     !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------
     ! the indicator "random" requires special treatment below (it does not pass via
     ! block_coarsening_indicator)
-    if (indicator /= "random") then
+    select case(indicator)
+    case ("everywhere")
+        ! coarsen all blocks. Note: it is not always possible (with any grid) to do that!
+        ! The flag may be removed again (completeness, Jmin, gradedness)...
+        ! Done only in the first iteration of grid adaptation,
+        ! because otherwise, the grid would continue changing, and the coarsening
+        ! stops only if all blocks are at Jmin.
+        if (iteration==0) then
+            do k = 1, lgt_n
+                ! flag for coarsening
+                lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS) = -1
+            enddo
+        endif
+
+    case ("random")
+        ! random coarsening. Done only in the first iteration of grid adaptation,
+        ! because otherwise, the grid would continue changing, and the coarsening
+        ! stops only if all blocks are at Jmin.
+        if (iteration==0) then
+            ! set random seed
+            call init_random_seed()
+            ! only root tags blocks (can be messy otherwise)
+            if (params%rank == 0) then
+                tags = 0
+                ! the chance for coarsening: (note to coarsen, all 4 or 8 sisters need to have this status,
+                ! hence the probability for a block to actually coarsen is only crsn_chance**(2^D))
+                crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
+
+                do k = 1, lgt_n
+                    lgt_id = lgt_active(k)
+                    ! random number
+                    call random_number(r)
+                    ! set refinement status to coarsen based on random numbers.
+                    if ( r <= crsn_chance ) then
+                        lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                        tags = tags + 1
+                    endif
+                enddo
+            endif
+            ! sync light data, as only root sets random refinement
+            call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
+        endif
+
+    case default
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.
@@ -211,35 +257,8 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
             enddo
         endif
-    else
-        ! random coarsening. Done only in the first iteration of grid adaptation,
-        ! because otherwise, the grid would continue changing, and the coarsening
-        ! stops only if all blocks are at Jmin.
-        if (iteration==0) then
-            ! set random seed
-            call init_random_seed()
-            ! only root tags blocks (can be messy otherwise)
-            if (params%rank == 0) then
-                tags = 0
-                ! the chance for coarsening: (note to coarsen, all 4 or 8 sisters need to have this status,
-                ! hence the probability for a block to actually coarsen is only crsn_chance**(2^D))
-                crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
+    end select
 
-                do k = 1, lgt_n
-                    lgt_id = lgt_active(k)
-                    ! random number
-                    call random_number(r)
-                    ! set refinement status to coarsen based on random numbers.
-                    if ( r <= crsn_chance ) then
-                        lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
-                        tags = tags + 1
-                    endif
-                enddo
-            endif
-            ! sync light data, as only root sets random refinement
-            call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
-        endif
-    endif
 
 
 

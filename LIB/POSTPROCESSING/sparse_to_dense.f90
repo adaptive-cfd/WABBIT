@@ -37,6 +37,7 @@ subroutine sparse_to_dense(params)
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
+    character(len=80)                       :: operator
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks
@@ -66,6 +67,8 @@ subroutine sparse_to_dense(params)
         return
     end if
 
+
+
     ! get values from command line (filename and level for interpolation)
     call check_file_exists(trim(file_in))
     call read_attributes(file_in, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
@@ -85,14 +88,27 @@ subroutine sparse_to_dense(params)
       call get_command_argument(5, order)
     endif
 
+    write(*,*) "order=", order
+
+    call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
+
     if (order == "4") then
-        params%harten_multiresolution = .true.
+        params%wavelet_transform_type = 'harten-multiresolution'
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
+        params%wavelet = "CDF4,0"
+        params%wavelet_transform_type = "harten-multiresolution"
+    elseif (order == "44") then
+        params%wavelet_transform_type = 'harten-multiresolution'
+        params%order_predictor = "multiresolution_4th"
+        params%n_ghosts = 6_ik
+        params%wavelet = "CDF4,4"
+        params%wavelet_transform_type = "biorthogonal"
     elseif (order == "2") then
-        params%harten_multiresolution = .true.
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
+        params%wavelet = "CDF2,0"
+        params%wavelet_transform_type = "harten-multiresolution"
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
@@ -169,8 +185,32 @@ subroutine sparse_to_dense(params)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
-    call to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    if (operator=="sparse-to-dense") then
+        call to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, target_level=level)
+
+    elseif (operator=="refine-coarsen") then
+        write(*,*) "starting at", lgt_n
+
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_flow )
+
+        write(*,*) "refined to", lgt_n
+
+        params%threshold_mask = .false.
+        params%coarsening_indicator = "threshold-state-vector"
+        params%physics_type = "ConvDiff-new"
+        params%ghost_nodes_redundant_point_coarseWins = .false.
+        params%iter_ghosts = .false.
+        params%eps_normalized = .false.
+        params%force_maxlevel_dealiasing = .false.
+        params%min_treelevel = 1
+
+        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp )
+
+        write(*,*) "coarsened to", lgt_n
+    endif
 
     call write_field(file_out, time, iteration, 1, params, lgt_block, &
         hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)

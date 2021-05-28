@@ -40,7 +40,7 @@ module module_convdiff_new
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
-    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094
+    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk
     real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
@@ -104,6 +104,8 @@ contains
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
@@ -333,6 +335,36 @@ contains
       select case (params_convdiff%inicond(i))
       case ("zero")
           u(:,:,:,i) = 0.0_rk
+
+      case ("sin")
+          if (params_convdiff%dim==2) then
+              do ix = 1, Bs(1)+2*g
+                  do iy = 1, Bs(2)+2*g
+                      ! compute x,y coordinates from spacing and origin
+                      x = dble(ix-(g+1)) * dx(1) + x0(1)
+                      y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                      u(ix,iy,:,i) = sin(2.0_rk*pi*x)
+                  end do
+              end do
+          else
+              call abort(66273,"this inicond is 2d only..")
+          endif
+
+      case ("sin+1")
+          if (params_convdiff%dim==2) then
+              do ix = 1, Bs(1)+2*g
+                  do iy = 1, Bs(2)+2*g
+                      ! compute x,y coordinates from spacing and origin
+                      x = dble(ix-(g+1)) * dx(1) + x0(1)
+                      y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                      u(ix,iy,:,i) = sin(2.0_rk*pi*x) + 1.0_rk
+                  end do
+              end do
+          else
+              call abort(66273,"this inicond is 2d only..")
+          endif
 
       case ("cyclogenesis")
           if (params_convdiff%dim==2) then

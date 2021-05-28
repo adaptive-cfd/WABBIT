@@ -74,7 +74,6 @@ subroutine post_add_two_masks(params)
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn)=.True.
-    params%harten_multiresolution = .false.
     params%wavelet_transform_type = 'biorthogonal'
     params%order_predictor = "multiresolution_4th"
     params%wavelet='CDF4,4'

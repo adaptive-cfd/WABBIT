@@ -173,12 +173,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         if (present(external_loop)) then
             if (external_loop) exit ! exit loop
         endif
-
-        ! if the indicator is everywhere, we need to exit the loop here, because otherwise
-        ! adapt_mesh won't stop before all blocks are on params%min_treelevel
-        if (indicator == "everywhere") then
-            exit ! exit loop
-        endif
     end do
 
     ! The grid adaptation is done now, the blocks that can be coarsened are coarser.

@@ -108,14 +108,8 @@ subroutine ini_file_to_params( params, filename )
     ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
     ! prior to downsampling.
     call read_param_mpi(FILE, 'Wavelet', 'transform_type', params%wavelet_transform_type, 'harten-multiresolution')
-    if (params%wavelet_transform_type == 'harten-multiresolution') then
-        params%harten_multiresolution = .true.
+    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
 
-    elseif (params%wavelet_transform_type == 'biorthogonal') then
-        params%harten_multiresolution = .false.
-        call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
-
-    endif
 
     !***************************************************************************
     ! read DEBUG parameters

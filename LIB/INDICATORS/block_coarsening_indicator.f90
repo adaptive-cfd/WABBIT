@@ -72,8 +72,6 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
     Bs = params%Bs
     g = params%n_ghosts
 
-
-
     !> This routine sets the -1 coarsening flag on a block. it uses different methods to
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
     !! this status may be revoked later in the computation.
@@ -90,11 +88,6 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
                 refinement_status = -1
             endif
         endif
-
-    case ("everywhere")
-        ! simply coarsen the entire grid. Note that this means that adapt_mesh will coarsen down to Jmin
-        ! if the iteration loop is on (you can bypass that behavior using external_loop=.true.)
-        refinement_status = -1
 
     case ("mask-allzero-noghosts")
         if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
@@ -115,13 +108,6 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
 
         thresholding_component = params%threshold_state_vector_component
         call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level )
-
-    case ("random")
-        !! randomly coarse some blocks. used for testing. note we tag for coarsening
-        !! only once in the first iteration. this is important: as adapt_mesh is an iterative
-        !! routine that calls the coarsening until the grid does not change anymore. without
-        !! the iteration==0 check, it will always keep on coarsening.
-        call abort(77777,"This function has been moved to grid_coarsening_indicator.f90 and should not be called")
 
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))

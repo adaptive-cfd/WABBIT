@@ -122,7 +122,7 @@ subroutine performance_test(params)
                 ! actual coarsening
                 call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
                 lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-                hvy_n(tree_ID_flow), tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+                hvy_n(tree_ID_flow), tree_ID_flow, "everywhere", hvy_tmp )
             endif
             call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
             Nblocks = lgt_n(tree_ID_flow)

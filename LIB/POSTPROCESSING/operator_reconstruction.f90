@@ -216,8 +216,7 @@ subroutine operator_reconstruction(params)
 
                 params_acm%filter_type = "wavelet_filter"
                 params_acm%order_predictor = params%order_predictor
-                params_acm%wavelet = params%wavelet
-                params_acm%harten_multiresolution = params%harten_multiresolution
+                
                 do k = 1, hvy_n
                     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )

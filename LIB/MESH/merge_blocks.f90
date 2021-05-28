@@ -45,6 +45,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
 
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id, N
     integer(kind=ik), dimension(3) ::  bound1, bound2, boundm, Bs
+    logical :: harten_multiresolution
 
     ! number of blocks to be merged
     N_merge = size(lgt_blocks_to_merge,1)
@@ -54,6 +55,15 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     ! level of merged block
     level = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_MESH_LVL )
     tree_id = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_TREE_ID )
+
+    select case(params%wavelet_transform_type)
+    case ("harten-multiresolution")
+        harten_multiresolution = .true.
+    case ("biorthogonal")
+        harten_multiresolution = .false.
+    case default
+        call abort(2105281, "params%wavelet_transform_type="//trim(adjustl(params%wavelet_transform_type))//" is not known!")
+    end select
 
     if ( N_merge /= 4 .and. N_merge /= 8) then
         call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
@@ -129,7 +139,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
 
         if (N_merge == 4) then
             ! ************ 2D case ***********************
-            if (params%harten_multiresolution) then
+            if (harten_multiresolution) then
                 ! hartens multiresolution: coarsening is just taking every 2nd grid point.
 
                 ! sister 0
@@ -163,7 +173,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
 
         elseif (N_merge == 8) then
             ! ************ 3D case ***********************
-            if (params%harten_multiresolution) then
+            if (harten_multiresolution) then
                 ! sister 0
                 hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
                 ! sister 1

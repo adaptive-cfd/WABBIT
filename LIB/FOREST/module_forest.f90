@@ -1058,7 +1058,7 @@ contains
         character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
         integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
-        logical :: MR
+        character(len=80) :: MR
         Jmax = params%max_treelevel ! max treelevel
         fsize= params%forest_size   ! maximal number of trees in forest
         N    = params%number_blocks ! number of blocks per rank
@@ -1560,8 +1560,9 @@ contains
 
         !!! Attention we should not use prefilter of CDF44 wavelets here. Because
         !!! it will change the original data!!!
-        MR = params%harten_multiresolution
-        params%harten_multiresolution = .True.
+        MR = params%wavelet_transform_type
+        params%wavelet_transform_type = "harten-multiresolution"
+
         if (present(dest_tree_id)) then
            ! we have to synchronize lgt data since we were updating it locally on this procesor
            call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
@@ -1589,7 +1590,8 @@ contains
            lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1),tree_id1 )
            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
          endif
-         params%harten_multiresolution=MR
+         
+         params%wavelet_transform_type = MR
 
 
 
@@ -1827,7 +1829,8 @@ function scalar_product_two_trees( params, tree_n, &
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !---------------------------------------------------------------
-    logical :: verbose=.false.,MR
+    logical :: verbose=.false.
+    character(len=80) :: MR
     integer(kind=ik)    :: free_tree_id, Jmax, Bs(3), g, &
                          N, k, rank, i, mpierr
     integer(kind=ik)    :: level1, level2, hvy_id1, hvy_id2, lgt_id1, lgt_id2
@@ -2004,8 +2007,9 @@ function scalar_product_two_trees( params, tree_n, &
                        MPI_SUM,WABBIT_COMM, mpierr)
     !!! Attention we should not use prefilter of CDF44 wavelets here. Because
     !!! it will change the original data!!!
-   MR = params%harten_multiresolution
-   params%harten_multiresolution=.True.
+   MR = params%wavelet_transform_type
+   params%wavelet_transform_type = "harten-multiresolution"
+
    if (tree_id1 .ne. tree_id2) then
      call coarse_tree_2_reference_mesh(params, tree_n, &
            lgt_block, lgt_active(:,tree_id1), lgt_n(tree_id1), lgt_sortednumlist(:,:,tree_id1), &
@@ -2016,7 +2020,7 @@ function scalar_product_two_trees( params, tree_n, &
            lgt_block_ref, lgt_active_ref(:,2),lgt_n_ref(2), &
            hvy_block, hvy_active(:,tree_id2), hvy_n(tree_id2), hvy_tmp, hvy_neighbor, tree_id2, verbosity=.False.)
    endif
-   params%harten_multiresolution=MR
+   params%wavelet_transform_type = MR
 
     t_elapse = MPI_WTIME() - t_elapse
 

@@ -78,7 +78,8 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
     ! this is a HACK
     if (params%physics_type == 'ACM-new') then
         tmp = params%threshold_mask
-        params%threshold_mask =.true.
+        params%threshold_mask = .true.
+        if (.not. params%penalization) params%threshold_mask = .false.
     endif
 
     ! choose between reading from files and creating datafields analytically
@@ -105,14 +106,14 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         ! it contains many zeros. Can be used for wavelet compression tests as well.
         iter = 0
         if (adapt) then
-            ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
+            ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
                 lgt_n_tmp = -99
-                ! what happens on very coarse grids is that the first coarsening interation removes
-                ! the mask completely...
-                ! we therefore outsource the iteration loop here. (argument external_loop to
-                ! adapt_mesh)
+                ! what happens on very coarse grids is that the first coarsening interation (internal to adapt_mesh) removes
+                ! the mask completely... This is because we do not currently reconstruct the mask inside this iteration loop (to avoid overhead)
+                ! we therefore outsource the iteration loop here. (argument external_loop to adapt_mesh)
+
                 do while ( lgt_n_tmp /= lgt_n(tree_ID_flow) )
                     lgt_n_tmp = lgt_n(tree_ID_flow)
 
@@ -139,7 +140,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
         endif
 
         ! HACK
-        ! Navier stokes has different statevector (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) then
+        ! Navier stokes has different statevector (sqrt(rho),sqrt(rho)u,sqrt(rho)v,p) than
         ! the statevector saved to file (rho,u,v,p)
         ! we therefore convert it once here
         if (params%physics_type == 'navier_stokes') then
@@ -196,7 +197,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                 !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
                 call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
                 lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID_flow  )
-
+                
                 ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                 ! not, the detail coefficients for all blocks are zero. In the time stepper, this
                 ! corresponds to advancing the solution in time, it's just that here we know the exact

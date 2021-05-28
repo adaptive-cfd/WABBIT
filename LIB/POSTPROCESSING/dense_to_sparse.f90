@@ -77,15 +77,14 @@ subroutine dense_to_sparse(params)
 
     ! Check parameters for correct inputs:
     if (order == "CDF20") then
-        params%harten_multiresolution = .true.
+        params%wavelet_transform_type = 'harten-multiresolution'
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
     elseif (order == "CDF40") then
-        params%harten_multiresolution = .true.
+        params%wavelet_transform_type = 'harten-multiresolution'
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
     elseif (order == "CDF44") then
-        params%harten_multiresolution = .false.
         params%wavelet_transform_type = 'biorthogonal'
         params%order_predictor = "multiresolution_4th"
         params%wavelet='CDF4,4'

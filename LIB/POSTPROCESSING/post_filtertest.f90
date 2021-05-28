@@ -128,7 +128,7 @@ enddo
 
     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
     lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-    1, "everywhere", hvy_tmp=hvy_tmp, external_loop=.true., ignore_maxlevel=.true. )
+    1, "everywhere", hvy_tmp=hvy_tmp, ignore_maxlevel=.true. )
 
     write(*,*) "adapted to=", lgt_n(tree_ID_flow)
 

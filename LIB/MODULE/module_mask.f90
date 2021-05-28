@@ -308,7 +308,7 @@ contains
             call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
             lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
             lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
-            hvy_n(tree_ID_mask), tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, external_loop=.false., ignore_maxlevel=.true.)
+            hvy_n(tree_ID_mask), tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
 
 
             if (params%rank==0) then
@@ -331,7 +331,7 @@ contains
         call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
         lgt_active(:,tree_ID_mask_coarser), lgt_n(tree_ID_mask_coarser), &
         lgt_sortednumlist(:,:,tree_ID_mask_coarser), hvy_active(:,tree_ID_mask_coarser), &
-        hvy_n(tree_ID_mask_coarser), tree_ID_mask_coarser, "everywhere", hvy_tmp, external_loop=.true.)
+        hvy_n(tree_ID_mask_coarser), tree_ID_mask_coarser, "everywhere", hvy_tmp)
 
         ! prune both masks
         if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax

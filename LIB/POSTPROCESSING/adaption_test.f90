@@ -82,17 +82,16 @@ subroutine adaption_test(params)
 
   ! Check parameters for correct inputs:
   if (order == "CDF20" .or. order == "CDF2,0") then
-      params%harten_multiresolution = .true.
+      params%wavelet_transform_type = "harten-multiresolution"
       params%order_predictor = "multiresolution_2nd"
       params%wavelet='CDF2,0'
       params%n_ghosts = 2_ik
   elseif (order == "CDF40" .or. order == "CDF4,0") then
-      params%harten_multiresolution = .true.
+      params%wavelet_transform_type = "harten-multiresolution"
       params%order_predictor = "multiresolution_4th"
       params%wavelet='CDF4,0'
       params%n_ghosts = 4_ik
   elseif (order == "CDF44" .or. order == "CDF4,4") then
-      params%harten_multiresolution = .false.
       params%wavelet_transform_type = 'biorthogonal'
       params%order_predictor = "multiresolution_4th"
       params%wavelet='CDF4,4'

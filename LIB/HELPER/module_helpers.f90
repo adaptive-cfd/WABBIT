@@ -22,6 +22,26 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
+    ! https://de.wikipedia.org/wiki/Polynominterpolation#Lagrangesche_Interpolationsformel
+    ! Returns the value of $\ell_j(x)$ with nodes $x_i$
+    function lagrange_polynomial(x, xi, j) result(result)
+        implicit none
+        real(kind=rk), intent(in) :: x
+        real(kind=rk), intent(in) :: xi(1:)
+        integer(kind=ik), intent(in) :: j
+        real(kind=rk) :: result
+        integer(kind=ik) :: m
+
+        result = 1.0_rk
+
+        do m = 1, size(xi)
+            if (m /= j) then
+                result = result * (x-xi(m))/(xi(j)-xi(m))
+            endif
+        enddo
+
+    end function
+
     !-----------------------------------------------------------------------------
     !> This function computes the factorial of n
     !-----------------------------------------------------------------------------

@@ -62,6 +62,9 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
 
     select case(mode)
+    case ("--extract-slice")
+        call post_extract_slice(params)
+
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
 

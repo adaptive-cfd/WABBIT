@@ -40,21 +40,17 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
     !> file name
     character(len=*), intent(in)        :: fname
-
     !> time loop parameters
     real(kind=rk), intent(in)           :: time
     integer(kind=ik), intent(in)        :: iteration
-
     !> datafield number
     integer(kind=ik), intent(in)        :: dF
-
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
-
     !> list of active blocks (light data)
     integer(kind=ik), intent(in)        :: lgt_active(:), hvy_active(:)
     !> number of active blocks (light data)
@@ -69,17 +65,14 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! grid parameter
     integer(kind=ik)                    :: g, dim
     integer(kind=ik), dimension(3)      :: Bs
-
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
     ! coordinates and spacing arrays
     real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:)
     ! treecode array
     integer(kind=ik), allocatable       :: block_treecode(:,:)
-
     ! file id integer
     integer(hid_t)                      :: file_id
-
     ! offset variables
     integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D, periodic_BC, symmetry_BC
@@ -191,7 +184,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         if (lgt_rank == rank) then
             ! compute block spacing and origin from the treecode
             lgt_id = lgt_active(k)
-            call get_block_spacing_origin( params, lgt_id , lgt_block, xx0, ddx )
+            call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
 
             if ( params%dim == 3 ) then

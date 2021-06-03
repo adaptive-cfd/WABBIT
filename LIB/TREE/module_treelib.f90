@@ -1162,14 +1162,8 @@ end subroutine adjacent4
 
 
   subroutine encoding(treearray, ix, dim , block_num, treeN)
-  !---------------------------------------------------------------------------------------------
-  ! modules
-
       ! global parameters
       use module_params
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
 
       implicit none
       !> dimension (2 or 3)
@@ -1186,10 +1180,8 @@ end subroutine adjacent4
       ! variables for calculate real treecode length N
       real(kind=rk)                   :: Jn
       integer(kind=ik)                :: N, l,d
-
-
-      ! auxiliary vectors
       integer(kind=ik), allocatable   :: ix_binary(:)
+
       ! real treecode length
       Jn = log(dble(block_num)) / log(2.0_rk**dim)
       N  = nint(Jn)
@@ -1212,6 +1204,41 @@ end subroutine adjacent4
       deallocate( ix_binary )
 
   end subroutine encoding
+
+  subroutine encoding_revised(treecode, ix, dim, level)
+      ! global parameters
+      use module_params
+
+      implicit none
+      !> dimension (2 or 3)
+      integer(kind=ik), intent(in)    :: dim
+      !> block position coordinates
+      integer(kind=ik), intent(in)    :: ix(dim)
+      integer(kind=ik), intent(in)    :: level
+      !> treecode
+      integer(kind=ik), intent(out)   :: treecode(1:)
+
+      ! variables for calculate real treecode length N
+      integer(kind=ik)                :: treeN
+      real(kind=rk)                   :: Jn
+      integer(kind=ik)                :: l,d
+      integer(kind=ik), allocatable   :: ix_binary(:)
+
+      treeN = size(treecode)
+
+      ! reset output
+      treecode = 0
+      ! allocate auxiliary vectors
+      allocate( ix_binary(level) )
+
+      ! convert block coordinates into binary numbers
+      do d = 1, dim
+          call int_to_binary(ix(d)-1, level, ix_binary)
+          treecode(1:level) = treecode(1:level) + ix_binary(1:level)*2**(d-1)
+      end do
+
+      deallocate( ix_binary )
+  end subroutine encoding_revised
 
 
   !> \brief convert a integer i to binary b \n

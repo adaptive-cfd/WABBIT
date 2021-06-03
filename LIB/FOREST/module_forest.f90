@@ -594,7 +594,7 @@ contains
         !> list of active blocks (light data)
         integer(kind=ik), intent(inout) :: hvy_active(:, :)
         !> sorted list of numerical treecodes, used for block finding
-        integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+        integer(kind=tsize), intent(inout) :: lgt_sortednumlist(:,:,:)
         logical, intent(in),optional      :: verbosity !< if true: additional information of processing
         !-----------------------------------------------------------------
         ! result
@@ -605,7 +605,7 @@ contains
 
         L2norm =  scalar_product_two_trees( params, tree_n, &
                                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
-                                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
+                                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp, &
                                        tree_id1=tree_id, tree_id2=tree_id)
         L2norm = sqrt(L2norm)
         if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
@@ -1590,7 +1590,7 @@ contains
            lgt_sortednumlist(:,:,tree_id1), hvy_active(:,tree_id1), hvy_n(tree_id1),tree_id1 )
            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_id1), hvy_n(tree_id1))
          endif
-         
+
          params%wavelet_transform_type = MR
 
 

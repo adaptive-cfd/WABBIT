@@ -76,6 +76,8 @@ subroutine post_extract_slice(params)
     params%order_predictor = "multiresolution_4th"
     allocate(params%symmetry_vector_component(1:3))
     params%symmetry_vector_component(1:3) = "0"
+    ! hack to save on memory
+    N_MAX_COMPONENTS = 1
 
     allocate(treecode(1:tc_length))
 
@@ -94,7 +96,7 @@ subroutine post_extract_slice(params)
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1),kind=rk)*dx(1))) then
+        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
             Nblocks = Nblocks +1
         endif
     end do
@@ -113,7 +115,7 @@ subroutine post_extract_slice(params)
         call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1),kind=rk)*dx(1))) then
+        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
             !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             ! floor index: in our notation, this is point 1 (the second point)
             ! where: | is location of interpolation

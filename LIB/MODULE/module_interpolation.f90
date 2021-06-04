@@ -103,7 +103,7 @@ contains
         character(len=*), intent(in) :: wavelet
         integer(kind=ik) :: i, neqn
 
-        neqn = size(fine,3)
+        neqn = size(fine,4)
         do i = 1, neqn
             call restriction_prefilter_3D(fine(:,:,:,i), fine_filtered2(:,:,:,i), wavelet)
         enddo

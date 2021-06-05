@@ -95,7 +95,10 @@ do
         echo "Writing output to: " ${logfile}
 
         # run the actual test
+        T2="$(date +%s)"
         ./${ts} > $logfile
+        T2="$(($(date +%s)-T2))"
+        echo "Time used in test: ${T2} seconds"
 
         if [ $? == 0 ]; then
             printf "%s \n" "${pass_color} pass ${end_color}"

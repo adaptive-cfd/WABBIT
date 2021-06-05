@@ -31,6 +31,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
 
     integer(kind=ik) :: ijk(2,3)
     integer(kind=ik) :: bounds_type, istage, istage_buffer(1:4), rounds(1:4), inverse
+    logical, save :: informed = .false.
 
 
     if (.not. ghost_nodes_module_ready) then
@@ -42,8 +43,23 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
-    if (size(hvy_block,4)>N_max_components) then
-        call abort(160720191,"You try to ghost-sync a vector with too many components.")
+    if (size(hvy_block,4)>N_MAX_COMPONENTS .and. .not. informed) then
+        if (params%rank ==0) then
+            write(*,*) "-------------------------------------------------------------------------"
+            write(*,*) "---warning---warning---warning---warning---warning---warning---warning---"
+            write(*,*) "---warning---warning---warning---warning---warning---warning---warning---"
+            write(*,*) "-------------------------------------------------------------------------"
+            write(*,*) " A warning from the ghost nodes module: we have allocated a buffer with an estimation for"
+            write(*,*) " neqn=", N_MAX_COMPONENTS, " components of a vector, but you try to sync"
+            write(*,*) " neqn=", size(hvy_block,4), " This may work just fine: but in some (rare) cases, "
+            write(*,*) " we will see a buffer overflow. The code will then abort with an error, and you have"
+            write(*,*) " to restart this simulation with more memory."
+            write(*,*) "-------------------------------------------------------------------------"
+            write(*,*) "---warning---warning---warning---warning---warning---warning---warning---"
+            write(*,*) "---warning---warning---warning---warning---warning---warning---warning---"
+            write(*,*) "-------------------------------------------------------------------------"
+        endif
+        informed = .true.
     endif
 
     Bs    = params%Bs
@@ -1053,6 +1069,9 @@ subroutine AppendLineToBuffer( int_send_buffer, new_send_buffer, buffer_size, ne
 
     ! real data
     if (buffer_size>0) then
+        if (i0+buffer_size-1 >= size(new_send_buffer,1)) then
+            call abort(202106049, "Internal bug: we ran out of space for the ghost nodes. Restart simulation with more memory.")
+        endif
         new_send_buffer( i0:i0+buffer_size-1, istage  ) = line_buffer(1:buffer_size)
     endif
 

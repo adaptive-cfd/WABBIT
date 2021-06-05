@@ -32,7 +32,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     rank, number_procs, dim
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
-    real(kind=rk)       :: effective_memory
+    real(kind=rk)       :: memory_this, memory_total
     integer(kind=ik)    :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
     integer, allocatable :: blocks_per_mpirank(:)
 
@@ -45,10 +45,12 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! set parameters for readability
     rank            = params%rank
+    dim             = params%dim
     Bs              = params%Bs
     g               = params%n_ghosts
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
+    memory_total    = 0.0_rk
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
@@ -101,7 +103,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'(80("_"))')
     endif
 
-    !Automatic memory management. If specified --memory=0.3GB in the call line,
+    ! Automatic memory management. If specified --memory=0.3GB in the call line,
     if (params%number_blocks < 1) then
         !---------------------------------------------------------------------------
         ! Automatic memory management. If specified --memory=0.3GB in the call line,
@@ -128,8 +130,8 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3))))  &  ! real buffer ghosts
+                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
 
                     ! hvy_mask
                     if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
@@ -146,10 +148,9 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                         mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
                     endif
 
-
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)))  &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
@@ -199,121 +200,99 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-        "hvy_block", nx, ny, nz, Neqn, params%number_blocks
-    endif
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )
+    memory_this = product(real(shape(hvy_block)))*8.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_block", memory_this, shape(hvy_block)
     endif
 
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",7(i9,1x),")")') &
-            "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
-        endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
+        memory_this = product(real(shape(hvy_work)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_work", memory_this, shape(hvy_work)
         endif
     end if
 
     if ( present(hvy_tmp) ) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
-        endif
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
+        memory_this = product(real(shape(hvy_tmp)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_tmp", memory_this, shape(hvy_tmp)
         endif
     endif
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
-        endif
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
-
+        memory_this = product(real(shape(hvy_mask)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_mask", memory_this, shape(hvy_mask)
         endif
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_mask", 1, 1, 1, 1, 1
-        endif
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
-
+        memory_this = product(real(shape(hvy_mask)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_mask", memory_this, shape(hvy_mask)
         endif
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "hvy_neighbor", params%number_blocks, max_neighbors
-    endif
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
+    memory_this = product(real(shape(hvy_neighbor)))*8.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_neighbor", memory_this, shape(hvy_neighbor)
     endif
 
     !---------------------------------------------------------------------------)
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
-    endif
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
+    memory_this = product(real(shape(lgt_block)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_block", memory_this, shape(lgt_block)
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "lgt_sortednumlist", size(lgt_block,1), 2
-    endif
     allocate( lgt_sortednumlist( size(lgt_block,1), 2) )
+    memory_this = product(real(shape(lgt_sortednumlist)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_sortednumlist", memory_this, shape(lgt_sortednumlist)
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
-        "lgt_active", size(lgt_block, 1)
-    endif
     allocate( lgt_active( size(lgt_block, 1) ) )
+    memory_this = product(real(shape(lgt_active)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_active", memory_this, shape(lgt_active)
     endif
 
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
-        "hvy_active", size(hvy_block, 5)
-    endif
     allocate( hvy_active( size(hvy_block, 5) ) )
+    memory_this = product(real(shape(hvy_active)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_active", memory_this, shape(hvy_active)
     endif
 
     ! setting -1 is required to avoid "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU"
@@ -324,21 +303,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks
-        write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') params%number_blocks
-
-        effective_memory = (dble(size(hvy_block)) + & ! real data
-        dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
-        )*8.0e-9 ! in GB
-
-        if (present(hvy_tmp)) effective_memory = effective_memory + dble(size(hvy_tmp))*8.0e-9 ! in GB
-        if (present(hvy_work)) effective_memory = effective_memory + dble(size(hvy_work))*8.0e-9 ! in GB
-
-        ! note we currently use 8byte per real and integer by default, so all the same bytes per point
-        write(*,'("INIT: Measured (true) local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB per mpirank")') &
-        effective_memory
-
-        write(*,'("INIT-GLOBAL: Measured (true) TOTAL (on all CPU) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB")') &
-        effective_memory*dble(params%number_procs)
+        write(*,'("INIT: Measured local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!): ",g15.3," GB per rank")') memory_total
     end if
 
 end subroutine allocate_tree
@@ -380,7 +345,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     rank, number_procs,  dim
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
-    real(kind=rk)       :: effective_memory
+    real(kind=rk)       :: memory_this, memory_total
     integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
     integer, allocatable :: blocks_per_mpirank(:)
 
@@ -394,6 +359,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     g               = params%n_ghosts
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
+    memory_total    = 0.0_rk
     nx = Bs(1)+2*g
     ny = Bs(2)+2*g
     nz = Bs(3)+2*g
@@ -464,16 +430,16 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
                 ! read memory from command line (in GB)
                 read(memstring(10:len_trim(memstring)-2),* ) maxmem
 
-                if (params%rank==0) write(*,'("INIT: total memory: ",f9.4,"GB")') maxmem
+                if (params%rank==0) write(*,'("INIT: desired total memory: ",f9.4,"GB")') maxmem
 
                 ! memory per MPIRANK (in GB)
                 maxmem = maxmem / dble(params%number_procs)
 
-                if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
+                if (params%rank==0) write(*,'("INIT: desired memory-per-rank: ",f9.4,"GB")') maxmem
 
                 if (params%dim==3) then
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3)))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3))))  &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
@@ -494,7 +460,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
                 else
                     mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2))) &  ! real buffer ghosts
+                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)))  &  ! real buffer ghosts
                     + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
 
                     ! hvy_mask
@@ -544,140 +510,116 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-        "hvy_block", nx, ny, nz, Neqn, params%number_blocks
-    endif
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )
+    memory_this = product(real(shape(hvy_block)))*8.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_block", product(real(shape(hvy_block)))*8.0e-9, shape(hvy_block)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_block", memory_this, shape(hvy_block)
     endif
 
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",6(i9,1x),")")') &
-            "hvy_work", nx, ny, nz, Neqn, params%number_blocks, nrhs_slots
-        endif
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
+        memory_this = product(real(shape(hvy_work)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_work", product(real(shape(hvy_work)))*8.0e-9, shape(hvy_work)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_work", memory_this, shape(hvy_work)
         endif
     end if
 
     if ( present(hvy_tmp) ) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_tmp", nx, ny, nz, nwork, params%number_blocks
-        endif
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
+        memory_this = product(real(shape(hvy_tmp)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_tmp", product(real(shape(hvy_tmp)))*8.0e-9, shape(hvy_tmp)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_tmp", memory_this, shape(hvy_tmp)
         endif
     endif
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_mask", nx, ny, nz, params%N_mask_components, params%number_blocks
-        endif
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
+        memory_this = product(real(shape(hvy_mask)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_mask", memory_this, shape(hvy_mask)
         endif
 
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
-        if (rank==0) then
-            write(*,'("INIT: ALLOCATING ",A19,"(",5(i9,1x),")")') &
-            "hvy_mask", 1, 1, 1, 1, 1
-        endif
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
-
+        memory_this = product(real(shape(hvy_mask)))*8.0e-9
+        memory_total = memory_total + memory_this
         if (rank==0) then
-            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-            "hvy_mask", product(real(shape(hvy_mask)))*8.0e-9, shape(hvy_mask)
+            write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "hvy_mask", memory_this, shape(hvy_mask)
         endif
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "hvy_neighbor", params%number_blocks, max_neighbors
-    endif
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
+    memory_this = product(real(shape(hvy_neighbor)))*8.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_neighbor", product(real(shape(hvy_neighbor)))*8.0e-9, shape(hvy_neighbor)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_neighbor", memory_this, shape(hvy_neighbor)
     endif
 
     !---------------------------------------------------------------------------)
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "lgt_block", number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS
-    endif
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
+    memory_this = product(real(shape(lgt_block)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_block", product(real(shape(lgt_block)))*4.0e-9, shape(lgt_block)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_block", memory_this, shape(lgt_block)
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",3(i9,1x),")")') &
-        "lgt_sortednumlist", size(lgt_block,1), 2, params%forest_size
-    endif
     allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
+    memory_this = product(real(shape(lgt_sortednumlist)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_sortednumlist", product(real(shape(lgt_sortednumlist)))*4.0e-9, shape(lgt_sortednumlist)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_sortednumlist", memory_this, shape(lgt_sortednumlist)
     endif
 
     !---------------------------------------------------------------------------
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "lgt_active", size(lgt_block,1), params%forest_size
-    endif
     allocate( lgt_active( size(lgt_block,1), params%forest_size ) )
+    memory_this = product(real(shape(lgt_active)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_active", product(real(shape(lgt_active)))*4.0e-9, shape(lgt_active)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_active", memory_this, shape(lgt_active)
     endif
 
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
-        "lgt_n", params%forest_size
-    endif
     allocate( lgt_n(params%forest_size ) )
+    memory_this = product(real(shape(lgt_n)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "lgt_n", product(real(shape(lgt_n)))*4.0e-9, shape(lgt_n)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_n", memory_this, shape(lgt_n)
     endif
 
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",1(i9,1x),")")') &
-        "hvy_n", params%forest_size
-    endif
     allocate( hvy_n(params%forest_size ) )
+    memory_this = product(real(shape(hvy_n)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_n", product(real(shape(hvy_n)))*4.0e-9, shape(hvy_n)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_n", memory_this, shape(hvy_n)
     endif
+
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATING ",A19,"(",2(i9,1x),")")') &
-        "hvy_active", size(hvy_block, 5), params%forest_size
-    endif
     allocate( hvy_active( size(hvy_block, 5), params%forest_size ) )
+    memory_this = product(real(shape(hvy_active)))*4.0e-9
+    memory_total = memory_total + memory_this
     if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4,"GB SHAPE=",7(i9,1x))') &
-        "hvy_active", product(real(shape(hvy_active)))*4.0e-9, shape(hvy_active)
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_active", memory_this, shape(hvy_active)
     endif
 
     lgt_n = 0
@@ -688,21 +630,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks
-        write(*,'("INIT: System is allocating heavy work data for ",i7," blocks " )') params%number_blocks
-
-        effective_memory = (dble(size(hvy_block)) + & ! real data
-        dble(size(lgt_block)+size(lgt_sortednumlist)+size(hvy_neighbor)+size(lgt_active)+size(hvy_active))/2.0 & ! integer (hence /2)
-        )*8.0e-9 ! in GB
-
-        if (present(hvy_tmp)) effective_memory = effective_memory + dble(size(hvy_tmp))*8.0e-9 ! in GB
-        if (present(hvy_work)) effective_memory = effective_memory + dble(size(hvy_work))*8.0e-9 ! in GB
-
-        ! note we currently use 8byte per real and integer by default, so all the same bytes per point
-        write(*,'("INIT: Measured (true) local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB per mpirank")') &
-        effective_memory
-
-        write(*,'("INIT-GLOBAL: Measured (true) TOTAL (on all CPU) memory (hvy_block+hvy_work+lgt_block no ghosts!) is ",g15.3,"GB")') &
-        effective_memory*dble(params%number_procs)
+        write(*,'("INIT: Measured local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!):   ",g15.3," GB per rank")') memory_total
     end if
 
 end subroutine allocate_forest

@@ -198,8 +198,9 @@ subroutine init_ghost_nodes( params )
             allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, Neqn) )
         end if
 
-        ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
-        ! for all my blocks. previous versions allocated one of those per "friend"
+        ! size of ghost nodes buffer. The worst case is that we have to send ALL my ghost node
+        ! points to another rank, but this happens only if ALL my blocks have ONLY neighbors
+        ! on other MPIRANKS.
         if ( params%dim==3 ) then
           buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
@@ -213,20 +214,14 @@ subroutine init_ghost_nodes( params )
         ! allocate synch buffer
         if (rank==0) then
             write(*,'("GHOSTS-INIT: Attempting to allocate the ghost-sync-buffer.")')
-
-            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12," Nstages=",i1)') &
-            buffer_N_int, buffer_N, Nstages
-
-            write(*,'("GHOSTS-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N_int)*dble(Nstages)*8e-9
-
-            write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N)*dble(Nstages)*8e-9
+            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12," Nstages=",i1)') buffer_N_int, buffer_N, Nstages
+            write(*,'("GHOSTS-INIT: Int  buffer:", f9.4, " GB per rank")') 2.0*dble(buffer_N_int)*dble(Nstages)*8e-9
+            write(*,'("GHOSTS-INIT: Real buffer:", f9.4, " GB per rank")') 2.0*dble(buffer_N)*dble(Nstages)*8e-9
             write(*,'("---------------- allocating now ----------------")')
         endif
 
         ! wait now so that if allocation fails, we get at least the above info
-        call MPI_barrier( WABBIT_COMM, status(1))
+        call MPI_barrier( WABBIT_COMM, status(1) )
 
         allocate( int_send_buffer( 1:buffer_N_int, 1:Nstages), stat=status(1) )
         allocate( int_recv_buffer( 1:buffer_N_int, 1:Nstages), stat=status(2) )
@@ -236,7 +231,6 @@ subroutine init_ghost_nodes( params )
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
-
             write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
              "new_send_buffer", shape(new_send_buffer)
 

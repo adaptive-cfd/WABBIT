@@ -104,6 +104,15 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
     call read_param_mpi(FILE, 'VPM', 'dont_use_pruned_tree_mask', params%dont_use_pruned_tree_mask, .false.)
 
+    if (params%physics_type == "ACM-new")  then
+        if (params%penalization) then
+            if ((.not.params%dont_use_pruned_tree_mask).and.(params%mask_time_independent_part)) then
+                ! we sync the mask array in this case, which has 6 components
+                N_MAX_COMPONENTS = max(6, params%n_eqn)
+            endif
+        endif
+    endif
+
     ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
     ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
     ! prior to downsampling.
@@ -269,6 +278,10 @@ end subroutine ini_file_to_params
         ! are the maximum this code can currently perform.
         call abort(170619,"Error: Max treelevel cannot be larger 18 (64bit long integer problem) ")
     end if
+
+    ! the default case is that we synchronize (ghosts) with n-eqn compontents in the vector
+    ! may be overwritten if pruned tree mask is used (by six)
+    N_MAX_COMPONENTS = params%n_eqn
 
     ! read switch to turn on|off mesh refinement
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )

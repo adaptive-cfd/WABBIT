@@ -32,7 +32,10 @@ module module_globals
   ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
   ! universality dictates that we can also use a different number of components, for example
   ! when syn'ing the mask function (which in many cases has six entries.)
-  integer, public  :: N_MAX_COMPONENTS = 6
+  ! New in 06/2021: the hack continues. We now set this parameter at different places
+  ! to save on memory. That can be params%n_eqn (default in simulations), 6 (if mask is synced). The new default is 3,
+  ! for postprocessing.
+  integer, public  :: N_MAX_COMPONENTS = 3
 
   !subroutines of this module
   interface abort

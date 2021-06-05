@@ -77,7 +77,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         nz = 1
         max_neighbors = 16
     else
-        max_neighbors   = 74
+        max_neighbors = 74
     endif
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
@@ -103,13 +103,12 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         write(*,'(80("_"))')
     endif
 
+    !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,
+    ! wabbit will automatically select the number of blocks per rank to be allocated
+    ! to consume this amount of memory
+    !---------------------------------------------------------------------------
     if (params%number_blocks < 1) then
-        !---------------------------------------------------------------------------
-        ! Automatic memory management. If specified --memory=0.3GB in the call line,
-        ! wabbit will automatically select the number of blocks per rank to be allocated
-        ! to consume this amount of memory. helpful on local machines.
-        !---------------------------------------------------------------------------
         ! loop over all arguments until you find the string "--memory" in them (or not)
         ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
         do i = 1, command_argument_count()
@@ -121,64 +120,39 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
                 ! read memory from command line (in GB)
                 read(memstring(10:len_trim(memstring)-2),* ) maxmem
 
-                if (params%rank==0) write(*,'("INIT: total memory: ",f9.4,"GB")') maxmem
+                if (params%rank==0) write(*,'("INIT: total memory   : ",f9.4,"GB")') maxmem
 
                 ! memory per MPIRANK (in GB)
                 maxmem = maxmem / dble(params%number_procs)
 
                 if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
 
-                if (params%dim==3) then
-                    mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3))))  &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
+                ! first compute mem per block in points
+                mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
+                + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts
+                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
 
-                    ! hvy_mask
-                    if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
-                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-                    ! hvy_tmp
-                    if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-                    ! hvy_work
-                    if ( present(hvy_work) ) then
-                        mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-                else
-                    mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)))  &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
-
-                    ! hvy_mask
-                    if ( present(hvy_mask) .and. params%N_mask_components>0  ) then
-                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
-                    ! hvy_tmp
-                    if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
-                    ! hvy_work
-                    if ( present(hvy_work) ) then
-                        mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
+                ! hvy_mask
+                if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
+                    mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
                 endif
 
-                ! in GB:
-                mem_per_block = mem_per_block * 8.0e-9
+                ! hvy_tmp
+                if ( present(hvy_tmp) ) then
+                    mem_per_block = mem_per_block + real(nwork) * real(product(Bs(1:dim)+2*g))
+                endif
 
-                params%number_blocks = nint( maxmem / mem_per_block)
+                ! hvy_work
+                if ( present(hvy_work) ) then
+                    mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
+                endif
+
+                mem_per_block = mem_per_block * 8.0e-9 ! in GB
+                params%number_blocks = nint(maxmem / mem_per_block)
 
                 if (params%rank==0) then
                     write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
-                    params%number_blocks*params%number_procs
+                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
                 endif
 
                 if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**params%dim)) then
@@ -356,6 +330,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     rank            = params%rank
     Bs              = params%Bs
+    dim             = params%dim
     g               = params%n_ghosts
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
@@ -412,13 +387,12 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         write(*,'(80("_"))')
     endif
 
+    !---------------------------------------------------------------------------
     ! Automatic memory management. If specified --memory=0.3GB in the call line,
+    ! wabbit will automatically select the number of blocks per rank to be allocated
+    ! to consume this amount of memory
+    !---------------------------------------------------------------------------
     if (params%number_blocks < 1) then
-        !---------------------------------------------------------------------------
-        ! Automatic memory management. If specified --memory=0.3GB in the call line,
-        ! wabbit will automatically select the number of blocks per rank to be allocated
-        ! to consume this amount of memory. helpful on local machines.
-        !---------------------------------------------------------------------------
         ! loop over all arguments until you find the string "--memory" in them (or not)
         ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
         do i = 1, command_argument_count()
@@ -430,65 +404,39 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
                 ! read memory from command line (in GB)
                 read(memstring(10:len_trim(memstring)-2),* ) maxmem
 
-                if (params%rank==0) write(*,'("INIT: desired total memory: ",f9.4,"GB")') maxmem
+                if (params%rank==0) write(*,'("INIT: total memory   : ",f9.4,"GB")') maxmem
 
                 ! memory per MPIRANK (in GB)
                 maxmem = maxmem / dble(params%number_procs)
 
-                if (params%rank==0) write(*,'("INIT: desired memory-per-rank: ",f9.4,"GB")') maxmem
+                if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
 
-                if (params%dim==3) then
-                    mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - ((Bs(1))*(Bs(2))*(Bs(3))))  &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
+                ! first compute mem per block in points
+                mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
+                + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts
+                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
 
-                    ! hvy_mask
-                    if ( present(hvy_mask) ) then
-                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-                    ! hvy_tmp
-                    if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-                    ! hvy_work
-                    if ( present(hvy_work) ) then
-                        mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g))
-                    endif
-
-
-                else
-                    mem_per_block = real(Neqn) * real((Bs(1)+2*g)*(Bs(2)+2*g)) & ! hvy_block
-                    + 2.0 * nstages * real(N_MAX_COMPONENTS) * real((Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)))  &  ! real buffer ghosts
-                    + 2.0 * nstages * real(max_neighbors) * 5 / 2.0 ! int bufer (4byte hence /2)
-
-                    ! hvy_mask
-                    if ( present(hvy_mask) ) then
-                        mem_per_block = mem_per_block + real(params%N_mask_components) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
-                    ! hvy_tmp
-                    if ( present(hvy_tmp) ) then
-                        mem_per_block = mem_per_block + real(nwork) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
-                    ! hvy_work
-                    if ( present(hvy_work) ) then
-                        mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real((Bs(1)+2*g)*(Bs(2)+2*g))
-                    endif
-
+                ! hvy_mask
+                if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
+                    mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
                 endif
 
-                ! in GB:
-                mem_per_block = mem_per_block * 8.0e-9
+                ! hvy_tmp
+                if ( present(hvy_tmp) ) then
+                    mem_per_block = mem_per_block + real(nwork) * real(product(Bs(1:dim)+2*g))
+                endif
 
-                params%number_blocks = nint( maxmem / mem_per_block)
+                ! hvy_work
+                if ( present(hvy_work) ) then
+                    mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
+                endif
+
+                mem_per_block = mem_per_block * 8.0e-9 ! in GB
+                params%number_blocks = nint(maxmem / mem_per_block)
 
                 if (params%rank==0) then
                     write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, &
-                    params%number_blocks*params%number_procs
+                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
                 endif
 
                 if ((params%adapt_mesh .or. params%adapt_inicond) .and. (params%number_blocks<2**params%dim)) then

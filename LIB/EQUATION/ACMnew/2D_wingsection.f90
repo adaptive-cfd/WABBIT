@@ -28,7 +28,7 @@ subroutine draw_2d_wingsection(time, mask, x0, dx, Bs, g )
     real(kind=rk), save :: a0_y0
     real(kind=rk), save :: a0_alpha
     integer(kind=ik), save :: nfft_x0, nfft_y0, nfft_alpha
-    character(len=strlen), save :: kinematics_type
+    character(len=clong), save :: kinematics_type
 
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")

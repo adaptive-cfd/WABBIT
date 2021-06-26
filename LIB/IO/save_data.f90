@@ -1,37 +1,14 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name save_data.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief save data main function, call write data routine
-!
-!>
-!! input:
-!!           - time loop parameter
+!! input:    - time loop parameter
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
-!!
-!! output:
-!!           -
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 07/11/16 - switch to v0.4 \n
-!! 26/01/17 - switch to 3D, v0.5
-!
 ! ********************************************************************************************
 
 subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor)
 
     implicit none
-
     !> time loop parameters
     real(kind=rk), intent(in)                       :: time
     integer(kind=ik), intent(in)                    :: iteration
@@ -60,11 +37,10 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)                 :: hvy_neighbor(:,:)
 
-
     ! loop variable
     integer(kind=ik)      :: k, lgt_id, hvy_id
     ! file name
-    character(len=80)     :: fname, tmp
+    character(len=cshort)     :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)         :: t0, x0(1:3), dx(1:3)
     integer(kind=2)       :: n_domain(1:3)
@@ -88,11 +64,11 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     do k = 1, hvy_n(tree_ID_flow)
         hvy_id = hvy_active(k,tree_ID_flow)
         ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-        
+
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
             call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &

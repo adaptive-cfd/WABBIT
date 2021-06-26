@@ -1,66 +1,38 @@
-!> \file
-!> \brief  unit test for ghost nodes synchronization
-!> \version 0.5
-!> \author msr, engels
 !> \note input only params struct to this subroutine
 !!       create new light/heavy data arrays here and deallocate them after this function
-!! \details
-!! \date 21/01/17 - create
-!! \date 03/04/17 - major rewrite: no local memory allocation, convergence test is performed \n
-!! \date 05/04/17 - use the renewed refine_mesh with random indicator
-!
 ! ********************************************************************************************
 
 subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
     hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
 
-
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(inout)       :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)       :: params                     !> user defined parameter structure
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)            !> light data array
+    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
-
-    ! number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)         :: hvy_n
-    ! number of active blocks (light data)
-    integer(kind=ik), intent(inout)         :: lgt_n
-    ! loop variables
-    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
-    ! process rank
-    integer(kind=ik)                        :: rank, number_procs
-    ! spacing
-    real(kind=rk)                           :: ddx(1:3), xx0(1:3)
-
-    ! grid parameter
-    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz
+    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)          !> neighbor array (heavy data)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:)              !> list of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:)              !> list of active blocks (heavy data)
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)         :: hvy_n                      ! number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)         :: lgt_n                      ! number of active blocks (light data)
+    integer(kind=ik)                        :: k, l, lgt_id, hvy_id       ! loop variables
+    integer(kind=ik)                        :: rank, number_procs         ! process rank
+    real(kind=rk)                           :: ddx(1:3), xx0(1:3)         ! spacing
+    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz   ! grid parameter
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk)                           :: Lx, Ly, Lz, x, y, z
-    ! data dimensionality
-    integer(kind=ik)                        :: d,  max_neighbors
-    ! frequency of sin functions for testing:
-    real(kind=rk)                           :: frequ(1:6)
+    integer(kind=ik)                        :: d,  max_neighbors          ! data dimensionality
+    real(kind=rk)                           :: frequ(1:6)                 ! frequency of sin functions for testing:
     integer(kind=ik)                        :: ifrequ
 
     ! error variable
     real(kind=rk)                           :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty
-    ! MPI error variable
-    integer(kind=ik)                        :: ierr
-    logical::test
+    integer(kind=ik)                        :: ierr                       ! MPI error variable
+    logical                                 :: test
 
     rank = params%rank
     Lx = params%domain_size(1)
@@ -133,7 +105,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
             ! hvy_id of the block we're looking at
             hvy_id = hvy_active(k)
             ! light id of this block
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, rank, params%number_blocks )
             ! compute block spacing and origin from treecode
             call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 

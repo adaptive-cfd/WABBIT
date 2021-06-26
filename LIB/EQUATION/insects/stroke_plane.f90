@@ -10,7 +10,7 @@ subroutine StrokePlane ( time, Insect )
   real(kind=rk), intent(in) :: time
   type(diptera), intent(inout) :: Insect
   real(kind=rk) :: eta_stroke
-  character(len=strlen) :: dummy
+  character(len=clong) :: dummy
 
   select case (Insect%BodyMotion)
   case ("free_flight")

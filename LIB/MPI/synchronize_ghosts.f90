@@ -44,7 +44,7 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
 
     ! do k = 1, hvy_n
     !     hvy_id = hvy_active(k)
-    !     call hvy_id_to_lgt_id(lgt_id, hvy_id, params%rank, params%number_blocks)
+    !     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
     !
     !     call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
     !     params%domain_size, params%Bs, params%dim, n_domain )

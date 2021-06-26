@@ -1,50 +1,30 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name merge_blocks.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief Merge 4 or 8 blocks into a new one (restriction operator).
 !
-!> \details
 !! This routine merges either 4 or 8 blocks into one new block with half the resolution
 !! It is supposed that all blocks are on the same mpirank, thus gather_blocks_on_proc has
 !! to be called prior to merging.
-!! \n
 !! Note ghost nodes are not copied (thus synching is required afterwards). Why you ask? Because the coarser
 !! ghost node layer is physically larger than the fine one. Hence, it cannot be filled just from the data
 !! that we have on entry in ths routine.
-!! \n
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
 subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_mask )
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
-    !> list of blocks to merge, can contain 4 or 8 blocks
-    integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)
-    !
+    integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)         !> list of blocks to merge, can contain 4 or 8 blocks
     real(kind=rk), ALLOCATABLE, save    :: tmpblock(:,:,:,:)
-
-    ! number of blocks to be merged, can be 4 or 8
-    integer(kind=ik) :: N_merge
+    integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
     ! what CPU is responsible for merging:
-    integer(kind=ik) :: data_rank(8)
-    ! list of block ids, proc ranks
-    integer(kind=ik) :: heavy_ids(8), tree_id
+    integer(kind=ik)                    :: data_rank(8)
+    integer(kind=ik)                    :: heavy_ids(8), tree_id          ! list of block ids, proc ranks
 
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id, N
-    integer(kind=ik), dimension(3) ::  bound1, bound2, boundm, Bs
+    integer(kind=ik), dimension(3)      ::  bound1, bound2, boundm, Bs
     logical :: harten_multiresolution
 
     ! number of blocks to be merged
@@ -71,7 +51,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
 
     ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
     do i = 1, N_merge
-        call lgt_id_to_proc_rank( data_rank(i), lgt_blocks_to_merge(i), params%number_blocks )
+        call lgt2proc( data_rank(i), lgt_blocks_to_merge(i), params%number_blocks )
     enddo
 
     ! Check if all blocks lie on the same rank
@@ -124,11 +104,11 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
         ! loop over the sisters and store the corresponding mpirank and heavy index
         ! in a list (still, we are dealing with all four sisters)
         do i = 1, N_merge
-            call lgt_id_to_hvy_id( heavy_ids(i), lgt_blocks_to_merge(i), data_rank(1), params%number_blocks )
+            call lgt2hvy( heavy_ids(i), lgt_blocks_to_merge(i), data_rank(1), params%number_blocks )
         enddo
 
         ! get heavy id of merge block
-        call lgt_id_to_hvy_id( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
+        call lgt2hvy( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
 
         do i = 1,3
             bound1(i) = g+1

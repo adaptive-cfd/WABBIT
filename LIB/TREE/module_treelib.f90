@@ -1,18 +1,13 @@
-!> \file
 module module_treelib
 
   use module_globals
-
-
 
 contains
 
 #include "get_neighbor_treecode.f90"
 
-
 !-----------------------------------------------------------------------------
 !> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
-!> \details
 !>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)
 !>   - The surface normal is computed from the treecode
 subroutine get_adjacent_boundary_surface_normal(treecode, domain_size, Bs, dim, n_surface)
@@ -164,8 +159,6 @@ subroutine treecodenumber2array( number, level, array )
 
 end subroutine
 !===============================================================================
-
-
 
 
 subroutine adjacent4( treecode, direction, treecode_neighbor)
@@ -516,68 +509,27 @@ end subroutine adjacent4
 
 
 
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name    adjacent_block_2D.f90
-  !> \version  0.4
-  !> \author   msr
-  !
   !> \brief give treecode for adjacent block
-  !
-  !>
-  !! input:
-  !!                    - treecode for block N
+  !! input:             - treecode for block N
   !!                    - direction for neighbor search
   !!                    - max treelevel
-  !!
-  !! output:
-  !!                    - neighbor treecode, for neighbor on same level
-  !!
-  !!
-  !! = log ======================================================================================
-  !! \n
-  !! 07/11/16 - switch to v0.4
+  !! output:            - neighbor treecode, for neighbor on same level
   ! ********************************************************************************************
 
   recursive subroutine adjacent_block_2D(me, neighbor, direction, level, max_treelevel)
 
-  !---------------------------------------------------------------------------------------------
-  ! modules
-
-      ! global parameters
-      use module_params
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
+      use module_params   ! global parameters
 
       implicit none
-
-      !> max treelevel
       integer(kind=ik), intent(in)        :: max_treelevel
-      !> mesh level
       integer(kind=ik), intent(in)        :: level
-      !> block treecode
-      integer(kind=ik), intent(in)        :: me(max_treelevel)
-      !> direction for neighbor search
-      character(len=3), intent(in)        :: direction
-
-      !> neighbor treecode
-      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)
-
-      ! treecode variable
-      integer(kind=ik)                    :: neighbor2(max_treelevel)
-      ! loop variable
-      integer(kind=ik)                    :: i
-
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
+      integer(kind=ik), intent(in)        :: me(max_treelevel)          !> block treecode
+      character(len=3), intent(in)        :: direction                  !> direction for neighbor search
+      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)    !> neighbor treecode
+      integer(kind=ik)                    :: neighbor2(max_treelevel)   ! treecode variable
+      integer(kind=ik)                    :: i                          ! loop variable
 
       neighbor = -1
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
 
       select case(direction)
           case('__N')
@@ -684,28 +636,11 @@ end subroutine adjacent4
   end subroutine adjacent_block_2D
 
 
-  !> \file
-  !> \callgraph
-  ! ********************************************************************************************
-  ! WABBIT
-  ! ============================================================================================
-  !> \name adjacent_block_3D.f90
-  !> \version 0.5
-  !> \author msr
-  !
   !> \brief give treecode for adjacent block in 3D \n
-  !
-  !>
-  !! input:
-  !!                    - treecode for block N
+  !! input:             - treecode for block N
   !!                    - direction for neighbor search
   !!                    - max treelevel
-  !!
-  !!output:
-  !!                    - neighbor treecode, for neighbor on same level
-  !!
-  !! \n
-  !!
+  !!output:             - neighbor treecode, for neighbor on same level
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
@@ -732,51 +667,22 @@ end subroutine adjacent4
   !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
   !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
-  ! --------------------------------------------------------------------------------------------
-  !
-  !> \details = log ======================================================================================
-  !! \n
-  !! 27/01/17 - start
-  !
   ! ********************************************************************************************
 
   recursive subroutine adjacent_block_3D(me, neighbor, direction, level, max_treelevel)
 
-  !---------------------------------------------------------------------------------------------
-  ! modules
-
-      ! global parameters
-      use module_params
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
+      use module_params     ! global parameters
 
       implicit none
-
-      !> max treelevel
       integer(kind=ik), intent(in)        :: max_treelevel
-      !> mesh level
       integer(kind=ik), intent(in)        :: level
-      !> block treecode
-      integer(kind=ik), intent(in)        :: me(max_treelevel)
-      !> direction for neighbor search
-      character(len=7), intent(in)        :: direction
-
-      !> neighbor treecode
-      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)
-      ! treecode variable
-      integer(kind=ik)                    :: neighbor2(max_treelevel), neighbor3(max_treelevel)
-
-      ! loop variable
-      integer(kind=ik)                    :: i
-
-  !---------------------------------------------------------------------------------------------
-  ! variables initialization
+      integer(kind=ik), intent(in)        :: me(max_treelevel)      !> block treecode
+      character(len=7), intent(in)        :: direction              !> direction for neighbor search
+      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)!> neighbor treecode
+      integer(kind=ik)                    :: neighbor2(max_treelevel), neighbor3(max_treelevel)   ! treecode variable
+      integer(kind=ik)                    :: i                      ! loop variable
 
       neighbor = me
-
-  !---------------------------------------------------------------------------------------------
-  ! main body
 
       select case(direction)
 
@@ -1071,13 +977,10 @@ end subroutine adjacent4
 
       implicit none
 
-      !> block position coordinates
-      integer(kind=ik), intent(out)    :: i, j, k
-      !> treecode size
-      integer(kind=ik), intent(in)    :: treeN
-      !> treecode
+      integer(kind=ik), intent(out)  :: i, j, k          !> block position coordinates
+      integer(kind=ik), intent(in)   :: treeN            !> treecode size
       integer(kind=ik), intent(in)   :: treecode(treeN)
-      integer(kind=ik) :: nx, step, l
+      integer(kind=ik)               :: nx, step, l
 
       ! this is the maximum index possible (the last one on the finest grid)
       nx = 2**treeN
@@ -1159,23 +1062,16 @@ end subroutine adjacent4
 !
 
 
-
-
   subroutine encoding(treearray, ix, dim , block_num, treeN)
       ! global parameters
       use module_params
 
       implicit none
-      !> dimension (2 or 3)
-      integer(kind=ik), intent(in)    :: dim
-      !> block position coordinates
-      integer(kind=ik), intent(in)    :: ix(dim)
-      !> number of blocks
-      integer(kind=ik), intent(in)    :: block_num
-      !> treecode size
-      integer(kind=ik), intent(in)    :: treeN
-      !> treecode
-      integer(kind=ik), intent(out)   :: treearray(treeN)
+      integer(kind=ik), intent(in)    :: dim              !> dimension (2 or 3)
+      integer(kind=ik), intent(in)    :: ix(dim)          !> block position coordinates
+      integer(kind=ik), intent(in)    :: block_num        !> number of blocks
+      integer(kind=ik), intent(in)    :: treeN            !> treecode size
+      integer(kind=ik), intent(out)   :: treearray(treeN) !> treecode
 
       ! variables for calculate real treecode length N
       real(kind=rk)                   :: Jn
@@ -1205,17 +1101,15 @@ end subroutine adjacent4
 
   end subroutine encoding
 
+
   subroutine encoding_revised(treecode, ix, dim, level)
       ! global parameters
       use module_params
 
       implicit none
-      !> dimension (2 or 3)
-      integer(kind=ik), intent(in)    :: dim
-      !> block position coordinates
-      integer(kind=ik), intent(in)    :: ix(dim)
+      integer(kind=ik), intent(in)    :: dim            !> dimension (2 or 3)
+      integer(kind=ik), intent(in)    :: ix(dim)        !> block position coordinates
       integer(kind=ik), intent(in)    :: level
-      !> treecode
       integer(kind=ik), intent(out)   :: treecode(1:)
 
       ! variables for calculate real treecode length N
@@ -1243,24 +1137,15 @@ end subroutine adjacent4
 
   !> \brief convert a integer i to binary b \n
   !! binary return as vector with length N
-  !! \details
-  !!\date 07/11/16 - switch to v0.4
   subroutine int_to_binary(i, N, b)
 
-      ! global parameters
-      use module_params
+      use module_params       ! global parameters
 
       implicit none
-
-      !> integer to convert into binary
-      integer(kind=ik), intent(in)    :: i
-      !> length of binary output vector
-      integer(kind=ik), intent(in)    :: N
-      !> output vector
-      integer(kind=ik), intent(out)   :: b(N)
-      ! loop variables
-      integer(kind=ik)                :: j, k, tmp(N)
-
+      integer(kind=ik), intent(in)    :: i            !> integer to convert into binary
+      integer(kind=ik), intent(in)    :: N            !> length of binary output vector
+      integer(kind=ik), intent(out)   :: b(N)         !> output vector
+      integer(kind=ik)                :: j, k, tmp(N) ! loop variables
 
       j = 1
       b = 0

@@ -1,52 +1,19 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name quicksort.f90
-!> \version 0.5
-!> \author engels, msr
-!
-!> \brief quicksort subroutine
-!
-!>
-!! input:    -
-!! output:   -
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 14/06/17 - create
-!!
-! ********************************************************************************************
 recursive subroutine quicksort(a, first, last, sortdim)
-
-!---------------------------------------------------------------------------------------------
-! modules
 
     ! global parameters
     use module_params
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
     integer(kind=tsize), intent(inout) ::  a(:,:)
-    integer(kind=ik), intent(in) :: sortdim
-    integer(kind=tsize), dimension(2) :: x, t
-    integer(kind=ik) :: first, last
-    integer(kind=ik) :: i, j
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    integer(kind=ik), intent(in)       :: sortdim
+    integer(kind=tsize), dimension(2)  :: x, t
+    integer(kind=ik)                   :: first, last
+    integer(kind=ik)                   :: i, j
 
     x = a( (first+last) / 2 , sortdim)
     i = first
     j = last
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! if we've arrived at small lists, call interchange sort and return
     if ( j-i < 6) then
@@ -96,21 +63,13 @@ subroutine interchange_sort(a, left_end, right_end, sortdim)
 
 
 
-
-
 ! ------------------------------------------------------------------------------
 ! Sort a 2d array (: x dim) according to "sortdims" entry in the second dimension
 ! ------------------------------------------------------------------------------
  recursive subroutine quicksort_ik(a, first, last, sortdim, dim)
 
-!---------------------------------------------------------------------------------------------
-! modules
-
     ! global parameters
     use module_params
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
@@ -123,15 +82,9 @@ subroutine interchange_sort(a, left_end, right_end, sortdim)
     integer(kind=ik) :: first, last
     integer(kind=ik) :: i, j
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     x = a( (first+last) / 2 , sortdim)
     i = first
     j = last
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! if we've arrived at small lists, call interchange sort and return
     if ( j-i < 6) then

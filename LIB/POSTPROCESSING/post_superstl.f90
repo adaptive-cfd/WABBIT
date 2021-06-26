@@ -18,7 +18,7 @@ subroutine post_superstl(params)
     real(kind=4), allocatable, dimension(:,:) :: triangles, normals
     real(kind=rk), allocatable, dimension(:,:) :: superstl
     real(kind=rk) :: scale, origin(3)
-    character(len=80) :: fname_stl, fname_out, dummy
+    character(len=cshort) :: fname_stl, fname_out, dummy
     integer :: i, ntri
 
     call get_command_argument(2, dummy)

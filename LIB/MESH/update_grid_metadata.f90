@@ -13,27 +13,18 @@ subroutine update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID, skip_diagonal_neighbors)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(out)       :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(out)    :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(out)       :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(out)       :: hvy_n
+    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)          !> light data array
+    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)        !> heavy data array - neighbor data
+    integer(kind=ik), intent(out)       :: lgt_active(:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(out)       :: lgt_n                    !> number of active blocks (light data)
+    integer(kind=tsize), intent(out)    :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(out)       :: hvy_active(:)            !> list of active blocks (heavy data)
+    integer(kind=ik), intent(out)       :: hvy_n                    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
-    logical, intent(in), optional       :: skip_diagonal_neighbors ! unused currently
+    logical, intent(in), optional       :: skip_diagonal_neighbors  ! unused currently
 
-    real(kind=rk) :: t0
-
+    real(kind=rk)                       :: t0
     t0 = MPI_wtime()
 
     call create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)

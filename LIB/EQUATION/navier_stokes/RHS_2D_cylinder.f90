@@ -1,5 +1,3 @@
-!-----------------------------------------------------------------------------------------
-!> \file
 !> \brief Right hand side for 2D navier stokes equation in cylindrical coordinates
 !>        -------------------------------------------------------------------------
 !> The original author of the rotational symmetric formulation of the RHS
@@ -26,10 +24,8 @@
 !!   \tau_{rz} &=\mu \left[ \frac{\partial u_z}{\partial r} + \frac{\partial u_r}{\partial z}  \right]\\
 !!   \nabla \cdot \vec{u} &= \frac{1}{r}\frac{\partial (ru_r)}{\partial r} + \frac{\partial u_z}{\partial z}
 !!\f}
-!! \date 08.12.18 - creation
-!> \author Pkrah
 !-----------------------------------------------------------------------------------------
-!>\brief main function of RHS_2D_cylinders
+
 subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
 
     implicit none

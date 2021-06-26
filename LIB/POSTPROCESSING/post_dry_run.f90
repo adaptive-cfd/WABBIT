@@ -3,22 +3,14 @@ subroutine post_dry_run
     use mpi
     use module_helpers
     use module_MPI
-    ! global parameters
-    use module_params
-    ! timing module
+    use module_params               ! global parameters
     use module_timing
-    ! init data module
-    use module_initialization
-    ! mesh manipulation subroutines
-    use module_mesh
-    ! IO module
+    use module_initialization       ! init data module
+    use module_mesh                 ! mesh manipulation subroutines
     use module_IO
-    ! time step module
     use module_time_step
-    ! unit test module
     use module_unit_test
-    ! bridge implementation of wabbit
-    use module_bridge_interface
+    use module_bridge_interface     ! bridge implementation of wabbit
     use module_forest
     use module_mask
     ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
@@ -27,14 +19,10 @@ subroutine post_dry_run
 
     implicit none
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! number of processes
-    integer(kind=ik)                    :: number_procs
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1, t2
-    ! user defined parameter structure
-    type (type_params)                  :: params
+    integer(kind=ik)                    :: ierr             ! MPI error variable
+    integer(kind=ik)                    :: number_procs     ! number of processes
+    real(kind=rk)                       :: t0, t1, t2       ! cpu time variables for running time calculation
+    type (type_params)                  :: params           ! user defined parameter structure
 
     integer(kind=ik), allocatable       :: lgt_block(:, :)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
@@ -44,10 +32,8 @@ subroutine post_dry_run
     integer(kind=ik), allocatable       :: hvy_active(:,:)
     integer(kind=ik), allocatable       :: lgt_n(:)
     integer(kind=ik), allocatable       :: hvy_n(:)
-    ! time loop variables
-    real(kind=rk)                       :: time
-    ! filename of *.ini file used to read parameters
-    character(len=80)                   :: filename,fname
+    real(kind=rk)                       :: time             ! time loop variables
+    character(len=cshort)                   :: filename,fname   ! filename of *.ini file used to read parameters
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
@@ -87,7 +73,6 @@ subroutine post_dry_run
     endif
 
 
-
     !---------------------------------------------------------------------------
     ! Initialize parameters,bridge and grid
     !---------------------------------------------------------------------------
@@ -98,12 +83,8 @@ subroutine post_dry_run
     call ini_file_to_params( params, filename )
 
 
-
-
-
     call get_cmd_arg( "--pruned", pruned, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%min_treelevel )
-
 
 
 

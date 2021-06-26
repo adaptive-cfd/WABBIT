@@ -13,10 +13,10 @@ subroutine adaption_test(params)
   !--------------------------------------------
   type (type_params), intent(inout)  :: params
   !--------------------------------------------
-  character(len=80):: file_out, order, args
+  character(len=cshort):: file_out, order, args
   real(kind=rk), allocatable      :: error(:)
   integer(kind=ik), allocatable   :: lgt_block(:, :),Nb_adapt(:)
-  character(len=80),allocatable   :: eps_str_list(:)
+  character(len=cshort),allocatable   :: eps_str_list(:)
   real(kind=rk), allocatable      :: hvy_block(:, :, :, :, :)
   real(kind=rk), allocatable      :: hvy_tmp(:, :, :, :, :)
   integer(kind=ik), allocatable   :: hvy_neighbor(:,:), hvy_active(:, :)

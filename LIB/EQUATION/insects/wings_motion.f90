@@ -98,7 +98,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
   real(kind=rk) :: phicdeg
   real(kind=rk) :: alphacdeg, ttau
   integer :: i,mpicode
-  character(len=strlen) :: dummy
+  character(len=clong) :: dummy
   type(inifile) :: kinefile
 
   select case ( protocoll )

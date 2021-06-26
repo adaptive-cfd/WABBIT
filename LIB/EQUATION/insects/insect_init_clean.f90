@@ -23,7 +23,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
     type(inifile) :: PARAMS
     real(kind=rk),dimension(1:3)::defaultvec
-    character(len=strlen) :: DoF_string, dummystr
+    character(len=clong) :: DoF_string, dummystr
     integer :: j, tmp, mpirank, mpicode, ntri
     integer(kind=2) :: wingID, Nwings
 
@@ -110,12 +110,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
     if ( index(Insect%FlappingMotion_right,"from_file::") /= 0 ) then
         ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
-        Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 12:strlen  )
+        Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 12:clong  )
         Insect%FlappingMotion_right = "from_file"
 
     elseif ( index(Insect%FlappingMotion_right,"kinematics_loader::") /= 0 ) then
         ! new syntax, uses the kinematics loader for non-periodic kinematics
-        Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 20:strlen )
+        Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 20:clong )
         Insect%FlappingMotion_right = "kinematics_loader"
 
     elseif ( Insect%FlappingMotion_right == "from_file" ) then
@@ -130,12 +130,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
     if ( index(Insect%FlappingMotion_left,"from_file::") /= 0 ) then
         ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
-        Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 12:strlen  )
+        Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 12:clong  )
         Insect%FlappingMotion_left = "from_file"
 
     elseif ( index(Insect%FlappingMotion_left,"kinematics_loader::") /= 0 ) then
         ! new syntax, uses the kinematics loader for non-periodic kinematics
-        Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 20:strlen )
+        Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 20:clong )
         Insect%FlappingMotion_left = "kinematics_loader"
 
     elseif ( Insect%FlappingMotion_left == "from_file" ) then
@@ -175,12 +175,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
         if ( index(Insect%FlappingMotion_right2,"from_file::") /= 0 ) then
             ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
-            Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 12:strlen  )
+            Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 12:clong  )
             Insect%FlappingMotion_right2 = "from_file"
 
         elseif ( index(Insect%FlappingMotion_right,"kinematics_loader::") /= 0 ) then
             ! new syntax, uses the kinematics loader for non-periodic kinematics
-            Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 20:strlen )
+            Insect%kine_wing_r2%infile = Insect%FlappingMotion_right2( 20:clong )
             Insect%FlappingMotion_right2 = "kinematics_loader"
 
         elseif ( Insect%FlappingMotion_right2 == "from_file" ) then
@@ -194,12 +194,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
         if ( index(Insect%FlappingMotion_left2,"from_file::") /= 0 ) then
             ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
-            Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 12:strlen  )
+            Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 12:clong  )
             Insect%FlappingMotion_left2 = "from_file"
 
         elseif ( index(Insect%FlappingMotion_left2,"kinematics_loader::") /= 0 ) then
             ! new syntax, uses the kinematics loader for non-periodic kinematics
-            Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 20:strlen )
+            Insect%kine_wing_l2%infile = Insect%FlappingMotion_left2( 20:clong )
             Insect%FlappingMotion_left2 = "kinematics_loader"
 
         elseif ( Insect%FlappingMotion_left2 == "from_file" ) then

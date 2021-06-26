@@ -2,9 +2,6 @@
 !> This module implements different shock tests to validate the
 !> euler equations of NS and to test the filters in a multiresolution
 !> framework.
-!> \details
-!> \author PKrah
-!> \date 10.08.2018 - creation of the module
 !----------------------------------------------------------------
 
 module module_shock
@@ -26,8 +23,6 @@ module module_shock
               shock_tube_penalization2D, shock_tube_penalization3D
     !**********************************************************************************************
 
-  !> \file
-  !> \details
   !> Available shock tubes
   !! ------------------------
   !!
@@ -40,7 +35,7 @@ module module_shock
 
 
   type :: type_shock_params
-      character(len=80) :: name                      !< name of the shock (sod_shock_tube,moving-shock,etc.)
+      character(len=cshort) :: name                      !< name of the shock (sod_shock_tube,moving-shock,etc.)
       real(kind=rk)     :: rho_left,u_left,p_left    !< left values (behind the shock front)
       real(kind=rk)     :: rho_right,u_right,p_right !< right values of the shock front
       real(kind=rk)     :: machnumber     !< machnumber of a moving shock
@@ -227,7 +222,6 @@ end subroutine read_params_shock_tube
 
     end subroutine set_inicond_shock_tube
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 
 
 
@@ -546,8 +540,6 @@ end subroutine shock_tube_penalization2D
 
 end subroutine set_shock_in_direction
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 
 
 end module module_shock

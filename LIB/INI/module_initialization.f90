@@ -1,10 +1,7 @@
 module module_initialization
     use mpi
-    ! global parameters
     use module_params
-    ! timing module
     use module_timing
-    ! mesh module
     use module_mesh
     ! read routines
     use module_IO

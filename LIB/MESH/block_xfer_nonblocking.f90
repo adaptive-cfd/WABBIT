@@ -111,7 +111,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             ! RECV CASE
             !-------------------------------------------------------------------
             ! get hvy id where to store the data
-            call lgt_id_to_hvy_id( hvy_id_new, lgt_id_new, myrank, params%number_blocks )
+            call lgt2hvy( hvy_id_new, lgt_id_new, myrank, params%number_blocks )
 
             ireq = ireq + 1
             tag = 2*k ! use unique tag for each message
@@ -139,7 +139,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
             ! SEND CASE
             !-------------------------------------------------------------------
             ! what heavy ID (on its owner proc, which is me) does the block have?
-            call lgt_id_to_hvy_id( hvy_id, lgt_id, mpirank_sender, params%number_blocks )
+            call lgt2hvy( hvy_id, lgt_id, mpirank_sender, params%number_blocks )
 
             ireq = ireq + 1
             tag = 2*k ! use unique tag for each message

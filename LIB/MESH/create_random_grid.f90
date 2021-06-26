@@ -1,38 +1,21 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name create_random_grid.f90
-!> \version 0.5
-!> \author engels
 subroutine create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity, iterations, tree_ID )
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(inout)   :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)   :: params                     !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(out)          :: hvy_tmp(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: lgt_active(:)              !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n                      !> number of active blocks (light data)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
-    !> what level to initialize?
-    integer(kind=ik), intent(in)        :: Jmin, iterations
+    integer(kind=ik), intent(inout)     :: hvy_active(:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                      !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: Jmin, iterations           !> what level to initialize?
     !> write output
     logical, intent(in)                 :: verbosity
     integer(kind=ik), intent(in)        :: tree_ID

@@ -1,22 +1,9 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name find_neighbor_corner_3D.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief find neighbor on block corner
-!
-!> \details  input:
-!!                   - heavy and light data id
-!!                   - light data array and max treelevel
-!!                   - direction for neighbor search
-!!                   - list of active blocks
-!!
-!!            output:
-!!                   - neighbor list array
+!> input:  - heavy and light data id
+!!         - light data array and max treelevel
+!!         - direction for neighbor search
+!!         - list of active blocks
+!! output: - neighbor list array
 !!
 ! --------------------------------------------------------------------------------------------
 !> \details  neighbor codes: \n
@@ -46,54 +33,30 @@
 !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
 !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
 !!               '_43/134', '_43/634', '_45/145', '_45/645' \)
-! --------------------------------------------------------------------------------------------
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 30/01/17 - create
-!
 ! ********************************************************************************************
 
 subroutine find_neighbor_corner_3D(params, heavy_id, light_id, lgt_block, max_treelevel, dir, hvy_neighbor, &
     lgt_n, lgt_sortednumlist, error, n_domain)
 
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data id
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
     integer(kind=ik), intent(in)        :: heavy_id
-    !> light data id
     integer(kind=ik), intent(in)        :: light_id
-    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> direction for neighbor search
-    character(len=7), intent(in)        :: dir
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)            !> light data array
+    character(len=7), intent(in)        :: dir                        !> direction for neighbor search
+    integer(kind=ik), intent(in)        :: lgt_n                      !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
     logical, intent(inout)              :: error
-    integer(kind=2), intent(in) :: n_domain(1:3)
-
-    ! mesh level
+    integer(kind=2), intent(in)         :: n_domain(1:3)
     integer(kind=ik)                    :: level
     ! treecode varaibles
     integer(kind=ik)                    :: my_treecode(max_treelevel), neighbor(max_treelevel), virt_treecode(max_treelevel)
-
-    ! return value from function "does_block_exist"
-    logical                             :: exists
-
+    logical                             :: exists                     ! return value from function "does_block_exist"
     ! variable to show if there is a valid corner neighbor
     logical                             :: lvl_down_neighbor
-
-    ! auxiliary variables
-    integer(kind=ik)                    :: list_id, virt_code
-
-    ! neighbor light data id
+    integer(kind=ik)                    :: list_id, virt_code         ! auxiliary variables
     integer(kind=ik)                    :: neighbor_light_id, tree_id
 
     my_treecode = lgt_block( light_id, 1:max_treelevel )

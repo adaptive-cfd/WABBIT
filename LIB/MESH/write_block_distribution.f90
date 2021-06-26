@@ -1,31 +1,19 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!
 !> \brief write current block distribution to file
-!
 !========================================================================================
 
     subroutine write_block_distribution( params, dist_list, filename )
         implicit none
 
-       !---------------------------------------------------------------
-        integer(kind=ik), intent(in)   :: dist_list(:)   !< iteration
-        type (type_params), intent(in) :: params         !< user defined parameter structure
-        character(len=*), intent(in)   :: filename
-        !---------------------------------------------------------------
-
-        ! file existence variable
-        logical                             :: file_exists
-        ! file IO error variable, counter
-        integer(kind=ik)                    :: io_error, k
+        integer(kind=ik), intent(in)        :: dist_list(:)   !< iteration
+        type (type_params), intent(in)      :: params         !< user defined parameter structure
+        character(len=*), intent(in)        :: filename
+        logical                             :: file_exists    ! file existence variable
+        integer(kind=ik)                    :: io_error, k    ! file IO error variable, counter
 
         if ( params%rank == 0 ) then
             ! check file existence, if not create file
             inquire(file=filename, exist=file_exists)
-            
+
             ! if the file is not there, now we create it.
             if (file_exists) then
                 ! open for append

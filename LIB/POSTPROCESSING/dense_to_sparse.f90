@@ -1,9 +1,4 @@
-
-!> \file
-!> \name sparse_to_dense.f90
-!> \author PKrah
 !> \brief postprocessing for sparsing data from a dense wabbit field
-!> \date 29.03.2019 creation
 !-----------------------------------------------------------------------------------------------------
 
 subroutine dense_to_sparse(params)
@@ -18,12 +13,12 @@ subroutine dense_to_sparse(params)
     implicit none
 
     !> parameter struct
-    type (type_params), intent(inout)  :: params
-    character(len=80)      :: indicator="threshold-state-vector", file_in, args
-    character(len=80)      :: tail_string
-    real(kind=rk)          :: time, eps=-1.0_rk
-    integer(kind=ik)       :: iteration
-    character(len=80), allocatable :: file_out(:)
+    type (type_params), intent(inout)       :: params
+    character(len=cshort)                       :: indicator="threshold-state-vector", file_in, args
+    character(len=cshort)                       :: tail_string
+    real(kind=rk)                           :: time, eps=-1.0_rk
+    integer(kind=ik)                        :: iteration
+    character(len=cshort), allocatable          :: file_out(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
@@ -34,7 +29,7 @@ subroutine dense_to_sparse(params)
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in
-    character(len=80)                       :: order
+    character(len=cshort)                       :: order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: treecode_size, number_dense_blocks, i, l, dim

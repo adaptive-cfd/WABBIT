@@ -1,19 +1,12 @@
 subroutine respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-
-    ! treelevel restrictions
-    integer(kind=ik) :: Jmax, Jmin
-    ! loop variables
-    integer(kind=ik) :: k
+    type (type_params), intent(in)      :: params           !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)  !> light data array
+    integer(kind=ik), intent(in)        :: lgt_active(:)    !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n            !> number of active blocks (light data)
+    integer(kind=ik)                    :: Jmax, Jmin       ! treelevel restrictions
+    integer(kind=ik)                    :: k                ! loop variables
 
     Jmax = params%max_treelevel
     Jmin = params%min_treelevel

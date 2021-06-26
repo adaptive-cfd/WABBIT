@@ -1,13 +1,4 @@
-!> \file
-! WABBIT
-!> \name sparse_to_dense.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief postprocessing routine for interpolation of a given field to the desired level
-!
-! = log ======================================================================================
-!> \date  31/01/18 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
 subroutine sparse_to_dense(params)
@@ -22,8 +13,8 @@ subroutine sparse_to_dense(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: file_in
-    character(len=80)      :: file_out
+    character(len=cshort)      :: file_in
+    character(len=cshort)      :: file_out
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration
 
@@ -37,7 +28,7 @@ subroutine sparse_to_dense(params)
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
-    character(len=80)                       :: operator
+    character(len=cshort)                       :: operator
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks

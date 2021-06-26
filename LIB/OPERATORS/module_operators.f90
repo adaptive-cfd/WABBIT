@@ -1,41 +1,20 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_operators.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief module for all operator routines
-!
-!>
-!! = log ======================================================================================
-!! \n
-!! 28/7/17 - create
 ! *********************************************************************************************
 
 module module_operators
 
-!---------------------------------------------------------------------------------------------
-! modules
-
 use mpi
-! global parameters
-use module_params
-! timing module
+use module_params     ! global parameters
 use module_timing
 use module_treelib
 
 implicit none
-
 
 PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
 PUBLIC :: compute_vorticity, compute_vorticity_abs, divergence, gradient, compute_Qcriterion, component_wise_tree_norm
-
 
 contains
 
@@ -48,20 +27,14 @@ contains
 subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, which_norm, norm)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
+    integer(kind=ik), intent(inout)     :: hvy_active(:)                        !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                                !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> which norm to use ? "L2", "Linfty"
-    character(len=*), intent(in) :: which_norm
-    !> the computed norm for each component of the vector
-    real(kind=rk), intent(inout) :: norm(:)
-    real(kind=rk) :: x0(1:3), dx(1:3)
+    character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
+    real(kind=rk), intent(inout)        :: norm(:)                              !> the computed norm for each component of the vector
+    real(kind=rk)                       :: x0(1:3), dx(1:3)
     integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g, p, mpierr, lgt_id, D, J
 
     ! note: if norm and hvy_block components are of different size, we use the smaller one.
@@ -76,7 +49,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
         if (params%dim == 2) then
             do k = 1, hvy_n
                 hvy_id = hvy_active(k)
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
@@ -89,7 +62,7 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
         else
             do k = 1, hvy_n
                 hvy_id = hvy_active(k)
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
@@ -125,7 +98,6 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
     end select
 
 end subroutine
-
 
 
 end module module_operators

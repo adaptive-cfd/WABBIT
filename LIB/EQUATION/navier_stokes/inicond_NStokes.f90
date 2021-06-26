@@ -1,7 +1,3 @@
-  !-----------------------------------------------------------------------------
-  !>\file
-  !> Initial Conditions of the Navier Stokes module
-  !-----------------------------------------------------------------------------
   subroutine INICOND_NStokes( time, u, g, x0, dx, boundary_flag )
 
     use module_shock, only : set_shock_in_direction,moving_shockVals,standing_shockVals
@@ -217,8 +213,6 @@
 
 
 
-
-
   !> \brief initialize shear layer setup, setup for all datafields here,
   subroutine inicond_shear_layer(  u, x0, dx ,Bs, g)
     implicit none
@@ -290,7 +284,6 @@
       endif
 
   end subroutine inicond_shear_layer
-
 
 
 

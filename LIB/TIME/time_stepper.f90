@@ -1,31 +1,15 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name time_stepper.f90
-!> \version 0.5
-!> \author msr, sm
-!
-!> \brief time step main function
-!
-!>
 !! Runge-Kutta: \n
 !! data_field(t) = data_field(t) + sum(b_j*k_j)
 !! with k_j = RHS(t+dt*c_j, datafield(t) + dt*sum(a_ji*k_i))         \n
 !!
 !! \image html time_step.svg "Time-stepper" width=300
 !!
-!! input:
-!!           - time variable
+!! input:    - time variable
 !!           - params
 !!           - light and heavy data
 !!           - neighbor list
-!!
-!! output:
-!!           - time variable
+!! output:   - time variable
 !!           - heavy data array
-!!
 !!
 !! physics: \n
 ! --------
@@ -39,49 +23,27 @@
 !! |c2 | a21| 0  |  0|
 !! |c3 | a31| a32|  0|
 !! | 0 | b1 | b2 | b3|
-!!
-!
-! = log ======================================================================================
-!
-!> \date 08/11/16 - switch to v0.4 \n
-!! \date 07/12/16 - now uses heavy work data array and work for different physics \n
-!! \date 31/01/17 - switch to 3D, v0.5 \n
-!! \date 23/05/17 - new structure for time_stepper, now works for any explicit Runge Kutta method
-!! (up to RK of order 4)
 ! ********************************************************************************************
 
 subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
     hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
     implicit none
 
-    !> time varible
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(inout)     :: iteration
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
-
+    type (type_params), intent(in)      :: params                       !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)              !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-
-    integer(kind=ik) :: k
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)            !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)              !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik)                    :: k
 
     ! currently not working (Thomas, 02-2021)
     ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
@@ -130,7 +92,7 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
 
     case("RungeKuttaChebychev-FSI")
-        ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They 
+        ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They
         ! are applicable only for ACM module currently
         call RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
             hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)

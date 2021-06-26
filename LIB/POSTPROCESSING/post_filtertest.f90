@@ -13,7 +13,7 @@ subroutine post_filtertest(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: file_ux, infile
+    character(len=cshort)      :: file_ux, infile
     real(kind=rk)          :: time,x ,y
     integer, allocatable :: lgt_n(:)
     integer, allocatable :: hvy_n(:)
@@ -27,7 +27,7 @@ subroutine post_filtertest(params)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    character(len=80)                  :: fname
+    character(len=cshort)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -76,7 +76,7 @@ do k = 1, hvy_n(tree_ID_flow)
     ! call random_data(hvy_block(:,:,:,:,hvy_active(k,tree_ID_flow)))
     !!!!!!!!!
 
-    call hvy_id_to_lgt_id( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
+    call hvy2lgt( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
     do iy = 1, params%Bs(2)+2*params%n_ghosts

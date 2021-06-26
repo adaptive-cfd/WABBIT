@@ -1,20 +1,8 @@
-! ********************************************************************************************
-! WABBIT
 ! ============================================================================================
-!> \file
-!> \brief rhs for 2D convection diffusion equation
-!>        ---------------------------------------------
 !> The right hand side for the convection diffusion equations is implemented as follows:
 !>\f{eqnarray*}{
 !! \partial_t \phi &=& -u_0 \cdot \nabla \phi + \nu \nabla^2 \phi
 !!\f}
-!
-!> \name RHS_2D_convdiff_new.f90
-!> \version 0.5
-!> \author msr, engels
-! = log ======================================================================================
-!> \version 10/11/16 - switch to v0.4
-!! \version 12/17 - new convection diffusion module (new physics structure)
 ! ********************************************************************************************
 
 
@@ -122,9 +110,6 @@
 
 
   end subroutine RHS_convdiff
-
-
-
 
 
 

@@ -1,66 +1,28 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> name: find_sisters.f90
-!> version: 0.5
-!> author: engels
-!
 !> \brief To a given light id "my_id", find the 3 (2D) or 7 (3D) sister block that have a common mother
 !! block. They are returned in the sisters array. \n
-!
-!>
 !! input:    - light data array \n
 !! output:   - light data array
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 10/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lgt_sortednumlist )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> this is the block whose sisters we look for
-    integer(kind=ik), intent(in)        :: lgt_my_id
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_my_id                  !> this is the block whose sisters we look for
     !> here we will return the sisters. This array is allocated before calling
     !! this routine, and it can be either 4 or 8 or in length (2D / 3D), depending on whether
     !! you want to include the block whose sisters we look for or not.
     integer(kind=ik), intent(inout)     :: lgt_sisters_id(:)
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-
-    ! loop variables
-    integer(kind=ik)                    :: i
-    ! treecode variable
-    integer(kind=ik), allocatable, save :: all_treecodes(:,:)
-    ! block level
-    integer(kind=ik)                    :: N_sisters, tree_id
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
+    integer(kind=ik), intent(in)        :: lgt_n                      !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik)                    :: i                          ! loop variables
+    integer(kind=ik), allocatable, save :: all_treecodes(:,:)         ! treecode variable
+    integer(kind=ik)                    :: N_sisters, tree_id         ! block level
     integer(kind=ik)                    :: mother_level, my_level
     logical                             :: exists
 
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
   ! check out how many sisters we look for. The number can be 4 or 8 in 2D or 3D. Note the
   ! block whose sisters we look for is returned as well
   N_sisters = size(lgt_sisters_id)
@@ -78,9 +40,6 @@ subroutine find_sisters( params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lg
   my_level = lgt_block( lgt_my_id, params%max_treelevel + IDX_MESH_LVL )
 
   lgt_sisters_id = -1
-
-!---------------------------------------------------------------------------------------------
-! main body
 
   ! Find sisters. The sister blocks have the same mother, that means their treecode
   ! is idential up to the last entry

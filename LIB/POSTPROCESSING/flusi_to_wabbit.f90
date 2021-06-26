@@ -1,15 +1,5 @@
-!> \file
-! WABBIT
-!> \name flusi_to_wabbit.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief postprocessing routine that generates a WABBIT-readable .h5 file (a field composed in blocks)
 !! from a .h5 file where all data is stored in one block
-!
-! = log ======================================================================================
-!> \date  07/03/18 - create hashcode: commit 8f4858f429c6c3f537190f48a8e8a931154a01d5
-!> \date 20/7/2018 - add read_field_flusi_MPI for parallel reading, commit 03b933e706b988828a0b0321baedb2dc9f76773d
 !-----------------------------------------------------------------------------------------------------
 !
 subroutine flusi_to_wabbit(params)
@@ -23,11 +13,11 @@ subroutine flusi_to_wabbit(params)
     implicit none
 
     !> parameter struct
-    type (type_params), intent(inout)  :: params
-    character(len=80)      :: file_in
-    character(len=80)      :: file_out
-    real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration
+    type (type_params), intent(inout) :: params
+    character(len=cshort)                 :: file_in
+    character(len=cshort)                 :: file_out
+    real(kind=rk)                     :: time
+    integer(kind=ik)                  :: iteration
 
     integer(kind=ik), allocatable     :: lgt_block(:, :)
     real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :)

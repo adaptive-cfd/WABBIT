@@ -1,7 +1,4 @@
-!> \file
-!> \brief
 !! Synchronize ligt data array among all mpiranks
-!> \details
 !-------------------------------------------------------------------------------
 ! the light data array looks like this (here for 2 mpiranks) (x=used .=unused)
 !

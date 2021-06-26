@@ -1,41 +1,18 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name reset_ghost_nodes.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief reset ghosts nodes for all blocks (not just active ones) for debuging
 !> ghost nodes are set to a very large constant.
-!
-!>
 !! input:    - params, light and heavy data \n
 !! output:   - heavy data array
-!
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 19/05/17 - create
-!
 ! ********************************************************************************************
 
 subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
-
-    ! grid parameter
-    integer(kind=ik)                    :: g
-    integer(kind=ik), dimension(3)     :: Bs
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: hvy_active(:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n                      !> number of active blocks (heavy data)
+    integer(kind=ik)                    :: g                          ! grid parameter
+    integer(kind=ik), dimension(3)      :: Bs
 
     Bs = params%Bs
     g  = params%n_ghosts

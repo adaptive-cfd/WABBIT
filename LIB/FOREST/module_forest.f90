@@ -1,15 +1,8 @@
-
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module for implementing multiple trees in a forest
-!> \version 10.1.2019
-!> \author P.Krah
 !-----------------------------------------------------------------
 
 module module_forest
 
-    ! modules
     use mpi
     use module_precision
     use module_ini_files_parser_mpi, only : read_param_mpi
@@ -38,7 +31,7 @@ contains
         hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id)
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(in)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id
@@ -62,7 +55,7 @@ contains
         if (params%dim == 3) then
             do k = 1, hvy_n(tree_id)
                 hvy_id = hvy_active(k, tree_id)
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
+                call hvy2lgt( lgt_id, hvy_id, rank, N )
 
                 ! pruning condition: all entries of the block are small
                 if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
@@ -78,7 +71,7 @@ contains
         else
             do k = 1, hvy_n(tree_id)
                 hvy_id = hvy_active(k, tree_id)
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, rank, N )
+                call hvy2lgt( lgt_id, hvy_id, rank, N )
 
                 ! pruning condition: all entries of the block are small
                 if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
@@ -164,8 +157,8 @@ contains
     !             ! its heavy data
     !
     !             ! now check on which CPU this block is currently
-    !             call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
-    !             call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !             call lgt2proc( rank_pruned, lgt_id1, N)
+    !             call lgt2proc( rank_full, lgt_id2, N)
     !
     !             if (rank_full /= rank_pruned) then
     !                 n_comm = n_comm + 1
@@ -201,7 +194,7 @@ contains
     !     do k = 1, hvy_n(tree_id_pruned)
     !
     !         hvy_id1  = hvy_active(k, tree_id_pruned)
-    !         call hvy_id_to_lgt_id(lgt_id1, hvy_id1, params%rank, params%number_blocks)
+    !         call hvy2lgt(lgt_id1, hvy_id1, params%rank, params%number_blocks)
     !         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
     !
     !         call does_block_exist(lgt_block(lgt_id1, 1:level1), exists, lgt_id2, &
@@ -211,8 +204,8 @@ contains
     !         ! its heavy data
     !         if (exists) then
     !             ! now check on which CPU this block is currently
-    !             call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
-    !             call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !             call lgt2proc( rank_pruned, lgt_id1, N)
+    !             call lgt2proc( rank_full, lgt_id2, N)
     !
     !             if (rank_full /= rank_pruned) then
     !                 ! This is an erorr one should never see: the block xfer is done, and coexisting blocks should
@@ -223,8 +216,8 @@ contains
     !             ! only responsible mpirank can perform the addition
     !             if (params%rank==rank_full) then
     !                 ! get both heavy ids
-    !                 call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank_pruned, N )
-    !                 call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full  , N )
+    !                 call lgt2hvy( hvy_id1, lgt_id1, rank_pruned, N )
+    !                 call lgt2hvy( hvy_id2, lgt_id2, rank_full  , N )
     !                 ! actual addition
     !                 hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + hvy_block(:,:,:,1,hvy_id1)
     !             endif
@@ -248,9 +241,9 @@ contains
     !
     !                 if (treecode1 == treecode2) then
     !                     ! this is one of the sisters
-    !                     call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+    !                     call lgt2proc( rank_full, lgt_id2, N)
     !                     if (params%rank == rank_full) then
-    !                         call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full, N)
+    !                         call lgt2hvy( hvy_id2, lgt_id2, rank_full, N)
     !                         hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
     !                     endif
     !                 endif
@@ -263,7 +256,7 @@ contains
         hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_pruned, tree_id_full)
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(in)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id_pruned, tree_id_full
@@ -318,8 +311,8 @@ contains
                 ! its heavy data
 
                 ! now check on which CPU this block is currently
-                call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
-                call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+                call lgt2proc( rank_pruned, lgt_id1, N)
+                call lgt2proc( rank_full, lgt_id2, N)
 
                 if (rank_full /= rank_pruned) then
                     n_comm = n_comm + 1
@@ -349,7 +342,7 @@ contains
         do k = 1, hvy_n(tree_id_pruned)
 
             hvy_id1  = hvy_active(k, tree_id_pruned)
-            call hvy_id_to_lgt_id(lgt_id1, hvy_id1, params%rank, params%number_blocks)
+            call hvy2lgt(lgt_id1, hvy_id1, params%rank, params%number_blocks)
             level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
             call does_block_exist(lgt_block(lgt_id1, 1:level1), exists, lgt_id2, &
@@ -359,8 +352,8 @@ contains
             ! its heavy data
             if (exists) then
                 ! now check on which CPU this block is currently
-                call lgt_id_to_proc_rank( rank_pruned, lgt_id1, N)
-                call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+                call lgt2proc( rank_pruned, lgt_id1, N)
+                call lgt2proc( rank_full, lgt_id2, N)
 
                 if (rank_full /= rank_pruned) then
                     ! This is an error one should never see: the block xfer is done, and coexisting blocks should
@@ -371,8 +364,8 @@ contains
                 ! only responsible mpirank can perform the addition
                 if (params%rank==rank_full) then
                     ! get both heavy ids
-                    call lgt_id_to_hvy_id( hvy_id1, lgt_id1, rank_pruned, N )
-                    call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full  , N )
+                    call lgt2hvy( hvy_id1, lgt_id1, rank_pruned, N )
+                    call lgt2hvy( hvy_id2, lgt_id2, rank_full  , N )
 
                     ! actual addition
                     ! hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id2) + hvy_block(:,:,:,:,hvy_id1)
@@ -408,10 +401,10 @@ contains
 
                     if (treecode1 == treecode2) then
                         ! this is one of the sisters
-                        call lgt_id_to_proc_rank( rank_full, lgt_id2, N)
+                        call lgt2proc( rank_full, lgt_id2, N)
 
                         if (params%rank == rank_full) then
-                            call lgt_id_to_hvy_id( hvy_id2, lgt_id2, rank_full, N)
+                            call lgt2hvy( hvy_id2, lgt_id2, rank_full, N)
                             ! hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
                             hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id1)
                         endif
@@ -497,11 +490,11 @@ contains
         t_elapse = MPI_WTIME()
         do k = 1, hvy_n(tree_id_source)
             hvy_id_source = hvy_active(k, tree_id_source)
-            call hvy_id_to_lgt_id( lgt_id_source, hvy_id_source, rank, N )
+            call hvy2lgt( lgt_id_source, hvy_id_source, rank, N )
 
             ! first we have to find out if the hvy data belongs to the tree we want to copy
             call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-            call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+            call lgt2hvy( hvy_id_dest, lgt_id_dest, rank, N )
             !--------------------
             ! Light DATA
             !--------------------
@@ -788,7 +781,7 @@ contains
 
         implicit none
         !-----------------------------------------------------------------
-        type (type_params), intent(in) :: params   !< params structure
+        type (type_params), intent(in)    :: params   !< params structure
         integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
         integer(kind=ik), intent(inout)   :: tree_n   !< number of trees in forest
         integer(kind=ik), intent(in)      :: tree_id1, tree_id2 !< number of the tree
@@ -1058,7 +1051,7 @@ contains
         character (len=5) :: op !< which arithmetical operation (+,-,*,/) which is applied
         integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
         integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
-        character(len=80) :: MR
+        character(len=cshort) :: MR
         Jmax = params%max_treelevel ! max treelevel
         fsize= params%forest_size   ! maximal number of trees in forest
         N    = params%number_blocks ! number of blocks per rank
@@ -1139,12 +1132,12 @@ contains
             !         #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1153,7 +1146,7 @@ contains
                         ! copy light data from one of the added trees
                         ! first we have to find out if the hvy data belongs to the tree we want to copy
                         call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-                        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+                        call lgt2hvy( hvy_id_dest, lgt_id_dest, rank, N )
                         !--------------------
                         ! Light DATA
                         !--------------------
@@ -1199,12 +1192,12 @@ contains
             !         #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1250,13 +1243,13 @@ contains
             !
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1, tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 ! we want to add everything to tree1
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1301,13 +1294,13 @@ contains
             !         #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1, tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 ! we want to add everything to tree1
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2, tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1328,12 +1321,12 @@ contains
             !         #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1342,7 +1335,7 @@ contains
                         ! copy light data from one of the added trees
                         ! first we have to find out if the hvy data belongs to the tree we want to copy
                         call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-                        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+                        call lgt2hvy( hvy_id_dest, lgt_id_dest, rank, N )
                         !--------------------
                         ! Light DATA
                         !--------------------
@@ -1388,12 +1381,12 @@ contains
             !
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1402,7 +1395,7 @@ contains
                         ! copy light data from one of the added trees
                         ! first we have to find out if the hvy data belongs to the tree we want to copy
                         call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-                        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+                        call lgt2hvy( hvy_id_dest, lgt_id_dest, rank, N )
                         !--------------------
                         ! Light DATA
                         !--------------------
@@ -1448,13 +1441,13 @@ contains
             !        # #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 ! we want to add everything to tree1
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1499,12 +1492,12 @@ contains
             !        # #
             do k1 = 1, hvy_n(tree_id1)
                 hvy_id1 = hvy_active(k1,tree_id1)
-                call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+                call hvy2lgt(lgt_id1, hvy_id1, rank, N )
                 level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
                 treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
                 do k2 = 1, hvy_n(tree_id2)
                     hvy_id2 = hvy_active(k2,tree_id2)
-                    call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+                    call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                     level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
                     treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                     if (treecode1 .ne. treecode2 ) then
@@ -1513,7 +1506,7 @@ contains
                         ! copy light data from one of the added trees
                         ! first we have to find out if the hvy data belongs to the tree we want to copy
                         call get_free_local_light_id( params, rank, lgt_block, lgt_id_dest)
-                        call lgt_id_to_hvy_id( hvy_id_dest, lgt_id_dest, rank, N )
+                        call lgt2hvy( hvy_id_dest, lgt_id_dest, rank, N )
                         !--------------------
                         ! Light DATA
                         !--------------------
@@ -1830,7 +1823,7 @@ function scalar_product_two_trees( params, tree_n, &
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !---------------------------------------------------------------
     logical :: verbose=.false.
-    character(len=80) :: MR
+    character(len=cshort) :: MR
     integer(kind=ik)    :: free_tree_id, Jmax, Bs(3), g, &
                          N, k, rank, i, mpierr
     integer(kind=ik)    :: level1, level2, hvy_id1, hvy_id2, lgt_id1, lgt_id2
@@ -1933,12 +1926,12 @@ function scalar_product_two_trees( params, tree_n, &
     sprod = 0.0_rk
     loop_tree1: do k1 = 1, hvy_n(tree_id1)
         hvy_id1 = hvy_active(k1,tree_id1)
-        call hvy_id_to_lgt_id(lgt_id1, hvy_id1, rank, N )
+        call hvy2lgt(lgt_id1, hvy_id1, rank, N )
         level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
         treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
         loop_tree2: do k2 = 1, hvy_n(tree_id2) !loop over all treecodes in 2.tree to find the same block
             hvy_id2 = hvy_active(k2,tree_id2)
-            call hvy_id_to_lgt_id(lgt_id2, hvy_id2, rank, N )
+            call hvy2lgt(lgt_id2, hvy_id2, rank, N )
             level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
             treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
             if (treecode1 .ne. treecode2 ) then
@@ -2123,7 +2116,7 @@ function scalar_product_two_trees_old( params, tree_n, &
     sprod = 0.0_rk
     do k = 1, hvy_n(free_tree_id)
       hvy_id = hvy_active(k, free_tree_id)
-      call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N )
+      call hvy2lgt(lgt_id, hvy_id, rank, N )
       ! calculate the lattice spacing.
       ! It is needed to perform the L2 inner product
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -2146,10 +2139,6 @@ function scalar_product_two_trees_old( params, tree_n, &
     endif
 end function
 !##############################################################
-
-
-
-
 
 
 
@@ -2249,8 +2238,8 @@ end function
                         call abort(270219, "Trees need same treestructure to fetch processor block distribution")
                     endif
                     ! check the block distribution (leaves are on same rank)
-                    call lgt_id_to_proc_rank( rank1, lgt_id1, N)
-                    call lgt_id_to_proc_rank( rank2, lgt_id2, N)
+                    call lgt2proc( rank1, lgt_id1, N)
+                    call lgt2proc( rank2, lgt_id2, N)
                     if (rank1 .ne. rank2) then
                         n_comm = n_comm + 1
         !                write(*,*) "===============> not identical", n_comm
@@ -2297,17 +2286,13 @@ end function
 
         do k = 1, hvy_n
             ! calculate lgtblock id corresponding to hvy id
-            call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+            call hvy2lgt( lgt_id, hvy_active(k), rank, N )
             if (lgt_block(lgt_id, idxtree) == tree_id) then
                 tree_hvy_n = tree_hvy_n + 1
             end if
         end do
     end function count_tree_hvy_n
     !##############################################################
-
-
-
-
 
 
 end module module_forest

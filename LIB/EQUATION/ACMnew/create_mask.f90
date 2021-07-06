@@ -47,6 +47,12 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! mask function and boundary values
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     select case (params_acm%geometry)
+    
+    case ('sphere-fixed') 
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_fixed_sphere(x0, dx, Bs, g, mask )
+        endif
+
     case ('sphere-free')
         if (stage == "time-dependent-part" .or. stage == "all-parts") then
             call draw_free_sphere(x0, dx, Bs, g, mask )
@@ -245,11 +251,6 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_cavity( mask, x0, dx, Bs, g )
         endif
 
-    case ('2D-wingsection')
-        if (stage == "time-dependent-part" .or. stage == "all-parts") then
-            call draw_2d_wingsection( time, mask, x0, dx, Bs, g )
-        endif
-
     case ('none')
         mask = 0.0_rk
 
@@ -438,6 +439,66 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask )
     end do
 
 end subroutine draw_free_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_precision
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+   
+    !h = 2*minval(dx)
+    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    h = 1.5_rk * dx_min
+
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%x_cntr(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+ 
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y + z*z)
+ 
+                tmp = smoothstep(r, params_acm%R_cyl, h)
+
+                if (tmp >= mask(ix,iy,iz,1)) then
+                    mask(ix,iy,iz,1) = tmp
+                    ! color
+                    mask(ix,iy,iz,5) = 1.0_rk    
+                endif 
+            end do
+        end do
+    end do
+
+end subroutine draw_fixed_sphere
 
 !-------------------------------------------------------------------------------
 

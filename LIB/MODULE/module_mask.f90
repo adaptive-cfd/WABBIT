@@ -18,31 +18,22 @@ contains
         use module_ACM
         implicit none
 
-        !> user defined parameter structure
-        type (type_params), intent(in)      :: params
-        real(kind=rk), intent(in)           :: time
-        !> light data array
-        integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-        real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-        real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-        !> heavy data array - neighbor data
-        integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-        !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)        :: hvy_active(:,:)
-        !> list of active blocks (light data)
-        integer(kind=ik), intent(inout)        :: lgt_active(:,:)
-        !> number of active blocks (heavy data)
-        integer(kind=ik), intent(inout)        :: hvy_n(:)
-        !> number of active blocks (light data)
-        integer(kind=ik), intent(inout)        :: lgt_n(:)
-        !> sorted list of numerical treecodes, used for block finding
-        integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:,:)
-        logical, intent(in), optional :: all_parts
-
-        integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jactive, Jmax
-        real(kind=rk) :: x0(1:3), dx(1:3)
-        logical, save :: time_independent_part_ready = .false.
-        logical :: force_all_parts
+        type (type_params), intent(in)         :: params                        !> user defined parameter structure
+        real(kind=rk), intent(in)              :: time
+        integer(kind=ik), intent(inout)        :: lgt_block(:, :)               !> light data array
+        real(kind=rk), intent(inout)           :: hvy_mask(:, :, :, :, :)
+        real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
+        integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)             !> heavy data array - neighbor data
+        integer(kind=ik), intent(inout)        :: hvy_active(:,:)               !> list of active blocks (heavy data)
+        integer(kind=ik), intent(inout)        :: lgt_active(:,:)               !> list of active blocks (light data)
+        integer(kind=ik), intent(inout)        :: hvy_n(:)                      !> number of active blocks (heavy data)
+        integer(kind=ik), intent(inout)        :: lgt_n(:)                      !> number of active blocks (light data)
+        integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:,:)      !> sorted list of numerical treecodes, used for block finding
+        logical, intent(in), optional          :: all_parts
+        integer(kind=ik)                       :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jactive, Jmax
+        real(kind=rk)                          :: x0(1:3), dx(1:3)
+        logical, save                          :: time_independent_part_ready = .false.
+        logical                                :: force_all_parts
 
         Bs = params%Bs
         g  = params%n_ghosts
@@ -124,7 +115,7 @@ contains
                 hvy_id = hvy_active(k, tree_ID_flow)
 
                 ! convert given hvy_id to lgt_id for block spacing routine
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 ! get block spacing for RHS
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -173,16 +164,12 @@ contains
 
         implicit none
 
-        !> user defined parameter structure
-        type (type_params), intent(in)      :: params
+        type (type_params), intent(in)      :: params                   !> user defined parameter structure
         real(kind=rk), intent(in)           :: time
-        !> light data array
-        integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+        integer(kind=ik), intent(inout)     :: lgt_block(:, :)          !> light data array
         real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-        !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-        !> number of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: hvy_n(:)
+        integer(kind=ik), intent(inout)     :: hvy_active(:,:)          !> list of active blocks (heavy data)
+        integer(kind=ik), intent(inout)     :: hvy_n(:)                 !> number of active blocks (heavy data)
         integer :: k, hvy_id, Bs(1:3), g, lgt_id
         real(kind=rk) :: x0(1:3), dx(1:3)
 
@@ -193,7 +180,7 @@ contains
             hvy_id = hvy_active(k, tree_ID_flow)
 
             ! convert given hvy_id to lgt_id for block spacing routine
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
@@ -212,27 +199,19 @@ contains
 
         implicit none
 
-        !> user defined parameter structure
-        type (type_params), intent(in)      :: params
+        type (type_params), intent(in)      :: params                     !> user defined parameter structure
         real(kind=rk), intent(in)           :: time
-        !> light data array
-        integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+        integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
         real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
         real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-        !> heavy data array - neighbor data
-        integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-        !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-        !> list of active blocks (light data)
-        integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-        !> number of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: hvy_n(:)
-        !> number of active blocks (light data)
-        integer(kind=ik), intent(inout)     :: lgt_n(:)
-        !> sorted list of numerical treecodes, used for block finding
-        integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+        integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
+        integer(kind=ik), intent(inout)     :: hvy_active(:,:)            !> list of active blocks (heavy data)
+        integer(kind=ik), intent(inout)     :: lgt_active(:,:)            !> list of active blocks (light data)
+        integer(kind=ik), intent(inout)     :: hvy_n(:)                   !> number of active blocks (heavy data)
+        integer(kind=ik), intent(inout)     :: lgt_n(:)                   !> number of active blocks (light data)
+        integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
         integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, tree_n, iter, lgt_id, Jmin
-        real(kind=rk) :: x0(1:3), dx(1:3)
+        real(kind=rk)                       :: x0(1:3), dx(1:3)
 
         if (params%rank==0) then
             write(*,'(80("~"))')
@@ -257,7 +236,7 @@ contains
 
         do k = 1, hvy_n(tree_ID_mask)
             hvy_id = hvy_active(k, tree_ID_mask)
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
             hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
@@ -295,7 +274,7 @@ contains
                 ! ==> you are mistaken. some blocks contain garbage and will not be removed
                 ! probably you could set those blocks to zero but until we use the µCT really, we should not bother.
                 ! if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
-                    call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                    call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
                     call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
                     hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )

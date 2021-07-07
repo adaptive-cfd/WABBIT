@@ -1,9 +1,4 @@
-
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module for volume penaliza \f$\chi(x,t)\f$
-!> \details
 !> This module implements the mask function on each Block
 !!          \f[
 !!                           \chi(x,t)\quad \forall\;  x\in\mathcal{–}^l
@@ -17,22 +12,15 @@
 !!                  the same
 !!       + maybe it is better to have a global mask on the finest grid level and coarsen it for
 !!         lower levels on the specific Blocks
-!!
-!> \version 23.2.2018
-!> \author P.Krah
 !-----------------------------------------------------------------
 
 module module_ns_penalization
 
-  !---------------------------------------------------------------------------------------------
-  ! modules
   use module_navier_stokes_params
   use module_precision
   use module_ini_files_parser_mpi
   use module_helpers, only:smoothstep
   use mpi
-  !---------------------------------------------------------------------------------------------
-  ! variables
 
   implicit none
 
@@ -50,7 +38,7 @@ module module_ns_penalization
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
-  character(len=80),                 save        :: mask_geometry!273.15_rk
+  character(len=cshort),                 save        :: mask_geometry!273.15_rk
   logical           ,                save        :: smooth_mask, use_sponge
   real(kind=rk),public             , save        :: C_eta_inv,C_sp_inv
   real(kind=rk),                     save        :: domain_size(3)=0.0_rk
@@ -97,11 +85,6 @@ subroutine init_penalization( FILE )
 end subroutine init_penalization
 
 
-
-
-
-
-
 !==========================================================================
 !> This function adds a penalization term
 !> to navier stokes equations
@@ -129,7 +112,6 @@ subroutine add_penalization_term(rhs,penalization,phi)
 
 end subroutine add_penalization_term
 !==========================================================================
-
 
 
 
@@ -264,8 +246,6 @@ function transition(x,x0,trans_width,val_left,val_rigth)
 
     transition= s * val_rigth + (1-s) * val_left
 end function transition
-
-
 
 
 
@@ -537,7 +517,6 @@ end subroutine wall_3D
 
 
 
-
 subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
 
     implicit none
@@ -581,11 +560,6 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
     end do
 end subroutine draw_free_outlet_wall
 !==========================================================================
-
-
-
-
-
 
 
 end module module_ns_penalization

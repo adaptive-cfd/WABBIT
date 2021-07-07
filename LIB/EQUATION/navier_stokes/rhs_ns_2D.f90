@@ -1,8 +1,3 @@
-
-!--------------------------------------------------------------------------------------------------------------------------------------------------------
-!> \file
-!> \brief Right hand side for 2D navier stokes equation
-!>        ---------------------------------------------
 !> The right hand side of navier stokes in the skew symmetric form is implemented as follows:
 !>\f{eqnarray*}{
 !!     \partial_t \sqrt{\rho} &=& -\frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{\sqrt{\rho}}\frac{1}{C_{\rm SP} } (\rho-\rho^{\rm SP}) \\
@@ -31,50 +26,23 @@
 !!    \partial_\alpha(u_\beta \tau_{\alpha\beta}+\phi_\alpha) - u_\alpha\partial_\beta \tau_{\alpha\beta}
 !!    =
 !!\f}
-!> \version 0.5
-!> \date 05/03/18 - create (commit beb3fa44e) \n
-!> \author Pkrah
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-
-
-
-
-
-
-
-
-!>\brief main function of RHS_2D_navier_stokes
 subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
-!---------------------------------------------------------------------------------------------
-!
     implicit none
-    !> grid parameter
-    integer(kind=ik), intent(in)                            :: g
+    integer(kind=ik), intent(in)                            :: g                !> grid parameter
     integer(kind=ik), dimension(3), intent(in)              :: Bs
-    !> origin and spacing of the block
-    real(kind=rk), dimension(2), intent(in)                 :: x0, delta_x
-    !> datafields
-    real(kind=rk), intent(in)                               :: phi(:, :, :)
-    !> rhs array
+    real(kind=rk), dimension(2), intent(in)                 :: x0, delta_x      !> origin and spacing of the block
+    real(kind=rk), intent(in)                               :: phi(:, :, :)     !> datafields
     real(kind=rk), intent(inout)                            :: rhs(:, :, :)
-
-    ! adiabatic coefficient
-    real(kind=rk)                                           :: gamma_
-    ! specific gas constant
-    real(kind=rk)                                           :: Rs
-    ! isochoric heat capacity
-    real(kind=rk)                                           :: Cv
-    ! isobaric heat capacity
-    real(kind=rk)                                           :: Cp
-    ! prandtl number
-    real(kind=rk)                                           :: Pr
-    ! dynamic viscosity
-    real(kind=rk)                                           :: dx,dy,dx2_12_inv,dy2_12_inv,sqrt_rho_inv
-    ! dissipation switch
-    logical                                                 :: dissipation
-
+    real(kind=rk)                                           :: gamma_           ! adiabatic coefficient
+    real(kind=rk)                                           :: Rs               ! specific gas constant
+    real(kind=rk)                                           :: Cv               ! isochoric heat capacity
+    real(kind=rk)                                           :: Cp               ! isobaric heat capacity
+    real(kind=rk)                                           :: Pr               ! prandtl number
+    real(kind=rk)                                           :: dx,dy,dx2_12_inv,dy2_12_inv,sqrt_rho_inv ! dynamic viscosity
+    logical                                                 :: dissipation      ! dissipation switch
     ! variables
     real(kind=rk)                                           :: rho(Bs(1)+2*g, Bs(2)+2*g), u(Bs(1)+2*g, Bs(2)+2*g), v(Bs(1)+2*g, Bs(2)+2*g),vRho(Bs(1)+2*g, Bs(2)+2*g), p(Bs(1)+2*g, Bs(2)+2*g), &
                                                                uRho(Bs(1)+2*g, Bs(2)+2*g),uRhou(Bs+2*g, Bs+2*g),uRhov(Bs+2*g, Bs+2*g),vRhov(Bs(1)+2*g, Bs(2)+2*g), &
@@ -85,17 +53,10 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
                                                                div_U, uRho_x, uRhou_x, vRhov_y, vRhou_y, vRho_y,uRhov_x, vp_y, up_x
     !friction parameters
     real(kind=rk)                                           ::  mu_d, mu, mu0, lambda
-
     ! friction_terms
     real(kind=rk)                                           ::  fric_p, fric_u, fric_v
-
     !loop variables
     integer(kind=ik)                                        :: ix,iy
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set physics parameters for readability
     gamma_      = params_ns%gamma_
@@ -147,10 +108,8 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
         ! mask coefficient
         mask = 1.0_rk/params_ns%C_eta*mask
     endif
-!---------------------------------------------------------------------------------------------
-! main body
 
-       !-----------------------------------------------------------------------
+
         do ix = g+1, Bs(2)+g
             do iy = g+1, Bs(1)+g
 
@@ -281,8 +240,6 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
         end do
 
 
-
-
 end subroutine rhs_ns_2d
 
 
@@ -327,7 +284,6 @@ end function df_dxdy_central
 
 
 
-
 !--------------------------------------------------------------------------!
 !               phils sponge stuff
 !--------------------------------------------------------------------------!
@@ -348,27 +304,16 @@ end function df_dxdy_central
 subroutine get_sponge(sponge, x0, dx, Bs, g)
 
     implicit none
-
-    ! grid
-    integer(kind=ik), intent(in)                              :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> sponge term for every grid point of this block
-    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)                   :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)                                             :: x, ddx
-    ! loop variables
-    integer(kind=ik)                                          :: ix, iy
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    integer(kind=ik), intent(in)                              :: g              ! grid
+    integer(kind=ik), dimension(3), intent(in)                :: Bs
+    real(kind=rk), dimension(2*g+Bs, 2*g+Bs), intent(out)     :: sponge         !> sponge term for every grid point of this block
+    real(kind=rk), dimension(2), intent(in)                   :: x0, dx         !> spacing and origin of block
+    real(kind=rk)                                             :: x, ddx         ! auxiliary variables
+    integer(kind=ik)                                          :: ix, iy         ! loop variables
 
     ! reset sponge array
     sponge = 0.0_rk
-!---------------------------------------------------------------------------------------------
-! main body
+
     ddx = 0.1_rk*params_ns%domain_size(1)
 
     do iy=1, Bs(2)+2*g

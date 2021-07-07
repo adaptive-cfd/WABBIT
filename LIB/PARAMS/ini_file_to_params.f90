@@ -14,7 +14,7 @@ subroutine ini_file_to_params( params, filename )
     ! maximum memory available on all cpus
     real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
     ! string read from command line call
-    character(len=80)                               :: memstring
+    character(len=cshort)                               :: memstring
     !
     integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
     integer(kind=ik), dimension(3)                  :: Bs
@@ -394,7 +394,7 @@ end subroutine ini_file_to_params
         integer(kind=ik), intent(in)    :: dims !number of dimensions
         integer(kind=ik):: Bs(3)
         integer(kind=ik):: i, n_entries
-        character(len=80):: output
+        character(len=cshort):: output
 
         Bs = 1
         ! read number_block_nodes

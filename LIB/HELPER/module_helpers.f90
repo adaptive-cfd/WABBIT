@@ -91,7 +91,7 @@ contains
     ! This function returns, to a given filename, the corresponding dataset name
     ! in the hdf5 file, following flusi conventions (folder/ux_0000.h5 -> "ux")
     !-----------------------------------------------------------------------------
-    character(len=strlen)  function get_dsetname(fname)
+    character(len=clong)  function get_dsetname(fname)
         implicit none
         character(len=*), intent(in) :: fname
         ! extract dsetname (from "/" until "_", excluding both)
@@ -278,18 +278,12 @@ contains
 
     real(kind=rk) function startup_conditioner(time, time_release, tau)
 
-        !---------------------------------------------------------------------------------------------
-        ! modules
         use module_precision
-        !---------------------------------------------------------------------------------------------
-        ! variables
 
         implicit none
 
         real(kind=rk), intent(in)  :: time,time_release, tau
         real(kind=rk)              :: dt
-        !---------------------------------------------------------------------------------------------
-        ! main body
 
         dt = time-time_release
 
@@ -430,8 +424,6 @@ contains
     end subroutine
 
 
-
-
     !-------------------------------------------------------------------------------
     ! runtime control routines
     ! flusi regularily reads from a file runtime_control.ini if it should do some-
@@ -441,7 +433,7 @@ contains
         ! overwrites the file again with the standard runtime_control file
         implicit none
         integer :: mpirank, mpicode
-        character(len=80) :: file
+        character(len=cshort) :: file
 
         file = "runtime_control"
         call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
@@ -465,8 +457,8 @@ contains
         ! reads runtime control command
         use module_ini_files_parser_mpi
         implicit none
-        character(len=80) :: command
-        character(len=80) :: file
+        character(len=cshort) :: command
+        character(len=cshort) :: file
         type(inifile) :: CTRL_FILE
         logical :: exists
         integer :: mpirank, mpicode
@@ -659,10 +651,10 @@ contains
         implicit none
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: default
-        character(len=80), intent(out) :: value
+        character(len=cshort), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
 
         value = default
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -714,7 +706,7 @@ contains
     subroutine get_cmd_arg_str_vct( name, value )
         implicit none
         character(len=*), intent(in) :: name
-        character(len=80), intent(out), ALLOCATABLE :: value(:)
+        character(len=cshort), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
         character(len=600) :: args
@@ -782,7 +774,7 @@ contains
         integer(kind=ik), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -840,7 +832,7 @@ contains
         real(kind=rk), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -906,7 +898,7 @@ contains
         logical, intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -968,7 +960,7 @@ contains
     subroutine print_command_line_arguments()
         implicit none
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
         if (rank == 0) then

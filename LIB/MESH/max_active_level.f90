@@ -1,40 +1,15 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name max_active_level.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief return finest level in active block list
-!
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 
 function max_active_level( lgt_block, lgt_active, lgt_n )
 
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
-
     implicit none
 
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in), optional :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in), optional :: lgt_n
-    ! return value
-    integer(kind=ik)                    :: max_active_level
-    ! loop variables
-    integer(kind=ik)                    :: k, Jmax, max_treelevel
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)            !> light data array
+    integer(kind=ik), intent(in), optional :: lgt_active(:)           !> list of active blocks (light data)
+    integer(kind=ik), intent(in), optional :: lgt_n                   !> number of active blocks (light data)
+    integer(kind=ik)                    :: max_active_level           ! return value
+    integer(kind=ik)                    :: k, Jmax, max_treelevel     ! loop variables
 
     max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
     !---------------------------------------------------------------------------------------------

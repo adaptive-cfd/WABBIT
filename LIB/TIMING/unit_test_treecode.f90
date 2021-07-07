@@ -1,35 +1,15 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-
-!
-!> = log ======================================================================================
-!! \n
-!! 04/04/17 - create
-!
-! ********************************************************************************************
-
 subroutine unit_test_treecode( params )
 
-!---------------------------------------------------------------------------------------------
-! modules
-! IO module
 use module_IO
 use module_treelib
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(inout) :: params
-    integer(kind=ik), ALLOCATABLE ::  treecode(:), n(:)
-    integer(kind=ik) :: treeN, ix, iy, iz, k, kk
-    integer(kind=tsize) :: newtreecode, neighbor
-    real(kind=rk) :: t
-    logical :: array_compare
+    type (type_params), intent(inout) :: params                   !> user defined parameter structure
+    integer(kind=ik), ALLOCATABLE     ::  treecode(:), n(:)
+    integer(kind=ik)                  :: treeN, ix, iy, iz, k, kk
+    integer(kind=tsize)               :: newtreecode, neighbor
+    real(kind=rk)                     :: t
+    logical                           :: array_compare
 
     ix = 77
     iy = 69

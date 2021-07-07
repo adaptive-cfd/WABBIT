@@ -1,16 +1,10 @@
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module for MODEL ORDER REDUCTION
 !! Current Methods:
 !!              * snapshot POD
-!> \version 01.3.2019
-!> \author P.Krah
 !-----------------------------------------------------------------
 
 module module_MOR
 
-  ! modules
   use mpi
   use module_forest
   use module_precision
@@ -54,38 +48,30 @@ contains
     implicit none
 
     !-----------------------------------------------------------------
-    !> user defined parameter structure
-    type (type_params), intent(inout)     :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> size of active lists
-    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n(:)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)        :: params                    !> user defined parameter structure
+    integer(kind=ik),  intent(inout)         :: lgt_block(:, :)           !> light data array
+    integer(kind=ik),  intent(inout)         :: lgt_n(:),tree_n, hvy_n(:) !> size of active lists
+    real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk),  intent(inout)           :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
+    real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)         !> neighbor array (heavy data)
+    integer(kind=ik),  intent(inout)         :: lgt_active(:, :)          !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)          !> list of active blocks (light data)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
-    !> number of POD modes
-    integer(kind=ik),optional, intent(inout)     :: truncation_rank
+    integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
     !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
     !> then the given treshold we discard the corresponding POD MODE.
-    real(kind=rk), optional, intent(in)     :: truncation_error
+    real(kind=rk), optional, intent(in)      :: truncation_error
     !> if true we write out all temporal coefficients and eigenvalues
     !> filenames eigenvalues.txt, acoef.txt
-    logical, optional, intent(in)     :: save_all
+    logical, optional, intent(in)            :: save_all
     !---------------------------------------------------------------
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
                     eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse, Volume
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                       free_tree_id, tree_id, max_nr_pod_modes, it
-    character(len=80):: filename
+    character(len=cshort):: filename
     character(len=30) :: rowfmt
     !---------------------------------------------------------------------------
     ! check inputs and set default values
@@ -194,37 +180,29 @@ contains
     implicit none
 
     !-----------------------------------------------------------------
-    !> user defined parameter structure
-    type (type_params), intent(inout)     :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> size of active lists
-    integer(kind=ik),  intent(inout)        :: lgt_n(:),tree_n, hvy_n(:)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)        :: params                    !> user defined parameter structure
+    integer(kind=ik),  intent(inout)         :: lgt_block(:, :)           !> light data array
+    integer(kind=ik),  intent(inout)         :: lgt_n(:),tree_n, hvy_n(:) !> size of active lists
+    real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk),  intent(inout)           :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
+    real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)         !> neighbor array (heavy data)
+    integer(kind=ik),  intent(inout)         :: lgt_active(:, :)          !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)          :: hvy_active(:, :)          !> list of active blocks (heavy data)
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     !> POD eigenvalues and eigenbasis to construct modes
-    real(kind=rk),  intent(in)           :: eigenvalues(:), eigenbasis(:, :)
-    !> number of POD modes
-    integer(kind=ik),optional, intent(inout)     :: truncation_rank
+    real(kind=rk),  intent(in)               :: eigenvalues(:), eigenbasis(:, :)
+    integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
     !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
     !> then the given treshold we discard the corresponding POD MODE.
-    real(kind=rk), optional, intent(in)     :: truncation_error
+    real(kind=rk), optional, intent(in)      :: truncation_error
     !---------------------------------------------------------------
-    real(kind=rk) ::  max_err, t_elapse, Volume
-    real(kind=rk) ,allocatable ::  alpha(:), a_coefs(:,:)
+    real(kind=rk)                            ::  max_err, t_elapse, Volume
+    real(kind=rk) ,allocatable               ::  alpha(:), a_coefs(:,:)
     integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
                        tree_id, N_modes, max_nr_pod_modes, it, j
-    character(len=80):: filename
+    character(len=cshort)                        :: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
     !---------------------------------------------------------------------------
@@ -401,9 +379,9 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80)      :: file_out, args,order
-    character(len=80),dimension(:), allocatable :: fname_list,  eigenbasis_files
-    character(len=80),dimension(:,:), allocatable :: file_in
+    character(len=cshort)      :: file_out, args,order
+    character(len=cshort),dimension(:), allocatable :: fname_list,  eigenbasis_files
+    character(len=cshort),dimension(:,:), allocatable :: file_in
     real(kind=rk)   , allocatable :: time(:),M(:,:),eigenvectors(:, :), eigenvalues(:,:)
     integer(kind=ik), allocatable :: iteration(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
@@ -667,14 +645,6 @@ contains
 
 
 
-
-
-
-
-
-
-
-
   !##############################################################
   subroutine post_PODerror(params)
     use module_precision
@@ -688,8 +658,8 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) :: fname_acoefs, filename, args, order
-    character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
+    character(len=cshort) :: fname_acoefs, filename, args, order
+    character(len=cshort),dimension(:), allocatable   :: fsnapshot_list, fmode_list
     character(len=100),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
@@ -1102,9 +1072,6 @@ contains
 
 
 
-
-
-
   !##############################################################
   !> Compute the L2 norm of the snapshotmatrix
   function compute_L2norm(params, tree_n, lgt_n, lgt_block, hvy_block, hvy_active, hvy_n, &
@@ -1114,33 +1081,27 @@ contains
       implicit none
       !-----------------------------------------------------------------
       ! inputs:
-      type (type_params), intent(inout)  :: params
-      integer(kind=ik), intent(in)      :: N_snapshots
-      !> light data array
-      integer(kind=ik),  intent(inout):: lgt_block(:, :)
-      !> size of active lists
-      integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
-      !> heavy data array - block data
-      real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+      type (type_params), intent(inout)   :: params
+      integer(kind=ik), intent(in)        :: N_snapshots
+      integer(kind=ik),  intent(inout)    :: lgt_block(:, :)              !> light data array
+      integer(kind=ik),  intent(inout)    :: lgt_n(:), tree_n, hvy_n(:)   !> size of active lists
+      real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
       !> heavy temp data: needed in blockxfer which is called in add_two_trees
-      real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
-      !> neighbor array (heavy data)
-      integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
-      !> list of active blocks (light data)
-      integer(kind=ik), intent(inout) :: lgt_active(:, :)
-      !> list of active blocks (light data)
-      integer(kind=ik), intent(inout) :: hvy_active(:, :)
+      real(kind=rk),   intent(inout)      :: hvy_tmp(:, :, :, :, :)
+      integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)            !> neighbor array (heavy data)
+      integer(kind=ik), intent(inout)     :: lgt_active(:, :)             !> list of active blocks (light data)
+      integer(kind=ik), intent(inout)     :: hvy_active(:, :)             !> list of active blocks (heavy data)
       !> sorted list of numerical treecodes, used for block finding
-      integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
-      logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+      integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+      logical, intent(in),optional        :: verbosity !< if true: additional information of processing
       !-----------------------------------------------------------------
       ! result
-      real(kind=rk) :: L2norm
+      real(kind=rk)                       :: L2norm
       !-----------------------------------------------------------------
-      integer(kind=ik)    :: lgt_id, hvy_id, ierr, tree_id = 1
-      integer(kind=ik)    :: k, rank, g, Bs(3), dF=1
-      real(kind=rk) :: norm, x0(3), dx(3), Volume
-      logical :: verbose=.false.
+      integer(kind=ik)                    :: lgt_id, hvy_id, ierr, tree_id = 1
+      integer(kind=ik)                    :: k, rank, g, Bs(3), dF=1
+      real(kind=rk)                       :: norm, x0(3), dx(3), Volume
+      logical                             :: verbose=.false.
 
       if (present(verbosity)) verbose = verbosity
       rank = params%rank
@@ -1172,30 +1133,22 @@ contains
     implicit none
 
     !-----------------------------------------------------------------
-    !> user defined parameter structure
-    type (type_params), intent(inout)  :: params
-    !> Covariance matrix for snapshot POD
-    real(kind=rk),  intent(inout)   :: C(:,:)
-    !> light data array
-    integer(kind=ik),  intent(inout):: lgt_block(:, :)
-    !> size of active lists
-    integer(kind=ik),  intent(inout):: lgt_n(:), tree_n, hvy_n(:)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)   :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)   :: params                     !> user defined parameter structure
+    real(kind=rk),  intent(inout)       :: C(:,:)                     !> Covariance matrix for snapshot POD
+    integer(kind=ik),  intent(inout)    :: lgt_block(:, :)            !> light data array
+    integer(kind=ik),  intent(inout)    :: lgt_n(:), tree_n, hvy_n(:) !> size of active lists
+    real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: needed in blockxfer which is called in add_two_trees
-    real(kind=rk),   intent(inout)  :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), intent(inout) :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout) :: lgt_active(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout) :: hvy_active(:, :)
+    real(kind=rk),   intent(inout)      :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:, :)           !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:, :)           !> list of active blocks (heavy data)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
-    integer(kind=ik)  :: tree_id1, tree_id2, N_snapshots, rank
-    real(kind=rk)     :: C_val, Volume, t_elapse, t_inc(2)
-    integer(kind=ik)  , allocatable :: lgt_active_tmp(:,:), lgt_block_tmp(:,:),lgt_n_tmp(:)
+    integer(kind=ik)                    :: tree_id1, tree_id2, N_snapshots, rank
+    real(kind=rk)                       :: C_val, Volume, t_elapse, t_inc(2)
+    integer(kind=ik)  , allocatable     :: lgt_active_tmp(:,:), lgt_block_tmp(:,:),lgt_n_tmp(:)
 
     allocate(lgt_block_tmp(size(lgt_block,1),size(lgt_block,2)))
     allocate(lgt_n_tmp(size(lgt_n,1)))
@@ -1263,8 +1216,8 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80), allocatable :: file_in(:,:), fname_list(:)
-    character(len=80) :: fname_acoefs, tmp_name, file_out, args, order
+    character(len=cshort), allocatable :: file_in(:,:), fname_list(:)
+    character(len=cshort) :: fname_acoefs, tmp_name, file_out, args, order
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
@@ -1542,40 +1495,32 @@ contains
     implicit none
 
     !-----------------------------------------------------------------
-    !> user defined parameter structure
-    type (type_params), intent(inout)     :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> size of active lists
-    integer(kind=ik),  intent(inout)        :: lgt_n(:), hvy_n(:)
-    !> heavy data array - block data
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)
+    type (type_params), intent(inout)   :: params                     !> user defined parameter structure
+    integer(kind=ik),  intent(inout)    :: lgt_block(:, :)            !> light data array
+    integer(kind=ik),  intent(inout)    :: lgt_n(:), hvy_n(:)         !> size of active lists
+    real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk),  intent(inout)           :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), intent(inout)          :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)          :: lgt_active(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)          :: hvy_active(:, :)
+    real(kind=rk),  intent(inout)       :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> neighbor array (heavy data)
+    integer(kind=ik),  intent(inout)    :: lgt_active(:, :)           !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:, :)           !> list of active blocks (heavy data)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> tree id of the reconstructed field and number of active trees
-    integer(kind=ik), intent(inout)       :: dest_tree_id, tree_n
-    !> number of POD modes
-    integer(kind=ik), intent(in)     :: iteration, N_modes
+    integer(kind=ik), intent(inout)     :: dest_tree_id, tree_n
+    integer(kind=ik), intent(in)        :: iteration, N_modes         !> number of POD modes
     !> Threshold value for truncating POD modes. If the singular value is smaller,
     !> then the given treshold we discard the corresponding POD MODE.
-    real(kind=rk),  intent(in)     :: a_coefs(:,:)
+    real(kind=rk),  intent(in)          :: a_coefs(:,:)
     !> optional argument for the tree_id of the first mode:
     !> this can be useful if you have some trees which are stored at beginning
     !>  tree_1 tree_2 tree_3, tree_mode1, tree_mode2 etc.
     !> default is 0
     integer(kind=ik), optional, intent(in)       :: opt_offset_mode_tree_id
     !---------------------------------------------------------------
-    integer(kind=ik)::  i, rank, free_tree_id, offset = 0_ik
-    real(kind=rk) :: a, t_elapse
-    character(len=80):: filename
+    integer(kind=ik)                    ::  i, rank, free_tree_id, offset = 0_ik
+    real(kind=rk)                       :: a, t_elapse
+    character(len=cshort)                   :: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
     !---------------------------------------------------------------------------
@@ -1647,13 +1592,6 @@ contains
   !##############################################################
 
 
-
-
-
-
-
-
-
   !##############################################################
   subroutine post_timecoef_POD(params)
     use module_precision
@@ -1667,9 +1605,9 @@ contains
     !--------------------------------------------
     type (type_params), intent(inout)  :: params
     !--------------------------------------------
-    character(len=80) ::  filename, args, order
-    character(len=80),dimension(:), allocatable   :: fsnapshot_list, fmode_list
-    character(len=80),dimension(:,:), allocatable ::snapshot_in, mode_in
+    character(len=cshort) ::  filename, args, order
+    character(len=cshort),dimension(:), allocatable   :: fsnapshot_list, fmode_list
+    character(len=cshort),dimension(:,:), allocatable ::snapshot_in, mode_in
     real(kind=rk)   , allocatable :: L2error(:),time(:)
     integer(kind=ik), allocatable :: iter_list(:)
     integer(kind=ik), allocatable :: lgt_block(:, :)
@@ -2009,7 +1947,7 @@ contains
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
     !> order of the wavelt
-    character(len=80), intent(in)    :: order
+    character(len=cshort), intent(in)    :: order
 
       ! Check parameters for correct inputs:
       if (order == "CDF20" .or. order == "CDF2,0") then

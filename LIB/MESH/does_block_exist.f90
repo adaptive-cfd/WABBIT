@@ -1,39 +1,17 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name does_block_exist.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief given a treecode, look for the block, return .true. and its light_id if found
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4
-!! 12/02/19 - check if block does exist in the specified tree
 ! ********************************************************************************************
 
 subroutine does_block_exist(treecode, exists, light_id, lgt_sortednumlist, lgt_n, tree_id)
     implicit none
 
-    !> block treecode we are looking for, array representation
-    integer(kind=ik), intent(in)        :: treecode(:)
-    !> logical, .true. if block with treecode exists
-    logical, intent(out)                :: exists
-    !> light data id of block if found
-    integer(kind=ik), intent(out)       :: light_id
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-    !> it helps to know how many active light blocks we have in total
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> index of the tree we are looking at
-    integer(kind=ik), intent(in)        :: tree_id
-    ! loop variables
-    integer(kind=ik)                    :: k, i1, i2, imid
-    ! numerical treecode
-    integer(kind=tsize)                 :: num_treecode
+    integer(kind=ik), intent(in)        :: treecode(:)                !> block treecode we are looking for, array representation
+    logical, intent(out)                :: exists                     !> true if block with treecode exists
+    integer(kind=ik), intent(out)       :: light_id                   !> light data id of block if found
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(in)        :: lgt_n                      !> it helps to know how many active light blocks we have in total
+    integer(kind=ik), intent(in)        :: tree_id                    !> index of the tree we are looking at
+    integer(kind=ik)                    :: k, i1, i2, imid            ! loop variables
+    integer(kind=tsize)                 :: num_treecode               ! numerical treecode
 
     exists   = .false.
     light_id = -1

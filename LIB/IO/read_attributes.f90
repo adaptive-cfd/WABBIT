@@ -1,17 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name read_attributes.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief read attributes saved in a hdf5-file
-! = log ======================================================================================
-!
-!> \date 02/02/18 - create
-!
 
 subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, periodic_BC, symmetry_BC, verbosity)
 

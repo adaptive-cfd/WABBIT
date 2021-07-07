@@ -1,17 +1,6 @@
-
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \file
-!> \callgraph
 !> \brief wrapper for RHS call in time step function, computes RHS in work array
 !! (inplace)
-!> \version 0.5
-!> \author sm
-!! \date 23/05/17 - create
 !!
-!
-!>\details
 !! calls RHS depending on physics
 !!
 !! butcher table, e.g.
@@ -22,9 +11,6 @@
 !! |c2 | a21| 0  |  0|
 !! |c3 | a31| a32|  0|
 !! | 0 | b1 | b2 | b3|
-!!
-!!
-!
 !**********************************************************************************************
 
 subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, &
@@ -32,39 +18,22 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
 
    implicit none
 
-    !> time variable
     real(kind=rk), intent(in)           :: time, dt
-    !> user defined parameter structure, hvy_active
-    type (type_params), intent(in)      :: params
-    !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> hvy_mask are qty that depend on the grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-
-    !> spacing and origin of a block
-    real(kind=rk), dimension(3)         :: dx, x0
-    ! loop variables
-    integer(kind=ik)                    :: k,  lgt_id
-    ! grid parameter
-    integer(kind=ik)                    :: g
-    integer(kind=ik), dimension(3) :: Bs
-
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure, hvy_active
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)     !> heavy work data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)    !> hvy_mask are qty that depend on the grid and not explicitly on time
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)            !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                   !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                   !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
+    real(kind=rk), dimension(3)         :: dx, x0                     !> spacing and origin of a block
+    integer(kind=ik)                    :: k,  lgt_id                 ! loop variables
+    integer(kind=ik)                    :: g                          ! grid parameter
+    integer(kind=ik), dimension(3)      :: Bs
 
     ! grid parameter
     Bs    = params%Bs
@@ -90,7 +59,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, lg
     ! them nicer, two RHS stages have to be defined: integral / local stage.
     do k = 1, hvy_n(tree_ID_flow)
       ! convert given hvy_id to lgt_id for block spacing routine
-      call hvy_id_to_lgt_id( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
+      call hvy2lgt( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
       ! get block spacing for RHS
       call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 

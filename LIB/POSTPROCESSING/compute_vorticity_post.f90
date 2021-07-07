@@ -1,13 +1,4 @@
-!> \file
-! WABBIT
-!> \name compute_vorticity_post.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief postprocessing routine for subsequent vorticity calculation from datafields ux, uy (, uz) saved in .h5 files
-! = log ======================================================================================
-!
-!> \version 02/02/18 - create commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 !-----------------------------------------------------------------------------------------------------
 
 subroutine compute_vorticity_post(params)
@@ -23,18 +14,18 @@ subroutine compute_vorticity_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: file_ux, file_uy, file_uz, operator
-    real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
-    integer(kind=ik), dimension(3) :: Bs
-    character(len=2)       :: order
+    character(len=cshort)                  :: file_ux, file_uy, file_uz, operator
+    real(kind=rk)                      :: time
+    integer(kind=ik)                   :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
+    integer(kind=ik), dimension(3)     :: Bs
+    character(len=2)                   :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=80)                  :: fname
+    character(len=cshort)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -167,7 +158,7 @@ subroutine compute_vorticity_post(params)
 
     ! calculate vorticity from velocities
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (operator == "--vorticity") then

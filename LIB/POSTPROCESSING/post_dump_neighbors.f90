@@ -12,7 +12,7 @@ subroutine post_dump_neighbors(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: file, operator
+    character(len=cshort)      :: file, operator
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length
     integer(kind=ik), dimension(3) :: Bs

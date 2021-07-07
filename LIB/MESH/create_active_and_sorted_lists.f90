@@ -1,33 +1,10 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name create_active_and_sorted_lists.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief create all active (lgt/hvy) lists, create also sorted list of active
 !! light blocks with numerical treecodes
-!! \n
-!! input:
-!!           - light data
-!!
-!! output:
-!!           - list of active blocks
+!! input:    - light data
+!! output:   - list of active blocks
 !!           - number of active blocks
 !!           - sorted light data with numerical treecodes
-!!
-!> = log ======================================================================================
-!! \n
-!! 14/06/17 - create subroutine
-!!
 ! ********************************************************************************************
-
-
-
-
-! ################################################################################
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE by looping
 !> over the hvy ids and synchronizing the active lists with the other procs
 subroutine create_active_and_sorted_lists_tree_comm( params, lgt_block, lgt_active, &
@@ -87,7 +64,7 @@ subroutine create_active_and_sorted_lists_tree_comm( params, lgt_block, lgt_acti
     ! loop over all hvy_data
     ! =======================================================
     do hvy_id = 1, N
-        call hvy_id_to_lgt_id( k, hvy_id, rank, N )
+        call hvy2lgt( k, hvy_id, rank, N )
         ! block is active
         if (lgt_block(k,TREE_ID_IDX)==tree_ID) then
              ! assuming that there are more blocks per rank then blocks with the corresponding tree ID
@@ -215,7 +192,7 @@ subroutine create_active_and_sorted_lists_tree( params, lgt_block, lgt_active, &
     ! loop over all hvy_data
     ! =======================================================
     do hvy_id = 1, N
-        call hvy_id_to_lgt_id( k, hvy_id, rank, N )
+        call hvy2lgt( k, hvy_id, rank, N )
         ! block is active
         if (lgt_block(k,TREE_ID_IDX)==tree_ID) then
             if ( lgt_block(k, 1) /= -1 ) then
@@ -345,10 +322,10 @@ subroutine create_active_and_sorted_lists_tree_old( params, lgt_block, lgt_activ
             ! update hvy active
             ! ---------------------------
             ! save heavy id, only if proc responsable for block
-            call lgt_id_to_proc_rank( block_rank, k, N )
+            call lgt2proc( block_rank, k, N )
             if ( rank == block_rank ) then
                 ! convert light data id into heavy data id
-                call lgt_id_to_hvy_id( heavy_id, k, rank, N)
+                call lgt2hvy( heavy_id, k, rank, N)
                 hvy_active( hvy_n + 1 ) = heavy_id
                 hvy_n                   = hvy_n + 1
             end if
@@ -463,7 +440,7 @@ subroutine create_active_and_sorted_lists_forest_comm( params, lgt_block, lgt_ac
     ! loop over all light data
     ! =======================================================
     do hvy_id = 1, N
-        call hvy_id_to_lgt_id( k, hvy_id, rank, N )
+        call hvy2lgt( k, hvy_id, rank, N )
         ! block is active
         if ( lgt_block(k, 1) /= -1 ) then
             ! which tree id has the current block k?
@@ -539,20 +516,6 @@ subroutine create_active_and_sorted_lists_forest_comm( params, lgt_block, lgt_ac
 
     call toc("create_active_and_sorted_lists_forest", MPI_wtime()-t0)
 end subroutine create_active_and_sorted_lists_forest_comm
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -647,10 +610,10 @@ subroutine create_active_and_sorted_lists_forest( params, lgt_block, lgt_active,
             ! update hvy active
             ! ---------------------------
             ! save heavy id, only if proc responsable for block
-            call lgt_id_to_proc_rank( block_rank, k, N )
+            call lgt2proc( block_rank, k, N )
             if ( rank == block_rank ) then
                 ! convert light data id into heavy data id
-                call lgt_id_to_hvy_id( heavy_id, k, rank, N)
+                call lgt2hvy( heavy_id, k, rank, N)
                 hvy_n(tree_id) = hvy_n(tree_id) + 1
                 hvy_active( hvy_n(tree_id) , tree_id ) = heavy_id
             end if

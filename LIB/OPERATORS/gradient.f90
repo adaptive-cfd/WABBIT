@@ -1,39 +1,18 @@
-!> \file
-! WABBIT
-!> \name gradient.f90
-!> \version 0.1
-!> \author dk
-!
 !> \brief computation of the gradient of a field
-!
-! = log ======================================================================================
 !-----------------------------------------------------------------------------------------------------
 subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
-    !> origin and spacing of the block
-    real(kind=rk), dimension(3), intent(in)        :: dx
-    !> local datafields
-    real(kind=rk), dimension(:,:,:), intent(in)    :: fld
-    !> vorticity
-    real(kind=rk), dimension(:,:,:,:), intent(out) :: grad_fld
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:), intent(in)    :: fld                       !> local datafields
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: grad_fld                  !> vorticity
     character(len=*), intent(in)                   :: discretization
-    !> grid parameters
-    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
     integer(kind=ik), dimension(3), intent(in)     :: Bs
-    !> derivatives
-    real(kind=rk)                                  :: fld_dx, fld_dy, fld_dz
-    !> inverse of dx, dy, dz
-    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv
-    ! loop variables
-    integer(kind=ik)                               :: ix, iy, iz
-    ! coefficients for Tam&Webb
-    real(kind=rk)                                  :: a(-3:3)
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    real(kind=rk)                                  :: fld_dx, fld_dy, fld_dz    !> derivatives
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
+    real(kind=rk)                                  :: a(-3:3)                   ! coefficients for Tam&Webb
 
     fld_dx = 0.0_rk
     fld_dy = 0.0_rk
@@ -44,9 +23,6 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     if (size(fld,3)>2) then
         !-----------------------------------------------------------------------

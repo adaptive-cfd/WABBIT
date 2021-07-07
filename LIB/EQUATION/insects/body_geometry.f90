@@ -1536,7 +1536,7 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     real(kind=rk) :: M_body(1:3,1:3), M_body_inv(1:3,1:3)
     real(kind=rk) :: scale, origin(1:3), tmp, x, y, z
     real(kind=rk) :: x_glob(1:3), x_body(1:3)
-    character(len=strlen) :: fname_stl
+    character(len=clong) :: fname_stl
 
     color_body = Insect%color_body
     M_body     = Insect%M_body

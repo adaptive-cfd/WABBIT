@@ -1,54 +1,17 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name treecode_to_sfc_id_3D.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief convert given treecode to position in sfc
-!
-!> 
 !! input:    - treecode \n
 !! output:   - position in sfc curve \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 09/02/17 - create
-!
 ! ********************************************************************************************
 
 subroutine treecode_to_sfc_id_3D(sfc_id, treecode, n)
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
-
-    !> sfc id
     integer(kind=ik), intent(out)       :: sfc_id
-
-    !> treecode size
-    integer(kind=ik), intent(in)        :: n
-
-    !> treecode
+    integer(kind=ik), intent(in)        :: n                !> treecode size
     integer(kind=ik), intent(in)        :: treecode(n)
-
-    !> loop variable
-    integer(kind=ik)                    :: k
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    integer(kind=ik)                    :: k                !> loop variable
 
     sfc_id = 0
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! calculate sfc id
     ! change -1 in treecode to 0

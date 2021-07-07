@@ -1,9 +1,3 @@
-!> \file
-! WABBIT
-!> \name keyvalues.f90
-!> \version 0.5
-!> \author sm, engels
-!
 !> \brief loads the specified *.h5 file and creates a *.key file that contains
 !! min / max / mean / L2 norm of the field data. This is used for testing
 !! so that we don't need to store entire fields but rather the *.key only
@@ -15,12 +9,10 @@ subroutine compare_keys(key1, key2)
     use module_precision
 
     implicit none
-    !> name of the file
-    character(len=*), intent(in)            :: key1, key2
-
-    integer(kind=ik) :: i
-    real(kind=rk) :: data1(1:6), data2(1:6), error(1:6)
-    integer(kind=ik) :: curves1(1:2), curves2(1:2), error_curve(1:2)
+    character(len=*), intent(in) :: key1, key2
+    integer(kind=ik)             :: i
+    real(kind=rk)                :: data1(1:6), data2(1:6), error(1:6)
+    integer(kind=ik)             :: curves1(1:2), curves2(1:2), error_curve(1:2)
     !-----------------------------------------------------------------------------------------------------
     ! does the user need help?
     if (key1 == '--help' .or. key1 == '--h') then

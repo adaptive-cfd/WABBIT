@@ -313,7 +313,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:)
     !> discretization order
-    character(len=80), intent(in)           :: order_discretization
+    character(len=cshort), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
@@ -531,7 +531,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
-    character(len=80), intent(in)           :: order_discretization
+    character(len=cshort), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
@@ -848,7 +848,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
-    character(len=80), intent(in)           :: order_discretization
+    character(len=cshort), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
@@ -1101,7 +1101,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
-    character(len=80), intent(in)           :: order_discretization
+    character(len=cshort), intent(in)           :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 

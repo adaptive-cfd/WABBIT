@@ -1,52 +1,22 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name read_mesh.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief read mesh properties of a field saved in a hdf5-file
-!
-!>
-!! input:
-!!           - parameter array
+!! input:    - parameter array
 !!           - name of the file we want to read from
-!!
-!! output:
-!!           - light block array
+!! output:   - light block array
 !!           - number of active blocks (light and heavy)
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 29/09/17 - create
-!
 ! ********************************************************************************************
 
 subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     implicit none
 
-    !> file name
-    character(len=*), intent(in)      :: fname
-    !> user defined parameter structure
-    type (type_params), intent(in)    :: params
-    !> number of active blocks (heavy and light data)
-    integer(kind=ik), intent(inout)   :: hvy_n, lgt_n
-    !> light data array
-    integer(kind=ik), intent(inout)   :: lgt_block(:,:)
-     !> index of the tree you want to save the field in
-    integer(kind=ik), optional, intent(in)   :: tree_id_optional
-
-    ! treecode array
-    integer(kind=ik), dimension(:,:), allocatable :: block_treecode
-    ! file id integer
+    character(len=*), intent(in)      :: fname                                  !> file name
+    type (type_params), intent(in)    :: params                                 !> user defined parameter structure
+    integer(kind=ik), intent(inout)   :: hvy_n, lgt_n                           !> number of active blocks (heavy and light data)
+    integer(kind=ik), intent(inout)   :: lgt_block(:,:)                         !> light data array
+    integer(kind=ik), optional, intent(in)   :: tree_id_optional                !> index of the tree you want to save the field in
+    integer(kind=ik), dimension(:,:), allocatable :: block_treecode             ! treecode array
     integer(hid_t)        :: file_id
-    ! process rank, number of procs
     integer(kind=ik)      :: rank, number_procs
-    ! grid parameter
-    integer(kind=ik)      :: g, datarank
+    integer(kind=ik)      :: g, datarank                                        ! grid parameter
     integer(kind=ik), dimension(3)    :: Bs
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2), Bs_file(1:3)
@@ -101,7 +71,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     !----------------------------------------------------------------------------------
     ! version check
     !----------------------------------------------------------------------------------
-    ! Files created using the newGhostNodes branch (after 08 April 2020) contain a version number. 
+    ! Files created using the newGhostNodes branch (after 08 April 2020) contain a version number.
     ! if the number is not found, version=0.
     call read_attribute( file_id, "blocks", "version", version)
 
@@ -118,12 +88,12 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,*) "The newGhostNodes branch still STORED the redundant point for visualization."
         write(*,*) "This was simply the first ghost node. If Bs was odd, this lead to an even number"
         write(*,*) "of points, and this cannot be read with present code versions."
-        write(*,*) ""        
+        write(*,*) ""
         write(*,*) "A workaround must be done in preprocessing: upsampling to equidistant resolution and"
         write(*,*) "re-gridding is required. I am truely sorry for this."
         write(*,*) ""
-        write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"                
-        write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"        
+        write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"
+        write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"
         write(*,*) "have been obtained with the newGhostNodes branch"
         write(*,*) "--------------------------------------------------------------------"
         write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
@@ -193,7 +163,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     lgt_block = -1
 
      do k = 1, hvy_n
-        call hvy_id_to_lgt_id( lgt_id, k, rank, params%number_blocks )
+        call hvy2lgt( lgt_id, k, rank, params%number_blocks )
         ! copy treecode
         lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level

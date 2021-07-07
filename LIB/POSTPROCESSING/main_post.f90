@@ -1,14 +1,4 @@
-!> \file
-! WABBIT
-!> \name    main.f90
-!> \version 0.5
-!> \author  sm
-!
 !> \brief main postprocessing program. get command argument to decide which postprocessing mode to run
-!
-! = log ======================================================================================
-!
-!> \version 30/1/2018 - create hashcode: commit 13cb3d25ab12e20cb38e5b87b9a1e27a8fe387e8
 ! ********************************************************************************************
 
 program main_post
@@ -19,23 +9,16 @@ program main_post
 
     implicit none
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank
-    ! number of processes
-    integer(kind=ik)                    :: number_procs
-
+    integer(kind=ik)                    :: ierr                   ! MPI error variable
+    integer(kind=ik)                    :: rank                   ! process rank
+    integer(kind=ik)                    :: number_procs           ! number of processes
     type (type_params)                  :: params
-    character(len=80)                   :: mode
-    character(len=80)                   :: filename, key1, key2
-
+    character(len=cshort)                   :: mode
+    character(len=cshort)                   :: filename, key1, key2
     real(kind=rk)                       :: elapsed_time
 
-    ! init mpi
-    call MPI_Init(ierr)
-    ! determine process rank
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    call MPI_Init(ierr)                                           ! init mpi
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)                ! determine process rank
     params%rank = rank
 
     ! this is used to document a bit (one often forgets to write down the params in the command line call)

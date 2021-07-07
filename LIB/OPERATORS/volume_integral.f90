@@ -1,65 +1,26 @@
-! !> \file
-! !> \callgraph
-! ! ********************************************************************************************
-! ! WABBIT
-! ! ============================================================================================
-! !> \name volume_integral.f90
-! !> \version 0.5
-! !> \author sm
-! !
-! !> \brief computation of the velocity volume integral
-! !
-! !>
-! !! input:
-! !!           - heavy block data
-! !!           - params
-! !!           - hvy_active, lgt_block list
-! !!
-! !! output:
-! !!           - volume integral
-! !!
-! !!
-! !! = log ======================================================================================
-! !! \n
-! !! 27/07/17 - create
-! ! ********************************************************************************************
-!
+!> \brief computation of the velocity volume integral
+!! input:    - heavy block data
+!!           - params
+!!           - hvy_active, lgt_block list
+!! output:   - volume integral
+! ********************************************************************************************
+
 ! subroutine volume_integral(volume_int, hvy_block, params, hvy_active, hvy_n, lgt_block)
 !
-! !----------------------------------------------------------------------------------------------
-! ! modules
-!
-! !----------------------------------------------------------------------------------------------
-! ! variables
-!
 !     implicit none
-!
-!     !> global volume integral
-!     real(kind=rk), dimension(3), intent(out) :: volume_int
-!     !> actual block data
-!     real(kind=rk), intent(in)                :: hvy_block(:, :, :, :, :)
-!     !> physics parameter structure
-!     type (type_params), intent(in)           :: params
-!     !> list of active blocks (heavy data)
-!     integer(kind=ik), intent(in)             :: hvy_active(:)
+!     real(kind=rk), dimension(3), intent(out) :: volume_int                !> global volume integral
+!     real(kind=rk), intent(in)                :: hvy_block(:, :, :, :, :)  !> actual block data
+!     type (type_params), intent(in)           :: params                    !> physics parameter structure
+!     integer(kind=ik), intent(in)             :: hvy_active(:)             !> list of active blocks (heavy data)
 !     integer(kind=ik), intent(in)             :: lgt_block(:,:)
 !     integer(kind=ik), intent(in)             :: hvy_n
 !
-!
-!     !> origin and spacing of the block
-!     real(kind=rk), dimension(3)              :: dx, x0
-!     !> volume integral of one block and of all blocks on my process
-!     real(kind=rk), dimension(3)              :: int_block, int_local
-!     !> grid parameter
-!     integer(kind=ik)                         :: Bs, g
-!     !> loop variables
-!     integer(kind=ik)                         :: k, lgt_id
-!     !> MPI error
+!     real(kind=rk), dimension(3)              :: dx, x0                    !> origin and spacing of the block
+!     real(kind=rk), dimension(3)              :: int_block, int_local      !> volume integral of one block and of all blocks on my process
+!     integer(kind=ik)                         :: Bs, g                     !> grid parameter
+!     integer(kind=ik)                         :: k, lgt_id                 !> loop variables
 !     integer                                  :: mpi_err
 !
-!
-! !---------------------------------------------------------------------------------------------
-! ! variables initialization
 !
 !    int_block  = 0.0_rk
 !    int_local  = 0.0_rk
@@ -68,13 +29,11 @@
 !    Bs = params%Bs
 !    g  = params%n_ghosts
 !
-! !---------------------------------------------------------------------------------------------
-! ! main body
 !
 !    do k = 1, hvy_n
 !
 !        ! convert given hvy_id to lgt_id for block spacing routine
-!        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+!        call hvy2lgt( lgt_id, hvy_active(k), params%rank, params%number_blocks )
 !
 !        ! get block spacing for RHS
 !        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )

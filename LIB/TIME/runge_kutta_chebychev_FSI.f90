@@ -9,37 +9,27 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_b
 
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy work data array - block data
-    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)
+    type (type_params), intent(in)      :: params                       !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)              !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)           !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)              !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
 
     ! in fortran, we work with indices:
-    integer :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
-    integer, parameter :: y00=1, F0=2
-    integer :: i, k, s, hvy_id
-    real(kind=rk) :: tau
-    logical, save :: setup_complete = .false.
-    logical, save :: informed = .false.
+    integer                             :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
+    integer, parameter                  :: y00=1, F0=2
+    integer                             :: i, k, s, hvy_id
+    real(kind=rk)                       :: tau
+    logical, save                       :: setup_complete = .false.
+    logical, save                       :: informed = .false.
 
     if (.not. setup_complete) then
         call setup_RKC_coefficients(params)

@@ -1,30 +1,18 @@
 subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
-    !> origin and spacing of the block
-    real(kind=rk), dimension(3), intent(in)        :: dx
-    !> local datafields
-    real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w
-    !> vorticity
-    real(kind=rk), dimension(:,:,:), intent(out)   :: Qcrit
+    real(kind=rk), dimension(3), intent(in)        :: dx              !> spacing of the block
+    real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w         !> local datafields
+    real(kind=rk), dimension(:,:,:), intent(out)   :: Qcrit           !> vorticity
     character(len=*), intent(in)                   :: discretization
-    !> grid parameters
-    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), intent(in)                   :: g               !> grid parameters
     integer(kind=ik), dimension(3), intent(in)     :: Bs
     !> derivatives
     real(kind=rk)                                  :: uxdx,uxdy,uxdz,uydx,uydy,uydz,uzdx,uzdy,uzdz
-    !> inverse of dx, dy, dz
-    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv
-    ! loop variables
-    integer(kind=ik)                               :: ix, iy, iz
-    ! coefficients for Tam&Webb
-    real(kind=rk)                                  :: a(-3:3)
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz      ! loop variables
+    real(kind=rk)                                  :: a(-3:3)         ! coefficients for Tam&Webb
     real(kind=rk) :: Amatrix(1:3,1:3)
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     Qcrit = 0.0_rk
 
@@ -34,9 +22,6 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     if (size(u,3)>2) then
         !-----------------------------------------------------------------------

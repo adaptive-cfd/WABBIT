@@ -25,7 +25,7 @@ subroutine BodyMotion(time, Insect)
     real(kind=rk) :: psi, beta, gamma, psi_dt, beta_dt, gamma_dt
     real(kind=rk) :: xc(1:3), vc(1:3), ep(0:3)
     real(kind=rk) :: T,R
-    character(len=strlen) :: dummy
+    character(len=clong) :: dummy
 
     ! the tag body_moves is used to draw the insect's body only once, if the body
     ! does not move (body_moves=="no"). For safety, we initialize the body as moving
@@ -224,7 +224,7 @@ subroutine BodyMotion(time, Insect)
             ! use body state from a pre-existing simulation, which was probably an FSI
             ! run with free-flight. using this case, you can replay the same motion under
             ! different flow conditions
-            call read_insect_STATE_from_file(time, Insect, Insect%BodyMotion(12:strlen), verbose=.false.)
+            call read_insect_STATE_from_file(time, Insect, Insect%BodyMotion(12:clong), verbose=.false.)
 
             Insect%body_moves = "yes"
             Insect%quaternion_solver_used = .true.

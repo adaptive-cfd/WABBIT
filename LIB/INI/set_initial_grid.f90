@@ -1,33 +1,11 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name set_initial_grid.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief This routine initializes the block data, i.e. it evaluates the initial condition on the grid
-!
-!>
-!! input:
-!!           - parameter array
+!! input:    - parameter array
 !!           - light data array
 !!           - heavy data array
 !!           - neighbor data array
 !!           - light and heavy active block list
-!!
-!! output:
-!!           - filled user defined data structure for global params
+!! output:   - filled user defined data structure for global params
 !!           - initialized light and heavy data arrays
-!!
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4, now run complete initialization within these subroutine and return
-!!            initialized block data to main program \n
-!! 07/12/16 - now uses heavy work data array \n
-!! 25/01/17 - switch to 3D, v0.5
-!
 ! ********************************************************************************************
 
 subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
@@ -35,27 +13,17 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(inout)    :: params
-    !> light data array
-    integer(kind=ik), intent(inout)      :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)
-    !> heavy work data array - block data.
-    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
+    type (type_params), intent(inout)    :: params                      !> user defined parameter structure
+    integer(kind=ik), intent(inout)      :: lgt_block(:, :)             !> light data array
+    real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)   !> heavy work data array - block data.
     real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)
-    !> list of active blocks light data)
-    integer(kind=ik), intent(inout)      :: lgt_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)      :: hvy_active(:,:)
-    !> number of heavy and light active blocks
-    integer(kind=ik), intent(inout)      :: hvy_n(:), lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:,:)
-    !> time loop variables
-    real(kind=rk), intent(inout)         :: time
+    integer(kind=ik), intent(inout)      :: hvy_neighbor(:,:)           !> neighbor array (heavy data)
+    integer(kind=ik), intent(inout)      :: lgt_active(:,:)             !> list of active blocks light data)
+    integer(kind=ik), intent(inout)      :: hvy_active(:,:)             !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)      :: hvy_n(:), lgt_n(:)          !> number of heavy and light active blocks
+    integer(kind=tsize), intent(inout)   :: lgt_sortednumlist(:,:,:)    !> sorted list of numerical treecodes, used for block finding
+    real(kind=rk), intent(inout)         :: time                        !> time loop variables
     integer(kind=ik), intent(inout)      :: iteration
 
     !> if .false. the code initializes on the coarsest grid, if .true. iterations
@@ -197,7 +165,7 @@ subroutine set_initial_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_acti
                 !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
                 call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
                 lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID_flow  )
-                
+
                 ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                 ! not, the detail coefficients for all blocks are zero. In the time stepper, this
                 ! corresponds to advancing the solution in time, it's just that here we know the exact

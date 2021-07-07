@@ -1,8 +1,3 @@
-
-! ============================================================================================
-!> \name coarsening_indicator.f90
-!> \version 0.5
-!> \author engels
 !> \brief Set coarsening status for all active blocks, different methods possible
 !
 !> \details This routine sets the coarsening flag for all blocks. We allow for different
@@ -16,11 +11,6 @@
 !! 0 do nothing \n
 !! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
 !! -2 block will coarsen and be merged with her sisters \n
-!! ------------------ \n
-!! \n
-!! = log ======================================================================================
-!! \n
-!! 29/05/2018 create
 ! ********************************************************************************************
 subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
@@ -29,37 +19,26 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
 
     implicit none
     real(kind=rk), intent(in)           :: time
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy work data array - block data.
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !> heavy work data array - block data.
     ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
     ! mask functions separately. This makes the mask routines tree-level routines (and no longer
     ! block level) so the physics modules have to provide an interface to create the mask at a tree
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
-    !> how to choose blocks for refinement
-    character(len=*), intent(in)        :: indicator
+    integer(kind=ik), intent(inout)     :: lgt_active(:)                  !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n                          !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)                  !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                          !> number of active blocks (heavy data)
+    character(len=*), intent(in)        :: indicator                      !> how to choose blocks for refinement
     !> coarsening iteration index. coarsening is done until the grid has reached
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)              !> heavy data array - neighbor data
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)         !> sorted list of numerical treecodes, used for block finding
 
     ! for the mask generation (time-independent mask) we require the mask on the highest
     ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
@@ -116,7 +95,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
             hvy_id = hvy_active(k)
 
             ! get lgt id of block
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
             ! some indicators may depend on the grid (e.g. the vorticity), hence
             ! we pass the spacing and origin of the block
@@ -225,7 +204,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
             do k = 1, hvy_n
                 hvy_id = hvy_active(k)
                 ! get lgt id of block
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 ! some indicators may depend on the grid, hence
                 ! we pass the spacing and origin of the block (as we have to compute vorticity
@@ -243,7 +222,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
             do k = 1, hvy_n
                 hvy_id = hvy_active(k)
                 ! get lgt id of block
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 ! some indicators may depend on the grid, hence
                 ! we pass the spacing and origin of the block (as we have to compute vorticity

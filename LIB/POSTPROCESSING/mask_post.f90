@@ -11,7 +11,7 @@ subroutine mask_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: fname_ini, fname_mask, fname_grid
+    character(len=cshort)      :: fname_ini, fname_mask, fname_grid
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
     integer(kind=ik), dimension(3) :: Bs
@@ -22,7 +22,7 @@ subroutine mask_post(params)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=80)                  :: fname
+    character(len=cshort)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     real(kind=rk), allocatable :: us(:,:,:,:)
     integer(hid_t)                     :: file_id
@@ -85,7 +85,7 @@ subroutine mask_post(params)
 
     ! calculate vorticity from velocities
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         call create_mask_3D_ACM( time, x0, dx, params%Bs, params%n_ghosts, &
         hvy_work(:,:,:,1, hvy_active(k)), us )

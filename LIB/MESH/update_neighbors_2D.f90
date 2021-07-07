@@ -1,28 +1,8 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name update_neighbors_2D.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief update neighbor relations with light data, store neighbors in neighbor list (heavy data)
 !!        2D version
-!
-!> \details
-!! input:
-!!           - light data array
+!! input:    - light data array
 !!           - params struct
-!!
-!! output:
-!!           - neighbor list array
-!!
-!! = log ======================================================================================
-!! \n
-!! 07/11/16 - switch to v0.4 \n
-!! 27/01/17 - use process rank from params struct
-!
+!! output:   - neighbor list array
 ! ********************************************************************************************
 !> \image html update_neighbors2D.svg "Update Neighbors" width=400
 
@@ -30,35 +10,20 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
     hvy_active, hvy_n, error, skip_diagonal_neighbors)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)          !> light data array
+    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)        !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: lgt_active(:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n                    !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(in)        :: hvy_active(:)            !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n                    !> number of active blocks (heavy data)
     logical, intent(inout)              :: error
-    logical, intent(in), optional       :: skip_diagonal_neighbors ! currently not working (Thomas, 02-2021) [unused]
-
-    ! number of blocks per proc
-    integer(kind=ik)                    :: N
-    ! max treelevel
+    logical, intent(in), optional       :: skip_diagonal_neighbors  ! currently not working (Thomas, 02-2021) [unused]
+    integer(kind=ik)                    :: N                        ! number of blocks per proc
     integer(kind=ik)                    :: max_treelevel
-
-    ! process rank
-    integer(kind=ik)                    :: rank
-
-    ! loop variable
-    integer(kind=ik)                    :: k, lgt_id
+    integer(kind=ik)                    :: rank                     ! process rank
+    integer(kind=ik)                    :: k, lgt_id                ! loop variable
     integer(kind=2) :: n_domain(1:3)
 
     rank = params%rank
@@ -80,7 +45,7 @@ subroutine update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
         hvy_neighbor(hvy_active(k), : ) = -1
 
         ! light id
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+        call hvy2lgt( lgt_id, hvy_active(k), rank, N )
 
         call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
         params%domain_size, params%Bs, params%dim, n_domain )

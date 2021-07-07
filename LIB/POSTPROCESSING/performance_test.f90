@@ -2,32 +2,24 @@ subroutine performance_test(params)
     use mpi
     use module_helpers
     use module_MPI
-    ! global parameters
-    use module_params
-    ! timing module
+    use module_params           ! global parameters
     use module_timing
-    ! init data module
-    use module_initialization
-    ! mesh manipulation subroutines
-    use module_mesh
-    ! IO module
+    use module_initialization   ! init data module
+    use module_mesh             ! mesh manipulation subroutines
     use module_IO
-    ! time step module
     use module_time_step
-    ! unit test module
     use module_unit_test
-    ! bridge implementation of wabbit
-    use module_bridge_interface
+    use module_bridge_interface ! bridge implementation of wabbit
     use module_forest
     use module_mask
 
     implicit none
-    type (type_params), intent(inout)  :: params
+    type (type_params), intent(inout)   :: params
 
     ! perform 20 time steps per mesh.
-    integer, parameter :: N_timesteps = 15
-    integer, parameter :: N_grids = 50
-    real(kind=rk), parameter :: target_grid_density = 0.11
+    integer, parameter                  :: N_timesteps = 15
+    integer, parameter                  :: N_grids = 50
+    real(kind=rk), parameter            :: target_grid_density = 0.11
 
     integer(kind=ik)                    :: number_procs, ierr, rank
     real(kind=rk)                       :: t0_timesteps(1:N_timesteps)
@@ -46,7 +38,7 @@ subroutine performance_test(params)
 
     real(kind=rk)                       :: time = 0.0_rk
     integer(kind=ik)                    :: iteration = 0
-    character(len=80)                   :: filename
+    character(len=cshort)                   :: filename
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp, j, a
     real(kind=rk)                       :: t0, dt, t4
 

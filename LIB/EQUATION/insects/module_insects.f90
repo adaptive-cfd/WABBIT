@@ -89,7 +89,7 @@ module module_insects
     ! coefficients are read only once from file (or set differently)
     logical :: initialized = .false.
     ! some details about the file, if reading from ini file
-    character(len=strlen) :: infile_convention="", infile_type="", infile_units="", infile=""
+    character(len=clong) :: infile_convention="", infile_type="", infile_units="", infile=""
     ! variables for kineloader (which uses non-periodic hermite interpolation)
     integer :: nk=0
     real(kind=rk), dimension (1:nhrmt_max) :: vec_t=0.d0, &
@@ -154,8 +154,8 @@ module module_insects
     ! total mass of insect:
     real(kind=rk) :: mass, gravity=0.d0, gravity_y=0.d0, gravity_x=0.d0
     ! variables to decide whether to draw the body or not.
-    character(len=strlen) :: body_moves="yes"
-    character(len=strlen) :: BodySuperSTLfile="none.superstl"
+    character(len=clong) :: body_moves="yes"
+    character(len=clong) :: BodySuperSTLfile="none.superstl"
     logical :: body_already_drawn = .false.
     ! second wing pair exists or not
     logical :: second_wing_pair
@@ -186,11 +186,11 @@ module module_insects
     ! STATE(19) : y-angular velocity of left wing
     ! STATE(20) : z-angular velocity of left wing
     real(kind=rk), dimension(1:6) :: DoF_on_off=0.d0
-    character(len=strlen) :: startup_conditioner=""
+    character(len=clong) :: startup_conditioner=""
     !-------------------------------------------------------------
     ! for wing fsi solver
     !-------------------------------------------------------------
-    character(len=strlen) :: wing_fsi="no"
+    character(len=clong) :: wing_fsi="no"
     real(kind=rk), dimension(1:3) :: torque_muscle_l_w=0.d0, torque_muscle_r_w=0.d0
     real(kind=rk), dimension(1:3) :: torque_muscle_l_b=0.d0, torque_muscle_r_b=0.d0
     real(kind=rk), dimension(1:3) :: init_alpha_phi_theta=0.d0
@@ -217,9 +217,9 @@ module module_insects
     real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
     ! wing inertia of the second pair of wings
     real(kind=rk) :: Jxx2=0.d0,Jyy2=0.d0,Jzz2=0.d0,Jxy2=0.d0
-    character(len=strlen) :: wing_thickness_distribution(1:4) = "constant"
-    character(len=strlen) :: pointcloudfile = "none"
-    character(len=strlen) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
+    character(len=clong) :: wing_thickness_distribution(1:4) = "constant"
+    character(len=clong) :: pointcloudfile = "none"
+    character(len=clong) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
     logical :: corrugated(1:4) = .false.
     real(kind=rk) :: corrugation_array_bbox(1:4,1:4)
     logical :: bristles(1:4) = .false.
@@ -234,7 +234,7 @@ module module_insects
     ! Wing kinematics
     !--------------------------------------------------------------
     logical :: fractal_tree = .false.
-    character(len=strlen) :: fractal_tree_file = "tree_data.in"
+    character(len=clong) :: fractal_tree_file = "tree_data.in"
     real(kind=rk), dimension(1:3) :: fractal_tree_x0 = (/0.0_rk, 0.0_rk, 0.0_rk/)
     real(kind=rk) :: fractal_tree_scaling = 1.0_rk
 
@@ -248,7 +248,7 @@ module module_insects
     ! (regular simulation) or kinematics.dry-run.t (for a dry run). The reason for this
     ! is that during postprocessing of an existing run, the dry run would overwrite the
     ! simulation data.
-    character(len=strlen) :: kinematics_file = "kinematics.t"
+    character(len=clong) :: kinematics_file = "kinematics.t"
     ! rotation matrices for the various coordinate system for the insect
     real(kind=rk),dimension(1:3,1:3) :: M_body, M_wing_l, M_wing_r, M_body_inv
     real(kind=rk),dimension(1:3,1:3) :: M_wing_l2, M_wing_r2
@@ -256,12 +256,12 @@ module module_insects
     !-------------------------------------------------------------
     ! parameters that control shape of wings, body, and motion
     !-------------------------------------------------------------
-    character(len=strlen) :: WingShape(1:4)=["","","",""] ! left, right, 2nd left, 2nd right
-    character(len=strlen) :: BodyType="", BodyMotion="", HasDetails=""
-    character(len=strlen) :: FlappingMotion_right="", FlappingMotion_left=""
-    character(len=strlen) :: FlappingMotion_right2="", FlappingMotion_left2=""
-    character(len=strlen) :: infile="", LeftWing="", RightWing=""
-    character(len=strlen) :: infile2="", LeftWing2="", RightWing2=""
+    character(len=clong) :: WingShape(1:4)=["","","",""] ! left, right, 2nd left, 2nd right
+    character(len=clong) :: BodyType="", BodyMotion="", HasDetails=""
+    character(len=clong) :: FlappingMotion_right="", FlappingMotion_left=""
+    character(len=clong) :: FlappingMotion_right2="", FlappingMotion_left2=""
+    character(len=clong) :: infile="", LeftWing="", RightWing=""
+    character(len=clong) :: infile2="", LeftWing2="", RightWing2=""
     ! parameters for body:
     real(kind=rk) :: L_body=0.d0, b_body=0.d0, R_head=0.d0, R_eye=0.d0
     ! parameters for wing shape:

@@ -1,32 +1,16 @@
-!> \file
-! WABBIT
-!> \name compute_divergence.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief computation of the divergence from a given velocity field
-!
-! = log ======================================================================================
-!> \date  13/04/18 - create hashcode: commit
 !-----------------------------------------------------------------------------------------------------
 subroutine divergence(u, v, w, dx, Bs, g, discretization, div)
     implicit none
-    !> origin and spacing of the block
-    real(kind=rk), dimension(3), intent(in)        :: dx
-    !> local datafields
-    real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w
-    !> vorticity
-    real(kind=rk), dimension(:,:,:), intent(out)   :: div
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> origin and spacing of the block
+    real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w                   !> local datafields
+    real(kind=rk), dimension(:,:,:), intent(out)   :: div                       !> vorticity
     character(len=*), intent(in)                   :: discretization
-    !> grid parameters
-    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
     integer(kind=ik), dimension(3), intent(in)     :: Bs
-    !> derivatives
-    real(kind=rk)                                  :: u_dx, v_dy, w_dz
-    !> inverse of dx, dy, dz
-    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv
-    ! loop variables
-    integer(kind=ik)                               :: ix, iy, iz
+    real(kind=rk)                                  :: u_dx, v_dy, w_dz          !> derivatives
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
     ! coefficients for Tam&Webb (4th order 1st derivative)
     real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for a standard centered 4th order 1st derivative

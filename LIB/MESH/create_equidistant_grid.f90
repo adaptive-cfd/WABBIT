@@ -1,21 +1,6 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name create_equidistant_grid.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief This routine tries to create an equidistant mesh on the specified level Jmin, so all blocks on
 !! this level are set to active and their treecodes are stored.
 !! Since the grid changes, the neighbor relations and active-lists are updated as well.
-!
-!!
-!! = log ======================================================================================
-!! \n
-!! 03 Apr 2017 - create
-!! \date 12/02/19 - updated lgt_block for multitrees
 ! ********************************************************************************************
 
 subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active, &
@@ -23,34 +8,19 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
-    !> what level to initialize?
-    integer(kind=ik), intent(in)        :: Jmin
-    !> write output
-    logical, intent(in)                 :: verbosity
+    type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)              !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: lgt_active(:)                  !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n                          !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)         !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_active(:)                  !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                          !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: Jmin                           !> what level to initialize?
+    logical, intent(in)                 :: verbosity                      !> write output
     integer(kind=ik), intent(in)        :: tree_ID
-
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-
-    ! loop control variables in space
-    integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz
-
+    integer(kind=ik)                    :: ierr                           ! MPI error variable
+    integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz   ! loop control variables in space
     integer(kind=ik)                    :: num_blocks, number_procs, k
     integer(kind=ik)                    :: d
 
@@ -137,13 +107,13 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
                             call encoding(treecode, (/ix,iy,iz/), d, num_blocks, Jmin)
 
                             ! on my section of the global light data list, which is the first and last light id I hold?
-                            call hvy_id_to_lgt_id( lgt_id_first, 1, params%rank, params%number_blocks )
-                            call hvy_id_to_lgt_id( lgt_id_last, params%number_blocks, params%rank, params%number_blocks )
+                            call hvy2lgt( lgt_id_first, 1, params%rank, params%number_blocks )
+                            call hvy2lgt( lgt_id_last, params%number_blocks, params%rank, params%number_blocks )
 
                             ! get a free block on this rank
                             call get_free_local_light_id( params, icpu, lgt_block, lgt_id)
                             ! and the corresponding heavy id
-                            call lgt_id_to_hvy_id( heavy_id, lgt_id, icpu, params%number_blocks )
+                            call lgt2hvy( heavy_id, lgt_id, icpu, params%number_blocks )
 
                             ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
 

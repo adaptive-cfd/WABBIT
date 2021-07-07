@@ -1,40 +1,20 @@
-! ----------------------------------------------------------------------------------------
-!> \file
-!> \brief Reset hvy and ligth data arrays
-!> \version 0.5
-!> \author msr
-!! \details
-!! \date 04/11/16 - switch to v0.4, now run complete initialization
-!!            within these subroutine and return initialized block data to main program
-!! \date 07/12/16 - now uses heavy work data array
-!! \date 25/01/17 - switch to 3D, v0.5
-! ----------------------------------------------------------------------------------------
-
 !> \brief reset grid, set all blocks to empty
 subroutine reset_tree(params, lgt_block, lgt_active, lgt_n,&
      hvy_active, hvy_n, lgt_sortednumlist, verbosity, tree_ID )
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)       :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)         :: lgt_n
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)         :: hvy_n
-    !> which tree to reset?
-    integer(kind=ik), intent(in)            :: tree_ID
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)
+    type (type_params), intent(in)          :: params                   !> user defined parameter structure
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)          !> light data array
+    integer(kind=ik),  intent(inout)        :: lgt_active(:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)         :: lgt_n                    !> number of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)         :: hvy_n                    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)            :: tree_ID                  !> which tree to reset?
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
     !> write output
     logical, intent(in)                     :: verbosity
-    integer(kind=ik) :: k
+    integer(kind=ik)                        :: k
 
     if ( (params%rank == 0) .and. verbosity ) then
       write(*,'(A)') "RESET-GRID: resetting grid to empty (deactivate all blocks)."
@@ -62,8 +42,6 @@ subroutine reset_tree(params, lgt_block, lgt_active, lgt_n,&
 end subroutine reset_tree
 
 
-
-
 !> Resets the light data. After calling this function
 !> only one tree is left in the forest, and all blocks are inactive with
 !> refinement status 0
@@ -72,22 +50,15 @@ subroutine reset_forest(params, lgt_block, lgt_active, lgt_n,&
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)       :: params
-    !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout),optional:: lgt_n(:)
-    !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)         :: hvy_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout) :: lgt_sortednumlist(:,:,:)
+    type (type_params), intent(in)          :: params                     !> user defined parameter structure
+    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)            !> light data array
+    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout),optional:: lgt_n(:)                   !> number of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)         :: hvy_n(:)                   !> number of active blocks (heavy data)
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik),  intent(inout),optional        :: tree_n
-    integer(kind=ik) :: i, max_treelevel, n_trees
+    integer(kind=ik)                        :: i, max_treelevel, n_trees
 
     ! lgt_block = -1 ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
     ! lgt_active = -1

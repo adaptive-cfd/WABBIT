@@ -1,16 +1,16 @@
 module module_t_files
     use mpi
+    use module_precision
     implicit none
 
     ! precision statement
-    integer, parameter :: rk = 8
     integer, parameter :: flush_frequency = 5
     integer, parameter :: max_parallel_files = 50
     integer, parameter :: max_columns = 45
     integer, save :: mpirank = 7
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)
-    character(len=80), save, allocatable :: filenames(:)
+    character(len=cshort), save, allocatable :: filenames(:)
     integer, save, allocatable :: iteration(:), n_columns(:)
     logical :: disable_all_output = .false.
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
@@ -37,7 +37,7 @@ contains
 
         integer :: fileID, mpicode
         logical :: exists
-        character(len=80) :: format
+        character(len=cshort) :: format
 
         if (disable_all_output) return
 
@@ -154,7 +154,7 @@ contains
     subroutine flush_t_file( fileID )
         implicit none
         integer, intent(in) :: fileID
-        character(len=80) :: format
+        character(len=cshort) :: format
         integer :: i
 
         if (disable_all_output) return

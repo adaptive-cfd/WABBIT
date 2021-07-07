@@ -1,22 +1,11 @@
-!---------------------------------------------------!!!!
-!> \file This file includes all filter routines
-!---------------------------------------------------!!!!
-
-
 !> \brief this function must be called before filter_block!
 subroutine init_filter(filter, FILE )
     implicit none
-    !> pointer to inifile
-    type(inifile)           ,intent(inout)  :: FILE
-    !> params structure of navier stokes
-    type(type_params_filter),intent(inout)  :: filter
-
-    ! stencil array, note: size is fixed
-    real(kind=rk)                      :: stencil(19)
-    ! filter position (array postion of value to filter)
-    integer(kind=ik)                   :: stencil_size
-    ! number of number_ghost_nodes
-    integer(kind=ik)                   :: g,mpi_rank,mpicode
+    type(inifile)           ,intent(inout)  :: FILE                 !> pointer to inifile
+    type(type_params_filter),intent(inout)  :: filter               !> params structure of navier stokes
+    real(kind=rk)                           :: stencil(19)          ! stencil array, note: size is fixed
+    integer(kind=ik)                        :: stencil_size         ! filter position (array postion of value to filter)
+    integer(kind=ik)                        :: g,mpi_rank,mpicode   ! number of number_ghost_nodes
 
 
     call MPI_COMM_RANK (WABBIT_COMM, mpi_rank, mpicode)
@@ -108,29 +97,6 @@ subroutine init_filter(filter, FILE )
         filter%stencil_size =stencil_size
 
 end subroutine init_filter
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 !> \brief Filter statevector \f$U\f$ in conservative variables on each block
@@ -248,11 +214,6 @@ end subroutine filter_block
 
 
 
-
-
-
-
-
 !=====================================================================
 !  WAVELET FILTER
 !=====================================================================
@@ -291,11 +252,6 @@ subroutine wavelet_filter(order_predictor, Bs, g, block_data)
 end subroutine wavelet_filter
 
 
-
-
-
-
-
 !=====================================================================
 !  1D FILTER
 !=====================================================================
@@ -307,35 +263,16 @@ end subroutine wavelet_filter
 !! \date 02/05/17 - return filtered value separatly
 subroutine filter_1D(phi, phi_tilde, a)
 
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> datafield
-    real(kind=rk), intent(in)           :: phi(:)
-    !> filtered value
-    real(kind=rk), intent(out)          :: phi_tilde
-    !> filter coefficients
-    real(kind=rk), intent(in)           :: a(:)
-
-    ! loop variable
-    integer(kind=ik)                    :: k
-
-    ! old values
-    real(kind=rk)                       :: phi_old(size(phi,1))
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    real(kind=rk), intent(in)           :: phi(:)                     !> datafield
+    real(kind=rk), intent(out)          :: phi_tilde                  !> filtered value
+    real(kind=rk), intent(in)           :: a(:)                       !> filter coefficients
+    integer(kind=ik)                    :: k                          ! loop variable
+    real(kind=rk)                       :: phi_old(size(phi,1))       ! old values
 
     phi_old   = phi
     phi_tilde = 0.0_rk
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! check filter stencil
     if ( size(phi) /= size(a) ) then
@@ -351,10 +288,6 @@ subroutine filter_1D(phi, phi_tilde, a)
     end do
 
 end subroutine filter_1D
-
-
-
-
 
 
 
@@ -388,7 +321,7 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   real(kind=rk),save    :: divu(size(SHIFT),3),soundspeed2(size(SHIFT),3) &
   ,Dtheta(size(SHIFT),3),sigma(size(SHIFT),3)
   ! /todo: move to ini file
-  character(len=80)                   :: detector_method, sigma_method
+  character(len=cshort)                   :: detector_method, sigma_method
 
   stencil(1:stencil_size) = (/  1.0_rk/  4.0_rk, &
   -1.0_rk/  2.0_rk, &
@@ -476,12 +409,8 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   enddo ! loop over iz
 
 
-
 end subroutine bogey_filter3D
 !=========================================================================================
-
-
-
 
 
 !=========================================================================================
@@ -514,7 +443,7 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   real(kind=rk),save    :: divu(size(SHIFT),3),soundspeed2(size(SHIFT),3) &
   ,Dtheta(size(SHIFT),3),sigma(size(SHIFT),3)
   ! /todo: move to ini file
-  character(len=80)                   :: detector_method, sigma_method
+  character(len=cshort)                   :: detector_method, sigma_method
 
   stencil(1:stencil_size) = (/  1.0_rk/  4.0_rk, &
   -1.0_rk/  2.0_rk, &
@@ -598,27 +527,12 @@ end subroutine bogey_filter2D_
 !=========================================================================================
 
 
-
-
 !=====================================================================
 !  BOGEY FILTER, !!!!!!!! OLD !!!!!!!!!!
 !=====================================================================
-!> \details
-!> \callgraph
-!> \name bogey_filter2D.f90
-!> \version 0.5
-!> \author msr
-!
 !> \brief bogey shock filter subroutine
 
-!! \date 21/09/17 - create
-!! \date 29/04/18 - update for new physics branch (pKrah)
-
-!
 ! subroutine bogey_filter2D(filter, Bs, g, N_dF ,hvy_work, xx0, ddx )
-!
-! !---------------------------------------------------------------------------------------------
-! ! variables
 !
 !     implicit none
 !     !> params structure of navier stokes
@@ -654,12 +568,6 @@ end subroutine bogey_filter2D_
 !     ! /todo: move to ini file
 !     character(len=80)                   :: detector_method, sigma_method
 !
-! !---------------------------------------------------------------------------------------------
-! ! interfaces
-!
-! !---------------------------------------------------------------------------------------------
-! ! variables initialization
-! !
 !     ! grid parameter
 !     ! Bs  = params%Bs
 !     ! g   = params%n_ghosts
@@ -706,9 +614,6 @@ end subroutine bogey_filter2D_
 !     v   = hvy_work(:, :, 1, UyF)
 !     p   = hvy_work(:, :, 1, pF)
 !     gamma_=params_ns%gamma_
-!
-! !---------------------------------------------------------------------------------------------
-! ! main body
 !
 !     ! first - shock detector
 !     ! detector input

@@ -1,28 +1,12 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name coarsening_indicator.f90
-!> \version 0.5
-!> \author engels
-!> \brief Set coarsening status for a single blocks, different methods possible
-!
 !> \details This routine sets the coarsening flag for a single blocks. We allow for different
 !! mathematical methods (everywhere / random) currently not very complex, but expected to grow
 !! in the future.
-!! \n
 !! ------------------ \n
 !! Refinement status: \n
 !! ------------------ \n
 !! +1 refine \n
 !! 0 do nothing \n
 !! -1 block wants to coarsen \n
-!! ------------------ \n
-!! \n
-!! = log ======================================================================================
-!! \n
-!! 23/05/2017 create
 ! ********************************************************************************************
 
 subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, indicator, &

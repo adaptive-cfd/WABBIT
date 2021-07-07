@@ -1,25 +1,15 @@
-!> \file
-!
 !> \brief module for all mesh subroutines
-!
-!> \details
-!> \author msr
-!! \date 24/11/16 - create
 ! ********************************************************************************************
 
 module module_mesh
 
     use mpi
-    ! global parameters
-    use module_params
-    ! debug module
-    use module_timing
-    ! interpolation routines
-    use module_interpolation
+    use module_params               ! global parameters
+    use module_timing               ! debug module
+    use module_interpolation        ! interpolation routines
     ! use MPI module, since threshold_block needs to synch ghosts
     use module_MPI
-    ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
-    use module_treelib
+    use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
     use module_operators, only: component_wise_tree_norm
     ! used in coarse_mesh
     use module_helpers, only: most_common_element
@@ -297,14 +287,6 @@ subroutine to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist
         hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_id )
 end subroutine
 !##############################################################
-
-
-
-
-
-
-
-
 
 
 end module module_mesh

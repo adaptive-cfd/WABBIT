@@ -1,38 +1,15 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name sponge.f90
-!> \version 0.5
-!> \author sm
-!
-!> \brief
-!
-!>
 !! input:    - params, origin and spacing of the block, grid parameters \n
 !! output:   - sponge term \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 12/18 - create
 !*********************************************************************************************
 subroutine sponge_2D(sponge, x0, dx, Bs, g)
     implicit none
 
-    ! grid
-    integer(kind=ik), intent(in)                   :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> sponge term for every grid point of this block
-    real(kind=rk), dimension(:,:), intent(out)     :: sponge
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in)        :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)    :: x, y, tmp, p, offset
-    ! loop variables
-    integer(kind=ik) :: ix, iy
+    integer(kind=ik), intent(in)                   :: g                         ! grid
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
+    real(kind=rk), dimension(:,:), intent(out)     :: sponge                    !> sponge term for every grid point of this block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx                    !> spacing and origin of block
+    real(kind=rk)                                  :: x, y, tmp, p, offset      ! auxiliary variables
+    integer(kind=ik)                               :: ix, iy                    ! loop variables
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: sponge_2D called but ACM not initialized"
 

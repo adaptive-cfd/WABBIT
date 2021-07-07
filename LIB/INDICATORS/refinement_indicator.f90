@@ -1,17 +1,7 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name refinement_indicator.f90
-!> \version 0.5
-!> \author engels
 !> \brief Set refinement status for active blocks, different methods possible
-!
 !> \details This routine sets the refinement flag for all blocks. We allow for different
 !! mathematical methods (everywhere / random) currently not very compley, but expected to grow
 !! in the future.
-!! \n
 !! ------------------
 !! Refinement status:
 !! ------------------
@@ -19,34 +9,20 @@
 !! 0 do nothing
 !! -1 block wants to refine (ignoring other constraints, such as gradedness)
 !! -2 block will refine and be merged with her sisters
-!! ------------------
-!! \n
-!! = log ======================================================================================
-!! \n
-!! 23/05/2017 create
 ! ********************************************************************************************
 
 subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, indicator )
     use module_helpers
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
-    !> how to choose blocks for refinement
-    character(len=*), intent(in)        :: indicator
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_n
-    ! local variables
-    integer(kind=ik) :: k, Jmax, max_blocks, ierr
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                      !> light data array
+    integer(kind=ik), intent(inout)     :: lgt_active(:)                        !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n                                !> number of active blocks (light data)
+    character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
+    integer(kind=ik), intent(inout)     :: hvy_active(:)                        !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
     integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
@@ -79,7 +55,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
             hvy_id = hvy_active(k)
 
             ! light id of this block
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
@@ -122,7 +98,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
                 hvy_id = hvy_active(k)
 
                 ! light id of this block
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) then
                     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
@@ -138,7 +114,7 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
                 hvy_id = hvy_active(k)
 
                 ! light id of this block
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) then
                     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1

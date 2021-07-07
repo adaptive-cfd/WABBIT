@@ -1,53 +1,24 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name get_inicond_from_file.f90
-!> \version 0.5
-!> \author sm
-!
 !> \brief call subroutines that read mesh and fields as initial condition from files
-!
-!>
-!! input:
-!!           - parameter array
-!!
-!! output:
-!!           - light data array
+!! input:    - parameter array
+!! output:   - light data array
 !!           - heavy data array
 !!           - number of active blocks (light and heavy)
 !!           - time and iteration
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 28/09/17 - create
-!
 ! ********************************************************************************************
 
 subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
 
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(in)        :: params
-    !> light data array
-    integer(kind=ik), intent(inout)       :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)          :: hvy_block(:, :, :, :, :)
-    !> number of heavy and light active blocks
-    integer(kind=ik), intent(inout)       :: hvy_n, lgt_n
-    !> time loop variables
-    real(kind=rk), intent(inout)          :: time
+    type (type_params), intent(in)        :: params                     !> user defined parameter structure
+    integer(kind=ik), intent(inout)       :: lgt_block(:, :)            !> light data array
+    real(kind=rk), intent(inout)          :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(inout)       :: hvy_n, lgt_n               !> number of heavy and light active blocks
+    real(kind=rk), intent(inout)          :: time                       !> time loop variables
     integer(kind=ik), intent(inout)       :: iteration
     real(kind=rk), dimension(3)           :: domain
-
-    ! cpu time variables for running time calculation
-    real(kind=rk)                         :: t0
-    ! number of files to read from
-    integer(kind=ik)                      :: N_files
-    ! loop variable
-    integer(kind=ik)                      :: dF, tc_length, dim, i
+    real(kind=rk)                         :: t0                         ! cpu time variables for running time calculation
+    integer(kind=ik)                      :: N_files                    ! number of files to read from
+    integer(kind=ik)                      :: dF, tc_length, dim, i      ! loop variable
     integer(kind=ik), dimension(3)        :: Bs
     logical                               :: periodic_BC(1:3), symmetry_BC(1:3)
 

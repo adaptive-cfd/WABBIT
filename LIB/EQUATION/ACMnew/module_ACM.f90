@@ -1,20 +1,7 @@
-!> \dir
-!> \brief Implementation of 3d/2d acm physics
-
 ! ********************************************************************************************
 !> Module for 2D/3D acm physics
 ! ********************************************************************************************
-!> \details
-!> \version 0.5
-!> \author engels
-!! \date pls add creation date
-!!
-! ********************************************************************************************
-
 module module_acm
-
-  !---------------------------------------------------------------------------------------------
-  ! modules
 
   use mpi
   use module_insects
@@ -29,9 +16,6 @@ module module_acm
   use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval
   use module_timing
-
-  !---------------------------------------------------------------------------------------------
-  ! variables
 
   implicit none
 
@@ -59,7 +43,7 @@ module module_acm
       real(kind=rk) :: a0_alpha
       real(kind=rk) :: time
       integer(kind=ik) :: nfft_x0, nfft_y0, nfft_alpha
-      character(len=strlen) :: kinematics_type
+      character(len=cshort) :: kinematics_type
   end type
 
   type(wingsection) :: wingsections(2)
@@ -76,8 +60,7 @@ module module_acm
     real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, &
-                     penal_power = 0.0_rk
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     ! gamma_p
@@ -88,14 +71,14 @@ module module_acm
     logical :: use_sponge = .false.
     logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0, C_smooth=1.5_rk
-    character(len=80) :: eps_norm
+    character(len=cshort) :: eps_norm
     logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
     real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
     z0source(:), scalar_Ceta(:), widthsource(:)
-    character(len=80), allocatable :: scalar_inicond(:), scalar_source_type(:)
+    character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
     ! when computing passive scalars, we require derivatives of the mask function, which
     ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
     ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -108,12 +91,11 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", &
-    order_predictor=""
-    character(len=80) :: sponge_type=""
-    character(len=80) :: coarsening_indicator=""
-    character(len=80), allocatable :: names(:)
-    character(len=80) :: wingsection_inifiles(2) !hack: currently only two of them...
+    character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
+    character(len=cshort) :: sponge_type=""
+    character(len=cshort) :: coarsening_indicator=""
+    character(len=cshort) :: wingsection_inifiles(1:2)
+    character(len=cshort), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
@@ -137,7 +119,6 @@ module module_acm
   ! all parameters for insects go here:
   ! HACK: made them public for FSI time stepper (18 Feb 2021)
   type(diptera), public, save :: insect
-
 
 contains
 
@@ -190,7 +171,7 @@ end subroutine
     character(len=*), intent(in) :: filename
     integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min
-    character(len=80) :: Bs_str, Bs_conc
+    character(len=cshort) :: Bs_str, Bs_conc
     character(len=16834) :: input_files
     character(len=12) :: timestamp
     character(:), allocatable :: Bs_short

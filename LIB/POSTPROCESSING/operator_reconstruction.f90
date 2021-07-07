@@ -12,7 +12,7 @@ subroutine operator_reconstruction(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: file, infile
+    character(len=cshort) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, dx_inv, val, x2, y2
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, tree_N, iblock, ix, iy, &
     g, lgt_n, hvy_n, iz, a, b
@@ -27,7 +27,7 @@ subroutine operator_reconstruction(params)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=80)                  :: fname
+    character(len=cshort)                  :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -157,7 +157,7 @@ subroutine operator_reconstruction(params)
     !---------------------------------------------------------------------------
     open(19, file=trim(adjustl(file))//'.operator_grid_points.txt', status='replace')
     do iblock = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
@@ -190,7 +190,7 @@ subroutine operator_reconstruction(params)
 
                 !---------------------------------------------------------------
                 ! set this one point we're looking at to 1
-                call hvy_id_to_lgt_id(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
+                call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -216,9 +216,9 @@ subroutine operator_reconstruction(params)
 
                 params_acm%filter_type = "wavelet_filter"
                 params_acm%order_predictor = params%order_predictor
-                
+
                 do k = 1, hvy_n
-                    call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                    call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                     call filter_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), g, x0, dx, &
@@ -229,7 +229,7 @@ subroutine operator_reconstruction(params)
                 !---------------------------------------------------------------
                 ! Now compute the derivative
                 do k = 1, hvy_n
-                    call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                    call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                     ! if (lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL) == 1) then
@@ -272,7 +272,7 @@ subroutine operator_reconstruction(params)
 
 
                 do k = 1, hvy_n
-                    call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                    call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                     do iy2 = g+1, Bs(2)+g
@@ -322,7 +322,7 @@ subroutine operator_reconstruction(params)
     ! !---------------------------------------------------------------
     ! ! set sine-wave
     ! do k = 1, hvy_n
-    !     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
     !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
     !
     !     do iy2 = g+1, Bs(2)+g
@@ -347,7 +347,7 @@ subroutine operator_reconstruction(params)
     ! !---------------------------------------------------------------
     ! ! Now compute the derivative
     ! do k = 1, hvy_n
-    !     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
     !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
     !
     !     dx_inv = 1.0_rk/dx(1)
@@ -402,7 +402,7 @@ subroutine operator_reconstruction(params)
     ! open(20, file=trim(adjustl(file))//'.u_derivative.txt', status='replace')
     ! open(21, file=trim(adjustl(file))//'.u_function.txt', status='replace')
     ! do k = 1, hvy_n
-    !     call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
     !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
     !
     !     do iy2 = g+1, Bs(2)+g

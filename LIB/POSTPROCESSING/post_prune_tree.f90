@@ -14,7 +14,7 @@ subroutine post_prune_tree(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: fname_ini, fname1, fname_out
+    character(len=cshort) :: fname_ini, fname1, fname_out
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)

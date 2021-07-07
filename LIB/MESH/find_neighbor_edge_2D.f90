@@ -1,12 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name find_neighbor_edge_2D.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief find neighbor on block edge
 !> \details valid cases for edge neighbors:
 !!           1. same level: always exact one neighbor
@@ -14,59 +5,36 @@
 !! neighbor relations
 !!           3. one level up: always two neighbors
 !!
-!! input:
-!!           - heavy and light data id
+!! input:    - heavy and light data id
 !!           - light data array and max treelevel
 !!           - direction for neighbor search
 !!           - list of active blocks
-!!
-!! output:
-!!           - neighbor list array
-!!
+!! output:   - neighbor list array
 ! -------------------------------------------------------------------------------------------------------------------------
-!> \details
 !! dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
-!!
-!!
-!! \date 7/11/16 - switch to v0.4
-!! \date 12/02/19 - update neighbor search for multipile trees (PKrah)
 ! ********************************************************************************************
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
 subroutine find_neighbor_edge_2D(params, heavy_id, light_id, lgt_block, &
             max_treelevel, dir, hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
     implicit none
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data id
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
     integer(kind=ik), intent(in)        :: heavy_id
-    !> light data id
     integer(kind=ik), intent(in)        :: light_id
-    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> direction for neighbor search
-    character(len=3), intent(in)        :: dir
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)            !> light data array
+    character(len=3), intent(in)        :: dir                        !> direction for neighbor search
+    integer(kind=ik), intent(in)        :: lgt_n                      !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
     logical, intent(inout)              :: error
-    integer(kind=2), intent(in) :: n_domain(1:3)
-
+    integer(kind=2), intent(in)         :: n_domain(1:3)
     ! auxiliary variables
     integer(kind=ik)                    :: neighborID_sameLevel, virt_code1, neighborID_finerLevel1, virt_code2, neighborID_finerLevel2, neighborID_coarserLevel
-
-    ! mesh level
     integer(kind=ik)                    :: level
     ! treecode varaibles
     integer(kind=ik)                    :: my_treecode(max_treelevel), neighbor(max_treelevel), virt_treecode(max_treelevel)
-    ! return value from function "does_block_exist"
-    logical                             :: exists
-    ! neighbor light data id, and id of the tree in the forest
+    logical                             :: exists                     ! return value from function "does_block_exist"
     integer(kind=ik)                    :: neighbor_light_id, tree_id
 
     my_treecode = lgt_block( light_id, 1:max_treelevel )

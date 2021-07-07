@@ -1,56 +1,28 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name get_free_local_light_id.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief Locally (on the calling processor only) look for a free block and return the ID. If full, error.
 !
 !> \details Unlike get_free_light_id, this routine returns a free slot on a given proc only. Note
 !! it can sometimes be useful to return a free block which also is not on the active list. This may
 !! seem odd (since by definition you shouldn't find any inactive block on the active list) but in
 !! routines that modify the mesh (especially deleting blocks), the active list gets outdated.
-!!
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4
-!
 ! ********************************************************************************************
 
 subroutine get_free_local_light_id( params, mpirank, lgt_block, lgt_free_id, lgt_active, lgt_n, ignore_error )
 
-    !---------------------------------------------------------------------------------------------
-    ! modules
-
-    ! global parameters
     use module_params
-
-    !---------------------------------------------------------------------------------------------
-    ! variables
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> On what rank do you want a free block ID?
-    integer(kind=ik), intent(in)        :: mpirank
-    !> light data array (global list, redundant on mpi)
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> return a free ID in the range of the proc "mpirank"
-    integer(kind=ik), intent(out)       :: lgt_free_id
-    !> list of active blocks (light data)
-    integer(kind=ik), optional, intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), optional, intent(inout)     :: lgt_n
+    type (type_params), intent(in)                :: params             !> user defined parameter structure
+    integer(kind=ik), intent(in)                  :: mpirank            !> On what rank do you want a free block ID?
+    integer(kind=ik), intent(inout)               :: lgt_block(:, :)    !> light data array (global list, redundant on mpi)
+    integer(kind=ik), intent(out)                 :: lgt_free_id        !> return a free ID in the range of the proc "mpirank"
+    integer(kind=ik), optional, intent(inout)     :: lgt_active(:)      !> list of active blocks (light data)
+    integer(kind=ik), optional, intent(inout)     :: lgt_n              !> number of active blocks (light data)
     !> if there are no more free light ids, the code aborts, unless use set ignore_error=.true
     !> in which case it will return the -1 ligt id
-    logical, optional, intent(in) :: ignore_error
+    logical, optional, intent(in)                 :: ignore_error
 
-    ! local variables
-    integer(kind=ik) :: k, first_light_id, last_light_id, i
+    integer(kind=ik) :: k, first_light_id, last_light_id, i             ! local variables
     logical :: valid, ign_err
 
     lgt_free_id = -1

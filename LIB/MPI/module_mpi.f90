@@ -1,29 +1,13 @@
-!>\dir
-!> MPI synchronization routines
-
-!> \file
-!> \brief File of MPI Module
-
-
 !> \brief This module implements all MPI synchronization routines
-!> \details
 !>          * synchronization of ghost nodes
 !>          * synchronization of light data
 !>          * creation of rank block rank lists
 !>          * copy, write send and recieve buffers
-!> \version 0.6
-!> \author engels, reiss, msr
-!! 12/01/17 - create
-!! 18/07/2018 - remove all old ghost node routines, build in JR's improved version of MSR's new ghost nodes
 module module_MPI
 
-
     use mpi
-    ! global parameters
-    use module_params
-    ! timing module
+    use module_params           ! global parameters
     use module_timing
-    ! interpolation routines
     use module_interpolation
     use module_treelib
 
@@ -99,14 +83,8 @@ logical :: filter = .false.
     ! global so we can save them easily to the ghosts_bounds.dat file
     integer(kind=ik) :: A, S
 
-!---------------------------------------------------------------------------------------------
-! public parts of this module
-
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
     PUBLIC :: synchronize_ghosts_generic_sequence, init_ghost_nodes, check_unique_origin
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 

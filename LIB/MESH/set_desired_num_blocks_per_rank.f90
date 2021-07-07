@@ -1,5 +1,3 @@
-!--------------------------------------------------------------------------------------------------------------------------------------------------------
-!> \file
 !> \brief Get current distribution of blocks among CPUs, compute optimal #blocks for each mpirank
 !>        ---------------------------------------------
 !! \details
@@ -7,21 +5,13 @@
 !! is contained. Note 1-based indexing. \n
 !! In addition we return "blocks_per_rank_optimal" of size mpisize, where we set the number of blocks for each rank
 !! such that the distribution is as homogeneous as possible and required block transfer is minimized
-!!
-!!
-!> \version 0.5
-!> \date 13/03/18 \n
-!> \author engels
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, lgt_n)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> block distribution lists. Note zero-based indexing. (as in MPI library)
-    integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)          !> block distribution lists. Note zero-based indexing. (as in MPI library)
+    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
 
     blocks_per_rank_optimal(:) = lgt_n / params%number_procs
 
@@ -42,26 +32,14 @@ end subroutine
 subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_rank_optimal, lgt_n, hvy_n)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-
-    !> block distribution lists. Note 1-based indexing.
-    integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)
-
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in) :: lgt_n
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in) :: hvy_n
-
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)   !> block distribution lists. Note 1-based indexing.
+    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: hvy_n                                !> number of active blocks (heavy data)
     ! loop variables
     integer                             :: num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks
-
-    ! dist list send buffer
-    integer(kind=ik)                    :: my_dist_list(params%number_procs)
-
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-
+    integer(kind=ik)                    :: my_dist_list(params%number_procs)    ! dist list send buffer
+    integer(kind=ik)                    :: ierr                                 ! MPI error variable
 
     ! determinate process rank
     rank = params%rank
@@ -72,7 +50,6 @@ subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_
     blocks_per_rank = 0
     my_dist_list = 0
     blocks_per_rank_optimal = 0
-
 
     ! save my number of active blocks
     my_dist_list(rank+1) = hvy_n

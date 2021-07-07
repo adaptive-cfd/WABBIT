@@ -151,7 +151,7 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   ! NOTE: for a corrugated wing, up- and downside are different, and therefore a distinction between the
   ! left- and right wing has to be made, essentially inverting the sign of the z_wing coordinate.
   character(len=1), intent(in) :: side ! can be R or L
-  character(len=strlen) :: wingshape_str
+  character(len=clong) :: wingshape_str
   integer(kind=2) :: wingID
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
@@ -1421,7 +1421,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   real(kind=rk) :: xroot, yroot
   type(diptera),intent(inout)::Insect
   integer(kind=2), intent(in) :: wingID ! wing id number
-  character(len=strlen) :: wingshape_str
+  character(len=clong) :: wingshape_str
 
   if (Insect%wingsetup_done(wingID)) then
     ! the second call is just a return statement
@@ -1907,7 +1907,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
 
   type(inifile) :: ifile
   real(kind=rk), allocatable :: tmparray(:,:)
-  character(len=strlen) :: type_str
+  character(len=clong) :: type_str
   integer :: a,b
   integer(kind=2), intent(in) :: wingID ! wing id number
   real(kind=rk) :: init_thickness

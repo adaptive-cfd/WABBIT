@@ -186,7 +186,7 @@ contains
         ! component index
         integer(kind=ik), intent(in) :: N
         ! returns the name
-        character(len=80), intent(out) :: name
+        character(len=cshort), intent(out) :: name
 
         select case(physics)
         case ('ACM-new')

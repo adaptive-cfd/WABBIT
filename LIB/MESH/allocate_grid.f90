@@ -38,7 +38,7 @@ subroutine allocate_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     real(kind=rk)      :: maxmem, mem_per_block
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
-    character(len=80)  :: memstring
+    character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
 
 
@@ -325,7 +325,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     real(kind=rk)      :: maxmem, mem_per_block
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
-    character(len=80)  :: memstring
+    character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
 
     rank            = params%rank

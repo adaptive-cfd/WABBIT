@@ -1,14 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_interpolation.f90
-!> \version 0.5
-!> \author msr, engels
-!
 !> \brief refinement and coarsening subroutines
-!
 ! ********************************************************************************************
 
 module module_interpolation
@@ -20,7 +10,6 @@ module module_interpolation
 
     PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, &
     restriction_prefilter_2D, restriction_prefilter_3D, restriction_prefilter_2D_vct, restriction_prefilter_3D_vct
-
 
 contains
 
@@ -629,8 +618,6 @@ contains
             enddo
         enddo
     end subroutine
-
-
 
 
 end module

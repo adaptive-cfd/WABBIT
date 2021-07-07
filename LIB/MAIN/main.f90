@@ -1,22 +1,4 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name    main.f90
-!> \version 0.5
-!> \author  msr
-!
 !> \brief main program, init all data, start time loop, output on screen during program run
-!
-!>
-!!
-!! = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4 \n
-!! 23/11/16 - use computing time array for simple performance tests \n
-!! 07/12/16 - now uses heavy work data array \n
-!! 25/01/17 - switch to 3D, v0.5
 ! ********************************************************************************************
 !> \image html rhs.svg width=600
 !> \image html rhs.eps
@@ -26,22 +8,14 @@ program main
     use mpi
     use module_helpers
     use module_MPI
-    ! global parameters
-    use module_params
-    ! timing module
+    use module_params           ! global parameters
     use module_timing
-    ! init data module
-    use module_initialization
-    ! mesh manipulation subroutines
-    use module_mesh
-    ! IO module
-    use module_IO
-    ! time step module
-    use module_time_step
-    ! unit test module
-    use module_unit_test
-    ! bridge implementation of wabbit
-    use module_bridge_interface
+    use module_initialization   ! init data module
+    use module_mesh             ! mesh manipulation subroutines
+    use module_IO               ! IO module
+    use module_time_step        ! time step module
+    use module_unit_test        ! unit test module
+    use module_bridge_interface ! bridge implementation of wabbit
     use module_forest
     use module_mask
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
@@ -50,16 +24,11 @@ program main
 
     implicit none
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank
-    ! number of processes
-    integer(kind=ik)                    :: number_procs
-    ! cpu time variables for running time calculation
-    real(kind=rk)                       :: t0, t1, t2
-    ! user defined parameter structure
-    type (type_params)                  :: params
+    integer(kind=ik)                    :: ierr           ! MPI error variable
+    integer(kind=ik)                    :: rank           ! process rank
+    integer(kind=ik)                    :: number_procs   ! number of processes
+    real(kind=rk)                       :: t0, t1, t2     ! cpu time variables for running time calculation
+    type (type_params)                  :: params         ! user defined parameter structure
 
     ! light data array (the grid metadata, block treecodes etc)
     ! line number = ( 1 + proc_rank ) * heavy_data_line_number
@@ -122,7 +91,7 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
-    character(len=80)                   :: filename
+    character(len=cshort)                   :: filename
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp, mpicode
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
@@ -357,7 +326,7 @@ program main
             if (params%filter_type /= "no_filter") then
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
                     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-                    
+
                     call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, hvy_active(:,tree_ID_flow), &
                     hvy_n(tree_ID_flow), hvy_neighbor)
                 end if

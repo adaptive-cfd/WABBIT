@@ -1,13 +1,5 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
-!
-!> \details
-!> \author engels, msr, Pkrah
-!! \date 17/08/18   - non blocking mpi communication for sending and receiving blocks during
-!!                    gather (PKrah, commit d48299f4231040f619b2f2af5f56bf4f72994ff5  )
-!! \date 22/05/2017 - Rewrite using modular subroutines, works for 2/3d cases
-!! \date 08/11/16 - switch to v0.4, split old interpolate_mesh subroutine into two refine/coarsen
-!!            subroutines
 ! ********************************************************************************************
 subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_active, hvy_n, tree_ID, hvy_mask )
@@ -76,7 +68,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
             ! figure out on which rank the sisters lie, xfer them if necessary
             do j = 1, N
-                call lgt_id_to_proc_rank( mpirank_owners(j), light_ids(j), params%number_blocks )
+                call lgt2proc( mpirank_owners(j), light_ids(j), params%number_blocks )
             enddo
 
             ! The merging will be done on the mpirank which holds the most of the sister blocks

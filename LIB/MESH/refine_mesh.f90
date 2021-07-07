@@ -1,11 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name refine_mesh.f90
-!> \version 0.5
-!> \author msr, engels
 !> \brief Refine the mash (tag / interpolate / update lists)
 !
 !> \details This routine first sets the refinement flag for all blocks to +1
@@ -16,17 +8,8 @@
 !! is applied.
 !!
 !! Note we assume, on call, that active lists / neighbor are up-to-date
-!
-!>
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays
-!! \n
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4 \n
-!! 03/02/17 - 3D heavy data \n
-!! 04/04/17 - include active lists, neighbor relations and load balancing, symmetrical to adapt_mesh \n
-!! 05/04/17 - Provide an interface to use different criteria for refinement, rename routines
 ! ********************************************************************************************
 
 subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
@@ -34,29 +17,18 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     use module_indicators
 
-
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)         :: params
-    !> light data array
-    integer(kind=ik), intent(inout)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_n
-    !> how to choose blocks for refinement
-    character(len=*), intent(in)           :: indicator
+    type (type_params), intent(in)         :: params                      !> user defined parameter structure
+    integer(kind=ik), intent(inout)        :: lgt_block(:, :)             !> light data array
+    real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
+    integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)           !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)        :: lgt_active(:)               !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)        :: lgt_n                       !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)      !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)        :: hvy_active(:)               !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)        :: hvy_n                       !> number of active blocks (heavy data)
+    character(len=*), intent(in)           :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)           :: tree_ID
 
     ! cpu time variables for running time calculation
@@ -100,7 +72,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     do k = 1, hvy_n
         ! loop over hvy is safer, because we can tell for each mpirank if it fails or not
         ! so we detect also problems arising from load-imbalancing.
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
 
         if ( lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) == +1) then
             ! this block will be refined, so it creates 2**D new blocks but is deleted

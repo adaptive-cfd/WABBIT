@@ -1,26 +1,8 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name init_physics_modules.f90
-!> \version 0.5
-!> \author engels
-!
 !> \brief Wrapper to call the parameter-initialization routines for the physics module in use.
-!!
 !! NOTE: this is *NOT* a part of module_params.f90 in order to avoid circulars in the makefile
-!!
-!! input:
-!!           - params struct to know what module is used.
+!! input:    - params struct to know what module is used.
 !!           - filename of the ini file to be read
-!! output:
-!!           - parameters are stored in the modules themselves.
-!!
-!! = log ======================================================================================
-!! \n
-!! 17/12/17 - create
-!
+!! output:   - parameters are stored in the modules themselves.
 !**********************************************************************************************
 
 subroutine init_physics_modules( params, filename, N_mask_components)

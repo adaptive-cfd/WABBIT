@@ -13,7 +13,7 @@ subroutine post_generate_forest(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) ::  fname_out,mode
+    character(len=cshort) ::  fname_out,mode
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
@@ -94,7 +94,7 @@ subroutine post_generate_forest(params)
         block: do k = 1, hvy_n(it)
             hvy_id = hvy_active(k, it)
             ! convert given hvy_id to lgt_id for block spacing routine
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             if (params%dim == 2) then

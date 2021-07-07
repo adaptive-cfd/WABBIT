@@ -14,7 +14,7 @@ subroutine post_add_two_masks(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: mode, fname1, fname2, fname_out
+    character(len=cshort) :: mode, fname1, fname2, fname_out
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)

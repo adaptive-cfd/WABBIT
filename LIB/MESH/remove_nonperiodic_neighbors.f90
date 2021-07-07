@@ -4,25 +4,20 @@
 subroutine remove_nonperiodic_neighbors(params, lgt_block, hvy_neighbor, hvy_active, hvy_n)
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    type (type_params), intent(in)      :: params               !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)      !> light data array
+    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_active(:)        !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n                !> number of active blocks (heavy data)
 
     integer(kind=ik) :: k, hvy_id, lgt_id, lgt_id_neighbor, J1, J2, a
-    logical :: remove
-    integer(kind=2) :: n_domain(1:3)
+    logical                             :: remove
+    integer(kind=2)                     :: n_domain(1:3)
 
     do k = 1, hvy_n
         ! the block w're looking at ...
         hvy_id = hvy_active(k)
-        call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! ... and its level
         J1 = lgt_block(lgt_id, params%max_treelevel + IDX_MESH_LVL)
 

@@ -252,7 +252,7 @@ contains
         ! dimensionality is (3,ntri)
         real(kind=4), allocatable, dimension(:,:) :: triangles, normals
 
-        character(len=80) :: title
+        character(len=cshort) :: title
         integer :: iunit, irc, k, i, ierr
         integer*2 :: padding
         real*4 :: n(3),x1(3),x2(3),x3(3)

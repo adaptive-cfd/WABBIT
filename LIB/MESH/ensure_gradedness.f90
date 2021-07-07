@@ -1,12 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name ensure_gradedness.f90
-!> \version 0.5
-!> \author msr, engels
-!
 !> \brief check the gradedness after new refinement status
 !
 !> \details This routine is called after all blocks have been tagged whether to refine or coarsen or stay.
@@ -14,53 +5,29 @@
 !! result in an non-graded mesh. These mistakes are corrected, their status -1 or 0 is overwritten.
 !! The status +1 is always conserved (recall to call respect_min_Jmax before).
 !!
-!!
 !! Since 04/2017, the new code checks all blocks that want to coarsen or remain, NOT the ones that
 !! want to refine, as was done in prototypes. The reason is MPI: I cannot easily set the flags of
 !! my neighbors, as they might reside on another proc.
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 10/11/16 - switch to v0.4 \n
-!! 23/11/16 - rework complete subroutine: use list of active blocks, procs works now on light data \n
-!! 03/02/17 - insert neighbor_num variable to use subroutine for 2D and 3D data \n
-!! 05/04/17 - Improvement: Ensure a graded mesh in any case, not only in the coarsen states (which was done before)
-!! 09/06/17 - speed up with switching to 8bit integer for working arrays, shorten send/receive buffer
-!
 ! ********************************************************************************************
-
 
 subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n )
 
     implicit none
-
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> neighbor list
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
-    !> active_block_list (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
+    type (type_params), intent(in)      :: params                 !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)        !> light data array
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)     !> neighbor list
+    integer(kind=ik), intent(inout)     :: lgt_active(:)          !> active_block_list (light data)
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
-
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! process rank
-    integer(kind=ik)                    :: rank
+    integer(kind=ik), intent(in)        :: lgt_n                  !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:)          !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                  !> number of active blocks (heavy data)
+    integer(kind=ik)                    :: ierr                   ! MPI error variable
+    integer(kind=ik)                    :: rank                   ! process rank
     ! loop variables
     integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
     counter, hvy_id, neighbor_status, Jmax, proc_id, lgt_id
-    ! status of grid changing
-    logical                             :: grid_changed, test2
+    logical                             :: grid_changed, test2    ! status of grid changing
 
     ! it turned out that in some situations ensure_completeness is very expensive, mostly because
     ! of the find_sisters routine. We therefore at least do this procedure only once and not
@@ -106,7 +73,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         ! we loop over heavy data here: parallel execution.
         do k = 1, hvy_n
             hvy_id = hvy_active(k)
-            call hvy_id_to_lgt_id(lgt_id, hvy_id, rank, N)
+            call hvy2lgt(lgt_id, hvy_id, rank, N)
 
             !-------------------------------------------------------------------
             ! completeness

@@ -133,7 +133,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
         do k = 1, hvy_n
             ! calculate light id
             sender_hvy_id = hvy_active(k)
-            call hvy_id_to_lgt_id( sender_lgt_id, sender_hvy_id, myrank, N )
+            call hvy2lgt( sender_lgt_id, sender_hvy_id, myrank, N )
 
             ! loop over all neighbors
             do neighborhood = 1, size(hvy_neighbor, 2)
@@ -144,9 +144,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
                     ! neighbor light data id
                     neighbor_lgt_id = hvy_neighbor( sender_hvy_id, neighborhood )
                     ! calculate neighbor rank
-                    call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )
+                    call lgt2proc( neighbor_rank, neighbor_lgt_id, N )
                     ! neighbor heavy id
-                    call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
+                    call lgt2hvy( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                     ! define level difference: sender - receiver, so +1 means sender on higher level
                     level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 
@@ -805,7 +805,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     ! and this is dangerous, as we might do the same mistakes twice and conclude "hey, it works!
     ! my test is okay". So we don't do it. ...
     do hvy_id_k = 1, size( hvy_block, 5)
-        call hvy_id_to_lgt_id(lgt_id, hvy_id_k, params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_id_k, params%rank, params%number_blocks)
         hvy_block_test(:, :, :, :, hvy_id_k) = real(lgt_id, kind=rk)
     end do
 
@@ -849,7 +849,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     do hvy_id_k = 1, hvy_n
         ! calculate light id
         local_hvy_id =  hvy_active(hvy_id_k)
-        call hvy_id_to_lgt_id(localLightId, local_hvy_id  , params%rank , params%number_blocks )
+        call hvy2lgt(localLightId, local_hvy_id  , params%rank , params%number_blocks )
 
         do boundaryIndex =1,spaceDirections !
             i1      = g + 1
@@ -1241,7 +1241,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     do k = 1, hvy_n
         ! calculate light id
         sender_hvy_id = hvy_active(k)
-        call hvy_id_to_lgt_id( sender_lgt_id, sender_hvy_id, myrank, N )
+        call hvy2lgt( sender_lgt_id, sender_hvy_id, myrank, N )
 
         ! loop over all neighbors
         do neighborhood = 1, size(hvy_neighbor, 2)
@@ -1250,11 +1250,11 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
                 ! neighbor light data id
                 neighbor_lgt_id = hvy_neighbor( sender_hvy_id, neighborhood )
                 ! calculate neighbor rank
-                call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )
+                call lgt2proc( neighbor_rank, neighbor_lgt_id, N )
 
                 if (neighbor_rank /= myrank .or. count_internal) then
                     ! neighbor heavy id
-                    call lgt_id_to_hvy_id( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
+                    call lgt2hvy( hvy_id_receiver, neighbor_lgt_id, neighbor_rank, N )
                     ! define level difference: sender - receiver, so +1 means sender on higher level
                     level_diff = lgt_block( sender_lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
 

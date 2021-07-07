@@ -1,8 +1,4 @@
 !> \brief Get the time step according to the conditions of the physics module
-!> \details
-!> \author sm
-!> \date 18/04/17 - create
-!> \date 03/09/18 - removed unused variables (P.Krah) commit 0b79d945422eedda70fa5f874cd2889a10ef8287
 subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
     use module_physics_metamodule, only : GET_DT_BLOCK_meta
@@ -33,7 +29,7 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
       do k = 1, hvy_n
           ! as the local CFL condition depends on the blocks, we give the routine
           ! the block grid (origin/spacing)
-          call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+          call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
           call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
           ! physics modules dictate some restrictions due to CFL conditions, penalization

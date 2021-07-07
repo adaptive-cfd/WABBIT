@@ -1,13 +1,6 @@
-!> \file
-! WABBIT
-!> \name keyvalues.f90
-!> \version 0.5
-!> \author sm, engels
-!
 !> \brief loads the specified *.h5 file and creates a *.key file that contains
 !! min / max / mean / L2 norm of the field data. This is used for testing
 !! so that we don't need to store entire fields but rather the *.key only
-!! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
 !*********************************************************************************************
 
 subroutine post_mean(params)
@@ -18,10 +11,8 @@ subroutine post_mean(params)
     use mpi
 
     implicit none
-    !> name of the file
-    character(len=80)            :: fname, fname_out
-    !> parameter struct
-    type (type_params), intent(inout)       :: params
+    character(len=cshort)                       :: fname, fname_out                 !> name of the file
+    type (type_params), intent(inout)       :: params                           !> parameter struct
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
@@ -99,7 +90,7 @@ subroutine post_mean(params)
 
     g = params%n_ghosts
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (params%dim == 3) then

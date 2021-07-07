@@ -12,7 +12,7 @@ subroutine post_rhs(params)
 
     ! !> parameter struct
     type (type_params), intent(inout)  :: params
-    ! character(len=80)      :: fname_ini, fname_input, dummy
+    ! character(len=cshort)      :: fname_ini, fname_input, dummy
     ! real(kind=rk)          :: time
     ! integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
     ! integer(kind=ik), dimension(3) :: Bs
@@ -25,7 +25,7 @@ subroutine post_rhs(params)
     ! integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     ! integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     ! integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    ! character(len=80)                  :: fname
+    ! character(len=cshort)                  :: fname
     ! real(kind=rk), dimension(3)        :: dx, x0
     ! real(kind=rk), allocatable         :: us(:,:,:,:)
     ! integer(hid_t)                     :: file_id

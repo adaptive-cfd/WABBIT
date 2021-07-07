@@ -1,12 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name find_neighbor_corner_2D.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief find neighbor on block corner
 !> \details  valid cases for corner neighbors:
 !!    1. same level: always exact one neighbor
@@ -14,14 +5,11 @@
 !! only on block corner (not additional on block side)
 !!    3. one level up: always exact one neighbor
 !!
-!! input:
-!!           - heavy and light data id
+!! input:    - heavy and light data id
 !!           - light data array and max treelevel
 !!           - direction for neighbor search
 !!           - list of active blocks
-!!
-!!  output:
-!!           - neighbor list array
+!!  output:  - neighbor list array
 !!
 ! -------------------------------------------------------------------------------------------------------------------------
 !>  dirs = (/'__N', '__E', '__S', '__W', '_NE', '_NW', '_SE', '_SW', 'NNE', 'NNW', 'SSE', 'SSW', 'ENE', 'ESE', 'WNW', 'WSW'/)
@@ -41,11 +29,6 @@
 ! 14 ESE
 ! 15 WNW
 ! 16 WSW
-! -------------------------------------------------------------------------------------------------------------------------
-!> \details
-!! = log ======================================================================================
-!! \n
-!! 08/11/16 - switch to v0.4
 ! ********************************************************************************************
 !> \image html neighborhood.svg "Neighborhood Relations in 2D" width=400
 
@@ -56,37 +39,25 @@ subroutine find_neighbor_corner_2D(params, heavy_id, light_id, lgt_block, max_tr
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> heavy data id
     integer(kind=ik), intent(in)        :: heavy_id
-    !> light data id
     integer(kind=ik), intent(in)        :: light_id
-    !> max treelevel
     integer(kind=ik), intent(in)        :: max_treelevel
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> direction for neighbor search
-    character(len=3), intent(in)        :: dir
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)            !> light data array
+    character(len=3), intent(in)        :: dir                        !> direction for neighbor search
+    integer(kind=ik), intent(in)        :: lgt_n                      !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
     logical, intent(inout)              :: error
-    integer(kind=2), intent(in) :: n_domain(1:3)
-
-    ! mesh level
-    integer(kind=ik)                    :: level
+    integer(kind=2), intent(in)         :: n_domain(1:3)
+    integer(kind=ik)                    :: level                      ! mesh level
     ! treecode varaibles
     integer(kind=ik)                    :: my_treecode(max_treelevel), neighbor(max_treelevel), virt_treecode(max_treelevel)
     ! return value from function "does_block_exist"
     logical                             :: exists
     ! variable to show if there is a valid corner neighbor
     logical                             :: lvl_down_neighbor
-    ! auxiliary variables
-    integer(kind=ik)                    :: list_id, virt_code
-    ! neighbor light data id
-    integer(kind=ik)                    :: neighbor_light_id, tree_id
+    integer(kind=ik)                    :: list_id, virt_code           ! auxiliary variables
+    integer(kind=ik)                    :: neighbor_light_id, tree_id   ! neighbor light data id
 
     my_treecode = lgt_block( light_id, 1:max_treelevel )
     level       = lgt_block( light_id, max_treelevel + IDX_MESH_LVL )

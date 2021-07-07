@@ -1,25 +1,10 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name treecode_to_hilbertcode_2D.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief convert given treecode to code in hilbert curve
-!
-!> 
-!! input:   
-!!           - treecode
+!! input:    - treecode
 !!           - size of treecode
-!!
-!! output:   
-!!           - hilbert code
+!! output:   - hilbert code
 !!
 !! hilbert pattern
 ! ---------------
-!>
 !!   |A: |B: |C: |D: |
 !!   |---|---|---|---|
 !!   |0 3|0 1|2 1|2 3|
@@ -30,54 +15,28 @@
 !!    |---|---|---|---|
 !!    |B D|A B|C C|D A|
 !!    |A A|C B|B D|D C|
-!!
-!! = log ======================================================================================
-!! \n
-!! 25/01/17 - create
 ! ********************************************************************************************
-!
 !> \image html hilbert.svg "A Path taken by the Hilbert Curve in 2D" width=300
 !> \image latex hilbert.eps "A Path taken by the Hilbert Curve in 2D"
 
 subroutine treecode_to_hilbertcode_2D(treecode, hilbertcode, n)
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> treecode size
-    integer(kind=ik), intent(in)        :: n
-
-    !> treecode
-    integer(kind=ik), intent(in)        :: treecode(n)
-
-    !> hilbert code
-    integer(kind=ik), intent(out)       :: hilbertcode(n)
-
-    ! loop variable
-    integer(kind=ik)                    :: k
-
-    ! treecode number
-    integer(kind=ik)                    :: tree_i, prev_tree_i
+    integer(kind=ik), intent(in)        :: n              !> treecode size
+    integer(kind=ik), intent(in)        :: treecode(n)    !> treecode
+    integer(kind=ik), intent(out)       :: hilbertcode(n) !> hilbert code
+    integer(kind=ik)                    :: k              ! loop variable
+    integer(kind=ik)                    :: tree_i, prev_tree_i    ! treecode number
 
     ! hilbert pattern, note: use integer
     ! pattern : A B C D
     ! integer : 1 2 3 4
     integer(kind=ik)                    :: hilbert_pattern, prev_hilbert_pattern
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
     prev_tree_i          = 0
     prev_hilbert_pattern = 0
     hilbert_pattern      = 0
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! loop over treecode
     do k = 1, n

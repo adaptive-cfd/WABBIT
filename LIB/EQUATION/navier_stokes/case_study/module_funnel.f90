@@ -1,23 +1,12 @@
-
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module of 2D/3D ion funnel
-!> \version 23.2.2018
-!> \author P.Krah
-!-----------------------------------------------------------------
 
 module module_funnel
 
-  !-------------------------------------------------------
-  ! modules
   use module_navier_stokes_params
   use module_precision
   use module_ns_penalization
   use module_ini_files_parser_mpi, only : read_param_mpi
   use mpi
-  !--------------------------------------------------------
-  ! variables
 
   implicit none
 
@@ -33,7 +22,7 @@ module module_funnel
   !**********************************************************************************************
 
 !  real(kind=rk),    allocatable,     save        :: mask(:,:,:)
-  character(len=80),save    :: mask_geometry!273.15_rk
+  character(len=cshort),save    :: mask_geometry!273.15_rk
   logical      ,save        :: smooth_mask, use_sponge
   !real(kind=rk),save        :: C_eta_inv, C_sp_inv, L_sponge
   real(kind=rk),save        :: domain_size(3)=0.0_rk
@@ -318,8 +307,6 @@ end subroutine draw_funnel
 
 
 
-
-
   subroutine mean_quantity(integral,area)
       !> area of taking the mean
       real(kind=rk),intent(in)    :: area
@@ -351,13 +338,6 @@ end subroutine draw_funnel
       funnel%pump_pressure = integral(pF)
 
   end subroutine mean_quantity
-
-
-
-
-
-
-
 
 
 end module module_funnel

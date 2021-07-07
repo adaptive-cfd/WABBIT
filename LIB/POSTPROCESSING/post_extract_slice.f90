@@ -20,7 +20,7 @@ subroutine post_extract_slice(params)
 
     implicit none
 
-    character(len=80)                       :: fname, fname_out
+    character(len=cshort)                       :: fname, fname_out
     type (type_params), intent(inout)       :: params
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
@@ -93,7 +93,7 @@ subroutine post_extract_slice(params)
 
     Nblocks = 0
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
@@ -112,7 +112,7 @@ subroutine post_extract_slice(params)
 
     i = 1
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then

@@ -1,22 +1,12 @@
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module of global parameters and functions
-!> \details
 !!    * index positions of lgt_data (IDX_TREE_ID, IDX_MESH_LVL, IDX_REFINE_STS etc)
 !!    * functions abort
 !!    * global prints (todo)
 !!    * global MPI communicator
-!!
-!> \version 2.8.2018
-!> \author P.Krah
 !-----------------------------------------------------------------
-
-!> \brief this module contains all global parameters and functions
 module module_globals
 
-! import MPI module
- use module_precision
+ use module_precision     ! import MPI module
 
   implicit none
   !> global communicator for WABBIT! Dont use MPI_COMM_WORLD!!!!!

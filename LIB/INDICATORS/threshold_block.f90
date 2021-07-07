@@ -1,27 +1,5 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name threshold_block.f90
-!> \version 0.6
-!> \author msr, engels
-!
-!> \brief thresholding for a single block
-!
-!>
 !! The block thresholding is done with the restriction/prediction operators acting on the
 !! entire block \n
-!!
-!!
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 10/11/16 - switch to v0.4
-!! 08/09/17 - add linear wavelet filtering - discarding all details, if block level == Jmax
-!! 29/05/18 - now consider only one block, not the entire grid. old name was confusing.
-!!
 ! ********************************************************************************************
 !> \image html threshold.svg width=400
 

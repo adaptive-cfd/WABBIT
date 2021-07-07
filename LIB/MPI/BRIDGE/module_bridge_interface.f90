@@ -95,7 +95,7 @@ integer                                      :: ierr               ! MPI communi
 integer         , dimension(MPI_STATUS_SIZE) :: status             ! MPI communication status
 double precision, dimension(3,2)             :: Domain     ! received domain parameters to transform
 integer         , dimension(5)             :: discretizationParams ! Number of grid points and processes
-character(len=80)                            :: geometry
+character(len=cshort)                            :: geometry
 
   ! Only the root particle process receive the parameters from the root fluid process
   if (myBridge%myWorldRank == 0) then                              ! check if the process is the root process

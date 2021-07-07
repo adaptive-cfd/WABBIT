@@ -1,13 +1,3 @@
-
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name refinement_execute_3D.f90
-!> \version 0.5
-!> \author msr, engels
-!
 !> \brief Refine mesh (3D version). All cpu loop over their heavy data and check if the refinement
 !! flag +1 is set on the block. If so, we take this block, interpolate it to the next finer
 !! level and create 8 new blocks, each carrying a part of the interpolated data.
@@ -16,46 +6,26 @@
 !> \note The interpolation (or prediction) operator here is applied to a block INCLUDING
 !! any ghost nodes. You must sync first.
 !
-!> \details
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 03/02/17 - create
-!
 ! ********************************************************************************************
 
 subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
-
-    ! loop variables
-    integer(kind=ik)                    :: k, N, dF, lgt_id
-    ! process rank
-    integer(kind=ik)                    :: rank
-    ! grid parameter
-    integer(kind=ik)                    :: g
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                      !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: hvy_active(:)                        !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik)                    :: k, N, dF, lgt_id                     ! loop variables
+    integer(kind=ik)                    :: rank                                 ! process rank
+    integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    ! data fields for interpolation
-    real(kind=rk), allocatable, save    :: new_data(:,:,:,:), data_predict_fine(:,:,:)
-    ! free light/heavy data id
+    real(kind=rk), allocatable, save    :: new_data(:,:,:,:), data_predict_fine(:,:,:)  ! data fields for interpolation
     integer(kind=ik)                    :: lgt_free_id, free_heavy_id
-    ! treecode varaible
     integer(kind=ik)                    :: treecode(params%max_treelevel)
-    ! mesh level
     integer(kind=ik)                    :: level, tree_id
 
     N = params%number_blocks
@@ -78,7 +48,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     do k = 1, hvy_n
 
         ! light data id
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), rank, N )
+        call hvy2lgt( lgt_id, hvy_active(k), rank, N )
 
         ! block wants to refine
         if ( (lgt_block( lgt_id, params%max_treelevel + idx_refine_sts) == +1) ) then
@@ -105,7 +75,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! first new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -128,7 +98,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! second new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -151,7 +121,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! third new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -174,7 +144,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! fourth new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -197,7 +167,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! fifth new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -220,7 +190,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! sixth new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -243,7 +213,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! seventh new block
             ! find a free light id on this rank
             call get_free_local_light_id( params, rank, lgt_block, lgt_free_id)
-            call lgt_id_to_hvy_id( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
             ! write new light data
             ! old treecode
             lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode(:)
@@ -266,7 +236,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
             ! eigth new block
             ! write data on current heavy id
             free_heavy_id = hvy_active(k)
-            call hvy_id_to_lgt_id( lgt_free_id, free_heavy_id, rank, N )
+            call hvy2lgt( lgt_free_id, free_heavy_id, rank, N )
 
             ! write new light data
             ! old treecode

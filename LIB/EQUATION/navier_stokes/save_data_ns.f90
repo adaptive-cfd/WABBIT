@@ -43,7 +43,7 @@
     integer(kind=ik)             ::  nvar, k
     integer(kind=ik), dimension(3) :: Bs
     ! variable name
-    character(len=80)            :: name
+    character(len=cshort)            :: name
 
 
     Bs(1) = size(u,1) - 2*g
@@ -52,7 +52,7 @@
     nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
-    
+
     tmp_u  = u(:,:,:,:)
     work(:,:,:,1:nvar)=u
     if ( .not. ALL(params_ns%periodic_BC)) then
@@ -131,7 +131,7 @@
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=80), intent(out) :: name
+    character(len=cshort), intent(out) :: name
 
     if (allocated(params_ns%names)) then
       name = params_ns%names(N)

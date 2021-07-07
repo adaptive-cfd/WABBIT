@@ -1,69 +1,27 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name write_field.f90
-!> \version 0.5
-!> \author engels, msr
-!
 !> \brief write data of a single datafield dF at timestep iteration and time t
-!
-!>
-!! input:
-!!           - time loop parameter
+!! input:    - time loop parameter
 !!           - datafield number
 !!           - parameter array
 !!           - light data array
 !!           - heavy data array
-!!
-!! output:
-!!           -
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 07/11/16
-!!          - switch to v0.4
-!!
-!! 26/01/17
-!!          - switch to 3D, v0.5
-!!          - add dirs_3D array for 3D neighbor codes
-!!
-!! 21/02/17
-!!          - use parallel IO, write one data array with all data
-!
 ! ********************************************************************************************
 
 subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
     implicit none
 
-    !> file name
-    character(len=*), intent(in)        :: fname
-    !> time loop parameters
-    real(kind=rk), intent(in)           :: time
+    character(len=*), intent(in)        :: fname                                !> file name
+    real(kind=rk), intent(in)           :: time                                 !> time loop parameters
     integer(kind=ik), intent(in)        :: iteration
-    !> datafield number
-    integer(kind=ik), intent(in)        :: dF
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_active(:), hvy_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
-
-    ! process rank
-    integer(kind=ik)                    :: rank, lgt_rank
-    ! loop variable
-    integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status
-    ! grid parameter
-    integer(kind=ik)                    :: g, dim
+    integer(kind=ik), intent(in)        :: dF                                   !> datafield number
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)                      !> light data array
+    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: lgt_active(:), hvy_active(:)         !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
+    integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
+    integer(kind=ik)                    :: g, dim                               ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
@@ -71,16 +29,15 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:)
     ! treecode array
     integer(kind=ik), allocatable       :: block_treecode(:,:)
-    ! file id integer
     integer(hid_t)                      :: file_id
     ! offset variables
     integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D, periodic_BC, symmetry_BC
 
-    character(len=80) :: arg
-    type(INIFILE) :: FILE
+    character(len=cshort)                   :: arg
+    type(INIFILE)                       :: FILE
 
-    logical, parameter :: save_ghosts = .False.
+    logical, parameter                  :: save_ghosts = .False.
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -175,9 +132,9 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     do k = 1, lgt_n
 
         ! calculate proc rank from light data line number
-        call lgt_id_to_proc_rank( lgt_rank, lgt_active(k), params%number_blocks )
+        call lgt2proc( lgt_rank, lgt_active(k), params%number_blocks )
         ! calculate heavy block id corresponding to light id
-        call lgt_id_to_hvy_id( hvy_id, lgt_active(k), rank, params%number_blocks )
+        call lgt2hvy( hvy_id, lgt_active(k), rank, params%number_blocks )
 
         ! if I own this block, I copy it to the buffer.
         ! also extract block coordinate origin and spacing

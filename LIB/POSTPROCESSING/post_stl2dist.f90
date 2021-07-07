@@ -14,7 +14,7 @@ subroutine post_stl2dist(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: fname_ini, fname_stl, fname_out, dummy
+    character(len=cshort) :: fname_ini, fname_stl, fname_out, dummy
     integer :: i, Bs(1:3), g, ntri, k, iter, skips, a
     integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax, safety, mpicode
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal, vertex2_normal, &
@@ -183,7 +183,7 @@ subroutine post_stl2dist(params)
 
 
             ! compute block spacing and origin from treecode
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
             ! shift origin to take ghost nodes into account

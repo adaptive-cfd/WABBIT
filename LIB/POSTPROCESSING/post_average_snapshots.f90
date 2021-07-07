@@ -15,9 +15,9 @@ subroutine post_average_snapshots(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: fname_ini, fname2, fname_out
+    character(len=cshort) :: fname_ini, fname2, fname_out
 
-    character(len=80), allocatable     :: fname_in(:)
+    character(len=cshort), allocatable     :: fname_in(:)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)

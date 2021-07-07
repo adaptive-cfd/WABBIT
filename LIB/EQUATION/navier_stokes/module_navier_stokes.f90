@@ -1,27 +1,11 @@
-!> \dir
-!> \brief
-!>Implementation of 3d/2d Navier Stokes Physics
-
-!-----------------------------------------------------------------
-!> \file
-!> \brief
 !! Module of public 2D/3D Navier Stokes equation
-!> \details
 !!    * reads in params
 !!    * sets initial conditions
 !!    * calls RHS
 !!    * calculates time step
-!!
-!> \version 23.1.2018
-!> \author P.Krah
-!-----------------------------------------------------------------
 
-!> \brief Implementation of Navier Stokes Physiscs Interface for
-!! WABBIT
 module module_navier_stokes
 
-  !---------------------------------------------------------------------------------------------
-  ! modules
   use module_navier_stokes_params
   use module_helpers, only: block_contains_NaN
   use module_ns_penalization
@@ -148,11 +132,6 @@ contains
     call clean_ini_file_mpi( FILE )
 
   end subroutine READ_PARAMETERS_NStokes
-
-
-
-
-
 
 
 
@@ -300,10 +279,6 @@ contains
     end select
 
   end subroutine RHS_NStokes
-
-
-
-
 
 
 
@@ -620,7 +595,6 @@ contains
 
 
 
-
   !-----------------------------------------------------------------------------
   !-----------------------------------------------------------------------------
   ! main level wrapper to compute statistics (such as mean flow, global energy,
@@ -839,9 +813,6 @@ contains
 
 
 
-
-
-
   !-----------------------------------------------------------------------------
   ! main level wrapper to filter a block. Note this is completely
   ! independent of the grid and any MPI formalism, neighboring relations and the like.
@@ -946,7 +917,7 @@ subroutine create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
 end subroutine create_mask_NSTOKES
 
      !-----------------------------------------------------------------------------
-     ! Adaptation is dependent on the different physics application. 
+     ! Adaptation is dependent on the different physics application.
      ! Every physics module can choose its own coarsening indicator.
     !-----------------------------------------------------------------------------
     subroutine PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, threshold_field, &
@@ -967,10 +938,10 @@ end subroutine create_mask_NSTOKES
 
         ! output. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: threshold_field(1:,1:,1:,1:)
-        
+
         integer(kind=ik), intent(out):: N_thresholding_components
         integer(kind=ik) :: Bs(3),ix,iy,iz
-       
+
         Bs = params_ns%Bs
 
         if (params_ns%dim == 3) then
@@ -1021,10 +992,7 @@ end subroutine create_mask_NSTOKES
 
         endselect
 
-    end subroutine 
-
-
-
+    end subroutine
 
 
 

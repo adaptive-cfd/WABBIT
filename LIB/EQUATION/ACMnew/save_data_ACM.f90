@@ -51,7 +51,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     ! local variables
     integer(kind=ik)  :: neqn, nwork, k, iscalar
     integer(kind=ik), dimension(3) :: Bs
-    character(len=80) :: name
+    character(len=cshort) :: name
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: PREPARE_SAVE_DATA_ACM called but ACM not initialized"
     ! number of state variables
@@ -153,7 +153,7 @@ subroutine FIELD_NAMES_ACM( N, name )
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=80), intent(out) :: name
+    character(len=cshort), intent(out) :: name
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: FIELD_NAMES_ACM called but ACM not initialized"
 

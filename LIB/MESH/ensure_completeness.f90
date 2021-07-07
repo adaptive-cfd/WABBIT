@@ -1,59 +1,21 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name ensure_completeness_2D.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief sets refinement status to -2 for all sister blocks, if coarsening is possible
-!
-!> \details
 !! input:    - light data array \n
 !! output:   - light data array
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 10/11/16 - switch to v0.4 \n
-!! 05/04/17 - works for 2D and 3D data and uses readable find_sisters routine.
 ! ********************************************************************************************
 !> \image html completeness.svg "Ensure Completeness" width=400
 
 subroutine ensure_completeness( params, lgt_block, lgt_id, sisters )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :), sisters(:)
+    type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :), sisters(:)    !> light data array
     integer(kind=ik), intent(in)        :: lgt_id
-
-    ! max treelevel
-    integer(kind=ik)                    :: Jmax
-    ! loop variables
-    integer(kind=ik)                    :: k, l, N_sisters, status
-
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    integer(kind=ik)                    :: Jmax                           ! max treelevel
+    integer(kind=ik)                    :: k, l, N_sisters, status        ! loop variables
 
     Jmax = params%max_treelevel
     N_sisters = size(sisters)
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! if all sisters exists, then the array should not contain values smaller
     ! zero (-1 would mean not found)

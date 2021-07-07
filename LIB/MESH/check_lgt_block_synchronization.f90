@@ -1,48 +1,23 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name check_lgt_block_synchronization.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief debug lgt_block data
-!
-!>
 !!  proc 0 gather all data and compare the data to his own light data \n
 !!
 !!  is currently unused, very helpful routine for development of block structures, lgt/hvy data
 !!
 !! input:    - params, light data \n
 !! output:   - status of lgt_block synchronzation \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 29/11/16 - create
 ! ********************************************************************************************
 
 subroutine check_lgt_block_synchronization( params, lgt_block)
-    !---------------------------------------------------------------------------------------------
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)     :: lgt_block(:, :)
-
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)                      !> light data array
     ! local light data array
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block,1) , size(lgt_block,2)), lgt_block_0( size(lgt_block,1) , size(lgt_block,2))
+    integer(kind=ik)                    :: ierr                                 ! MPI error variable
+    integer(kind=ik)                    :: k, l, lgt_start, a                   ! loop variables
+    integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)      ! lgt data
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! loop variables
-    integer(kind=ik)                    :: k, l, lgt_start, a
-    ! lgt data
-    integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)
-
-    !---------------------------------------------------------------------------------------------
 
     if (.not. allocated(lgt_all)) Then
         allocate(lgt_all(1:params%number_procs, size(lgt_block,1), size(lgt_block,2)))
@@ -136,7 +111,7 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
     tmp = 0
 
     do k = 1, hvy_n
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+        call hvy2lgt( lgt_id, hvy_active(k), params%rank, params%number_blocks )
         tmp(lgt_id,:) = hvy_neighbor(hvy_active(k),:)
     enddo
 

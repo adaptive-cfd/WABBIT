@@ -1,13 +1,3 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name balance_load_2D.f90
-!> \author engels
-!
-!> \brief balance the load
-!
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
 subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
@@ -15,25 +5,15 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     implicit none
 
-    !=============================================================================
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
+    integer(kind=ik), intent(inout)     :: lgt_active(:)              !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n                      !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_active(:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n                      !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     !> if true balance the load will always give the same block distribution
     !> for the same treestructure (default is False)
@@ -146,7 +126,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     case default
         call abort(210309, "The block_dist is unkown"//params%block_distribution)
-        
+
     end select
 
 
@@ -188,7 +168,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         end do
 
         ! find out on which mpirank lies the block that we're looking at
-        call lgt_id_to_proc_rank( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
+        call lgt2proc( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
         ! does this block lie on the right mpirank, i.e., the current part of the
         ! SFC? if so, nothing needs to be done. otherwise, the following if is active

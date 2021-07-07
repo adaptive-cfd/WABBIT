@@ -1,17 +1,5 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_hdf5_wrapper.f90
-!> \version 0.4
-!> \author engels, msr
-!
-!-------------------------------------------------------------------------------
 !> \brief Read a field from a file
 !> \note a single file can contain many arrays, if required
-!!
-!> \details
 !!
 !! |INPUT      |                                                                  |
 !! |-----------|------------------------------------------------------------------|
@@ -24,37 +12,21 @@
 !!                   they are rared=(/0,0,0/) rbred=(/nx-1,ny-1,nz-1/). If the data
 !!                   is distributed among procs, each proc has to indicate which
 !!                   portion of the array it holds \n
-!!
-!!
 !! |OUTPUT     |                                                                  |
 !! |-----------|------------------------------------------------------------------|
 !! |field      |     data read from file/written to file                          |
-!!
-!-------------------------------------------------------------------------------
-!
-!> = log ======================================================================================
-!! \n
-!! 04/11/16 - linked old module version to wabbit (use module_params)
 ! ********************************************************************************************
 
 module module_hdf5_wrapper
-
-!---------------------------------------------------------------------------------------------
-! modules
-
     use hdf5
     use mpi
-    ! global parameters
-    use module_params
+    use module_params       ! global parameters
     use module_precision
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
     ! Precision of doubles
-    character(len=80) :: field_precision = "double" !"single"
+    character(len=cshort) :: field_precision = "double" !"single"
     integer(kind=hsize_t), parameter :: max_chunk = 1024
 
     ! interface for writing attributes. an attribute is an object which is attached
@@ -79,11 +51,6 @@ module module_hdf5_wrapper
     interface read_dset_mpi_hdf5_2D
         module procedure read_int_dset_mpi_hdf5_2D, read_dble_dset_mpi_hdf5_2D
     end interface read_dset_mpi_hdf5_2D
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
@@ -789,7 +756,6 @@ end subroutine get_rank_datafield
     call h5dclose_f(dset_id, error) ! Close the dataset.
     call h5pclose_f(plist_id, error) ! Close the property list.
   end subroutine write_int_dset_mpi_hdf5_1D
-
 
 
   !-------------------------------------------------------------------------------

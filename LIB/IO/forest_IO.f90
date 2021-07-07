@@ -124,7 +124,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     integer(hsize_t) :: dims_treecode(2)
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     integer(hid_t)        :: file_id
-    character(len = 80) :: fname
+    character(len = cshort) :: fname
     logical :: verbose = .true.
 
     if (present(verbosity)) verbose=verbosity
@@ -201,7 +201,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     do k = 1, my_hvy_n
         call get_free_local_light_id( params, rank, lgt_block, free_lgt_id)
 
-        call lgt_id_to_hvy_id( free_hvy_id, free_lgt_id, rank, N )
+        call lgt2hvy( free_hvy_id, free_lgt_id, rank, N )
         ! copy treecode
         lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level

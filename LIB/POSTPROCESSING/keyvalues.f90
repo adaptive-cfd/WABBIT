@@ -1,14 +1,6 @@
-!> \file
-! WABBIT
-!> \name keyvalues.f90
-!> \version 0.5
-!> \author sm, engels
-!
 !> \brief loads the specified *.h5 file and creates a *.key file that contains
 !! min / max / mean / L2 norm of the field data. This is used for testing
 !! so that we don't need to store entire fields but rather the *.key only
-!! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
-!! \version 4/4/18 - add space filling curve test commit 47b4c1e24eabd112c950928e77e134046fc05d9a
 !*********************************************************************************************
 
 subroutine keyvalues(fname, params)
@@ -20,10 +12,8 @@ subroutine keyvalues(fname, params)
     use mpi
 
     implicit none
-    !> name of the file
-    character(len=*), intent(in)            :: fname
-    !> parameter struct
-    type (type_params), intent(inout)       :: params
+    character(len=*), intent(in)            :: fname                            !> name of the file
+    type (type_params), intent(inout)       :: params                           !> parameter struct
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
@@ -39,13 +29,12 @@ subroutine keyvalues(fname, params)
     real(kind=rk)                           :: time
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
-
-    integer(kind=ik)  :: sum_curve(2)
-    character(len=12) :: curves(2)
-    real(kind=rk)    :: x,y,z
-    real(kind=rk)    :: maxi,mini,squari,meani,qi
-    real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i
+    integer(kind=ik)                        :: sum_curve(2)
+    character(len=12)                       :: curves(2)
+    real(kind=rk)                           :: x,y,z
+    real(kind=rk)                           :: maxi,mini,squari,meani,qi
+    real(kind=rk)                           :: maxl,minl,squarl,meanl,ql
+    integer(kind=ik)                        :: ix,iy,iz,mpicode, ioerr, rank, i
     !-----------------------------------------------------------------------------------------------------
     rank = params%rank
     curves(1) = 'sfc_hilbert'
@@ -110,7 +99,7 @@ subroutine keyvalues(fname, params)
         WABBIT_COMM,mpicode)
 
         do k=1,hvy_n
-            call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
             tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
         end do
 
@@ -127,7 +116,7 @@ subroutine keyvalues(fname, params)
     ql = 0.0_rk
 
     do k = 1,hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         do iz = 1, Bs(3)
             do iy = 1, Bs(2)

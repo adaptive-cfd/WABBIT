@@ -1,42 +1,19 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name read_field.f90
-!> \version 0.5
-!> \author engels, sm
-!
 !> \brief read data of a single datafield dF at iteration and time t
-! = log ======================================================================================
-!
-!> \date 22/09/17 - create
-!
 ! ********************************************************************************************
 
 subroutine read_field(fname, dF, params, hvy_block, hvy_n)
     implicit none
 
-    !> file name
-    character(len=*), intent(in)        :: fname
-    !> datafield number
-    integer(kind=ik), intent(in)        :: dF
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> number of heavy and light active blocks
-    integer(kind=ik), intent(in)        :: hvy_n
-
-    ! file id integer
+    character(len=*), intent(in)        :: fname                      !> file name
+    integer(kind=ik), intent(in)        :: dF                         !> datafield number
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: hvy_n                      !> number of heavy and light active blocks
     integer(hid_t)                      :: file_id
-    ! process rank
-    integer(kind=ik)                    :: rank
-    ! grid parameter
-    integer(kind=ik)                    :: g, k
+    integer(kind=ik)                    :: rank                       ! process rank
+    integer(kind=ik)                    :: g, k                       ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    ! offset variables
-    integer(kind=ik), dimension(4)      :: ubounds3D, lbounds3D
+    integer(kind=ik), dimension(4)      :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3)      :: ubounds2D, lbounds2D
 
     ! procs per rank array

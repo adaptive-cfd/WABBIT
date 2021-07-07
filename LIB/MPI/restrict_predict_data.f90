@@ -3,19 +3,12 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)                  :: params
-    !> data buffer
-    real(kind=rk), intent(out)                      :: res_pre_data(:,:,:,:)
-    !> indices in x,y,z direction of the ghost node patch
-    integer(kind=ik), intent(in)                    :: ijk(2,3)
-    !> neighborhood relation, id from dirs
-    integer(kind=ik), intent(in)                    :: neighborhood
-    !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
-    !> hvy id
+    type (type_params), intent(in)                  :: params                   !> user defined parameter structure
+    real(kind=rk), intent(out)                      :: res_pre_data(:,:,:,:)    !> data buffer
+    integer(kind=ik), intent(in)                    :: ijk(2,3)                 !> indices in x,y,z direction of the ghost node patch
+    integer(kind=ik), intent(in)                    :: neighborhood             !> neighborhood relation, id from dirs
+    integer(kind=ik), intent(in)                    :: level_diff               !> difference between block levels
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)                    :: hvy_id
 
     ! some neighborhoods are intrinsically on the same level (level_diff=0)
@@ -42,19 +35,12 @@ end subroutine restrict_predict_data
 subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)                  :: params
-    !> data buffer
-    real(kind=rk), intent(out)                      :: res_data(:,:,:,:)
-    !> ijk
+    type (type_params), intent(in)                  :: params                   !> user defined parameter structure
+    real(kind=rk), intent(out)                      :: res_data(:,:,:,:)        !> data buffer
     integer(kind=ik), intent(in)                    :: ijk(2,3)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
-    !> hvy id
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)                    :: hvy_id
-
-    ! local variables
-    integer(kind=ik)                                :: ix, iy, iz, dF
+    integer(kind=ik)                                :: ix, iy, iz, dF           ! local variables
 
     real(kind=rk), allocatable:: tmp_block(:,:,:)
 
@@ -104,19 +90,12 @@ end subroutine restrict_data
 subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)                  :: params
-    !> data buffer
-    real(kind=rk), intent(out)                      :: pre_data(:,:,:,:)
-    !> ijk
+    type (type_params), intent(in)                  :: params                   !> user defined parameter structure
+    real(kind=rk), intent(out)                      :: pre_data(:,:,:,:)        !> data buffer
     integer(kind=ik), intent(in)                    :: ijk(2,3)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
-    !> hvy id
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)                    :: hvy_id
-
-    ! local variables
-    integer(kind=ik)                                :: dF, nx, ny, nz
+    integer(kind=ik)                                :: dF, nx, ny, nz           ! local variables
     integer(kind=ik)                                :: NdF
 
 

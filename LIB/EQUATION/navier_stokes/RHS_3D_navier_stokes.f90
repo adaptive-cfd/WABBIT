@@ -1,45 +1,15 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name RHS_3D_navier_stokes.f90
-!> \version 0.5
-!> \author msr
-!
-!> \brief RHS for 3D navier stokes equation
-!
-!>
 !! input:    - datafield, grid parameter, velocity, diffusion coefficient, derivative order \n
 !! output:   - RHS(datafield) \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 14/02/17 - create
-!
 ! ********************************************************************************************
 
 subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
-    !> grid parameter
-    integer(kind=ik), intent(in)                            :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> rhs parameter
-    real(kind=rk), dimension(3), intent(in)                 :: x0,delta_x
-    !> datafields
-    real(kind=rk), intent(in)                              :: phi(:, :, :, :)
-    ! rhs array
-    real(kind=rk),intent(inout)                               :: rhs(:, :, :,:)
+    integer(kind=ik), intent(in)                            :: g                !> grid parameter
+    integer(kind=ik), dimension(3), intent(in)              :: Bs
+    real(kind=rk), dimension(3), intent(in)                 :: x0,delta_x       !> rhs parameter
+    real(kind=rk), intent(in)                               :: phi(:, :, :, :)  !> datafields
+    real(kind=rk),intent(inout)                             :: rhs(:, :, :,:)   ! rhs array
     ! when implementing boundary conditions, it is necessary to know if the local field (block)
     ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
     ! The boundary_flag tells you if the local field is adjacent to a domain boundary:
@@ -50,48 +20,29 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     ! currently only acessible in the local stage
     !integer(kind=2), intent(in)                             :: boundary_flag(3)
 
-     ! adiabatic coefficien t
-    real(kind=rk)                                           :: gamma_
-    ! specific gas constant
-    real(kind=rk)                                           :: Rs
-    ! isochoric heat capacity
-    real(kind=rk)                                           :: Cv
-    ! isobaric heat capacity
-    real(kind=rk)                                           :: Cp
-    ! prandtl number
-    real(kind=rk)                                           :: Pr
-    ! dynamic viscosity
-    real(kind=rk)                                           :: mu0, mu_d, mu, lambda
-
-    ! spacing
-    real(kind=rk)                                           :: dx, dy, dz
-
-    ! dissipation switch
-    logical                                                 :: dissipation
-
+    real(kind=rk)                                           :: gamma_           ! adiabatic coefficien t
+    real(kind=rk)                                           :: Rs               ! specific gas constant
+    real(kind=rk)                                           :: Cv               ! isochoric heat capacity
+    real(kind=rk)                                           :: Cp               ! isobaric heat capacity
+    real(kind=rk)                                           :: Pr               ! prandtl number
+    real(kind=rk)                                           :: mu0, mu_d, mu, lambda  ! dynamic viscosity
+    real(kind=rk)                                           :: dx, dy, dz       ! spacing
+    logical                                                 :: dissipation      ! dissipation switch
     ! variables
     real(kind=rk)                                           :: rho(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), u(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), v(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), w(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
                                                                p(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), T(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
                                                                tau11(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau22(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau33(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
                                                                tau12(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau13(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), tau23(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
-
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy2(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy3(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), &
                                                                dummy4(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy5(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g), dummy6(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
-
     ! inverse sqrt(rho) field
     real(kind=rk)                                           :: phi1_inv(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g)
-
     ! loop variables
     integer(kind=ik)                                        :: i, j, k,n_eqn
     ! penalization fields
     real(kind=rk), allocatable,save   :: phi_prime(:,:,:,:), phi_ref(:,:,:,:), mask(:,:,:,:)
     logical ,save :: allocated_penal_fields=.false.
-!---------------------------------------------------------------------------------------------
-! interfaces
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set physics parameters for readability
     gamma_      = params_ns%gamma_
@@ -137,8 +88,6 @@ subroutine RHS_3D_navier_stokes(g, Bs, x0, delta_x, phi, rhs)!, boundary_flag)
     dy = delta_x(2)
     dz = delta_x(3)
 
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! derivatives
     ! u_x, u_y, u_z

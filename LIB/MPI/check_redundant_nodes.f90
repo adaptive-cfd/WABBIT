@@ -1,48 +1,26 @@
 subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active, hvy_n, stop_status )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
-    ! status of nodes check: if true: stops program
-    logical, intent(inout)              :: stop_status
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: lgt_block(:, :)            !> light data array
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_active(:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n                      !> number of active blocks (heavy data)
+    logical, intent(inout)              :: stop_status                ! status of nodes check: if true: stops program
 
-    ! MPI parameter
-    integer(kind=ik)                    :: myrank
-    ! loop variables
-    integer(kind=ik)                    :: N, k, l, neighborhood, level_diff
-    ! id integers
-    integer(kind=ik)                    :: lgt_id, neighbor_lgt_id, neighbor_rank, hvy_id
+    integer(kind=ik)                    :: myrank                     ! MPI parameter
+    integer(kind=ik)                    :: N, k, l, neighborhood, level_diff    ! loop variables
+    integer(kind=ik)                    :: lgt_id, neighbor_lgt_id, neighbor_rank, hvy_id   ! id integers
     integer(kind=ik), dimension(2,3)    :: ijk, ijk2
-    ! data buffer size
     integer(kind=ik)                    :: buffer_size, buffer_position
-    ! grid parameter
-    integer(kind=ik)                    :: g, i0, ii0, ii1
+    integer(kind=ik)                    :: g, i0, ii0, ii1            ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    ! number of datafields
-    integer(kind=ik)                    :: NdF
+    integer(kind=ik)                    :: NdF                        ! number of datafields
     logical                             :: test2
     integer(kind=ik), parameter         :: stage=1
-
- !---------------------------------------------------------------------------------------------
-! variables initialization
 
     if (.not. ghost_nodes_module_ready) then
         call init_ghost_nodes( params )
@@ -88,9 +66,9 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
             if ( hvy_neighbor( hvy_active(k), neighborhood ) > 0 ) then
 
                 neighbor_lgt_id = hvy_neighbor( hvy_active(k), neighborhood )
-                call lgt_id_to_proc_rank( neighbor_rank, neighbor_lgt_id, N )
-                call hvy_id_to_lgt_id( lgt_id, hvy_active(k), myrank, N )
-                call lgt_id_to_hvy_id( hvy_id, neighbor_lgt_id, neighbor_rank, N )
+                call lgt2proc( neighbor_rank, neighbor_lgt_id, N )
+                call hvy2lgt( lgt_id, hvy_active(k), myrank, N )
+                call lgt2hvy( hvy_id, neighbor_lgt_id, neighbor_rank, N )
 
                 ! define leveldiff: sender - receiver, so +1 means sender on higher level. sender is active block (me)
                 level_diff = lgt_block( lgt_id, params%max_treelevel + IDX_MESH_LVL ) - lgt_block( neighbor_lgt_id, params%max_treelevel + IDX_MESH_LVL )
@@ -163,7 +141,7 @@ subroutine check_redundant_nodes_clean( params, lgt_block, hvy_block, hvy_neighb
                 ijk = ijkGhosts(:,:, neighborhood, level_diff, INCLUDE_REDUNDANT, RECVER)
 
                 ! compare data
-                call hvy_id_to_lgt_id( lgt_id, hvy_id, myrank, N )
+                call hvy2lgt( lgt_id, hvy_id, myrank, N )
                 call compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_status, level_diff, &
                 lgt_block(lgt_id, params%max_treelevel + IDX_REFINE_STS), treecode2int( lgt_block(lgt_id, 1:params%max_treelevel) ) )
 
@@ -182,44 +160,23 @@ end subroutine check_redundant_nodes_clean
 
 subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_status, level_diff, my_ref, tc )
 
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
-
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)                  :: params
-    !> data buffer
-    real(kind=rk), intent(inout)                    :: line_buffer(:)
-    !> ijk
+    type (type_params), intent(in)                  :: params                   !> user defined parameter structure
+    real(kind=rk), intent(inout)                    :: line_buffer(:)           !> data buffer
     integer(kind=ik), intent(inout)                 :: ijk(2,3)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
-    !> hvy id
+    real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)                    :: hvy_id, level_diff, my_ref
-    ! status of nodes check: if true: stops program
-    logical, intent(inout)              :: stop_status
+    logical, intent(inout)                          :: stop_status              ! status of nodes check: if true: stops program
     integer(kind=tsize)::tc
-
-    ! loop variable
-    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven, g
+    integer(kind=ik)                                :: i, j, k, dF, buffer_i, oddeven, g    ! loop variable
     integer(kind=ik), dimension(3)                  :: Bs
-
-    ! error threshold
-    real(kind=rk)                                   :: eps
-
-
-    ! error norm
+    real(kind=rk)                                   :: eps                      ! error threshold
     real(kind=rk)       :: error_norm
 
     Bs = params%Bs
     g = params%n_ghosts
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
     buffer_i = 1
 
     ! NOTE: newer versions do not compare actual data, but fill the hvy_blocks with
@@ -237,8 +194,6 @@ subroutine compare_hvy_data( params, line_buffer, ijk, hvy_block, hvy_id, stop_s
     ! we can simply study the parity of g
     oddeven = mod(params%n_ghosts,2)
 
-!---------------------------------------------------------------------------------------------
-! main body
     ! loop over all data fields
     do dF = 1, size(hvy_block,4)
         ! third dimension, note: for 2D cases k is always 1

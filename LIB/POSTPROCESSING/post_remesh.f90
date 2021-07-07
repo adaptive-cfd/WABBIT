@@ -10,7 +10,7 @@ subroutine post_remesh(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80)      :: infile2, outfile, wavelet
+    character(len=cshort)      :: infile2, outfile, wavelet
 
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration

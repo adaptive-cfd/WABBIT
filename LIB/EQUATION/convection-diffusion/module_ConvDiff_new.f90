@@ -1,18 +1,6 @@
-!> \dir
 !> \brief Implementation of 3d/2d Convection Diffusion Equations
 ! ********************************************************************************************
-!> \file
-!> \brief Module for 2D/3D convdiff physics
-! ********************************************************************************************
-!! \brief Module for 2D/3D convdiff physics
-!> \callgraph
-!> \version 0.5
-!> \author engels
-! ********************************************************************************************
 module module_convdiff_new
-
-  !---------------------------------------------------------------------------------------------
-  ! modules
 
   use module_precision
   ! ini file parser module, used to read parameters. note: in principle, you can also
@@ -21,8 +9,6 @@ module module_convdiff_new
   use module_ini_files_parser_mpi
   use mpi
   use module_t_files
-  !---------------------------------------------------------------------------------------------
-  ! variables
 
   implicit none
 
@@ -44,8 +30,8 @@ module module_convdiff_new
     real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
-    character(len=80), allocatable :: names(:), inicond(:), velocity(:)
-    character(len=80) :: discretization,boundary_type
+    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
+    character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
   end type type_paramsb
 
@@ -209,7 +195,7 @@ contains
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=80), intent(out) :: name
+    character(len=cshort), intent(out) :: name
 
     if (allocated(params_convdiff%names)) then
       name = params_convdiff%names(N)

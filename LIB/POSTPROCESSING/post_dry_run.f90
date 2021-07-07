@@ -98,6 +98,7 @@ subroutine post_dry_run
     call ini_file_to_params( params, filename )
 
 
+    N_MAX_COMPONENTS = 6
 
 
 
@@ -127,7 +128,7 @@ subroutine post_dry_run
     ! switch is .true., blocks on Jmx are then forced to be coarsened to Jmax-1
     params%force_maxlevel_dealiasing = .false.
 
-    params%eps = 1.0e-5
+    params%eps = 1.0e-6
     params%coarsening_indicator = "threshold-state-vector"
 
     if (params%rank==0) then

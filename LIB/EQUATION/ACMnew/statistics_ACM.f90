@@ -43,10 +43,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     ! local variables
     integer(kind=ik) :: mpierr, ix, iy, iz, k
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2
+    real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, &
+    tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:6), ipowtotal=0.0_rk, apowtotal=0.0_rk
-    real(kind=rk) :: CFL, CFL_eta, CFL_nu
+    real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block, usx, usy, usz, chi
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
@@ -105,6 +106,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%u_residual = 0.0_rk
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk
+        params_acm%penal_power = 0.0_rk
         dx_min = 90.0e9_rk
 
         if (is_insect) then
@@ -136,6 +138,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ekin_block = 0.0_rk
         tmp_volume = 0.0_rk
         tmp_volume2 = 0.0_rk
+        penal_power_block = 0.0_rk
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
@@ -153,6 +156,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             do ix = g+1, Bs(1)+g-1
                 ! coloring not implemented for 2D
                 color = 0_2
+                chi = mask(ix,iy,1,1) * C_eta_inv
+                usx = mask(ix,iy,1,2)
+                usy = mask(ix,iy,1,3)
 
                 ! compute mean flow for output in statistics
                 meanflow_block(1) = meanflow_block(1) + u(ix,iy,1,1)
@@ -163,12 +169,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 tmp_volume2 = tmp_volume2 + mask(ix,iy,1,6)
 
                 ! forces acting on body
-                force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-mask(ix,iy,1,2))*mask(ix,iy,1,1)*C_eta_inv
-                force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-mask(ix,iy,1,3))*mask(ix,iy,1,1)*C_eta_inv
+                force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-usx)*chi
+                force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
+
+                ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+                penal_power_block = penal_power_block + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
 
                 ! residual velocity in the solid domain
-                residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-mask(ix,iy,1,2)) * mask(ix,iy,1,1))
-                residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-mask(ix,iy,1,3)) * mask(ix,iy,1,1))
+                residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
+                residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-usy) * mask(ix,iy,1,1))
 
                 ! kinetic energy
                 ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
@@ -220,9 +229,17 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! get this points color
                         color = int( mask(ix, iy, iz, 5), kind=2 )
 
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        usx = mask(ix,iy,iz,2)
+                        usy = mask(ix,iy,iz,3)
+                        usz = mask(ix,iy,iz,4)
+
                         if (color>0_2 .and. color < 6_2) then
                             ! penalization term
                             penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+
+                            ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+                            penal_power_block = penal_power_block + (usx*(u(ix,iy,iz,1)-usx) + usy*(u(ix,iy,iz,2)-usy) + usz*(u(ix,iy,iz,3)-usz))*chi
 
                             ! forces acting on this color
                             force_block(1:3, color) = force_block(1:3, color) - penal
@@ -284,6 +301,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%force_color = params_acm%force_color + force_block * dV
         params_acm%moment_color = params_acm%moment_color + moment_block * dV
         params_acm%e_kin = params_acm%e_kin + ekin_block * dV
+        params_acm%penal_power = params_acm%penal_power + penal_power_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
@@ -324,10 +342,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         !-------------------------------------------------------------------------
         ! volume of mask (useful to see if it is properly generated)
-        tmp(1) = params_acm%mask_volume
-        call MPI_ALLREDUCE(tmp(1), params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        tmp(1) = params_acm%sponge_volume
-        call MPI_ALLREDUCE(tmp(1), params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic energy
@@ -444,6 +461,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
+            call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
         end if
 

@@ -48,6 +48,22 @@ module module_acm
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
   !**********************************************************************************************
 
+  ! for 2d wing section optimization
+  type :: wingsection
+      logical :: initialized = .false.
+      real(kind=rk), allocatable :: ai_x0(:), bi_x0(:)
+      real(kind=rk), allocatable :: ai_y0(:), bi_y0(:)
+      real(kind=rk), allocatable :: ai_alpha(:), bi_alpha(:)
+      real(kind=rk) :: a0_x0, section_thickness
+      real(kind=rk) :: a0_y0
+      real(kind=rk) :: a0_alpha
+      real(kind=rk) :: time
+      integer(kind=ik) :: nfft_x0, nfft_y0, nfft_alpha
+      character(len=strlen) :: kinematics_type
+  end type
+
+  type(wingsection) :: wingsections(2)
+
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params_acm
@@ -60,7 +76,8 @@ module module_acm
     real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, &
+                     penal_power = 0.0_rk
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     ! gamma_p
@@ -91,10 +108,12 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor="", wingsection_inifile=""
+    character(len=80) :: inicond="", discretization="", filter_type="", geometry="cylinder", &
+    order_predictor=""
     character(len=80) :: sponge_type=""
     character(len=80) :: coarsening_indicator=""
     character(len=80), allocatable :: names(:)
+    character(len=80) :: wingsection_inifiles(2) !hack: currently only two of them...
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     ! the error compared to an analytical solution (e.g. taylor-green)
@@ -118,6 +137,7 @@ module module_acm
   ! all parameters for insects go here:
   ! HACK: made them public for FSI time stepper (18 Feb 2021)
   type(diptera), public, save :: insect
+
 
 contains
 
@@ -256,7 +276,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'wingsection_inifile', params_acm%wingsection_inifile, "none")
+    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
@@ -389,6 +409,11 @@ end subroutine
 
     if (params_acm%geometry=="fractal_tree") then
         call fractal_tree_init( Insect )
+    endif
+
+    if (params_acm%geometry=="2D-wingsection") then
+        call init_wingsection_from_file(params_acm%wingsection_inifiles(1), wingsections(1), 0.0_rk)
+        call init_wingsection_from_file(params_acm%wingsection_inifiles(2), wingsections(2), 0.0_rk)
     endif
 
     params_acm%initialized = .true.
@@ -576,6 +601,9 @@ end subroutine
       call init_t_file('kinematics.t', overwrite)
       call init_t_file('insect_state_vector.t', overwrite)
       call init_t_file('forces_rk.t', overwrite)
+      call init_t_file('penal_power.t', overwrite, (/&
+      "           time", &
+      "  E_dot_f_solid"/))
 
       if (Insect%second_wing_pair) then
           call init_t_file('forces_leftwing2.t', overwrite)

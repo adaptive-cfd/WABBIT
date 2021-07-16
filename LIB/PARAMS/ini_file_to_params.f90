@@ -90,8 +90,6 @@ subroutine ini_file_to_params( params, filename )
     ! read statistics parameters
     call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params%nsave_stats, 99999999_ik )
     call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
-    !> assume start at time 0.0 /todo change if start with reloaded data
-    params%next_stats_time = 0.0_rk + params%tsave_stats
 
     !***************************************************************************
     ! WABBIT needs to know about the mask function (if penalization is used): does it contain
@@ -350,8 +348,6 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
       ! read output write frequency
       call read_param_mpi(FILE, 'Time', 'walltime_write', params%walltime_write, 99999.9_rk )
-      ! assume start at time 0.0
-      params%next_write_time = 0.0_rk + params%write_time
       ! read value of fixed time step
       call read_param_mpi(FILE, 'Time', 'dt_fixed', params%dt_fixed, 0.0_rk )
       ! read value of fixed time step

@@ -219,8 +219,15 @@ program main
 
     ! next write time for reloaded data
     if (params%write_method == 'fixed_time') then
-        params%next_write_time = floor(time/params%next_write_time)*params%next_write_time + params%next_write_time
-        params%next_stats_time = floor(time/params%next_stats_time)*params%next_stats_time + params%next_stats_time
+        params%next_write_time = real(floor(time/params%write_time), kind=rk)*params%write_time + params%write_time
+        params%next_stats_time = real(floor(time/params%tsave_stats), kind=rk)*params%tsave_stats + params%tsave_stats
+
+        ! sometimes, rarely, floor can be tricky: say we resume a run at t=2.26 and write_time is 0.01. if the h5 file
+        ! is exactly at 2.26 but maybe the last digit flips (machine precision) it happens very rarely that
+        ! floor(2.26/0.01) = 225 (and not 226). Then, WABBIT misses the next write time (and produces no output anymore...)
+        ! correct for this mistake:
+        if (abs(params%next_write_time-time)<=1.0e-10_rk) params%next_write_time = params%next_write_time + params%write_time
+        if (abs(params%next_stats_time-time)<=1.0e-10_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
     end if
 
 
@@ -230,9 +237,17 @@ program main
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
-    if (rank==0) write(*,*) "starting main time loop"
-    keep_running = .true.
+    if (rank==0) then
+        write(*,*) "params%next_write_time=", params%next_write_time
+        write(*,*) "params%next_stats_time=", params%next_stats_time
+        write(*,*) ""
+        write(*,*) "        --------------------------------------------------"
+        write(*,*) "        | On your marks, ready, starting main time loop! |"
+        write(*,*) "        --------------------------------------------------"
+        write(*,*) ""
+    endif
 
+    keep_running = .true.
     do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
         t2 = MPI_wtime()
 

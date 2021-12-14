@@ -365,6 +365,10 @@ program main
             if (it_is_time_to_save_data) exit
         enddo
 
+        ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
+        ! stop and others not. this is a rare but severe problem, to solve it, synchronize:
+        call MPI_BCAST( it_is_time_to_save_data, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+
         !***********************************************************************
         ! Adapt mesh (coarsening where possible)
         !***********************************************************************

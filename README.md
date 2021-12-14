@@ -4,11 +4,11 @@
 New in 05/2021: please see this video for an introduction to the code's datastructures: https://www.youtube.com/watch?v=qBBIW2-ktgo
 
 
-With WABBIT it is possible to solve partial differential equations on block-based adaptive grids. Calculations in 2D and 3D are possible and is performed fully parallel. As in WABBIT the set of PDE is encapsulated from the rest of the code the PDE implementation is similar to calculatoins with single domain code. Solvable PDEs are of type
+With WABBIT it is possible to solve partial differential equations (PDE) on block-based adaptive grids. Calculations in 2D and 3D are possible and performed fully parallel. The set of PDE is encapsulated from the code handling the adaptive grid, and thus existing monobloc solvers can be adapted easily for this solver. WABBIT can handle PDEs of the following type:
 
 <a href="http://www.codecogs.com/eqnedit.php?latex=\partial_t&space;\phi&space;=&space;N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?\partial_t&space;\phi&space;=&space;N(\phi)" title="\partial_t \phi = N(\phi)" /></a>
 
-and <a href="http://www.codecogs.com/eqnedit.php?latex=N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?N(\phi)" title="N(\phi)" /></a> can be defined.
+and <a href="http://www.codecogs.com/eqnedit.php?latex=N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?N(\phi)" title="N(\phi)" /></a> can be defined. This implementation is handled by the "physics-modules".
 
 ## Getting Started
 How to get a copy of WABBIT and compiling the code:
@@ -16,7 +16,7 @@ How to get a copy of WABBIT and compiling the code:
 1. Clone from github
 
 ```
-git clone https://github.com/adaptive-cfd/WABBIT
+git clone git@github.com:adaptive-cfd/WABBIT.git
 ```
 
 2. Compile the code running make.
@@ -67,36 +67,30 @@ export HDF_ROOT
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 export LD_RUN_PATH=$LD_LIBRARY_PATH
 ```
-   Recommendtaion: Add the lines to export the variables to your bashrc-file.
+   Recommendation: Add the lines to export the variables to your bashrc-file. Otherwise, the export has to be done every time you open a new terminal to compile the code.
 
 ### run WABBIT
 
-Customize the .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name
+Customize the template .ini-file and rename file to [your_filename.ini], run WABBIT with option for dimension and .ini-file name
 
 ```
-wabbit [2D|3D] [your_filename.ini] --memory=2.0GB
+mpirun -n 1 ./wabbit [your_filename.ini] --memory=2.0GB
 ```
 
-where the --memory options allows you to approximately control how much memory is globally allocated, i.e., on all ranks. Note that WABBIT does not free memory which is once allocated again during runtime. This is because we intent to use clusters, where the globally available memory is reserved for the exectution.
+where the --memory options allows you to control how much memory is globally allocated, i.e., on all CPUs. Note that WABBIT does not free memory during runtime. This is because we intent to use clusters, where the available memory is reserved for the execution of the code alone. This is quite typical for supercomputing.
 
 ## Additional Information
 If you are new to WABBIT it is recommended to read the [information for newcomers](https://github.com/adaptive-cfd/WABBIT/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+the+newcomers%22 "newcomer issues")!
 
 In case you have problems with the preparation to use WABBIT, have a look at the informations given in the  [wiki](https://github.com/adaptive-cfd/WABBIT/wiki "additional information for WABBIT on fedora/ubuntu")
 
-For further Information see the documentation. Therefor it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed.
+For further Information see the documentation. Therefore it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed.
 
 ```
 make doc
 ```
 ## Publications
 
+* ["A wavelet-adaptive method for multiscale simulation of turbulent flows in flying insects"](https://arxiv.org/abs/1912.05371 "Engels2021"); T. Engels, K. Schneider, J. Reiss and M. Farge; Commun. Comput. Phys., 30, 1118-1149, 2021
+
 * ["An Open and Parallel Multiresolution Framework Using Block-Based Adaptive Grids"](https://link.springer.com/chapter/10.1007%2F978-3-319-98177-2_19 "Sroka2018"); Sroka, Engels, Krah, Mutzel, Schneider, Reiss; Active Flow and Combustion Control 2018
-
-## History
-
-* **v0.1** - *2D, periodic boundary, mesh adaption* --- lots of schemes for testing
-* **v0.2** - *2D, periodic boundary, mesh adaption* --- change mesh adaption to *paris_meeting*-version, simplify code
-* **v0.3** - *2D, periodic boundary, mesh adaption* --- MPI added, split block data in light/heavy data
-* **v0.4** - *2D, periodic boundary, mesh adaption* --- reworked data structure, order subroutines and switch to explicit variable/parameter passing
-* **v0.5** - *3D, 2D, periodic boundary, mesh adaption* --- now uses 3D

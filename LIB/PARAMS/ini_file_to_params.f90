@@ -228,7 +228,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Domain', 'symmetry_BC', params%symmetry_BC, params%symmetry_BC )
 
      do i = 1, 3
-         if (.not. (params%periodic_BC(i) .xor. params%symmetry_BC(i)) ) then
+         if (.not. (params%periodic_BC(i) .or. params%symmetry_BC(i)) ) then
              call abort(92841123, "Get your crowbar: the arrays for periodic_BC and symmetry_BC are incompatible.")
          endif
      enddo

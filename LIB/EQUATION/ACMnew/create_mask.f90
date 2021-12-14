@@ -786,16 +786,18 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! auxiliary variables
     real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
     cy2, r_1, r_2, h, mask1, mask2, freq, vy2
+    real(kind=rk), allocatable, save :: mu(:)
     !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
     ! loop variables
-    integer(kind=ik)      :: ix, iy
+    integer(kind=ik)      :: ix, iy, k, nfft_y0
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
-
+    nfft_y0 = wingsections(1)%nfft_y0
+    if (.not. allocated(mu)) allocate(mu(nfft_y0))
     ! reset mask array
     mask = 0.0_rk
     mask1 = 0.0_rk
@@ -804,7 +806,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! main body
     ! radius of the cylinders
     R1 = 1.0_rk * params_acm%R_cyl
-    R2 = 0.5_rk * params_acm%R_cyl
+    R2 = 1.0_rk * params_acm%R_cyl
     ! Here we set the frequency of the 2. cylinder oscillating up and down behind
     ! the 1. cyl. It should be choosen such that the characteristic time scale of
     ! the vortex shedding is larger then the movement!
@@ -818,16 +820,21 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! f1 = St1*params_acm%u_mean_set(1)/(2*R1)
     ! f2 = St2*params_acm%u_mean_set(1)/(2*R2)
     ! ! make cylinder movement slow in comparison to vortex shedding frequency:
-    ! freq = min(f1,f2) / 50
-    freq = 2e-3
+    ! freq = min(f1,f2) / 10
+    freq = 0.2e-2
+    mu = wingsections(1)%ai_y0 
     ! center of the first cylinder
     cx1 = 0.125_rk * params_acm%domain_size(1)
     cy1 = 0.500_rk * params_acm%domain_size(2)
     ! center of the second cylinder (oscillates behind 1. cylinder)
     cx2 = 4*cx1
-    cy2 = cy1 + 0.25_rk*params_acm%domain_size(2) * sin(2*pi*freq * time)
-    ! velocity of moving cylinder
-    vy2 = 0.25_rk * params_acm%domain_size(2) * 2 * pi * freq * cos(2*pi*freq*time)
+    cy2 = cy1 
+    vy2 = 0
+    do k = 1, nfft_y0
+        cy2 = cy2 + mu(k) * sin(2*k*pi*freq*time)
+        ! velocity of moving cylinder
+        vy2 = vy2 + mu(k) * 2 * pi * freq * k * cos(2*k*pi*freq*time)
+    end do
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 

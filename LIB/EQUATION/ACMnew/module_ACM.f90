@@ -392,7 +392,7 @@ end subroutine
         call fractal_tree_init( Insect )
     endif
 
-    if (params_acm%geometry=="2D-wingsection") then
+    if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
         call init_wingsection_from_file(params_acm%wingsection_inifiles(1), wingsections(1), 0.0_rk)
         call init_wingsection_from_file(params_acm%wingsection_inifiles(2), wingsections(2), 0.0_rk)
     endif

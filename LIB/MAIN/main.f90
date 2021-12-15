@@ -327,12 +327,15 @@ program main
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
-                it_is_time_to_save_data= .true.
+                it_is_time_to_save_data = .true.
             endif
             if ((MPI_wtime()-tstart)/3600.0_rk - params%walltime_last_write > params%walltime_write) then
-                params%walltime_last_write = MPI_wtime()
-                it_is_time_to_save_data= .true.
+                params%walltime_last_write = MPI_wtime()-tstart
+                it_is_time_to_save_data = .true.
             endif
+            ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
+            ! save data and others do not. this is a rare but severe problem, to solve it, synchronize:
+            call MPI_BCAST( it_is_time_to_save_data, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
 
             !*******************************************************************
             ! filter
@@ -364,10 +367,6 @@ program main
             ! interupt the inner loop prematurely.
             if (it_is_time_to_save_data) exit
         enddo
-
-        ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
-        ! stop and others not. this is a rare but severe problem, to solve it, synchronize:
-        call MPI_BCAST( it_is_time_to_save_data, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
 
         !***********************************************************************
         ! Adapt mesh (coarsening where possible)

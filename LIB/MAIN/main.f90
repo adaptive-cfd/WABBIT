@@ -329,7 +329,7 @@ program main
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
                 it_is_time_to_save_data = .true.
             endif
-            if ((MPI_wtime()-tstart)/3600.0_rk - params%walltime_last_write > params%walltime_write) then
+            if ((MPI_wtime()-tstart) - params%walltime_last_write > params%walltime_write*3600.0_rk) then
                 params%walltime_last_write = MPI_wtime()-tstart
                 it_is_time_to_save_data = .true.
             endif

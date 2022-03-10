@@ -179,7 +179,7 @@ program main
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
 
-    if (.not. params%read_from_files .or. params%adapt_inicond) then
+    if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
         ! save initial condition to disk (unless we're reading from file and do not adapt,
         ! in which case this makes no sense)
         ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
@@ -329,6 +329,11 @@ program main
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
                 it_is_time_to_save_data = .true.
             endif
+            ! do not save any output before this time (so maybe revoke the previous decision)
+            if (time<=params%write_time_first) then
+                it_is_time_to_save_data = .false.
+            endif
+            ! save after walltime unit is not affected by write_time_first
             if ((MPI_wtime()-tstart) - params%walltime_last_write > params%walltime_write*3600.0_rk) then
                 params%walltime_last_write = MPI_wtime()-tstart
                 it_is_time_to_save_data = .true.

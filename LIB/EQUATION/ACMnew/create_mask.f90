@@ -822,13 +822,13 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! ! make cylinder movement slow in comparison to vortex shedding frequency:
     ! freq = min(f1,f2) / 10
     freq = 0.2e-2
-    mu = wingsections(1)%ai_y0 
+    mu = wingsections(1)%ai_y0
     ! center of the first cylinder
-    cx1 = 0.125_rk * params_acm%domain_size(1)
+    cx1 = 0.250_rk * params_acm%domain_size(1)
     cy1 = 0.500_rk * params_acm%domain_size(2)
     ! center of the second cylinder (oscillates behind 1. cylinder)
-    cx2 = 4*cx1
-    cy2 = cy1 
+    cx2 = 0.500_rk * params_acm%domain_size(1)
+    cy2 = cy1
     vy2 = 0
     do k = 1, nfft_y0
         cy2 = cy2 + mu(k) * sin(2*k*pi*freq*time)

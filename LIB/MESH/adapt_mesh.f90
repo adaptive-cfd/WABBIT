@@ -61,7 +61,7 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
 
     integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration, k, max_neighbors, lgt_id
+    integer(kind=ik)                    :: lgt_n_old, iteration, k, lgt_id
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1
     ! MPI error variable
@@ -80,13 +80,6 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     else
         ignore_maxlevel2 = .false.
     endif
-
-    if (params%dim == 3) then
-        max_neighbors = 56
-    else
-        max_neighbors = 12
-    end if
-
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronice them.

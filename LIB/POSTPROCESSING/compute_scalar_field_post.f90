@@ -82,6 +82,8 @@ subroutine compute_scalar_field_post(params)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
+    allocate(params%symmetry_vector_component(1))
+    params%symmetry_vector_component(1) = "0" ! scalar
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )

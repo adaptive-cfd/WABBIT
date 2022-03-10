@@ -344,8 +344,9 @@ end subroutine ini_file_to_params
       call read_param_mpi(FILE, 'Time', 'write_method', params%write_method, "fixed_freq" )
       ! read output write frequency
       call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
-      ! read output write frequency
+      ! read output write interval
       call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+      call read_param_mpi(FILE, 'Time', 'write_time_first', params%write_time_first, 0.0_rk )
       ! read output write frequency
       call read_param_mpi(FILE, 'Time', 'walltime_write', params%walltime_write, 99999.9_rk )
       ! read value of fixed time step

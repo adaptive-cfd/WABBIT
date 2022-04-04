@@ -12,7 +12,7 @@
 !! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
 !! -2 block will coarsen and be merged with her sisters \n
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
+subroutine grid_coarsening_indicator( time, params, level_this, lgt_block, hvy_block, hvy_tmp, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
 
     use module_indicators
@@ -20,6 +20,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     implicit none
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    integer(kind=ik), intent(in)        :: level_this                     !> current level to look at (in the case of biorthogonal wavelets, not in "harten-multiresolution")
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !> heavy work data array - block data.
@@ -54,7 +55,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:,:,:,:)
-    logical :: consider_hvy_tmp
+    logical :: consider_hvy_tmp, biorthogonal
 
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
@@ -63,6 +64,7 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     neq = params%n_eqn
     Bs = params%Bs
     g = params%n_ghosts
+    biorthogonal = (params%wavelet_transform_type=="biorthogonal")
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n
@@ -199,43 +201,32 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.
-        if (params%threshold_mask .and. present(hvy_mask)) then
-            ! loop over all my blocks
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
-                ! get lgt id of block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        do k = 1, hvy_n
+            hvy_id = hvy_active(k)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
-                ! some indicators may depend on the grid, hence
-                ! we pass the spacing and origin of the block (as we have to compute vorticity
-                ! here, this can actually be omitted.)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
+            ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
+            ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
+            ! this should prevent filtering artifacts at block-block interfaces.
+            if ((level /= level_this).and.(biorthogonal)) cycle
 
-                ! evaluate the criterion on this block.
+            ! some indicators may depend on the grid, hence
+            ! we pass the spacing and origin of the block (as we have to compute vorticity
+            ! here, this can actually be omitted.)
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+            ! evaluate the criterion on this block.
+            if (params%threshold_mask .and. present(hvy_mask)) then
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
-            enddo
-        else
-            ! loop over all my blocks
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
-                ! get lgt id of block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-
-                ! some indicators may depend on the grid, hence
-                ! we pass the spacing and origin of the block (as we have to compute vorticity
-                ! here, this can actually be omitted.)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
-
-                ! evaluate the criterion on this block.
+            else
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
-            enddo
-        endif
+            endif
+        enddo
     end select
 
 

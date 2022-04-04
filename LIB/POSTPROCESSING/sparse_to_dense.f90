@@ -13,8 +13,8 @@ subroutine sparse_to_dense(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)      :: file_in
-    character(len=cshort)      :: file_out
+    character(len=cshort)  :: file_in
+    character(len=cshort)  :: file_out
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration
 
@@ -88,18 +88,16 @@ subroutine sparse_to_dense(params)
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 4_ik
         params%wavelet = "CDF4,0"
-        params%wavelet_transform_type = "harten-multiresolution"
     elseif (order == "44") then
-        params%wavelet_transform_type = 'harten-multiresolution'
+        params%wavelet_transform_type = "biorthogonal"
         params%order_predictor = "multiresolution_4th"
         params%n_ghosts = 6_ik
         params%wavelet = "CDF4,4"
-        params%wavelet_transform_type = "biorthogonal"
     elseif (order == "2") then
+        params%wavelet_transform_type = "harten-multiresolution"
         params%order_predictor = "multiresolution_2nd"
         params%n_ghosts = 2_ik
         params%wavelet = "CDF2,0"
-        params%wavelet_transform_type = "harten-multiresolution"
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
@@ -130,6 +128,11 @@ subroutine sparse_to_dense(params)
         write(*,'(A20,1x,A80)') "Writing to file:", file_out
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
+
+        write(*,'(A40,1x,A40)') "params%wavelet_transform_type", params%wavelet_transform_type
+        write(*,'(A40,1x,A40)') "params%order_predictor", params%order_predictor
+        write(*,'(A40,1x,A40)') "params%wavelet", params%wavelet
+        write(*,'(A40,1x,i2)') "params%n_ghosts", params%n_ghosts
         write(*,'(80("-"))')
     endif
 

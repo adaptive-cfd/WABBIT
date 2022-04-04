@@ -91,6 +91,10 @@ make doc
 ```
 ## Publications
 
+* ["Wavelet adaptive proper orthogonal decomposition for large-scale flow data"](https://link.springer.com/article/10.1007/s10444-021-09922-2 "Krah2022"); Krah, Engels, Schneider, Reiss; Advances in Comput. Math. Volume 48, Article number: 10, 2022 
+
 * ["A wavelet-adaptive method for multiscale simulation of turbulent flows in flying insects"](https://arxiv.org/abs/1912.05371 "Engels2021"); T. Engels, K. Schneider, J. Reiss and M. Farge; Commun. Comput. Phys., 30, 1118-1149, 2021
 
 * ["An Open and Parallel Multiresolution Framework Using Block-Based Adaptive Grids"](https://link.springer.com/chapter/10.1007%2F978-3-319-98177-2_19 "Sroka2018"); Sroka, Engels, Krah, Mutzel, Schneider, Reiss; Active Flow and Combustion Control 2018
+
+

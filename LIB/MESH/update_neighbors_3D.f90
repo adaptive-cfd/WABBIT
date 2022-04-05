@@ -93,6 +93,9 @@ subroutine update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_
             ! '6'-side
             call find_neighbor_face_3D(params, hvy_active(k), lgt_id, lgt_block, max_treelevel, '__6/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
 
+            ! the idea was to consider diagonal neighbors only for the gradedness condition, but not for ghost nodes sync'ing.
+            ! this could potentially save a lot of computing time, since the ghost nodes in general are heavily memory-bound.
+            ! however, it did not work, and I forgot why.
             if (PRESENT(skip_diagonal_neighbors)) then
                 if (skip_diagonal_neighbors) cycle
             endif

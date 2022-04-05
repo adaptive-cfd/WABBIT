@@ -1,8 +1,3 @@
-!> \brief loads the specified *.h5 file and creates a *.key file that contains
-!! min / max / mean / L2 norm of the field data. This is used for testing
-!! so that we don't need to store entire fields but rather the *.key only
-!*********************************************************************************************
-
 subroutine post_mean(params)
     use module_IO
     use module_precision
@@ -11,7 +6,7 @@ subroutine post_mean(params)
     use mpi
 
     implicit none
-    character(len=cshort)                       :: fname, fname_out                 !> name of the file
+    character(len=cshort)                   :: fname, fname_out                 !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
@@ -52,7 +47,8 @@ subroutine post_mean(params)
     call check_file_exists( fname )
 
     ! add some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     params%Bs = Bs
     params%n_eqn = 1
@@ -62,7 +58,7 @@ subroutine post_mean(params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_blocks = 2_ik*lgt_n/params%number_procs
+    params%number_blocks = ceiling( real(lgt_n) / real(params%number_procs) )
 
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
     hvy_active, lgt_sortednumlist)

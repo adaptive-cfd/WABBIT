@@ -251,17 +251,18 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! check if we find a *.ini file name in the command line call
     ! if we do, read it, and append it to the HDF5 file. this way, data
     ! and parameters are always together. thomas, 16/02/2019
-    if (params%rank==0) then
-        call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
-        do k = 1, COMMAND_ARGUMENT_COUNT()
-            call get_command_argument( k, arg )
-            if (index(arg, ".ini") /= 0) then
-                ! found the ini file.
-                call read_ini_file(FILE, arg, .false., remove_comments=.false.)
-                call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
-                call write_attribute(file_id, "params", "filename", arg)
-            end if
-        enddo
-        call close_file_hdf5_serial(file_id)
-    endif
+    
+    ! if (params%rank==0) then
+    !     call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
+    !     do k = 1, COMMAND_ARGUMENT_COUNT()
+    !         call get_command_argument( k, arg )
+    !         if (index(arg, ".ini") /= 0) then
+    !             ! found the ini file.
+    !             call read_ini_file(FILE, arg, .false., remove_comments=.false.)
+    !             call write_string_dset_hdf5(file_id, "params", FILE%PARAMS, maxcolumns)
+    !             call write_attribute(file_id, "params", "filename", arg)
+    !         end if
+    !     enddo
+    !     call close_file_hdf5_serial(file_id)
+    ! endif
 end subroutine write_field

@@ -54,6 +54,7 @@ subroutine keyvalues(fname, params)
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
     params%dim = dim
     params%Bs = Bs
     params%max_treelevel = tc_length
@@ -63,7 +64,7 @@ subroutine keyvalues(fname, params)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
     ! make sure there is enough memory allocated
-    params%number_blocks = (dim**2) * (lgt_n/params%number_procs)
+    params%number_blocks = ceiling( real(lgt_n) / real(params%number_procs) )
 
     call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist)

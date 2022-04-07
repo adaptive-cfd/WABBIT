@@ -334,7 +334,7 @@ subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
                 !default is 0
                 phi_ref(ix,iy,iz,:)=0.0_rk
-                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                 if (X(alpha)<domain_size(alpha)*0.5_rk) then
                   phi_ref(ix,iy,iz,rhoF)   = rho_L
                   phi_ref(ix,iy,iz,pF)     = p_L
@@ -435,7 +435,7 @@ subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
                 !default is 0
                 phi_ref(ix,iy,:)=0.0_rk
-                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                 if (X(alpha)<domain_size(alpha)*0.5_rk) then
                   phi_ref(ix,iy,rhoF)   = rho_L
                   phi_ref(ix,iy,pF)     = p_L
@@ -511,7 +511,7 @@ end subroutine shock_tube_penalization2D
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0
                   phi(ix,iy,iz,nF)=0.0_rk
-                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                   b      = smoothstep(x0_shock -X(alpha),h)
                   phi(ix,iy,iz,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix
@@ -529,7 +529,7 @@ end subroutine shock_tube_penalization2D
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0
                   phi(ix,iy,1,nF)=0.0_rk
-                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                   b      = smoothstep(x0_shock -X(alpha),h)
                   phi(ix,iy,1,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix

@@ -62,11 +62,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
     integer(kind=ik)                    :: lgt_n_old, iteration, k, lgt_id
-    ! cpu time variables for running time calculation
     real(kind=rk)                       :: t0, t1
-    ! MPI error variable
     integer(kind=ik)                    :: ierr, k1, hvy_id
-    logical :: ignore_maxlevel2
+    logical                             :: ignore_maxlevel2, iterate
+    ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin
 
 
     ! start time
@@ -74,6 +74,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     t1 = t0
     lgt_n_old = 0
     iteration = 0
+    iterate   = .true.
+    Jmin      = params%min_treelevel
+    Jmin_active = min_active_level( lgt_block, lgt_active, lgt_n )
+    Jmax_active = max_active_level( lgt_block, lgt_active, lgt_n )
+    level       = Jmax_active ! algorithm starts on maximum *active* level
 
     if (present(ignore_maxlevel)) then
         ignore_maxlevel2 = ignore_maxlevel
@@ -81,17 +86,19 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         ignore_maxlevel2 = .false.
     endif
 
+
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
-    ! we synchronice them.
+    ! we synchronize them.
     t0 = MPI_Wtime()
     call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
-    !> we iterate until the number of blocks is constant (note: as only coarsening
+    !! we iterate from the highest current level to the lowest current level and then iterate further
+    !! until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
-    do while ( lgt_n_old /= lgt_n )
+    do while (iterate)
         lgt_n_old = lgt_n
 
         !> (a) check where coarsening is possible
@@ -108,10 +115,10 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         if (params%threshold_mask .and. present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
-            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            call grid_coarsening_indicator( time, params, level, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2, hvy_mask)
         else
-            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            call grid_coarsening_indicator( time, params, level, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2)
         endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
@@ -160,11 +167,24 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
-        iteration = iteration + 1
 
         ! see description above in argument list.
         if (present(external_loop)) then
             if (external_loop) exit ! exit loop
+        endif
+
+        iteration = iteration + 1
+        level = level - 1
+
+        ! loop condition for outer iteration depends on the transform type:
+        ! for biorthogonal, we have to consider all levels individidually (Note: it may well
+        ! be that on some level, nothing can be coarsened, but on the levels below, it is possible.
+        ! Hence checking for a constant grid is misleading at this time.)
+        ! for harten-multiresolution, its sufficient to iterate until the grid is constant
+        if (params%wavelet_transform_type=="biorthogonal") then
+            iterate = (level >= Jmin)
+        else
+            iterate = (lgt_n_old /= lgt_n)
         endif
     end do
 

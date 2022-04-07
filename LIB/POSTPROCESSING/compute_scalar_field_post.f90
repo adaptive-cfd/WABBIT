@@ -131,9 +131,11 @@ subroutine compute_scalar_field_post(params)
         write( fname,'(a, "_", i12.12, ".h5")') 'gradx', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 1, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+
         write( fname,'(a, "_", i12.12, ".h5")') 'grady', nint(time * 1.0e6_rk)
         call write_field(fname, time, iteration, 2, params, lgt_block,&
         hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+
         if (params%dim == 3) then
             write( fname,'(a, "_", i12.12, ".h5")') 'gradz', nint(time * 1.0e6_rk)
             call write_field(fname, time, iteration, 3, params, lgt_block, &

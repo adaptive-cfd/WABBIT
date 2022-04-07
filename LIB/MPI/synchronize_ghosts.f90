@@ -31,6 +31,8 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
             call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
             filter = .true.
             call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            filter = .true.
+            call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
         endif
     endif
 

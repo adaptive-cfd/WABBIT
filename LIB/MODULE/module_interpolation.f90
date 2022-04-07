@@ -15,7 +15,6 @@ contains
 
     ! coarsen the block by one level
     subroutine restriction_2D(fine, coarse)
-
         implicit none
 
         real(kind=rk), dimension(1:,1:), intent(in) :: fine

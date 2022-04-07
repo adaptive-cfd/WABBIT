@@ -135,8 +135,8 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
                 ! biorthogonal wavelets: apply a low-pass filter (called H) prior to decimation
 
                 ! sister 0
-                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:)
+                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock, params%wavelet) ! low-pass filtering
+                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:) ! decimation (of filtered data)
 
                 ! sister 1
                 call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(2) ), tmpblock, params%wavelet)

@@ -306,7 +306,7 @@ contains
 
     integer(kind=ik) :: ix, iy, iz, i
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: x,y,c0x,c0y,z,c0z
+    real(kind=rk) :: x,y,c0x,c0y,z,c0z,lambd
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -371,12 +371,13 @@ contains
 
       case ("circle")
             if (params_convdiff%dim==2) then
+                lambd = 0.005 *maxval(params_convdiff%domain_size)
                 do ix = 1, Bs(1)+2*g
                     do iy = 1, Bs(2)+2*g
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                        u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /min(dx(1),dx(2))))
+                        u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
                     end do
                 end do
             else

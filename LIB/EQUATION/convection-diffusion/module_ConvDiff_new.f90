@@ -246,7 +246,7 @@ contains
     ! TODO: make this global and allocatable
     real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
     integer(kind=ik) :: i, ix, iy
-    real(kind=rk) :: x,y,unorm
+    real(kind=rk) :: x,y,unorm,c_react
 
     dt = 9.9e9_rk
 
@@ -274,7 +274,11 @@ contains
         endif
 
         if (params_convdiff%nu(i) > 1.0e-13_rk) then
-            dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          if (params_convdiff%gamma>1.0e-13_rk) then
+            c_react = 0.15*params_convdiff%gamma
+            dt = min(dt,params_convdiff%CFL_nu/c_react * minval(dx(1:params_convdiff%dim)) )
+          endif
         endif
 
     enddo
@@ -377,7 +381,8 @@ contains
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                        u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1+dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
                     end do
                 end do
             else

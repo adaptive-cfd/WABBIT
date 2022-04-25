@@ -382,7 +382,7 @@ contains
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
                         !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
-                        u(ix,iy,:,i) = 0.5*(1+dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
                     end do
                 end do
             else

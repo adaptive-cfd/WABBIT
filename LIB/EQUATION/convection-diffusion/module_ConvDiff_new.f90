@@ -26,8 +26,8 @@ module module_convdiff_new
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
-    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk
-    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk
+    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
+    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
@@ -79,10 +79,11 @@ contains
 
     allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'gamma', params_convdiff%gamma, 0.0_rk ) ! reaction constant
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0x', params_convdiff%u0x )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0y', params_convdiff%u0y )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0z', params_convdiff%u0z )
-
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'tau', params_convdiff%tau , 0.0_rk)
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%x0 )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%y0 )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%z0 )
@@ -95,6 +96,7 @@ contains
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'w0', params_convdiff%w0(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_convdiff%periodic_BC(1:params_convdiff%dim), &
                                                        params_convdiff%periodic_BC(1:params_convdiff%dim) )
@@ -244,7 +246,7 @@ contains
     ! TODO: make this global and allocatable
     real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
     integer(kind=ik) :: i, ix, iy
-    real(kind=rk) :: x,y,unorm
+    real(kind=rk) :: x,y,unorm,c_react
 
     dt = 9.9e9_rk
 
@@ -272,7 +274,11 @@ contains
         endif
 
         if (params_convdiff%nu(i) > 1.0e-13_rk) then
-            dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          if (params_convdiff%gamma>1.0e-13_rk) then
+            c_react = 0.15*params_convdiff%gamma
+            dt = min(dt,params_convdiff%CFL_nu/c_react * minval(dx(1:params_convdiff%dim)) )
+          endif
         endif
 
     enddo
@@ -304,7 +310,7 @@ contains
 
     integer(kind=ik) :: ix, iy, iz, i
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: x,y,c0x,c0y,z,c0z
+    real(kind=rk) :: x,y,c0x,c0y,z,c0z,lambd
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -366,6 +372,22 @@ contains
           else
               call abort(66273,"this inicond is 2d only..")
           endif
+
+      case ("circle")
+            if (params_convdiff%dim==2) then
+                lambd = 0.005 *maxval(params_convdiff%domain_size)
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
 
       case("blob")
           if (params_convdiff%dim==2) then

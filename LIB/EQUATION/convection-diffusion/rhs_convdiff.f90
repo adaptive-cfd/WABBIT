@@ -79,7 +79,7 @@
       ! global forcing term (e.g. in FSI the forces on bodies). As the physics
       ! modules cannot see the grid, (they only see blocks), in order to encapsulate
       ! them nicer, two RHS stages have to be defined: integral / local stage.
-      !
+      !if abs(params_convdiff%gamma)>0
       ! called for each block.
 
       return
@@ -100,7 +100,6 @@
       ! operators etc.
       !
       ! called for each block.
-
       call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
 
 
@@ -141,7 +140,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
     ! real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:2)
     real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu, gamma
     real(kind=rk) :: u_dx, u_dy, u_dz
     real(kind=rk) :: u_dxdx, u_dydy, u_dzdz
     real(kind=rk) :: xcb, ycb, beta, x,y, sech,bc
@@ -174,13 +173,12 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
 
-
+    gamma = params_convdiff%gamma
     ! looop over components - they are independent scalars
     do i = 1, N
 
         ! because p%nu might load the entire params in the cache and thus be slower:
         nu = params_convdiff%nu(i)
-
         !!!!!!!!!!!!
         ! 2D
         !!!!!!!!!!!!
@@ -369,6 +367,10 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
         if (maxval(phi(:,:,:,i))>20.0_rk) call abort(666,"large values in phi. that cannot be good.")
     end do
 
+    ! reaction
+    if (gamma>=1.0e-10) then
+      rhs = rhs - gamma * (phi-1) * phi**2
+    endif
 
 end subroutine RHS_convdiff_new
 
@@ -388,10 +390,9 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
 
     integer(kind=ik) :: ix,iy
     real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3, phi, r, ut
+    real(kind=rk) :: x1,y1,x2,y2,r1,r2,r0,w0(2)
 
     u0 = 0.0_rk
-
-
     c0x = 0.5_rk*params_convdiff%domain_size(1)
     c0y = 0.5_rk*params_convdiff%domain_size(2)
     T = params_convdiff%T_swirl
@@ -433,6 +434,31 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
     case("constant")
         u0(:,:,1) = params_convdiff%u0x(i)
         u0(:,:,2) = params_convdiff%u0y(i)
+
+    case("circular")
+          u0(:,:,1) = -params_convdiff%domain_size(1) * pi * 0.5 * sin(2*pi*time)
+          u0(:,:,2) = params_convdiff%domain_size(2) * pi * 0.5 * cos(2*pi*time)
+
+    case("vortex-pair")
+      x1 = 0.6 -  params_convdiff%u0x(i) * time
+      y1 = 0.49 * params_convdiff%domain_size(2)
+      x2 = 0.6 -  params_convdiff%u0x(i) * time
+      y2 = 0.51 * params_convdiff%domain_size(2)
+      w0(1:2) = params_convdiff%w0(1:params_convdiff%dim)
+      r0 = 0.005   ! initial size of vortex
+      do iy = 1, Bs(2) + 2*g
+          do ix = 1, Bs(1) + 2*g
+              x = dble(ix-(g+1)) * dx(1) + x0(1)
+              y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+              r1 = (x-x1)**2 + (y-y1)**2
+              r2 = (x-x2)**2 + (y-y2)**2
+
+              u0(ix,iy,1) = -w0(1) * (y - y1) * dexp(-(r1/r0)**2) + w0(2) * (y - y2) * dexp(-(r2/r0)**2)
+              u0(ix,iy,2) =  w0(1) * (x - x1) * dexp(-(r1/r0)**2) - w0(2) * (x - x2) * dexp(-(r2/r0)**2)
+          enddo
+      enddo
+      u0 = u0 * dexp(-(time / params_convdiff%tau) ** 2)
 
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')

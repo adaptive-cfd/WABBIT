@@ -47,6 +47,8 @@ program main_post
     select case(mode)
     case ("--extract-slice")
         call post_extract_slice(params)
+    case ("--ghost-test")
+        call postGhostSyncTest(params)
 
     case ("--dump-neighbors")
         call post_dump_neighbors(params)

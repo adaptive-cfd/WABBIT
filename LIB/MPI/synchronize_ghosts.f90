@@ -27,12 +27,11 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
         call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
         if (params%iter_ghosts) then
-            filter = .true.
-            call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-            filter = .true.
-            call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-            filter = .true.
-            call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+!            write(*,*) "iterative scheme...", NiterationsGhosts
+            do k = 1, NiterationsGhosts
+                filter = .true.
+                call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+            enddo
         endif
     endif
 

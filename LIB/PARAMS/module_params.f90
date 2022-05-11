@@ -73,7 +73,7 @@ module module_params
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
         logical, allocatable :: threshold_state_vector_component(:)
-        ! deside if WABBIT should start from input files
+        ! decide if WABBIT should start from input files
         logical :: read_from_files
         ! files we want to read for inital cond.
         character(len=cshort), dimension(:), allocatable :: input_files
@@ -88,7 +88,7 @@ module module_params
         ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
         ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
         ! and (1) appears to be more stable.
-        logical :: ghost_nodes_redundant_point_coarseWins = .true.
+        logical :: ghost_nodes_redundant_point_coarseWins = .false.
         logical :: iter_ghosts = .false.
 
         ! switch for mesh adaption

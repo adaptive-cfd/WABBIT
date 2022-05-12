@@ -22,6 +22,8 @@ module module_MPI
 
 !!!!!!!!!!!!
 logical :: filter = .false.
+! HACK
+integer(kind=ik), public :: NiterationsGhosts = 1
 !!!!!!!!!!!!
 
 

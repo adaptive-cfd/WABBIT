@@ -96,8 +96,8 @@ contains
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'w0', params_convdiff%w0(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'w0', params_convdiff%w0(1:params_convdiff%dim) )
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim) )
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_convdiff%periodic_BC(1:params_convdiff%dim), &
                                                        params_convdiff%periodic_BC(1:params_convdiff%dim) )
     if ( .not. All(params_convdiff%periodic_BC) ) then

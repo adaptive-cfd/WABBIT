@@ -6,16 +6,15 @@ subroutine operator_reconstruction(params)
     use module_forest
     use module_mpi
     use module_acm
-    use module_bridge_interface, only : initialize_communicator
     use module_time_step, only: filter_wrapper
 
     implicit none
 
     type (type_params), intent(inout)  :: params
     character(len=cshort) :: file, infile
-    real(kind=rk) :: time, x, y, dx_fine, u_dx, dx_inv, val, x2, y2
+    real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, tree_N, iblock, ix, iy, &
-    g, lgt_n, hvy_n, iz, a, b
+    g, lgt_n, hvy_n, iz, a1, b1, a2, b2, level
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
@@ -23,11 +22,11 @@ subroutine operator_reconstruction(params)
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
-    real(kind=rk), allocatable         :: stencil(:)
+    real(kind=rk), allocatable         :: stencil1(:),stencil2(:)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
     integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=cshort)                  :: fname
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -41,10 +40,12 @@ subroutine operator_reconstruction(params)
     ! b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
 
+    if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
+
     call get_command_argument(2, file)
     call check_file_exists(file)
 
-    ! get some parameters from one of the files (they should be the same in all of them)
+    ! get some parameters from the grid file
     call read_attributes(file, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
@@ -65,81 +66,99 @@ subroutine operator_reconstruction(params)
     ! new points are added in wabbit
 
 
+    ! discretization
+    call get_cmd_arg( "--discretization", params%order_discretization, default="FD_4th_central" )
+    call get_cmd_arg( "--predictor", params%order_predictor, default="multiresolution_4th" )
+    ! viscosity
+    call get_cmd_arg( "--viscosity", nu, default=0.0_rk )
+    ! coarseWins or fineWins
+    call get_cmd_arg( "--coarse-wins", params%ghost_nodes_redundant_point_coarseWins, default=.false. )
 
     !---------------------------------------------------------------------------
     ! Adjustable PARAMETERS
     !---------------------------------------------------------------------------
-    params%n_ghosts = 6_ik
-    ! coarseWins or fineWins
-    params%ghost_nodes_redundant_point_coarseWins = .false.
     dir = "x"
-
-    ! params%order_discretization = "FD_2nd_central"
-    ! params%order_predictor = "multiresolution_2nd"
-
-    params%order_discretization = "FD_4th_central_optimized"
-    params%order_predictor = "multiresolution_4th"
     params%wavelet = "CDF44"
     params%wavelet_transform_type = "biorthogonal"!"harten-multiresolution"
-
-    params%iter_ghosts = .true.
+    params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
 
-    if (params%order_discretization == "FD_4th_central_optimized") then
-        allocate(stencil(-3:+3))
+    select case(params%order_discretization)
+    case("FD_4th_central_optimized")
         ! Tam & Webb, 4th order optimized (for first derivative)
-        stencil = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    endif
+        allocate(stencil1(-3:+3))
+        stencil1 = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+        ! 2nd derivative
+        allocate(stencil2(-2:+2))
+        stencil2 = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-    if (params%order_discretization == "FD_4th_central") then
-        allocate(stencil(-2:+2))
+        params%n_ghosts = 4_ik
+
+    case("FD_4th_central")
         ! standard 4th central FD stencil
-        stencil = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
-    endif
+        allocate(stencil1(-2:+2))
+        stencil1 = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+        ! 2nd derivative
+        allocate(stencil2(-2:+2))
+        stencil2 = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-    if (params%order_discretization == "FD_2nd_central") then
-        allocate(stencil(-1:+1))
+        params%n_ghosts = 2_ik
+
+    case("FD_2nd_central")
         ! Tam & Webb, 4th order optimized (for first derivative)
-        stencil = (/-0.5_rk, 0.0_rk, 0.5_rk/)
-    endif
+        allocate(stencil1(-1:+1))
+        stencil1 = (/-0.5_rk, 0.0_rk, 0.5_rk/)
+        ! 2nd derivative
+        allocate(stencil2(-1:+1))
+        stencil2 = (/1.0_rk, -2.0_rk, 1.0_rk/)
 
-    if (params%order_discretization == "CDF44") then
-        allocate( stencil(-6:6) )
-        stencil = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
-        87.0d0*2.0d0**(-7.d0), &
-        9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
+        params%n_ghosts = 2_ik
 
-        write(*,'(13(es15.8,1x))') stencil
-    endif
+    case default
+        call abort(1919191222,"unknown discretization set?!")
+
+    end select
+
+    ! if (params%order_discretization == "CDF44") then
+    !     allocate( stencil(-6:6) )
+    !     stencil = (/ -2.0d0**(-9.d0), 0.0d0,  9.0d0*2.0d0**(-8.d0), -2.0d0**(-5.d0),  -63.0d0*2.0d0**(-9.d0),  9.0d0*2.0d0**(-5.d0), &
+    !     87.0d0*2.0d0**(-7.d0), &
+    !     9.0d0*2.0d0**(-5.d0), -63.0d0*2.0d0**(-9.d0), -2.0d0**(-5.d0), 9.0d0*2.0d0**(-8.d0), 0.0d0, -2.0d0**(-9.d0)/) ! H TILDE
+    !
+    !     write(*,'(13(es15.8,1x))') stencil
+    ! endif
 
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1)') trim(params%order_discretization), &
-    trim(params%order_predictor), dir, params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins
+    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",e12.4)') trim(params%order_discretization), &
+    trim(params%order_predictor), dir, params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu
     close(17)
 
     !---------------------------------------------------------------------------
 
     if ((params%order_discretization == "FD_4th_central_optimized").and.(params%n_ghosts<4)) then
-        call abort(33,"no enough g")
+        call abort(33,"not enough g")
     endif
 
 
+    !---------------------------------------------------------------------------
+    !---------------------------------------------------------------------------
+    !---------------------------------------------------------------------------
+
+
     g = params%n_ghosts
-    a = lbound(stencil, dim=1)
-    b = ubound(stencil, dim=1)
+    a1 = lbound(stencil1, dim=1)
+    b1 = ubound(stencil1, dim=1)
+    a2 = lbound(stencil2, dim=1)
+    b2 = ubound(stencil2, dim=1)
     iz = 1
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
 
     call init_ghost_nodes( params )
 
     call read_mesh(file, params, lgt_n, hvy_n, lgt_block)
-
-    ! call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active, &
-    ! lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 1, .true., 1 )
 
     call create_active_and_sorted_lists(params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
@@ -149,8 +168,8 @@ subroutine operator_reconstruction(params)
 
     dx_fine = (2.0_rk**-max_active_level(lgt_block, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
     nx_fine = nint(domain(2)/dx_fine)
-
     write(*,*) "nx_fine=", nx_fine
+    write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2)
 
     !---------------------------------------------------------------------------
     ! save the grid (for plotting in python)
@@ -159,6 +178,7 @@ subroutine operator_reconstruction(params)
     do iblock = 1, hvy_n
         call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -167,7 +187,7 @@ subroutine operator_reconstruction(params)
                 ixx = nint(x/dx_fine)+1
                 iyy = nint(y/dx_fine)+1
 
-                write(19,*) ixx, iyy, x, y
+                write(19,*) ixx, iyy, x, y, level
             enddo
         enddo
     enddo
@@ -203,7 +223,11 @@ subroutine operator_reconstruction(params)
                 ixx = nint(x/dx_fine)+1
                 iyy = nint(y/dx_fine)+1
 
+
+                ! set the one
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 hvy_block(ix, iy, iz, 1, hvy_active(iblock)) = 1.0_rk
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                 !---------------------------------------------------------------
                 ! synchronize ghosts (important! if e.g. coarseWins is active and you happen to set the redundant value of a refined block, its overwritten to be zero again)
@@ -214,16 +238,16 @@ subroutine operator_reconstruction(params)
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                params_acm%filter_type = "wavelet_filter"
-                params_acm%order_predictor = params%order_predictor
-
-                do k = 1, hvy_n
-                    call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-                    call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-                    call filter_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), g, x0, dx, &
-                    hvy_block(:,:,:,:,hvy_active(k)), hvy_block(:,:,:,:,hvy_active(k)) )
-                end do
+                ! params_acm%filter_type = "wavelet_filter"
+                ! params_acm%order_predictor = params%order_predictor
+                !
+                ! do k = 1, hvy_n
+                !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+                !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                !
+                !     call filter_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), g, x0, dx, &
+                !     hvy_block(:,:,:,:,hvy_active(k)), hvy_block(:,:,:,:,hvy_active(k)) )
+                ! end do
 
 
                 !---------------------------------------------------------------
@@ -232,29 +256,28 @@ subroutine operator_reconstruction(params)
                     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-                    ! if (lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL) == 1) then
-                    !     ! coarse
-                    !     dx_inv = 0.5_rk
-                    ! else
-                    !     ! fine
-                    !     dx_inv = 1.0_rk !/ dx(1)
-                    ! endif
                     dx_inv = 1.0_rk / dx(1)
 
-                    do iy2 = g+1, Bs(2)+g
-                        do ix2 = g+1, Bs(1)+g
 
-                            if (dir=="x") then
-                                u_dx = sum( stencil*hvy_block(ix2+a:ix2+b, iy2, iz, 1, hvy_active(k)) )*dx_inv
-                            elseif (dir=='y') then
-                                u_dx = sum( stencil*hvy_block(ix2, iy2+a:iy2+b, iz, 1, hvy_active(k)) )*dx_inv
-                            else
-                                call abort(123,'X or Y baby, nothing else.')
-                            endif
-
-                            hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx
+                    if (dir=="x") then
+                        do iy2 = g+1, Bs(2)+g
+                            do ix2 = g+1, Bs(1)+g
+                                u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_active(k)) )*dx_inv
+                                u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_active(k)) )*dx_inv**2
+                                hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
+                            end do
                         end do
-                    end do
+                    elseif (dir=='y') then
+                        do iy2 = g+1, Bs(2)+g
+                            do ix2 = g+1, Bs(1)+g
+                                u_dx   = sum( stencil1*hvy_block(ix2, iy2+a1:iy2+b1, iz, 1, hvy_active(k)) )*dx_inv
+                                u_dxdx = sum( stencil2*hvy_block(ix2, iy2+a2:iy2+b2, iz, 1, hvy_active(k)) )*dx_inv**2
+                                hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
+                            end do
+                        end do
+                    else
+                        call abort(123,'X or Y baby, nothing else.')
+                    endif
                 end do
 
 
@@ -267,10 +290,11 @@ subroutine operator_reconstruction(params)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-
-
-
-
+                ! save operator line to text file.
+                ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
+                ! create a matrix N_max**2 by N_max**2, where N_max is Npoints on the finest level.
+                ! Many points do not exist; they are on coarse levels. however, this is a problem
+                ! for the python script, because it first reads the entie matrix, then removes zero cols/rows.
                 do k = 1, hvy_n
                     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )

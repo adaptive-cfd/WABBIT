@@ -37,7 +37,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
         ! the file containes the radius of the cylinder
         R = treedata(i,7)*Insect%fractal_tree_scaling
 
-        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(1,kind=2), bounding_box=treedata_boundingbox(i,1:6))
+        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(0,kind=2), bounding_box=treedata_boundingbox(i,1:6))
     end do
 
 end subroutine draw_fractal_tree
@@ -137,7 +137,7 @@ subroutine fractal_tree_init(Insect)
             treedata_boundingbox(icyl, 1:6) = (/xmin, ymin, zmin, xmax, ymax, zmax/)
         enddo
 
-        if (root) write(*,'("Computing static bounding done.")')
+        if (root) write(*,'("Computing static bounding boxes done.")')
 
     else
         call abort(20200504, "fractal_tree_init seems to be called twice.")

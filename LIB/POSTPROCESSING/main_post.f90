@@ -56,6 +56,9 @@ program main_post
     case ("--OP")
         call operator_reconstruction(params)
 
+    case ("--OP-rhs")
+        call rhs_operator_reconstruction(params)
+
     case ("--prune-tree")
         call post_prune_tree(params)
 
@@ -150,6 +153,8 @@ case ("--filter")
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
             write(*,*) "--Q"
+            write(*,*) "--OP-rhs"
+            write(*,*) "--OP"
             write(*,*) "--gradient"
             write(*,*) "--keyvalues"
             write(*,*) "--dry-run"

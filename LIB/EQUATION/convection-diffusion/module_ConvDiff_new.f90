@@ -310,7 +310,7 @@ contains
 
     integer(kind=ik) :: ix, iy, iz, i
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: x,y,c0x,c0y,z,c0z,lambd
+    real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -388,6 +388,22 @@ contains
             else
                 call abort(66273,"this inicond is 2d only..")
             endif
+        case ("1D-bump")
+            if (params_convdiff%dim==2) then
+                delta = dsqrt(8/params_convdiff%gamma)
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk * params_convdiff%domain_size(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (abs(x) - params_convdiff%blob_width(i) ) / delta))
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
+
 
       case("blob")
           if (params_convdiff%dim==2) then

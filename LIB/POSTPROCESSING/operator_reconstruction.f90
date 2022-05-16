@@ -31,6 +31,7 @@ subroutine operator_reconstruction(params)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
     character(len=1) :: dir
+    logical :: refine
 
     ! Tam & Webb, 4th order optimized (for first derivative)
     ! a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
@@ -50,14 +51,14 @@ subroutine operator_reconstruction(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
-    params%max_treelevel = tc_length
+    params%max_treelevel = tc_length+2
     params%n_eqn = 2
     params%domain_size = domain
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
-    params%number_blocks = lgt_n
+    params%number_blocks = 8*lgt_n
 
     ! Note:
     ! When comparing with the basic hand-made matlab operator script, keep in mind
@@ -73,13 +74,14 @@ subroutine operator_reconstruction(params)
     call get_cmd_arg( "--viscosity", nu, default=0.0_rk )
     ! coarseWins or fineWins
     call get_cmd_arg( "--coarse-wins", params%ghost_nodes_redundant_point_coarseWins, default=.false. )
+    call get_cmd_arg( "--refine-coarsen", refine, default=.false. )
 
     !---------------------------------------------------------------------------
     ! Adjustable PARAMETERS
     !---------------------------------------------------------------------------
     dir = "x"
-    params%wavelet = "CDF44"
-    params%wavelet_transform_type = "biorthogonal"!"harten-multiresolution"
+    params%wavelet = "CDF40"
+    params%wavelet_transform_type = "harten-multiresolution"!"biorthogonal"!
     params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
@@ -131,7 +133,7 @@ subroutine operator_reconstruction(params)
 
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",e12.4)') trim(params%order_discretization), &
+    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",es12.4)') trim(params%order_discretization), &
     trim(params%order_predictor), dir, params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu
     close(17)
 
@@ -171,6 +173,15 @@ subroutine operator_reconstruction(params)
     write(*,*) "nx_fine=", nx_fine
     write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2)
 
+    ! this hack ensures, on mono_CPU, that later on, refine+coarsening always ends up in the same order in hvy_actve
+    if (refine) then
+        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=1 )
+
+        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+    endif
+
     !---------------------------------------------------------------------------
     ! save the grid (for plotting in python)
     !---------------------------------------------------------------------------
@@ -193,7 +204,6 @@ subroutine operator_reconstruction(params)
     enddo
     close(19)
 
-
     !---------------------------------------------------------------------------
     ! compute operator matrix
     !---------------------------------------------------------------------------
@@ -203,7 +213,7 @@ subroutine operator_reconstruction(params)
     do iblock = 1, hvy_n
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
-                write(*,*) "--------------------point---------------------------"
+                ! write(*,*) "--------------------point---------------------------"
                 !---------------------------------------------------------------
                 ! reset entire grid to zeros (do not care about performance, just reset all)
                 hvy_block = 0.0_rk
@@ -249,6 +259,11 @@ subroutine operator_reconstruction(params)
                 !     hvy_block(:,:,:,:,hvy_active(k)), hvy_block(:,:,:,:,hvy_active(k)) )
                 ! end do
 
+                if (refine) then
+                    call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+                    lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=1 )
+                endif
+
 
                 !---------------------------------------------------------------
                 ! Now compute the derivative
@@ -289,6 +304,13 @@ subroutine operator_reconstruction(params)
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+                if (refine) then
+                    call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+                    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+                endif
+! is the order of blocks in hvy_active still the same ? does that matter?
+
+
 
                 ! save operator line to text file.
                 ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
@@ -315,11 +337,13 @@ subroutine operator_reconstruction(params)
                             if (abs(val) > 1.0e-13) then
                                 ! this point is a nonzero value
                                 write(17,'(i6,1x,i6,1x,es15.8)') ixx+(iyy-1)*nx_fine, ixx2+(iyy2-1)*nx_fine, val
-                                write(*,*) "python col=", ixx2+(iyy2-1)*nx_fine -1 , "row=", ixx+(iyy-1)*nx_fine -1, val, "xy=",x,y, "block", k
+                                ! write(*,*) "python col=", ixx2+(iyy2-1)*nx_fine -1 , "row=", ixx+(iyy-1)*nx_fine -1, val, "xy=",x,y, "block", k
                             endif
                         end do
                     end do
                 end do
+
+
 
 
 
@@ -328,127 +352,4 @@ subroutine operator_reconstruction(params)
     enddo
     close(17)
     close(18)
-
-    !---------------------------------------------------------------------------
-    ! Now, we set a sine wave on the grid and compute its derivative.
-    ! We store it in 1D indexing format.
-    ! It can be compared directly with the above operator:
-    ! (python) error = np.max(np.abs( u_dx - np.matmul(D.transpose(),u) ))
-    ! With the right ghost nodes sync'ing (also after the derivative) the process
-    ! works like a charm, illustrating that it IS indeed the right operator matrix.
-    !---------------------------------------------------------------------------
-
-
-    ! !---------------------------------------------------------------
-    ! ! reset entire grid to zeros (do not care about performance, just reset all)
-    ! hvy_block = 0.0_rk
-    !
-    ! !---------------------------------------------------------------
-    ! ! set sine-wave
-    ! do k = 1, hvy_n
-    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-    !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-    !
-    !     do iy2 = g+1, Bs(2)+g
-    !         do ix2 = g+1, Bs(1)+g
-    !             x2 = dble(ix2-(g+1)) * dx(1) + x0(1)
-    !             y2 = dble(iy2-(g+1)) * dx(2) + x0(2)
-    !
-    !             if (abs((x2-domain(1))) <=1.0e-9) x2 = 0.0_rk ! not needed strictly speaking
-    !             if (abs((y2-domain(2))) <=1.0e-9) y2 = 0.0_rk
-    !
-    !             hvy_block(ix2, iy2, iz, 1, hvy_active(k)) = sin(2.0_rk*pi*x2)
-    !         enddo
-    !     enddo
-    ! enddo
-    !
-    !
-    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !
-    !
-    ! !---------------------------------------------------------------
-    ! ! Now compute the derivative
-    ! do k = 1, hvy_n
-    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-    !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-    !
-    !     dx_inv = 1.0_rk/dx(1)
-    !
-    !     do iy2 = g+1, Bs(2)+g
-    !         do ix2 = g+1, Bs(1)+g
-    !             if (params%order_discretization == "FD_2nd_central") then
-    !                 if (dir=="x") then
-    !                     u_dx = (hvy_block(ix2+1,iy2,iz,1,hvy_active(k)) - hvy_block(ix2-1,iy2,iz,1,hvy_active(k)))*dx_inv*0.5_rk
-    !                 elseif (dir=='y') then
-    !                     u_dx = (hvy_block(ix2,iy2+1,iz,1,hvy_active(k)) - hvy_block(ix2,iy2-1,iz,1,hvy_active(k)))*dx_inv*0.5_rk
-    !                 else
-    !                     call abort(123,'XY')
-    !                 endif
-    !
-    !
-    !             elseif (params%order_discretization == 'FD_4th_central_optimized')then
-    !                 if (dir=="x") then
-    !                     u_dx = (  a(-3)*hvy_block(ix2-3, iy2, iz, 1, hvy_active(k)) &
-    !                     + a(-2)*hvy_block(ix2-2, iy2, iz, 1, hvy_active(k)) &
-    !                     + a(-1)*hvy_block(ix2-1, iy2, iz, 1, hvy_active(k)) &
-    !                     + a(0 )*hvy_block(ix2  , iy2, iz, 1, hvy_active(k)) &
-    !                     + a(+1)*hvy_block(ix2+1, iy2, iz, 1, hvy_active(k)) &
-    !                     + a(+2)*hvy_block(ix2+2, iy2, iz, 1, hvy_active(k)) &
-    !                     + a(+3)*hvy_block(ix2+3, iy2, iz, 1, hvy_active(k)))*dx_inv
-    !                 elseif (dir=='y') then
-    !                     u_dx = (  a(-3)*hvy_block(ix, iy2-3, iz, 1, hvy_active(k)) &
-    !                     + a(-2)*hvy_block(ix, iy2-2, iz, 1, hvy_active(k)) &
-    !                     + a(-1)*hvy_block(ix, iy2-1, iz, 1, hvy_active(k)) &
-    !                     + a(0 )*hvy_block(ix, iy2  , iz, 1, hvy_active(k)) &
-    !                     + a(+1)*hvy_block(ix, iy2+1, iz, 1, hvy_active(k)) &
-    !                     + a(+2)*hvy_block(ix, iy2+2, iz, 1, hvy_active(k)) &
-    !                     + a(+3)*hvy_block(ix, iy2+3, iz, 1, hvy_active(k)))*dx_inv
-    !                 else
-    !                     call abort(123,'XY')
-    !                 endif
-    !             else
-    !                 call abort(771272,"unknown")
-    !             endif
-    !
-    !             hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx
-    !         end do
-    !     end do
-    ! end do
-    !
-    !
-    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !
-    !
-    ! open(20, file=trim(adjustl(file))//'.u_derivative.txt', status='replace')
-    ! open(21, file=trim(adjustl(file))//'.u_function.txt', status='replace')
-    ! do k = 1, hvy_n
-    !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-    !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-    !
-    !     do iy2 = g+1, Bs(2)+g
-    !         do ix2 = g+1, Bs(1)+g
-    !             x = dble(ix2-(g+1)) * dx(1) + x0(1)
-    !             y = dble(iy2-(g+1)) * dx(2) + x0(2)
-    !
-    !             if (abs((x-domain(1))) <=1.0e-9) x = 0.0_rk
-    !             if (abs((y-domain(2))) <=1.0e-9) y = 0.0_rk
-    !
-    !             ixx2 = nint(x/dx_fine)+1
-    !             iyy2 = nint(y/dx_fine)+1
-    !
-    !             write(20,'(i6,1x,es15.8)') ixx2+(iyy2-1)*nx_fine, hvy_block(ix2, iy2, iz, 2, hvy_active(k))
-    !             write(21,'(i6,1x,es15.8)') ixx2+(iyy2-1)*nx_fine, hvy_block(ix2, iy2, iz, 1, hvy_active(k))
-    !         end do
-    !     end do
-    ! end do
-    ! close(20)
-    ! close(21)
-    !
-    ! call write_field("ww_000.h5", time, 1, 1, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active )
-    ! call write_field("wwdx_000.h5", time, 1, 2, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active )
-
 end subroutine

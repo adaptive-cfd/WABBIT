@@ -149,6 +149,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
+    ! coefficients for a standard centered 4th order 1st derivative
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
 
     ! set parameters for readability
@@ -249,6 +251,27 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 endif
+
+            case("FD_4th_central")
+                !-----------------------------------------------------------------------
+                ! 2D, 4th order (standard scheme not the TW)
+                !-----------------------------------------------------------------------
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! gradient
+                        u_dx = (a_FD4(-2)*phi(ix-2,iy,1,i) + a_FD4(-1)*phi(ix-1,iy,1,i) &
+                             +  a_FD4(+2)*phi(ix+2,iy,1,i) + a_FD4(+1)*phi(ix+1,iy,1,i))*dx_inv
+                        u_dy = (a_FD4(-2)*phi(ix,iy-2,1,i) + a_FD4(-1)*phi(ix,iy-1,1,i) &
+                             +  a_FD4(+2)*phi(ix,iy+2,1,i) + a_FD4(+1)*phi(ix,iy+1,1,i))*dy_inv
+
+                        u_dxdx = (b(-2)*phi(ix-2,iy,1,1) + b(-1)*phi(ix-1,iy,1,1) + b(0)*phi(ix,iy,1,1)&
+                               +  b(+1)*phi(ix+1,iy,1,1) + b(+2)*phi(ix+2,iy,1,1))*dx2_inv
+                        u_dydy = (b(-2)*phi(ix,iy-2,1,1) + b(-1)*phi(ix,iy-1,1,1) + b(0)*phi(ix,iy,1,1)&
+                               +  b(+1)*phi(ix,iy+1,1,1) + b(+2)*phi(ix,iy+2,1,1))*dy2_inv
+
+                        rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
+                    end do
+                end do
 
 
             case default

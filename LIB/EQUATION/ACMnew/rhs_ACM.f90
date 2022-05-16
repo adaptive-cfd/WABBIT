@@ -322,7 +322,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
+                     u_dx4, v_dx4, u_dy4, v_dy4
     ! loop variables
     integer(kind=rk) :: ix, iy, idir
     ! coefficients for Tam&Webb (4th order 1st derivative)
@@ -457,7 +458,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                        +  b(+1)*phi(ix+1,iy,2) + b(+2)*phi(ix+2,iy,2))*dx2_inv
                 v_dydy = (b(-2)*phi(ix,iy-2,2) + b(-1)*phi(ix,iy-1,2) + b(0)*phi(ix,iy,2) &
                        +  b(+1)*phi(ix,iy+1,2) + b(+2)*phi(ix,iy+2,2))*dy2_inv
-
                 div_U = u_dx + v_dy
 
                 penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
@@ -473,11 +473,35 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         call abort(441166, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
     end select
 
+    ! ---------------------------------------------------------------------------
+    ! EXPERIMENTAL
+    ! hyperviscosity, with 2nd order 4th derivative
+    ! ---------------------------------------------------------------------------
+    ! if (abs(nu_p) > 1.0e-13_rk) then
+    !     do iy = g+1, Bs(2)+g
+    !         do ix = g+1, Bs(1)+g
+    !             u_dx4  = ( 1.0_rk*phi(ix-2,iy,1) + (-4.0_rk)*phi(ix-1,iy,1) + 6.0_rk*phi(ix,iy,1) &
+    !             + (-4.0_rk)*phi(ix+1,iy,1) + 1.0_rk*phi(ix+2,iy,1))*dx2_inv*dx2_inv
+    !             u_dy4  = ( 1.0_rk*phi(ix,iy-2,1) + (-4.0_rk)*phi(ix,iy-1,1) + 6.0_rk*phi(ix,iy,1) &
+    !             + (-4.0_rk)*phi(ix,iy+1,1) + 1.0_rk*phi(ix,iy+2,1))*dy2_inv*dy2_inv
+    !
+    !             v_dx4  = ( 1.0_rk*phi(ix-2,iy,2) + (-4.0_rk)*phi(ix-1,iy,2) + 6.0_rk*phi(ix,iy,2) &
+    !             + (-4.0_rk)*phi(ix+1,iy,2) + 1.0_rk*phi(ix+2,iy,2))*dx2_inv*dx2_inv
+    !             v_dy4  = ( 1.0_rk*phi(ix,iy-2,2) + (-4.0_rk)*phi(ix,iy-1,2) + 6.0_rk*phi(ix,iy,2) &
+    !             + (-4.0_rk)*phi(ix,iy+1,2) + 1.0_rk*phi(ix,iy+2,2))*dy2_inv*dy2_inv
+    !
+    !
+    !             rhs(ix,iy,1) = rhs(ix,iy,1) - nu_p*(u_dx4+u_dy4)
+    !             rhs(ix,iy,2) = rhs(ix,iy,2) - nu_p*(v_dx4+v_dy4)
+    !         end do
+    !     end do
+    ! endif
 
-    !---------------------------------------------------------------------------
+    ! ---------------------------------------------------------------------------
+    ! EXPERIMENTAL
     ! Pressure diffusion term, experimental. (Hence not integrated in the above loops,
     ! performance does not yet matter, only if this term turns out to be super useful)
-    !---------------------------------------------------------------------------
+    ! ---------------------------------------------------------------------------
     if (nu_p > 1.0e-13_rk) then
         select case(order_discretization)
         case ("FD_2nd_central")

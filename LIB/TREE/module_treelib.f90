@@ -103,7 +103,7 @@ end subroutine get_block_spacing_origin2
     integer(kind=tsize) :: treecode2int
     N = size(treearray,1)
 
-    if (present(tree_id) .and. tree_id>0) then
+    if (present(tree_id)) then
         treecode2int = tree_id
         potency = floor(log10(real(tree_id)), kind=tsize) + 1_tsize
         ! the +1 is necessary because it seperates the treecode from the tree_id with a 0

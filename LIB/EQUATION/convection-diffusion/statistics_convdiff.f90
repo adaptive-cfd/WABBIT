@@ -32,7 +32,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     ! local variables
     integer(kind=ik) :: mpierr, ix, iy, iz, k
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: scalar_integral
+    real(kind=rk) :: scalar_integral, scalar_max
     real(kind=rk), save :: umag, umax, dx_min
 
 
@@ -49,6 +49,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
         ! this stage is called only once, NOT for each block.
         ! performs initializations in the RHS module, such as resetting integrals
         params_convdiff%scalar_integral = 0.0_rk
+        params_convdiff%scalar_max = 0.0_rk
 
     case ("integral_stage")
         !-------------------------------------------------------------------------
@@ -59,6 +60,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
 
         ! tmp values for computing the current block only
         scalar_integral = 0.0_rk
+        scalar_max = -9.0e9_rk
 
         if (params_convdiff%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
@@ -78,9 +80,12 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
             enddo
         endif
 
+        scalar_max = maxval(u(:,:,:,1))
+
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
         params_convdiff%scalar_integral = params_convdiff%scalar_integral + scalar_integral * product(dx(1:params_convdiff%dim))
+        params_convdiff%scalar_max = max(params_convdiff%scalar_max, scalar_max)
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -88,8 +93,9 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
         ! this stage is called only once, NOT for each block.
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_integral, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_max     , 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
-        call append_t_file( 'scalar_integral.t', (/time, dt, params_convdiff%scalar_integral/) )
+        call append_t_file( 'scalar_integral.t', (/time, dt, params_convdiff%scalar_integral, params_convdiff%scalar_max /) )
 
     case default
         call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")

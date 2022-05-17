@@ -27,7 +27,7 @@ module module_convdiff_new
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
-    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk
+    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
     integer(kind=ik) :: dim, N_scalars, N_fields_saved
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
@@ -325,6 +325,13 @@ contains
       c0z = params_convdiff%z0(i)
 
       select case (params_convdiff%inicond(i))
+      case ("noise")
+          do ix = 1, Bs(1)+2*g
+              do iy = 1, Bs(2)+2*g
+                  u(ix,iy,:,i) = rand_nbr()
+              end do
+          end do
+
       case ("zero")
           u(:,:,:,i) = 0.0_rk
 

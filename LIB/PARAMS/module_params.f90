@@ -67,7 +67,7 @@ module module_params
         ! maximal numbers of trees in the forest
         integer(kind=ik) :: forest_size=1
         ! order of refinement predictor
-        character(len=cshort) :: order_predictor="not-initialized"
+        character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"

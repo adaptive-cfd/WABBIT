@@ -285,6 +285,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
     call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
+    call read_param_mpi(FILE, 'Blocks', 'inicond_grid_from_file', params%inicond_grid_from_file, "no" )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "sfc_hilbert" )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator_inicond', params%coarsening_indicator_inicond, params%coarsening_indicator )

@@ -21,7 +21,7 @@ module module_forest
     PUBLIC :: add_two_trees, substract_two_trees, count_tree_hvy_n, average_trees, &
     copy_tree, multiply_two_trees, multiply_tree_with_scalar, coarse_tree_2_reference_mesh, &
     compute_tree_L2norm, delete_tree, scalar_product_two_trees, scalar_product_two_trees_old, &
-    same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree
+    same_block_distribution, prune_tree, add_pruned_to_full_tree, refine_tree, store_ref_meshes
     !**********************************************************************************************
 
 contains
@@ -745,7 +745,6 @@ contains
        integer(kind=ik), intent(in)      :: lgt_n(:), lgt_block(:, : ), lgt_active(:,:)
        integer(kind=ik), allocatable, intent(inout) ::  lgt_block_ref(:, : ), lgt_active_ref(:,:)
        integer(kind=ik), intent(inout)   ::lgt_n_ref(2)
-
        !-----------------------------------------------------------------
        integer(kind=ik) :: k1
        if (maxval(lgt_n_ref) < max(lgt_n(tree_id1),lgt_n(tree_id2))) then
@@ -841,6 +840,7 @@ contains
                     ! (i.e. treecode length). Therefore we have to find the minimum of both
                     ! levels.
                     level_min = min(level1, level2)
+
                     treecode1 = treecode2int( lgt_block(lgt_id1, 1:level_min) )
                     treecode2 = treecode2int( lgt_block(lgt_id2, 1:level_min) )
 

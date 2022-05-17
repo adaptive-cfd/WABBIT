@@ -48,7 +48,7 @@ subroutine rhs_operator_reconstruction(params)
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --OP-rhs u_001.h5 inifile.ini --discretization=FD_4th_central_optimized --predictor=multiresolution_4th  --coarse-wins=0"
+            write(*,*) "./wabbit-post --OP-rhs u_001.h5 inifile.ini"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) " This function computes the linearised RHS operator A (Ngrid x Ngrid)"
             write(*,*) " arround the given statevector (here u_001)!"
@@ -81,11 +81,6 @@ subroutine rhs_operator_reconstruction(params)
     params%Bs = Bs
     params%number_blocks = 10*Nlgtn
 
-    ! discretization
-    call get_cmd_arg( "--discretization", params%order_discretization, default="FD_4th_central" )
-    call get_cmd_arg( "--predictor", params%order_predictor, default="multiresolution_4th" )
-    ! coarseWins or fineWins
-    call get_cmd_arg( "--coarse-wins", params%ghost_nodes_redundant_point_coarseWins, default=.false. )
 
     !---------------------------------------------------------------------------
     ! Adjustable PARAMETERS

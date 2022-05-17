@@ -1,4 +1,5 @@
 subroutine rhs_operator_reconstruction(params)
+    use mpi
     use module_precision
     use module_mesh
     use module_params
@@ -7,6 +8,7 @@ subroutine rhs_operator_reconstruction(params)
     use module_mpi
     use module_acm
     use module_time_step
+    use module_ini_files_parser_mpi
 
     implicit none
 
@@ -14,7 +16,7 @@ subroutine rhs_operator_reconstruction(params)
     character(len=cshort) :: file, infile,mode
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
     integer(kind=ik) :: iteration, k, tc_length, tree_N, iblock, ix, iy, &
-    g, iz, a1, b1, a2, b2, level
+    g, iz, a1, b1, a2, b2, level,tree_id_tmp
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
@@ -34,8 +36,11 @@ subroutine rhs_operator_reconstruction(params)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
     character(len=1) :: dir
-    logical, parameter :: verbosity=.True.
+    logical, parameter :: verbosity=.False.
     integer(kind=ik) :: Nlgtn
+    integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+    integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
+    type(inifile) :: ini_file
 
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
@@ -48,7 +53,7 @@ subroutine rhs_operator_reconstruction(params)
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --OP-rhs u_001.h5 inifile.ini"
+            write(*,*) "./wabbit-post --OP-rhs u_001.h5 inifile.ini --memory=10GB"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) " This function computes the linearised RHS operator A (Ngrid x Ngrid)"
             write(*,*) " arround the given statevector (here u_001)!"
@@ -79,9 +84,8 @@ subroutine rhs_operator_reconstruction(params)
     fsize = params%forest_size
     params%domain_size = domain
     params%Bs = Bs
-    params%number_blocks = 10*Nlgtn
-
-
+    ! call read_ini_file_mpi(ini_file, fname_ini, .true.)
+    ! call read_param_mpi(ini_file, 'ConvectionDiffusion', 'nu', nu )
     !---------------------------------------------------------------------------
     ! Adjustable PARAMETERS
     !---------------------------------------------------------------------------
@@ -181,8 +185,6 @@ subroutine rhs_operator_reconstruction(params)
         enddo
     enddo
     close(19)
-
-
     !---------------------------------------------------------------------------
     ! compute operator matrix
     !---------------------------------------------------------------------------
@@ -190,6 +192,28 @@ subroutine rhs_operator_reconstruction(params)
     open(18, file=trim(adjustl(file))//'.operator_matrix_nosync.txt', status='replace')
 
     ! we now calculate 1/h[rhs(u + h* e_i) - rhs(u)]1/h[rhs(u + h* e_i) - rhs(u)]
+    if ( params%adapt_mesh ) then
+      !---------------------------------------------------------------------------
+      ! store_reference_mesh
+      !---------------------------------------------------------------------------
+      call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
+                                  lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_id_u, tree_id_ei)
+      !---------------------------------------------------------------------------
+      ! refine grid ones
+      !---------------------------------------------------------------------------
+        do tree_id_tmp = 1, 3
+          ! synchronization before refinement (because the interpolation takes place on the extended blocks
+          ! including the ghost nodes)
+          ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
+          ! Snych'ing becomes much mor expensive one the grid is refined.
+          call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id_tmp), hvy_n(tree_id_tmp) )
+
+          ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
+          ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
+          call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id_tmp), lgt_n(tree_id_tmp), &
+          lgt_sortednumlist(:,:,tree_id_tmp), hvy_active(:,tree_id_tmp), hvy_n(tree_id_tmp), "everywhere", tree_ID=tree_id_tmp )
+        enddo
+    endif
     call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
         lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_id_u)
 
@@ -235,20 +259,6 @@ subroutine rhs_operator_reconstruction(params)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id_ei), hvy_n(tree_id_ei))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                ! params_acm%filter_type = "wavelet_filter"
-                ! params_acm%order_predictor = params%order_predictor
-                !
-                ! do k = 1, hvy_n
-                !     call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-                !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                !
-                !     call filter_ACM( 0.0_rk, hvy_block(:,:,:,:,hvy_active(k)), g, x0, dx, &
-                !     hvy_block(:,:,:,:,hvy_active(k)), hvy_block(:,:,:,:,hvy_active(k)) )
-                ! end do
-
-
-                !---------------------------------------------------------------
                 ! Now compute rhs(u+he_i) of the derivative 1/h[rhs(u + h* e_i) - rhs(u)]
                 call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
                     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_id_ei)
@@ -266,7 +276,15 @@ subroutine rhs_operator_reconstruction(params)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_id_rhs), hvy_n(tree_id_rhs))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                if ( params%adapt_mesh ) then
+                  call coarse_tree_2_reference_mesh(params, tree_n, &
+                        lgt_block, lgt_active(:,tree_id_rhs), lgt_n(tree_id_rhs), lgt_sortednumlist(:,:,tree_id_rhs), &
+                        lgt_block_ref, lgt_active_ref(:,1),lgt_n_ref(1), &
+                        hvy_block, hvy_active(:,tree_id_rhs), hvy_n(tree_id_rhs), hvy_tmp, hvy_neighbor, tree_id_rhs, verbosity)
+                  call create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+                                   lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
+                endif
                 ! save operator line to text file.
                 ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
                 ! create a matrix N_max**2 by N_max**2, where N_max is Npoints on the finest level.

@@ -14,7 +14,7 @@ subroutine operator_reconstruction(params)
     character(len=cshort) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, tree_N, iblock, ix, iy, &
-    g, lgt_n, hvy_n, iz, a1, b1, a2, b2, level
+    g, lgt_n, hvy_n, iz, a1, b1, a2, b2, level, j
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
@@ -32,14 +32,8 @@ subroutine operator_reconstruction(params)
     real(kind=rk), dimension(3)        :: domain
     character(len=1) :: dir
     logical :: refine, notAllPointsAreZero
-
-    ! Tam & Webb, 4th order optimized (for first derivative)
-    ! a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    ! standard 4th central FD stencil
-    ! a = (/0.0_rk , 1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk, 0.0_rk/)
-    ! 4th order coefficients for second derivative
-    ! b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-
+    real(kind=rk), dimension(4), PARAMETER :: permut_x=(/0.0_rk, 1.0_rk, 0.0_rk, 1.0_rk/), permut_y=(/0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/)
+    real(kind=rk) :: x_in2, y_in2
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
 
@@ -170,18 +164,7 @@ subroutine operator_reconstruction(params)
     nx_fine = nint(domain(2)/dx_fine)
 
     write(*,*) "nx_fine=", nx_fine
-    write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2)
-
-    ! this hack ensures, on mono_CPU, that later on, refine+coarsening always ends up in the same order in hvy_actve
-    if (refine) then
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=1 )
-
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
-    endif
+    write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2) ! note actual operator size is smaller because of redundant points
 
     !---------------------------------------------------------------------------
     ! save the grid (for plotting in python)
@@ -214,15 +197,13 @@ subroutine operator_reconstruction(params)
     ! loop over points on the fine level (expensive - loops over a lot of points that do not exist...)
     do iyy = 1, nx_fine!+1 ! skip periodic up/right
         do ixx = 1, nx_fine!+1
-    ! do ixx = 2, nx_fine ! skip awful periodic points
-    !     do iyy = 2, nx_fine
 
             ! coordinates of the point to be set to one
             x_in = dble(ixx-1) * dx_fine
             y_in = dble(iyy-1) * dx_fine
 
-            ! if (abs((x_in-domain(1))) <= 1.0e-12) x_in = 0.0_rk
-            ! if (abs((y_in-domain(2))) <= 1.0e-12) y_in = 0.0_rk
+            ! if (abs((x_in-domain(1))) <=1.0e-9) x_in = 0.0_rk
+            ! if (abs((y_in-domain(2))) <=1.0e-9) y_in = 0.0_rk
 
             notAllPointsAreZero = .false.
 
@@ -236,83 +217,30 @@ subroutine operator_reconstruction(params)
                 call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-                if ((x_in >= x0(1)) .and. (x_in <= x0(1)+dble(Bs(1)-1)*dx(1) )) then
-                    if ((y_in >= x0(2)) .and. (y_in <= x0(2)+dble(Bs(2)-1)*dx(2) )) then
-                        ! the "one" lies on this block
-                        ix = nint((x_in-x0(1))/dx(1)) + g+1
-                        iy = nint((y_in-x0(2))/dx(2)) + g+1
+                do j = 1, 4
+                    x_in2 = x_in + permut_x(j)*domain(1)
+                    y_in2 = y_in + permut_y(j)*domain(2)
 
-                        x = dble(ix-(g+1)) * dx(1) + x0(1)
-                        y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    if ((x_in2 >= x0(1)) .and. (x_in2 <= x0(1)+dble(Bs(1)-1)*dx(1) )) then
+                        if ((y_in2 >= x0(2)) .and. (y_in2 <= x0(2)+dble(Bs(2)-1)*dx(2) )) then
+                            ! the "one" lies on this block
+                            ix = nint((x_in2-x0(1))/dx(1)) + g+1
+                            iy = nint((y_in2-x0(2))/dx(2)) + g+1
 
-                        ! is this *really* the right point? Think of two levels, fine & coarse. you strive to set 1 on the finest grid point,
-                        ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
-                        ! really correspond to (x_in,y_in)
-                        if ((abs(x-x_in)<1.0e-13_rk) .and. (abs(y-y_in)<1.0e-13_rk)) then
-                            hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
-                            notAllPointsAreZero = .true.
-                            ! write(*,*) x_in, y_in, x, y, "--", ix,iy,iblock
+                            x = dble(ix-(g+1)) * dx(1) + x0(1)
+                            y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                            ! is this *really* the right point? Think of two levels, fine & coarse. you strive to set 1 on the finest grid point,
+                            ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
+                            ! really correspond to (x_in2,y_in2)
+                            if ((abs(x-x_in2)<1.0e-13_rk) .and. (abs(y-y_in2)<1.0e-13_rk)) then
+                                hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
+                                notAllPointsAreZero = .true.
+                                ! write(*,*) x_in, y_in, x, y, "--", ix,iy,iblock
+                            endif
                         endif
                     endif
-                endif
-
-                if ((x_in+1.0_rk >= x0(1)) .and. (x_in+1.0_rk <= x0(1)+dble(Bs(1)-1)*dx(1) )) then
-                    if ((y_in >= x0(2)) .and. (y_in <= x0(2)+dble(Bs(2)-1)*dx(2) )) then
-                        ! the "one" lies on this block
-                        ix = nint((x_in+1.0_rk-x0(1))/dx(1)) + g+1
-                        iy = nint((y_in-x0(2))/dx(2)) + g+1
-
-                        x = dble(ix-(g+1)) * dx(1) + x0(1)
-                        y = dble(iy-(g+1)) * dx(2) + x0(2)
-
-                        ! is this *really* the right point? Think of two levels, fine & coarse. you strive to set 1 on the finest grid point,
-                        ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
-                        ! really correspond to (x_in,y_in)
-                        if ((abs(x-(x_in+1.0_rk))<1.0e-13_rk) .and. (abs(y-y_in)<1.0e-13_rk)) then
-                            hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
-                            notAllPointsAreZero = .true.
-                            ! write(*,*) x_in+1.0_rk, y_in, x, y, "--", ix,iy,iblock
-                        endif
-                    endif
-                endif
-                if ((x_in >= x0(1)) .and. (x_in <= x0(1)+dble(Bs(1)-1)*dx(1) )) then
-                    if ((y_in+1.0_rk >= x0(2)) .and. (y_in+1.0_rk <= x0(2)+dble(Bs(2)-1)*dx(2) )) then
-                        ! the "one" lies on this block
-                        ix = nint((x_in-x0(1))/dx(1)) + g+1
-                        iy = nint((y_in+1.0_rk-x0(2))/dx(2)) + g+1
-
-                        x = dble(ix-(g+1)) * dx(1) + x0(1)
-                        y = dble(iy-(g+1)) * dx(2) + x0(2)
-
-                        ! is this *really* the right point? Think of two levels, fine & coarse. you strive to set 1 on the finest grid point,
-                        ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
-                        ! really correspond to (x_in,y_in)
-                        if ((abs(x-x_in)<1.0e-13_rk) .and. (abs(y-(y_in+1.0_rk))<1.0e-13_rk)) then
-                            hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
-                            notAllPointsAreZero = .true.
-                            ! write(*,*) x_in, y_in+1.0_rk, x, y, "--", ix,iy,iblock
-                        endif
-                    endif
-                endif
-                if ((x_in+1.0_rk >= x0(1)) .and. (x_in+1.0_rk <= x0(1)+dble(Bs(1)-1)*dx(1) )) then
-                    if ((y_in+1.0_rk >= x0(2)) .and. (y_in+1.0_rk <= x0(2)+dble(Bs(2)-1)*dx(2) )) then
-                        ! the "one" lies on this block
-                        ix = nint((x_in+1.0_rk-x0(1))/dx(1)) + g+1
-                        iy = nint((y_in+1.0_rk-x0(2))/dx(2)) + g+1
-
-                        x = dble(ix-(g+1)) * dx(1) + x0(1)
-                        y = dble(iy-(g+1)) * dx(2) + x0(2)
-
-                        ! is this *really* the right point? Think of two levels, fine & coarse. you strive to set 1 on the finest grid point,
-                        ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
-                        ! really correspond to (x_in,y_in)
-                        if ((abs(x-(x_in+1.0_rk))<1.0e-13_rk) .and. (abs(y-(y_in+1.0_rk))<1.0e-13_rk)) then
-                            hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
-                            notAllPointsAreZero = .true.
-                            ! write(*,*) x_in+1.0_rk, y_in+1.0_rk, x, y, "--", ix,iy,iblock
-                        endif
-                    endif
-                endif
+                enddo
             enddo
 
             ! many points on the finest level do not exist - if the entire grid is zeros,
@@ -334,9 +262,10 @@ subroutine operator_reconstruction(params)
             if (refine) then
                 call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
                 lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=1 )
+
+                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
             endif
 
-            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
 
             !---------------------------------------------------------------
             ! Now compute the derivative
@@ -378,15 +307,15 @@ subroutine operator_reconstruction(params)
             if (refine) then
                 call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
                 lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+
+                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
             endif
 
-            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
 
             ! save operator line to text file.
             ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
             ! create a matrix N_max**2 by N_max**2, where N_max is Npoints on the finest level.
-            ! Many points do not exist; they are on coarse levels. however, this is a problem
-            ! for the python script, because it first reads the entie matrix, then removes zero cols/rows.
+            ! Many points do not exist; they are on coarse levels
             do k = 1, hvy_n
                 call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )

@@ -41,7 +41,7 @@ subroutine rhs_operator_reconstruction(params)
     integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
     type(inifile) :: ini_file
-
+    real(kind=rk) :: dt
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
 
@@ -89,8 +89,9 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     ! Adjustable PARAMETERS
     !---------------------------------------------------------------------------
-    OPERATOR = "RHS" ! decide between RHS or Identity
-    params%wavelet = "CDF40"
+    !OPERATOR = "RHS" ! decide between RHS or Identity
+    OPERATOR = "EVOLVE" ! decide between RHS or Identity
+    params%wavelet = "CDF44"
     params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
@@ -249,6 +250,16 @@ subroutine rhs_operator_reconstruction(params)
     if (OPERATOR == "RHS") then
       call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
          lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_id_rhs_u)
+    else if( OPERATOR == "EVOLVE") then
+      iteration = 0
+      time = 0.0_rk
+      dt = 1
+      call time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
+          hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, tree_id_rhs_u)
+      do k = 1, hvy_n(tree_id_rhs_u)
+                hvy_id = hvy_active(k,tree_id_rhs_u)
+                hvy_work(:,:,:,:,hvy_id,1) = hvy_block(:,:,:,:,hvy_id)
+      enddo
     else !! this operator is used for the identity
       do k = 1, hvy_n(tree_id_rhs_u)
             hvy_id = hvy_active(k,tree_id_rhs_u)
@@ -312,6 +323,14 @@ subroutine rhs_operator_reconstruction(params)
                 if (OPERATOR == "RHS") then
                   call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
                      lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_id_ei)
+                else if( OPERATOR == "EVOLVE") then
+                  iteration = 0
+                  time = 0
+                  call time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
+                     hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, tree_id_ei)
+                     do k = 1, hvy_n(tree_id_ei)! call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
+                       hvy_work(:,:,:,:,hvy_active(k,tree_id_ei),1) = hvy_block(:,:,:,:,hvy_active(k,tree_id_ei))
+                     enddo
                 else !! this operator is used for the identity
                   do k = 1, hvy_n(tree_id_ei)! call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
                     hvy_work(:,:,:,:,hvy_active(k,tree_id_ei),1) = hvy_block(:,:,:,:,hvy_active(k,tree_id_ei))

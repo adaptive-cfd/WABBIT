@@ -387,7 +387,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             end select
         endif
 
-        if (maxval(phi(:,:,:,i))>20.0_rk) call abort(666,"large values in phi. that cannot be good.")
+        if (maxval(phi(:,:,:,i))>2000000.0_rk) call abort(666,"large values in phi. that cannot be good.")
     end do
 
     ! reaction

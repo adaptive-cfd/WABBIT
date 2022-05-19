@@ -26,7 +26,7 @@
 ! ********************************************************************************************
 
 subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
-    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, tree_id)
     implicit none
 
     real(kind=rk), intent(inout)        :: time, dt
@@ -37,25 +37,33 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(in), optional :: tree_id                   !> is only needed for testing purposes
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)            !> heavy data array - neighbor data
     integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: lgt_active(:,:)              !> list of active blocks (light data)
     integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
     integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik)                    :: k
+    integer(kind=ik)                    :: k,  tree_id_evolv
 
     ! currently not working (Thomas, 02-2021)
-    ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-    ! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.true.)
+    ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_evolv), lgt_n(tree_ID_evolv), &
+    ! lgt_sortednumlist(:,:,tree_ID_evolv), hvy_active(:,tree_ID_evolv), hvy_n(tree_ID_evolv), skip_diagonal_neighbors=.true.)
+
+
+    if (present(tree_id)) then
+          tree_id_evolv = tree_id
+    else
+          tree_id_evolv = tree_ID_flow
+    end if
 
     if ( .not. All(params%periodic_BC) ) then
         !!! if we have NON-PERIODIC boundary conditions it is important to reset hvy_work.
         !!! this is important because hvy_work saves the RHS also in the ghost node layer of the
         !!! boundary blocks which is not synchronized. if RHS would be not 0 in the ghost node layer
         !!! then the integrator would change the values in the ghost node layer.
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_work(:, :, :, :, hvy_active(k,tree_ID_flow), :) = 0.0_rk
+        do k = 1, hvy_n(tree_ID_evolv)
+            hvy_work(:, :, :, :, hvy_active(k,tree_ID_evolv), :) = 0.0_rk
         enddo
     endif
 
@@ -83,7 +91,7 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
         ! runge-kutta scheme
         !-----------------------------------------------------------------------
         call RungeKuttaGeneric(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
+            hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist, tree_id_evolv)
 
     case("RungeKuttaGeneric-FSI")
         ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They
@@ -103,8 +111,8 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
 
 
 ! currently not working (Thomas, 02-2021)
-! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-! lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), skip_diagonal_neighbors=.false.)
+! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_evolv), lgt_n(tree_ID_evolv), &
+! lgt_sortednumlist(:,:,tree_ID_evolv), hvy_active(:,tree_ID_evolv), hvy_n(tree_ID_evolv), skip_diagonal_neighbors=.false.)
 
     ! increase time variable after all RHS substeps
     time = time + dt

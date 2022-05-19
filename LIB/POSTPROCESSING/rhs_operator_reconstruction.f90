@@ -13,7 +13,7 @@ subroutine rhs_operator_reconstruction(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: file, infile,mode, OPERATOR
+    character(len=cshort) :: file, mode, OPERATOR
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
     integer(kind=ik) :: iteration, k, tc_length, tree_N, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level,tree_id_tmp,tree_id_rhs_u,tree_id_rhs_u_ei
@@ -41,7 +41,7 @@ subroutine rhs_operator_reconstruction(params)
     integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
     type(inifile) :: ini_file
-    real(kind=rk) :: dt
+    real(kind=rk) :: dt,CFL_number
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
 
@@ -91,7 +91,11 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     !OPERATOR = "RHS" ! decide between RHS or Identity
     OPERATOR = "EVOLVE" ! decide between RHS or Identity
-    params%wavelet = "CDF44"
+    call get_cmd_arg( "--wavelet", params%wavelet, default= params%wavelet )    ! if not set we take the parameter from the ini file
+    call get_cmd_arg( "--operator", OPERATOR, default= OPERATOR )               ! if not set we take the parameter from the ini file
+    call get_cmd_arg( "--adapt", params%adapt_mesh, default= params%adapt_mesh )! if not set we take the parameter from the ini file
+    CFL_number = params%CFL
+    !params%adapt_mesh = .False.
     params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
@@ -120,8 +124,15 @@ subroutine rhs_operator_reconstruction(params)
 
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",e12.4)') trim(params%order_discretization), &
-    trim(params%order_predictor), " ", params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu
+    if (params%adapt_mesh) then
+      write(17,'(A,1x,A,1x,A,1x,A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",e12.4," CFL=",e12.4)') trim(params%order_discretization), &
+      trim(params%order_predictor), " ",trim(params%wavelet)," ",trim(OPERATOR), &
+      params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu, &
+      CFL_number
+    else
+      write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2," nu=",e12.4," CFL=",e12.4)') trim(params%order_discretization), &
+      " static grid ",trim(OPERATOR), params%n_ghosts, params%Bs(1), nu, CFL_number
+    endif
     close(17)
 
     !---------------------------------------------------------------------------

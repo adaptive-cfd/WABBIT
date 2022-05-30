@@ -111,6 +111,8 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         domain(3) = 0.0_rk
         dim = 2
 
+        if (.not.REDUNDANT_GRID) Bs(1:2) = Bs(1:2)-1
+
     elseif (datarank == 4) then
         ! 3D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
@@ -119,6 +121,8 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         Bs(3) = int( size_field(3), kind=ik)
         Nb = int( size_field(4), kind=ik)
         dim = 3
+
+        if (.not.REDUNDANT_GRID) Bs(1:3) = Bs(1:3)-1
 
     else
         ! crazy data

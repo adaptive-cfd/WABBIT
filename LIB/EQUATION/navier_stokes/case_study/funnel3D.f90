@@ -50,12 +50,12 @@ subroutine draw_funnel3D(x0, dx, Bs, g, mask, mask_color)
 
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
-    do iz=g+1, Bs(3)+g
+    do iz=g+1, Bs(3)+g+ONE_SKIPREDUNDANT
       z = dble(iz - (g+1)) * dx(3) + x0(3)
-      do iy=g+1, Bs(2)+g
+      do iy=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
          y = dble(iy-(g+1)) * dx(2) + x0(2)
          r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-         do ix=g+1, Bs(1)+g
+         do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
               x = dble(ix-(g+1)) * dx(1) + x0(1)
 
               ! reset the mask function here
@@ -102,12 +102,12 @@ subroutine draw_sponge3D(x0, dx, Bs, g, mask, mask_color)
 
     h  = 1.5_rk*maxval(dx(1:params_ns%dim))
 
-  do iz=g+1, Bs(3)+g
+  do iz=g+1, Bs(3)+g+ONE_SKIPREDUNDANT
     z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=g+1, Bs(2)+g
+    do iy=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=g+1, Bs(1)+g
+       do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx(1) + x0(1)
             ! Outlet flow: PUMPS
             ! ------------------
@@ -208,12 +208,12 @@ subroutine compute_penal3D(mask_color, mask, phi, x0, dx, Bs, g ,phi_ref)
 
 
 
-  do iz=g+1, Bs(3)+g
+  do iz=g+1, Bs(3)+g+ONE_SKIPREDUNDANT
     z = dble(iz - (g+1)) * dx(3) + x0(3)
-    do iy=g+1, Bs(2)+g
+    do iy=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
        y = dble(iy-(g+1)) * dx(2) + x0(2)
        r = sqrt((y-R_domain)**2+(z-R_domain)**2)
-       do ix=g+1, Bs(1)+g
+       do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 
             !reset ref values
@@ -317,15 +317,15 @@ end subroutine compute_penal3D
       width =funnel%wall_thickness
       tmp   =  0.0_rk
       r0    =(R_domain-2*funnel%wall_thickness)
-      do iz=g+1, Bs(3)+g
+      do iz=g+1, Bs(3)+g+ONE_SKIPREDUNDANT
        ! relative coordinates z=z-Lz/2
        z = dble(iz-(g+1)) * dx(3) + x0(3) - R_domain
-       do iy=g+1, Bs(2)+g
+       do iy=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
          ! relative coordinates y=y-Ly/2
          y = dble(iy-(g+1)) * dx(2) + x0(2)-R_domain
          ! radius
          r = dsqrt(y**2+z**2)
-         do ix=g+1, Bs(1)+g
+         do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
               !this is the absolut coordinate
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &

@@ -264,6 +264,13 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'redundant_grid', REDUNDANT_GRID, .false. )
+
+    if (REDUNDANT_GRID) then
+        ONE_SKIPREDUNDANT = 0
+    else
+        ONE_SKIPREDUNDANT = 0
+    endif
 
     if ( params%max_treelevel < params%min_treelevel ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")

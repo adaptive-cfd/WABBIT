@@ -98,8 +98,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     !---------------------------------------------------------------------------------------------
     call diffxy_c_opt( Bs, g, dx, dy, u, dummy, dummy2)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = - 0.5_rk * rho(i,j) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j))
         end do
     end do
@@ -117,8 +117,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     !---------------------------------------------------------------------------------------------
     call diffxy_c_opt( Bs, g, dx, dy, v, dummy, dummy2)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,3) = - 0.5_rk * rho(i,j) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j))
         end do
     end do
@@ -136,8 +136,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     !---------------------------------------------------------------------------------------------
     call diffxy_c_opt( Bs, g, dx, dy, p, dummy, dummy2)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = rhs(i,j,2) - dummy(i,j)
             rhs(i,j,3) = rhs(i,j,3) - dummy2(i,j)
             rhs(i,j,4) = (gamma_ - 1.0_rk) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j) )
@@ -152,8 +152,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         !---------------------------------------------------------------------------------------------
         call diffx_c_opt( Bs, g, dx, tau11, dummy)
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,2) = rhs(i,j,2) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * u(i,j) * dummy(i,j)
             end do
@@ -163,8 +163,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         !---------------------------------------------------------------------------------------------
         call diffy_c_opt( Bs, g, dy, tau12, dummy)
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,2) = rhs(i,j,2) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * u(i,j) * dummy(i,j)
             end do
@@ -174,8 +174,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         !---------------------------------------------------------------------------------------------
         call diffx_c_opt( Bs, g, dx, tau12, dummy)
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,3) = rhs(i,j,3) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * v(i,j) * dummy(i,j)
             end do
@@ -185,8 +185,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         !---------------------------------------------------------------------------------------------
         call diffy_c_opt( Bs, g, dy, tau22, dummy)
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,3) = rhs(i,j,3) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * v(i,j) * dummy(i,j)
             end do
@@ -205,8 +205,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         call diffx_c_opt( Bs, g, dx, dummy3, dummy)
         call diffy_c_opt( Bs, g, dy, dummy4, dummy2)
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,4) = rhs(i,j,4) + ( gamma_ - 1.0_rk ) * ( dummy(i,j) + dummy2(i,j) )
             end do
         end do
@@ -225,8 +225,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
     call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,1) = (-dummy3(i,j) - dummy4(i,j)) * 0.5_rk * phi1_inv(i,j)
         end do
     end do
@@ -241,8 +241,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
     call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = ( rhs(i,j,2) - 0.5_rk * ( dummy3(i,j) + dummy4(i,j) ) ) * phi1_inv(i,j)
         end do
     end do
@@ -257,8 +257,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
     call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,3) = ( rhs(i,j,3) - 0.5_rk * ( dummy3(i,j) + dummy4(i,j) ) ) * phi1_inv(i,j)
         end do
     end do
@@ -273,8 +273,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     call diffx_c_opt( Bs, g, dx, dummy,  dummy3)
     call diffy_c_opt( Bs, g, dy, dummy2, dummy4)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,4) = rhs(i,j,4) - gamma_ * ( dummy3(i,j) + dummy4(i,j) )
         end do
     end do
@@ -294,8 +294,8 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
         phi_prime(:,:,pF  )= p
 
         call compute_mask_and_ref2D(params_ns, Bs, g, x0, delta_x, phi_prime, mask, phi_ref)
-        do j = g+1, Bs(2)+g
-          do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+          do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             ! density
             rhs(i,j,rhoF)=rhs(i,j,rhoF) -0.5_rk*phi1_inv(i,j)*mask(i,j,rhoF)*(rho(i,j)-  Phi_ref(i,j,rhoF) )
             ! x-velocity
@@ -364,8 +364,8 @@ subroutine  diffx_c_opt( Bs, g, dx, u, dudx)
 
     dx_inv = 1.0_rk/(12.0_rk*dx)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             dudx(i,j) = ( u(i-2,j) - 8.0_rk*u(i-1,j) + 8.0_rk*u(i+1,j) - u(i+2,j) ) * dx_inv
         end do
     end do
@@ -391,8 +391,8 @@ subroutine  diffy_c_opt( Bs, g, dy, u, dudy)
 
     dy_inv = 1.0_rk/(12.0_rk*dy)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             dudy(i,j) = ( u(i,j-2) - 8.0_rk*u(i,j-1) + 8.0_rk*u(i,j+1) - u(i,j+2) ) * dy_inv
         end do
     end do

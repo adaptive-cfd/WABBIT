@@ -63,10 +63,10 @@ subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
         h = params_acm%C_smooth * dx_min
 
         ! Note: this basic mask function is set on the ghost nodes as well.
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2) - y00
 
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - x00
 
                 xp =  cos(alpha)*x + sin(alpha)*y

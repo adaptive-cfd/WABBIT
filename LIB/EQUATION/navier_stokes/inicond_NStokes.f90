@@ -323,8 +323,8 @@
         if (dimension==2) then
           ! 2D case
           ! create gauss pulse
-          do ix = g+1,Bs(1)+g
-            do iy = g+1,Bs(2)+g
+          do ix = g+1,Bs(1)+g+ONE_SKIPREDUNDANT
+            do iy = g+1,Bs(2)+g+ONE_SKIPREDUNDANT
               ! compute x,y coordinates from spacing and origin
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               y = dble(iy-(g+1)) * dx(2) + x0(2)
@@ -339,9 +339,9 @@
         else
           ! 3D case
           ! create gauss pulse
-          do ix = g+1,Bs(1)+g
-            do iy = g+1,Bs(2)+g
-              do iz = g+1,Bs(3)+g
+          do ix = g+1,Bs(1)+g+ONE_SKIPREDUNDANT
+            do iy = g+1,Bs(2)+g+ONE_SKIPREDUNDANT
+              do iz = g+1,Bs(3)+g+ONE_SKIPREDUNDANT
 
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)

@@ -10,6 +10,7 @@ module module_MPI
     use module_timing
     use module_interpolation
     use module_treelib
+    use module_ghostsUniqueGrid
 
     implicit none
 
@@ -86,7 +87,7 @@ integer(kind=ik), public :: NiterationsGhosts = 1
     integer(kind=ik) :: A, S
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: synchronize_ghosts_generic_sequence, init_ghost_nodes, check_unique_origin
+    PUBLIC :: sync_ghosts_redundantGrid, init_ghost_nodes, check_unique_origin
 
 contains
 
@@ -116,6 +117,11 @@ subroutine init_ghost_nodes( params )
     integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
     integer(kind=ik) :: ijksend(2,3)
+
+    if (.not. REDUNDANT_GRID) then
+        call init_ghost_nodes_uniqueGrid( params )
+        return
+    endif
 
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then

@@ -30,9 +30,9 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
         !-----------------------------------------------------------------------
         dz_inv = 1.0_rk / dx(3)
         if (discretization == "FD_2nd_central" ) then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         fld_dx = (fld(ix+1,iy,iz)-fld(ix-1,iy,iz))*dx_inv*0.5_rk
                         fld_dy = (fld(ix,iy+1,iz)-fld(ix,iy-1,iz))*dy_inv*0.5_rk
                         fld_dz = (fld(ix,iy,iz+1)-fld(ix,iy,iz-1))*dz_inv*0.5_rk
@@ -44,9 +44,9 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
                 end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         fld_dx = (a(-3)*fld(ix-3,iy,iz) + a(-2)*fld(ix-2,iy,iz) &
                         + a(-1)*fld(ix-1,iy,iz) + a(0)*fld(ix,iy,iz)&
                         + a(+1)*fld(ix+1,iy,iz) + a(+2)*fld(ix+2,iy,iz) &
@@ -76,8 +76,8 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
         ! 2D case 2D case 2D case 2D case
         !-----------------------------------------------------------------------
         if (discretization == "FD_2nd_central" ) then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     fld_dx = (fld(ix+1,iy,1)-fld(ix-1,iy,1))*dx_inv*0.5_rk
                     fld_dy = (fld(ix,iy+1,1)-fld(ix,iy-1,1))*dy_inv*0.5_rk
                     grad_fld(ix,iy,1,1) = fld_dx
@@ -85,8 +85,8 @@ subroutine gradient(fld, dx, Bs, g, discretization, grad_fld)
                 end do
             end do
         else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     fld_dx = (a(-3)*fld(ix-3,iy,1) + a(-2)*fld(ix-2,iy,1) + &
                     a(-1)*fld(ix-1,iy,1) + a(0)*fld(ix,iy,1)&
                     +  a(+1)*fld(ix+1,iy,1) + a(+2)*fld(ix+2,iy,1) + a(+3)*fld(ix+3,iy,1))*dx_inv

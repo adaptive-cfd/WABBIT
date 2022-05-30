@@ -21,7 +21,7 @@ MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90 module_forest.f90 \
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90 module_mask.f90 \
-	module_t_files.f90 module_saving.f90
+	module_t_files.f90 module_saving.f90 module_ghostsUniqueGrid.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -280,6 +280,10 @@ $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ghostsUniqueGrid.o: module_ghostsUniqueGrid.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_timing.o \
+	$(OBJDIR)/module_interpolation.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \

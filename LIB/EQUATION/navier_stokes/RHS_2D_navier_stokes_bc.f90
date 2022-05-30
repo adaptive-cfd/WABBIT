@@ -116,8 +116,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxy( Bs, g, dx, dy, u, dummy, dummy2,boundary_flag)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = - 0.5_rk * rho(i,j) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j))
         end do
     end do
@@ -135,8 +135,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxy( Bs, g, dx, dy, v, dummy, dummy2,boundary_flag)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,3) = - 0.5_rk * rho(i,j) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j))
         end do
     end do
@@ -154,8 +154,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     !---------------------------------------------------------------------------------------------
     call diffxy( Bs, g, dx, dy, p, dummy, dummy2,boundary_flag)
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = rhs(i,j,2) - dummy(i,j)
             rhs(i,j,3) = rhs(i,j,3) - dummy2(i,j)
             rhs(i,j,4) = (gamma_ - 1.0_rk) * ( u(i,j) * dummy(i,j) + v(i,j) * dummy2(i,j) )
@@ -170,8 +170,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffx( Bs, g, dx, tau11, dummy,boundary_flag(1))
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,2) = rhs(i,j,2) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * u(i,j) * dummy(i,j)
             end do
@@ -181,8 +181,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffy( Bs, g, dy, tau12, dummy, boundary_flag(2))
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,2) = rhs(i,j,2) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * u(i,j) * dummy(i,j)
             end do
@@ -192,8 +192,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffx( Bs, g, dx, tau12, dummy, boundary_flag(1))
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,3) = rhs(i,j,3) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * v(i,j) * dummy(i,j)
             end do
@@ -203,8 +203,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         !---------------------------------------------------------------------------------------------
         call diffy( Bs, g, dy, tau22, dummy, boundary_flag(2))
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,3) = rhs(i,j,3) + dummy(i,j)
                 rhs(i,j,4) = rhs(i,j,4) - ( gamma_ - 1.0_rk ) * v(i,j) * dummy(i,j)
             end do
@@ -223,8 +223,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         call diffx( Bs, g, dx, dummy3, dummy, boundary_flag(1))
         call diffy( Bs, g, dy, dummy4, dummy2, boundary_flag(2))
 
-        do j = g+1, Bs(2)+g
-            do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 rhs(i,j,4) = rhs(i,j,4) + ( gamma_ - 1.0_rk ) * ( dummy(i,j) + dummy2(i,j) )
             end do
         end do
@@ -243,8 +243,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
     call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,1) = (-dummy3(i,j) - dummy4(i,j)) * 0.5_rk * phi1_inv(i,j)
         end do
     end do
@@ -259,8 +259,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
     call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,2) = ( rhs(i,j,2) - 0.5_rk * ( dummy3(i,j) + dummy4(i,j) ) ) * phi1_inv(i,j)
         end do
     end do
@@ -275,8 +275,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
     call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,3) = ( rhs(i,j,3) - 0.5_rk * ( dummy3(i,j) + dummy4(i,j) ) ) * phi1_inv(i,j)
         end do
     end do
@@ -291,8 +291,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
     call diffx( Bs, g, dx, dummy,  dummy3, boundary_flag(1))
     call diffy( Bs, g, dy, dummy2, dummy4, boundary_flag(2))
 
-    do j = g+1, Bs(2)+g
-        do i = g+1, Bs(1)+g
+    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             rhs(i,j,4) = rhs(i,j,4) - gamma_ * ( dummy3(i,j) + dummy4(i,j) )
         end do
     end do
@@ -312,8 +312,8 @@ subroutine RHS_2D_navier_stokes_BC( g, Bs, x0, delta_x, phi, rhs, boundary_flag)
         phi_prime(:,:,pF  )= p
 
         call compute_mask_and_ref2D(params_ns, Bs, g, x0, delta_x, phi_prime, mask, phi_ref)
-        do j = g+1, Bs(2)+g
-          do i = g+1, Bs(1)+g
+        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+          do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             ! density
             rhs(i,j,rhoF)=rhs(i,j,rhoF) -0.5_rk*phi1_inv(i,j)*mask(i,j,rhoF)*(rho(i,j)-  Phi_ref(i,j,rhoF) )
             ! x-velocity

@@ -1,0 +1,2 @@
+Note: the loop bounds with +ONE_SKIPREDUNDANT need to be revised, if this code is to be used sometime (probabl, it wont)
+unit tests of ghost nodes give 4th order, simulations are looking good

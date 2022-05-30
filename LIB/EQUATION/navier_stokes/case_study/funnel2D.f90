@@ -49,11 +49,11 @@ subroutine draw_funnel2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     ! parameter for smoothing function (width)
     h  = 1.5_rk*max(dx, dr)
     ! smooth width in x and y direction
-    do ir = g+1, Bs(2)+g
+    do ir = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
        ! calculate the radial distance from the coordinate origin
        r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix = g+1, Bs(1)+g
+       do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx + x0
             !=============================
 !     /\     reset the mask function!
@@ -107,11 +107,11 @@ subroutine draw_sponge2D(r0, dr, x0, dx, Bs, g, mask, mask_color)
     h  = 1.5_rk*max(dx, dr)
 
     ! smooth width in x and y direction
-    do ir=g+1, Bs(2)+g
+    do ir=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
       ! calculate the radial distance from the coordinate origin
       r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix=g+1, Bs(1)+g
+       do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx + x0
                                        ! the temperature of the funnel
             ! Outlet flow: PUMPS
@@ -206,11 +206,11 @@ subroutine  compute_penal2D(mask_color, mask, phi, r0, dr, x0, dx, Bs, g ,phi_re
       !call abort('ERROR [funnel.f90]: discretication constant dy to large')
     endif
     ! smooth width in x and y direction
-    do ir=g+1, Bs(2)+g
+    do ir=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
       ! calculate the radial distance from the coordinate origin
        r = abs(dble(ir-(g+1)) * dr + r0)
 
-       do ix=g+1, Bs(1)+g
+       do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx + x0
             rho = phi(ix,ir,rhoF)
             u   = phi(ix,ir,UxF)
@@ -538,10 +538,10 @@ end function draw_sink
       width =funnel%wall_thickness
       tmp   =  0.0_rk
       r0    =(R_domain-2*funnel%wall_thickness)
-       do ir=g+1, Bs(2)+g
+       do ir=g+1, Bs(2)+g+ONE_SKIPREDUNDANT
          y = dble(ir-(g+1)) * dx(2) + x0(2)
          r = abs(y-R_domain)
-         do ix=g+1, Bs(1)+g
+         do ix=g+1, Bs(1)+g+ONE_SKIPREDUNDANT
               x = dble(ix-(g+1)) * dx(1) + x0(1)
               if (abs(x-funnel%pump_x_center)<= funnel%pump_diameter*0.5_rk .and. &
                   r>r0 .and. r<r0+width) then

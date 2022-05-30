@@ -288,8 +288,8 @@ subroutine RHS_2D_cylinder( g, Bs, x0, dx, phi, rhs, boundary_flag)
             phi_prime(:, :, pF  )= p
 
             call compute_mask_and_ref2D(params_ns, Bs, g, x0, dx, phi_prime, mask, phi_ref)
-            do ir = g+1, Bs(2)+g
-              do ix = g+1, Bs(1)+g
+            do ir = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+              do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 ! density
                 rhs(ix, ir, rhoF)=rhs(ix, ir, rhoF) -0.5_rk*sqrt_rho_inv(ix, ir)*mask(ix, ir, rhoF)*(rho(ix, ir)-Phi_ref(ix, ir, rhoF) )
                 ! x-velocity

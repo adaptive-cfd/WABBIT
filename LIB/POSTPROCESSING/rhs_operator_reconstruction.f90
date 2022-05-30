@@ -215,8 +215,8 @@ subroutine rhs_operator_reconstruction(params)
         call hvy2lgt(lgt_id, hvy_active(iblock,tree_id_u), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
-        do ix = g+1, Bs(1)+g
-            do iy = g+1, Bs(2)+g
+        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
 
@@ -281,8 +281,8 @@ subroutine rhs_operator_reconstruction(params)
     iz = 1
 
     do iblock = 1, hvy_n(tree_id_u)
-        do ix = g+1, Bs(1)+g
-            do iy = g+1, Bs(2)+g
+        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 !write(*,*) "--------------------point---------------------------"
                 !---------------------------------------------------------------
                 ! reset entire grid to zeros (do not care about performance, just reset all)
@@ -387,8 +387,8 @@ subroutine rhs_operator_reconstruction(params)
                     call hvy2lgt(lgt_id, hvy_active(k,tree_id_rhs_u_ei), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-                    do iy2 = g+1, Bs(2)+g
-                        do ix2 = g+1, Bs(1)+g
+                    do iy2 = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix2 = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             x = dble(ix2-(g+1)) * dx(1) + x0(1)
                             y = dble(iy2-(g+1)) * dx(2) + x0(2)
 

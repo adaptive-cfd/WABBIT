@@ -166,9 +166,9 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
               if (params_ns%dim==3 ) then
                   ! 3D
                   ! loop over block data
-                  do i = g+1, Bs(1)+g
-                      do j = g+1, Bs(2)+g
-                          do l = g+1, Bs(3)+g
+                  do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                      do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                          do l = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                               ! x direction
                               call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l,dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                               ! y direction
@@ -183,8 +183,8 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
               else
                   ! 2D
                   ! loop over block data
-                  do i = g+1, Bs(1)+g
-                      do j = g+1, Bs(2)+g
+                  do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                      do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                           ! x direction
                           call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1, dF_old ), phi_tilde(1), filter%stencil(1:stencil_size) )
                           ! y direction
@@ -344,9 +344,9 @@ subroutine bogey_filter3D(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
 
   ! This routine is ugly but fucking fast and it saves memory!!
   ! Because filtering is done locally in every step.
-  do iz = g+1, Bs(3)+g
-    do iy = g+1, Bs(2)+g
-      do ix = g+1, Bs(1)+g
+  do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+      do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
         do i=1,7 !shift the stencil loop
           !This loop shifts the stencil in every direction   direction shift(1)=-3,shift(2)=-2,...shift(6)=3
 
@@ -472,8 +472,8 @@ subroutine bogey_filter2D_(filter, u, g, Bs, N_dF, xx0, ddx, work_array)
   ! This routine is ugly but fucking fast and it saves memory!!
   ! Because filtering is done locally in every step.
   iz=1
-  do iy = g+1, Bs(2)+g
-    do ix = g+1, Bs(1)+g
+  do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
       do i=1,7 !shift the stencil loop
         !This loop shifts the stencil in every direction   direction shift(1)=-1,shift(2)=0,shift(3)=1
 

@@ -78,9 +78,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     !          Also note, that the first detail is using points from the ghost nodes for interpolation
                     !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
                     !          in any case.
-                    do l = g+1, Bs(3)+g
-                        do j = g+1, Bs(2)+g
-                            do i = g+1, Bs(1)+g
+                    do l = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! do i = 1, Bs(1)+2*g
                     !     do j = 1, Bs(2)+2*g
                     !         do l = 1, Bs(3)+2*g
@@ -98,9 +98,9 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
 
                     ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
                     ! NOTE: we EXCLUDE ghost nodes
-                    do l = g+1, Bs(3)+g
-                        do j = g+1, Bs(2)+g
-                            do i = g+1, Bs(1)+g
+                    do l = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                                 detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                             end do
                         end do
@@ -140,8 +140,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     !          Also note, that the first detail is using points from the ghost nodes for interpolation
                     !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
                     !          in any case.
-                    do j = g+1, Bs(2)+g
-                        do i = g+1, Bs(1)+g
+                    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! do i = 1, Bs(1)+2*g
                         ! do j = 1, Bs(2)+2*g
                             detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
@@ -156,8 +156,8 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
 
                     ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    do j = g+1, Bs(2)+g
-                        do i = g+1, Bs(1)+g
+                    do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
                         end do
                     end do

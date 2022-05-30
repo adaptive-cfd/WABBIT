@@ -98,8 +98,8 @@ subroutine post_generate_forest(params)
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
             if (params%dim == 2) then
-                do ix = g+1,Bs(1)+g
-                    do iy = g+1,Bs(2)+g
+                do ix = g+1,Bs(1)+g+ONE_SKIPREDUNDANT
+                    do iy = g+1,Bs(2)+g+ONE_SKIPREDUNDANT
                         hvy_block(ix,iy,1,1,hvy_id) = 0.0_rk
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1)

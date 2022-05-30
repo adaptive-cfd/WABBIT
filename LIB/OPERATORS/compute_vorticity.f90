@@ -28,9 +28,9 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
 
         select case(discretization)
         case("FD_2nd_central")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
                         u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
                         v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
@@ -47,9 +47,9 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
 
         case("FD_4th_central")
             ! Note: a(0) does NOT appear (it is zero...)
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         u_dy = (a_FD4(-2)*u(ix,iy-2,iz) + a_FD4(-1)*u(ix,iy-1,iz) + a_FD4(+1)*u(ix,iy+1,iz) + a_FD4(+2)*u(ix,iy+2,iz))*dy_inv
                         u_dz = (a_FD4(-2)*u(ix,iy,iz-2) + a_FD4(-1)*u(ix,iy,iz-1) + a_FD4(+1)*u(ix,iy,iz+1) + a_FD4(+2)*u(ix,iy,iz+2))*dz_inv
                         v_dx = (a_FD4(-2)*v(ix-2,iy,iz) + a_FD4(-1)*v(ix-1,iy,iz) + a_FD4(+1)*v(ix+1,iy,iz) + a_FD4(+2)*v(ix+2,iy,iz))*dx_inv
@@ -66,9 +66,9 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
 
         case("FD_4th_central_optimized")
             ! Note: a(0) does NOT appear (it is zero...)
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) &
                         + a(-1)*u(ix,iy-1,iz) + a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) &
                         + a(+3)*u(ix,iy+3,iz))*dy_inv
@@ -107,8 +107,8 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
     else
         select case(discretization)
         case("FD_2nd_central")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
                     v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv*0.5_rk
 
@@ -117,8 +117,8 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
             end do
 
         case("FD_4th_central")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     u_dy = (a_FD4(-2)*u(ix,iy-2,1) + a_FD4(-1)*u(ix,iy-1,1) + a_FD4(+1)*u(ix,iy+1,1) + a_FD4(+2)*u(ix,iy+2,1))*dy_inv
                     v_dx = (a_FD4(-2)*v(ix-2,iy,1) + a_FD4(-1)*v(ix-1,iy,1) + a_FD4(+1)*v(ix+1,iy,1) + a_FD4(+2)*v(ix+2,iy,1))*dx_inv
 
@@ -127,8 +127,8 @@ subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
             end do
 
         case("FD_4th_central_optimized")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + a(-1)*u(ix,iy-1,1) + a(+1)*u(ix,iy+1,1) &
                     + a(+2)*u(ix,iy+2,1) + a(+3)*u(ix,iy+3,1))*dy_inv
                     v_dx = (a(-3)*v(ix-3,iy,1) + a(-2)*v(ix-2,iy,1) + a(-1)*v(ix-1,iy,1) + a(+1)*v(ix+1,iy,1) &
@@ -173,9 +173,9 @@ subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
         dz_inv = 1.0_rk / dx(3)
         select case(discretization)
         case("FD_2nd_central")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
                         u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
                         v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
@@ -189,9 +189,9 @@ subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
             end do
 
         case("FD_4th_central")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         ! Note: a(0) does NOT appear (it is zero...)
                         u_dy = (a_FD4(-2)*u(ix,iy-2,iz) + a_FD4(-1)*u(ix,iy-1,iz) + a_FD4(+1)*u(ix,iy+1,iz) + a_FD4(+2)*u(ix,iy+2,iz))*dy_inv
                         u_dz = (a_FD4(-2)*u(ix,iy,iz-2) + a_FD4(-1)*u(ix,iy,iz-1) + a_FD4(+1)*u(ix,iy,iz+1) + a_FD4(+2)*u(ix,iy,iz+2))*dz_inv
@@ -206,9 +206,9 @@ subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
             end do
 
         case("FD_4th_central_optimized")
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         ! Note: a(0) does NOT appear (it is zero...)
                         u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + a(-1)*u(ix,iy-1,iz) + a(+1)*u(ix,iy+1,iz) &
                         + a(+2)*u(ix,iy+2,iz) + a(+3)*u(ix,iy+3,iz))*dy_inv

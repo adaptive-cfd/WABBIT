@@ -423,11 +423,11 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask )
     h = Insect%C_smooth*minval(dx)
 
     ! Note: this basic mask function is set on the ghost nodes as well.
-    do iz = g+1, Bs(3)+g
+    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
         z = dble(iz-(g+1)) * dx(3) + x0(3) - Insect%STATE(3)
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2) - Insect%STATE(2)
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - Insect%STATE(1)
 
                 ! distance from center of cylinder
@@ -482,11 +482,11 @@ subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
 
 
     ! Note: this basic mask function is set on the ghost nodes as well.
-    do iz = g+1, Bs(3)+g
+    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
         z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%x_cntr(3)
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
 
                 ! distance from center of cylinder
@@ -533,11 +533,11 @@ subroutine draw_cylinderz(x0, dx, Bs, g, mask )
     ! parameter for smoothing function (width)
     h = Insect%C_smooth*minval(dx)
 
-    do iz = g+1, Bs(3)+g
+    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
         z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%domain_size(3)/2.0
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0
 
                 ! distance from center of cylinder
@@ -1069,10 +1069,10 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
     omz2t = - alpham/Am**2 * sin(time/Am)
 
     ! For all grid points of this subdomain
-    do iy = g+1, Bs(2)+g
+    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
         y = dble(iy-(g+1)) * dx(2) + x0(2) - y2
 
-        do ix = g+1, Bs(1)+g
+        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx(1) + x0(1) - x2
 
             xref = x*dcos(anglez2) + y*dsin(anglez2)

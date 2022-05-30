@@ -58,7 +58,7 @@ contains
                 call hvy2lgt( lgt_id, hvy_id, rank, N )
 
                 ! pruning condition: all entries of the block are small
-                if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
+                if (.not. any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(2)+g+ONE_SKIPREDUNDANT, g+1:Bs(3)+g+ONE_SKIPREDUNDANT, 1, hvy_id) > 0.0_rk) ) then
                     ! pruning: delete the block from the tree
                     lgt_block(lgt_id, :) = -1_ik
                 endif
@@ -74,7 +74,7 @@ contains
                 call hvy2lgt( lgt_id, hvy_id, rank, N )
 
                 ! pruning condition: all entries of the block are small
-                if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
+                if ( .not. any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(2)+g+ONE_SKIPREDUNDANT, 1, 1, hvy_id) > 0.0_rk) ) then
                     ! pruning: delete the block from the tree
                     lgt_block(lgt_id, :) = -1_ik
                 endif

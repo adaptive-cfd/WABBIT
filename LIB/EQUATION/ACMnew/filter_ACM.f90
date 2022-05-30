@@ -84,9 +84,9 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array, mask )
           ! 3D or 2D case
           if (params_acm%dim==3 ) then
               ! 3D
-              do i = g+1, Bs(1)+g
-                  do j = g+1, Bs(2)+g
-                      do l = g+1, Bs(3)+g
+              do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                  do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                      do l = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                           ! x direction
                           call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, l, dF ), phi_tilde(1), stencil(1:stencil_size) )
                           ! y direction
@@ -100,8 +100,8 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array, mask )
               end do
           else
               ! 2D
-              do i = g+1, Bs(1)+g
-                  do j = g+1, Bs(2)+g
+              do i = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                  do j = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                       ! x direction
                       call filter_1D( work_array(i-( (stencil_size+1)/2-1):i+( (stencil_size+1)/2-1), j, 1, dF ), phi_tilde(1), stencil(1:stencil_size) )
                       ! y direction

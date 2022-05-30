@@ -32,9 +32,9 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
             call abort(0112181, "ERROR: Q-criterion using 2nd order not implemented.")
 
         else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                         uxdx = (a(-3)*u(ix-3,iy,iz) + a(-2)*u(ix-2,iy,iz) + a(-1)*u(ix-1,iy,iz) + a(0)*u(ix,iy,iz) &
                              +  a(+1)*u(ix+1,iy,iz) + a(+2)*u(ix+2,iy,iz) + a(+3)*u(ix+3,iy,iz))*dx_inv
                         uxdy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz) &

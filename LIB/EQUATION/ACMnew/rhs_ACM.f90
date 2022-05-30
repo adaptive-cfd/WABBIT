@@ -357,8 +357,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 u_dx   = (phi(ix+1,iy  ,1) - phi(ix-1,iy  ,1))*dx_inv*0.5_rk
                 u_dy   = (phi(ix  ,iy+1,1) - phi(ix  ,iy-1,1))*dy_inv*0.5_rk
 
@@ -390,8 +390,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         ! 4th order (Tam&web optimized scheme)
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 ! first derivatives of u, v, p
                 ! Note: a(0) does NOT appear (it is zero...)
                 u_dx = (a(-3)*phi(ix-3,iy,1) + a(-2)*phi(ix-2,iy,1) + a(-1)*phi(ix-1,iy,1) &
@@ -435,8 +435,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         ! 4th order (standard)
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 ! first derivatives of u, v, p
                 ! Note: a(0) does NOT appear (it is zero...)
                 u_dx = (a_FD4(-2)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,1))*dx_inv
@@ -478,8 +478,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! hyperviscosity, with 2nd order 4th derivative
     ! ---------------------------------------------------------------------------
     ! if (abs(nu_p) > 1.0e-13_rk) then
-    !     do iy = g+1, Bs(2)+g
-    !         do ix = g+1, Bs(1)+g
+    !     do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+    !         do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
     !             u_dx4  = ( 1.0_rk*phi(ix-2,iy,1) + (-4.0_rk)*phi(ix-1,iy,1) + 6.0_rk*phi(ix,iy,1) &
     !             + (-4.0_rk)*phi(ix+1,iy,1) + 1.0_rk*phi(ix+2,iy,1))*dx2_inv*dx2_inv
     !             u_dy4  = ( 1.0_rk*phi(ix,iy-2,1) + (-4.0_rk)*phi(ix,iy-1,1) + 6.0_rk*phi(ix,iy,1) &
@@ -506,8 +506,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         select case(order_discretization)
         case ("FD_2nd_central")
             ! 2nd order
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     p_dxdx = (phi(ix-1,iy  ,3) -2.0_rk*phi(ix,iy,3) +phi(ix+1,iy  ,3))*dx2_inv
                     p_dydy = (phi(ix  ,iy-1,3) -2.0_rk*phi(ix,iy,3) +phi(ix  ,iy+1,3))*dy2_inv
 
@@ -516,8 +516,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
             end do
 
         case("FD_4th_central_optimized","FD_4th_central")
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     p_dxdx = (b(-2)*phi(ix-2,iy,3) + b(-1)*phi(ix-1,iy,3) + b(0)*phi(ix,iy,3) &
                            +  b(+1)*phi(ix+1,iy,3) + b(+2)*phi(ix+2,iy,3))*dx2_inv
                     p_dydy = (b(-2)*phi(ix,iy-2,3) + b(-1)*phi(ix,iy-1,3) + b(0)*phi(ix,iy,3) &
@@ -544,8 +544,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                 ! which is different from the penalization term, which acts only on ux,uy and not p
                 spo = mask(ix,iy,6) * eps_inv
@@ -627,9 +627,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! first and second derivatives of u,v,w
                     u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
                     u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
@@ -685,9 +685,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! 4th order (standard scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! first derivatives of u, v, p
                     u_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,1))*dx_inv
                     u_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1) +a_FD4(-1)*phi(ix,iy-1,iz,1) +a_FD4(+1)*phi(ix,iy+1,iz,1) +a_FD4(+2)*phi(ix,iy+2,iz,1))*dy_inv
@@ -752,9 +752,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! 4th order (tam&web optimized scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! first derivatives of u, v, p
                     u_dx = (a(-3)*phi(ix-3,iy,iz,1) + a(-2)*phi(ix-2,iy,iz,1) + a(-1)*phi(ix-1,iy,iz,1)  &
                          +  a(+1)*phi(ix+1,iy,iz,1) + a(+2)*phi(ix+2,iy,iz,1) + a(+3)*phi(ix+3,iy,iz,1))*dx_inv
@@ -856,9 +856,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in grid_qty
@@ -951,11 +951,11 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             ! 1st: compute source terms (note the strcmp needs to be outside the loop)
             select case (params_acm%scalar_source_type(iscalar))
             case ("gaussian")
-                do iz = g+1, Bs(3)+g
+                do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                     z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
-                    do iy = g+1, Bs(2)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                         y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                        do ix = g+1, Bs(1)+g
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
                             R = x + y + z ! note this is (x-x0)**2
@@ -974,11 +974,11 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                 end do
             case ("circular")
                 R0sq = params_acm%widthsource(iscalar)**2
-                do iz = g+1, Bs(3)+g
+                do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
                     z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
-                    do iy = g+1, Bs(2)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                         y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                        do ix = g+1, Bs(1)+g
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
                             R = x + y + z ! note this is (x-x0)**2
@@ -1006,9 +1006,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
             ! sponge layer
             if (params_acm%absorbing_sponge) then
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
                             source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_eta
@@ -1019,9 +1019,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
 
             ! 2nd: compute rhs for this scalar.
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+            do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         ux = phi(ix,iy,iz,1)
                         uy = phi(ix,iy,iz,2)
                         uz = phi(ix,iy,iz,3)
@@ -1198,9 +1198,9 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             ! 1st: compute source terms (note the strcmp needs to be outside the loop)
             select case (params_acm%scalar_source_type(iscalar))
             case ("gaussian")
-                do iy = g+1, Bs(2)+g
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                     y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                    do ix = g+1, Bs(1)+g
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
                         masksource = dexp( -(x + y) / (params_acm%widthsource(iscalar))**2  )
@@ -1230,8 +1230,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
             ! sponge layer
             if (params_acm%absorbing_sponge) then
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         ! for the source term, we use the usual dirichlet C_eta
                         ! to force scalar to 0
                         source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
@@ -1241,8 +1241,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
 
             ! 2nd: compute rhs for this scalar.
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     ux = phi(ix,iy,1,1)
                     uy = phi(ix,iy,1,2)
 
@@ -1362,9 +1362,9 @@ subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
         dy_inv = 1.0_rk / dx(2)
 
         if (params_acm%discretization == "FD_2nd_central") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         u_dy = (u(ix,iy+1,iz,1)-u(ix,iy-1,iz,1))*dy_inv*0.5_rk
                         v_dx = (u(ix+1,iy,iz,2)-u(ix-1,iy,iz,2))*dx_inv*0.5_rk
 
@@ -1373,9 +1373,9 @@ subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
                 end do
             end do
         elseif (params_acm%discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         u_dy = (a(-3)*u(ix,iy-3,iz,1) &
                         + a(-2)*u(ix,iy-2,iz,1) &
                         + a(-1)*u(ix,iy-1,iz,1) &
@@ -1408,9 +1408,9 @@ subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
         dz_inv = 1.0_rk / dx(3)
 
         if (params_acm%discretization == "FD_2nd_central") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         u_dy = (u(ix,iy+1,iz,1) - u(ix,iy-1,iz,1))*dy_inv*0.5_rk
                         u_dz = (u(ix,iy,iz+1,1) - u(ix,iy,iz-1,1))*dz_inv*0.5_rk
                         v_dx = (u(ix+1,iy,iz,2) - u(ix-1,iy,iz,2))*dx_inv*0.5_rk
@@ -1425,9 +1425,9 @@ subroutine vorticity_ACM_block(Bs, g, dx, u, vor)
                 end do
             end do
         elseif (params_acm%discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
+            do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         u_dy = (a(-3)*u(ix,iy-3,iz,1) &
                         + a(-2)*u(ix,iy-2,iz,1) &
                         + a(-1)*u(ix,iy-1,iz,1) &

@@ -62,11 +62,11 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
             nnorm = 1.0_rk
 
             if (params%dim == 3) then
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
+                a = minval(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, hvy_id))
+                b = maxval(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, hvy_id))
             else
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
+                a = minval(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, 1, hvy_id))
+                b = maxval(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, 1, hvy_id))
             endif
 
             ! exclude blocks which are all zero or all one from refinement.
@@ -100,11 +100,11 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
                 ! light id of this block
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) then
+                if (any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, hvy_id) > 0.0_rk)) then
                     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
                 endif
 
-                ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6, hvy_id) > 0.0_rk)) then
+                ! if (any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 6, hvy_id) > 0.0_rk)) then
                 !     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
                 ! endif
             enddo
@@ -116,10 +116,10 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
                 ! light id of this block
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) then
+                if (any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, 1, hvy_id) > 0.0_rk)) then
                     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
                 endif
-                ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6, hvy_id) > 0.0_rk)) then
+                ! if (any(hvy_block(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, 6, hvy_id) > 0.0_rk)) then
                 !     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
                 ! endif
             enddo

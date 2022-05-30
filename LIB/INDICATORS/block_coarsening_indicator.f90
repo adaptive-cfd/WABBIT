@@ -64,20 +64,20 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         ! debug indicator (useful for grid generation tests)
         ! coarsen a block if the maxval of its first component is smaller 0.9 (for passive scalars)
         if (params%dim==2) then
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) ) <= 0.9_rk ) then
+            if ( maxval(block_data(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1, 1) ) <= 0.9_rk ) then
                 refinement_status = -1
             endif
         else
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) ) <= 0.9_rk ) then
+            if ( maxval(block_data(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1) ) <= 0.9_rk ) then
                 refinement_status = -1
             endif
         endif
 
     case ("mask-allzero-noghosts")
-        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
+        if ( maxval(block_data(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1) )<1.0e-9_rk ) then
             refinement_status = -1
         endif
-        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )>=1.0_rk- 1.0e-9_rk ) then
+        if ( minval(block_data(g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, g+1:Bs(1)+g+ONE_SKIPREDUNDANT, 1) )>=1.0_rk- 1.0e-9_rk ) then
             refinement_status = -1
         endif
 

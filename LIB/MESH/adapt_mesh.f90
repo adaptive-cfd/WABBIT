@@ -199,14 +199,16 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !
     ! NOTE: If the flag ghost_nodes_redundant_point_coarseWins is true, then the +11 status is useless
     ! because the redundant points are overwritten on the fine block with the coarser values
-    if ( .not. params%ghost_nodes_redundant_point_coarseWins ) then
-        do k = 1, lgt_n
-            lgt_id = lgt_active(k)
-            if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
-                lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
-            end if
-        end do
-    end if
+    if (REDUNDANT_GRID) then
+        if ( .not. params%ghost_nodes_redundant_point_coarseWins ) then
+            do k = 1, lgt_n
+                lgt_id = lgt_active(k)
+                if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
+                    lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
+                end if
+            end do
+        end if
+    endif
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer

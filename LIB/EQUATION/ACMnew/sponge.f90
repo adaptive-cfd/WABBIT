@@ -15,10 +15,10 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
 
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                 ! distance to borders of domain
@@ -40,9 +40,9 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
         p = params_acm%p_sponge
         offset = 0.5_rk * params_acm%domain_size(1)
 
-        do iy = g+1, Bs(2)+g
+        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
             y = dble(iy-(g+1)) * dx(2) + x0(2) - offset
-            do ix = g+1, Bs(1)+g
+            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1) - offset
 
                 ! distance to borders of domain
@@ -79,11 +79,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
 
     if (params_acm%sponge_type == "rect") then
         ! rectangular sponge with 45deg edges
-        do iz = g+1, Bs(3)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
             z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = g+1, Bs(2)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = g+1, Bs(1)+g
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                     ! distance to borders of domain
@@ -99,11 +99,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         ! insect is supposed to be at y=0
     elseif (params_acm%sponge_type == "rect-symmetry-y") then
         ! rectangular sponge with 45deg edges
-        do iz = g+1, Bs(3)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
             z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = g+1, Bs(2)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = g+1, Bs(1)+g
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                     ! distance to borders of domain
@@ -118,11 +118,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         ! insect is supposed to be at y=0 z=0
     elseif (params_acm%sponge_type == "rect-symmetry-yz") then
         ! rectangular sponge with 45deg edges
-        do iz = g+1, Bs(3)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
             z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = g+1, Bs(2)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = g+1, Bs(1)+g
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     x = dble(ix-(g+1)) * dx(1) + x0(1)
 
                     ! distance to borders of domain
@@ -135,7 +135,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
 
     elseif (params_acm%sponge_type == "inlet-outlet-x") then
         ! outlet sponge in x-direction
-        do ix = g+1, Bs(1)+g
+        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 
             ! distance to borders of domain
@@ -158,11 +158,11 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         pinv = 1.0_rk / p
         offset = 0.5_rk * params_acm%domain_size(1)
 
-        do iz = g+1, Bs(3)+g
+        do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
             z = (dble(iz-(g+1)) * dx(3) + x0(3) - offset)**p
-            do iy = g+1, Bs(2)+g
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 y = (dble(iy-(g+1)) * dx(2) + x0(2) - offset)**p
-                do ix = g+1, Bs(1)+g
+                do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                     x = (dble(ix-(g+1)) * dx(1) + x0(1) - offset)**p
 
                     ! distance to borders of domain

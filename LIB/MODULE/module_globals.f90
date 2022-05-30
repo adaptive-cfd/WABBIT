@@ -27,6 +27,11 @@ module module_globals
   ! for postprocessing.
   integer, public  :: N_MAX_COMPONENTS = 3
 
+  integer(kind=ik), public :: ONE_SKIPREDUNDANT=-1
+  logical, public :: REDUNDANT_GRID=.false.
+  ! integer(kind=ik), public :: ONE_SKIPREDUNDANT=0
+  ! logical, public :: REDUNDANT_GRID=.true.
+
   !subroutines of this module
   interface abort
       module procedure abort1, abort2, abort3

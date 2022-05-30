@@ -110,8 +110,8 @@ subroutine rhs_ns_2D( g, Bs, x0, delta_x, phi, rhs)
     endif
 
 
-        do ix = g+1, Bs(2)+g
-            do iy = g+1, Bs(1)+g
+        do ix = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
 
                 ! Derivatives
                 !------------

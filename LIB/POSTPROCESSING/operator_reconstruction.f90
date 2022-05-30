@@ -44,6 +44,8 @@ subroutine operator_reconstruction(params)
     call read_attributes(file, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+REDUNDANT_GRID = .false.
+ONE_SKIPREDUNDANT = 0
 
     params%max_treelevel = tc_length+2 ! to allow refinement
     params%n_eqn = 2
@@ -135,6 +137,8 @@ subroutine operator_reconstruction(params)
         call abort(33,"not enough g")
     endif
 
+    write(*,*) Bs
+
 
     !---------------------------------------------------------------------------
     !---------------------------------------------------------------------------
@@ -160,7 +164,11 @@ subroutine operator_reconstruction(params)
     call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
 
+    if (REDUNDANT_GRID) then
     dx_fine = (2.0_rk**-max_active_level(lgt_block, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
+else
+    dx_fine = (2.0_rk**-max_active_level(lgt_block, lgt_active, lgt_n))*domain(2)/real((Bs(2)), kind=rk)
+endif
     nx_fine = nint(domain(2)/dx_fine)
 
     write(*,*) "nx_fine=", nx_fine
@@ -174,8 +182,8 @@ subroutine operator_reconstruction(params)
         call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
-        do ix = g+1, Bs(1)+g
-            do iy = g+1, Bs(2)+g
+        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
+            do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
 
@@ -276,16 +284,16 @@ subroutine operator_reconstruction(params)
                 dx_inv = 1.0_rk / dx(1)
 
                 if (dir=="x") then
-                    do iy2 = g+1, Bs(2)+g
-                        do ix2 = g+1, Bs(1)+g
+                    do iy2 = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix2 = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_active(k)) )*dx_inv
                             u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_active(k)) )*dx_inv**2
                             hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
                         end do
                     end do
                 elseif (dir=='y') then
-                    do iy2 = g+1, Bs(2)+g
-                        do ix2 = g+1, Bs(1)+g
+                    do iy2 = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix2 = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             u_dx   = sum( stencil1*hvy_block(ix2, iy2+a1:iy2+b1, iz, 1, hvy_active(k)) )*dx_inv
                             u_dxdx = sum( stencil2*hvy_block(ix2, iy2+a2:iy2+b2, iz, 1, hvy_active(k)) )*dx_inv**2
                             hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
@@ -320,8 +328,8 @@ subroutine operator_reconstruction(params)
                 call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
-                do iy2 = g+1, Bs(2)+g
-                    do ix2 = g+1, Bs(1)+g
+                do iy2 = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix2 = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         x = dble(ix2-(g+1)) * dx(1) + x0(1)
                         y = dble(iy2-(g+1)) * dx(2) + x0(2)
 

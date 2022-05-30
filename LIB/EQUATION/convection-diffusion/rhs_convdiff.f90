@@ -197,8 +197,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! please note the performance penalty associated with the if-clause so
                 ! do not put it inside the loop, even if it's tempting.
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
 
@@ -209,8 +209,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else !  no viscosity
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
@@ -222,8 +222,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 2D, 4th order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             ! gradient
                             u_dx = (a(-3)*phi(ix-3,iy,1,i) + a(-2)*phi(ix-2,iy,1,i) + a(-1)*phi(ix-1,iy,1,i) + a(0)*phi(ix,iy,1,i)&
                             +  a(+3)*phi(ix+3,iy,1,i) + a(+2)*phi(ix+2,iy,1,i) + a(+1)*phi(ix+1,iy,1,i))*dx_inv
@@ -239,8 +239,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                    do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                        do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                             ! gradient
                             u_dx = (a(-3)*phi(ix-3,iy,1,i) + a(-2)*phi(ix-2,iy,1,i) + a(-1)*phi(ix-1,iy,1,i) + a(0)*phi(ix,iy,1,i)&
                             +  a(+3)*phi(ix+3,iy,1,i) + a(+2)*phi(ix+2,iy,1,i) + a(+1)*phi(ix+1,iy,1,i))*dx_inv
@@ -256,8 +256,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 !-----------------------------------------------------------------------
                 ! 2D, 4th order (standard scheme not the TW)
                 !-----------------------------------------------------------------------
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         ! gradient
                         u_dx = (a_FD4(-2)*phi(ix-2,iy,1,i) + a_FD4(-1)*phi(ix-1,iy,1,i) &
                              +  a_FD4(+2)*phi(ix+2,iy,1,i) + a_FD4(+1)*phi(ix+1,iy,1,i))*dx_inv
@@ -280,8 +280,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
 
             if (params_convdiff%velocity(i)=="cyclogenesis") then
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                    do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i)
                         y = y / params_convdiff%blob_width(i)
                         ! sech(x) = 1.0 / cosh(x)
@@ -306,9 +306,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 3D, 2nd order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iz = g+1, Bs(3)+g
-                        do iy = g+1, Bs(2)+g
-                            do ix = g+1, Bs(1)+g
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                                 u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
                                 u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
                                 u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
@@ -323,9 +323,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iz = g+1, Bs(3)+g
-                        do iy = g+1, Bs(2)+g
-                            do ix = g+1, Bs(1)+g
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                                 u_dx = (phi(ix+1,iy,iz,i) - phi(ix-1,iy,iz,i))*dx_inv*0.5_rk
                                 u_dy = (phi(ix,iy+1,iz,i) - phi(ix,iy-1,iz,i))*dy_inv*0.5_rk
                                 u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
@@ -341,9 +341,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 ! 3D, 4th order
                 !-----------------------------------------------------------------------
                 if (nu>=1.0e-10) then ! with viscosity
-                    do iz = g+1, Bs(3)+g
-                        do iy = g+1, Bs(2)+g
-                            do ix = g+1, Bs(1)+g
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                                 ! gradient
                                 u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv
@@ -365,9 +365,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         end do
                     end do
                 else ! no viscosity
-                    do iz = g+1, Bs(3)+g
-                        do iy = g+1, Bs(2)+g
-                            do ix = g+1, Bs(1)+g
+                    do iz = g+1, Bs(3)+g+ONE_SKIPREDUNDANT
+                        do iy = g+1, Bs(2)+g+ONE_SKIPREDUNDANT
+                            do ix = g+1, Bs(1)+g+ONE_SKIPREDUNDANT
                                 ! gradient
                                 u_dx = (a(-3)*phi(ix-3,iy,iz,i) + a(-2)*phi(ix-2,iy,iz,i) + a(-1)*phi(ix-1,iy,iz,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix+3,iy,iz,i) + a(+2)*phi(ix+2,iy,iz,i) + a(+1)*phi(ix+1,iy,iz,i))*dx_inv

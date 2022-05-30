@@ -68,7 +68,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     if (save_ghosts) then
         allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n ), stat=status)
     else
-        allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+        if (REDUNDANT_GRID) then
+            allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+        else
+            allocate(myblockbuffer( 1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:hvy_n ), stat=status)
+        endif
     endif
     if (status /= 0) then
         call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
@@ -115,7 +119,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n/) - 1
         if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n/) - 1
-
+        if (.not. REDUNDANT_GRID) ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n/) - 1
     else
 
         ! tell the hdf5 wrapper what part of the global [bsx x bsy x n_active]
@@ -124,7 +128,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
         if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n/) - 1
-
+        if (.not. REDUNDANT_GRID) ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n/) - 1
     endif
 
     l = 1
@@ -149,7 +153,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 if (save_ghosts) then
                     myblockbuffer(:,:,:,l) = hvy_block( :, :, :, dF, hvy_id)
                 else
-                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                    if (REDUNDANT_GRID) then
+                        myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                    else
+                        myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+1+g, g+1:Bs(2)+1+g, g+1:Bs(3)+1+g, dF, hvy_id)
+                    endif
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -173,7 +181,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 if (save_ghosts) then
                     myblockbuffer(:,:,1,l) = hvy_block(:, :, 1, dF, hvy_id)
                 else
-                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                    if (REDUNDANT_GRID) then
+                        myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                    else
+                        myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, 1, dF, hvy_id)
+                    endif
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -232,7 +244,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
 
 
     ! add additional annotations
-    call write_attribute(file_id, "blocks", "version", (/20200902/)) ! this is used to distinguish wabbit file formats
+    if (REDUNDANT_GRID) then
+        call write_attribute(file_id, "blocks", "version", (/20200902/)) ! this is used to distinguish wabbit file formats
+    else
+        call write_attribute(file_id, "blocks", "version", (/20220526/)) ! this is used to distinguish wabbit file formats
+    endif
     call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
@@ -251,7 +267,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! check if we find a *.ini file name in the command line call
     ! if we do, read it, and append it to the HDF5 file. this way, data
     ! and parameters are always together. thomas, 16/02/2019
-    
+
     ! if (params%rank==0) then
     !     call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
     !     do k = 1, COMMAND_ARGUMENT_COUNT()

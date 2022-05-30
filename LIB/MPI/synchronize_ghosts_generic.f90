@@ -1,4 +1,4 @@
-subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+subroutine sync_ghosts_redundantGrid( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
 
     implicit none
 
@@ -299,7 +299,7 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
             call sync_ghosts_symmetry_condition( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
         endif
     end do ! loop over stages 1,2
-end subroutine synchronize_ghosts_generic_sequence
+end subroutine sync_ghosts_redundantGrid
 
 !############################################################################################################
 
@@ -813,7 +813,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     ! on the redundant nodes. However, NOTE this implies that the subsequent
     ! call to check_redundant_nodes_clean gives DIFFERENT values on interpolated
     ! points ...
-    call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts_redundantGrid( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n )
 
     ! .. which is why the test here CANNOT suceed on interpolated data. In the compare
     ! routine, we thus skip those points.

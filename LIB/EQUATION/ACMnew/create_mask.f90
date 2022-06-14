@@ -851,16 +851,24 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
             if (params_acm%smooth_mask) then
                 mask1 = smoothstep( r_1, R1, h)
                 mask2 = smoothstep( r_2, R2, h)
-                if (mask2>0.0) mask(ix,iy,3) = vy2
+                if (mask2>0.0) then
+                  mask(ix,iy,3) = vy2
+                  mask(ix,iy,5) = 2.0_rk
+                end if
+                if (mask1>0.0) then
+                  mask(ix,iy,5) = 1.0_rk
+                end if
                 mask(ix,iy,1) = mask1 + mask2
             else
                 ! if point is inside one of the cylinders, set mask to 1
                 if (r_1 <= R1) then
                     mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,5) = 1.0_rk
                 elseif ( r_2 <= R2) then
                     mask(ix,iy,1) = 1.0_rk
                     mask(ix,iy,2) = 0.0_rk
                     mask(ix,iy,3) = vy2
+                    mask(ix,iy,5) = 2.0_rk
                 else
                     mask(ix,iy,:) = 0.0_rk
                 end if

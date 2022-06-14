@@ -154,8 +154,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs(1)+g-1
-                ! coloring not implemented for 2D
-                color = 0_2
+
+                color = int( mask(ix, iy, 1, 5), kind=2 )
+
                 chi = mask(ix,iy,1,1) * C_eta_inv
                 usx = mask(ix,iy,1,2)
                 usy = mask(ix,iy,1,3)

@@ -825,15 +825,15 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     mu = wingsections(1)%ai_y0
     ! center of the first cylinder
     cx1 = 0.250_rk * params_acm%domain_size(1)
-    cy1 = 0.500_rk * params_acm%domain_size(2)
+    cy1 = 0.250_rk * params_acm%domain_size(2)
     ! center of the second cylinder (oscillates behind 1. cylinder)
     cx2 = 0.500_rk * params_acm%domain_size(1)
-    cy2 = cy1
+    cy2 = 0.500_rk * params_acm%domain_size(2)
     vy2 = 0
     do k = 1, nfft_y0
-        cy2 = cy2 + mu(k) * sin(2*k*pi*freq*time)
+        cy2 = cy2 + mu(k) * cos(2*k*pi*freq*time)
         ! velocity of moving cylinder
-        vy2 = vy2 + mu(k) * 2 * pi * freq * k * cos(2*k*pi*freq*time)
+        vy2 = vy2 - mu(k) * 2 * pi * freq * k * sin(2*k*pi*freq*time)
     end do
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))

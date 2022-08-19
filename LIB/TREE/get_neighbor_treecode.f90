@@ -1,9 +1,9 @@
-subroutine get_neighbor_treecode( my_treecode, neighbor_treecode, direction, &
+subroutine get_neighbor_treecode( tcBlock, neighbor_treecode, direction, &
     leveldiff, J, dim, max_treelevel, level_down_neighbor_possible)
     implicit none
 
     integer(kind=ik), intent(in)  :: direction, leveldiff, J, dim, max_treelevel
-    integer(kind=ik), intent(in)  :: my_treecode(max_treelevel)
+    integer(kind=ik), intent(in)  :: tcBlock(max_treelevel)
     integer(kind=ik), intent(out) :: neighbor_treecode(max_treelevel)
     logical, intent(out) :: level_down_neighbor_possible
 
@@ -193,10 +193,10 @@ subroutine get_neighbor_treecode( my_treecode, neighbor_treecode, direction, &
 
         ! calculate treecode for neighbor on same level
         if (dim==3) then
-            call adjacent_block_3D( my_treecode, neighbor_treecode, direction_names_3d(direction), &
+            call adjacent_block_3D( tcBlock, neighbor_treecode, direction_names_3d(direction), &
             level, max_treelevel)
         else
-            call adjacent_block_2D( my_treecode, neighbor_treecode, direction_names_2d(direction), &
+            call adjacent_block_2D( tcBlock, neighbor_treecode, direction_names_2d(direction), &
             level, max_treelevel)
         endif
 
@@ -207,7 +207,7 @@ subroutine get_neighbor_treecode( my_treecode, neighbor_treecode, direction, &
             ! is it possible to have a neighbor on that level at all?
             ! in the coarser neighbor case, finding a valid treecode can be tricky. not all treecodes
             ! have a VALID coarser neighbor in the specified direction.
-            if (array_compare( my_treecode(1:J-leveldiff), neighbor_treecode(1:J-leveldiff), J-leveldiff) ) then
+            if (array_compare( tcBlock(1:J-leveldiff), neighbor_treecode(1:J-leveldiff), J-leveldiff) ) then
                 level_down_neighbor_possible = .false.
             else
                 level_down_neighbor_possible = .true.
@@ -216,7 +216,7 @@ subroutine get_neighbor_treecode( my_treecode, neighbor_treecode, direction, &
 
     elseif (leveldiff==-1) then
         ! first neighbor virtual treecode, one level up
-        virt_treecode = my_treecode
+        virt_treecode = tcBlock
         ! append last digit
         virt_treecode( level+1 ) = virtual_treecode_finer_level(direction)
 

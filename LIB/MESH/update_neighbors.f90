@@ -4,7 +4,7 @@
 !! output:    - neighbor list array
 ! ********************************************************************************************
 subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, skip_diagonal_neighbors)
+    lgt_sortednumlist, hvy_active, hvy_n)
 
     implicit none
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
@@ -15,47 +15,109 @@ subroutine update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, 
     integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik), intent(in)        :: hvy_active(:)            !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n                    !> number of active blocks (heavy data)
-    logical, intent(in), optional       :: skip_diagonal_neighbors  ! currently not working (Thomas, 02-2021) [unused]
-    logical                             :: error = .false., error2 = .false.
-    integer(kind=ik )                   :: mpierror, k
+    logical                             :: error = .false.
+    integer(kind=ik )                   :: mpierror, k, N, Jmax, lgtID
     real(kind=rk)                       :: x0(1:3), dx(1:3)
+    integer(kind=2)                     :: n_domain(1:3)
+
+
+    N = params%number_blocks
+    Jmax = params%max_treelevel
+
 
     if ( params%dim == 3 ) then
-        if (present(skip_diagonal_neighbors)) then
-            call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error, skip_diagonal_neighbors)
-        else
-            call update_neighbors_3D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
-        endif
+        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        !               3D
+        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! special case:
+        ! if there is only one block => all neighbors are this block
+        ! one block criteria: lgt_n should be one!
+        if ( lgt_n == 1 ) then
+            hvy_neighbor(1,1:26) = lgt_active(1)
+            return
+        end if
+
+        ! loop over active heavy data blocks
+        do k = 1, hvy_n
+            ! delete existing neighbors (they are assumed to be outdated when calling this routine)
+            hvy_neighbor(hvy_active(k), :) = -1
+
+            call hvy2lgt( lgtID, hvy_active(k), params%rank, N )
+
+            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%max_treelevel+IDX_MESH_LVL)), &
+            params%domain_size, params%Bs, params%dim, n_domain )
+
+            ! faces
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__1/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__2/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__3/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__4/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__5/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '__6/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+
+            ! edges
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_12/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_13/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_14/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_15/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_62/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_63/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_64/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_65/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_23/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_25/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_43/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '_45/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+
+            ! corners
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '123/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '134/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '145/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '152/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '623/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '634/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '645/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvy_active(k), lgtID, lgt_block, Jmax, '652/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+        end do
+
     else
-        if (present(skip_diagonal_neighbors)) then
-            call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error, skip_diagonal_neighbors)
-        else
-            call update_neighbors_2D(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, error)
-        endif
+        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        !               2D
+        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        ! special case:
+        ! if there is only one block => all neighbors are this block
+        ! one block criteria: lgt_n should be one!
+        if ( lgt_n == 1 ) then
+            hvy_neighbor(1,1:8) = lgt_active(1)
+            return
+        end if
+
+        ! loop over active heavy data blocks
+        do k = 1, hvy_n
+            ! delete existing neighbors (they are assumed to be outdated when calling this routine)
+            hvy_neighbor(hvy_active(k), :) = -1
+
+            call hvy2lgt( lgtID, hvy_active(k), params%rank, N )
+
+            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%max_treelevel+IDX_MESH_LVL)), &
+            params%domain_size, params%Bs, params%dim, n_domain )
+
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '__E', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '__S', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '__W', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '_NE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '_NW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '_SE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvy_active(k), lgtID, lgt_block, Jmax, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+        end do
+
     end if
 
     if (error) then
-        ! open(14, file="lgt_block.txt", status='replace')
-        ! do k = 1, lgt_n
-        !     write(14,'(20(i5,1x))') lgt_block(lgt_active(k),:)
-        ! enddo
-        ! close(14)
-        !
-        ! open(14, file="hvy_neighbors.txt", status='replace')
-        ! do k = 1, lgt_n
-        !     write(74,'(90(i5,1x))') hvy_neighbor(lgt_active(k),:)
-        ! enddo
-        ! close(14)
-        !
-        ! open(14, file="x0_dx.txt", status='replace')
-        ! do k = 1, lgt_n
-        !     write(*,*) "dumping", k, lgt_active(k)
-        !     call get_block_spacing_origin( params,lgt_active(k) , lgt_block, x0, dx )
-        !     write(14,'(6(es15.6,1x))') x0, dx
-        ! enddo
-        ! close(14)
-
-        call abort(71737, "Grid error: we did not find a neighboring block. Either your data is corrupt (reading from file) or you found a bug.")
+        call abort(71737, "Grid error: we did not find a neighboring block. Either your data is corrupt (reading from file) or you found a bug (grid generation failed).")
     endif
 
     ! Is there any non-periodic boundary ?

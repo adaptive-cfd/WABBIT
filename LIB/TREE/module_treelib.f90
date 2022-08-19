@@ -516,122 +516,122 @@ end subroutine adjacent4
   !! output:            - neighbor treecode, for neighbor on same level
   ! ********************************************************************************************
 
-  recursive subroutine adjacent_block_2D(me, neighbor, direction, level, max_treelevel)
+  recursive subroutine adjacent_block_2D(tcBlock, tcNeighbor, direction, level, max_treelevel)
 
       use module_params   ! global parameters
 
       implicit none
       integer(kind=ik), intent(in)        :: max_treelevel
       integer(kind=ik), intent(in)        :: level
-      integer(kind=ik), intent(in)        :: me(max_treelevel)          !> block treecode
+      integer(kind=ik), intent(in)        :: tcBlock(max_treelevel)          !> block treecode
       character(len=3), intent(in)        :: direction                  !> direction for neighbor search
-      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)    !> neighbor treecode
-      integer(kind=ik)                    :: neighbor2(max_treelevel)   ! treecode variable
+      integer(kind=ik), intent(out)       :: tcNeighbor(max_treelevel)    !> neighbor treecode
+      integer(kind=ik)                    :: tcNeighbor2(max_treelevel)   ! treecode variable
       integer(kind=ik)                    :: i                          ! loop variable
 
-      neighbor = -1
+      tcNeighbor = -1
 
       select case(direction)
-          case('__N')
+      case('__N')
           ! north
-              neighbor(level) = modulo(me(level)+2, 4)
-              i = level - 1
+          tcNeighbor(level) = modulo(tcBlock(level)+2, 4)
+          i = level - 1
 
-              do while (i /= 0)
-                  if ( (me(i+1)==2) .or. (me(i+1)==3) ) then
-                      neighbor(1:i) = me(1:i)
-                      i = 0
-                  else
-                      neighbor(i) = modulo(me(i)+2, 4)
-                      i = i - 1
-                  end if
-              end do
+          do while (i /= 0)
+              if ( (tcBlock(i+1)==2) .or. (tcBlock(i+1)==3) ) then
+                  tcNeighbor(1:i) = tcBlock(1:i)
+                  i = 0
+              else
+                  tcNeighbor(i) = modulo(tcBlock(i)+2, 4)
+                  i = i - 1
+              end if
+          end do
 
-          case('__S')
+      case('__S')
           ! south
-              neighbor(level) = modulo(me(level)+2, 4)
-              i = level - 1
+          tcNeighbor(level) = modulo(tcBlock(level)+2, 4)
+          i = level - 1
 
-              do while (i /= 0)
-                  if ( (me(i+1)==0) .or. (me(i+1)==1) ) then
-                      neighbor(1:i) = me(1:i)
-                      i = 0
-                  else
-                      neighbor(i) = modulo(me(i)+2, 4)
-                      i = i - 1
-                  end if
-              end do
+          do while (i /= 0)
+              if ( (tcBlock(i+1)==0) .or. (tcBlock(i+1)==1) ) then
+                  tcNeighbor(1:i) = tcBlock(1:i)
+                  i = 0
+              else
+                  tcNeighbor(i) = modulo(tcBlock(i)+2, 4)
+                  i = i - 1
+              end if
+          end do
 
-          case('__E')
+      case('__E')
           ! east
-              if ( (me(level)==0) .or. (me(level)==2) ) then
-                  neighbor(level) = modulo(me(level)+1, 4)
+          if ( (tcBlock(level)==0) .or. (tcBlock(level)==2) ) then
+              tcNeighbor(level) = modulo(tcBlock(level)+1, 4)
+          else
+              tcNeighbor(level) = modulo(tcBlock(level)-1, 4)
+          end if
+
+          i = level - 1
+
+          do while (i /= 0)
+              if ( (tcBlock(i+1)==0) .or. (tcBlock(i+1)==2) ) then
+                  tcNeighbor(1:i) = tcBlock(1:i)
+                  i = 0
               else
-                  neighbor(level) = modulo(me(level)-1, 4)
-              end if
-
-              i = level - 1
-
-              do while (i /= 0)
-                  if ( (me(i+1)==0) .or. (me(i+1)==2) ) then
-                      neighbor(1:i) = me(1:i)
-                      i = 0
+                  if ( (tcBlock(i)==1) .or. (tcBlock(i)==3) ) then
+                      tcNeighbor(i) = modulo(tcBlock(i)-1, 4)
                   else
-                      if ( (me(i)==1) .or. (me(i)==3) ) then
-                          neighbor(i) = modulo(me(i)-1, 4)
-                      else
-                          neighbor(i) = modulo(me(i)+1, 4)
-                      end if
-                      i = i - 1
+                      tcNeighbor(i) = modulo(tcBlock(i)+1, 4)
                   end if
-              end do
+                  i = i - 1
+              end if
+          end do
 
-          case('__W')
+      case('__W')
           ! west
-              if ( (me(level)==0) .or. (me(level)==2) ) then
-                  neighbor(level) = modulo(me(level)+1, 4)
+          if ( (tcBlock(level)==0) .or. (tcBlock(level)==2) ) then
+              tcNeighbor(level) = modulo(tcBlock(level)+1, 4)
+          else
+              tcNeighbor(level) = modulo(tcBlock(level)-1, 4)
+          end if
+
+          i = level - 1
+
+          do while (i /= 0)
+              if ( (tcBlock(i+1)==1) .or. (tcBlock(i+1)==3) ) then
+                  tcNeighbor(1:i) = tcBlock(1:i)
+                  i = 0
               else
-                  neighbor(level) = modulo(me(level)-1, 4)
-              end if
-
-              i = level - 1
-
-              do while (i /= 0)
-                  if ( (me(i+1)==1) .or. (me(i+1)==3) ) then
-                      neighbor(1:i) = me(1:i)
-                      i = 0
+                  if ( (tcBlock(i)==1) .or. (tcBlock(i)==3) ) then
+                      tcNeighbor(i) = modulo(tcBlock(i)-1, 4)
                   else
-                      if ( (me(i)==1) .or. (me(i)==3) ) then
-                          neighbor(i) = modulo(me(i)-1, 4)
-                      else
-                          neighbor(i) = modulo(me(i)+1, 4)
-                      end if
-                      i = i - 1
+                      tcNeighbor(i) = modulo(tcBlock(i)+1, 4)
                   end if
-              end do
+                  i = i - 1
+              end if
+          end do
 
-          case('_NE')
+      case('_NE')
           ! northeast
-              call adjacent_block_2D(me, neighbor2, '__N', level, max_treelevel)
-              call adjacent_block_2D(neighbor2, neighbor, '__E', level, max_treelevel)
+          call adjacent_block_2D(tcBlock, tcNeighbor2, '__N', level, max_treelevel)
+          call adjacent_block_2D(tcNeighbor2, tcNeighbor, '__E', level, max_treelevel)
 
-          case('_NW')
+      case('_NW')
           ! northwest
-              call adjacent_block_2D(me, neighbor2, '__N', level, max_treelevel)
-              call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
+          call adjacent_block_2D(tcBlock, tcNeighbor2, '__N', level, max_treelevel)
+          call adjacent_block_2D(tcNeighbor2, tcNeighbor, '__W', level, max_treelevel)
 
-          case('_SE')
+      case('_SE')
           ! southeast
-              call adjacent_block_2D(me, neighbor2, '__S', level, max_treelevel)
-              call adjacent_block_2D(neighbor2, neighbor, '__E', level, max_treelevel)
+          call adjacent_block_2D(tcBlock, tcNeighbor2, '__S', level, max_treelevel)
+          call adjacent_block_2D(tcNeighbor2, tcNeighbor, '__E', level, max_treelevel)
 
-          case('_SW')
+      case('_SW')
           ! southwest
-              call adjacent_block_2D(me, neighbor2, '__S', level, max_treelevel)
-              call adjacent_block_2D(neighbor2, neighbor, '__W', level, max_treelevel)
+          call adjacent_block_2D(tcBlock, tcNeighbor2, '__S', level, max_treelevel)
+          call adjacent_block_2D(tcNeighbor2, tcNeighbor, '__W', level, max_treelevel)
 
-          case default
-              call abort(118119, "Lord vader, the treelib does not know the direction")
+      case default
+          call abort(118119, "Lord vader, the treelib does not know the direction")
       end select
   end subroutine adjacent_block_2D
 
@@ -669,285 +669,285 @@ end subroutine adjacent4
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
 
-  recursive subroutine adjacent_block_3D(me, neighbor, direction, level, max_treelevel)
+  recursive subroutine adjacent_block_3D(tcBlock, tcNeighbor, direction, level, max_treelevel)
 
       use module_params     ! global parameters
 
       implicit none
       integer(kind=ik), intent(in)        :: max_treelevel
       integer(kind=ik), intent(in)        :: level
-      integer(kind=ik), intent(in)        :: me(max_treelevel)      !> block treecode
+      integer(kind=ik), intent(in)        :: tcBlock(max_treelevel)      !> block treecode
       character(len=7), intent(in)        :: direction              !> direction for neighbor search
-      integer(kind=ik), intent(out)       :: neighbor(max_treelevel)!> neighbor treecode
-      integer(kind=ik)                    :: neighbor2(max_treelevel), neighbor3(max_treelevel)   ! treecode variable
+      integer(kind=ik), intent(out)       :: tcNeighbor(max_treelevel)!> neighbor treecode
+      integer(kind=ik)                    :: tcNeighbor2(max_treelevel), tcNeighbor3(max_treelevel)   ! treecode variable
       integer(kind=ik)                    :: i                      ! loop variable
 
-      neighbor = me
+      tcNeighbor = tcBlock
 
       select case(direction)
 
-          case('__1/___')
+      case('__1/___')
           ! '1'-side
-              neighbor(level) = modulo(me(level) + 4, 8)
-              i = level - 1
+          tcNeighbor(level) = modulo(tcBlock(level) + 4, 8)
+          i = level - 1
 
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case (0,1,2,3)
-                          ! nothing to do, leave loop
-                          i = 0
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case (0,1,2,3)
+                  ! nothing to do, leave loop
+                  i = 0
 
-                      case (4,5,6,7)
-                          neighbor(i) = modulo(me(i) + 4, 8)
-                          i = i - 1
+              case (4,5,6,7)
+                  tcNeighbor(i) = modulo(tcBlock(i) + 4, 8)
+                  i = i - 1
 
-                  end select
-              end do
+              end select
+          end do
 
-          case('__6/___')
+      case('__6/___')
           ! '6'-side
-              neighbor(level) = modulo(me(level) - 4, 8)
-              i = level - 1
+          tcNeighbor(level) = modulo(tcBlock(level) - 4, 8)
+          i = level - 1
 
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case (4,5,6,7)
-                          ! nothing to do, leave loop
-                          i = 0
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case (4,5,6,7)
+                  ! nothing to do, leave loop
+                  i = 0
 
-                      case (0,1,2,3)
-                          neighbor(i) = modulo(me(i) - 4, 8)
-                          i = i - 1
+              case (0,1,2,3)
+                  tcNeighbor(i) = modulo(tcBlock(i) - 4, 8)
+                  i = i - 1
 
-                  end select
-              end do
+              end select
+          end do
 
-          case('__3/___')
+      case('__3/___')
           ! '3'-side
-              select case(me(level))
-                  case(0,1,4,5)
-                      neighbor(level) = modulo(me(level) + 2, 8)
-                  case(2,3,6,7)
-                      neighbor(level) = modulo(me(level) + 6, 8)
-              end select
+          select case(tcBlock(level))
+          case(0,1,4,5)
+              tcNeighbor(level) = modulo(tcBlock(level) + 2, 8)
+          case(2,3,6,7)
+              tcNeighbor(level) = modulo(tcBlock(level) + 6, 8)
+          end select
 
-              i = level - 1
+          i = level - 1
 
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case (0,1,4,5)
-                          ! nothing to do, leave loop
-                          i = 0
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case (0,1,4,5)
+                  ! nothing to do, leave loop
+                  i = 0
 
-                      case (2,3,6,7)
-                          select case(me(i))
-                              case (0,1,4,5)
-                                  neighbor(i) = modulo(me(i) + 2, 8)
-                              case (2,3,6,7)
-                                  neighbor(i) = modulo(me(i) + 6, 8)
-                          end select
-                          i = i - 1
-
+              case (2,3,6,7)
+                  select case(tcBlock(i))
+                  case (0,1,4,5)
+                      tcNeighbor(i) = modulo(tcBlock(i) + 2, 8)
+                  case (2,3,6,7)
+                      tcNeighbor(i) = modulo(tcBlock(i) + 6, 8)
                   end select
-              end do
+                  i = i - 1
 
-          case('__5/___')
+              end select
+          end do
+
+      case('__5/___')
           ! '5'-side
-              select case(me(level))
-                  case(2,3,6,7)
-                      neighbor(level) = modulo(me(level) - 2, 8)
-                  case(0,1,4,5)
-                      neighbor(level) = modulo(me(level) - 6, 8)
-              end select
+          select case(tcBlock(level))
+          case(2,3,6,7)
+              tcNeighbor(level) = modulo(tcBlock(level) - 2, 8)
+          case(0,1,4,5)
+              tcNeighbor(level) = modulo(tcBlock(level) - 6, 8)
+          end select
 
-              i = level - 1
+          i = level - 1
 
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case (2,3,6,7)
-                          ! nothing to do, leave loop
-                          i = 0
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case (2,3,6,7)
+                  ! nothing to do, leave loop
+                  i = 0
 
-                      case (0,1,4,5)
-                          select case(me(i))
-                              case (2,3,6,7)
-                                  neighbor(i) = modulo(me(i) - 2, 8)
-                              case (0,1,4,5)
-                                  neighbor(i) = modulo(me(i) - 6, 8)
-                          end select
-                          i = i - 1
-
+              case (0,1,4,5)
+                  select case(tcBlock(i))
+                  case (2,3,6,7)
+                      tcNeighbor(i) = modulo(tcBlock(i) - 2, 8)
+                  case (0,1,4,5)
+                      tcNeighbor(i) = modulo(tcBlock(i) - 6, 8)
                   end select
-              end do
+                  i = i - 1
 
-          case('__2/___')
+              end select
+          end do
+
+      case('__2/___')
           ! '2'-side
-              select case(me(level))
+          select case(tcBlock(level))
+          case(1,3,5,7)
+              tcNeighbor(level) = modulo(tcBlock(level) - 1, 8)
+          case(0,2,4,6)
+              tcNeighbor(level) = modulo(tcBlock(level) - 7, 8)
+          end select
+
+          i = level - 1
+
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case(1,3,5,7)
+                  ! nothing to do, leave loop
+                  i = 0
+
+              case(0,2,4,6)
+                  select case(tcBlock(i))
                   case(1,3,5,7)
-                      neighbor(level) = modulo(me(level) - 1, 8)
+                      tcNeighbor(i) = modulo(tcBlock(i) - 1, 8)
                   case(0,2,4,6)
-                      neighbor(level) = modulo(me(level) - 7, 8)
-              end select
-
-              i = level - 1
-
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case(1,3,5,7)
-                          ! nothing to do, leave loop
-                          i = 0
-
-                      case(0,2,4,6)
-                          select case(me(i))
-                              case(1,3,5,7)
-                                  neighbor(i) = modulo(me(i) - 1, 8)
-                              case(0,2,4,6)
-                                  neighbor(i) = modulo(me(i) - 7, 8)
-                          end select
-                          i = i - 1
-
+                      tcNeighbor(i) = modulo(tcBlock(i) - 7, 8)
                   end select
-              end do
+                  i = i - 1
 
-          case('__4/___')
+              end select
+          end do
+
+      case('__4/___')
           ! '4'-side
-              select case(me(level))
+          select case(tcBlock(level))
+          case(0,2,4,6)
+              tcNeighbor(level) = modulo(tcBlock(level) + 1, 8)
+          case(1,3,5,7)
+              tcNeighbor(level) = modulo(tcBlock(level) + 7, 8)
+          end select
+
+          i = level - 1
+
+          do while (i /= 0)
+              select case( tcBlock(i+1) )
+              case(0,2,4,6)
+                  ! nothing to do, leave loop
+                  i = 0
+
+              case(1,3,5,7)
+                  select case(tcBlock(i))
                   case(0,2,4,6)
-                      neighbor(level) = modulo(me(level) + 1, 8)
+                      tcNeighbor(i) = modulo(tcBlock(i) + 1, 8)
                   case(1,3,5,7)
-                      neighbor(level) = modulo(me(level) + 7, 8)
-              end select
-
-              i = level - 1
-
-              do while (i /= 0)
-                  select case( me(i+1) )
-                      case(0,2,4,6)
-                          ! nothing to do, leave loop
-                          i = 0
-
-                      case(1,3,5,7)
-                          select case(me(i))
-                              case(0,2,4,6)
-                                  neighbor(i) = modulo(me(i) + 1, 8)
-                              case(1,3,5,7)
-                                  neighbor(i) = modulo(me(i) + 7, 8)
-                          end select
-                          i = i - 1
-
+                      tcNeighbor(i) = modulo(tcBlock(i) + 7, 8)
                   end select
-              end do
+                  i = i - 1
 
-          case('_12/___')
+              end select
+          end do
+
+      case('_12/___')
           ! '12'-edge
-              call adjacent_block_3D(me, neighbor2, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__2/___', level, max_treelevel)
 
-          case('_13/___')
+      case('_13/___')
           ! '13'-edge
-              call adjacent_block_3D(me, neighbor2, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('_14/___')
+      case('_14/___')
           ! '14'-edge
-              call adjacent_block_3D(me, neighbor2, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__4/___', level, max_treelevel)
 
-          case('_15/___')
+      case('_15/___')
           ! '15'-edge
-              call adjacent_block_3D(me, neighbor2, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('_62/___')
+      case('_62/___')
           ! '62'-edge
-              call adjacent_block_3D(me, neighbor2, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__2/___', level, max_treelevel)
 
-          case('_63/___')
+      case('_63/___')
           ! '63'-edge
-              call adjacent_block_3D(me, neighbor2, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('_64/___')
+      case('_64/___')
           ! '64'-edge
-              call adjacent_block_3D(me, neighbor2, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__4/___', level, max_treelevel)
 
-          case('_65/___')
+      case('_65/___')
           ! '65'-edge
-              call adjacent_block_3D(me, neighbor2, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('_23/___')
+      case('_23/___')
           ! '23'-edge
-              call adjacent_block_3D(me, neighbor2, '__2/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('_25/___')
+      case('_25/___')
           ! '25'-edge
-              call adjacent_block_3D(me, neighbor2, '__2/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('_43/___')
+      case('_43/___')
           ! '43'-edge
-              call adjacent_block_3D(me, neighbor2, '__4/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('_45/___')
+      case('_45/___')
           ! '45'-edge
-              call adjacent_block_3D(me, neighbor2, '__4/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor2, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('123/___')
+      case('123/___')
           ! '123'-corner
-              call adjacent_block_3D(me, neighbor3, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__2/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('134/___')
+      case('134/___')
           ! '134'-corner
-              call adjacent_block_3D(me, neighbor3, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__3/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__4/___', level, max_treelevel)
 
-          case('145/___')
+      case('145/___')
           ! '145'-corner
-              call adjacent_block_3D(me, neighbor3, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__4/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('152/___')
+      case('152/___')
           ! '152'-corner
-              call adjacent_block_3D(me, neighbor3, '__1/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__5/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__1/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__2/___', level, max_treelevel)
 
-          case('623/___')
+      case('623/___')
           ! '623'-corner
-              call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__2/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__3/___', level, max_treelevel)
 
-          case('634/___')
+      case('634/___')
           ! '634'-corner
-              call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__3/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__3/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__4/___', level, max_treelevel)
 
-          case('645/___')
+      case('645/___')
           ! '645'-corner
-              call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__4/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__4/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__5/___', level, max_treelevel)
 
-          case('652/___')
+      case('652/___')
           ! '652'-corner
-              call adjacent_block_3D(me, neighbor3, '__6/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor3, neighbor2, '__5/___', level, max_treelevel)
-              call adjacent_block_3D(neighbor2, neighbor, '__2/___', level, max_treelevel)
+          call adjacent_block_3D(tcBlock, tcNeighbor3, '__6/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor3, tcNeighbor2, '__5/___', level, max_treelevel)
+          call adjacent_block_3D(tcNeighbor2, tcNeighbor, '__2/___', level, max_treelevel)
 
-          case default
-              call abort(118112, "Lord vader, the treelib does not know the direction")
+      case default
+          call abort(118112, "Lord vader, the treelib does not know the direction")
       end select
 
   end subroutine adjacent_block_3D

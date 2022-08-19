@@ -45,21 +45,9 @@ contains
 
 #include "block_xfer_nonblocking.f90"
 
-    ! update neighbors, 2D/3D
 #include "update_neighbors.f90"
-#include "update_neighbors_2D.f90"
-#include "update_neighbors_3D.f90"
-    ! neighbor search, edge
-#include "find_neighbor_edge_2D.f90"
-#include "find_neighbor_edge_3D.f90"
 
-    ! neighbor search, corner
-#include "find_neighbor_corner_2D.f90"
-#include "find_neighbor_corner_3D.f90"
-    ! neighbor search, face
-#include "find_neighbor_face_3D.f90"
-
-    ! search routine to find light data id corresponding to treecode
+#include "find_neighbors.f90"
 #include "does_block_exist.f90"
 
     ! block refinement subroutine

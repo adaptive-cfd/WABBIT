@@ -46,11 +46,6 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik)                    :: k,  tree_id_evolv
 
-    ! currently not working (Thomas, 02-2021)
-    ! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_evolv), lgt_n(tree_ID_evolv), &
-    ! lgt_sortednumlist(:,:,tree_ID_evolv), hvy_active(:,tree_ID_evolv), hvy_n(tree_ID_evolv), skip_diagonal_neighbors=.true.)
-
-
     if (present(tree_id)) then
           tree_id_evolv = tree_id
     else
@@ -110,11 +105,7 @@ subroutine time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_w
     end select
 
 
-! currently not working (Thomas, 02-2021)
-! call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active(:,tree_ID_evolv), lgt_n(tree_ID_evolv), &
-! lgt_sortednumlist(:,:,tree_ID_evolv), hvy_active(:,tree_ID_evolv), hvy_n(tree_ID_evolv), skip_diagonal_neighbors=.false.)
-
-    ! increase time variable after all RHS substeps
+    ! increase time variables after all RHS substeps
     time = time + dt
     iteration = iteration + 1
 

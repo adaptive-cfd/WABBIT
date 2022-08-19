@@ -23,7 +23,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     integer(kind=ik)                    :: data_rank(8)
     integer(kind=ik)                    :: heavy_ids(8), tree_id          ! list of block ids, proc ranks
 
-    integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, maxtL, hvy_merge_id, N
+    integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
     integer(kind=ik), dimension(3)      ::  bound1, bound2, boundm, Bs
     logical :: harten_multiresolution
 
@@ -31,10 +31,10 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     N_merge = size(lgt_blocks_to_merge,1)
     Bs = params%Bs
     g  = params%n_ghosts
-    maxtL = params%max_treelevel
+    Jmax = params%max_treelevel
     ! level of merged block
-    level = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_MESH_LVL )
-    tree_id = lgt_block( lgt_blocks_to_merge(1), maxtL + IDX_TREE_ID )
+    level = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_MESH_LVL )
+    tree_id = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_TREE_ID )
 
     select case(params%wavelet_transform_type)
     case ("harten-multiresolution")
@@ -45,14 +45,16 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
         call abort(2105281, "params%wavelet_transform_type="//trim(adjustl(params%wavelet_transform_type))//" is not known!")
     end select
 
-    if ( N_merge /= 4 .and. N_merge /= 8) then
-        call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
-    endif
 
     ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
     do i = 1, N_merge
         call lgt2proc( data_rank(i), lgt_blocks_to_merge(i), params%number_blocks )
     enddo
+
+#ifdef DEV
+    if ( N_merge /= 4 .and. N_merge /= 8) then
+        call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
+    endif
 
     ! Check if all blocks lie on the same rank
     if ( maxval(data_rank(1:N_merge)-data_rank(1)) /= 0 ) then
@@ -69,6 +71,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
             endif
         enddo
     enddo
+#endif
 
     ! allocate tmp buffer (used only for biorthogonal wavelets, not harten-style multiresolution)
     if ( .not. allocated(tmpblock) ) then
@@ -95,9 +98,9 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     ! create light data entry for the new block
     lgt_block( lgt_merge_id, : ) = -1
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
-    lgt_block( lgt_merge_id, maxtl+ IDX_MESH_LVL ) = level-1
-    lgt_block( lgt_merge_id, maxtl+ idx_refine_sts ) = 0
-    lgt_block( lgt_merge_id, maxtl+ IDX_TREE_ID ) = tree_id
+    lgt_block( lgt_merge_id, Jmax+ IDX_MESH_LVL ) = level-1
+    lgt_block( lgt_merge_id, Jmax+ idx_refine_sts ) = 0
+    lgt_block( lgt_merge_id, Jmax+ IDX_TREE_ID ) = tree_id
 
     ! b) heavy data merging (individual operation)
     if ( data_rank(1) == params%rank) then

@@ -29,9 +29,7 @@ subroutine refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_
     integer(kind=ik)                    :: level, tree_id
 
     N = params%number_blocks
-    ! set MPI parameter
     rank = params%rank
-    ! grid parameter
     Bs = params%Bs
     g  = params%n_ghosts
 

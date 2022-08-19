@@ -113,7 +113,7 @@ subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
     ! And synchronize that (in my_lgt_block_recv_buffer)
     ! buffer = aaaabbbbccccccdd
     !
-    ! NOTE: aaaa can contain some wholes, but is not expected to be very hollow
+    ! NOTE: aaaa can contain some holes, but is not expected to be very hollow
     !
     ! ==========================================================================
 

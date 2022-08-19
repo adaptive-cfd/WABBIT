@@ -6,6 +6,18 @@ contains
 
 #include "get_neighbor_treecode.f90"
 
+
+! for numerical treecodes:
+! subroutine appendDigitTreecode
+! subroutine setTreecodeInactive
+! setLevel
+! getLevel
+! setTreeID
+! getTreeID
+! setRefinementStatus
+! getRefinementStatus
+
+
 !-----------------------------------------------------------------------------
 !> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
 !>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)

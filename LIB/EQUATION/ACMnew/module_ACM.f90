@@ -554,6 +554,13 @@ end subroutine
       ! therefore the general call has to pass time
       real(kind=rk), intent (in) :: time
       logical, intent(in) :: overwrite
+      logical :: is_insect, use_color
+
+      is_insect = .false.
+      use_color = .false.
+      if (params_acm%geometry == "Insect") is_insect = .true.
+      if (params_acm%geometry == "two-moving-cylinders") use_color = .true.
+
 
 
       call init_t_file('meanflow.t', overwrite)
@@ -568,19 +575,25 @@ end subroutine
       "            CFL", &
       "         CFL_nu", &
       "        CFL_eta"/) )
-      call init_t_file('moments.t', overwrite)
-      call init_t_file('aero_power.t', overwrite)
-      call init_t_file('forces_body.t', overwrite)
-      call init_t_file('moments_body.t', overwrite)
-      call init_t_file('forces_leftwing.t', overwrite)
-      call init_t_file('moments_leftwing.t', overwrite)
-      call init_t_file('forces_rightwing.t', overwrite)
-      call init_t_file('moments_rightwing.t', overwrite)
+      if (is_insect) then
+        call init_t_file('moments.t', overwrite)
+        call init_t_file('aero_power.t', overwrite)
+        call init_t_file('forces_body.t', overwrite)
+        call init_t_file('moments_body.t', overwrite)
+        call init_t_file('forces_leftwing.t', overwrite)
+        call init_t_file('moments_leftwing.t', overwrite)
+        call init_t_file('forces_rightwing.t', overwrite)
+        call init_t_file('moments_rightwing.t', overwrite)
+        call init_t_file('insect_state_vector.t', overwrite)
+      endif
+      if (use_color) then
+        call init_t_file('forces_1.t', overwrite)
+        call init_t_file('forces_2.t', overwrite)
+      endif
       call init_t_file('error_taylor_green.t', overwrite)
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)
-      call init_t_file('insect_state_vector.t', overwrite)
       call init_t_file('forces_rk.t', overwrite)
       call init_t_file('penal_power.t', overwrite, (/&
       "           time", &

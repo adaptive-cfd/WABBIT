@@ -64,7 +64,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     !   5           For the insects, this is 2ND RIGHT WING
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     integer(kind=2) :: color
-    logical :: is_insect
+    logical :: is_insect, use_color
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
@@ -85,7 +85,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
     ! save some computing time by using a logical and not comparing every time
     is_insect = .false.
+    use_color = .false.
     if (params_acm%geometry == "Insect") is_insect = .true.
+    if (params_acm%geometry == "two-moving-cylinders") use_color = .true.
 
 
 
@@ -154,8 +156,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
             do ix = g+1, Bs(1)+g-1
-                ! coloring not implemented for 2D
-                color = 0_2
+
+                color = int( mask(ix, iy, 1, 5), kind=2 )
+
                 chi = mask(ix,iy,1,1) * C_eta_inv
                 usx = mask(ix,iy,1,2)
                 usy = mask(ix,iy,1,3)
@@ -406,6 +409,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
             call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,:)), &
             sum(params_acm%force_color(2,:)), sum(params_acm%force_color(3,:)) /) )
+
+            if (use_color) then
+                color = 1_2
+                call append_t_file( 'forces_1.t', (/time, params_acm%force_color(:,color)/) )
+                color = 2_2
+                call append_t_file( 'forces_2.t', (/time, params_acm%force_color(:,color)/) )
+            endif
 
             if (is_insect) then
                 call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )

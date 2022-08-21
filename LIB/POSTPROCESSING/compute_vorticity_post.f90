@@ -6,7 +6,6 @@ subroutine compute_vorticity_post(params)
     use module_mesh
     use module_params
     use module_IO
-    use module_forest
     use module_mpi
     use module_operators
 
@@ -14,22 +13,28 @@ subroutine compute_vorticity_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)                  :: file_ux, file_uy, file_uz, operator
+    character(len=cshort)              :: file_ux, file_uy, file_uz, operator
     real(kind=rk)                      :: time
-    integer(kind=ik)                   :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length, g
+    integer(kind=ik)                   :: iteration, k, lgt_id, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
     character(len=2)                   :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=cshort)                  :: fname
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
     integer(kind=ik)                   :: nwork
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -75,7 +80,7 @@ subroutine compute_vorticity_post(params)
     call check_file_exists(trim(file_uy))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_ux, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, &
+    call read_attributes(file_ux, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     if (params%dim == 3) then
@@ -123,7 +128,7 @@ subroutine compute_vorticity_post(params)
 
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
-    params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     nwork = 1
     if (operator == "--vorticity") then
@@ -131,67 +136,69 @@ subroutine compute_vorticity_post(params)
     endif
 
     ! allocate data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, neqn_hvy_tmp=nwork)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n, neqn_hvy_tmp=nwork)
 
     ! read mesh
-    call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block)
+    call read_mesh(file_ux, params, lgt_n, hvy_n, lgt_block, tree_ID)
 
     ! read actual data (velocity)
-    call read_field(file_ux, 1, params, hvy_block, hvy_n)
-    call read_field(file_uy, 2, params, hvy_block, hvy_n)
+    call read_field(file_ux, 1, params, hvy_block, hvy_n, tree_ID)
+    call read_field(file_uy, 2, params, hvy_block, hvy_n, tree_ID)
 
     if (params%dim == 3) then
-        call read_field(file_uz, 3, params, hvy_block, hvy_n)
+        call read_field(file_uz, 3, params, hvy_block, hvy_n, tree_ID)
     end if
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! calculate vorticity from velocities
-    do k = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (operator == "--vorticity") then
             if (params%dim == 3) then
-                call compute_vorticity( hvy_block(:,:,:,1,hvy_active(k)), &
-                hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
+                call compute_vorticity( hvy_block(:,:,:,1,hvy_id), &
+                hvy_block(:,:,:,2,hvy_id), hvy_block(:,:,:,3,hvy_id),&
                 dx, Bs, g,&
-                params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_active(k)))
+                params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id))
             else
-                call compute_vorticity(hvy_block(:,:,:,1,hvy_active(k)), &
-                hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,1,hvy_active(k)),&
+                call compute_vorticity(hvy_block(:,:,:,1,hvy_id), &
+                hvy_block(:,:,:,2,hvy_id), hvy_block(:,:,:,1,hvy_id),&
                 dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,:,hvy_active(k)))
+                params%order_discretization, hvy_tmp(:,:,:,:,hvy_id))
             end if
 
         elseif (operator=="--vor-abs") then
-            call compute_vorticity_abs(hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), hvy_block(:,:,:,3,hvy_active(k)),&
-            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
+            call compute_vorticity_abs(hvy_block(:,:,:,1,hvy_id), &
+            hvy_block(:,:,:,2,hvy_id), hvy_block(:,:,:,3,hvy_id),&
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvy_id))
 
         elseif (operator == "--divergence") then
-            call divergence( hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), &
-            hvy_block(:,:,:,3,hvy_active(k)),&
+            call divergence( hvy_block(:,:,:,1,hvy_id), &
+            hvy_block(:,:,:,2,hvy_id), &
+            hvy_block(:,:,:,3,hvy_id),&
             dx, Bs, g, &
-            params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
+            params%order_discretization, hvy_tmp(:,:,:,1,hvy_id))
 
         elseif (operator == "--Q") then
-            call compute_Qcriterion( hvy_block(:,:,:,1,hvy_active(k)), &
-            hvy_block(:,:,:,2,hvy_active(k)), &
-            hvy_block(:,:,:,3,hvy_active(k)),&
+            call compute_Qcriterion( hvy_block(:,:,:,1,hvy_id), &
+            hvy_block(:,:,:,2,hvy_id), &
+            hvy_block(:,:,:,3,hvy_id),&
             dx, Bs, g, &
-            params%order_discretization, hvy_tmp(:,:,:,1,hvy_active(k)))
+            params%order_discretization, hvy_tmp(:,:,:,1,hvy_id))
 
         else
             call abort(1812011, "operator is neither --vorticity --vor-abs --divergence --Q")
@@ -202,28 +209,28 @@ subroutine compute_vorticity_post(params)
     if (operator == "--vorticity") then
         write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
 
-        call write_field(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
 
         if (params%dim == 3) then
             write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 2, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n,  hvy_active)
+            call saveHDF5_tree(fname, time, iteration, 2, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n,  hvy_active, tree_ID)
             write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 3, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active)
+            call saveHDF5_tree(fname, time, iteration, 3, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
         end if
 
     elseif (operator == "--vor-abs") then
         write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
 
-        call write_field(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
 
     elseif (operator=="--divergence") then
         write( fname,'(a, "_", i12.12, ".h5")') 'divu', nint(time * 1.0e6_rk)
 
-        call write_field(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
 
     elseif (operator=="--Q") then
         write( fname,'(a, "_", i12.12, ".h5")') 'Qcrit', nint(time * 1.0e6_rk)
 
-        call write_field(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 1, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
     endif
 end subroutine compute_vorticity_post

@@ -23,7 +23,7 @@ module module_indicators
 
 contains
 
-#include "refinement_indicator.f90"
+#include "refinementIndicator_tree.f90"
 #include "block_coarsening_indicator.f90"
   ! threshold the blocks
 #include "threshold_block.f90"

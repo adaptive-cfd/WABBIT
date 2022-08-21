@@ -1,5 +1,6 @@
 !> \brief Get the time step according to the conditions of the physics module
-subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
+subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, &
+    hvy_n, lgt_block, lgt_active, lgt_n, dt )
 
     use module_physics_metamodule, only : GET_DT_BLOCK_meta
 

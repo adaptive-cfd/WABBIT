@@ -92,7 +92,7 @@ module module_params
         logical :: iter_ghosts = .false.
 
         ! switch for mesh adaption
-        logical :: adapt_mesh=.false., adapt_inicond=.false.
+        logical :: adapt_tree=.false., adapt_inicond=.false.
         logical :: out_of_memory = .false.
         ! number of allocated heavy data fields per process
         integer(kind=ik) :: number_blocks = -1_ik

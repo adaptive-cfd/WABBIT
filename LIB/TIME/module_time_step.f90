@@ -4,7 +4,7 @@ module module_time_step
     use module_timing
     use module_MPI
     ! use mesh module, since we need to compute dx and origin of blocks
-    use module_mesh !, only : get_block_spacing_origin, max_active_level
+    use module_mesh !, only : get_block_spacing_origin, maxActiveLevel_tree
     ! to call RHS routines:
     use module_physics_metamodule, only : RHS_meta, STATISTICS_meta, FILTER_meta
     use module_mask
@@ -17,7 +17,7 @@ module module_time_step
 
 contains
 
-#include "time_stepper.f90"
+#include "timeStep_tree.f90"
 #include "RHS_wrapper.f90"
 #include "filter_wrapper.f90"
 #include "statistics_wrapper.f90"

@@ -3,7 +3,7 @@
 !! Since the grid changes, the neighbor relations and active-lists are updated as well.
 ! ********************************************************************************************
 
-subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active, &
+subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity, tree_ID )
 
     implicit none
@@ -11,11 +11,11 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)              !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: lgt_active(:)                  !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n                          !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)         !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_active(:)                  !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n                          !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)                !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                       !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)       !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                       !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: Jmin                           !> what level to initialize?
     logical, intent(in)                 :: verbosity                      !> write output
     integer(kind=ik), intent(in)        :: tree_ID
@@ -144,7 +144,7 @@ subroutine create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active,
 
     ! as the grid has changed (we created it here), we now update the heavy and light
     ! active lists, as well as neighbor relations.
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-end subroutine create_equidistant_grid
+end subroutine createEquidistantGrid_tree

@@ -6,7 +6,7 @@
 ! ********************************************************************************************
 
 subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor)
+    hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor, tree_ID)
 
     implicit none
     !> time loop parameters
@@ -16,6 +16,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     type (type_params), intent(in)                  :: params
     !> light data array
     integer(kind=ik), intent(inout)                 :: lgt_block(:, :)
+    integer(kind=ik), intent(in)                    :: tree_ID
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
@@ -40,7 +41,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! loop variable
     integer(kind=ik)      :: k, lgt_id, hvy_id
     ! file name
-    character(len=cshort)     :: fname, tmp
+    character(len=cshort) :: fname, tmp
     ! cpu time variables for running time calculation
     real(kind=rk)         :: t0, x0(1:3), dx(1:3)
     integer(kind=2)       :: n_domain(1:3)
@@ -87,7 +88,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! actual saving step. one file per component.
     ! loop over components/qty's:
     do k = 1, params%N_fields_saved
-
         ! physics modules shall provide an interface for wabbit to know how to label
         ! the components to be stored to hard disk (in the work array)
         call FIELD_NAMES_meta(params%physics_type, k, tmp)
@@ -100,9 +100,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         endif
 
         ! actual writing
-        call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
-        lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow))
-
+        call saveHDF5_tree( fname, time, iteration, k, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
     enddo
 
     call toc( "save_data", MPI_wtime()-t0 )

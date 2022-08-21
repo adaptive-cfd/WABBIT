@@ -22,9 +22,10 @@ subroutine flusi_to_wabbit(params)
     integer(kind=ik), allocatable     :: lgt_block(:, :)
     real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable     :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                  :: hvy_n, lgt_n, k
+    integer(kind=ik), allocatable     :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik) , allocatable    :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                  :: tree_ID=1, hvy_id, k
     integer(kind=ik)                  :: refinement_status
     integer(kind=ik) , dimension(3)   :: Bs
     real(kind=rk), dimension(3)       :: x0, dx
@@ -37,7 +38,10 @@ subroutine flusi_to_wabbit(params)
 
     !-----------------------------------------------------------------------------------------------------
     params%n_eqn  = 1
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
     !----------------------------------------------
+
     call get_command_argument(2, file_in)
     ! does the user need help?
     if (params%rank==0) then
@@ -54,11 +58,7 @@ subroutine flusi_to_wabbit(params)
         write(*,*) "        if you pass a field of zeros thats what you get out. note wabbit uses double precision by "
         write(*,*) "        default, so your file may be exactly twice as large."
         write(*,*) ""
-        write(*,*) "USAGE: ./wabbit-post --flusi-to-wabbit [source.h5 [target.h5] [Bsx] [Bsy] [Bsz]"
-        write(*,*) "       for 3D data:"
-        write(*,*) "       ./wabbit-post --flusi-to-wabbit mask_00000.h5 wabbit_000000000.h5 33 33 33"
-        write(*,*) "       for 2D data:"
-        write(*,*) "       ./wabbit-post --flusi-to-wabbit --input=mask_00000.h5 --output=wabbit_000000000.h5 --Bs=33"
+        write(*,*) "USAGE: ./wabbit-post --flusi-to-wabbit --input=mask_00000.h5 --output=wabbit_000000000.h5 --Bs=33"
         write(*,*) ""
         write(*,*) "NOTES: * Even though anisotropic resolution would be possible, it is not implemented yet"
         write(*,*) "       * The blocksize BS is isotropic"
@@ -156,40 +156,45 @@ subroutine flusi_to_wabbit(params)
     params%Bs = Bs
     params%n_ghosts = 1_ik
     params%order_predictor = 'multiresolution_4th'
-    lgt_n = (2_ik**params%max_treelevel)**params%dim
-    hvy_n = lgt_n
-    params%number_blocks = lgt_n
+    lgt_n(tree_ID) = (2_ik**params%max_treelevel)**params%dim
+    hvy_n(tree_ID) = lgt_n(tree_ID)
+    params%number_blocks = lgt_n(tree_ID)
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! create an equidistant grid (order of light id is important!)
-    call create_equidistant_grid( params, lgt_block, hvy_neighbor,&
+    call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor,&
     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
-    params%max_treelevel, .true., tree_ID=1)
+    params%max_treelevel, .true., tree_ID)
 
     ! read the field from flusi file and organize it in WABBITs blocks
-    call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n,&
-    hvy_active, params, nxyz)
+    call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n(tree_ID),&
+    hvy_active(:,tree_ID), params, nxyz)
+
     ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
     ! they will therefore send their redundant points to the last blocks in x,y and z-direction
-    do k = 1, lgt_n
-        call get_block_spacing_origin( params, lgt_active(k), lgt_block, x0, dx )
+    do k = 1, lgt_n(tree_ID)
+        call get_block_spacing_origin( params, lgt_active(k, tree_ID), lgt_block, x0, dx )
+
         start_x = nint(x0(1)/dx(1))
         start_y = nint(x0(2)/dx(2))
+
         if (params%dim == 3) then
             start_z = nint(x0(3)/dx(3))
         else
             start_z = 0_ik
         end if
-        lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
+
+        lgt_block(lgt_active(k,tree_ID), params%max_treelevel + IDX_REFINE_STS) = refinement_status(start_x, start_y, start_z, nxyz, Bs)
     end do
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     iteration = 0
-    call write_field(file_out, time, iteration, 1, params, lgt_block, &
-    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
+
+    call saveHDF5_tree(file_out, time, iteration, 1, params, lgt_block, &
+    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
 
 end subroutine flusi_to_wabbit
 

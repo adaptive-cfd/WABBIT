@@ -96,17 +96,17 @@ subroutine post_rhs(params)
     !
     ! ! create lists of active blocks (light and heavy data)
     ! ! update list of sorted nunmerical treecodes, used for finding blocks
-    ! call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist )
+    ! call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
+    ! lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=???? )
     !
     ! ! update neighbor relations
-    ! call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
+    ! call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
     ! lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
     !
     !
     !
     ! if ( adaptive ) then
-    !     call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    !     call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     !     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp, hvy_mask )
     ! endif
     !
@@ -125,7 +125,7 @@ subroutine post_rhs(params)
     ! do k = 1, params%n_eqn
     !     write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
     !
-    !     call write_field(fname, time, iteration, k, params, lgt_block,&
+    !     call saveHDF5_tree(fname, time, iteration, k, params, lgt_block,&
     !     hvy_work(:,:,:,:,:,1), lgt_active, lgt_n, hvy_n, hvy_active )
     ! enddo
 

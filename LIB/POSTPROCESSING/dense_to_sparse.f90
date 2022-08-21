@@ -14,11 +14,11 @@ subroutine dense_to_sparse(params)
 
     !> parameter struct
     type (type_params), intent(inout)       :: params
-    character(len=cshort)                       :: indicator="threshold-state-vector", file_in, args
-    character(len=cshort)                       :: tail_string
+    character(len=cshort)                   :: indicator="threshold-state-vector", file_in, args
+    character(len=cshort)                   :: tail_string
     real(kind=rk)                           :: time, eps=-1.0_rk
     integer(kind=ik)                        :: iteration
-    character(len=cshort), allocatable          :: file_out(:)
+    character(len=cshort), allocatable      :: file_out(:)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
@@ -29,7 +29,7 @@ subroutine dense_to_sparse(params)
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in
-    character(len=cshort)                       :: order
+    character(len=cshort)                   :: order
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: treecode_size, number_dense_blocks, i, l, dim
@@ -179,13 +179,12 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! allocate data and reset grid
     !----------------------------------
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-        lgt_sortednumlist, hvy_work=hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_work=hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! reset the grid: all blocks are inactive and empty
-    call reset_tree( params, lgt_block, lgt_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-    lgt_sortednumlist(:,:,tree_ID_flow), .true., tree_ID=1 )
+    call reset_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, &
+    lgt_sortednumlist, .true., tree_ID=tree_ID_flow )
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -194,21 +193,21 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! READ Grid and coarse if possible
     !----------------------------------
-    params%adapt_mesh=.true.
+    params%adapt_tree=.true.
     params%adapt_inicond=.true.
     params%read_from_files=.true.
+
     call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp )
+    lgt_n, hvy_n, lgt_sortednumlist, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp )
 
     !----------------------------------
     ! Write sparse files
     !----------------------------------
     do i = 1, params%n_eqn
-        call write_field(file_out(i), time, iteration, i, params, lgt_block, &
-        hvy_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), &
-        hvy_active(:,tree_ID_flow))
+        call saveHDF5_tree(file_out(i), time, iteration, i, params, lgt_block, &
+        hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID_flow)
     enddo
 
-    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n , lgt_n=lgt_n)
+    call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 end subroutine dense_to_sparse

@@ -2,7 +2,6 @@ module module_mask
 
     use module_physics_metamodule
     use module_mesh
-    use module_forest
     use module_params
     use module_precision
     use module_globals
@@ -35,11 +34,11 @@ contains
         logical, save                          :: time_independent_part_ready = .false.
         logical                                :: force_all_parts
 
-        Bs = params%Bs
-        g  = params%n_ghosts
-        Jactive = max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow))
-        Jmax = params%max_treelevel
-        tree_n = params%forest_size ! used only for resetting at this point
+        Bs      = params%Bs
+        g       = params%n_ghosts
+        Jactive = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
+        Jmax    = params%max_treelevel
+        tree_n  = params%forest_size ! used only for resetting at this point
 
         ! without penalization, do nothing.
         if (.not. params%penalization) return
@@ -221,17 +220,15 @@ contains
 
         Bs = params%Bs
         g  = params%n_ghosts
-        Jactive = max_active_level(lgt_block,lgt_active(:,tree_ID_flow),lgt_n(tree_ID_flow))
+        Jactive = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
         Jmax = params%max_treelevel
         Jmin = params%min_treelevel
         tree_n = params%forest_size ! used only for resetting at this point
 
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
-        call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
-        lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
-        lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
-        hvy_n(tree_ID_mask), params%min_treelevel, .true., tree_ID_mask )
+        call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true., tree_ID_mask )
 
 
         do k = 1, hvy_n(tree_ID_mask)
@@ -255,15 +252,13 @@ contains
 
             ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
             ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-            call refine_mesh( params, lgt_block, hvy_mask, hvy_neighbor, &
-            lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
-            lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
-            hvy_n(tree_ID_mask), "mask-threshold", tree_ID_mask )
+            call refine_tree( params, lgt_block, hvy_mask, hvy_neighbor, &
+            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID_mask )
 
 
             if (params%rank==0) then
                 write(*,'("Did refinement for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
-                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
+                maxActiveLevel_tree(lgt_block, tree_ID_mask, lgt_active, lgt_n), lgt_n(tree_ID_mask), lgt_n
             endif
 
             ! the constant part needs to be generated on Jmax (where RHS is computed)
@@ -284,15 +279,13 @@ contains
             ! we found that sometimes, we end up with more blocks than expected
             ! and some zero-blocks can be coarsened again. doing that turned out to be
             ! important for large-scale simulations
-            call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
-            lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask), &
-            lgt_sortednumlist(:,:,tree_ID_mask), hvy_active(:,tree_ID_mask), &
-            hvy_n(tree_ID_mask), tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
+            call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
 
 
             if (params%rank==0) then
                 write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
-                max_active_level(lgt_block,lgt_active(:,tree_ID_mask), lgt_n(tree_ID_mask)), lgt_n(tree_ID_mask), lgt_n
+                maxActiveLevel_tree(lgt_block, tree_ID_mask, lgt_active, lgt_n), lgt_n(tree_ID_mask), lgt_n
             endif
         enddo
 
@@ -307,10 +300,8 @@ contains
 
         ! coarsen by one level only.
         if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
-        call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, &
-        lgt_active(:,tree_ID_mask_coarser), lgt_n(tree_ID_mask_coarser), &
-        lgt_sortednumlist(:,:,tree_ID_mask_coarser), hvy_active(:,tree_ID_mask_coarser), &
-        hvy_n(tree_ID_mask_coarser), tree_ID_mask_coarser, "everywhere", hvy_tmp)
+        call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID_mask_coarser, "everywhere", hvy_tmp)
 
         ! prune both masks
         if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax

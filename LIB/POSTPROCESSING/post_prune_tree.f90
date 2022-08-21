@@ -9,7 +9,6 @@ subroutine post_prune_tree(params)
     use module_time_step
     use module_stl_file_reader
     use module_helpers
-    use module_forest
 
     implicit none
 
@@ -80,17 +79,17 @@ subroutine post_prune_tree(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
+    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID=1)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
+    lgt_n, hvy_n, hvy_active, dF=1, tree_ID=1, time=time, iteration=iteration )
 
     ! make a summary of the program parts, which have been profiled using toc(...)
     ! and print it to stdout

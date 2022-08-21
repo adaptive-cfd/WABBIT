@@ -8,7 +8,6 @@ subroutine post_generate_forest(params)
     use module_physics_metamodule
     use module_time_step
     use module_helpers
-    use module_forest
 
     implicit none
 
@@ -23,7 +22,7 @@ subroutine post_generate_forest(params)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
-    integer :: hvy_id, lgt_id, fsize, j, tree_id
+    integer :: hvy_id, lgt_id, fsize, j, tree_ID
     integer(kind=ik) :: it,ix,iy,iz,k,p,n,m, Bs(1:3)=17, tree_N,g=4,i,f
     real(kind=rk) :: time, domain(1:3), norm, x,y,z,xrel,yrel,zrel,x0(1:3),dx(1:3),dt, r
     integer(kind=ik) :: freq(15**2) = (/(i, i=1,15**2)/)
@@ -69,7 +68,7 @@ subroutine post_generate_forest(params)
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
-    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
+    call reset_forest(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, &
     lgt_sortednumlist)
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -89,14 +88,17 @@ subroutine post_generate_forest(params)
     end do
 
     tree: do it = 1, tree_N
-        call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active(:,it), lgt_n(it), &
-        lgt_sortednumlist(:,:,it), hvy_active(:,it), hvy_n(it), params%max_treelevel, .false., it )
+        call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, params%max_treelevel, .false., it )
+
         block: do k = 1, hvy_n(it)
             hvy_id = hvy_active(k, it)
+
             ! convert given hvy_id to lgt_id for block spacing routine
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             ! get block spacing for RHS
             call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
             if (params%dim == 2) then
                 do ix = g+1,Bs(1)+g
                     do iy = g+1,Bs(2)+g
@@ -140,10 +142,13 @@ subroutine post_generate_forest(params)
                     end do
                 end do
             end if
+
         end do block
+
         write( fname_out, '("u_", i12.12, ".h5")')  it
+
         call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-        lgt_n, hvy_n, hvy_active, dF=1, tree_id=it, time=real(it*dt,kind=rk), iteration=it )
+        lgt_n, hvy_n, hvy_active, dF=1, tree_ID=it, time=real(it*dt,kind=rk), iteration=it )
     end do tree
 
     call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &

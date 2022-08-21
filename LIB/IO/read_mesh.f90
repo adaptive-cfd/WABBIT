@@ -5,14 +5,14 @@
 !!           - number of active blocks (light and heavy)
 ! ********************************************************************************************
 
-subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
+subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID )
     implicit none
 
     character(len=*), intent(in)      :: fname                                  !> file name
     type (type_params), intent(in)    :: params                                 !> user defined parameter structure
-    integer(kind=ik), intent(inout)   :: hvy_n, lgt_n                           !> number of active blocks (heavy and light data)
+    integer(kind=ik), intent(inout)   :: hvy_n(:), lgt_n(:)                     !> number of active blocks (heavy and light data)
     integer(kind=ik), intent(inout)   :: lgt_block(:,:)                         !> light data array
-    integer(kind=ik), optional, intent(in)   :: tree_id_optional                !> index of the tree you want to save the field in
+    integer(kind=ik), intent(in)      :: tree_ID                                !> index of the tree you want to save the field in
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode             ! treecode array
     integer(hid_t)        :: file_id
     integer(kind=ik)      :: rank, number_procs
@@ -21,23 +21,17 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! offset variables
     integer(kind=ik)      :: ubounds(2), lbounds(2), Bs_file(1:3)
     integer(kind=ik)      :: blocks_per_rank_list(0:params%number_procs-1)
-    integer(kind=ik)      :: lgt_id, k, tree_id
+    integer(kind=ik)      :: lgt_id, k
     integer(kind=ik)      :: ierr
     integer(kind=ik)      :: treecode_size, tmp(1), version(1)
     integer(hsize_t)      :: dims_treecode(2)
     integer(kind=hsize_t) :: size_field(1:4)
 
-    if (present(tree_id_optional)) then
-        tree_id=tree_id_optional
-    else
-        tree_id=1
-    endif
-
     rank         = params%rank
     number_procs = params%number_procs
     Bs   = params%Bs
     g    = params%n_ghosts
-    Bs_file      = 1
+    Bs_file = 1
 
 
     call check_file_exists(fname)
@@ -45,8 +39,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
     ! how much blocks are we going to read?
-    call read_attribute(file_id, "blocks", "total_number_blocks", tmp)
-    lgt_n = tmp(1)
+    call read_attribute(file_id, "blocks", "total_number_blocks", lgt_n)
+    ! lgt_n(tree_ID) = tmp(1)
     call get_rank_datafield(file_id, "blocks", datarank)
     call get_size_datafield(datarank, file_id, "blocks", size_field(1:datarank))
     ! Files created using newGhostNodes branch (after 08 04 2020) contain a version number
@@ -62,7 +56,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         write(*,'(80("~"))')
         write(*,'("Filename         = ",A)') trim(adjustl(fname))
         write(*,'("VERSION of file  = ",i9)') version(1)
-        write(*,'("Expected Nblocks = ",i9," (on all cpus)")') lgt_n
+        write(*,'("Expected Nblocks = ",i9," (on all cpus)")') lgt_n(tree_ID)
         write(*,'("datarank         = ",i1," ---> ",i1,"D data")') datarank, datarank-1
         write(*,'("Bs_file          = ",3(i3,1x))') Bs_file
         write(*,'("Bs_memory        = ",3(i3,1x))') params%Bs
@@ -107,11 +101,11 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     endif
 
     ! do we have enough memory?
-    if (lgt_n > size(lgt_block,1)) then
+    if (lgt_n(tree_ID) > size(lgt_block,1)) then
         call abort(20030219, "ERROR:read_mesh:We try to load a file which will not fit in the memory!")
     endif
 
-    if (lgt_n <= 0) then
+    if (lgt_n(tree_ID) <= 0) then
         call abort(20030219, "We try to read an empty data file! Something is wrong, Nb<=0")
     end if
 
@@ -119,21 +113,21 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! this list contains (on each mpirank) the number of blocks for each mpirank. note
     ! zero indexing as required by MPI
     ! set list to the average value
-    blocks_per_rank_list(:) = lgt_n / number_procs
+    blocks_per_rank_list(:) = lgt_n(tree_ID) / number_procs
 
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
-    if (mod(lgt_n, number_procs) > 0) then
-        blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) = &
-            blocks_per_rank_list(0:mod(lgt_n, number_procs)-1) + 1
+    if (mod(lgt_n(tree_ID), number_procs) > 0) then
+        blocks_per_rank_list(0:mod(lgt_n(tree_ID), number_procs)-1) = &
+            blocks_per_rank_list(0:mod(lgt_n(tree_ID), number_procs)-1) + 1
     end if
 
     ! some error control -> did we loose blocks? should never happen.
-    if ( sum(blocks_per_rank_list) /= lgt_n) then
+    if ( sum(blocks_per_rank_list) /= lgt_n(tree_ID) ) then
         call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
     end if
 
     ! number of active blocks on my process
-    hvy_n = blocks_per_rank_list(rank)
+    hvy_n(tree_ID) = blocks_per_rank_list(rank)
 
     ! check what max_level was saved in file (check dimensions of treecode in file)
     call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
@@ -146,14 +140,14 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
     end if
 
-    allocate(block_treecode(1:dims_treecode(1), 1:hvy_n))
+    allocate(block_treecode(1:dims_treecode(1), 1:hvy_n(tree_ID)))
     block_treecode = -1
 
     ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
     ! array we want to hold, so that all CPU can read from the same file simultaneously
     ! (note zero-based offset):
     lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
-    ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + hvy_n - 1/)
+    ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + hvy_n(tree_ID) - 1/)
     call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
 
     ! close file and HDF5 library
@@ -162,7 +156,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! this resetting is expensive but we do it only once:
     lgt_block = -1
 
-     do k = 1, hvy_n
+     do k = 1, hvy_n(tree_ID)
         call hvy2lgt( lgt_id, k, rank, params%number_blocks )
         ! copy treecode
         lgt_block(lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
@@ -171,7 +165,7 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
         ! set refinement status
         lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) = 0
         ! set number of the tree
-        lgt_block(lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_id
+        lgt_block(lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_ID
     end do
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
@@ -185,8 +179,8 @@ subroutine read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_id_optional )
     ! to get an idea how it looks like and if the desired dense level is larger
     ! or smaller
     if (params%rank==0) then
-        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
-        max_active_level( lgt_block )
+        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') minActiveLevel_tree(lgt_block, tree_ID), &
+        maxActiveLevel_tree(lgt_block, tree_ID)
         write(*,*) "Done reading MESH! (NOT the actual data!)"
         write(*,'(80("~"))')
     endif

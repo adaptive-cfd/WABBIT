@@ -29,7 +29,7 @@ subroutine post_stl2dist(params)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:), hvy_n(:), lgt_n(:)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer :: hvy_id, lgt_id
+    integer :: hvy_id, lgt_id, tree_ID=1
     integer :: c_plus, c_minus,res, tree_n
     integer :: ix1,iy1,iz1
     logical :: done, array_compare_real, pruning
@@ -124,12 +124,12 @@ subroutine post_stl2dist(params)
     call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
 
-    call reset_tree( params, lgt_block, lgt_active(:,1), &
-    lgt_n(1), hvy_active(:,1), hvy_n(1), lgt_sortednumlist(:,:,1), .true., tree_ID=1)
+    call reset_tree( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_ID)
 
     ! start with an equidistant grid on coarsest level
-    call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active(:,1), lgt_n(1), &
-    lgt_sortednumlist(:,:,1), hvy_active(:,1), hvy_n(1), params%min_treelevel, .true., tree_ID=1 )
+    call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true., tree_ID)
 
     ! reset grid to zeros
     do k = 1, hvy_n(1)
@@ -159,8 +159,8 @@ subroutine post_stl2dist(params)
     do iter = params%min_treelevel, params%max_treelevel
 
         ! refine the mesh where the mask function is interesting
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,1), lgt_n(1), &
-        lgt_sortednumlist(:,:,1), hvy_active(:,1), hvy_n(1), "mask-threshold", tree_ID=1 )
+        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID )
 
         skips = 0
 
@@ -273,8 +273,8 @@ subroutine post_stl2dist(params)
 
         if (params%rank==0) then
             write(*, '("Nb=",i6," Jmin=",i2," Jmax=",i2)') &
-            lgt_n(1), min_active_level( lgt_block, lgt_active(:,1), lgt_n(1) ), &
-            max_active_level( lgt_block, lgt_active(:,1), lgt_n(1) )
+            lgt_n(1), minActiveLevel_tree( lgt_block, 1, lgt_active, lgt_n ), &
+            maxActiveLevel_tree( lgt_block, 1, lgt_active, lgt_n )
         endif
 
     enddo ! loop over level
@@ -282,22 +282,21 @@ subroutine post_stl2dist(params)
     !=======================================================================
     ! coarsening of blocks with constant values
     !=======================================================================
-    call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,1), &
-    lgt_n(1), lgt_sortednumlist(:,:,1), hvy_active(:,1), &
-    hvy_n(1), 1, params%coarsening_indicator, hvy_block )
+    call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 1, params%coarsening_indicator, hvy_block )
 
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
     if (pruning) then
         if (params%rank==0) write(*,*) "now pruning!"
 
         call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
+        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID=1)
     endif
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=0.0_rk, iteration=-1 )
+    lgt_n, hvy_n, hvy_active, dF=1, tree_ID=1, time=0.0_rk, iteration=-1 )
 
 end subroutine

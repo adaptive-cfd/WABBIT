@@ -24,13 +24,14 @@ contains
 #include "gradient.f90"
 
 
-subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, which_norm, norm)
+subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID, which_norm, norm)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(inout)     :: hvy_active(:)                        !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                      !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                             !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
     real(kind=rk), intent(inout)        :: norm(:)                              !> the computed norm for each component of the vector
@@ -47,8 +48,8 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
     case ("L2")
         norm = 0.0_rk
         if (params%dim == 2) then
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
@@ -60,8 +61,8 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
                 enddo
             enddo
         else
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
@@ -80,8 +81,8 @@ subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hv
 
     case ("Linfty")
         norm = -1.0_rk
-        do k = 1, hvy_n
-            hvy_id = hvy_active(k)
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
             do p = 1, n_eqn
                 ! yes, we can include the ghost nodes: it does not matter for the infty
                 ! norm.

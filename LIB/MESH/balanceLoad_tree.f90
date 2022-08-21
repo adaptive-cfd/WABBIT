@@ -1,6 +1,6 @@
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
-subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+subroutine balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, predictable_dist)
 
     implicit none
@@ -9,11 +9,11 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: lgt_active(:)              !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n                      !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_active(:)              !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n                      !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     !> if true balance the load will always give the same block distribution
     !> for the same treestructure (default is False)
@@ -68,9 +68,9 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     ! First step: define how many blocks each mpirank should have.
     !---------------------------------------------------------------------------------
     if (is_predictable) then
-       call set_desired_num_blocks_per_rank(params, opt_dist_list, lgt_n)
+       call set_desired_num_blocks_per_rank(params, opt_dist_list, lgt_n(tree_ID))
     else
-       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n, hvy_n)
+       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n(tree_ID), hvy_n(tree_ID))
     endif
 
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
@@ -92,14 +92,14 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! Z - curve
         !-----------------------------------------------------------
         if (params%dim == 3) then
-            do k = 1, lgt_n
-                call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
-                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+            do k = 1, lgt_n(tree_ID)
+                call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
-            do k = 1, lgt_n
-                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k), 1:params%max_treelevel ), params%max_treelevel )
-                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+            do k = 1, lgt_n(tree_ID)
+                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), params%max_treelevel )
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif
     case("sfc_hilbert")
@@ -107,20 +107,20 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
         ! Hilbert curve
         !-----------------------------------------------------------
         if (params%dim == 3) then
-            do k = 1, lgt_n
+            do k = 1, lgt_n(tree_ID)
                 ! transfer treecode to hilbertcode
-                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
                 ! calculate sfc position from hilbertcode
                 call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
-                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
-            do k = 1, lgt_n
+            do k = 1, lgt_n(tree_ID)
                 ! transfer treecode to hilbertcode
-                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
                 ! calculate sfc position from hilbertcode
                 call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
-                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif
 
@@ -132,10 +132,10 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! sort sfc_list according to the first dimension, thus the position on
     ! the space filling curve (this was a bug, fixed: Thomas, 13/03/2018)
-    if (lgt_n > 1) then
-        call quicksort_ik(sfc_sorted_list, 1, lgt_n, 1, 2)
+    if (lgt_n(tree_ID) > 1) then
+        call quicksort_ik(sfc_sorted_list, 1, lgt_n(tree_ID), 1, 2)
     end if
-    call toc( "balance_load (SFC+sort)", MPI_wtime()-t1 )
+    call toc( "balanceLoad_tree (SFC+sort)", MPI_wtime()-t1 )
 
     !---------------------------------------------------------------------------------
     ! 2nd: plan communication (fill list of blocks to transfer)
@@ -154,7 +154,7 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
 
     ! prepare lists for transfering of blocks
     ! COLLECTIVE OPERATION
-    do k = 1, lgt_n
+    do k = 1, lgt_n(tree_ID)
         ! if the current owner of the SFC is supposed to have zero blocks
         ! then it does not really own this part of the SFC. So we look for the
         ! first rank which is supposed to hold at least one block, and declare it as owner
@@ -202,16 +202,16 @@ subroutine balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active,
     !---------------------------------------------------------------------------------
     ! 3rd: actual communication (send/recv)
     !---------------------------------------------------------------------------------
-    call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, msg="balance_load" )
-    call toc( "balance_load (comm)", MPI_wtime()-t1 )
+    call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, msg="balanceLoad_tree" )
+    call toc( "balanceLoad_tree (comm)", MPI_wtime()-t1 )
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
-    ! NOTE: an idea would be to also xfer the neighboring information (to save the update_neighbors
+    ! NOTE: an idea would be to also xfer the neighboring information (to save the updateNeighbors_tree
     ! call) but that is tricky: the neighbor list contains light ID of the neighbors, and those
     ! also change with the xfer.
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
     ! timing
-    call toc( "balance_load (TOTAL)", MPI_wtime()-t0 )
-end subroutine balance_load
+    call toc( "balanceLoad_tree (TOTAL)", MPI_wtime()-t0 )
+end subroutine balanceLoad_tree

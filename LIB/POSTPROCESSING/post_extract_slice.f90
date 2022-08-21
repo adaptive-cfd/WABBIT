@@ -25,11 +25,14 @@ subroutine post_extract_slice(params)
     integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
+    integer(kind=ik), allocatable           :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable           :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                        :: tree_ID=1, hvy_id
+
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, tc_length, dim, level
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, tc_length, dim, level
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
@@ -39,13 +42,16 @@ subroutine post_extract_slice(params)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:), treecode(:)
     integer(kind=ik), allocatable           :: lgt_block_2Dslice(:,:)
-    integer(kind=ik), allocatable           :: lgt_active_2Dslice(:), hvy_active_2Dslice(:)
+    integer(kind=ik), allocatable           :: lgt_active_2Dslice(:,:), hvy_active_2Dslice(:,:)
 
     integer(kind=ik)  :: Nblocks, g
     real(kind=rk)    :: x,y,z, x_query_normalized
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
     integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, i
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     call get_cmd_arg("--file", fname, "not given")
     call get_cmd_arg("--output", fname_out, "slice_00.h5")
@@ -60,7 +66,9 @@ subroutine post_extract_slice(params)
     endif
 
     ! get some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
     params%dim = dim
     params%Bs = Bs
     params%max_treelevel = tc_length
@@ -71,7 +79,7 @@ subroutine post_extract_slice(params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_blocks = lgt_n
+    params%number_blocks = lgt_n(tree_ID)
     params%block_distribution = "sfc_hilbert"
     params%order_predictor = "multiresolution_4th"
     allocate(params%symmetry_vector_component(1:3))
@@ -81,19 +89,22 @@ subroutine post_extract_slice(params)
 
     allocate(treecode(1:tc_length))
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
+    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID)
 
-    call read_field(fname, 1, params, hvy_block, hvy_n )
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
-
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:), hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     Nblocks = 0
-    do k = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
@@ -101,18 +112,20 @@ subroutine post_extract_slice(params)
         endif
     end do
 
-    write(*,*) "out of the total ", lgt_n," blocks, ", Nblocks, " are concerned by slicing"
+    write(*,*) "out of the total ", lgt_n(tree_ID)," blocks, ", Nblocks, " are concerned by slicing"
 
     allocate( hvy_block_2Dslice(1:Bs(2)+2*g, 1:Bs(3)+2*g, 1, 1, 1:Nblocks) )
     allocate( lgt_block_2Dslice(1:Nblocks, 1:tc_length+EXTRA_LGT_FIELDS))
-    allocate( lgt_active_2Dslice(1:Nblocks), hvy_active_2Dslice(1:Nblocks))
+    allocate( lgt_active_2Dslice(1:Nblocks, 1), hvy_active_2Dslice(1:Nblocks, 1))
 
     hvy_block_2Dslice = 0.0_rk
     lgt_block_2Dslice = -1
 
     i = 1
-    do k = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
@@ -143,10 +156,10 @@ subroutine post_extract_slice(params)
 
             ! interpolate the slice along the x-direction
             hvy_block_2Dslice(:, :, 1, 1, i) = &
-            +lagrange_polynomial(x_query_normalized, xi, 1)*hvy_block( ix-1, :, :, 1, hvy_active(k)) &
-            +lagrange_polynomial(x_query_normalized, xi, 2)*hvy_block( ix  , :, :, 1, hvy_active(k)) &
-            +lagrange_polynomial(x_query_normalized, xi, 3)*hvy_block( ix+1, :, :, 1, hvy_active(k)) &
-            +lagrange_polynomial(x_query_normalized, xi, 4)*hvy_block( ix+2, :, :, 1, hvy_active(k))
+            +lagrange_polynomial(x_query_normalized, xi, 1)*hvy_block( ix-1, :, :, 1, hvy_id) &
+            +lagrange_polynomial(x_query_normalized, xi, 2)*hvy_block( ix  , :, :, 1, hvy_id) &
+            +lagrange_polynomial(x_query_normalized, xi, 3)*hvy_block( ix+1, :, :, 1, hvy_id) &
+            +lagrange_polynomial(x_query_normalized, xi, 4)*hvy_block( ix+2, :, :, 1, hvy_id)
 
             ! this is just the inverse of what get_block_spacing_origin2 computes
             ! we use it to create the 2D treecode
@@ -176,10 +189,11 @@ subroutine post_extract_slice(params)
     params%domain_size = (/domain(2), domain(3), 0.0_rk/)
 
     do i = 1, Nblocks
-        lgt_active_2Dslice(i) = i
-        hvy_active_2Dslice(i) = i
+        lgt_active_2Dslice(i, tree_ID) = i
+        hvy_active_2Dslice(i, tree_ID) = i
     enddo
 
-    call write_field( fname_out, time, iteration, 1, params, lgt_block_2Dslice, hvy_block_2Dslice, lgt_active_2Dslice, Nblocks, Nblocks, hvy_active_2Dslice)
+    call saveHDF5_tree( fname_out, time, iteration, 1, params, lgt_block_2Dslice, &
+    hvy_block_2Dslice, lgt_active_2Dslice, (/Nblocks/), (/Nblocks/), hvy_active_2Dslice, tree_ID)
 
 end subroutine

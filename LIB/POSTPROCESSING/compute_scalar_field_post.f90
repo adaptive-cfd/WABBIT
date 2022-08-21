@@ -13,26 +13,33 @@ subroutine compute_scalar_field_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)                  :: file_fld, operator
+    character(len=cshort)              :: file_fld, operator
     real(kind=rk)                      :: time
-    integer(kind=ik)                   :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length
+    integer(kind=ik)                   :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3)     :: Bs
     character(len=2)                   :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
-    character(len=cshort)                  :: fname
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
     call get_command_argument(1, operator)
     call get_command_argument(2, file_fld)
+
     ! does the user need help?
     if (file_fld=='--help' .or. file_fld=='--h') then
         if (params%rank==0) then
@@ -54,7 +61,8 @@ subroutine compute_scalar_field_post(params)
     call check_file_exists(trim(file_fld))
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file_fld, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(file_fld, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     call get_command_argument(3, order)
 
@@ -86,40 +94,41 @@ subroutine compute_scalar_field_post(params)
     params%symmetry_vector_component(1) = "0" ! scalar
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
-    params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
-    ! allocate data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &
-    lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    ! allocate data    
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! read mesh and field
-    call read_mesh(file_fld, params, lgt_n, hvy_n, lgt_block)
-    call read_field(file_fld, 1, params, hvy_block, hvy_n)
+    call read_mesh(file_fld, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    call read_field(file_fld, 1, params, hvy_block, hvy_n, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    ! update neighbor relations
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! calculate vorticity from velocities
-    do k = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (operator == "--gradient") then
             if (params%dim == 3) then
-                call gradient( hvy_block(:,:,:,1,hvy_active(k)), &
-                dx, params%Bs, params%n_ghosts, &
-                params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_active(k)))
+                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%n_ghosts, &
+                params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id))
             else
-                call gradient( hvy_block(:,:,:,1,hvy_active(k)), &
-                dx, params%Bs, params%n_ghosts, &
-                params%order_discretization, hvy_tmp(:,:,:,1:2,hvy_active(k)))
+                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%n_ghosts, &
+                params%order_discretization, hvy_tmp(:,:,:,1:2,hvy_id))
             end if
 
         else
@@ -129,17 +138,17 @@ subroutine compute_scalar_field_post(params)
 
     if (operator=="--gradient") then
         write( fname,'(a, "_", i12.12, ".h5")') 'gradx', nint(time * 1.0e6_rk)
-        call write_field(fname, time, iteration, 1, params, lgt_block,&
-        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 1, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
 
         write( fname,'(a, "_", i12.12, ".h5")') 'grady', nint(time * 1.0e6_rk)
-        call write_field(fname, time, iteration, 2, params, lgt_block,&
-        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+        call saveHDF5_tree(fname, time, iteration, 2, params, lgt_block,&
+        hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
 
         if (params%dim == 3) then
             write( fname,'(a, "_", i12.12, ".h5")') 'gradz', nint(time * 1.0e6_rk)
-            call write_field(fname, time, iteration, 3, params, lgt_block, &
-            hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active )
+            call saveHDF5_tree(fname, time, iteration, 3, params, lgt_block, &
+            hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
         end if
     endif
 end subroutine compute_scalar_field_post

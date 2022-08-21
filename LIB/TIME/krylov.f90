@@ -1,5 +1,5 @@
 subroutine krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
+    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist, tree_ID)
     ! use module_blas
     implicit none
 
@@ -28,6 +28,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block
     integer(kind=ik), intent(inout)     :: hvy_n(:)
     !> number of active blocks (light data)
     integer(kind=ik), intent(inout)     :: lgt_n(:)
+    integer(kind=ik), intent(in)        :: tree_ID
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------------------
@@ -70,7 +71,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block
 
     ! the very last slot (M+3) is the "reference right hand side"
     call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_mask, hvy_tmp, lgt_block, &
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
+    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu
@@ -98,7 +99,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, lgt_block, hvy_block
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
         call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
-        hvy_mask, hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
+        hvy_mask, hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
 
         ! linearization of RHS slot (M_max+1)
         do k = 1, hvy_n(tree_ID_flow)

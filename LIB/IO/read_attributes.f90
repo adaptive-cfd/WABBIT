@@ -1,6 +1,7 @@
 !> \brief read attributes saved in a hdf5-file
 
-subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, periodic_BC, symmetry_BC, verbosity)
+subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, &
+    periodic_BC, symmetry_BC, verbosity)
 
     implicit none
     !> file name
@@ -79,6 +80,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
             periodic_BC = .true.
         end where
     endif
+    
     if (present(symmetry_BC)) then
         call read_attribute(file_id, "blocks", "symmetry_BC", tmp2, (/0_ik, 0_ik, 0_ik/))
 

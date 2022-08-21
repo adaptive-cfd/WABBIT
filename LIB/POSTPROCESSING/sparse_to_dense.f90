@@ -1,6 +1,3 @@
-!> \brief postprocessing routine for interpolation of a given field to the desired level
-!-----------------------------------------------------------------------------------------------------
-
 subroutine sparse_to_dense(params)
     use module_precision
     use module_mesh
@@ -18,13 +15,15 @@ subroutine sparse_to_dense(params)
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration
 
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
-    real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(kind=ik)                        :: hvy_n, lgt_n, max_neighbors, level, k, tc_length
+    integer(kind=ik), allocatable      :: lgt_block(:, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
+    integer(kind=ik)                        :: max_neighbors, level, k, tc_length
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in, order
@@ -32,7 +31,9 @@ subroutine sparse_to_dense(params)
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks
-!-----------------------------------------------------------------------------------------------------
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     call get_command_argument(2, file_in)
     call get_command_argument(3, file_out)
@@ -59,24 +60,24 @@ subroutine sparse_to_dense(params)
     end if
 
 
-
     ! get values from command line (filename and level for interpolation)
     call check_file_exists(trim(file_in))
-    call read_attributes(file_in, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, &
+    params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     if (len_trim(file_out)==0) then
-      call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
+        call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
 
     ! check if optional arguments are specified
     if (command_argument_count()<4) then
-      ! set defaults
-      order = "4"
-      level = tc_length
+        ! set defaults
+        order = "4"
+        level = tc_length
     else
-      call get_command_argument(4, level_in)
-      read(level_in,*) level
-      call get_command_argument(5, order)
+        call get_command_argument(4, level_in)
+        read(level_in,*) level
+        call get_command_argument(5, order)
     endif
 
     write(*,*) "order=", order
@@ -111,7 +112,7 @@ subroutine sparse_to_dense(params)
     params%n_eqn  = 1
     params%block_distribution="sfc_hilbert"
 
-     if (params%dim==3) then
+    if (params%dim==3) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
         max_neighbors = 74
@@ -146,50 +147,50 @@ subroutine sparse_to_dense(params)
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
     !> \todo change that for 3d case
-    params%number_blocks = ceiling( 4.0*dble(max(lgt_n, number_dense_blocks)) / dble(params%number_procs) )
+    params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
 
     if (params%rank==0) then
         write(*,'("Data dimension: ",i1,"D")') params%dim
-        write(*,'("File contains Nb=",i6," blocks of size Bs=",i4," x ",i4," x ",i4)') lgt_n, Bs(1),Bs(2),Bs(3)
+        write(*,'("File contains Nb=",i6," blocks of size Bs=",i4," x ",i4," x ",i4)') lgt_n(tree_ID), Bs(1),Bs(2),Bs(3)
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("Time=",g12.4," it=",i9)') time, iteration
         write(*,'("Length of treecodes in file=",i3," in memory=",i3)') tc_length, params%max_treelevel
         write(*,'("   NCPU=",i6)') params%number_procs
-        write(*,'("File   Nb=",i6," blocks")') lgt_n
+        write(*,'("File   Nb=",i6," blocks")') lgt_n(tree_ID)
         write(*,'("Memory Nb=",i6)') params%number_blocks
         write(*,'("Dense  Nb=",i6)') number_dense_blocks
     endif
 
     ! allocate data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! read field
-    call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block)
-    call read_field(file_in, 1, params, hvy_block, hvy_n)
+    call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    call read_field(file_in, 1, params, hvy_block, hvy_n, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
     ! balance the load
-    call balance_load(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+    call balanceLoad_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (operator=="sparse-to-dense") then
-        call to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, target_level=level)
+        call toEquidistant_tree(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID, target_level=level)
 
     elseif (operator=="refine-coarsen") then
-        write(*,*) "starting at", lgt_n
+        write(*,*) "starting at", lgt_n(tree_ID)
 
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_flow )
+        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID )
 
-        write(*,*) "refined to", lgt_n
+        write(*,*) "refined to", lgt_n(tree_ID)
 
         params%threshold_mask = .false.
         params%coarsening_indicator = "threshold-state-vector"
@@ -200,23 +201,23 @@ subroutine sparse_to_dense(params)
         params%force_maxlevel_dealiasing = .false.
         params%min_treelevel = 1
 
-        call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
         lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp )
 
-        write(*,*) "coarsened to", lgt_n
+        write(*,*) "coarsened to", lgt_n(tree_ID)
     endif
 
-    call write_field(file_out, time, iteration, 1, params, lgt_block, &
-        hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
+    call saveHDF5_tree(file_out, time, iteration, 1, params, lgt_block, &
+    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
 
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
-            trim(adjustl(file_in)), level, trim(adjustl(file_out))
-         write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now)")') &
-             min_active_level( lgt_block, lgt_active, lgt_n ),&
-             max_active_level( lgt_block, lgt_active, lgt_n )
+        trim(adjustl(file_in)), level, trim(adjustl(file_out))
+        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now)")') &
+        minActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n ),&
+        maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
     end if
 
-    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp)
+    call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 end subroutine sparse_to_dense

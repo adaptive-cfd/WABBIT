@@ -10,18 +10,19 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n )
+subroutine ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
     implicit none
     type (type_params), intent(in)      :: params                 !> user defined parameter structure
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)        !> light data array
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)     !> neighbor list
-    integer(kind=ik), intent(inout)     :: lgt_active(:)          !> active_block_list (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
-    integer(kind=ik), intent(in)        :: lgt_n                  !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)          !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n                  !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)        !> active_block_list (light data)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), intent(in)        :: lgt_n(:)               !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)        !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)               !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik)                    :: ierr                   ! MPI error variable
     integer(kind=ik)                    :: rank                   ! process rank
     ! loop variables
@@ -30,7 +31,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     logical                             :: grid_changed, test2    ! status of grid changing
 
     ! it turned out that in some situations ensure_completeness is very expensive, mostly because
-    ! of the find_sisters routine. We therefore at least do this procedure only once and not
+    ! of the findSisters_tree routine. We therefore at least do this procedure only once and not
     ! in each iteration of the algorithm.
     integer(kind=ik), allocatable, save  :: sisters(:)
 
@@ -59,7 +60,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
     ! is reached. It means just the same as 0 (stay) in the context of this routine
 
 
-    ! we repeat the ensure_gradedness procedure until this flag is .false. since as long
+    ! we repeat the ensureGradedness_tree procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
     grid_changed = .true. ! set true to trigger the loop
     counter = 0
@@ -71,8 +72,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
         t0 = MPI_wtime()
         ! we loop over heavy data here: parallel execution.
-        do k = 1, hvy_n
-            hvy_id = hvy_active(k)
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt(lgt_id, hvy_id, rank, N)
 
             !-------------------------------------------------------------------
@@ -86,10 +87,10 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
             !      v
             ! -1  -1    -1   0
             ! -1  -1    -1  -1
-            ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensure_gradedness routine.
+            ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
             if ( lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == -1) then
                 ! find the sisters of this block
-                call find_sisters(params, lgt_id, sisters, lgt_block, lgt_n, lgt_sortednumlist)
+                call findSisters_tree(params, lgt_id, sisters, lgt_block, lgt_n, lgt_sortednumlist, tree_ID)
                 ! check if all sisters share the -1 status, remove it if they don't
                 call ensure_completeness( params, lgt_block, lgt_id, sisters )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
@@ -107,8 +108,8 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                     if ( hvy_neighbor( hvy_id, i ) > 0 ) then
                         ! check neighbor treelevel
                         mylevel         = lgt_block( lgt_id, Jmax + IDX_MESH_LVL )
-                        neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + IDX_MESH_LVL )
-                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ) , Jmax + IDX_REFINE_STS )
+                        neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ), Jmax + IDX_MESH_LVL )
+                        neighbor_status = lgt_block( hvy_neighbor( hvy_id, i ), Jmax + IDX_REFINE_STS )
 
                         if (mylevel == neighbor_level) then
                             ! neighbor on same level
@@ -161,7 +162,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                 ! so we both would just go up one level together - that's fine
                             end if
                         else
-                            call abort(785879, "ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
+                            call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
                         end if
                     end if ! if neighbor exists
                 end do ! loop over neighbors
@@ -194,13 +195,13 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
                                 endif
                             end if
                         else
-                            call abort(785879, "ERROR: ensure_gradedness: my neighbor does not seem to have -1,0,+1 level diff!")
+                            call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
                         end if
                     end if ! if neighbor exists
                 end do
             end if ! refinement status
         end do ! loop over blocks
-        call toc( "ensure_gradedness (processing part)", MPI_Wtime()-t0 )
+        call toc( "ensureGradedness_tree (processing part)", MPI_Wtime()-t0 )
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
         ! only the blocks it holds, not blocks held by other ranks.
@@ -210,7 +211,7 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
         !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()
         call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
-        call toc( "ensure_gradedness (sync_lgt)", MPI_Wtime()-t0 )
+        call toc( "ensureGradedness_tree (sync_lgt)", MPI_Wtime()-t0 )
 
         ! avoid infinite loops
         counter = counter + 1
@@ -218,4 +219,4 @@ subroutine ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n
 
     end do ! end do of repeat procedure until grid_changed==.false.
 
-end subroutine ensure_gradedness
+end subroutine ensureGradedness_tree

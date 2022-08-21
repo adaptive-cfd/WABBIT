@@ -4,7 +4,6 @@ subroutine post_dump_neighbors(params)
     use module_mesh
     use module_params
     use module_IO
-    use module_forest
     use module_mpi
     use module_operators
 
@@ -14,18 +13,23 @@ subroutine post_dump_neighbors(params)
     type (type_params), intent(inout)  :: params
     character(len=cshort)      :: file, operator
     real(kind=rk)          :: time
-    integer(kind=ik)       :: iteration, k, lgt_id, lgt_n, hvy_n, tc_length
+    integer(kind=ik)       :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
     integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:), lgt_n(:), hvy_n(:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     call get_command_argument(1, operator)
     call get_command_argument(2, file)
@@ -37,7 +41,7 @@ subroutine post_dump_neighbors(params)
             write(*,*) " Wabbit postprocessing: dump neighbors"
             write(*,*) "-----------------------------------------------------------"
             write(*,*) " Read in a data field (2D or 3D) and computes the neighbor relations"
-            write(*,*) " (update_neighbors) for all blocks. then, dumps lgt_block and hvy_neighbor to "
+            write(*,*) " (updateNeighbors_tree) for all blocks. then, dumps lgt_block and hvy_neighbor to "
             write(*,*) " ascii file. Useful for development"
             write(*,*) " Best used in serial monoproc: then, hvy_id == lgt_id"
         end if
@@ -52,7 +56,8 @@ subroutine post_dump_neighbors(params)
 
 
     ! get some parameters from one of the files (they should be the same in all of them)
-    call read_attributes(file, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
     ! unused so just fill any value
@@ -69,20 +74,21 @@ subroutine post_dump_neighbors(params)
     allocate(params%butcher_tableau(1,1))
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
-    params%number_blocks = ceiling(  real(lgt_n)/real(params%number_procs) )
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     ! allocate data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! read mesh and field
-    call read_tree((/file/), 1, params, lgt_n, lgt_block, hvy_block, hvy_tmp, tree_id_optional=1)
+    call read_tree((/file/), 1, params, lgt_n(tree_ID), lgt_block, hvy_block, hvy_tmp, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
     open(14, file="lgt_block.txt", status='replace')
     do k = 1, size(lgt_block,1)

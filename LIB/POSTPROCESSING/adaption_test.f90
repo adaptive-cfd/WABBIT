@@ -1,7 +1,6 @@
 subroutine adaption_test(params)
   use module_precision
   use module_params
-  use module_forest
   use module_IO
   use module_mpi
   use module_globals
@@ -24,7 +23,7 @@ subroutine adaption_test(params)
   integer(kind=tsize), allocatable:: lgt_sortednumlist(:,:,:)
   integer(kind=ik)                :: max_neighbors, level, k, Bs(3), tc_length
   real(kind=rk), dimension(3)     :: domain
-  integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id_input, tree_id_adapt
+  integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID_input, tree_ID_adapt
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
   integer(kind=ik) :: j, n_components=1, tree_n, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
@@ -74,7 +73,7 @@ subroutine adaption_test(params)
   params%min_treelevel=1
   params%physics_type="POD"
   params%eps_normalized=.True. ! normalize the statevector before thresholding
-  params%adapt_mesh = .True.! .False.!.True.
+  params%adapt_tree = .True.! .False.!.True.
   params%coarsening_indicator="threshold-state-vector"
   params%threshold_mask=.False.
   params%n_eqn = n_components
@@ -137,9 +136,9 @@ subroutine adaption_test(params)
 
   hvy_neighbor = -1_ik
   tree_n= 0_ik ! reset number of trees in forest
-  tree_id_input = 1
-  tree_id_adapt = 2
-  call read_field2tree(params, params%input_files , params%n_eqn, tree_id_input, &
+  tree_ID_input = 1
+  tree_ID_adapt = 2
+  call read_field2tree(params, params%input_files , params%n_eqn, tree_ID_input, &
                 tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                 hvy_active, hvy_n, hvy_tmp, hvy_neighbor,  verbosity=.false.)
 
@@ -150,38 +149,37 @@ subroutine adaption_test(params)
   ! need the L2 norm of the input for the relative error
   L2norm = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
                lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
-               hvy_active, hvy_n, hvy_tmp, tree_id_input, verbose )
+               hvy_active, hvy_n, hvy_tmp, tree_ID_input, verbose )
 
   do i = 1, n_eps
     ! copy form original data
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id_adapt, tree_id_input)
+                hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID_adapt, tree_ID_input)
     ! adapt to given eps:
     read (unit=eps_str_list(i),fmt=*) params%eps
-    call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id_adapt), &
-        lgt_n(tree_id_adapt), lgt_sortednumlist(:,:,tree_id_adapt), hvy_active(:,tree_id_adapt), &
-        hvy_n(tree_id_adapt), tree_id_adapt, params%coarsening_indicator, hvy_tmp )
+    call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_adapt, params%coarsening_indicator, hvy_tmp )
 
-    lgt_n_tmp = lgt_n(tree_id_adapt)
-    Jmin = min_active_level( lgt_block, lgt_active(:,tree_id_adapt), lgt_n(tree_id_adapt) )
-    Jmax = max_active_level( lgt_block, lgt_active(:,tree_id_adapt), lgt_n(tree_id_adapt) )
+    lgt_n_tmp = lgt_n(tree_ID_adapt)
+    Jmin = minActiveLevel_tree(lgt_block, tree_ID_adapt, lgt_active, lgt_n)
+    Jmax = maxActiveLevel_tree(lgt_block, tree_ID_adapt, lgt_active, lgt_n)
 
     if (save_all) then
       do j = 1, n_components
           write( file_out, '("u",i1,"-eps", A,"_",i12.12 ,".h5")') j, trim(adjustl(eps_str_list(i))), nint(time * 1.0e6_rk)
 
           call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, tree_id_adapt , time , iteration )
+          lgt_n, hvy_n, hvy_active, j, tree_ID_adapt , time , iteration )
       end do
     end if
 
     ! compare to original data:
     call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id_adapt, tree_id_input)
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID_adapt, tree_ID_input)
     ! compute L2 norm
     error(i) = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
                                 lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
-                                 hvy_active, hvy_n, hvy_tmp, tree_id_adapt, verbose )
+                                 hvy_active, hvy_n, hvy_tmp, tree_ID_adapt, verbose )
     error(i) = error(i)/L2norm
     Nb_adapt(i) = lgt_n_tmp
 
@@ -190,7 +188,7 @@ subroutine adaption_test(params)
        write(*,'("Field adapted to eps=",es10.2," rel err=", es10.2," Nblocks=", i6," Nb_adapt/Nb_dense=",f6.1,"% Nb_adapt/Nb_input=",f5.1,"% [Jmin,Jmax]=[",i2,",",i2,"]")') &
               params%eps, error(i), lgt_n_tmp, &
               100.0*dble(lgt_n_tmp)/dble( (2**params%max_treelevel)**params%dim ), &
-              100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_id_input)), Jmin, Jmax
+              100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), Jmin, Jmax
     endif
   end do
   ! elapsed time for reading and coarsening the data
@@ -205,7 +203,7 @@ subroutine adaption_test(params)
     write(14,'("eps", 1x, " L2error", 1x ,"Nb blocks", 1x , "Nb_adapt/Nb_input")')
     do i = 1, n_eps
       write(14,FMT='(A," ",es15.8," ",i7," ",es10.3)') &
-      trim(adjustl(eps_str_list(i))),error(i),Nb_adapt(i), 1.0_rk*dble(Nb_adapt(i))/dble(lgt_n(tree_id_input))
+      trim(adjustl(eps_str_list(i))),error(i),Nb_adapt(i), 1.0_rk*dble(Nb_adapt(i))/dble(lgt_n(tree_ID_input))
     enddo
     close(14)
   end if

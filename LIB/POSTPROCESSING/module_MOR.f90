@@ -6,7 +6,6 @@
 module module_MOR
 
   use mpi
-  use module_forest
   use module_precision
   use module_globals
   use module_params
@@ -38,7 +37,7 @@ contains
   !>      for POD modes
   !> The output is as the following:
   !>  1.) All input snapshots are returned with tree: id 1, 2, ..., N_snapshots
-  !>  2.) The POD modes are saved in trees with tree_ids:
+  !>  2.) The POD modes are saved in trees with tree_IDs:
   !>            N_snapshots+1, N_snapshots+2, ..., N_snapshots+truncation_rank
   !>  3.) On output the truncation rank is updated to the acutal number of modes with
   !>      squared singular value bigger then the given or default truncation error
@@ -60,7 +59,7 @@ contains
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)       :: lgt_sortednumlist(:,:,:)
     integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
-    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
+    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk), optional, intent(in)      :: truncation_error
     !> if true we write out all temporal coefficients and eigenvalues
@@ -69,8 +68,8 @@ contains
     !---------------------------------------------------------------
     real(kind=rk) :: C(tree_n,tree_n), V(tree_n,tree_n), work(5*tree_n), &
                     eigenvalues(tree_n), alpha(tree_n), max_err, t_elapse, Volume
-    integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                      free_tree_id, tree_id, max_nr_pod_modes, it
+    integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_ID, &
+                      free_tree_ID, tree_ID, max_nr_pod_modes, it
     character(len=cshort):: filename
     character(len=30) :: rowfmt
     !---------------------------------------------------------------------------
@@ -98,7 +97,7 @@ contains
       write(*,'("Number of SNAPSHOTS used: ",i4)') N_snapshots
       write(*,'("Desired Truncation Rank: ", i4)') max_nr_pod_modes
       write(*,'("Maximal Error in L2 norm: ",es12.4)') max_err
-      if (params%adapt_mesh) write(*,'("Compression threshold eps: ",es12.4)') params%eps
+      if (params%adapt_tree) write(*,'("Compression threshold eps: ",es12.4)') params%eps
       write(*,'(80("-"))')
       write(*, *)
     endif
@@ -194,14 +193,14 @@ contains
     !> POD eigenvalues and eigenbasis to construct modes
     real(kind=rk),  intent(in)               :: eigenvalues(:), eigenbasis(:, :)
     integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
-    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_id_dest
+    !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk), optional, intent(in)      :: truncation_error
     !---------------------------------------------------------------
     real(kind=rk)                            ::  max_err, t_elapse, Volume
     real(kind=rk) ,allocatable               ::  alpha(:), a_coefs(:,:)
-    integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_id, &
-                       tree_id, N_modes, max_nr_pod_modes, it, j
+    integer(kind=ik):: N_snapshots, root, ierr, i, rank, pod_mode_tree_ID, &
+                       tree_ID, N_modes, max_nr_pod_modes, it, j
     character(len=cshort)                        :: filename
     !---------------------------------------------------------------------------
     ! check inputs and set default values
@@ -238,7 +237,7 @@ contains
   ! construct POD basis functions (modes)
   !---------------------------------------------------------------------------
   N_modes = 0
-  pod_mode_tree_id= N_snapshots + 1
+  pod_mode_tree_ID= N_snapshots + 1
   if ( rank == 0 ) write(*,*) "Constructing POD modes (X*V)"
   do i = N_snapshots, 1, -1
   ! compute normalized eigenvectors. If eigenvalues are to small discard modes
@@ -254,28 +253,27 @@ contains
     alpha = eigenbasis(:,i)/sqrt(dble(N_snapshots)*eigenvalues(i))
     ! calculate pod modes:
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, pod_mode_tree_id, 1)
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, pod_mode_tree_ID, 1)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
-                                    pod_mode_tree_id, alpha(1))
+                                    pod_mode_tree_ID, alpha(1))
 
     ! Linear Combination of the snapshots to build the i-th POD MODE
-    do tree_id = 2, N_snapshots
+    do tree_ID = 2, N_snapshots
       call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_id, tree_id, b=alpha(tree_id))
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, pod_mode_tree_ID, tree_ID, b=alpha(tree_ID))
     end do
 
-    if ( params%adapt_mesh) then
-      call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,pod_mode_tree_id), &
-      lgt_n(pod_mode_tree_id), lgt_sortednumlist(:,:,pod_mode_tree_id), hvy_active(:,pod_mode_tree_id), &
-      hvy_n(pod_mode_tree_id), pod_mode_tree_id, params%coarsening_indicator, hvy_tmp )
+    if ( params%adapt_tree) then
+      call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+      lgt_n, lgt_sortednumlist, hvy_active, hvy_n, pod_mode_tree_ID, params%coarsening_indicator, hvy_tmp )
     endif
 
     t_elapse = MPI_WTIME() - t_elapse
     if (rank == 0) then
           write(*,'("POD mode ", i4," constructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"] Nblocks=",i12)') &
           N_modes, t_elapse,&
-          min_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
-          max_active_level( lgt_block, lgt_active(:,pod_mode_tree_id), lgt_n(pod_mode_tree_id) ), &
+          minActiveLevel_tree( lgt_block, pod_mode_tree_ID, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, pod_mode_tree_ID, lgt_active, lgt_n ), &
           sum(lgt_n(1:N_snapshots+2))
     endif
     !----------------------------------
@@ -284,7 +282,7 @@ contains
     do j = 1, params%n_eqn
         write( filename, '("mode",i1,"_", i12.12, ".h5")') j, N_modes
         call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, tree_id , 0.0_rk , N_modes )
+          lgt_n, hvy_n, hvy_active, j, tree_ID , 0.0_rk , N_modes )
     end do
 
     !---------------------------------------------------------------------------
@@ -295,7 +293,7 @@ contains
          a_coefs(it,N_modes) = scalar_product_two_trees( params, tree_n, &
                          lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                          hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                         it, pod_mode_tree_id)
+                         it, pod_mode_tree_ID)
     enddo
     t_elapse = MPI_WTIME() - t_elapse
     if ( rank == 0 ) write(*,'("Time Coefficient Mode ",i3," computed in t_cpu=", es12.4, "sec" )') &
@@ -370,7 +368,6 @@ contains
   subroutine post_POD(params)
     use module_precision
     use module_params
-    use module_forest
     use module_mpi
 
     implicit none
@@ -394,7 +391,7 @@ contains
     integer(hid_t)                          :: file_id
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, truncation_rank_in = -1
+    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID, truncation_rank_in = -1
     integer(kind=ik) :: i, N_snapshots, dim, fsize, lgt_n_tmp, truncation_rank = 3
     integer(kind=ik) :: j, n_components=1, io_error,tree_n
     real(kind=rk) :: truncation_error=0.0_rk, truncation_error_in=-1.0_rk, maxmem=-1.0_rk, &
@@ -432,7 +429,7 @@ contains
     call get_cmd_arg( "--nmodes", truncation_rank_in, default=-1_ik )
     call get_cmd_arg( "--error", truncation_error_in, default=-1.0_rk )
     call get_cmd_arg( "--list", fname_list )
-    call get_cmd_arg( "--memory", args, default="2GB")
+    call get_cmd_arg( "--memory", args, default="-2.0GB")
     read(args(1:len_trim(args)-2),* ) maxmem
     call get_cmd_arg( "--save_all", save_all, default=.true.)
     call get_cmd_arg( "--start_from_eigenbasis", eigenbasis_files)
@@ -456,12 +453,12 @@ contains
 
     call set_wavelet_params(params, order )
 
-    if ( eps > 0) then
+    if (eps > 0) then
       ! adapt the mesh if possible
-      params%adapt_mesh = .True.! .False.!.True.
+      params%adapt_tree = .True.! .False.!.True.
       params%eps=eps
     else
-      params%adapt_mesh = .False.
+      params%adapt_tree = .False.
       params%eps = 0.0_rk
     endif
 
@@ -473,6 +470,7 @@ contains
     if (allocated(eigenbasis_files)) start_from_eigenbasis = .True.
 
     call count_lines_in_ascii_file_mpi(fname_list(1), N_snapshots, n_header=0)
+
     !--------------------------
     ! check if files exists:
     !-------------------------------
@@ -522,13 +520,18 @@ contains
                          params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(file_in(i,j), lgt_n_tmp, time(i), iteration(i), domain, bs, level, dim)
+
         params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
-        if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
-        if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
-        if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
+
+        if (any(params%Bs /= Bs)) call abort( 203191, " Block size is not consistent ")
+
+        if (abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
+
+        if (params%dim /= dim) call abort( 203193, "Dimension is not consistent ")
       end do
       i = i + 1
     end do
+
     ! now we have all information to allocate the grid and set up the forest:
     if (truncation_rank_in /= -1) then
       fsize = N_snapshots + truncation_rank + 2 !we need some extra fields for storing etc
@@ -546,6 +549,7 @@ contains
     endif
 
     call adjust_n_ghosts_for_scalarproduct(params)
+
     !----------------------------------
     ! allocate data
     !----------------------------------
@@ -555,26 +559,24 @@ contains
     ! call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
     ! lgt_sortednumlist,tree_n)
 
-
     hvy_neighbor = -1_ik
     tree_n= 0_ik ! reset number of trees in forest
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
     t_elapse(1) = MPI_WTIME()
-    do tree_id = 1, N_snapshots
-      call read_field2tree(params,file_in(tree_id,:) , params%n_eqn, tree_id, &
+    do tree_ID = 1, N_snapshots
+      call read_field2tree(params, file_in(tree_ID,:), params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor,  verbosity=.false.)
       !----------------------------------
       ! Adapt the data to the given eps
       !----------------------------------
-      if (params%adapt_mesh) then
+      if (params%adapt_tree) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-          call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_id), &
-          lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), &
-          hvy_n(tree_id), tree_id, params%coarsening_indicator, hvy_tmp )
+          call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+          lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, params%coarsening_indicator, hvy_tmp )
       endif
     end do
     ! elapsed time for reading and coarsening the data
@@ -593,10 +595,10 @@ contains
         do i = 1, N_snapshots
           write(*, '("Snapshot=",i3 , " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           i, iteration(i), time(i), lgt_n(i), &
-          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
-          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
-          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          minActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n )
           write(*, '("Files:")')
           do j = 1, n_components
             write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
@@ -649,7 +651,6 @@ contains
   subroutine post_PODerror(params)
     use module_precision
     use module_params
-    use module_forest
     use module_mpi
 
     implicit none
@@ -673,9 +674,9 @@ contains
     integer(hid_t)                   :: file_id
     real(kind=rk), dimension(3)      :: domain
     integer(hsize_t), dimension(2)   :: dims_treecode
-    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes, min_lvl
+    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID, dF, N_modes, min_lvl
     integer(kind=ik) :: i, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
-    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_id, unused_int,tree_n
+    integer(kind=ik) :: j, n_components=1, io_error, reconst_tree_ID, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
     logical :: verbose = .false., save_all = .false., all_snapshots_dense = .false.
@@ -751,10 +752,10 @@ contains
 
     if ( eps > 0.0_rk) then
       ! adapt the mesh if possible
-      params%adapt_mesh = .True.! .False.!.True.
+      params%adapt_tree = .True.! .False.!.True.
       params%eps=eps
     else
-      params%adapt_mesh = .False.
+      params%adapt_tree = .False.
       params%eps = 0.0_rk
     endif
 
@@ -902,16 +903,17 @@ contains
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
-    do tree_id = 1, N_snapshots
-      call read_field2tree(params,snapshot_in(tree_id,:) , params%n_eqn, tree_id, &
+    min_lvl = 9999
+    do tree_ID = 1, N_snapshots
+      call read_field2tree(params,snapshot_in(tree_ID,:) , params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.false.)
+      min_lvl = min( min_lvl, minActiveLevel_tree(lgt_block, tree_ID) )
     end do
 
-    min_lvl = min_active_level(lgt_block)
     if (min_lvl==params%max_treelevel) then
       all_snapshots_dense = .True.
-      params%adapt_mesh=.False.
+      params%adapt_tree=.False.
       ! it is faster to bring all modes to the same mesh at this point,
       ! since otherwise they will be refined and coarsed when reconstructing
       ! the snapshots. this produces a lot of overhead and makes the calculations slow
@@ -926,20 +928,20 @@ contains
     ! READ ALL MODES
     !----------------------------------
     do j = 1, N_modes
-      tree_id = N_snapshots+j
-      call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_id, &
+      tree_ID = N_snapshots+j
+      call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity=.false.)
       ! it is faster to bring all modes to the same mesh at this point,
       ! since otherwise they will be refined and coarsed when reconstructing
       ! the snapshots. this produces a lot of overhead and makes the calculations slow
       if ( all_snapshots_dense ) then
-        call to_dense_mesh(params, lgt_block, lgt_active(:,tree_id), lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), &
-                        hvy_block, hvy_active(:,tree_id), hvy_n(tree_id), hvy_tmp, hvy_neighbor, target_level=params%max_treelevel)
+        call toEquidistant_tree(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+                        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID, target_level=params%max_treelevel)
       endif
       if ( params%rank == 0 ) then
-        write(*,'("Mode", i3," Stored in Tree_id: ",i3)') j, tree_id
-        write(*,'("Number blocks ",i12)') lgt_n(tree_id)
+        write(*,'("Mode", i3," Stored in Tree_id: ",i3)') j, tree_ID
+        write(*,'("Number blocks ",i12)') lgt_n(tree_ID)
       endif
     end do
 
@@ -957,10 +959,10 @@ contains
         do i = 1, N_snapshots
           write(*, '("Snapshot=",i3 , " time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           i, time(i), lgt_n(i), &
-          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
-          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
-          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          minActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n )
         end do
         write(*,*) "Modes used for reconstruction:"
         do i = 1, N_modes
@@ -1002,7 +1004,7 @@ contains
     !---------------------------------------------------------------
     !---------------------------------------------------------------
     if (tree_n < fsize) then
-      reconst_tree_id = tree_n + 1
+      reconst_tree_ID = tree_n + 1
     else
        call abort(2808191, "Take care of the trees, they will take care of you.")
     end if
@@ -1012,7 +1014,7 @@ contains
 
         call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-        a_coefs, j , r, reconst_tree_id, opt_offset_mode_tree_id=N_snapshots)
+        a_coefs, j , r, reconst_tree_ID, opt_offset_mode_tree_ID=N_snapshots)
 
         !---------------------------------
         ! save the reconstructed snapshot
@@ -1025,17 +1027,17 @@ contains
             !                   - time of reconstructed snapshot
             write( filename, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') dF, r, nint(time(j) * 1.0e6_rk)
             call write_tree_field(filename, params, lgt_block, lgt_active, hvy_block, &
-            lgt_n, hvy_n, hvy_active, dF, reconst_tree_id ,time(j), iter_list(j) )
+            lgt_n, hvy_n, hvy_active, dF, reconst_tree_ID ,time(j), iter_list(j) )
           end do
         end if
         !---------------------------------
 
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_id, j)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, reconst_tree_ID, j)
         ! compute L2 norm
         norm = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
                                     lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
-                                     hvy_active, hvy_n, hvy_tmp, reconst_tree_id, verbose )
+                                     hvy_active, hvy_n, hvy_tmp, reconst_tree_ID, verbose )
         L2norm = L2norm + norm**2
       end do
       L2error(r) = L2norm/L2norm_snapshots**2
@@ -1098,7 +1100,7 @@ contains
       ! result
       real(kind=rk)                       :: L2norm
       !-----------------------------------------------------------------
-      integer(kind=ik)                    :: lgt_id, hvy_id, ierr, tree_id = 1
+      integer(kind=ik)                    :: lgt_id, hvy_id, ierr, tree_ID = 1
       integer(kind=ik)                    :: k, rank, g, Bs(3), dF=1
       real(kind=rk)                       :: norm, x0(3), dx(3), Volume
       logical                             :: verbose=.false.
@@ -1110,11 +1112,11 @@ contains
       Volume = product(params%domain_size(1:params%dim))
       L2norm = 0.0_rk
       ! Loop over the active hvy_data
-      do tree_id =1, N_snapshots
+      do tree_ID =1, N_snapshots
           norm = compute_tree_L2norm( params, tree_n, &
                                       lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                       hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp, &
-                                      tree_id, verbose)
+                                      tree_ID, verbose)
           L2norm = L2norm + norm**2
       end do
 
@@ -1146,7 +1148,7 @@ contains
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !---------------------------------------------------------------
-    integer(kind=ik)                    :: tree_id1, tree_id2, N_snapshots, rank
+    integer(kind=ik)                    :: tree_ID1, tree_ID2, N_snapshots, rank
     real(kind=rk)                       :: C_val, Volume, t_elapse, t_inc(2)
     integer(kind=ik)  , allocatable     :: lgt_active_tmp(:,:), lgt_block_tmp(:,:),lgt_n_tmp(:)
 
@@ -1168,23 +1170,23 @@ contains
     Volume = product(params%domain_size(1:params%dim))
     ! We loop over all snapshots X_i, i=1,...,N to calculate the values of the symmetric
     ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
-    do tree_id1 = 1, N_snapshots
-      do tree_id2 = tree_id1, N_snapshots
+    do tree_ID1 = 1, N_snapshots
+      do tree_ID2 = tree_ID1, N_snapshots
         t_inc(1) = MPI_wtime()
         ! L2 scalarproduct between tree 1 and tree 2
         C_val = scalar_product_two_trees( params, tree_n, &
                         lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                         hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                        tree_id1, tree_id2)
+                        tree_ID1, tree_ID2)
 
         ! Construct symmetric correlation matrix
-        C(tree_id1, tree_id2) = C_val
-        C(tree_id2, tree_id1) = C_val
+        C(tree_ID1, tree_ID2) = C_val
+        C(tree_ID2, tree_ID1) = C_val
         !
         t_inc(1) = MPI_WTIME() - t_inc(1)
         if (rank == 0) then
           write(*,'("Matrixelement (i,j)= (", i3,",", i3, ") constructed in t_cpu=",es10.2, "sec Nblocks=",i10)') &
-          tree_id1, tree_id2, t_inc(1), sum(lgt_n(1:N_snapshots))
+          tree_ID1, tree_ID2, t_inc(1), sum(lgt_n(1:N_snapshots))
         endif
       end do
     end do
@@ -1207,7 +1209,6 @@ contains
  subroutine post_reconstruct(params)
     use module_precision
     use module_params
-    use module_forest
     use module_mpi
 
     implicit none
@@ -1229,7 +1230,7 @@ contains
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik) :: N_modes_used=1_ik, max_nr_modes, iteration=-1, n_components,tree_n, min_lvl
-    integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_id, reconst_tree_id
+    integer(kind=ik) :: treecode_size,iter, number_dense_blocks, tree_ID, reconst_tree_ID
     integer(kind=ik) :: i,j, n_opt_args, N_snapshots, dim, fsize, lgt_n_tmp, rank, io_error
     real(kind=rk) ::  maxmem=-1.0_rk, eps=-1.0_rk, Volume, tmp_time
     logical :: verbosity = .false., save_all
@@ -1310,10 +1311,10 @@ contains
 
     if ( eps > 0.0_rk ) then
       ! adapt the mesh if possible
-      params%adapt_mesh = .True.! .False.!.True.
+      params%adapt_tree = .True.! .False.!.True.
       params%eps=eps
     else
-      params%adapt_mesh = .False.
+      params%adapt_tree = .False.
       params%eps = 0.0_rk
     endif
 
@@ -1403,13 +1404,14 @@ contains
     !----------------------------------
     ! READ ALL Modes needed
     !----------------------------------
-    do tree_id = 1, N_modes_used
-      call read_field2tree(params, file_in(tree_id,:), params%n_eqn, tree_id, &
+    min_lvl = 9999
+    do tree_ID = 1, N_modes_used
+      call read_field2tree(params, file_in(tree_ID,:), params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
+      min_lvl = min(min_lvl, minActiveLevel_tree(lgt_block, tree_ID) )
     end do
 
-    min_lvl = min_active_level(lgt_block)
     if (min_lvl == params%max_treelevel) then
       params%min_treelevel= params%max_treelevel
     endif
@@ -1423,10 +1425,10 @@ contains
         do i = 1, N_Modes_used
           write(*, '("Mode=",i3, " Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           mode_number(i), lgt_n(i), &
-          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
-          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
-          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          minActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n )
           do j = 1, n_components
             write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
           end do
@@ -1450,12 +1452,12 @@ contains
     !----------------------------------
     ! reconstruct iteration
     !----------------------------------
-    reconst_tree_id = tree_n + 1
+    reconst_tree_ID = tree_n + 1
     if (save_all) then
       do iteration = 1, N_snapshots
         call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       a_coefs, iteration , N_modes_used, reconst_tree_id)
+                       a_coefs, iteration , N_modes_used, reconst_tree_ID)
         !----------------------------------
         ! Save components of reconstructed
         ! Snapshot
@@ -1463,14 +1465,14 @@ contains
         do j = 1, n_components
           write( file_out, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') j, N_modes_used, iteration
           call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-            lgt_n, hvy_n, hvy_active, j, reconst_tree_id , real(iteration,kind=rk) , iteration )
+            lgt_n, hvy_n, hvy_active, j, reconst_tree_ID , real(iteration,kind=rk) , iteration )
         end do
       end do
     else
       !! reconstruct only single snapshot
       call reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                      hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                     a_coefs, iteration , N_modes_used, reconst_tree_id)
+                     a_coefs, iteration , N_modes_used, reconst_tree_ID)
       !----------------------------------
       ! Save components of reconstructed
       ! Snapshot
@@ -1478,7 +1480,7 @@ contains
       do j = 1, n_components
         write( file_out, '("reconst",i1,"-",i3.3,"_", i12.12, ".h5")') j, N_modes_used, iteration
         call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, reconst_tree_id ,real(iteration,kind=rk) , iteration )
+          lgt_n, hvy_n, hvy_active, j, reconst_tree_ID ,real(iteration,kind=rk) , iteration )
       end do
     endif
 
@@ -1491,7 +1493,7 @@ contains
   !##############################################################
   subroutine reconstruct_iteration( params, lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                        hvy_block, hvy_neighbor, hvy_active, hvy_tmp, hvy_n, tree_n, &
-                       a_coefs, iteration, N_modes, dest_tree_id, opt_offset_mode_tree_id)
+                       a_coefs, iteration, N_modes, dest_tree_ID, opt_offset_mode_tree_ID)
     implicit none
 
     !-----------------------------------------------------------------
@@ -1507,18 +1509,18 @@ contains
     !> sorted list of numerical treecodes, used for block finding
     integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> tree id of the reconstructed field and number of active trees
-    integer(kind=ik), intent(inout)     :: dest_tree_id, tree_n
+    integer(kind=ik), intent(inout)     :: dest_tree_ID, tree_n
     integer(kind=ik), intent(in)        :: iteration, N_modes         !> number of POD modes
     !> Threshold value for truncating POD modes. If the singular value is smaller,
     !> then the given treshold we discard the corresponding POD MODE.
     real(kind=rk),  intent(in)          :: a_coefs(:,:)
-    !> optional argument for the tree_id of the first mode:
+    !> optional argument for the tree_ID of the first mode:
     !> this can be useful if you have some trees which are stored at beginning
     !>  tree_1 tree_2 tree_3, tree_mode1, tree_mode2 etc.
     !> default is 0
-    integer(kind=ik), optional, intent(in)       :: opt_offset_mode_tree_id
+    integer(kind=ik), optional, intent(in)       :: opt_offset_mode_tree_ID
     !---------------------------------------------------------------
-    integer(kind=ik)                    ::  i, rank, free_tree_id, offset = 0_ik
+    integer(kind=ik)                    ::  i, rank, free_tree_ID, offset = 0_ik
     real(kind=rk)                       :: a, t_elapse
     character(len=cshort)                   :: filename
     !---------------------------------------------------------------------------
@@ -1526,8 +1528,8 @@ contains
     !---------------------------------------------------------------------------
     rank= params%rank
 
-    if (present(opt_offset_mode_tree_id)) then
-      offset=opt_offset_mode_tree_id
+    if (present(opt_offset_mode_tree_ID)) then
+      offset=opt_offset_mode_tree_ID
     endif
 
     if (rank == 0) then
@@ -1536,7 +1538,7 @@ contains
       write(*,'(30("#"), " Reconstruct ", 30("#"))')
       write(*,'(80("-"))')
       write(*,'("Number of Modes used: ",i4)') N_modes
-      if (params%adapt_mesh) write(*,'("Compression threshold eps: ",es12.4)') params%eps
+      if (params%adapt_tree) write(*,'("Compression threshold eps: ",es12.4)') params%eps
       write(*,'(80("-"))')
       write(*, *)
     endif
@@ -1544,12 +1546,12 @@ contains
     ! in this algorithm we need at least N_mode trees plus 2 additional fields for
     ! saving the reconstructed field and a temporary field
     if ( params%forest_size < N_modes + 2 ) call abort(1003191,"Error! Need more Trees. Tip: increase forest_size")
-    if ( dest_tree_id<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
+    if ( dest_tree_ID<= N_modes) call abort(200419,"Error! Destination tree id overwrites POD Modes!")
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_id, offset+1)
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, dest_tree_ID, offset+1)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
-                                    dest_tree_id, a_coefs(iteration,1))
-    free_tree_id = dest_tree_id + 1
+                                    dest_tree_ID, a_coefs(iteration,1))
+    free_tree_ID = dest_tree_ID + 1
   !---------------------------------------------------------------------------
   ! reconstruct field
   !---------------------------------------------------------------------------
@@ -1559,33 +1561,32 @@ contains
     a = a_coefs(iteration, i)
     ! calculate pod modes:
     call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_id , offset + i)
+            hvy_block, hvy_active, hvy_n, hvy_neighbor, free_tree_ID , offset + i)
     call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, &
-                                    free_tree_id, a)
+                                    free_tree_ID, a)
     call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, dest_tree_id, free_tree_id)
+            hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, dest_tree_ID, free_tree_ID)
 
   end do
   !---------------------------------------------------------------------------
   ! adapted reconstructed field
   !---------------------------------------------------------------------------
-  call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,dest_tree_id),&
-  lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), hvy_n(dest_tree_id) )
+  call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
+  lgt_n, lgt_sortednumlist, hvy_active, hvy_n, dest_tree_ID )
 
-  if ( params%adapt_mesh) then
-     call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,dest_tree_id), &
-     lgt_n(dest_tree_id), lgt_sortednumlist(:,:,dest_tree_id), hvy_active(:,dest_tree_id), &
-     hvy_n(dest_tree_id), dest_tree_id, params%coarsening_indicator, hvy_tmp )
+  if ( params%adapt_tree) then
+     call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, dest_tree_ID, params%coarsening_indicator, hvy_tmp )
    else
-      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_id), hvy_n(dest_tree_id))
+      call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
   endif
 
   t_elapse = MPI_WTIME() - t_elapse
   if (rank == 0) then
           write(*,'("Snapshot ", i4," reconstructed in t_cpu=",es12.4, "sec [Jmin,Jmax]=[",i2,",",i2,"]")') &
           iteration, t_elapse, &
-          min_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) ), &
-          max_active_level( lgt_block, lgt_active(:,dest_tree_id), lgt_n(dest_tree_id) )
+          minActiveLevel_tree( lgt_block, dest_tree_ID, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, dest_tree_ID, lgt_active, lgt_n )
   endif
 
   end subroutine reconstruct_iteration
@@ -1596,7 +1597,6 @@ contains
   subroutine post_timecoef_POD(params)
     use module_precision
     use module_params
-    use module_forest
     use module_mpi
 
     implicit none
@@ -1620,9 +1620,9 @@ contains
     integer(hid_t)                   :: file_id
     real(kind=rk), dimension(3)      :: domain
     integer(hsize_t), dimension(2)   :: dims_treecode
-    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_id, dF, N_modes
+    integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID, dF, N_modes
     integer(kind=ik) :: i,it, N_snapshots, dim, fsize, lgt_n_tmp, r, iteration=-1
-    integer(kind=ik) :: j, n_components=1, io_error, free_tree_id,pod_mode_tree_id, unused_int,tree_n
+    integer(kind=ik) :: j, n_components=1, io_error, free_tree_ID,pod_mode_tree_ID, unused_int,tree_n
     real(kind=rk)    :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, L2norm_snapshots, Volume, norm
     real(kind=rk)    :: unused_var
     logical :: verbose = .false., save_all = .false.
@@ -1699,10 +1699,10 @@ contains
 
     if ( eps > 0.0_rk) then
       ! adapt the mesh if possible
-      params%adapt_mesh = .True.! .False.!.True.
+      params%adapt_tree = .True.! .False.!.True.
       params%eps=eps
     else
-      params%adapt_mesh = .False.
+      params%adapt_tree = .False.
       params%eps = 0.0_rk
     endif
 
@@ -1848,8 +1848,8 @@ contains
     !----------------------------------
     ! READ ALL SNAPSHOTS
     !----------------------------------
-    do tree_id = 1, N_snapshots
-      call read_field2tree(params,snapshot_in(tree_id,:) , params%n_eqn, tree_id, &
+    do tree_ID = 1, N_snapshots
+      call read_field2tree(params,snapshot_in(tree_ID,:) , params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
     end do
@@ -1857,8 +1857,8 @@ contains
     ! READ ALL MODES
     !----------------------------------
     do j = 1, N_modes
-      tree_id = N_snapshots+j
-      call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_id, &
+      tree_ID = N_snapshots+j
+      call read_field2tree(params,mode_in(j,:) , params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
     end do
@@ -1877,10 +1877,10 @@ contains
         do i = 1, N_snapshots
           write(*, '("Snapshot=",i3 , " time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
           i, time(i), lgt_n(i), &
-          100.0*dble(lgt_n(i))/dble( (2**max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ))**params%dim ), &
+          100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ))**params%dim ), &
           100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
-          min_active_level( lgt_block, lgt_active(:,i), lgt_n(i) ), &
-          max_active_level( lgt_block, lgt_active(:,i), lgt_n(i) )
+          minActiveLevel_tree( lgt_block, i, lgt_active, lgt_n ), &
+          maxActiveLevel_tree( lgt_block, i, lgt_active, lgt_n )
         end do
         write(*,*) "Modes used for reconstruction:"
         do i = 1, N_modes
@@ -1913,11 +1913,11 @@ contains
     do it = 1, N_snapshots
       do i = 1, N_modes
          ! scalar product (inner product)
-         pod_mode_tree_id = N_snapshots + i
+         pod_mode_tree_ID = N_snapshots + i
          a_coefs(it,i) = scalar_product_two_trees( params, tree_n, &
                          lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                          hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                         it, pod_mode_tree_id)
+                         it, pod_mode_tree_ID)
       enddo
     enddo
 

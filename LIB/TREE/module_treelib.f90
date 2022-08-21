@@ -105,22 +105,22 @@ end subroutine get_block_spacing_origin2
 
   !===============================================================================
   !> \brief from a tree id and treecode we make a tree-identifieer, which is
-  !! an integer made of the tree_id and the treecode
-  !! Note: tree_id s start from 1
-  function treecode2int(treearray, tree_id)
+  !! an integer made of the tree_ID and the treecode
+  !! Note: tree_ID s start from 1
+  function treecode2int(treearray, tree_ID)
     implicit none
     integer(kind=ik), intent(in) :: treearray(:)
-    integer(kind=ik), optional, intent(in) :: tree_id
+    integer(kind=ik), optional, intent(in) :: tree_ID
     integer(kind=tsize) :: N, i, potency
     integer(kind=tsize) :: treecode2int
     N = size(treearray,1)
 
-    if (present(tree_id)) then
-        treecode2int = tree_id
-        potency = floor(log10(real(tree_id)), kind=tsize) + 1_tsize
-        ! the +1 is necessary because it seperates the treecode from the tree_id with a 0
+    if (present(tree_ID)) then
+        treecode2int = tree_ID
+        potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
+        ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
     else
-        ! For the rest of wabbit not using tree_ids we have to make sure that
+        ! For the rest of wabbit not using tree_IDs we have to make sure that
         ! the results stay the same
         potency = -1_tsize
         treecode2int = 0_tsize

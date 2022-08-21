@@ -11,7 +11,6 @@ subroutine post_dry_run
     use module_time_step
     use module_unit_test
     use module_bridge_interface     ! bridge implementation of wabbit
-    use module_forest
     use module_mask
     ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
     ! to dump kinematics data.
@@ -33,7 +32,7 @@ subroutine post_dry_run
     integer(kind=ik), allocatable       :: lgt_n(:)
     integer(kind=ik), allocatable       :: hvy_n(:)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)                   :: filename,fname   ! filename of *.ini file used to read parameters
+    character(len=cshort)               :: filename,fname   ! filename of *.ini file used to read parameters
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
@@ -176,14 +175,13 @@ subroutine post_dry_run
     do while ( time < params%time_max )
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
-        call create_equidistant_grid( params, lgt_block, hvy_neighbor, &
-        lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow),&
-        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
+        call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist,&
+        hvy_active, hvy_n, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
 
 
         if (params%rank==0) then
             write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7)') &
-            max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow)), lgt_n(tree_ID_flow)
+            maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n), lgt_n
         endif
 
         ! generate complete mask on the initial equidistant grid
@@ -202,10 +200,8 @@ subroutine post_dry_run
 
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
-            call refine_mesh( params, lgt_block, hvy_mask, hvy_neighbor, &
-            lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-            hvy_n(tree_ID_flow), "mask-threshold", tree_ID_flow )
+            call refine_tree( params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again
             call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
@@ -215,16 +211,15 @@ subroutine post_dry_run
             ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
             ! is effectively ignored. It seems redundant; if we set a small eps (done independent
             ! of the parameter file), this yields the same result
-            call adapt_mesh( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-            lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-            tree_ID_flow, params%coarsening_indicator, hvy_mask )
+            call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
+            lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, params%coarsening_indicator, hvy_mask )
 
             ! on new grid, create the mask again
             call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
             hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
 
             ! current finest level is:
-            Jnow = max_active_level(lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow))
+            Jnow = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
 
             if (params%rank==0) then
                 write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
@@ -247,7 +242,7 @@ subroutine post_dry_run
             if (params%rank==0) write(*,*) "now pruning!"
 
             call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_id=tree_ID_flow)
+            hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID=tree_ID_flow)
         endif
 
         !***********************************************************************
@@ -258,25 +253,25 @@ subroutine post_dry_run
 
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
-        ! call write_field( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
+        ! call saveHDF5_tree( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
 
         call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-        lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_flow, time=time, iteration=-1 )
+        lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_flow, time=time, iteration=-1 )
 
         !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
-        !lgt_n, hvy_n, hvy_active, dF=1, tree_id=tree_ID_mask, time=time, iteration=-1 )
+        !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )
 
 !        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
 !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-!        lgt_n, hvy_n, hvy_active, dF=2, tree_id=tree_ID_flow, time=time, iteration=-1 )
+!        lgt_n, hvy_n, hvy_active, dF=2, tree_ID=tree_ID_flow, time=time, iteration=-1 )
 
 !        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
 !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-!        lgt_n, hvy_n, hvy_active, dF=3, tree_id=tree_ID_flow, time=time, iteration=-1 )
+!        lgt_n, hvy_n, hvy_active, dF=3, tree_ID=tree_ID_flow, time=time, iteration=-1 )
 
         ! write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
         ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-        ! lgt_n, hvy_n, hvy_active, dF=4, tree_id=tree_ID_flow, time=time, iteration=-1 )
+        ! lgt_n, hvy_n, hvy_active, dF=4, tree_ID=tree_ID_flow, time=time, iteration=-1 )
 
         time = time + params%write_time
     end do

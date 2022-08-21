@@ -9,7 +9,6 @@ subroutine post_add_two_masks(params)
     use module_time_step
     use module_stl_file_reader
     use module_helpers
-    use module_forest
 
     implicit none
 
@@ -24,7 +23,7 @@ subroutine post_add_two_masks(params)
     integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
-    integer :: hvy_id, lgt_id, fsize, j, tree_id
+    integer :: hvy_id, lgt_id, fsize, j, tree_ID
 
     integer(kind=ik) :: iteration, Bs(1:3), tc_length1, dim, tc_length2, N1, N2, tree_N
     real(kind=rk) :: time, domain(1:3), norm
@@ -107,50 +106,50 @@ subroutine post_add_two_masks(params)
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
 
     select case(mode)
     case ("--add")
         call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, verbosity=.true.)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=1, tree_ID2=2, verbosity=.true.)
 
     case ("--subtract")
         call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=1, tree_ID2=2)
 
     case ("--multiply")
         call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2)
+        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=1, tree_ID2=2)
     case ("--test_operations")
         ! this tests inplace vs out of place operations
         ! z = x*y + x
         ! norm(w)
          call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=2, dest_tree_id=3, verbosity=.True.)
+         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=1, tree_ID2=2, dest_tree_ID=3, verbosity=.True.)
          call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=1, tree_id2=3, dest_tree_id=4, verbosity=.True.)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=1, tree_ID2=3, dest_tree_ID=4, verbosity=.True.)
         ! y <- x*y + x
          call multiply_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+         hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=2, tree_ID2=1, verbosity=.True.)
          call add_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=1, verbosity=.True.)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=2, tree_ID2=1, verbosity=.True.)
          ! w = z-y
          call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_id1=2, tree_id2=4, dest_tree_id=3)
+             hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=2, tree_ID2=4, dest_tree_ID=3)
         !
         norm =  scalar_product_two_trees( params, tree_n, &
                                        lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                        hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                                       tree_id1=2, tree_id2=2)
+                                       tree_ID1=2, tree_ID2=2)
         if (params%rank==0) then
             write(*,*) "Norm (should be not 0): ", norm
         end if
         norm =  scalar_product_two_trees( params, tree_n, &
                               lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                               hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                              tree_id1=4, tree_id2=4)
+                              tree_ID1=4, tree_ID2=4)
         if (params%rank==0) then
           write(*,*) "Norm (should be not 0): ", norm
         end if
@@ -159,7 +158,7 @@ subroutine post_add_two_masks(params)
         norm =  scalar_product_two_trees( params, tree_n, &
                                    lgt_block,  lgt_active, lgt_n, lgt_sortednumlist, &
                                    hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp ,&
-                                   tree_id1=3, tree_id2=3)
+                                   tree_ID1=3, tree_ID2=3)
         if (params%rank==0) then
             write(*,*) "Norm (should be 0): ", norm
         end if
@@ -168,20 +167,19 @@ subroutine post_add_two_masks(params)
         call abort(301219,"unkown mode...")
     end select
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-    tree_id = 1
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
-    lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id) )
+    tree_ID = 1
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-    tree_id = 2
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
-    lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id), hvy_n(tree_id) )
-
+    tree_ID = 2
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=time, iteration=iteration )
+    lgt_n, hvy_n, hvy_active, dF=1, tree_ID=1, time=time, iteration=iteration )
 
     call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
     lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )

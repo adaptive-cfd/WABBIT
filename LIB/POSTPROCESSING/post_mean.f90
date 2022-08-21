@@ -8,14 +8,18 @@ subroutine post_mean(params)
     implicit none
     character(len=cshort)                   :: fname, fname_out                 !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
+
+    integer(kind=ik), allocatable      :: lgt_block(:, :)
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim, g
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, dim, g
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
@@ -28,7 +32,8 @@ subroutine post_mean(params)
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
     integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, tc_length
 
-
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     !-----------------------------------------------------------------------------------------------------
     rank = params%rank
@@ -47,7 +52,7 @@ subroutine post_mean(params)
     call check_file_exists( fname )
 
     ! add some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, &
+    call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     params%Bs = Bs
@@ -58,21 +63,22 @@ subroutine post_mean(params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_blocks = ceiling( real(lgt_n) / real(params%number_procs) )
+    params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
-    call read_field(fname, 1, params, hvy_block, hvy_n )
+    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID )
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+
     ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -85,14 +91,16 @@ subroutine post_mean(params)
     meanl = 0.0_rk
 
     g = params%n_ghosts
-    do k = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
         if (params%dim == 3) then
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_id))*dx(1)*dx(2)*dx(3)
         else
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
+            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_id))*dx(1)*dx(2)
         endif
     end do
 

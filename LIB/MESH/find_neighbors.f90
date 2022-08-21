@@ -36,8 +36,8 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
     integer(kind=ik), intent(in)        :: Jmax
     integer(kind=ik), intent(in)        :: lgt_block(:, :)          !> light data array
     character(len=*), intent(in)        :: dir                      !> direction for neighbor search
-    integer(kind=ik), intent(in)        :: lgt_n                    !> number of active blocks (light data)
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(in)        :: lgt_n(:)                 !> number of active blocks (light data)
+    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)        !> heavy data array - neighbor data
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)
@@ -47,7 +47,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
     integer(kind=ik)                    :: level
     integer(kind=ik)                    :: tcBlock(Jmax), tcNeighbor(Jmax), tcVirtual(Jmax)
     logical                             :: exists
-    integer(kind=ik)                    :: lgtID_neighbor, tree_id
+    integer(kind=ik)                    :: lgtID_neighbor, tree_ID
     integer(kind=ik)                    :: k
     ! variable to show if there is a valid edge neighbor
     logical                             :: lvl_down_neighbor
@@ -55,7 +55,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
 
     tcBlock    = lgt_block( lgtID_block, 1:Jmax )
     level      = lgt_block( lgtID_block, Jmax + IDX_MESH_LVL )
-    tree_id    = lgt_block( lgtID_block, Jmax + IDX_TREE_ID )
+    tree_ID    = lgt_block( lgtID_block, Jmax + IDX_TREE_ID )
     neighborDirCode_sameLevel     = -1
     neighborDirCode_coarserLevel  = -1
     neighborDirCode_finerLevel    = -1
@@ -548,7 +548,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
     ! calculate treecode for neighbor on same level
     call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
     ! check if (hypothetical) neighbor exists and if so find its lgtID
-    call does_block_exist(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_id)
+    call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
 
     if (exists) then
         ! we found the neighbor on the same level.
@@ -565,7 +565,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
         ! the last index to -1 = I go one level down (coarser)
         tcNeighbor( level ) = -1
         ! check if (hypothetical) neighbor exists and if so find its lgtID
-        call does_block_exist(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_id)
+        call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
 
         if ( exists ) then
             ! neighbor is one level down (coarser)
@@ -590,7 +590,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent(tcVirtual, tcNeighbor, dir, level+1, Jmax, params%dim)
                 ! check if (hypothetical) neighbor exists and if so find its lgtID
-                call does_block_exist(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_id)
+                call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
 
                 if (exists) then
                     hvy_neighbor( hvyID_block, neighborDirCode_finerLevel(k) ) = lgtID_neighbor

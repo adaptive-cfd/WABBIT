@@ -1,22 +1,23 @@
 ! If some BC are non-periodic, we have to remove their neighborhood relationship
 ! by setting it to -1. Otherwise, the sync_ghosts routine will overwrite the redundant points,
 ! which is an error in this case.
-subroutine remove_nonperiodic_neighbors(params, lgt_block, hvy_neighbor, hvy_active, hvy_n)
+subroutine remove_nonperiodic_neighbors(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, tree_ID)
     implicit none
 
     type (type_params), intent(in)      :: params               !> user defined parameter structure
     integer(kind=ik), intent(in)        :: lgt_block(:, :)      !> light data array
     integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)    !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_active(:)        !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n                !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:,:)      !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n(:)             !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik) :: k, hvy_id, lgt_id, lgt_id_neighbor, J1, J2, a
     logical                             :: remove
     integer(kind=2)                     :: n_domain(1:3)
 
-    do k = 1, hvy_n
+    do k = 1, hvy_n(tree_ID)
         ! the block w're looking at ...
-        hvy_id = hvy_active(k)
+        hvy_id = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! ... and its level
         J1 = lgt_block(lgt_id, params%max_treelevel + IDX_MESH_LVL)

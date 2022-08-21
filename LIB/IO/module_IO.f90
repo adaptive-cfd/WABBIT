@@ -14,14 +14,13 @@ module module_IO
     ! for reading parameters and storing them in each hdf file
     use module_ini_files_parser_mpi
     use module_helpers, only : check_file_exists, block_contains_NaN
-    use module_forest
     use module_treelib
 
     implicit none
 
 contains
 
-#include "write_field.f90"
+#include "saveHDF5_tree.f90"
 #include "read_mesh.f90"
 #include "read_field.f90"
 #include "read_attributes.f90"

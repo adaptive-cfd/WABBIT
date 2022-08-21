@@ -61,8 +61,8 @@ end subroutine filter_wrapper
 ! (.not.params%filter_only_maxlevel .and. .not.params%filter_all_except_maxlevel)
 ! ATTENTION: This is not entirely true, because in fact, we should sync_ghosts after coarsening, but that is not
 ! possible in the block based fashion. Thus, the mesh-based
-!   call adapt_mesh(..everywhere..)
-!   call refine_mesh(..everywhere..)
+!   call adapt_tree(..everywhere..)
+!   call refine_tree(..everywhere..)
 ! does something slightly different. You can also see that from the simple fact that coarseing of an arbitrary
 ! grid is not always possible for all blocks (completeness condition)
 subroutine wavelet_filter(time, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, hvy_active, hvy_n, hvy_neighbor)

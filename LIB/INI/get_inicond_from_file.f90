@@ -6,13 +6,14 @@
 !!           - time and iteration
 ! ********************************************************************************************
 
-subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, time, iteration)
+subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tree_ID, time, iteration)
 
     implicit none
     type (type_params), intent(in)        :: params                     !> user defined parameter structure
     integer(kind=ik), intent(inout)       :: lgt_block(:, :)            !> light data array
     real(kind=rk), intent(inout)          :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
-    integer(kind=ik), intent(inout)       :: hvy_n, lgt_n               !> number of heavy and light active blocks
+    integer(kind=ik), intent(inout)       :: hvy_n(:), lgt_n(:)         !> number of heavy and light active blocks
+    integer(kind=ik), intent(in)          :: tree_ID
     real(kind=rk), intent(inout)          :: time                       !> time loop variables
     integer(kind=ik), intent(inout)       :: iteration
     real(kind=rk), dimension(3)           :: domain
@@ -30,7 +31,7 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
     if (params%rank==0) write(*,*) "Reading initial condition from file"
 
     ! read time, iteration, domain size and total number of blocks from first input file
-    call read_attributes(params%input_files(1), lgt_n, time, iteration, domain, Bs, &
+    call read_attributes(params%input_files(1), lgt_n(tree_ID), time, iteration, domain, Bs, &
     tc_length, dim, periodic_BC=periodic_BC, symmetry_BC=symmetry_BC)
 
     ! print time, iteration and domain on screen
@@ -61,16 +62,16 @@ subroutine get_inicond_from_file(params, lgt_block, hvy_block, hvy_n, lgt_n, tim
         endif
     enddo
 
-    if (lgt_n > size(lgt_block,1)) then
+    if (lgt_n(tree_ID) > size(lgt_block,1)) then
         call abort(743734, 'ERROR: Not enough memory allocated for the saved field!')
     endif
 
     ! read treecode from first input file
-    call read_mesh(params%input_files(1), params, lgt_n, hvy_n, lgt_block)
+    call read_mesh(params%input_files(1), params, lgt_n, hvy_n, lgt_block, tree_ID)
 
     ! read datafields from files into hvy_block array
     do dF = 1, N_files
-        call read_field(params%input_files(dF), dF, params, hvy_block, hvy_n )
+        call read_field(params%input_files(dF), dF, params, hvy_block, hvy_n, tree_ID)
     end do
 
     ! timing

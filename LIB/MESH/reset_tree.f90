@@ -1,17 +1,17 @@
 !> \brief reset grid, set all blocks to empty
-subroutine reset_tree(params, lgt_block, lgt_active, lgt_n,&
+subroutine reset_tree(params, lgt_block, lgt_active, lgt_n, &
      hvy_active, hvy_n, lgt_sortednumlist, verbosity, tree_ID )
 
     implicit none
 
     type (type_params), intent(in)          :: params                   !> user defined parameter structure
     integer(kind=ik),  intent(inout)        :: lgt_block(:, :)          !> light data array
-    integer(kind=ik),  intent(inout)        :: lgt_active(:)            !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)         :: lgt_n                    !> number of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:)            !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)         :: hvy_n                    !> number of active blocks (heavy data)
+    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)         :: lgt_n(:)                    !> number of active blocks (light data)
+    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)            !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)         :: hvy_n(:)                    !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)            :: tree_ID                  !> which tree to reset?
-    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:)   !> sorted list of numerical treecodes, used for block finding
+    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
     !> write output
     logical, intent(in)                     :: verbosity
     integer(kind=ik)                        :: k
@@ -33,10 +33,10 @@ subroutine reset_tree(params, lgt_block, lgt_active, lgt_n,&
     ! update list of sorted nunmerical treecodes, used for finding blocks
 
     ! set number of active blocks to maximum number, to reset everything
-    lgt_n = size(lgt_active,1)
-    hvy_n = size(hvy_active,1)
+    lgt_n(tree_ID) = size(lgt_active,1)
+    hvy_n(tree_ID) = size(hvy_active,1)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, &
          hvy_n, lgt_sortednumlist, tree_ID )
 
 end subroutine reset_tree
@@ -67,7 +67,7 @@ subroutine reset_forest(params, lgt_block, lgt_active, lgt_n,&
     ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:,:) = -1
-    ! reset tree_id
+    ! reset tree_ID
     lgt_block(:, max_treelevel+IDX_TREE_ID) = -1
     ! all blocks are inactive, reset mesh level
     lgt_block(:, max_treelevel+IDX_MESH_LVL) = -1
@@ -82,10 +82,10 @@ subroutine reset_forest(params, lgt_block, lgt_active, lgt_n,&
     end do
 
     if (present(tree_n)) then
-        call create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+        call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
     else
-        call create_active_and_sorted_lists_forest( params, lgt_block, lgt_active, &
+        call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
                lgt_n, hvy_active, hvy_n, lgt_sortednumlist, n_trees)
     end if
 end subroutine reset_forest

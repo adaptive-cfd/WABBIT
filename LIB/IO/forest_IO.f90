@@ -4,17 +4,17 @@
 !> contain a quantity at the same snapshot (i.e. same iteration/time).
 !> If no data has been read in before. This function will allocate
 !> the heavy data for you.
-subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity)
+subroutine read_field2tree(params, fnames, N_files, tree_ID, tree_n, lgt_block, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity)
+
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(inout) :: params           !< params structure
     integer(kind=ik), intent(in)      :: N_files     !< number of fields/quantities to read
     character(len=*), intent(in)      :: fnames(N_files)  !< file names
     integer(kind=ik), intent(inout)   :: tree_n       !< number of active trees
-    integer(kind=ik), intent(in)      :: tree_id     !< number of the tree
-    integer(kind=ik), allocatable, intent(inout)   :: lgt_n(:),hvy_n(:)   !< number of active light and heavy blocks
+    integer(kind=ik), intent(in)      :: tree_ID     !< number of the tree
+    integer(kind=ik), allocatable, intent(inout)   :: lgt_n(:), hvy_n(:)   !< number of active light and heavy blocks
     integer(kind=ik), ALLOCATABLE, intent(inout)   :: lgt_block(:, : )  !< light data array
     real(kind=rk), ALLOCATABLE, intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), ALLOCATABLE, intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
@@ -34,11 +34,11 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     rank  = params%rank
     fsize = params%forest_size
 
-    if (tree_id <= tree_n) then
-        ! the tree altready exists: to overwrite it, we first delete the existing one
-        call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, tree_id)
+    if (tree_ID <= tree_n) then
+        ! the tree already exists: to overwrite it, we first delete the existing one
+        call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, tree_ID)
 
-        call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+        call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
         lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
     endif
 
@@ -79,15 +79,15 @@ subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
 
 
     ! read treecode from first input file
-    call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_id, verbosity=verbose)
+    call read_tree(fnames, N_files, params, lgt_n_tmp, lgt_block, hvy_block, hvy_tmp, tree_ID, verbosity=verbose)
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
+    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
 
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active(:,tree_id),&
-    lgt_n(tree_id), lgt_sortednumlist(:,:,tree_id), hvy_active(:,tree_id) , hvy_n(tree_id) )
+    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_id), hvy_n(tree_id) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
 end subroutine read_field2tree
 !##############################################################
@@ -100,8 +100,7 @@ end subroutine read_field2tree
 !
 !
 !-------------------------------------------------------------------------------
-subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, &
-    tree_id_optional, verbosity)
+subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, tree_ID, verbosity)
     implicit none
 
     !-------------------------------- ---------------------------------
@@ -114,13 +113,14 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     integer(kind=ik), intent(inout) :: lgt_n !< number of active blocks (heavy and light data)
     integer(kind=ik), intent(inout) :: lgt_block(:,:) !< light data array
     logical, intent(in), optional :: verbosity !< if verbosity==True generates log output
-    integer(kind=ik), optional, intent(in) :: tree_id_optional !< index of the tree you want to save the data in
+    integer(kind=ik), intent(in) :: tree_ID !< index of the tree you want to save the data in
     real(kind=rk), intent(inout) :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     real(kind=rk), intent(inout) :: hvy_tmp(:, :, :, :, :) !< heavy data array - block data
     !-------------------------------- ---------------------------------
-    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, tree_id, Bs(3), g, dF
+    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(3), g, dF
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n
+    integer(kind=ik), allocatable :: hvy_n(:)
     integer(hsize_t) :: dims_treecode(2)
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     integer(hid_t)        :: file_id
@@ -128,12 +128,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     logical :: verbose = .true.
 
     if (present(verbosity)) verbose=verbosity
-
-    if (present(tree_id_optional)) then
-        tree_id = tree_id_optional
-    else
-        tree_id = 1
-    endif
+    allocate( hvy_n(1:tree_ID) )
 
     ! set MPI parameters
     rank         = params%rank
@@ -189,10 +184,12 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     !-----------------------------------------------------------------------------
     ! Step 2: read heavy data from files into hvy_tmp
     !-----------------------------------------------------------------------------
+    hvy_n = my_hvy_n
     do dF = 1, N_files
         ! read data from file
         call check_file_exists(trim(fnames(dF)))
-        call read_field(fnames(dF), dF, params, hvy_tmp, my_hvy_n )
+
+        call read_field(fnames(dF), dF, params, hvy_tmp, hvy_n, tree_ID)
     end do
 
     !-----------------------------------------------------------------------------
@@ -209,7 +206,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
         ! set refinement status
         lgt_block(free_lgt_id, params%max_treelevel+IDX_REFINE_STS) = 0
         ! set number of the tree
-        lgt_block(free_lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_id
+        lgt_block(free_lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_ID
         ! copy actual data
         do dF = 1, params%n_eqn
             hvy_block( :, :, :, df, free_hvy_id ) = hvy_tmp(:, :, :, df, k)
@@ -217,7 +214,7 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     end do
 
     if ( rank == 0 .and. verbose) then
-        write(*,'("Stored in Tree_id: ",i3)') tree_id
+        write(*,'("Stored in Tree_id: ",i3)') tree_ID
         write(*,'("Nblocks=",i6," (on all cpus)")') lgt_n
     end if
 
@@ -232,24 +229,26 @@ subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_t
     ! to get an idea how it looks like and if the desired dense level is larger
     ! or smaller
     if (params%rank==0 .and. verbose ) then
-        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') min_active_level( lgt_block ), &
-        max_active_level( lgt_block )
+        write(*,'("In the file we just read, Jmin=",i3," Jmax=",i3)') minActiveLevel_tree( lgt_block, tree_ID ), &
+        maxActiveLevel_tree( lgt_block, tree_ID )
     endif
+
+    deallocate( hvy_n )
 
 end subroutine read_tree
 !##############################################
 
 
 !##############################################################
-!> save a specific field with specified tree_id
-!> \TODO This function will replace write_field in the future
+!> save a specific field with specified tree_ID
+!> \TODO This function will replace saveHDF5_tree in the future
 subroutine write_tree_field(fname, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF, tree_id, time, iteration )
+    lgt_n, hvy_n, hvy_active, dF, tree_ID, time, iteration )
 
     implicit none
 
     !-----------------------------------------------------------------
-    character(len=*), intent(in) :: fname  !< filename
+    character(len=*), intent(in)   :: fname  !< filename
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in)   :: lgt_block(:, :) !< ligh block data
     integer(kind=ik), intent(in)   :: lgt_active(:,:) !< list of active blocks for each tree
@@ -257,9 +256,9 @@ subroutine write_tree_field(fname, params, lgt_block, lgt_active, hvy_block, &
     integer(kind=ik), intent(in)   :: hvy_active(:,:) !< list of active hvy blocks
     real(kind=rk), intent(in)      :: hvy_block(:, :, :, :, :)
     !--------------------
-    ! optional parameter
+    ! optional parameters
     !--------------------
-    integer(kind=ik), optional, intent(in) :: tree_id !< id of the tree (default: 1)
+    integer(kind=ik), optional, intent(in) :: tree_ID !< id of the tree (default: 1)
     real(kind=rk), optional, intent(in)    :: time !< time loop parameters (default: 0.0)
     integer(kind=ik), optional, intent(in) :: iteration !< iteration of the solver (default: 1)
     integer(kind=ik), optional,intent(in)  :: dF !< datafield number (default: 1)
@@ -273,16 +272,19 @@ subroutine write_tree_field(fname, params, lgt_block, lgt_active, hvy_block, &
     else
         dataField = 1
     endif
-    if (present(tree_id)) then
-        treeid = tree_id
+
+    if (present(tree_ID)) then
+        treeid = tree_ID
     else
         treeid = 1
     endif
+
     if (present(time)) then
         t = time
     else
         t = 0.0_rk
     endif
+
     if (present(iteration)) then
         it = iteration
     else
@@ -290,7 +292,7 @@ subroutine write_tree_field(fname, params, lgt_block, lgt_active, hvy_block, &
     endif
 
     ! write the data
-    call write_field(fname, t, it, dataField, params, lgt_block, hvy_block, &
-    lgt_active(:,treeid), lgt_n(treeid), hvy_n(treeid), hvy_active(:, treeid))
+    call saveHDF5_tree(fname, t, it, dataField, params, lgt_block, hvy_block, &
+    lgt_active, lgt_n, hvy_n, hvy_active, treeid)
 end subroutine
 !##############################################################

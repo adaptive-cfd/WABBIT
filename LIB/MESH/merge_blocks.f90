@@ -21,7 +21,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
     ! what CPU is responsible for merging:
     integer(kind=ik)                    :: data_rank(8)
-    integer(kind=ik)                    :: heavy_ids(8), tree_id          ! list of block ids, proc ranks
+    integer(kind=ik)                    :: heavy_ids(8), tree_ID          ! list of block ids, proc ranks
 
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
     integer(kind=ik), dimension(3)      ::  bound1, bound2, boundm, Bs
@@ -34,7 +34,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     Jmax = params%max_treelevel
     ! level of merged block
     level = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_MESH_LVL )
-    tree_id = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_TREE_ID )
+    tree_ID = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_TREE_ID )
 
     select case(params%wavelet_transform_type)
     case ("harten-multiresolution")
@@ -100,7 +100,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
     lgt_block( lgt_merge_id, Jmax+ IDX_MESH_LVL ) = level-1
     lgt_block( lgt_merge_id, Jmax+ idx_refine_sts ) = 0
-    lgt_block( lgt_merge_id, Jmax+ IDX_TREE_ID ) = tree_id
+    lgt_block( lgt_merge_id, Jmax+ IDX_TREE_ID ) = tree_ID
 
     ! b) heavy data merging (individual operation)
     if ( data_rank(1) == params%rank) then

@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, indicator, tree_ID  )
 
     use module_indicators
@@ -23,11 +23,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     integer(kind=ik), intent(inout)        :: lgt_block(:, :)             !> light data array
     real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
     integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)           !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)        :: lgt_active(:)               !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_n                       !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:)      !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)        :: hvy_active(:)               !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_n                       !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)        :: lgt_active(:,:)             !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)        :: lgt_n(:)                    !> number of active blocks (light data)
+    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:,:)    !> sorted list of numerical treecodes, used for block finding
+    integer(kind=ik), intent(inout)        :: hvy_active(:,:)             !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)        :: hvy_n(:)                    !> number of active blocks (heavy data)
     character(len=*), intent(in)           :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)           :: tree_ID
 
@@ -41,14 +41,14 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-    call refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, indicator )
-    call toc( "refine_mesh (refinement_indicator)", MPI_Wtime()-t1 )
+    call refinementIndicator_tree( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, tree_ID, indicator )
+    call toc( "refine_tree (refinementIndicator_tree)", MPI_Wtime()-t1 )
 
 
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     t1 = MPI_Wtime()
-    call respect_min_max_treelevel( params, lgt_block, lgt_active, lgt_n )
-    call toc( "refine_mesh (respect_min_max_treelevel)", MPI_Wtime()-t1 )
+    call respectJmaxJmin_tree( params, lgt_block, lgt_active, lgt_n, tree_ID )
+    call toc( "refine_tree (respectJmaxJmin_tree)", MPI_Wtime()-t1 )
 
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
@@ -56,10 +56,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! in all other indicators, this step is very important.
     t1 = MPI_Wtime()
     if ( indicator /= "everywhere" ) then
-      call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-      lgt_sortednumlist, hvy_active, hvy_n )
+      call ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+      lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
     endif
-    call toc( "refine_mesh (ensure_gradedness)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (ensureGradedness_tree)", MPI_Wtime()-t1 )
 
 
     !---------------------------------------------------------------------------
@@ -69,10 +69,10 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! is called. It then aborts the time loop and dumps a backup for late resuming.
     ! If the following check fails, then this will be in postprocessing, and it will kill the code.
     hvy_n_afterRefinement = 0
-    do k = 1, hvy_n
+    do k = 1, hvy_n(tree_ID)
         ! loop over hvy is safer, because we can tell for each mpirank if it fails or not
         ! so we detect also problems arising from load-imbalancing.
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        call hvy2lgt(lgt_id, hvy_active(k, tree_ID), params%rank, params%number_blocks)
 
         if ( lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) == +1) then
             ! this block will be refined, so it creates 2**D new blocks but is deleted
@@ -86,9 +86,9 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     ! oh-oh case.
     if ( hvy_n_afterRefinement > params%number_blocks ) then
         write(*,'("On rank:",i5," hvy_n=",i5," will refine to ",i5," but limit is ",i5)') &
-        params%rank, hvy_n, hvy_n_afterRefinement, params%number_blocks
+        params%rank, hvy_n(tree_ID), hvy_n_afterRefinement, params%number_blocks
 
-        call abort (1909181827,"[refine_mesh.f90]: The refinement step will fail (not enough memory).")
+        call abort (1909181827,"[refine_tree.f90]: The refinement step will fail (not enough memory).")
     endif
     !---------------------------------------------------------------------------
 
@@ -98,11 +98,11 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! the status +11
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
-        call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+        call refinementExecute3D_tree( params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID )
     else
-        call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n )
+        call refinementExecute2D_tree( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n, tree_ID )
     end if
-    call toc( "refine_mesh (refinement_execute)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (refinement_execute)", MPI_Wtime()-t1 )
 
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
@@ -110,7 +110,7 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
     t2 = MPI_wtime()
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     t_misc = MPI_wtime() - t2
 
@@ -121,17 +121,17 @@ subroutine refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! then we force blocks on Jmax to coarsen, even if their details are large. Hence, each refinement
     !! step is a true "everywhere". Then, there is no need for balancing, as all mpiranks automatically
     !! hold the same number of blocks, if they started with a balanced distribution (which is the
-    !! output of adapt_mesh.)
+    !! output of adapt_tree.)
     !! This of course implies any other indicator than "everywhere" requires balancing here.
     if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
         t1 = MPI_Wtime()
-        call balance_load( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
+        call balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
         hvy_active, hvy_n, tree_ID )
-        call toc( "refine_mesh (balance_load)", MPI_Wtime()-t1 )
+        call toc( "refine_tree (balanceLoad_tree)", MPI_Wtime()-t1 )
     endif
 
 
-    call toc( "refine_mesh (lists+neighbors)", t_misc )
-    call toc( "refine_mesh (TOTAL)", MPI_wtime()-t0 )
+    call toc( "refine_tree (lists+neighbors)", t_misc )
+    call toc( "refine_tree (TOTAL)", MPI_wtime()-t0 )
 
-end subroutine refine_mesh
+end subroutine refine_tree

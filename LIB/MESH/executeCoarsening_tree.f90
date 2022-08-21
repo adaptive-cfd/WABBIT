@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
+subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_active, hvy_n, tree_ID, hvy_mask )
     implicit none
 
@@ -16,27 +16,27 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
     !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n
+    integer(kind=ik), intent(inout)     :: lgt_n(:)
     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:)
+    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n
+    integer(kind=ik), intent(inout)     :: hvy_n(:)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
-    integer(kind=ik)                    :: k, maxtl, N, j
+    integer(kind=ik)                    :: k, Jmax, N, j
     ! list of block ids, proc ranks
     integer(kind=ik)                    :: light_ids(1:8), mpirank_owners(1:8)
     integer(kind=ik), allocatable, save :: xfer_list(:,:)
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, ierr
+    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID
 
 
-    maxtl = params%max_treelevel
+    Jmax = params%max_treelevel
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
@@ -50,7 +50,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
     ! first, prepare for xfer (gather information: which blocks are sent where)
     ! COLLECTIVE OPERATION
     !---------------------------------------------------------------------------
-    do k = 1, lgt_n
+    do k = 1, lgt_n(tree_ID)
         ! Check if the block will be coarsened.
         !
         ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
@@ -59,12 +59,13 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         ! so: check again if this block is REALLY active (the active list is updated later)
         !
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
-        ! ensure_gradedness removes the -1 flag if not all sister blocks share it
+        ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
+        lgtID = lgt_active(k, tree_ID)
 
-        if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+IDX_REFINE_STS) == -1) then
+        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -1) then
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-            call find_sisters( params, lgt_active(k), light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist )
+            call findSisters_tree( params, lgtID, light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist, tree_ID )
 
             ! figure out on which rank the sisters lie, xfer them if necessary
             do j = 1, N
@@ -85,7 +86,7 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
 
                 ! don't forget: mark all 4/8 sisters as treated here, in order not to trigger this
                 ! loop again: we use the temporary status -7
-                lgt_block(light_ids(j), maxtl+IDX_REFINE_STS) = -7
+                lgt_block(light_ids(j), Jmax+IDX_REFINE_STS) = -7
             enddo
         endif
     enddo
@@ -95,30 +96,30 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
         ! It can be useful to simultaneously coarsen more than one array, in most cases this
         ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
         ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask, msg="coarse_mesh" )
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask, msg="executeCoarsening_tree" )
     else
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, msg="coarse_mesh" )
+        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, msg="executeCoarsening_tree" )
     endif
 
     ! the active lists are outdates after the transfer: we need to create
-    ! them or find_sisters will not be able to do its job
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, lgt_n, hvy_active, &
-    hvy_n, lgt_sortednumlist, tree_ID )
+    ! them or findSisters_tree will not be able to do its job
+    call createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID )
 
     ! actual merging
-    do k = 1, lgt_n
+    do k = 1, lgt_n(tree_ID)
         ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
         ! the active list. NOTE HERE: due to previous loops, some light data id are already
         ! coarsened, (and thus given the -1) but they are still in active block list
         ! so: check again if this block is REALLY active (the active list is updated later)
         !
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
-        ! ensure_gradedness removes the -1 flag and sets -7 (temporarily assigned above) flag if not all sister blocks share it
-        if ( lgt_block(lgt_active(k), 1) >= 0 .and. lgt_block(lgt_active(k), maxtl+IDX_REFINE_STS) == -7) then
+        ! ensureGradedness_tree removes the -1 flag and sets -7 (temporarily assigned above) flag if not all sister blocks share it
+        lgtID = lgt_active(k, tree_ID)
+        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -7) then
             ! merge the four blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.
-            call find_sisters( params, lgt_active(k), light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist )
+            call findSisters_tree( params, lgtID, light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist, tree_ID )
             ! note the newly merged block has status 0
 
             if (present(hvy_mask)) then
@@ -131,4 +132,4 @@ subroutine coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sor
             endif
         endif
     enddo
-end subroutine coarse_mesh
+end subroutine executeCoarsening_tree

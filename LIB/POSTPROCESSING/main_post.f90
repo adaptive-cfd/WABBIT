@@ -13,8 +13,8 @@ program main_post
     integer(kind=ik)                    :: rank                   ! process rank
     integer(kind=ik)                    :: number_procs           ! number of processes
     type (type_params)                  :: params
-    character(len=cshort)                   :: mode
-    character(len=cshort)                   :: filename, key1, key2
+    character(len=cshort)               :: mode
+    character(len=cshort)               :: filename, key1, key2
     real(kind=rk)                       :: elapsed_time
 
     call MPI_Init(ierr)                                           ! init mpi
@@ -47,8 +47,6 @@ program main_post
     select case(mode)
     case ("--extract-slice")
         call post_extract_slice(params)
-    case ("--ghost-test")
-        call postGhostSyncTest(params)
 
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
@@ -80,11 +78,11 @@ program main_post
     case("--mult-mask", "--mult-mask-direct", "--mult-mask-inverse")
         call mult_mask(params)
 
-    !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
+        !mean of a given field sum(q_ij)/size(q_ij) the result is a scalar
     case("--mean")
         call post_mean(params)
 
-    ! average of multiple snapshots the result is the averaged snapshot
+        ! average of multiple snapshots the result is the averaged snapshot
     case("--average")
         call post_average_snapshots(params)
 
@@ -95,7 +93,7 @@ program main_post
         call performance_test(params)
 
     case ("--adaption-test")
-          call adaption_test(params)
+        call adaption_test(params)
 
     case("--dense-to-sparse")
         call dense_to_sparse(params)
@@ -123,23 +121,23 @@ program main_post
     case ("--flusi-to-wabbit")
         call flusi_to_wabbit(params)
 
-  case ("--POD")
-    call post_POD(params)
+    case ("--POD")
+        call post_POD(params)
 
-case ("--filter")
-   call post_filtertest(params)
+    case ("--filter")
+        call post_filtertest(params)
 
-  case ("--POD-reconstruct")
-    call post_reconstruct(params)
+    case ("--POD-reconstruct")
+        call post_reconstruct(params)
 
-  case ("--POD-error")
-    call post_PODerror(params)
+    case ("--POD-error")
+        call post_PODerror(params)
 
-  case ("--POD-time")
-    call post_timecoef_POD(params)
+    case ("--POD-time")
+        call post_timecoef_POD(params)
 
-  case ("--generate_forest")
-    call post_generate_forest(params)
+    case ("--generate_forest")
+        call post_generate_forest(params)
     case default
 
         if (params%rank==0) then

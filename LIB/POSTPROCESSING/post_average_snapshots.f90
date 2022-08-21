@@ -10,7 +10,6 @@ subroutine post_average_snapshots(params)
     use module_time_step
     use module_stl_file_reader
     use module_helpers
-    use module_forest
 
     implicit none
 
@@ -28,7 +27,7 @@ subroutine post_average_snapshots(params)
     integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
     integer(kind=ik), allocatable      :: Nblocks(:)
-    integer :: hvy_id, lgt_id, fsize, i, tree_id, average_tree_id
+    integer :: hvy_id, lgt_id, fsize, i, tree_ID, average_tree_ID
     integer(kind=ik) :: iteration, Bs(1:3), tc_length1, dim, tc_length2, Nargs, &
                         tree_N, level, N_snapshots
     real(kind=rk) :: time, domain(1:3)
@@ -106,27 +105,27 @@ subroutine post_average_snapshots(params)
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
 
-    do tree_id = 1, N_snapshots
-      call read_field2tree(params,fname_in(tree_id) , params%n_eqn, tree_id, &
+    do tree_ID = 1, N_snapshots
+      call read_field2tree(params,fname_in(tree_ID) , params%n_eqn, tree_ID, &
                   tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
                   hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-      if (params%adapt_mesh) then
+      if (params%adapt_tree) then
           ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
           ! adapt-mesh also performs neighbor and active lists updates
-      !    call adapt_tree_mesh( time(tree_id), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-      !    lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_id, tree_n)
+      !    call adapt_tree_mesh( time(tree_ID), params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+      !    lgt_sortednumlist, hvy_active, hvy_n, params%coarsening_indicator, hvy_tmp ,tree_ID, tree_n)
       endif
     end do
 
 
-    average_tree_id = N_snapshots + 1
+    average_tree_ID = N_snapshots + 1
     call average_trees( params, tree_N, lgt_block, lgt_active,&
                         lgt_n, lgt_sortednumlist, hvy_block, hvy_active,&
                         hvy_n, hvy_tmp, hvy_neighbor, (/(i, i= 1, N_snapshots)/), &
-                        average_tree_id, verbosity)
+                        average_tree_ID, verbosity)
 
     call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=average_tree_id, time=0.0_rk, iteration=0 )
+    lgt_n, hvy_n, hvy_active, dF=1, tree_ID=average_tree_ID, time=0.0_rk, iteration=0 )
 
 
     call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &

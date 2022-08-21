@@ -18,11 +18,14 @@ subroutine keyvalues(fname, params)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
+    integer(kind=ik), allocatable           :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable           :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                        :: tree_ID=1, hvy_id
+
     integer(hsize_t), dimension(4)          :: size_field
     integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, tc_length, dim
+    integer(kind=ik)                        :: lgt_id, k, nz, iteration, tc_length, dim
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
@@ -39,6 +42,10 @@ subroutine keyvalues(fname, params)
     rank = params%rank
     curves(1) = 'sfc_hilbert'
     curves(2) = 'sfc_z'
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
+    
     !-----------------------------------------------------------------------------------------------------
     if (fname=='--help' .or. fname=='--h') then
         if (rank==0) then
@@ -53,7 +60,8 @@ subroutine keyvalues(fname, params)
     if (rank==0) write (*,'("analyzing file ",a20," for keyvalues")') trim(adjustl(fname))
 
     ! get some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     params%dim = dim
     params%Bs = Bs
@@ -64,20 +72,20 @@ subroutine keyvalues(fname, params)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
     ! make sure there is enough memory allocated
-    params%number_blocks = ceiling( real(lgt_n) / real(params%number_procs) )
+    params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
 
     ! the work array needs to be allocated as balance load requires a buffer.
     ! it can However be smaller than what is allocated in allocate_grid.
     allocate( hvy_tmp( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4), size(hvy_block,5)) )
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
-    call read_field(fname, 1, params, hvy_block, hvy_n )
+    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID )
 
-    call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -88,24 +96,27 @@ subroutine keyvalues(fname, params)
     allocate(blocks_per_rank(1:params%number_procs))
 
     ! test all existing space filling curves
-    do i=1,size(curves)
+    do i = 1,size(curves)
         tree = 0_ik
         params%block_distribution=trim(curves(i))
 
-        call balance_load(params, lgt_block, hvy_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID=1)
+        call balanceLoad_tree(params, lgt_block, hvy_block, hvy_neighbor, &
+        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
 
         call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
         WABBIT_COMM,mpicode)
 
-        do k=1,hvy_n
-            call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+
+            call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
             tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
         end do
 
         call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
-        MPI_SUM,0,WABBIT_COMM,mpicode)
+        MPI_SUM, 0, WABBIT_COMM, mpicode)
         sum_curve(i) = sum(sum_tree)
     end do
 
@@ -116,9 +127,12 @@ subroutine keyvalues(fname, params)
     meanl = 0.0_rk
     ql = 0.0_rk
 
-    do k = 1,hvy_n
-        call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
         do iz = 1, Bs(3)
             do iy = 1, Bs(2)
                 do ix = 1, Bs(1)
@@ -126,14 +140,15 @@ subroutine keyvalues(fname, params)
                     y = dble(iy-1)*dx(2)/dble(Bs(2)) + x0(2)
                     z = dble(iz-1)*dx(3)/dble(Bs(3)) + x0(3)
 
-                    ql = ql + hvy_block(ix,iy,iz,1,hvy_active(k))*(x+y+z)
+                    ql = ql + hvy_block(ix,iy,iz,1,hvy_id)*(x+y+z)
                 end do
             end do
         end do
-        maxl = max(maxl,maxval(hvy_block(:,:,:,:,hvy_active(k))))
-        minl = min(minl,minval(hvy_block(:,:,:,:,hvy_active(k))))
-        squarl = squarl + sum(hvy_block(:,:,:,:,hvy_active(k))**2)
-        meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_active(k)))
+
+        maxl = max(maxl,maxval(hvy_block(:,:,:,:,hvy_id)))
+        minl = min(minl,minval(hvy_block(:,:,:,:,hvy_id)))
+        squarl = squarl + sum(hvy_block(:,:,:,:,hvy_id)**2)
+        meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_id))
     end do
 
     call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
@@ -142,9 +157,9 @@ subroutine keyvalues(fname, params)
     call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
     call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
 
-    qi = qi / lgt_n
-    squari = squari / lgt_n
-    meani = meani / lgt_n
+    qi = qi / lgt_n(tree_ID)
+    squari = squari / lgt_n(tree_ID)
+    meani = meani / lgt_n(tree_ID)
 
     if (rank == 0) then
         open  (59, file=fname(1:index(fname,'.'))//'key', &

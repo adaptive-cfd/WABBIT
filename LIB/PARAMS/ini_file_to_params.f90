@@ -282,8 +282,8 @@ end subroutine ini_file_to_params
     N_MAX_COMPONENTS = params%n_eqn
 
     ! read switch to turn on|off mesh refinement
-    call read_param_mpi(FILE, 'Blocks', 'adapt_mesh', params%adapt_mesh, .true. )
-    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_mesh )
+    call read_param_mpi(FILE, 'Blocks', 'adapt_tree', params%adapt_tree, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'adapt_inicond', params%adapt_inicond, params%adapt_tree )
     call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
     call read_param_mpi(FILE, 'Blocks', 'inicond_grid_from_file', params%inicond_grid_from_file, "no" )
     call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "sfc_hilbert" )

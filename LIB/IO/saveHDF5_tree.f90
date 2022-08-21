@@ -6,7 +6,8 @@
 !!           - heavy data array
 ! ********************************************************************************************
 
-subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block, lgt_active, lgt_n, hvy_n, hvy_active)
+subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_block, &
+    lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
     implicit none
 
     character(len=*), intent(in)        :: fname                                !> file name
@@ -16,9 +17,11 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     integer(kind=ik), intent(in)        :: lgt_block(:, :)                      !> light data array
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(in)        :: lgt_active(:), hvy_active(:)         !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: lgt_active(:,:), hvy_active(:,:)         !> list of active blocks (light data)
+    integer(kind=ik), intent(in)        :: lgt_n(:)                                !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: hvy_n(:)                                !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID
+
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
     integer(kind=ik)                    :: g, dim                               ! grid parameter
@@ -34,7 +37,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
     integer(kind=ik), dimension(1:3)    :: ubounds2D, lbounds2D, periodic_BC, symmetry_BC
 
-    character(len=cshort)                   :: arg
+    character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
     logical, parameter                  :: save_ghosts = .False.
@@ -66,44 +69,47 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
     if (save_ghosts) then
-        allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n ), stat=status)
+        allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n(tree_ID) ), stat=status)
     else
-        allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n ), stat=status)
+        allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n(tree_ID) ), stat=status)
     endif
+
     if (status /= 0) then
         call abort(2510191, "IO: sorry, but buffer allocation failed! At least the weather is clearing up. Go outside.")
     endif
-    allocate(coords_spacing(1:3, 1:hvy_n) )
-    allocate(coords_origin(1:3, 1:hvy_n))
-    allocate(procs(1:hvy_n))
-    allocate(lgt_ids(1:hvy_n))
-    allocate(refinement_status(1:hvy_n))
+
+    allocate(coords_spacing(1:3, 1:hvy_n(tree_ID)) )
+    allocate(coords_origin(1:3, 1:hvy_n(tree_ID)))
+    allocate(procs(1:hvy_n(tree_ID)))
+    allocate(lgt_ids(1:hvy_n(tree_ID)))
+    allocate(refinement_status(1:hvy_n(tree_ID)))
     procs = rank
-    allocate(block_treecode(1:params%max_treelevel, 1:hvy_n))
+    allocate(block_treecode(1:params%max_treelevel, 1:hvy_n(tree_ID)))
 
     coords_origin = 7.0e6_rk
 
-    if (lgt_n < 1 ) call abort(291019, "you try to save an empty mesh.")
+    if (lgt_n(tree_ID) < 1 ) call abort(291019, "you try to save an empty mesh.")
 
 
     ! first: check if field contains NaNs
-    do k = 1, hvy_n
-        if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_active(k)))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+        if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_id))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
     end do
 
     ! output on screen
     if (rank == 0) then
-        sparsity_Jcurrent = dble(lgt_n) / dble(2**max_active_level( lgt_block, lgt_active, lgt_n ))**dim
-        sparsity_Jmax = dble(lgt_n) / dble(2**params%max_treelevel)**dim
+        sparsity_Jcurrent = dble(lgt_n(tree_ID)) / dble(2**maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n ))**dim
+        sparsity_Jmax = dble(lgt_n(tree_ID)) / dble(2**params%max_treelevel)**dim
 
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
-        time, trim(adjustl(fname)), lgt_n, 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
+        time, trim(adjustl(fname)), lgt_n(tree_ID), 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
     endif
 
     ! we need to know how many blocks each rank actually holds, and all procs need to
     ! know that distribution for all other procs in order to know what portion of the array
     ! they must write to.
-    call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
+    call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n(tree_ID) )
 
     ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
     ! it may contain holes)
@@ -113,8 +119,8 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n/) - 1
-        if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n/) - 1
+        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
 
     else
 
@@ -122,25 +128,24 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n/) - 1
-        if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n/) - 1
+        ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
 
     endif
 
     l = 1
     ! loop over all active light block IDs, check if it is mine, if so, copy the block to the buffer
-    do k = 1, lgt_n
-
+    do k = 1, lgt_n(tree_ID)
+        lgt_id = lgt_active(k, tree_ID)
         ! calculate proc rank from light data line number
-        call lgt2proc( lgt_rank, lgt_active(k), params%number_blocks )
+        call lgt2proc( lgt_rank, lgt_id, params%number_blocks )
         ! calculate heavy block id corresponding to light id
-        call lgt2hvy( hvy_id, lgt_active(k), rank, params%number_blocks )
+        call lgt2hvy( hvy_id, lgt_id, rank, params%number_blocks )
 
         ! if I own this block, I copy it to the buffer.
         ! also extract block coordinate origin and spacing
         if (lgt_rank == rank) then
             ! compute block spacing and origin from the treecode
-            lgt_id = lgt_active(k)
             call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
 
 
@@ -167,7 +172,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                 endif
 
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_id, 1:params%max_treelevel )
             else
                 ! 2D
                 if (save_ghosts) then
@@ -187,12 +192,12 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = lgt_block( lgt_active(k), 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_id, 1:params%max_treelevel )
             endif
 
 
-            refinement_status(l) = lgt_block( lgt_active(k), params%max_treelevel+IDX_REFINE_STS )
-            lgt_ids(l) = lgt_active(k)
+            refinement_status(l) = lgt_block( lgt_id, params%max_treelevel+IDX_REFINE_STS )
+            lgt_ids(l) = lgt_id
 
             ! next block
             l = l + 1
@@ -236,7 +241,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
-    call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n/))
+    call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
@@ -251,7 +256,7 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     ! check if we find a *.ini file name in the command line call
     ! if we do, read it, and append it to the HDF5 file. this way, data
     ! and parameters are always together. thomas, 16/02/2019
-    
+
     ! if (params%rank==0) then
     !     call open_file_hdf5_serial( trim(adjustl(fname)), file_id, .true.)
     !     do k = 1, COMMAND_ARGUMENT_COUNT()
@@ -265,4 +270,4 @@ subroutine write_field( fname, time, iteration, dF, params, lgt_block, hvy_block
     !     enddo
     !     call close_file_hdf5_serial(file_id)
     ! endif
-end subroutine write_field
+end subroutine saveHDF5_tree

@@ -3,7 +3,6 @@ subroutine operator_reconstruction(params)
     use module_mesh
     use module_params
     use module_IO
-    use module_forest
     use module_mpi
     use module_acm
     use module_time_step, only: filter_wrapper
@@ -14,7 +13,7 @@ subroutine operator_reconstruction(params)
     character(len=cshort) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, tree_N, iblock, ix, iy, &
-    g, lgt_n, hvy_n, iz, a1, b1, a2, b2, level, j
+    g, iz, a1, b1, a2, b2, level, j
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
@@ -24,8 +23,11 @@ subroutine operator_reconstruction(params)
     real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
     real(kind=rk), allocatable         :: stencil1(:),stencil2(:)
     integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:)
+    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
+    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+    integer(kind=ik)                   :: tree_ID=1, hvy_id
+
     character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
@@ -37,11 +39,14 @@ subroutine operator_reconstruction(params)
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
 
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
+
     call get_command_argument(2, file)
     call check_file_exists(file)
 
     ! get some parameters from the grid file
-    call read_attributes(file, lgt_n, time, iteration, domain, Bs, tc_length, params%dim, &
+    call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
@@ -52,7 +57,7 @@ subroutine operator_reconstruction(params)
     allocate(params%butcher_tableau(1,1))
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
-    params%number_blocks = 8*lgt_n ! to allow refinement
+    params%number_blocks = 8*lgt_n(tree_ID) ! to allow refinement
 
     ! Note:
     ! When comparing with the basic hand-made matlab operator script, keep in mind
@@ -148,32 +153,36 @@ subroutine operator_reconstruction(params)
     b2 = ubound(stencil2, dim=1)
     iz = 1
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp)
+    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
 
     call init_ghost_nodes( params )
 
-    call read_mesh(file, params, lgt_n, hvy_n, lgt_block)
+    call read_mesh(file, params, lgt_n, hvy_n, lgt_block, tree_ID)
 
-    call create_active_and_sorted_lists(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
+    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
+    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
 
-    call update_neighbors(params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n)
+    call updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, &
+    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-    dx_fine = (2.0_rk**-max_active_level(lgt_block, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
+    dx_fine = (2.0_rk**-maxActiveLevel_tree(lgt_block, tree_ID, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
     nx_fine = nint(domain(2)/dx_fine)
 
     write(*,*) "nx_fine=", nx_fine
-    write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2) ! note actual operator size is smaller because of redundant points
+    write(*,*) "nblocks=", lgt_n(tree_ID), "bs=", Bs, "npoints (op. matrix size!)=", lgt_n(tree_ID)*bs(1)*bs(2) ! note actual operator size is smaller because of redundant points
 
     !---------------------------------------------------------------------------
     ! save the grid (for plotting in python)
     !---------------------------------------------------------------------------
     open(19, file=trim(adjustl(file))//'.operator_grid_points.txt', status='replace')
-    do iblock = 1, hvy_n
-        call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
+    do iblock = 1, hvy_n(tree_ID)
+
+        call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -208,13 +217,13 @@ subroutine operator_reconstruction(params)
             notAllPointsAreZero = .false.
 
             ! reset entire grid to zeros (we just set one point to 1.0)
-            do iblock = 1, hvy_n
-                hvy_block(:, :, :, :, hvy_active(iblock)) = 0.0_rk
+            do iblock = 1, hvy_n(tree_ID)
+                hvy_block(:, :, :, :, hvy_active(iblock, tree_ID)) = 0.0_rk
             enddo
 
             ! set this one point we're looking at to 1 (on all blocks!)
-            do iblock = 1, hvy_n
-                call hvy2lgt(lgt_id, hvy_active(iblock), params%rank, params%number_blocks)
+            do iblock = 1, hvy_n(tree_ID)
+                call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                 do j = 1, 4
@@ -234,7 +243,7 @@ subroutine operator_reconstruction(params)
                             ! but on the coarse one, it lies exactly between two coarser points. neither one is correct ! so, check again, if (ix,iy)
                             ! really correspond to (x_in2,y_in2)
                             if ((abs(x-x_in2)<1.0e-13_rk) .and. (abs(y-y_in2)<1.0e-13_rk)) then
-                                hvy_block(ix, iy, iz, :, hvy_active(iblock)) = 1.0_rk
+                                hvy_block(ix, iy, iz, :, hvy_active(iblock,tree_ID)) = 1.0_rk
                                 notAllPointsAreZero = .true.
                                 ! write(*,*) x_in, y_in, x, y, "--", ix,iy,iblock
                             endif
@@ -256,21 +265,22 @@ subroutine operator_reconstruction(params)
             ! the finest active level), this sync is no longer required: we set ALL points (x_in,y_in) to one, on ALL blocks
             ! that have those points
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=1 )
+                call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+                lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID )
 
-                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif
 
 
             !---------------------------------------------------------------
             ! Now compute the derivative
-            do k = 1, hvy_n
-                call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                 dx_inv = 1.0_rk / dx(1)
@@ -278,17 +288,17 @@ subroutine operator_reconstruction(params)
                 if (dir=="x") then
                     do iy2 = g+1, Bs(2)+g
                         do ix2 = g+1, Bs(1)+g
-                            u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_active(k)) )*dx_inv
-                            u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_active(k)) )*dx_inv**2
-                            hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
+                            u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_id) )*dx_inv
+                            u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_id) )*dx_inv**2
+                            hvy_block(ix2,iy2,iz,2,hvy_id) = u_dx + nu*u_dxdx
                         end do
                     end do
                 elseif (dir=='y') then
                     do iy2 = g+1, Bs(2)+g
                         do ix2 = g+1, Bs(1)+g
-                            u_dx   = sum( stencil1*hvy_block(ix2, iy2+a1:iy2+b1, iz, 1, hvy_active(k)) )*dx_inv
-                            u_dxdx = sum( stencil2*hvy_block(ix2, iy2+a2:iy2+b2, iz, 1, hvy_active(k)) )*dx_inv**2
-                            hvy_block(ix2,iy2,iz,2,hvy_active(k)) = u_dx + nu*u_dxdx
+                            u_dx   = sum( stencil1*hvy_block(ix2, iy2+a1:iy2+b1, iz, 1, hvy_id) )*dx_inv
+                            u_dxdx = sum( stencil2*hvy_block(ix2, iy2+a2:iy2+b2, iz, 1, hvy_id) )*dx_inv**2
+                            hvy_block(ix2,iy2,iz,2,hvy_id) = u_dx + nu*u_dxdx
                         end do
                     end do
                 else
@@ -301,14 +311,14 @@ subroutine operator_reconstruction(params)
             ! on the coarse and fine level. This synchronizing step lets us keep only either of those,
             ! depending on fineWins or coarseWins
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
+                call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
                 lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
 
-                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif
 
 
@@ -316,8 +326,10 @@ subroutine operator_reconstruction(params)
             ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
             ! create a matrix N_max**2 by N_max**2, where N_max is Npoints on the finest level.
             ! Many points do not exist; they are on coarse levels
-            do k = 1, hvy_n
-                call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 
                 do iy2 = g+1, Bs(2)+g
@@ -331,7 +343,7 @@ subroutine operator_reconstruction(params)
                         ixx2 = nint(x/dx_fine)+1
                         iyy2 = nint(y/dx_fine)+1
 
-                        val = hvy_block(ix2, iy2, iz, 2, hvy_active(k)) ! u_dx
+                        val = hvy_block(ix2, iy2, iz, 2, hvy_id) ! u_dx
 
                         if (abs(val) > 1.0e-13) then
                             ! this point is a nonzero value

@@ -11,7 +11,7 @@ module module_mesh
     use module_MPI
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
     use module_operators, only: component_wise_tree_norm
-    ! used in coarse_mesh
+    ! used in executeCoarsening_tree
     use module_helpers, only: most_common_element
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
@@ -19,24 +19,11 @@ module module_mesh
 
     implicit none
 
-    ! interface generalising the mono-tree to multi-trees
-    interface create_active_and_sorted_lists
-        module procedure create_active_and_sorted_lists_tree_old, &
-                         create_active_and_sorted_lists_forest
-    end interface
-
     interface set_desired_num_blocks_per_rank
         module procedure set_desired_num_blocks_per_rank1, &
                          set_desired_num_blocks_per_rank2
     end interface
 
-    interface allocate_grid
-        module procedure allocate_forest, allocate_tree
-    end interface
-
-    interface deallocate_grid
-        module procedure deallocate_forest, deallocate_tree
-    end interface
 
 contains
 
@@ -45,37 +32,37 @@ contains
 
 #include "block_xfer_nonblocking.f90"
 
-#include "update_neighbors.f90"
+#include "updateNeighbors_tree.f90"
 
 #include "find_neighbors.f90"
-#include "does_block_exist.f90"
+#include "doesBlockExist_tree.f90"
 
     ! block refinement subroutine
-#include "refine_mesh.f90"
+#include "refine_tree.f90"
 
     ! check treelevel restrictions
-#include "respect_min_max_treelevel.f90"
+#include "respectJmaxJmin_tree.f90"
 
     ! check treelevel restrictions
-#include "refinement_execute_2D.f90"
-#include "refinement_execute_3D.f90"
+#include "refinementExecute2D_tree.f90"
+#include "refinementExecute3D_tree.f90"
 
     ! adapt the mesh
-#include "adapt_mesh.f90"
-#include "grid_coarsening_indicator.f90"
+#include "adapt_tree.f90"
+#include "CoarseningIndicator_tree.f90"
 
     ! gradedness check
-#include "ensure_gradedness.f90"
+#include "ensureGradedness_tree.f90"
 
     ! completeness check
 #include "ensure_completeness.f90"
 
     ! coarse mesh
-#include "coarse_mesh.f90"
+#include "executeCoarsening_tree.f90"
 #include "merge_blocks.f90"
 
     ! balance the load
-#include "balance_load.f90"
+#include "balanceLoad_tree.f90"
 
     ! create list with number of blocks per rank
 #include "set_desired_num_blocks_per_rank.f90"
@@ -96,28 +83,29 @@ contains
 #include "get_block_spacing_origin.f90"
 
     ! find sisters to a given block
-#include "find_sisters.f90"
+#include "findSisters_tree.f90"
 
     ! find globally coarsest / finest levels
-#include "max_active_level.f90"
-#include "min_active_level.f90"
+#include "ActiveLevel_tree.f90"
 #include "get_free_local_light_id.f90"
 #include "quicksort.f90"
-#include "update_grid_metadata.f90"
+#include "updateMetadata_tree.f90"
 
     ! routines for creation of an initial grid
-#include "create_equidistant_grid.f90"
-#include "create_random_grid.f90"
+#include "createEquidistantGrid_tree.f90"
+#include "createRandomGrid_tree.f90"
 
     ! allocate and reset all memory required for the gird
-#include "reset_grid.f90"
-#include "allocate_grid.f90"
+#include "reset_tree.f90"
+#include "allocate_forest.f90"
 
 #include "write_block_distribution.f90"
 
     ! lgt_block synchronization
 #include "check_lgt_block_synchronization.f90"
 #include "remove_nonperiodic_neighbors.f90"
+#include "forest.f90"
+
 
 ! check if we still have enough memory left: for very large simulations
 ! we cannot affort to have them fail without the possibility to resume them
@@ -135,7 +123,7 @@ logical function not_enough_memory(params, lgt_block, lgt_active, lgt_n)
 
     ! without adaptivity, this routine makes no sense, as the memory is constant
     ! the run either crashes right away or never
-    if (params%adapt_mesh .eqv. .false.) then
+    if (params%adapt_tree .eqv. .false.) then
         not_enough_memory = .false.
         return
     endif
@@ -198,81 +186,86 @@ end function
 !##############################################################
 ! This routine refines/coarsens to given target_level.
 ! If target_level is not passed, then max_treelevel is assumed
-subroutine to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, target_level, verbosity)
+subroutine toEquidistant_tree(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
+    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID, target_level, verbosity)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(inout) :: params   !< params structure
-    integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
-    integer(kind=ik), intent(inout)   :: lgt_n !< number of light active blocks
+    integer(kind=ik), intent(inout)   :: hvy_n(:)    !< number of active heavy blocks
+    integer(kind=ik), intent(inout)   :: lgt_n(:) !< number of light active blocks
     integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-    integer(kind=ik), intent(inout)   :: lgt_active(:), hvy_active(:) !< active lists
-    integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
+    integer(kind=ik), intent(inout)   :: lgt_active(:,:), hvy_active(:,:) !< active lists
+    integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), intent(in)      :: tree_ID
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
     integer(kind=ik), intent(in), optional :: target_level
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
     !-----------------------------------------------------------------
-    integer(kind=ik):: level, tree_id,k,treecode_size
-    logical :: verbose=.false.
+    integer(kind=ik):: level,k,treecode_size, lgt_id
+    logical :: verbose = .false.
 
     if (present(verbosity)) verbose=verbosity
     if (present(target_level)) then
-        level=target_level
+        level = target_level
     else
         level = params%max_treelevel
     endif
 
-    ! get tree_id form lgt data
-    tree_id = lgt_block(lgt_active(1),params%max_treelevel+IDX_TREE_ID)
-
     ! refine/coarse to attain desired level, respectively
-    !coarsen
-    do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
+    ! coarsen
+    do while (maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )>level)
         ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = -1
+        do k = 1, lgt_n(tree_ID)
+            lgt_id = lgt_active(k, tree_ID)
+
+            if (treecode_size(lgt_block(lgt_id,:), params%max_treelevel) > level) then
+                lgt_block(lgt_id, params%max_treelevel + IDX_REFINE_STS) = -1
+            endif
         end do
+
         ! this might not be necessary since we start from an admissible grid
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
+        call ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, tree_ID=1)
+        call executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
+        hvy_active, hvy_n, tree_ID)
 
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+        call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     end do
 
     ! refine
-    do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
+    do while (minActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )<level)
         ! check where refinement is actually needed
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = 1
+        do k = 1, lgt_n(tree_ID)
+            lgt_id = lgt_active(k, tree_ID)
+
+            if (treecode_size(lgt_block(lgt_id,:), params%max_treelevel) < level) then
+                lgt_block(lgt_id, params%max_treelevel + IDX_REFINE_STS) = 1
+            endif
         end do
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
+
+        call ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+
         if ( params%dim == 3 ) then
-            ! 3D:
-            call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+            call refinementExecute3D_tree( params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID )
         else
-            ! 2D:
-            call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active, hvy_n )
+            call refinementExecute2D_tree( params, lgt_block, hvy_block(:,:,1,:,:),&
+            hvy_active, hvy_n, tree_ID )
         end if
 
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_id)
+        call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
+        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
     end do
 
-    call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_id )
+    call balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
+    lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
 end subroutine
 !##############################################################
 

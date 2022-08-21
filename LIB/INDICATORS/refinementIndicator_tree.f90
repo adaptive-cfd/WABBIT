@@ -11,17 +11,18 @@
 !! -2 block will refine and be merged with her sisters
 ! ********************************************************************************************
 
-subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, indicator )
+subroutine refinementIndicator_tree(params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, tree_ID, indicator)
     use module_helpers
     implicit none
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)                      !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:)                        !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n                                !> number of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_active(:,:)                      !> list of active blocks (light data)
+    integer(kind=ik), intent(inout)     :: lgt_n(:)                             !> number of active blocks (light data)
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(inout)     :: hvy_active(:)                        !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n                                !> number of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                      !> list of active blocks (heavy data)
+    integer(kind=ik), intent(inout)     :: hvy_n(:)                             !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
@@ -45,14 +46,14 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! for refinement if the details are significant.
 
         ! reset refinement status to "stay"
-        do k = 1, lgt_n
-           lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS) = 0
+        do k = 1, lgt_n(tree_ID)
+           lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS) = 0
         enddo
 
         ! each CPU decides for its blocks if they're refined or not
-        do k = 1, hvy_n
+        do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
-            hvy_id = hvy_active(k)
+            hvy_id = hvy_active(k, tree_ID)
 
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -87,15 +88,15 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! component to be refined.
 
         ! reset refinement status to "stay"
-        do k = 1, lgt_n
-           lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS) = 0
+        do k = 1, lgt_n(tree_ID)
+           lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS) = 0
         enddo
 
         ! each CPU decides for its blocks if they're refined or not
         if (params%dim==3) then
-            do k = 1, hvy_n
+            do k = 1, hvy_n(tree_ID)
                 ! hvy_id of the block we're looking at
-                hvy_id = hvy_active(k)
+                hvy_id = hvy_active(k, tree_ID)
 
                 ! light id of this block
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -109,9 +110,9 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
                 ! endif
             enddo
         else
-            do k = 1, hvy_n
+            do k = 1, hvy_n(tree_ID)
                 ! hvy_id of the block we're looking at
-                hvy_id = hvy_active(k)
+                hvy_id = hvy_active(k, tree_ID)
 
                 ! light id of this block
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -135,8 +136,8 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! last index in the light data block list to +1. This indicator is used
         ! to refine the entire mesh at the beginning of a time step, if error
         ! control is desired.
-        do k = 1, lgt_n
-            lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = +1
+        do k = 1, lgt_n(tree_ID)
+            lgt_block( lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS ) = +1
         end do
 
     case ("random")
@@ -147,12 +148,12 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! random refinement can set at most this many blocks to refine (avoid errors
         ! due to insufficient memory)
         max_grid_density = params%max_grid_density
-        current_grid_density = dble(lgt_n) / dble(size(lgt_block,1))
+        current_grid_density = dble(lgt_n(tree_ID)) / dble(size(lgt_block,1))
         ! we allow at most this number of blocks to be active:
         max_blocks = floor( max_grid_density * dble(size(lgt_block,1)) )
         ! we already have lgt_n blocks we can set the status
         ! at most for Nmax-lgt_n blocks
-        max_blocks = max_blocks - lgt_n
+        max_blocks = max_blocks - lgt_n(tree_ID)
         ! each block flagged for refinement creates (2**d -1) new blocks
         max_blocks = max_blocks / (2**params%dim - 1)
         ! chance for randomized refinement
@@ -169,12 +170,12 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         ! random value which is not sync'ed
         if (params%rank == 0) then
             tags = 0
-            do k = 1, lgt_n
+            do k = 1, lgt_n(tree_ID)
                 call random_number(r)
                 ! set refinement status to refine
-                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k), Jmax + IDX_REFINE_STS)==0) then
+                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS)==0) then
                     tags = tags + 1
-                    lgt_block( lgt_active(k), Jmax + IDX_REFINE_STS ) = 1
+                    lgt_block( lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS ) = 1
                 end if
             end do
         endif
@@ -183,8 +184,8 @@ subroutine refinement_indicator( params, lgt_block, lgt_active, lgt_n, hvy_block
         call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
 
     case default
-        call abort("ERROR: refine_mesh: the refinement indicator is unkown")
+        call abort("ERROR: refine_tree: the refinement indicator is unkown")
 
     end select
 
-end subroutine refinement_indicator
+end subroutine refinementIndicator_tree

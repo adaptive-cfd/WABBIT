@@ -1,5 +1,5 @@
-subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_work, &
+    hvy_mask, hvy_tmp, tree_ID)
     ! it is unfortunate but this routine breaks the encapsulation concept, as it requires to
     ! have access to the "INSECT" structure for time stepping. hence, but ACM and INSECT modules
     ! have to be loaded here.
@@ -10,18 +10,11 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_b
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
     type (type_params), intent(in)      :: params                       !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)              !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)           !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)              !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! in fortran, we work with indices:
@@ -73,11 +66,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_b
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! calculate time step
-    call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_block, &
-    lgt_active(:,tree_ID), lgt_n(tree_ID), dt)
+    call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
     do k = 1, hvy_n(tree_ID)
-        hvy_id = hvy_active(k,tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
         ! Y0 = u (in matlab: y00 = u;)
         hvy_work(:,:,:,:,hvy_id, y00 ) = hvy_block(:,:,:,:,hvy_id)
         ! we need two copies (one is an iteration variable, the other (above) is kept constant)
@@ -88,9 +80,8 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_b
 
     ! F0 (RHS at initial time, old time level)
     ! note: call sync_ghosts on input data before
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, lgt_block, &
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
-    
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, tree_ID )
+
     ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
     call rigid_solid_rhs( time, iteration, Insect%STATE, Insect%rhs(:,F0), &
     params_acm%force_insect_g, params_acm%moment_insect_g, Insect )
@@ -112,8 +103,8 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, lgt_block, hvy_b
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
         call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
+
+        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
         call rigid_solid_rhs(tau, iteration, Insect%rhs(:,y1), Insect%rhs(:,F1), &
         params_acm%force_insect_g, params_acm%moment_insect_g, Insect)

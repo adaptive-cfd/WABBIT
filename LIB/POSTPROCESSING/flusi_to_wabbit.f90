@@ -9,6 +9,7 @@ subroutine flusi_to_wabbit(params)
     use module_IO
     use mpi
     use module_MPI
+    use module_forestMetaData
 
     implicit none
 
@@ -19,12 +20,7 @@ subroutine flusi_to_wabbit(params)
     real(kind=rk)                     :: time
     integer(kind=ik)                  :: iteration
 
-    integer(kind=ik), allocatable     :: lgt_block(:, :)
     real(kind=rk), allocatable        :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable     :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable     :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable  :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik) , allocatable    :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                  :: tree_ID=1, hvy_id, k
     integer(kind=ik)                  :: refinement_status
     integer(kind=ik) , dimension(3)   :: Bs
@@ -160,22 +156,18 @@ subroutine flusi_to_wabbit(params)
     hvy_n(tree_ID) = lgt_n(tree_ID)
     params%number_blocks = lgt_n(tree_ID)
 
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
     ! create an equidistant grid (order of light id is important!)
-    call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor,&
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, &
-    params%max_treelevel, .true., tree_ID)
+    call createEquidistantGrid_tree( params, params%max_treelevel, .true., tree_ID)
 
     ! read the field from flusi file and organize it in WABBITs blocks
-    call read_field_flusi_MPI(file_in, hvy_block, lgt_block, hvy_n(tree_ID),&
-    hvy_active(:,tree_ID), params, nxyz)
+    call read_field_flusi_MPI(file_in, hvy_block, params, nxyz, tree_ID)
 
     ! set refinement status of blocks not lying at the outer edge to 11 (historic fine)
     ! they will therefore send their redundant points to the last blocks in x,y and z-direction
     do k = 1, lgt_n(tree_ID)
-        call get_block_spacing_origin( params, lgt_active(k, tree_ID), lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_active(k, tree_ID), x0, dx )
 
         start_x = nint(x0(1)/dx(1))
         start_y = nint(x0(2)/dx(2))
@@ -193,8 +185,7 @@ subroutine flusi_to_wabbit(params)
 
     iteration = 0
 
-    call saveHDF5_tree(file_out, time, iteration, 1, params, lgt_block, &
-    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
+    call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 
 end subroutine flusi_to_wabbit
 

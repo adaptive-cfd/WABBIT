@@ -11,23 +11,26 @@
 !! -2 block will refine and be merged with her sisters
 ! ********************************************************************************************
 
-subroutine refinementIndicator_tree(params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, tree_ID, indicator)
+subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
+    use module_forestMetaData
     use module_helpers
     implicit none
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                      !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)                      !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                             !> number of active blocks (light data)
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                      !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                             !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
     integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
     real(kind=rk) :: a, b
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
 
 
     Jmax = params%max_treelevel
@@ -79,7 +82,7 @@ subroutine refinementIndicator_tree(params, lgt_block, lgt_active, lgt_n, hvy_bl
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.
         ! therefore we have to sync the lgt data
-        call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
 
 
     case ("mask-anynonzero")
@@ -128,7 +131,7 @@ subroutine refinementIndicator_tree(params, lgt_block, lgt_active, lgt_n, hvy_bl
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.
         ! therefore we have to sync the lgt data
-        call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
 
     case ("everywhere")
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))

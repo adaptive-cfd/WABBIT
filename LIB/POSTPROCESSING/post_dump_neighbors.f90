@@ -6,6 +6,7 @@ subroutine post_dump_neighbors(params)
     use module_IO
     use module_mpi
     use module_operators
+    use module_forestMetaData
 
     implicit none
 
@@ -17,11 +18,7 @@ subroutine post_dump_neighbors(params)
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:), lgt_n(:), hvy_n(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
     real(kind=rk), dimension(3)        :: dx, x0
@@ -77,18 +74,14 @@ subroutine post_dump_neighbors(params)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     ! allocate data
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
     ! read mesh and field
-    call read_tree((/file/), 1, params, lgt_n(tree_ID), lgt_block, hvy_block, hvy_tmp, tree_ID)
+    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
-
-    ! update neighbor relations
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+    call updateMetadata_tree( params, tree_ID )
 
     open(14, file="lgt_block.txt", status='replace')
     do k = 1, size(lgt_block,1)
@@ -105,7 +98,7 @@ subroutine post_dump_neighbors(params)
 
     open(14, file="x0_dx.txt", status='replace')
     do k = 1, size(lgt_block,1)
-        call get_block_spacing_origin( params, k, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, k, x0, dx )
         write(14,'(6(es15.6,1x))') x0, dx
     enddo
     close(14)

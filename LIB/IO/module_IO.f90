@@ -15,16 +15,34 @@ module module_IO
     use module_ini_files_parser_mpi
     use module_helpers, only : check_file_exists, block_contains_NaN
     use module_treelib
+    use module_forestMetaData
 
     implicit none
 
 contains
 
 #include "saveHDF5_tree.f90"
-#include "read_mesh.f90"
-#include "read_field.f90"
+#include "readHDF5vct_tree.f90"
 #include "read_attributes.f90"
 #include "read_file_flusi.f90"
 #include "forest_IO.f90"
+
+
+    ! returns the number of blocks stored in an HDF5 file
+    function getNumberBlocksH5File(fname)
+        character(len=*), intent(in) :: fname
+        integer(kind=ik) :: getNumberBlocksH5File
+
+        integer(hid_t) :: file_id
+
+        ! open the file
+        call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
+
+        ! read number of blocks...
+        call read_attribute(file_id, "blocks", "total_number_blocks", getNumberBlocksH5File)
+
+        ! close file and HDF5 library
+        call close_file_hdf5(file_id)
+    end function
 
 end module module_IO

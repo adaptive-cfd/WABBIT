@@ -1,17 +1,21 @@
 !> \brief given a treecode, look for the block, return .true. and its lgtID if found
 ! ********************************************************************************************
 
-subroutine doesBlockExist_tree(tcBlock, exists, lgtID, lgt_sortednumlist, lgt_n, tree_ID)
+subroutine doesBlockExist_tree(tcBlock, exists, lgtID, tree_ID)
     implicit none
 
     integer(kind=ik), intent(in)        :: tcBlock(:)                 !> block treecode we are looking for, array representation
     logical, intent(out)                :: exists                     !> true if block with treecode exists
     integer(kind=ik), intent(out)       :: lgtID                      !> light data id of block if found
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(in)        :: lgt_n(:)                   !> it helps to know how many active light blocks we have in total
     integer(kind=ik), intent(in)        :: tree_ID                    !> index of the tree we are looking at
     integer(kind=ik)                    :: k, i1, i2, imid            ! loop variables
     integer(kind=tsize)                 :: num_treecode               ! numerical treecode
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     exists   = .false.
     lgtID = -1

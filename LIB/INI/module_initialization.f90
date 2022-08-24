@@ -10,13 +10,12 @@ module module_initialization
 
     use module_mask
     use module_treelib
+    use module_forestMetaData
 
     implicit none
 
 contains
 
-    ! init_data subroutine
-#include "set_initial_grid.f90"
-#include "set_inicond_blocks.f90"
-#include "get_inicond_from_file.f90"
+#include "setInitialCondition_tree.f90"
+#include "setInicondBlocks_tree.f90"
 end module module_initialization

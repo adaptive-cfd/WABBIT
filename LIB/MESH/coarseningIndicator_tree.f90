@@ -12,8 +12,8 @@
 !! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
 !! -2 block will coarsen and be merged with her sisters \n
 ! ********************************************************************************************
-subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_block, hvy_tmp, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
+subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
+    tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
 
     use module_indicators
 
@@ -21,7 +21,6 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
     integer(kind=ik), intent(in)        :: level_this                     !> current level to look at (in the case of biorthogonal wavelets, not in "harten-multiresolution")
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !> heavy work data array - block data.
     ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
@@ -29,18 +28,12 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     ! block level) so the physics modules have to provide an interface to create the mask at a tree
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)                  !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                         !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                  !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                         !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     character(len=*), intent(in)        :: indicator                      !> how to choose blocks for refinement
     !> coarsening iteration index. coarsening is done until the grid has reached
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)              !> heavy data array - neighbor data
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)         !> sorted list of numerical treecodes, used for block finding
 
     ! for the mask generation (time-independent mask) we require the mask on the highest
     ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
@@ -57,6 +50,12 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:,:,:,:)
     logical :: consider_hvy_tmp, biorthogonal
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
@@ -88,7 +87,7 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     !! whatever reason. For example, vorticity, or in the skew-symmetric case you want
     !! to apply some statevector conversion first.
     !! it is a little unfortunate that we have to do this preparation here and not in
-    !! block_coarsening_indicator, where it should be. but after computing it, we have to
+    !! coarseningIndicator_block, where it should be. but after computing it, we have to
     !! sync its ghost nodes in order to apply the detail operator to the entire
     !! derived field (incl gost nodes).
     if (consider_hvy_tmp) then
@@ -102,7 +101,7 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
 
             ! some indicators may depend on the grid (e.g. the vorticity), hence
             ! we pass the spacing and origin of the block
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
             ! actual computation of thresholding quantity (vorticity etc)
             call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
@@ -135,10 +134,10 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
         if ( .not. consider_hvy_tmp ) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
-            call component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID, params%eps_norm, norm)
+            call component_wise_tree_norm(params, hvy_block, tree_ID, params%eps_norm, norm)
         else
             ! use derived qtys instead (hvy_tmp)
-            call component_wise_tree_norm(params, lgt_block, hvy_tmp, hvy_active, hvy_n, tree_ID, params%eps_norm, norm)
+            call component_wise_tree_norm(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
@@ -154,7 +153,7 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
     !> evaluate coarsening criterion on all blocks
     !---------------------------------------------------------------------------
     ! the indicator "random" requires special treatment below (it does not pass via
-    ! block_coarsening_indicator)
+    ! coarseningIndicator_block)
     select case(indicator)
     case ("everywhere")
         ! coarsen all blocks. Note: it is not always possible (with any grid) to do that!
@@ -215,15 +214,15 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
             ! some indicators may depend on the grid, hence
             ! we pass the spacing and origin of the block (as we have to compute vorticity
             ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
             ! evaluate the criterion on this block.
             if (params%threshold_mask .and. present(hvy_mask)) then
-                call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
             else
-                call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
+                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
             endif
@@ -249,6 +248,6 @@ subroutine CoarseningIndicator_tree( time, params, level_this, lgt_block, hvy_bl
 
 
     !> after modifying all refinement flags, we need to synchronize light data
-    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+    call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
-end subroutine CoarseningIndicator_tree
+end subroutine coarseningIndicator_tree

@@ -13,7 +13,7 @@
 ! performance is better. note you have to wait somewhere! always!
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
-subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_block2, msg )
+subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
     implicit none
 
     !> user defined parameter structure
@@ -21,8 +21,6 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
     !> list of transfers (:,1)=sender (:,2)=recv (:,3)=lgt_id
     integer(kind=ik), intent(inout)     :: xfer_list(:,:)
     integer(kind=ik), intent(in)        :: N_xfers
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> sometimes, it may be useful to perform the same xfer on multiple inputs, in
@@ -86,7 +84,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, lgt_block, hvy_block, hvy_blo
         mpirank_recver = xfer_list(k,2)
 
         ! its new light id will be "lgt_id_new"
-        call get_free_local_light_id( params, mpirank_recver, lgt_block, lgt_id_new, ignore_error=.true. )
+        call get_free_local_light_id( params, mpirank_recver, lgt_id_new, ignore_error=.true. )
 
         ! the idea is now if we do not have enough memory (ie no free block on target rank) we can
         ! wait until the current requests are finnished. Then we retry the loop.

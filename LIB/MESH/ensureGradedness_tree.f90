@@ -10,18 +10,10 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+subroutine ensureGradedness_tree( params, tree_ID )
 
     implicit none
     type (type_params), intent(in)      :: params                 !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)        !> light data array
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)     !> neighbor list
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)        !> active_block_list (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), intent(in)        :: lgt_n(:)               !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)        !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)               !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik)                    :: ierr                   ! MPI error variable
     integer(kind=ik)                    :: rank                   ! process rank
@@ -39,6 +31,12 @@ subroutine ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, l
     ! 2D: 16, 3D: 74
     integer(kind=ik) :: neighbor_num
     real(kind=rk) :: t0
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
 
     N = params%number_blocks
@@ -90,9 +88,9 @@ subroutine ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, l
             ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
             if ( lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == -1) then
                 ! find the sisters of this block
-                call findSisters_tree(params, lgt_id, sisters, lgt_block, lgt_n, lgt_sortednumlist, tree_ID)
+                call findSisters_tree(params, lgt_id, sisters, tree_ID)
                 ! check if all sisters share the -1 status, remove it if they don't
-                call ensure_completeness( params, lgt_block, lgt_id, sisters )
+                call ensure_completeness( params, lgt_id, sisters )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time
@@ -210,7 +208,7 @@ subroutine ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, l
 
         !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()
-        call synchronize_lgt_data( params, lgt_block, refinement_status_only=.true. )
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
         call toc( "ensureGradedness_tree (sync_lgt)", MPI_Wtime()-t0 )
 
         ! avoid infinite loops

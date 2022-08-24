@@ -2,23 +2,17 @@
 !!       create new light/heavy data arrays here and deallocate them after this function
 ! ********************************************************************************************
 
-subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, hvy_work, hvy_tmp, &
-    hvy_neighbor, lgt_active, hvy_active, lgt_sortednumlist, hvy_n, lgt_n )
+subroutine unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
-    integer(kind=ik),  intent(inout)        :: lgt_block(:, :)            !> light data array
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik),  intent(inout)        :: hvy_neighbor(:,:)          !> neighbor array (heavy data)
-    integer(kind=ik),  intent(inout)        :: lgt_active(:,:)            !> list of active blocks (light data)
-    integer(kind=ik),  intent(inout)        :: hvy_active(:,:)            !> list of active blocks (heavy data)
-    integer(kind=tsize), intent(inout)      :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)         :: hvy_n(:)                   ! number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)         :: lgt_n(:)                   ! number of active blocks (light data)
+    integer(kind=ik), intent(in)            :: tree_ID
+
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id       ! loop variables
     integer(kind=ik)                        :: rank, number_procs         ! process rank
     real(kind=rk)                           :: ddx(1:3), xx0(1:3)         ! spacing
@@ -71,18 +65,17 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
     params%max_grid_density = 0.10_rk
     ! perform 5 iterations of random refinement/coarsening
     l = 5
-    call createRandomGrid_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 2, .true., l, tree_ID_flow )
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., l, tree_ID )
 
     if (params%rank == 0) then
         write(*,'(80("-"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxActiveLevel_tree( lgt_block, tree_ID_flow, lgt_active, lgt_n )
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxActiveLevel_tree(tree_ID)
         write(*,'(" ready for testing.")')
     endif
 
 
-    if (maxActiveLevel_tree( lgt_block, tree_ID_flow, lgt_active, lgt_n ) == minActiveLevel_tree( lgt_block, tree_ID_flow, lgt_active, lgt_n )) then
+    if (maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)) then
         if (params%rank==0) write(*,*) "By chance, generated an equidistant mesh: skipping ghost nodes test"
         return
     endif
@@ -101,13 +94,15 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         ! Fill the above constructed grid with the exact solution values
         !-----------------------------------------------------------------------
         ! loop over all active blocks
-        do k = 1, hvy_n(tree_ID_flow)
+        do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
-            hvy_id = hvy_active(k, tree_ID_flow)
+            hvy_id = hvy_active(k, tree_ID)
+
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, rank, params%number_blocks )
+
             ! compute block spacing and origin from treecode
-            call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+            call get_block_spacing_origin( params, lgt_id, xx0, ddx )
 
             ! calculate f(x,y,z) for first datafield
             if ( params%dim == 3 ) then
@@ -152,7 +147,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)
@@ -164,8 +159,8 @@ subroutine unit_test_ghost_nodes_synchronization( params, lgt_block, hvy_block, 
         norm_Linfty = 0.0_rk
 
         ! loop over all active blocks and compute their error
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k, tree_ID_flow)
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
             error_L2     = error_L2 + sum( (hvy_block(:,:,:,1,hvy_id)-hvy_work(:,:,:,1,hvy_id,1))**2 )
             error_Linfty = max( error_Linfty, maxval(abs(hvy_block(:,:,:,1,hvy_id)-hvy_work(:,:,:,1,hvy_id,1))) )
 

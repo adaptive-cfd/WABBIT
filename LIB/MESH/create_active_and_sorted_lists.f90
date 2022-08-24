@@ -8,19 +8,12 @@
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE by looping
 !> over the hvy ids and synchronizing the active lists with the other procs
 ! This routine updates active lists for A SINGLE TREE inside a forest
-subroutine createActiveSortedLists_tree_comm( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine createActiveSortedLists_tree_comm( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of ACTIVE blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of ACTIVE blocks (light data) in each tree
     integer(kind=ik), intent(in)        :: tree_ID
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
 
     integer(kind=ik)                    :: k, N, hvy_id, block_rank, ierr, lgt_id
@@ -28,6 +21,12 @@ subroutine createActiveSortedLists_tree_comm( params, lgt_block, lgt_active, &
     real(kind=rk) :: t0,t(5)
 
     integer(kind=ik), allocatable, save     :: proc_lgt_n(:), proc_lgt_start(:)
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     t0 = MPI_wtime()
 
@@ -127,18 +126,12 @@ end subroutine createActiveSortedLists_tree_comm
 !> over the hvy ids and synchronizing the active lists with the other procs
 !> \author PKrah
 ! This routine updates active lists for A SINGLE TREE inside a forest
-subroutine createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine createActiveSortedLists_tree( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of ACTIVE blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of ACTIVE blocks (light data) in each tree
     integer(kind=ik), intent(in)        :: tree_ID
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
 
     integer(kind=ik)                    :: k, N, hvy_id, block_rank, ierr,lgt_n_sum, lgt_id
@@ -148,6 +141,12 @@ subroutine createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, h
     !integer(kind=ik), allocatable, save     :: my_lgt_recv_buffer(:,:)
     integer(kind=tsize), allocatable, save  :: my_lgt_send_buffer(:,:)
     integer(kind=ik), allocatable, save     :: proc_lgt_n(:), proc_lgt_start(:)
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     t0 = MPI_wtime()
 
@@ -256,24 +255,23 @@ end subroutine createActiveSortedLists_tree
 !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE
 !> \author PKrah
 ! This routine updates active lists for A SINGLE TREE inside a forest
-subroutine createActiveSortedLists_tree_old( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine createActiveSortedLists_tree_old( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of ACTIVE blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of ACTIVE blocks (light data) in each tree
     integer(kind=ik), intent(in)        :: tree_ID
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
     !-----------------------------------------------------------------
 
     integer(kind=ik)                    :: k, N, heavy_id, block_rank
     integer(kind=ik)                    :: rank, TREE_ID_IDX
     real(kind=rk) :: t0,t(5)
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     t0 = MPI_wtime()
 
@@ -365,19 +363,11 @@ end subroutine createActiveSortedLists_tree_old
 !> -------------------------------------------------------------
 !> \author PKrah
 ! This routine updates active lists for ALL TREES inside a forest
-subroutine createActiveSortedLists_forest_comm( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+subroutine createActiveSortedLists_forest_comm( params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of ACTIVE blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of ACTIVE blocks (light data) in each tree
-    integer(kind=ik), intent(inout)     :: tree_n!< number of ACTIVE trees in forest
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
+    type (type_params), intent(in) :: params    !< user defined parameter structure
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, hvy_id, block_rank, fsize
@@ -388,6 +378,12 @@ subroutine createActiveSortedLists_forest_comm( params, lgt_block, lgt_active, &
     integer(kind=ik) :: ierr, mpisize
     integer(kind=tsize), allocatable, save     :: my_lgt_send_buffer( :, :, :)
     integer(kind=ik), allocatable, save     :: proc_lgt_n(:), proc_lgt_start(:)
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
 
     t0 = MPI_wtime()
@@ -421,8 +417,8 @@ subroutine createActiveSortedLists_forest_comm( params, lgt_block, lgt_active, &
         hvy_n(tree_ID) = size(hvy_active(:,tree_ID))
 
         ! reset the active lists
-        lgt_active(1:lgt_n(tree_ID),tree_ID) = -1
-        hvy_active(1:hvy_n(tree_ID),tree_ID) = -1
+        lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
+        hvy_active(1:hvy_n(tree_ID), tree_ID) = -1
         lgt_sortednumlist(1:lgt_n(tree_ID), :, tree_ID) = -1
         my_lgt_send_buffer(1:hvy_n(tree_ID), :, tree_ID) = -1
     end do
@@ -528,32 +524,30 @@ end subroutine createActiveSortedLists_forest_comm
 !> lgt_n(:,tree_ID)            | number of active blocks in tree
 !> -------------------------------------------------------------
 !> \author PKrah
-! This routine updates active lists for ALL TREES inside a forest
-subroutine createActiveSortedLists_forest( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+! This routine updates active lists for ALL TREES in a forest
+subroutine createActiveSortedLists_forest(params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)!< light data array
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)!< list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)!< number of ACTIVE blocks (light data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)!< list of active blocks for each tree (light data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)!< number of ACTIVE blocks (light data) in each tree
-    integer(kind=ik), intent(inout)     :: tree_n!< number of ACTIVE trees in forest
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)!< sorted light data with numerical treecodes
+    type (type_params), intent(in) :: params    !< user defined parameter structure
     !-----------------------------------------------------------------
 
-    integer(kind=ik)                    :: k, N, heavy_id, block_rank, fsize
-    integer(kind=ik)                    :: rank, tree_ID, TREE_ID_IDX, lgt_n_sum, hvy_n_sum
+    integer(kind=ik) :: k, N, heavy_id, block_rank, fsize
+    integer(kind=ik) :: rank, tree_ID, TREE_ID_IDX, lgt_n_sum, hvy_n_sum
     integer(kind=tsize) :: treecode_int
     real(kind=rk) :: t0
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     t0 = MPI_wtime()
 
 
-    rank = params%rank
-    N    = params%number_blocks
+    rank  = params%rank
+    N     = params%number_blocks
     fsize = params%forest_size
     TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
 
@@ -561,7 +555,7 @@ subroutine createActiveSortedLists_forest( params, lgt_block, lgt_active, &
     ! Reset active lists of all trees
     ! =======================================================
     ! note: this seems to be a complicated way of reseting the
-    !       active lists, but it is very crucial for performance!
+    !       active lists, but it is very important for performance!
     !       NEVER RESET the full array without reasons!!!
     do tree_ID = 1, tree_n
         ! check if lgt_n or hvy_n of tree is valid (not too small or too large)
@@ -571,15 +565,15 @@ subroutine createActiveSortedLists_forest( params, lgt_block, lgt_active, &
         hvy_n(tree_ID) = size(hvy_active(:,tree_ID))
 
         ! reset the active lists
-        lgt_active(1:lgt_n(tree_ID),tree_ID) = -1
-        hvy_active(1:hvy_n(tree_ID),tree_ID) = -1
-        lgt_sortednumlist(1:lgt_n(tree_ID),:,tree_ID) = -1
+        lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
+        hvy_active(1:hvy_n(tree_ID), tree_ID) = -1
+        lgt_sortednumlist(1:lgt_n(tree_ID), :, tree_ID) = -1
     end do
 
 
     ! reset active block numbers
-    lgt_n = 0
-    hvy_n = 0
+    lgt_n  = 0
+    hvy_n  = 0
     tree_n = 0
 
     ! =======================================================
@@ -620,7 +614,6 @@ subroutine createActiveSortedLists_forest( params, lgt_block, lgt_active, &
             lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode
             lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treecode_int
-
         end if
     end do
 

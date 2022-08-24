@@ -11,6 +11,7 @@ module module_indicators
     use module_interpolation
     ! we now have an indicator which computes the vorticity, so include the operator module
     use module_operators
+    use module_forestMetaData
 
     ! some operators may depend on the actual data (that is, heavy data), for example
     ! for shock or mask detection. These criteria are computed mpi-locally (because of course
@@ -24,7 +25,7 @@ module module_indicators
 contains
 
 #include "refinementIndicator_tree.f90"
-#include "block_coarsening_indicator.f90"
-  ! threshold the blocks
+#include "coarseningIndicator_block.f90"
 #include "threshold_block.f90"
+
 end module module_indicators

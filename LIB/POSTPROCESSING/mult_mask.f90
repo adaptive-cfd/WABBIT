@@ -7,6 +7,7 @@ subroutine mult_mask(params)
     use module_operators
     use module_physics_metamodule
     use module_time_step
+    use module_forestMetaData
 
     implicit none
 
@@ -18,12 +19,7 @@ subroutine mult_mask(params)
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
     character(len=cshort)              :: fname
@@ -31,6 +27,12 @@ subroutine mult_mask(params)
     real(kind=rk), allocatable :: us(:,:,:,:)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
@@ -103,22 +105,14 @@ subroutine mult_mask(params)
     params%number_blocks = 4_ik*lgt_n(tree_ID)/params%number_procs
 
     ! allocate data
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work=hvy_work, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block, hvy_work=hvy_work)
 
-    ! read mesh and field
-    call read_mesh(fname_input, params, lgt_n, hvy_n, lgt_block, tree_ID)
-    call read_field(fname_input, 1, params, hvy_block, hvy_n, tree_ID)
-    call read_field(fname_mask , 2, params, hvy_block, hvy_n, tree_ID)
+    ! read data
+    call readHDF5vct_tree( (/fname_input, fname_mask/), params, hvy_block, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
-
-    ! update neighbor relations
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+    call updateMetadata_tree( params, tree_ID)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
@@ -133,7 +127,6 @@ subroutine mult_mask(params)
         end do
     end if
 
-    call saveHDF5_tree(fname_result, time, iteration, 1, params, lgt_block, &
-    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID )
+    call saveHDF5_tree(fname_result, time, iteration, 1, params, hvy_block, tree_ID)
 
 end subroutine mult_mask

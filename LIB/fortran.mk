@@ -12,7 +12,7 @@ OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_precision.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
+MFILES = module_precision.f90 module_forestMetaData.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
 	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
@@ -266,7 +266,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mask.o \
-	set_initial_grid.f90 set_inicond_blocks.f90 get_inicond_from_file.f90 $(OBJDIR)/module_treelib.o
+	setInitialCondition_tree.f90 setInicondBlocks_tree.f90 $(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o\
@@ -282,7 +282,7 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_interpolation.o refinementIndicator_tree.f90 block_coarsening_indicator.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_interpolation.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
@@ -290,14 +290,14 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o find_neighbors.f90 doesBlockExist_tree.f90 \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o find_neighbors.f90 doesBlockExist_tree.f90 \
 	refine_tree.f90 respectJmaxJmin_tree.f90 refinementExecute2D_tree.f90 adapt_tree.f90 threshold_block.f90 \
 	ensureGradedness_tree.f90 ensure_completeness.f90 executeCoarsening_tree.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
     treecode_to_hilbertcode_3D.f90 forest.f90 reset_tree.f90 \
     refinementExecute3D_tree.f90 get_block_spacing_origin.f90 updateNeighbors_tree.f90 check_lgt_block_synchronization.f90 \
 	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 \
-	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 CoarseningIndicator_tree.f90 \
+	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 coarseningIndicator_tree.f90 \
 	createEquidistantGrid_tree.f90 createRandomGrid_tree.f90 allocate_forest.f90 reset_tree.f90 block_xfer_nonblocking.f90 \
 	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -311,8 +311,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDI
 
 $(OBJDIR)/module_IO.o: module_IO.f90 $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_hdf5_wrapper.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
-	saveHDF5_tree.f90 read_field.f90 forest_IO.f90 \
-	read_mesh.f90 read_attributes.f90 read_file_flusi.f90 $(OBJDIR)/module_treelib.o
+	saveHDF5_tree.f90 forest_IO.f90 readHDF5vct_tree.f90 read_attributes.f90 read_file_flusi.f90 $(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
@@ -322,6 +321,9 @@ $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(O
 
 $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_helpers.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_forestMetaData.o: module_forestMetaData.f90 $(OBJDIR)/module_precision.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_saving.o: module_saving.f90 \

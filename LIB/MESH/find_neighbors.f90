@@ -26,19 +26,14 @@
 !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
 !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
 ! ********************************************************************************************
-subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir, hvy_neighbor, &
-    lgt_n, lgt_sortednumlist, error, n_domain)
+subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_domain)
 
     implicit none
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
     integer(kind=ik), intent(in)        :: hvyID_block
     integer(kind=ik), intent(in)        :: lgtID_block
     integer(kind=ik), intent(in)        :: Jmax
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)          !> light data array
     character(len=*), intent(in)        :: dir                      !> direction for neighbor search
-    integer(kind=ik), intent(in)        :: lgt_n(:)                 !> number of active blocks (light data)
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)        !> heavy data array - neighbor data
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)
     integer(kind=ik)                    :: neighborDirCode_sameLevel
@@ -548,7 +543,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
     ! calculate treecode for neighbor on same level
     call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
     ! check if (hypothetical) neighbor exists and if so find its lgtID
-    call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
+    call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
 
     if (exists) then
         ! we found the neighbor on the same level.
@@ -565,7 +560,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
         ! the last index to -1 = I go one level down (coarser)
         tcNeighbor( level ) = -1
         ! check if (hypothetical) neighbor exists and if so find its lgtID
-        call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
+        call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
 
         if ( exists ) then
             ! neighbor is one level down (coarser)
@@ -590,7 +585,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, lgt_block, Jmax, dir,
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent(tcVirtual, tcNeighbor, dir, level+1, Jmax, params%dim)
                 ! check if (hypothetical) neighbor exists and if so find its lgtID
-                call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, lgt_sortednumlist, lgt_n, tree_ID)
+                call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
 
                 if (exists) then
                     hvy_neighbor( hvyID_block, neighborDirCode_finerLevel(k) ) = lgtID_neighbor

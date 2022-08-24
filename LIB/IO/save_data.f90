@@ -5,8 +5,7 @@
 !!           - heavy data array
 ! ********************************************************************************************
 
-subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor, tree_ID)
+subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
 
     implicit none
     !> time loop parameters
@@ -14,8 +13,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     integer(kind=ik), intent(in)                    :: iteration
     !> user defined parameter structure
     type (type_params), intent(in)                  :: params
-    !> light data array
-    integer(kind=ik), intent(inout)                 :: lgt_block(:, :)
     integer(kind=ik), intent(in)                    :: tree_ID
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
@@ -27,16 +24,6 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(inout)                    :: hvy_mask(:, :, :, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)                 :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)                 :: lgt_active(:,:)
-    !> number of active blocks (light/heavy data)
-    integer(kind=ik), intent(inout)                 :: lgt_n(:), hvy_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)              :: lgt_sortednumlist(:,:,:)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)                 :: hvy_neighbor(:,:)
 
     ! loop variable
     integer(kind=ik)      :: k, lgt_id, hvy_id
@@ -56,19 +43,20 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling create_mask_tree if the mask is not stored is supposed
     ! to be small)
-    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    call create_mask_tree(params, time, hvy_mask, hvy_tmp)
 
 
     ! preparatory step. The physics modules have to copy everything they want to
     ! save to disk to the work array. missing qty's shall be computed.
     do k = 1, hvy_n(tree_ID_flow)
+
         hvy_id = hvy_active(k,tree_ID_flow)
+
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
         ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
@@ -100,7 +88,7 @@ subroutine save_data(iteration, time, params, lgt_block, hvy_block, lgt_active, 
         endif
 
         ! actual writing
-        call saveHDF5_tree( fname, time, iteration, k, params, lgt_block, hvy_tmp, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
+        call saveHDF5_tree( fname, time, iteration, k, params, hvy_tmp, tree_ID)
     enddo
 
     call toc( "save_data", MPI_wtime()-t0 )

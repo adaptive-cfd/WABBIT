@@ -4,17 +4,13 @@ subroutine post_mean(params)
     use module_params
     use module_mesh
     use mpi
+    use module_forestMetaData
 
     implicit none
     character(len=cshort)                   :: fname, fname_out                 !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
     integer(hsize_t), dimension(4)          :: size_field
@@ -65,20 +61,14 @@ subroutine post_mean(params)
     params%domain_size(3) = domain(3)
     params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
 
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
-    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID )
+    ! read input data
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call createActiveSortedLists_tree( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
-
-    ! update neighbor relations
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+    call updateMetadata_tree( params, tree_ID )
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -95,7 +85,7 @@ subroutine post_mean(params)
         hvy_id = hvy_active(k,tree_ID)
 
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if (params%dim == 3) then
             meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_id))*dx(1)*dx(2)*dx(3)

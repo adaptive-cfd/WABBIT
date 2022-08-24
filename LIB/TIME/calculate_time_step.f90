@@ -1,6 +1,5 @@
 !> \brief Get the time step according to the conditions of the physics module
-subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, &
-    hvy_n, lgt_block, lgt_active, lgt_n, dt )
+subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID )
 
     use module_physics_metamodule, only : GET_DT_BLOCK_meta
 
@@ -10,12 +9,11 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
     real(kind=rk), intent(in)     :: time                      !< current time of the simulation
     integer(kind=ik), intent(in)  :: iteration
     real(kind=rk), intent(in)     :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
-    integer(kind=ik), intent(in)  :: hvy_active(:),hvy_n       !< list of active blocks (heavy data) and number of active blocks
-    integer(kind=ik), intent(in)  :: lgt_block(:, :),lgt_active(:),lgt_n!< light data array,active list, number of active blocks
+    integer(kind=ik), intent(in)  :: tree_ID
     real(kind=rk), intent(out)    :: dt                         !< time step dt
     !--------------------------------------------------------------
     ! MPI error variable
-    integer(kind=ik) :: ierr, Jmax, k, lgt_id
+    integer(kind=ik) :: ierr, Jmax, k, lgt_id, hvy_id
     reaL(kind=rk ) :: ddx(1:3), xx0(1:3), dt_tmp
 
     dt = 9.0e9_rk
@@ -27,16 +25,17 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
       ! --------------------------------------------------------------------------
       ! physics module restrictions on time step
       ! --------------------------------------------------------------------------
-      do k = 1, hvy_n
+      do k = 1, hvy_n(tree_ID)
+          hvy_id = hvy_active(k, tree_ID)
           ! as the local CFL condition depends on the blocks, we give the routine
           ! the block grid (origin/spacing)
-          call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-          call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+          call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+          call get_block_spacing_origin( params, lgt_id, xx0, ddx )
 
           ! physics modules dictate some restrictions due to CFL conditions, penalization
           ! or other operators. Everything that is physics-dependent goes here. it is
           ! computed for each block, then the minimum is used.
-          call GET_DT_BLOCK_meta( params%physics_type, time, iteration, hvy_block(:,:,:,:,hvy_active(k)), &
+          call GET_DT_BLOCK_meta( params%physics_type, time, iteration, hvy_block(:,:,:,:,hvy_id), &
               params%Bs,params%n_ghosts, xx0, ddx, dt_tmp)
 
           dt = min( dt, dt_tmp )

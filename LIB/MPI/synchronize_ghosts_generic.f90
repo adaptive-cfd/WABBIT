@@ -43,6 +43,9 @@ subroutine synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block, hv
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
+    ! some postprocessing tools use g=0, in which case nothing is done here.
+    if (params%n_ghosts == 0) return
+
     if (size(hvy_block,4)>N_MAX_COMPONENTS .and. .not. informed) then
         if (params%rank ==0) then
             write(*,*) "-------------------------------------------------------------------------"
@@ -734,22 +737,15 @@ end subroutine unpack_all_ghostlayers_currentRound_internal_neighbor
 
 !############################################################################################################
 
-subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, testOriginFlag)
-
+subroutine check_unique_origin(params, hvy_block, testOriginFlag, tree_ID)
+    use module_forestMetaData
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: tree_ID
 
     ! status of the check
     logical,intent(out)                 :: testOriginFlag
@@ -813,20 +809,20 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
     ! on the redundant nodes. However, NOTE this implies that the subsequent
     ! call to check_redundant_nodes_clean gives DIFFERENT values on interpolated
     ! points ...
-    call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n )
+    call synchronize_ghosts_generic_sequence( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! .. which is why the test here CANNOT suceed on interpolated data. In the compare
     ! routine, we thus skip those points.
     testOriginFlag = .false.
-    call check_redundant_nodes_clean( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active, hvy_n, testOriginFlag)
+    call check_redundant_nodes_clean( params, lgt_block, hvy_block_test, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), testOriginFlag)
 
 
     if (testOriginFlag ) then
         ! filename is XXX.rank.dat
-        call write_real5( hvy_block_test, hvy_active, hvy_n, "hvy_block_test", params%rank )
-        call write_real5( hvy_block_test_err, hvy_active, hvy_n, "hvy_block_test_err", params%rank )
-        call write_real5( hvy_block_test_val, hvy_active, hvy_n, "hvy_block_test_val", params%rank )
-        call write_real5( hvy_block_test_interpref, hvy_active, hvy_n, "hvy_block_test_interpref", params%rank )
+        call write_real5( hvy_block_test, hvy_active(:,tree_ID), hvy_n(tree_ID), "hvy_block_test", params%rank )
+        call write_real5( hvy_block_test_err, hvy_active(:,tree_ID), hvy_n(tree_ID), "hvy_block_test_err", params%rank )
+        call write_real5( hvy_block_test_val, hvy_active(:,tree_ID), hvy_n(tree_ID), "hvy_block_test_val", params%rank )
+        call write_real5( hvy_block_test_interpref, hvy_active(:,tree_ID), hvy_n(tree_ID), "hvy_block_test_interpref", params%rank )
 
         call MPI_barrier(WABBIT_COMM, i1)
         ! call abort(111111,"Same origin of ghost nodes check failed - stopping.")
@@ -846,9 +842,9 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
         spaceDirections = 2
     end if
 
-    do hvy_id_k = 1, hvy_n
+    do hvy_id_k = 1, hvy_n(tree_ID)
         ! calculate light id
-        local_hvy_id =  hvy_active(hvy_id_k)
+        local_hvy_id =  hvy_active(hvy_id_k, tree_ID)
         call hvy2lgt(localLightId, local_hvy_id  , params%rank , params%number_blocks )
 
         do boundaryIndex =1,spaceDirections !
@@ -923,7 +919,7 @@ subroutine check_unique_origin(params, lgt_block, hvy_block, hvy_neighbor, hvy_a
                                     ' has origin ', redundantOriginLgtId , 'levelOrigin',  levelOrigin   , 'hF',   originHistoricFine
                                     !,originHistoricFine, localHistoricFine , originLghtIdHigher
                                     write (fileNameOrigin, "(A6,I3.3,A4)") 'origin', params%rank ,'.dat'
-                                    call write_real5(hvy_block_test, hvy_active, hvy_n, fileNameOrigin, params%rank  ) ! dubug output with ghost nodes
+                                    call write_real5(hvy_block_test, hvy_active(:,tree_ID), hvy_n(tree_ID), fileNameOrigin, params%rank  ) ! dubug output with ghost nodes
                                     call abort(44567 ,"should not dominate, who wrote this bloody code, and this useless error message? - stopping.")
                                 end if
                                 ! ----------

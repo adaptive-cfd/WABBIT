@@ -13,8 +13,7 @@
 !! | 0 | b1 | b2 | b3|
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_block, &
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID)
+subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID)
    implicit none
 
     real(kind=rk), intent(in)           :: time
@@ -23,13 +22,6 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)      !> hvy_mask are qtys that depend on grid and not explicitly on time
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)              !> light data array
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)              !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)            !> heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: tree_ID
 
     real(kind=rk), dimension(3)         :: volume_int                   !> global integral
@@ -50,8 +42,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
     ! create mask function at current time
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()
-    call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    call create_mask_tree(params, time, hvy_mask, hvy_tmp)
     call toc( "RHS_wrapper::create_mask_tree", MPI_wtime()-t1 )
 
 
@@ -77,7 +68,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
@@ -112,7 +103,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, lgt_
         ! convert given hvy_id to lgt_id for block spacing routine
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils

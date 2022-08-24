@@ -1,30 +1,17 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_active, hvy_n, tree_ID, hvy_mask )
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     ! It can be useful to simultaneously coarsen more than one array, in most cases this
     ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
     ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
@@ -34,6 +21,12 @@ subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt
     integer(kind=ik), allocatable, save :: xfer_list(:,:)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
 
     Jmax = params%max_treelevel
@@ -65,7 +58,7 @@ subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt
         if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -1) then
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-            call findSisters_tree( params, lgtID, light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist, tree_ID )
+            call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
 
             ! figure out on which rank the sisters lie, xfer them if necessary
             do j = 1, N
@@ -96,14 +89,14 @@ subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt
         ! It can be useful to simultaneously coarsen more than one array, in most cases this
         ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
         ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, hvy_mask, msg="executeCoarsening_tree" )
+        call block_xfer( params, xfer_list, n_xfer, hvy_block, hvy_mask, msg="executeCoarsening_tree" )
     else
-        call block_xfer( params, xfer_list, n_xfer, lgt_block, hvy_block, msg="executeCoarsening_tree" )
+        call block_xfer( params, xfer_list, n_xfer, hvy_block, msg="executeCoarsening_tree" )
     endif
 
     ! the active lists are outdates after the transfer: we need to create
     ! them or findSisters_tree will not be able to do its job
-    call createActiveSortedLists_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID )
+    call createActiveSortedLists_tree( params, tree_ID )
 
     ! actual merging
     do k = 1, lgt_n(tree_ID)
@@ -119,16 +112,16 @@ subroutine executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt
             ! merge the four blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.
-            call findSisters_tree( params, lgtID, light_ids(1:N), lgt_block, lgt_n, lgt_sortednumlist, tree_ID )
+            call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
             ! note the newly merged block has status 0
 
             if (present(hvy_mask)) then
                 ! It can be useful to simultaneously coarsen more than one array, in most cases this
                 ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
                 ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-                call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N), hvy_mask )
+                call merge_blocks( params, hvy_block, light_ids(1:N), hvy_mask )
             else
-                call merge_blocks( params, hvy_block, lgt_block, light_ids(1:N) )
+                call merge_blocks( params, hvy_block, light_ids(1:N) )
             endif
         endif
     enddo

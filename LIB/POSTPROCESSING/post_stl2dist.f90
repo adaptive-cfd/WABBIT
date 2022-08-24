@@ -10,6 +10,7 @@ subroutine post_stl2dist(params)
     use module_stl_file_reader
     use module_helpers
     use module_ini_files_parser_mpi
+    use module_forestMetaData
 
     implicit none
 
@@ -23,14 +24,10 @@ subroutine post_stl2dist(params)
     ! origin and spacing of blocks
     real(kind=rk) :: x0(1:3), dx(1:3), x,y,z,tmp
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: xyz_nxnynz(:, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:), hvy_n(:), lgt_n(:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
     integer :: hvy_id, lgt_id, tree_ID=1
-    integer :: c_plus, c_minus,res, tree_n
+    integer :: c_plus, c_minus, res
     integer :: ix1,iy1,iz1
     logical :: done, array_compare_real, pruning
 
@@ -121,15 +118,12 @@ subroutine post_stl2dist(params)
     g = params%n_ghosts
 
     ! allocate data
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
-    call reset_tree( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, .true., tree_ID)
+    call reset_tree( params, .true., tree_ID)
 
     ! start with an equidistant grid on coarsest level
-    call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true., tree_ID)
+    call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID)
 
     ! reset grid to zeros
     do k = 1, hvy_n(1)
@@ -159,8 +153,7 @@ subroutine post_stl2dist(params)
     do iter = params%min_treelevel, params%max_treelevel
 
         ! refine the mesh where the mask function is interesting
-        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID )
+        call refine_tree( params, hvy_block, "mask-threshold", tree_ID )
 
         skips = 0
 
@@ -184,7 +177,7 @@ subroutine post_stl2dist(params)
 
             ! compute block spacing and origin from treecode
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
             ! shift origin to take ghost nodes into account
             x0 = x0 - dble(g)*dx
@@ -273,8 +266,8 @@ subroutine post_stl2dist(params)
 
         if (params%rank==0) then
             write(*, '("Nb=",i6," Jmin=",i2," Jmax=",i2)') &
-            lgt_n(1), minActiveLevel_tree( lgt_block, 1, lgt_active, lgt_n ), &
-            maxActiveLevel_tree( lgt_block, 1, lgt_active, lgt_n )
+            lgt_n(1), minActiveLevel_tree(1), &
+            maxActiveLevel_tree(1)
         endif
 
     enddo ! loop over level
@@ -282,21 +275,16 @@ subroutine post_stl2dist(params)
     !=======================================================================
     ! coarsening of blocks with constant values
     !=======================================================================
-    call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, 1, params%coarsening_indicator, hvy_block )
+    call adapt_tree( 0.0_rk, params, hvy_block, 1, params%coarsening_indicator, hvy_block )
 
 
-    call createActiveSortedLists_forest( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    call createActiveSortedLists_forest(params)
 
     if (pruning) then
         if (params%rank==0) write(*,*) "now pruning!"
 
-        call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID=1)
+        call prune_tree( params, hvy_block, tree_ID=1)
     endif
 
-    call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_ID=1, time=0.0_rk, iteration=-1 )
-
+    call saveHDF5_tree(fname_out, 0.0_rk, -1_ik, 1, params, hvy_block, 1)
 end subroutine

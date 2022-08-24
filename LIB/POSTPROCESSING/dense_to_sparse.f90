@@ -9,6 +9,7 @@ subroutine dense_to_sparse(params)
     use module_mpi
     use module_initialization
     use module_helpers
+    use module_forestMetaData
 
     implicit none
 
@@ -19,12 +20,8 @@ subroutine dense_to_sparse(params)
     real(kind=rk)                           :: time, eps=-1.0_rk
     integer(kind=ik)                        :: iteration
     character(len=cshort), allocatable      :: file_out(:)
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), hvy_active(:,:), hvy_n(:), lgt_n(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
     integer(kind=ik)                        :: max_neighbors, level, k, tc_length, lgt_n_tmp
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
@@ -33,7 +30,14 @@ subroutine dense_to_sparse(params)
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: treecode_size, number_dense_blocks, i, l, dim
-    !-----------------------------------------------------------------------------------------------------
+
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
 
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
@@ -129,8 +133,6 @@ subroutine dense_to_sparse(params)
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
     ! we do not read an ini file, so defaults may not be set.
     allocate(params%butcher_tableau(1,1))
-
-
     params%block_distribution="sfc_hilbert"
 
     ! read attributes from file. This is especially important for the number of
@@ -179,12 +181,10 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! allocate data and reset grid
     !----------------------------------
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work=hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block, hvy_work=hvy_work, hvy_tmp=hvy_tmp)
 
     ! reset the grid: all blocks are inactive and empty
-    call reset_tree( params, lgt_block, lgt_active, lgt_n, hvy_active, hvy_n, &
-    lgt_sortednumlist, .true., tree_ID=tree_ID_flow )
+    call reset_tree( params, .true., tree_ID=tree_ID_flow )
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -197,17 +197,14 @@ subroutine dense_to_sparse(params)
     params%adapt_inicond=.true.
     params%read_from_files=.true.
 
-    call set_initial_grid( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_n, hvy_n, lgt_sortednumlist, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp )
+    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp )
 
     !----------------------------------
     ! Write sparse files
     !----------------------------------
     do i = 1, params%n_eqn
-        call saveHDF5_tree(file_out(i), time, iteration, i, params, lgt_block, &
-        hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID_flow)
+        call saveHDF5_tree(file_out(i), time, iteration, i, params, hvy_block, tree_ID_flow)
     enddo
 
-    call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call deallocate_forest(params, hvy_block, hvy_work, hvy_tmp=hvy_tmp)
 end subroutine dense_to_sparse

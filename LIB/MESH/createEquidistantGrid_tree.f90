@@ -3,19 +3,11 @@
 !! Since the grid changes, the neighbor relations and active-lists are updated as well.
 ! ********************************************************************************************
 
-subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, Jmin, verbosity, tree_ID )
+subroutine createEquidistantGrid_tree( params, Jmin, verbosity, tree_ID )
 
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)              !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)                !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                       !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)       !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                       !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: Jmin                           !> what level to initialize?
     logical, intent(in)                 :: verbosity                      !> write output
     integer(kind=ik), intent(in)        :: tree_ID
@@ -28,6 +20,12 @@ subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_acti
     integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, heavy_id
     integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
     integer(kind=ik),allocatable        :: treecode(:)
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     !-----------------------------------------------------------------------------
     ! initialization
@@ -46,8 +44,7 @@ subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_acti
     ! shortcut for number of cpu
     number_procs = params%number_procs
 
-    call reset_tree(params, lgt_block, lgt_active, lgt_n, &
-         hvy_active, hvy_n, lgt_sortednumlist, verbosity, tree_ID )
+    call reset_tree(params, verbosity, tree_ID )
 
     ! number of blocks in x,y direction
     nx = 2**Jmin
@@ -111,7 +108,7 @@ subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_acti
                             call hvy2lgt( lgt_id_last, params%number_blocks, params%rank, params%number_blocks )
 
                             ! get a free block on this rank
-                            call get_free_local_light_id( params, icpu, lgt_block, lgt_id)
+                            call get_free_local_light_id( params, icpu, lgt_id)
                             ! and the corresponding heavy id
                             call lgt2hvy( heavy_id, lgt_id, icpu, params%number_blocks )
 
@@ -140,11 +137,10 @@ subroutine createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_acti
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to
     ! be synced. However, the light data has to.
-    call synchronize_lgt_data( params, lgt_block, refinement_status_only=.false. )
+    call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     ! as the grid has changed (we created it here), we now update the heavy and light
     ! active lists, as well as neighbor relations.
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
 end subroutine createEquidistantGrid_tree

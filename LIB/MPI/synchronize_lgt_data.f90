@@ -22,14 +22,12 @@
 !         cannot use active lists here since they are likewise outdated.
 !
 !-------------------------------------------------------------------------------
-subroutine synchronize_lgt_data( params, lgt_block, refinement_status_only )
+subroutine synchronize_lgt_data( params, refinement_status_only )
+    use module_forestMetaData
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> INPUT: light data array, locally modified (=valid only on my section of the array)
-    !> OUTPUT: light data array, synchronized on all procs (=valid everywhere)
-    integer(kind=ik), intent(inout) :: lgt_block(:, :)
     !> Some operations change the treecodes etc and have to sync the entire array
     !> of light data. But sometimes, only the refinement status is altered: in that case
     !> we should communicate only that, of course, to save time

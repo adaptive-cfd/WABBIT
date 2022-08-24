@@ -9,7 +9,7 @@
 !! -1 block wants to coarsen \n
 ! ********************************************************************************************
 
-subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, indicator, &
+subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, indicator, &
     iteration, refinement_status, norm, level, block_mask)
 
     implicit none
@@ -123,4 +123,4 @@ subroutine block_coarsening_indicator( params, block_data, block_work, dx, x0, i
         refinement_status = max(refinement_status, refinement_status_mask)
     endif
 
-end subroutine block_coarsening_indicator
+end subroutine coarseningIndicator_block

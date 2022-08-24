@@ -9,18 +9,14 @@ subroutine keyvalues(fname, params)
     use module_precision
     use module_params
     use module_mesh
+    use module_forestMetaData
     use mpi
 
     implicit none
     character(len=*), intent(in)            :: fname                            !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable           :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                        :: tree_ID=1, hvy_id
 
     integer(hsize_t), dimension(4)          :: size_field
@@ -38,14 +34,21 @@ subroutine keyvalues(fname, params)
     real(kind=rk)                           :: maxi,mini,squari,meani,qi
     real(kind=rk)                           :: maxl,minl,squarl,meanl,ql
     integer(kind=ik)                        :: ix,iy,iz,mpicode, ioerr, rank, i
-    !-----------------------------------------------------------------------------------------------------
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
+
     rank = params%rank
     curves(1) = 'sfc_hilbert'
     curves(2) = 'sfc_z'
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
-    
+
     !-----------------------------------------------------------------------------------------------------
     if (fname=='--help' .or. fname=='--h') then
         if (rank==0) then
@@ -73,19 +76,18 @@ subroutine keyvalues(fname, params)
     params%domain_size(3) = domain(3)
     ! make sure there is enough memory allocated
     params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
+    params%order_predictor = "multiresolution_2nd"
 
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
     ! the work array needs to be allocated as balance load requires a buffer.
     ! it can However be smaller than what is allocated in allocate_grid.
     allocate( hvy_tmp( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4), size(hvy_block,5)) )
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
-    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID )
+    ! read data
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID, verbosity=.true.)
 
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
@@ -100,8 +102,7 @@ subroutine keyvalues(fname, params)
         tree = 0_ik
         params%block_distribution=trim(curves(i))
 
-        call balanceLoad_tree(params, lgt_block, hvy_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+        call balanceLoad_tree(params, hvy_block, tree_ID)
 
 
         call MPI_ALLGATHER(hvy_n,1,MPI_INTEGER,blocks_per_rank,1,MPI_INTEGER, &
@@ -131,7 +132,7 @@ subroutine keyvalues(fname, params)
         hvy_id = hvy_active(k, tree_ID)
 
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         do iz = 1, Bs(3)
             do iy = 1, Bs(2)

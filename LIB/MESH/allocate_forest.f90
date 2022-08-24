@@ -1,11 +1,8 @@
-subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n, neqn_hvy_tmp)
+subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp)
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(inout)                   :: params
-    !> light data array
-    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering etc (work array)
@@ -18,16 +15,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
     integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp
-    !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:,:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_n(:), lgt_n(:)
     ! local shortcuts:
     integer(kind=ik)                                    :: g, Neqn, number_blocks,&
     rank, number_procs,  dim
@@ -41,6 +29,12 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     rank            = params%rank
     Bs              = params%Bs
@@ -167,6 +161,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     if (rank == 0) then
         write(*,'("INIT: mpisize=",i6)') params%number_procs
         write(*,'("INIT: nwork=",i6)') nwork
+        write(*,'("INIT: forest_size=",i3)') params%forest_size
         write(*,'("INIT: Bs(1)=",i7," Bs(2)=",i7," Bs(3)=",i7," blocks-per-rank=",i7," total blocks=", i7)') &
         Bs(1),Bs(2),Bs(3), params%number_blocks, params%number_blocks*params%number_procs
         write(*,'("INIT: allocate_forest: Allocating a ",i1,"D case.")') params%dim
@@ -185,6 +180,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
+        if (allocated(hvy_work)) deallocate(hvy_work)
         allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
         memory_this = product(real(shape(hvy_work)))*8.0e-9
         memory_total = memory_total + memory_this
@@ -195,6 +191,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     end if
 
     if ( present(hvy_tmp) ) then
+        if (allocated(hvy_tmp)) deallocate(hvy_tmp)
         allocate( hvy_tmp( nx, ny, nz, nwork, params%number_blocks )  )
         memory_this = product(real(shape(hvy_tmp)))*8.0e-9
         memory_total = memory_total + memory_this
@@ -205,6 +202,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
+        if (allocated(hvy_mask)) deallocate(hvy_mask)
         allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
         memory_this = product(real(shape(hvy_mask)))*8.0e-9
         memory_total = memory_total + memory_this
@@ -215,6 +213,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     elseif ( present(hvy_mask) .and. params%N_mask_components <= 0 ) then
         ! dummy allocation, to prevent IFORT from yelling.
+        if (allocated(hvy_mask)) deallocate(hvy_mask)
         allocate( hvy_mask(1, 1, 1, 1, 1)  )
         memory_this = product(real(shape(hvy_mask)))*8.0e-9
         memory_total = memory_total + memory_this
@@ -225,6 +224,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (allocated(hvy_neighbor)) deallocate(hvy_neighbor)
     allocate( hvy_neighbor( params%number_blocks, max_neighbors ) )
     memory_this = product(real(shape(hvy_neighbor)))*8.0e-9
     memory_total = memory_total + memory_this
@@ -234,6 +234,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------)
+    if (allocated(lgt_block)) deallocate(lgt_block)
     allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
     memory_this = product(real(shape(lgt_block)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -243,6 +244,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (allocated(lgt_sortednumlist)) deallocate(lgt_sortednumlist)
     allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
     memory_this = product(real(shape(lgt_sortednumlist)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -252,6 +254,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
     endif
 
     !---------------------------------------------------------------------------
+    if (allocated(lgt_active)) deallocate(lgt_active)
     allocate( lgt_active( size(lgt_block,1), params%forest_size ) )
     memory_this = product(real(shape(lgt_active)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -260,6 +263,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         "lgt_active", memory_this, shape(lgt_active)
     endif
 
+    if (allocated(lgt_n)) deallocate(lgt_n)
     allocate( lgt_n(params%forest_size ) )
     memory_this = product(real(shape(lgt_n)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -268,6 +272,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
         "lgt_n", memory_this, shape(lgt_n)
     endif
 
+    if (allocated(hvy_n)) deallocate(hvy_n)
     allocate( hvy_n(params%forest_size ) )
     memory_this = product(real(shape(hvy_n)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -278,6 +283,7 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 
     !---------------------------------------------------------------------------
     ! note: 5th dimension in heavy data is block id
+    if (allocated(hvy_active)) deallocate(hvy_active)
     allocate( hvy_active( size(hvy_block, 5), params%forest_size ) )
     memory_this = product(real(shape(hvy_active)))*4.0e-9
     memory_total = memory_total + memory_this
@@ -300,29 +306,17 @@ subroutine allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_activ
 end subroutine allocate_forest
 
 
-subroutine deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, hvy_active, &
-    lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )
+subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
 
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(inout)                   :: params
-    !> light data array
-    integer(kind=ik), allocatable, intent(out)          :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable, intent(out)             :: hvy_tmp(:, :, :, :, :)
     !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
-    !> neighbor array (heavy data)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: lgt_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_active(:,:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), allocatable, intent(out)       :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable, intent(out)          :: hvy_n(:), lgt_n(:)
 
     if (params%rank == 0) then
         write(*,'(80("-"))')

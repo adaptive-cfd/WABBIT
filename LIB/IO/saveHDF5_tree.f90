@@ -6,8 +6,7 @@
 !!           - heavy data array
 ! ********************************************************************************************
 
-subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_block, &
-    lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
+subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     implicit none
 
     character(len=*), intent(in)        :: fname                                !> file name
@@ -15,11 +14,7 @@ subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_blo
     integer(kind=ik), intent(in)        :: iteration
     integer(kind=ik), intent(in)        :: dF                                   !> datafield number
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)                      !> light data array
     real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(in)        :: lgt_active(:,:), hvy_active(:,:)         !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n(:)                                !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: hvy_n(:)                                !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
@@ -99,7 +94,7 @@ subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_blo
 
     ! output on screen
     if (rank == 0) then
-        sparsity_Jcurrent = dble(lgt_n(tree_ID)) / dble(2**maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n ))**dim
+        sparsity_Jcurrent = dble(lgt_n(tree_ID)) / dble(2**maxActiveLevel_tree(tree_ID))**dim
         sparsity_Jmax = dble(lgt_n(tree_ID)) / dble(2**params%max_treelevel)**dim
 
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
@@ -109,7 +104,7 @@ subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_blo
     ! we need to know how many blocks each rank actually holds, and all procs need to
     ! know that distribution for all other procs in order to know what portion of the array
     ! they must write to.
-    call blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n(tree_ID) )
+    call blocks_per_mpirank( params, actual_blocks_per_proc, tree_ID )
 
     ! fill blocks buffer (we cannot use the bvy_block array as it is not contiguous, i.e.
     ! it may contain holes)
@@ -146,7 +141,7 @@ subroutine saveHDF5_tree( fname, time, iteration, dF, params, lgt_block, hvy_blo
         ! also extract block coordinate origin and spacing
         if (lgt_rank == rank) then
             ! compute block spacing and origin from the treecode
-            call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+            call get_block_spacing_origin( params, lgt_id, xx0, ddx )
 
 
             if ( params%dim == 3 ) then

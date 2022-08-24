@@ -6,58 +6,56 @@
 !! In addition we return "blocks_per_rank_optimal" of size mpisize, where we set the number of blocks for each rank
 !! such that the distribution is as homogeneous as possible and required block transfer is minimized
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
-subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, lgt_n)
+subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, tree_ID) ! predictable
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)          !> block distribution lists. Note zero-based indexing. (as in MPI library)
-    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
+    integer(kind=ik), intent(in)        :: tree_ID
 
-    blocks_per_rank_optimal(:) = lgt_n / params%number_procs
+    ! optimal distribution of blocks per mpirank. The simple division of "num_blocks" by "number_procs" actually
+    ! yields a double (since it is not guaranteed that all mpiranks hold the exact same number of blocks)
+    ! using the integer division, decimal places are cut
+    blocks_per_rank_optimal(:) = lgt_n(tree_ID) / params%number_procs
 
     ! as this does not necessarily work out, distribute remaining blocks on the first CPUs
-    if (mod(lgt_n, params%number_procs) > 0) then
-        blocks_per_rank_optimal(0:mod(lgt_n, params%number_procs)-1) = &
-        blocks_per_rank_optimal(0:mod(lgt_n, params%number_procs)-1) + 1
+    if (mod(lgt_n(tree_ID), params%number_procs) > 0) then
+        blocks_per_rank_optimal(0:mod(lgt_n(tree_ID), params%number_procs)-1) = &
+        blocks_per_rank_optimal(0:mod(lgt_n(tree_ID), params%number_procs)-1) + 1
     end if
 
     ! some error control -> did we loose blocks? should never happen.
-    if ( sum(blocks_per_rank_optimal) /= lgt_n) then
+#ifdef DEV
+    if ( sum(blocks_per_rank_optimal) /= lgt_n(tree_ID)) then
         call abort(1028,"ERROR: while reading from file, we seem to have gained/lost some blocks during distribution...")
     end if
+#endif
 
 end subroutine
 
 
-subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_rank_optimal, lgt_n, hvy_n)
+subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_rank_optimal, tree_ID)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)   !> block distribution lists. Note 1-based indexing.
-    integer(kind=ik), intent(in)        :: lgt_n                                !> number of active blocks (light data)
-    integer(kind=ik), intent(in)        :: hvy_n                                !> number of active blocks (heavy data)
-    ! loop variables
+    integer(kind=ik), intent(in)        :: tree_ID
+
     integer                             :: num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks
-    integer(kind=ik)                    :: my_dist_list(params%number_procs)    ! dist list send buffer
     integer(kind=ik)                    :: ierr                                 ! MPI error variable
 
-    ! determinate process rank
-    rank = params%rank
-
-    ! determinate process number
-    number_procs = params%number_procs
-
-    blocks_per_rank = 0
-    my_dist_list = 0
+    rank                    = params%rank
+    number_procs            = params%number_procs
+    blocks_per_rank         = 0
     blocks_per_rank_optimal = 0
 
     ! save my number of active blocks
-    my_dist_list(rank+1) = hvy_n
+    blocks_per_rank(rank+1) = hvy_n(tree_ID)
     ! count number of active blocks and current block distribution
-    call MPI_Allreduce(my_dist_list, blocks_per_rank, number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, blocks_per_rank, number_procs, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, ierr)
 
     ! count global number of blocks on all mpiranks
-    num_blocks = lgt_n
+    num_blocks = lgt_n(tree_ID)
 
     ! optimal distribution of blocks per mpirank. The simple division of "num_blocks" by "number_procs" actually
     ! yields a double (since it is not guaranteed that all mpiranks hold the exact same number of blocks)
@@ -114,7 +112,7 @@ subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_
         end do
     end do ! end of excess block distribution
 
-
+#ifdef DEV
     if (rank==0) then
         ! error checking. the sum of newly distributed blocks must of course be
         ! the same as the number we had before distribution
@@ -125,5 +123,6 @@ subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_
             call abort(11191,"ERROR lost some blocks")
         end if
     end if
+#endif
 
 end subroutine

@@ -1,14 +1,12 @@
 !> \brief reads a field from a .h5 file saved in flusi format
 !-----------------------------------------------------------------------------
-subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
+subroutine read_field_flusi(fname, hvy_block, params, Bs_f, tree_ID)
 
   implicit none
   character(len=*),intent(in)            :: fname                       !> file name
   real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
   type (type_params), intent(in)         :: params                      !> user defined parameter structure
-  integer(kind=ik), intent(in)           :: hvy_active(:)
-  integer(kind=ik), intent(in)           :: lgt_block(:, :)
-  integer(kind=ik), intent(in)           :: hvy_n
+  integer(kind=ik), intent(in)           :: tree_ID
   integer(kind=ik), dimension(3), intent(in) :: Bs_f
 
   ! grid parameter
@@ -49,29 +47,30 @@ subroutine read_field_flusi ( fname, hvy_block, lgt_block, hvy_n ,hvy_active, pa
   blockbuffer(:,Bs_f(2)+1,:) = blockbuffer(:,1,:)
   blockbuffer(:,:,Bs_f(3)+1) = blockbuffer(:,:,1)
   if (params%dim == 3) blockbuffer(Bs_f(1)+1,:,:) = blockbuffer(1,:,:)
-  do k=1, hvy_n
-      call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+  do k=1, hvy_n(tree_ID)
+
+      call hvy2lgt(lgt_id, hvy_active(k,tree_ID), params%rank, params%number_blocks)
+      call get_block_spacing_origin( params, lgt_id, x0, dx )
+
       start_x = nint(x0(1)/dx(1)) + 1
       start_y = nint(x0(2)/dx(2)) + 1
       if (params%dim == 3) then
           start_z = nint(x0(3)/dx(3)) + 1
-          hvy_block(1:Bs(1), 1:Bs(2), 1:Bs(3), 1, hvy_active(k)) = blockbuffer(start_x:start_x+Bs(1)-1,&
+          hvy_block(1:Bs(1), 1:Bs(2), 1:Bs(3), 1, hvy_active(k,tree_ID)) = blockbuffer(start_x:start_x+Bs(1)-1,&
               start_y:start_y+Bs(2)-1,start_z:start_z+Bs(3)-1)
       else
-          hvy_block(1:Bs(1), 1:Bs(2), 1, 1, hvy_active(k)) = blockbuffer(1,&
+          hvy_block(1:Bs(1), 1:Bs(2), 1, 1, hvy_active(k,tree_ID)) = blockbuffer(1,&
               start_x:start_x+Bs(1)-1,start_y:start_y+Bs(2)-1)
       end if
   end do
-
-
 
   ! close file and HDF5 library
   call close_file_hdf5(file_id)
 
 end subroutine read_field_flusi
 
-subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active, params, Bs_f)
+subroutine read_field_flusi_MPI(fname, hvy_block, params, Bs_f, tree_ID)
 
   implicit none
   !> file name
@@ -80,9 +79,8 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
   !> user defined parameter structure
   type (type_params), intent(in)      :: params
-  integer(kind=ik), intent(in)        :: hvy_active(:)
-  integer(kind=ik), intent(in)        :: lgt_block(:, :)
-  integer(kind=ik), intent(in)        :: hvy_n
+  integer(kind=ik), intent(in)        :: tree_ID
+
   integer(kind=ik), dimension(3)      :: Bs_f
   integer(kind=ik)                    :: g
   integer(kind=ik), dimension(3)      :: Bs
@@ -110,9 +108,9 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
   end if
 
   !> \todo test for 3D
-  do k = 1, hvy_n
-      call hvy2lgt(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-      call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+  do k = 1, hvy_n(tree_ID)
+      call hvy2lgt(lgt_id, hvy_active(k,tree_ID), params%rank, params%number_blocks)
+      call get_block_spacing_origin( params, lgt_id, x0, dx )
 
       ! from spacing and origin of the block, get position in flusi matrix
       start_x = nint( x0(1) / dx(1) )
@@ -128,7 +126,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
           num_Bs = ubounds-lbounds+1
 
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
-          hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k)))
+          hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k,tree_ID)))
       else
           lbounds = (/ start_x, start_y,0/)
           ubounds = (/ end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2)),0/)
@@ -137,7 +135,7 @@ subroutine read_field_flusi_MPI( fname, hvy_block, lgt_block, hvy_n ,hvy_active,
           call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
           blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1))
 
-          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k)) = blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1)
+          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k,tree_ID)) = blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1)
       end if
   end do
 

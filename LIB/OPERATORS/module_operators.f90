@@ -7,6 +7,7 @@ use mpi
 use module_params     ! global parameters
 use module_timing
 use module_treelib
+use module_forestMetaData
 
 implicit none
 
@@ -24,15 +25,12 @@ contains
 #include "gradient.f90"
 
 
-subroutine component_wise_tree_norm(params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID, which_norm, norm)
+subroutine component_wise_tree_norm(params, hvy_block, tree_ID, which_norm, norm)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)                      !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                             !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
     real(kind=rk), intent(inout)        :: norm(:)                              !> the computed norm for each component of the vector
     real(kind=rk)                       :: x0(1:3), dx(1:3)

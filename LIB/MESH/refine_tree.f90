@@ -12,28 +12,28 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, indicator, tree_ID  )
+subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
 
     use module_indicators
 
     implicit none
 
     type (type_params), intent(in)         :: params                      !> user defined parameter structure
-    integer(kind=ik), intent(inout)        :: lgt_block(:, :)             !> light data array
     real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
-    integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)           !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)        :: lgt_active(:,:)             !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)        :: lgt_n(:)                    !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:,:)    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)        :: hvy_active(:,:)             !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)        :: hvy_n(:)                    !> number of active blocks (heavy data)
     character(len=*), intent(in)           :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)           :: tree_ID
 
     ! cpu time variables for running time calculation
     real(kind=rk)                          :: t0, t1, t2, t_misc
     integer(kind=ik)                       :: k, hvy_n_afterRefinement, lgt_id
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
+
     ! start time
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
@@ -41,13 +41,13 @@ subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-    call refinementIndicator_tree( params, lgt_block, lgt_active, lgt_n, hvy_block, hvy_active, hvy_n, tree_ID, indicator )
+    call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
     call toc( "refine_tree (refinementIndicator_tree)", MPI_Wtime()-t1 )
 
 
     !> (b) check if block has reached maximal level, if so, remove refinement flags
     t1 = MPI_Wtime()
-    call respectJmaxJmin_tree( params, lgt_block, lgt_active, lgt_n, tree_ID )
+    call respectJmaxJmin_tree( params, tree_ID )
     call toc( "refine_tree (respectJmaxJmin_tree)", MPI_Wtime()-t1 )
 
 
@@ -56,8 +56,7 @@ subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! in all other indicators, this step is very important.
     t1 = MPI_Wtime()
     if ( indicator /= "everywhere" ) then
-      call ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-      lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+      call ensureGradedness_tree( params, tree_ID )
     endif
     call toc( "refine_tree (ensureGradedness_tree)", MPI_Wtime()-t1 )
 
@@ -98,9 +97,9 @@ subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! the status +11
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
-        call refinementExecute3D_tree( params, lgt_block, hvy_block, hvy_active, hvy_n, tree_ID )
+        call refinementExecute3D_tree( params, hvy_block, tree_ID )
     else
-        call refinementExecute2D_tree( params, lgt_block, hvy_block(:,:,1,:,:), hvy_active, hvy_n, tree_ID )
+        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
     end if
     call toc( "refine_tree (refinement_execute)", MPI_Wtime()-t1 )
 
@@ -110,8 +109,7 @@ subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! and do not have to ensure that the active list is up-to-date
     ! update list of sorted nunmerical treecodes, used for finding blocks
     t2 = MPI_wtime()
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
     t_misc = MPI_wtime() - t2
 
 
@@ -125,8 +123,7 @@ subroutine refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, 
     !! This of course implies any other indicator than "everywhere" requires balancing here.
     if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
         t1 = MPI_Wtime()
-        call balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, tree_ID )
+        call balanceLoad_tree( params, hvy_block, tree_ID )
         call toc( "refine_tree (balanceLoad_tree)", MPI_Wtime()-t1 )
     endif
 

@@ -81,9 +81,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     do l = g+1, Bs(3)+g
                         do j = g+1, Bs(2)+g
                             do i = g+1, Bs(1)+g
-                    ! do i = 1, Bs(1)+2*g
-                    !     do j = 1, Bs(2)+2*g
-                    !         do l = 1, Bs(3)+2*g
                                 detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
                             end do
                         end do
@@ -142,8 +139,6 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
                     !          in any case.
                     do j = g+1, Bs(2)+g
                         do i = g+1, Bs(1)+g
-                    ! do i = 1, Bs(1)+2*g
-                        ! do j = 1, Bs(2)+2*g
                             detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
                         end do
                     end do

@@ -6,37 +6,30 @@ module module_mask
     use module_precision
     use module_globals
     use module_MPI
+    use module_forestMetaData
 
     implicit none
 
 contains
 
-    subroutine create_mask_tree(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, all_parts)
+    subroutine create_mask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
         ! to test update insect here (HACK)
         use module_ACM
         implicit none
 
         type (type_params), intent(in)         :: params                        !> user defined parameter structure
         real(kind=rk), intent(in)              :: time
-        integer(kind=ik), intent(inout)        :: lgt_block(:, :)               !> light data array
         real(kind=rk), intent(inout)           :: hvy_mask(:, :, :, :, :)
         real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
-        integer(kind=ik), intent(inout)        :: hvy_neighbor(:,:)             !> heavy data array - neighbor data
-        integer(kind=ik), intent(inout)        :: hvy_active(:,:)               !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)        :: lgt_active(:,:)               !> list of active blocks (light data)
-        integer(kind=ik), intent(inout)        :: hvy_n(:)                      !> number of active blocks (heavy data)
-        integer(kind=ik), intent(inout)        :: lgt_n(:)                      !> number of active blocks (light data)
-        integer(kind=tsize), intent(inout)     :: lgt_sortednumlist(:,:,:)      !> sorted list of numerical treecodes, used for block finding
         logical, intent(in), optional          :: all_parts
-        integer(kind=ik)                       :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jactive, Jmax
+        integer(kind=ik)                       :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jactive, Jmax
         real(kind=rk)                          :: x0(1:3), dx(1:3)
         logical, save                          :: time_independent_part_ready = .false.
         logical                                :: force_all_parts
 
         Bs      = params%Bs
         g       = params%n_ghosts
-        Jactive = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
+        Jactive = maxActiveLevel_tree(tree_ID_flow)
         Jmax    = params%max_treelevel
         tree_n  = params%forest_size ! used only for resetting at this point
 
@@ -86,7 +79,7 @@ contains
 
         if ((Jactive < Jmax-1) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
             ! generate complete mask (may be expensive)
-            call create_complete_mask(params, time, lgt_block, hvy_mask, hvy_active, hvy_n)
+            call create_complete_mask(params, time, hvy_mask)
 
             ! we're done, all parts of mask function are created, leave routine now
             return
@@ -101,8 +94,7 @@ contains
         ! finest level (refined only where interesting).
         ! At most, mask in generated (Jmax-Jmin) times.
         if ( (.not. time_independent_part_ready) .and. (params%mask_time_independent_part) ) then
-            call create_time_independent_mask(params, time, lgt_block, hvy_mask, hvy_tmp, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+            call create_time_independent_mask(params, time, hvy_mask, hvy_tmp)
 
             time_independent_part_ready = .true.
         endif
@@ -117,7 +109,7 @@ contains
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 ! get block spacing for RHS
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                 ! 11 Oct 2020: this seems to be required, as the mask array can rarely
                 ! contain some garbage which is not deleted by the create_mask subroutines
@@ -142,13 +134,11 @@ contains
             if (Jactive == params%max_treelevel ) then
                 ! flow is on finest level: add complete mask on finest level
                 ! this is the case when computing the right hand side.
-                call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask, tree_ID_flow)
+                call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask, tree_ID_flow)
 
             elseif (Jactive == params%max_treelevel-1 ) then
 
-                call add_pruned_to_full_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask_coarser, tree_ID_flow)
+                call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
             else
                 write(*,*) "WARING: mask generation fails (flow grid neither on Jmax nor Jmax-1)"
             endif
@@ -159,16 +149,13 @@ contains
 
 
 
-    subroutine create_complete_mask(params, time, lgt_block, hvy_mask, hvy_active, hvy_n)
+    subroutine create_complete_mask(params, time, hvy_mask)
 
         implicit none
 
         type (type_params), intent(in)      :: params                   !> user defined parameter structure
         real(kind=rk), intent(in)           :: time
-        integer(kind=ik), intent(inout)     :: lgt_block(:, :)          !> light data array
         real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-        integer(kind=ik), intent(inout)     :: hvy_active(:,:)          !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: hvy_n(:)                 !> number of active blocks (heavy data)
         integer :: k, hvy_id, Bs(1:3), g, lgt_id
         real(kind=rk) :: x0(1:3), dx(1:3)
 
@@ -182,7 +169,7 @@ contains
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
             ! get block spacing for RHS
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
             call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
             hvy_mask(:,:,:,:,hvy_id), "all-parts" )
@@ -193,23 +180,15 @@ contains
 
 
 
-    subroutine create_time_independent_mask(params, time, lgt_block, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist)
+    subroutine create_time_independent_mask(params, time, hvy_mask, hvy_tmp)
 
         implicit none
 
         type (type_params), intent(in)      :: params                     !> user defined parameter structure
         real(kind=rk), intent(in)           :: time
-        integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
         real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
         real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-        integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
-        integer(kind=ik), intent(inout)     :: hvy_active(:,:)            !> list of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: lgt_active(:,:)            !> list of active blocks (light data)
-        integer(kind=ik), intent(inout)     :: hvy_n(:)                   !> number of active blocks (heavy data)
-        integer(kind=ik), intent(inout)     :: lgt_n(:)                   !> number of active blocks (light data)
-        integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
-        integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, tree_n, iter, lgt_id, Jmin
+        integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, iter, lgt_id, Jmin
         real(kind=rk)                       :: x0(1:3), dx(1:3)
 
         if (params%rank==0) then
@@ -220,21 +199,20 @@ contains
 
         Bs = params%Bs
         g  = params%n_ghosts
-        Jactive = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
+        Jactive = maxActiveLevel_tree(tree_ID_flow)
         Jmax = params%max_treelevel
         Jmin = params%min_treelevel
         tree_n = params%forest_size ! used only for resetting at this point
 
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
-        call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, params%min_treelevel, .true., tree_ID_mask )
+        call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID_mask )
 
 
         do k = 1, hvy_n(tree_ID_mask)
             hvy_id = hvy_active(k, tree_ID_mask)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
             call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
             hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
         enddo
@@ -252,13 +230,12 @@ contains
 
             ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
             ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-            call refine_tree( params, lgt_block, hvy_mask, hvy_neighbor, &
-            lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID_mask )
+            call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_mask )
 
 
             if (params%rank==0) then
                 write(*,'("Did refinement for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
-                maxActiveLevel_tree(lgt_block, tree_ID_mask, lgt_active, lgt_n), lgt_n(tree_ID_mask), lgt_n
+                maxActiveLevel_tree(tree_ID_mask), lgt_n(tree_ID_mask), lgt_n
             endif
 
             ! the constant part needs to be generated on Jmax (where RHS is computed)
@@ -270,7 +247,7 @@ contains
                 ! probably you could set those blocks to zero but until we use the µCT really, we should not bother.
                 ! if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
                     call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-                    call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                    call get_block_spacing_origin( params, lgt_id, x0, dx )
                     call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
                     hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
                 ! endif
@@ -279,13 +256,12 @@ contains
             ! we found that sometimes, we end up with more blocks than expected
             ! and some zero-blocks can be coarsened again. doing that turned out to be
             ! important for large-scale simulations
-            call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
+            call adapt_tree( time, params, hvy_mask, tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
 
 
             if (params%rank==0) then
                 write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
-                maxActiveLevel_tree(lgt_block, tree_ID_mask, lgt_active, lgt_n), lgt_n(tree_ID_mask), lgt_n
+                maxActiveLevel_tree(tree_ID_mask), lgt_n(tree_ID_mask), lgt_n
             endif
         enddo
 
@@ -295,22 +271,18 @@ contains
 
         ! we need the mask function both on Jmax (during the RHS) and Jmax-1
         ! (during saving after coarsening)
-        call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask_coarser, tree_ID_mask)
+        call copy_tree(params, hvy_mask, tree_ID_mask_coarser, tree_ID_mask)
 
         ! coarsen by one level only.
         if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
-        call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID_mask_coarser, "everywhere", hvy_tmp)
+        call adapt_tree( time, params, hvy_mask, tree_ID_mask_coarser, "everywhere", hvy_tmp)
 
         ! prune both masks
         if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
-        call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask)
+        call prune_tree( params, hvy_mask, tree_ID_mask)
 
         if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
-        call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID_mask_coarser)
+        call prune_tree( params, hvy_mask, tree_ID_mask_coarser)
 
         if (params%rank==0) then
             write(*,'(80("~"))')

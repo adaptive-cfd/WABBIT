@@ -41,7 +41,7 @@ module module_hdf5_wrapper
     ! when reading a field from file, we check the attribute nxyz for the size,
     ! so we know how much memory to allocate
     interface read_attribute
-        module procedure read_attrib_dble, read_attrib_int
+        module procedure read_attrib_dble, read_attrib_dble2, read_attrib_int, read_attrib_int2
     end interface read_attribute
 
     interface write_dset_mpi_hdf5_2D
@@ -1850,6 +1850,49 @@ subroutine read_attrib_dble(file_id,dsetname,aname,attribute)
 
 end subroutine read_attrib_dble
 
+subroutine read_attrib_dble2(file_id, dsetname, aname, attribute)
+  implicit none
+
+  integer(hid_t), intent(in)                  :: file_id
+  character(len=*), intent (in)               :: dsetname, aname
+  real(kind=rk), intent (inout) :: attribute
+
+  integer            :: dim
+  integer            :: error  ! error flags
+  integer(hid_t)     :: aspace_id ! Attribute Dataspace identifier
+  integer(hid_t)     :: attr_id   ! Attribute identifier
+  integer(hid_t)     :: dset_id  ! dataset identifier
+  integer(hsize_t)   :: adims(1)  ! Attribute dimension
+  logical            :: exists
+
+  ! convert input data for the attribute to the precision required by the HDF library
+  dim = 1
+  adims = int(dim, kind=hsize_t)
+
+  ! open the dataset
+  call h5dopen_f(file_id, dsetname, dset_id, error)
+
+  ! check if attribute exists
+  call h5aexists_f(dset_id, aname, exists, error)
+
+  if (exists) then
+    ! open attribute
+    call h5aopen_f(dset_id, aname, attr_id, error)
+    ! Get dataspace for attribute
+    call h5aget_space_f(attr_id, aspace_id, error)
+    ! read attribute data
+    call h5aread_f( attr_id, H5T_NATIVE_DOUBLE, attribute, adims, error)
+    ! close attribute
+    call h5aclose_f(attr_id,error) ! Close the attribute.
+    call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
+  else
+    attribute = 0.0_rk
+  endif
+
+  call h5dclose_f(dset_id,error)
+
+end subroutine read_attrib_dble2
+
 !-------------------------------------------------------------------------------
 ! Read an attribute
 ! INPUT:
@@ -1908,6 +1951,68 @@ subroutine read_attrib_int(file_id, dsetname, aname, attribute, default_value)
   call h5dclose_f(dset_id,error)
 
 end subroutine read_attrib_int
+
+!-------------------------------------------------------------------------------
+! Read an attribute
+! INPUT:
+!   filename  what file to read from (e.g. hallo.h5)
+!   dsetname  what dataset to read from within the file (e.g. stuff to read hallo.h5:stuff)
+!   aname     the name of the attribute to read
+!   attribute the vector that will hold the attribute. note: this routine uses
+!             assumed shaped arrays: it will try to read as many values as the size of the vectors
+! OUTPUT:
+!   attribute the values read from file
+!-------------------------------------------------------------------------------
+subroutine read_attrib_int2(file_id, dsetname, aname, attribute, default_value)
+  implicit none
+
+  integer(hid_t), intent(in)                     :: file_id
+  character(len=*), intent (in)                  :: dsetname, aname
+  integer(kind=ik), intent (inout)               :: attribute
+  integer(kind=ik), intent (in), optional        :: default_value
+
+  integer             :: dim
+  integer             :: error  ! error flags
+  integer(kind=ik)    :: attribute_vct(1)
+  integer(hid_t)      :: aspace_id ! Attribute Dataspace identifier
+  integer(hid_t)      :: attr_id   ! Attribute identifier
+  integer(hid_t)      :: dset_id  ! dataset identifier
+  integer(hsize_t)    :: adims(1)  ! Attribute dimension
+  logical             :: exists
+
+  ! convert input data for the attribute to the precision required by the HDF library
+  dim = 1
+  adims = int(dim, kind=hsize_t)
+
+  ! open the dataset
+  call h5dopen_f(file_id, dsetname, dset_id, error)
+
+  ! check if attribute exists
+  call h5aexists_f(dset_id, aname, exists, error)
+
+  if (exists) then
+      ! open attribute
+      call h5aopen_f(dset_id, aname, attr_id, error)
+      ! Get dataspace for attribute
+      call h5aget_space_f(attr_id, aspace_id, error)
+      ! read attribute data
+      call h5aread_f( attr_id, H5T_NATIVE_INTEGER, attribute_vct, adims, error)
+      ! close attribute
+      call h5aclose_f(attr_id,error) ! Close the attribute.
+      call h5sclose_f(aspace_id,error) ! Terminate access to the data space.
+
+      attribute = attribute_vct(1)
+  else
+      if (present(default_value)) then
+          attribute = default_value
+      else
+          attribute = 0
+      endif
+  endif
+
+  call h5dclose_f(dset_id,error)
+
+end subroutine read_attrib_int2
 
 
 ! overwrite and initialize file

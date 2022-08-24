@@ -6,26 +6,23 @@ subroutine operator_reconstruction(params)
     use module_mpi
     use module_acm
     use module_time_step, only: filter_wrapper
+    use module_forestMetaData
 
     implicit none
 
     type (type_params), intent(inout)  :: params
     character(len=cshort) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in
-    integer(kind=ik) :: iteration, k, lgt_id, tc_length, tree_N, iblock, ix, iy, &
+    integer(kind=ik) :: iteration, k, lgt_id, tc_length, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level, j
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
     real(kind=rk), allocatable         :: stencil1(:),stencil2(:)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
+
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
     character(len=cshort)              :: fname
@@ -153,20 +150,21 @@ subroutine operator_reconstruction(params)
     b2 = ubound(stencil2, dim=1)
     iz = 1
 
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
     call init_ghost_nodes( params )
 
-    call read_mesh(file, params, lgt_n, hvy_n, lgt_block, tree_ID)
+    ! read data
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID)
 
-    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
-    call updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
-
-    dx_fine = (2.0_rk**-maxActiveLevel_tree(lgt_block, tree_ID, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
+    dx_fine = (2.0_rk**-maxActiveLevel_tree(tree_ID))*domain(2)/real((Bs(2)-1), kind=rk)
     nx_fine = nint(domain(2)/dx_fine)
 
     write(*,*) "nx_fine=", nx_fine
@@ -179,7 +177,7 @@ subroutine operator_reconstruction(params)
     do iblock = 1, hvy_n(tree_ID)
 
         call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
 
@@ -224,7 +222,7 @@ subroutine operator_reconstruction(params)
             ! set this one point we're looking at to 1 (on all blocks!)
             do iblock = 1, hvy_n(tree_ID)
                 call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                 do j = 1, 4
                     x_in2 = x_in + permut_x(j)*domain(1)
@@ -269,8 +267,7 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID )
 
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif
@@ -281,7 +278,7 @@ subroutine operator_reconstruction(params)
             do k = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                 dx_inv = 1.0_rk / dx(1)
 
@@ -315,8 +312,7 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-                lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
 
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif
@@ -330,7 +326,7 @@ subroutine operator_reconstruction(params)
                 hvy_id = hvy_active(k, tree_ID)
 
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                 do iy2 = g+1, Bs(2)+g
                     do ix2 = g+1, Bs(1)+g

@@ -8,27 +8,23 @@ subroutine rhs_operator_reconstruction(params)
     use module_acm
     use module_time_step
     use module_ini_files_parser_mpi
+    use module_forestMetaData
 
     implicit none
 
     type (type_params), intent(inout)  :: params
     character(len=cshort) :: file, mode, OPERATOR
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
-    integer(kind=ik) :: iteration, k, tc_length, tree_N, iblock, ix, iy, &
+    integer(kind=ik) :: iteration, k, tc_length, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level,tree_ID_tmp,tree_ID_rhs_u,tree_ID_rhs_u_ei
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable      :: lgt_n(:), hvy_n(:)
     integer :: hvy_id, lgt_id, fsize, j, tree_ID_u, tree_ID_ei
     character(len=cshort)              :: fname, fname_ini
     real(kind=rk), dimension(3)        :: dx, x0
@@ -107,14 +103,12 @@ subroutine rhs_operator_reconstruction(params)
     endif
 
     ! we have to allocate grid if this routine is called for the first time
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_work,hvy_mask=hvy_mask, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block, hvy_work,hvy_mask=hvy_mask, hvy_tmp=hvy_tmp)
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
-    call init_ghost_nodes( params )
+    call init_ghost_nodes(params)
 
-    call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
-    lgt_sortednumlist,tree_n)
+    call reset_forest(params)
     lgt_n = 0 ! reset number of active light blocks
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
@@ -146,63 +140,34 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     !---------------------------------------------------------------------------
     tree_ID_u = 1
-    call read_field2tree(params, (/file/), 1, tree_ID_u, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID_u)
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_u )
+    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID_u, verbosity=.true.)
 
     ! this hack ensures, on mono_CPU, that later on, refine+coarsening always ends up in the same order in hvy_actve
     if (params%adapt_tree) then
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
-        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_u )
+        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
 
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
-        call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_u, "everywhere", hvy_tmp, external_loop=.true. )
+        call adapt_tree( time, params, hvy_block, tree_ID_u, "everywhere", hvy_tmp, external_loop=.true. )
 
     endif
 
     !---------------------------------------------------------------------------
     tree_ID_rhs_u = 2
-    call read_field2tree(params, (/file/), 1, tree_ID_rhs_u, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID_rhs_u)
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_rhs_u )
-    call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, tree_ID_rhs_u, &
-    0.0_rk, verbosity)
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_rhs_u)
+    call multiply_tree_with_scalar(params, hvy_block, tree_ID_rhs_u, 0.0_rk, verbosity)
     !---------------------------------------------------------------------------
     tree_ID_ei = 3
-    call read_field2tree(params, (/file/), 1, tree_ID_ei, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID_ei)
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_ei )
-    call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, tree_ID_ei, &
-    0.0_rk, verbosity)
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_ei)
+    call multiply_tree_with_scalar(params, hvy_block, tree_ID_ei, 0.0_rk, verbosity)
     !---------------------------------------------------------------------------
     tree_ID_rhs_u_ei = 4
-    call read_field2tree(params, (/file/), 1, tree_ID_rhs_u_ei, tree_n, &
-    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor)
-    call createActiveSortedLists_tree(params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID_rhs_u_ei)
-    call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active,&
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_rhs_u_ei )
-    call multiply_tree_with_scalar(params, hvy_block, hvy_active, hvy_n, tree_ID_rhs_u_ei, &
-    0.0_rk, verbosity)
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_rhs_u_ei)
+    call multiply_tree_with_scalar(params, hvy_block, tree_ID_rhs_u_ei, 0.0_rk, verbosity)
 
-    dx_fine = (2.0_rk**-maxActiveLevel_tree(lgt_block, tree_ID_u, lgt_active, lgt_n))*domain(2)/real((Bs(2)-1), kind=rk)
+    dx_fine = (2.0_rk**-maxActiveLevel_tree(tree_ID_u))*domain(2)/real((Bs(2)-1), kind=rk)
     nx_fine = nint(domain(2)/dx_fine)
     write(*,*) "nx_fine=", nx_fine
     write(*,*) "n_ghost=", g
@@ -214,8 +179,9 @@ subroutine rhs_operator_reconstruction(params)
     open(19, file=trim(adjustl(file))//'.operator_grid_points.txt', status='replace')
     do iblock = 1, hvy_n(tree_ID_u)
         call hvy2lgt(lgt_id, hvy_active(iblock,tree_ID_u), params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
         level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
@@ -239,36 +205,31 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     ! store_rewrite(*,*) "hvyn old/new",Nhvyn, hvy_n(tree_ID_rhs)ference_mesh
     !---------------------------------------------------------------------------
-    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID_rhs_u, tree_ID_u)
+    call copy_tree(params, hvy_block, tree_ID_rhs_u, tree_ID_u)
 
     if ( params%adapt_tree ) then
         tree_ID_tmp = tree_ID_rhs_u
 
-        call store_ref_meshes(lgt_block,     lgt_active,     lgt_n,  &
-        lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID_u, tree_ID_ei)
+        call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID_u, tree_ID_ei)
         Nhvyn = hvy_n(tree_ID_u)
         !---------------------------------------------------------------------------
         ! refine grid ones
         !---------------------------------------------------------------------------
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp) )
 
-        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_tmp )
+        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp )
 
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp))
     endif
 
     hvy_work(:,:,:,:,:,1) = 0
     if (OPERATOR == "RHS") then
-        call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID_rhs_u)
+        call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID_rhs_u)
     else if( OPERATOR == "EVOLVE") then
         iteration = 0
         time = 0.0_rk
         dt = 1
-        call timeStep_tree(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, tree_ID_rhs_u)
+        call timeStep_tree(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID_rhs_u)
         do k = 1, hvy_n(tree_ID_rhs_u)
             hvy_id = hvy_active(k,tree_ID_rhs_u)
             hvy_work(:,:,:,:,hvy_id,1) = hvy_block(:,:,:,:,hvy_id)
@@ -288,12 +249,11 @@ subroutine rhs_operator_reconstruction(params)
                 !write(*,*) "--------------------point---------------------------"
                 !---------------------------------------------------------------
                 ! reset entire grid to zeros (do not care about performance, just reset all)
-                call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID_ei, tree_ID_u)
+                call copy_tree(params, hvy_block, tree_ID_ei, tree_ID_u)
                 !---------------------------------------------------------------
                 ! set this one point we're looking at to 1
                 call hvy2lgt(lgt_id, hvy_active(iblock,tree_ID_ei), params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
@@ -314,12 +274,11 @@ subroutine rhs_operator_reconstruction(params)
                 if ( params%adapt_tree ) then
                     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei) )
 
-                    call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-                    lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_ei )
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
 
                 endif
 
-                call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_ei)
+                call updateMetadata_tree(params, tree_ID_ei)
                 !---------------------------------------------------------------
                 ! synchronize ghosts (important! if e.g. coarseWins is actiyve and you happen to set the redundant value of a refined block, its overwritten to be zero again)
                 ! Note: this also applies to coarse block bordering on a coarse block, if its ID is lower.
@@ -333,13 +292,11 @@ subroutine rhs_operator_reconstruction(params)
                 !     lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID_ei)
 
                 if (OPERATOR == "RHS") then
-                    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
-                    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID_ei)
+                    call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID_ei)
                 else if( OPERATOR == "EVOLVE") then
                     iteration = 0
                     time = 0
-                    call timeStep_tree(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, &
-                    hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, tree_ID_ei)
+                    call timeStep_tree(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID_ei)
                     do k = 1, hvy_n(tree_ID_ei)! call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
                         hvy_work(:,:,:,:,hvy_active(k,tree_ID_ei),1) = hvy_block(:,:,:,:,hvy_active(k,tree_ID_ei))
                     enddo
@@ -354,9 +311,9 @@ subroutine rhs_operator_reconstruction(params)
                 ! depending on fineWins or coarseWins
                 call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei))
                 call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u), hvy_n(tree_ID_rhs_u))
-                call delete_tree(params, lgt_block, lgt_active, lgt_n, hvy_active,hvy_n, tree_ID_rhs_u_ei)
-                call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_work(:,:,:,:,:,1), hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID1=tree_ID_ei, tree_ID2=tree_ID_rhs_u, dest_tree_ID=tree_ID_rhs_u_ei)
+
+                call delete_tree(params, tree_ID_rhs_u_ei)
+                call substract_two_trees(params, hvy_work(:,:,:,:,:,1), hvy_tmp, tree_ID1=tree_ID_ei, tree_ID2=tree_ID_rhs_u, dest_tree_ID=tree_ID_rhs_u_ei)
 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 !call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs), hvy_n(tree_ID_rhs))
@@ -364,16 +321,16 @@ subroutine rhs_operator_reconstruction(params)
                 !write(*,*) "--------------------point-3s--------------------------"
 
                 if ( params%adapt_tree ) then
-                    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_rhs_u_ei)
+                    call updateMetadata_tree(params, tree_ID_rhs_u_ei)
+
                     call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
                     ! call adapt_tree( time, params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, lgt_active(:,tree_ID_rhs_u_ei), &
                     !  lgt_n(tree_ID_rhs_u_ei), lgt_sortednumlist(:,:,tree_ID_rhs_u_ei), hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei), tree_ID_rhs_u_ei, "everywhere", hvy_tmp, external_loop=.true. )
-                    call coarse_tree_2_reference_mesh(params, tree_n, &
-                    lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                    lgt_block_ref, lgt_active_ref(:,1), lgt_n_ref(1), &
-                    hvy_work(:,:,:,:,:,1), hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID_rhs_u_ei, verbosity)
 
-                    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_rhs_u_ei)
+                    call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,1), lgt_n_ref(1), &
+                    hvy_work(:,:,:,:,:,1), hvy_tmp, tree_ID_rhs_u_ei, verbosity)
+
+                    call updateMetadata_tree(params, tree_ID_rhs_u_ei)
 
                     call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
                 endif
@@ -384,7 +341,7 @@ subroutine rhs_operator_reconstruction(params)
                 ! for the python script, because it first reads the entie matrix, then removes zero cols/rows.
                 do k = 1, hvy_n(tree_ID_rhs_u_ei)
                     call hvy2lgt(lgt_id, hvy_active(k,tree_ID_rhs_u_ei), params%rank, params%number_blocks)
-                    call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+                    call get_block_spacing_origin( params, lgt_id, x0, dx )
 
                     do iy2 = g+1, Bs(2)+g
                         do ix2 = g+1, Bs(1)+g

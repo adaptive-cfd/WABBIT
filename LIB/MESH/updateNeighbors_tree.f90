@@ -3,18 +3,10 @@
 !!            - params struct
 !! output:    - neighbor list array
 ! ********************************************************************************************
-subroutine updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+subroutine updateNeighbors_tree(params, tree_ID)
 
     implicit none
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)          !> light data array
-    integer(kind=ik), intent(out)       :: hvy_neighbor(:,:)        !> heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: lgt_active(:,:)          !> list of active blocks (light data)
-    integer(kind=ik), intent(in)        :: lgt_n(:)                 !> number of active blocks (light data)
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:) !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(in)        :: hvy_active(:,:)          !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n(:)                 !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     logical                             :: error = .false.
     integer(kind=ik)                    :: mpierror, k, N, Jmax, lgtID, hvyID
@@ -50,36 +42,36 @@ subroutine updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt
             params%domain_size, params%Bs, params%dim, n_domain )
 
             ! faces
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__1/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__2/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__3/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__4/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__5/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '__6/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__1/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__2/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__3/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__4/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__5/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '__6/___', error, n_domain)
 
             ! edges
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_12/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_13/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_14/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_15/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_62/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_63/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_64/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_65/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_23/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_25/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_43/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '_45/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_12/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_13/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_14/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_15/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_62/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_63/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_64/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_65/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_23/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_25/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_43/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '_45/___', error, n_domain)
 
             ! corners
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '123/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '134/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '145/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '152/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '623/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '634/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '645/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, lgt_block, Jmax, '652/___', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '123/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '134/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '145/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '152/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '623/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '634/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '645/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, '652/___', error, n_domain)
         end do
 
     else
@@ -106,15 +98,15 @@ subroutine updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt
             call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%max_treelevel+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
 
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '__N', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '__E', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '__S', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '__W', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '__N', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '__E', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '__S', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '__W', error, n_domain)
 
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '_NE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '_NW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '_SE', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, lgt_block, Jmax, '_SW', hvy_neighbor, lgt_n, lgt_sortednumlist, error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '_NE', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '_NW', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '_SE', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, '_SW', error, n_domain)
         end do
 
     end if
@@ -125,7 +117,7 @@ subroutine updateNeighbors_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt
 
     ! Is there any non-periodic boundary ?
     if ( .not. All(params%periodic_BC) ) then
-        call remove_nonperiodic_neighbors(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, tree_ID)
+        call remove_nonperiodic_neighbors(params, tree_ID)
     endif
 
 end subroutine updateNeighbors_tree

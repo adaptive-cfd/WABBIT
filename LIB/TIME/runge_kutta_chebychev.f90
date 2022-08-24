@@ -3,8 +3,7 @@
 !   Sommeijer et al. RKC: An explicit solver for parabolic PDEs (J comp appl math 1997)
 !   Verwer et al. RKC time-stepping for advection-diffusion-reaction problems (JCP 2004)
 
-subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
 
     implicit none
 
@@ -14,8 +13,6 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
@@ -23,18 +20,6 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! in fortran, we work with indices:
@@ -76,8 +61,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! calculate time step
-    call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_block, &
-    lgt_active(:,tree_ID), lgt_n(tree_ID), dt)
+    call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
@@ -89,8 +73,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
 
     ! F0 (RHS at initial time, old time level)
     ! note: call sync_ghosts on input data before
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, lgt_block, &
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, tree_ID )
 
     ! euler step
     do k = 1, hvy_n(tree_ID)
@@ -108,8 +91,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
         call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID )
+        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
 
         ! main formula
         ! y2 = (1-mu(i)-nu(i)) * y00 + mu(i) * y1 + nu(i) * y0 + mu_tilde(i)*dt*F1 + gamma_tilde(i)*dt*F0;

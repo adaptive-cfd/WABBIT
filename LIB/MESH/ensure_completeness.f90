@@ -4,12 +4,12 @@
 ! ********************************************************************************************
 !> \image html completeness.svg "Ensure Completeness" width=400
 
-subroutine ensure_completeness( params, lgt_block, lgt_id, sisters )
+subroutine ensure_completeness( params, lgt_id, sisters )
 
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :), sisters(:)    !> light data array
+    integer(kind=ik), intent(inout)     :: sisters(:)    !> light data array
     integer(kind=ik), intent(in)        :: lgt_id
     integer(kind=ik)                    :: Jmax                           ! max treelevel
     integer(kind=ik)                    :: k, l, N_sisters, status        ! loop variables

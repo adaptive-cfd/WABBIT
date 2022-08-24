@@ -9,11 +9,10 @@
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
-subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_mask )
+subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, hvy_mask )
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)                !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)         !> list of blocks to merge, can contain 4 or 8 blocks
@@ -26,6 +25,12 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
     integer(kind=ik), dimension(3)      ::  bound1, bound2, boundm, Bs
     logical :: harten_multiresolution
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors and tree_N are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     ! number of blocks to be merged
     N_merge = size(lgt_blocks_to_merge,1)
@@ -94,7 +99,7 @@ subroutine merge_blocks( params, hvy_block, lgt_block, lgt_blocks_to_merge, hvy_
 
     ! a) light data (collective operation)
     ! fetch a free light ID for the merged blocks
-    call get_free_local_light_id( params, data_rank(1), lgt_block, lgt_merge_id)
+    call get_free_local_light_id( params, data_rank(1), lgt_merge_id)
     ! create light data entry for the new block
     lgt_block( lgt_merge_id, : ) = -1
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )

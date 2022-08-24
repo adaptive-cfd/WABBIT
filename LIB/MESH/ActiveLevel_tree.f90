@@ -1,21 +1,33 @@
 !> \brief return coarsest level in active block list
 ! ********************************************************************************************
 
-function minActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
+function minActiveLevel_tree( tree_ID, use_active_list )
     implicit none
 
-    integer(kind=ik), intent(in)           :: lgt_block(:, :)           !> light data array
     integer(kind=ik), intent(in)           :: tree_ID
-    integer(kind=ik), intent(in), optional :: lgt_active(:,:)             !> list of active blocks (light data)
-    integer(kind=ik), intent(in), optional :: lgt_n(:)                     !> number of active blocks (light data)
+    logical, intent(in), optional          :: use_active_list
 
     integer(kind=ik)                       :: minActiveLevel_tree          ! return value
     integer(kind=ik)                       :: k, Jmin, max_treelevel    ! loop variables
+    logical :: use_active_list2
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
     Jmin = max_treelevel
 
-    if (present(lgt_active) .and. present(lgt_n)) then
+    if (present(use_active_list)) then
+        use_active_list2 = use_active_list
+    else
+        ! default
+        use_active_list2 = .true.
+    endif
+
+    if (use_active_list2) then
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n(tree_ID)
@@ -39,22 +51,27 @@ end function
 
 
 
-function maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
+function maxActiveLevel_tree( tree_ID, use_active_list )
 
     implicit none
 
-    integer(kind=ik), intent(in)           :: lgt_block(:, :)           !> light data array
     integer(kind=ik), intent(in)           :: tree_ID
-    integer(kind=ik), intent(in), optional :: lgt_active(:,:)             !> list of active blocks (light data)
-    integer(kind=ik), intent(in), optional :: lgt_n(:)                     !> number of active blocks (light data)
+    logical, intent(in), optional          :: use_active_list
 
     integer(kind=ik)                    :: maxActiveLevel_tree           ! return value
     integer(kind=ik)                    :: k, Jmax, max_treelevel     ! loop variables
+    logical :: use_active_list2
 
     max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
     Jmax = 0
 
-    if (present(lgt_active) .and. present(lgt_n)) then
+    if (present(use_active_list)) then
+        use_active_list2 = use_active_list
+    else
+        use_active_list2 = .true.
+    endif
+
+    if (use_active_list2) then
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n(tree_ID)

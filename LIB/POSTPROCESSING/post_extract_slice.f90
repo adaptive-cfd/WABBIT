@@ -17,17 +17,14 @@ subroutine post_extract_slice(params)
     use module_mesh
     use module_helpers
     use mpi
+    use module_forestMetaData
 
     implicit none
 
     character(len=cshort)                       :: fname, fname_out
     type (type_params), intent(inout)       :: params
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
+
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable           :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                        :: tree_ID=1, hvy_id
 
     integer(hsize_t), dimension(4)          :: size_field
@@ -89,14 +86,12 @@ subroutine post_extract_slice(params)
 
     allocate(treecode(1:tc_length))
 
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block, tree_ID)
-    call read_field(fname, 1, params, hvy_block, hvy_n, tree_ID)
+    ! read data
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
@@ -105,7 +100,7 @@ subroutine post_extract_slice(params)
         hvy_id = hvy_active(k, tree_ID)
 
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
             Nblocks = Nblocks +1
@@ -126,7 +121,7 @@ subroutine post_extract_slice(params)
         hvy_id = hvy_active(k,tree_ID)
 
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
             !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -193,7 +188,20 @@ subroutine post_extract_slice(params)
         hvy_active_2Dslice(i, tree_ID) = i
     enddo
 
-    call saveHDF5_tree( fname_out, time, iteration, 1, params, lgt_block_2Dslice, &
-    hvy_block_2Dslice, lgt_active_2Dslice, (/Nblocks/), (/Nblocks/), hvy_active_2Dslice, tree_ID)
+
+    ! -------------------
+    deallocate(lgt_block, lgt_active, hvy_active)
+    allocate(lgt_block(size(lgt_block_2Dslice,1), size(lgt_block_2Dslice,2)))
+    allocate(lgt_active(size(lgt_active_2Dslice,1), size(lgt_active_2Dslice,2)))
+    allocate(hvy_active(size(hvy_active_2Dslice,1), size(hvy_active_2Dslice,2)))
+
+    lgt_block  = lgt_block_2Dslice
+    lgt_active = lgt_active_2Dslice
+    hvy_active = hvy_active_2Dslice
+    hvy_n(tree_ID) = Nblocks
+    lgt_n(tree_ID) = Nblocks
+    ! -------------------
+
+    call saveHDF5_tree( fname_out, time, iteration, 1, params, hvy_block_2Dslice, tree_ID)
 
 end subroutine

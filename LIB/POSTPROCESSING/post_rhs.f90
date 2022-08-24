@@ -7,6 +7,7 @@ subroutine post_rhs(params)
     use module_operators
     use module_physics_metamodule
     use module_time_step
+    use module_forestMetaData
 
     implicit none
 

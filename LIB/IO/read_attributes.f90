@@ -1,13 +1,13 @@
 !> \brief read attributes saved in a hdf5-file
 
-subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length, dim, &
+subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_length, dim, &
     periodic_BC, symmetry_BC, verbosity)
 
     implicit none
     !> file name
     character(len=*), intent(in)                  :: fname
     !> number of active blocks (required to allocate light data, prior to reading)
-    integer(kind=ik), intent(out)                 :: lgt_n
+    integer(kind=ik), intent(out)                 :: nBlocksFile
     !> time (to be read from file)
     real(kind=rk), intent(out)                    :: time
     !> iteration (to be read from file)
@@ -80,7 +80,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
             periodic_BC = .true.
         end where
     endif
-    
+
     if (present(symmetry_BC)) then
         call read_attribute(file_id, "blocks", "symmetry_BC", tmp2, (/0_ik, 0_ik, 0_ik/))
 
@@ -96,7 +96,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
     call read_attribute(file_id, "blocks", "iteration", iiteration)
     iteration = iiteration(1)
     call read_attribute(file_id, "blocks", "total_number_blocks", number_blocks)
-    lgt_n = number_blocks(1)
+    nBlocksFile = number_blocks(1)
 
     !---------------------------------------------------------------------------
     ! Number of blocks and blocksize
@@ -138,11 +138,11 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         call abort(202009021, "Blocksize Bs(3) is an even number, which this code version cannot handle.")
     endif
 
-    if ( Nb /= lgt_n ) then
-        ! the number of blocks stored in metadata and the dimensionality of the
+    if ( Nb /= nBlocksFile ) then
+        ! the number of blocks stored in metadata and the actual size of the
         ! array do not match.
-        write(*,*) "Nb= ", Nb, "lgt_n= ", lgt_n
-        call abort(333139, "the number of blocks stored in metadata and the dimensionality of the array do not match.")
+        write(*,*) "Nb= ", Nb, "nBlocksFile= ", nBlocksFile
+        call abort(333139, "the number of blocks stored in metadata and the actual size of the array do not match.")
     endif
 
     !---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ subroutine read_attributes(fname, lgt_n, time, iteration, domain, bs, tc_length,
         write(*,'(" Bs           = ",3(i3,1x))') Bs
         write(*,'(" domain       = ",3(g15.8,1x))') domain
         write(*,'(" tc_length    = ",i3)') tc_length
-        write(*,'(" lgt_n        = ",i8)') lgt_n
+        write(*,'(" nBlocksFile        = ",i8)') nBlocksFile
         write(*,'(" dim          = ",i8)') dim
         if (present(periodic_BC)) write(*,'(" periodic_BC  = ",3(L1))') periodic_BC
         if (present(symmetry_BC)) write(*,'(" symmetry_BC  = ",3(L1))') symmetry_BC

@@ -1,17 +1,14 @@
-subroutine blocks_per_mpirank( params, actual_blocks_per_proc, hvy_n )
-  implicit none
-  !> user defined parameter structure
-  type (type_params), intent(in)      :: params
-  integer, intent(in) :: hvy_n
-  integer, dimension(0:params%number_procs-1), intent(out) :: actual_blocks_per_proc
-  integer, dimension(0:params%number_procs-1) :: tmp_actual_blocks_per_proc
+subroutine blocks_per_mpirank( params, actual_blocks_per_proc, tree_ID )
+    use module_forestMetaData
+    implicit none
+    !> user defined parameter structure
+    type (type_params), intent(in)      :: params
+    integer, intent(in) :: tree_ID
+    integer, dimension(0:params%number_procs-1), intent(out) :: actual_blocks_per_proc
 
-  integer :: error, myrank
+    integer :: error
 
-  myrank = params%rank
-
-  tmp_actual_blocks_per_proc = -1
-  tmp_actual_blocks_per_proc(myrank) = hvy_n
-  ! call MPI_Allreduce(my_block_list, lgt_block, size(lgt_block,1)*size(lgt_block,2), MPI_INTEGER4, MPI_SUM, MPI_COMM_WORLD, ierr)
-  call MPI_ALLREDUCE(tmp_actual_blocks_per_proc, actual_blocks_per_proc, params%number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, error)
+    actual_blocks_per_proc = -1
+    actual_blocks_per_proc(params%rank) = hvy_n(tree_ID)
+    call MPI_ALLREDUCE(MPI_IN_PLACE, actual_blocks_per_proc, params%number_procs, MPI_INTEGER, MPI_MAX, WABBIT_COMM, error)
 end subroutine

@@ -5,6 +5,7 @@ subroutine adaption_test(params)
   use module_mpi
   use module_globals
   use module_mesh
+  use module_forestMetaData
 
   implicit none
 
@@ -14,21 +15,25 @@ subroutine adaption_test(params)
   !--------------------------------------------
   character(len=cshort):: file_out, order, args
   real(kind=rk), allocatable      :: error(:)
-  integer(kind=ik), allocatable   :: lgt_block(:, :),Nb_adapt(:)
+  integer(kind=ik), allocatable   :: Nb_adapt(:)
   character(len=cshort),allocatable   :: eps_str_list(:)
   real(kind=rk), allocatable      :: hvy_block(:, :, :, :, :)
   real(kind=rk), allocatable      :: hvy_tmp(:, :, :, :, :)
-  integer(kind=ik), allocatable   :: hvy_neighbor(:,:), hvy_active(:, :)
-  integer(kind=ik), allocatable   :: lgt_active(:,:), lgt_n(:), hvy_n(:)
-  integer(kind=tsize), allocatable:: lgt_sortednumlist(:,:,:)
   integer(kind=ik)                :: max_neighbors, level, k, Bs(3), tc_length
   real(kind=rk), dimension(3)     :: domain
   integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID_input, tree_ID_adapt
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
-  integer(kind=ik) :: j, n_components=1, tree_n, lgt_n_tmp,Jmin, Jmax
+  integer(kind=ik) :: j, n_components=1, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
   logical :: verbose = .false., save_all = .true.
   character(len=30) :: rowfmt
+
+  ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+  ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+  ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+  ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+  ! to the last subroutine.)  -Thomas
+
 
   call get_command_argument(2, args)
   if ( args== '--help' .or. args == '--h') then
@@ -127,59 +132,47 @@ subroutine adaption_test(params)
   !----------------------------------
   ! allocate data
   !----------------------------------
-  call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-  hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+  call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
-  call reset_forest(params, lgt_block, lgt_active, lgt_n,hvy_active, hvy_n, &
-  lgt_sortednumlist,tree_n)
+  call reset_forest(params)
 
 
   hvy_neighbor = -1_ik
   tree_n= 0_ik ! reset number of trees in forest
   tree_ID_input = 1
   tree_ID_adapt = 2
-  call read_field2tree(params, params%input_files , params%n_eqn, tree_ID_input, &
-                tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_block, &
-                hvy_active, hvy_n, hvy_tmp, hvy_neighbor,  verbosity=.false.)
+  call readHDF5vct_tree(params%input_files, params, hvy_block, tree_ID_input, verbosity=.false.)
 
   !###########################################################
   ! actual error calculation:
   ! error_epsilon=|| u_input - u_epsilon||_2 / ||u_input||_2
   !###########################################################
   ! need the L2 norm of the input for the relative error
-  L2norm = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
-               lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
-               hvy_active, hvy_n, hvy_tmp, tree_ID_input, verbose )
+  L2norm = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_input, verbose )
 
   do i = 1, n_eps
     ! copy form original data
-    call copy_tree(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-                hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_ID_adapt, tree_ID_input)
+    call copy_tree(params, hvy_block, tree_ID_adapt, tree_ID_input)
     ! adapt to given eps:
     read (unit=eps_str_list(i),fmt=*) params%eps
-    call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_adapt, params%coarsening_indicator, hvy_tmp )
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID_adapt, params%coarsening_indicator, hvy_tmp)
 
     lgt_n_tmp = lgt_n(tree_ID_adapt)
-    Jmin = minActiveLevel_tree(lgt_block, tree_ID_adapt, lgt_active, lgt_n)
-    Jmax = maxActiveLevel_tree(lgt_block, tree_ID_adapt, lgt_active, lgt_n)
+    Jmin = minActiveLevel_tree(tree_ID_adapt)
+    Jmax = maxActiveLevel_tree(tree_ID_adapt)
 
     if (save_all) then
       do j = 1, n_components
           write( file_out, '("u",i1,"-eps", A,"_",i12.12 ,".h5")') j, trim(adjustl(eps_str_list(i))), nint(time * 1.0e6_rk)
 
-          call write_tree_field(file_out, params, lgt_block, lgt_active, hvy_block, &
-          lgt_n, hvy_n, hvy_active, j, tree_ID_adapt , time , iteration )
+          call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_adapt)
       end do
     end if
 
     ! compare to original data:
-    call substract_two_trees(params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID_adapt, tree_ID_input)
+    call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
     ! compute L2 norm
-    error(i) = compute_tree_L2norm( params, tree_n, lgt_block,  lgt_active, &
-                                lgt_n, lgt_sortednumlist, hvy_block, hvy_neighbor,&
-                                 hvy_active, hvy_n, hvy_tmp, tree_ID_adapt, verbose )
+    error(i) = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_adapt, verbose )
     error(i) = error(i)/L2norm
     Nb_adapt(i) = lgt_n_tmp
 

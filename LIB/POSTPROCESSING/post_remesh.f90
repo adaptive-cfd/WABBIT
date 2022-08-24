@@ -5,6 +5,7 @@ subroutine post_remesh(params)
     use module_IO
     use module_mpi
     use module_operators
+    use module_forestMetaData
 
     implicit none
 
@@ -16,13 +17,7 @@ subroutine post_remesh(params)
     integer(kind=ik)       :: k
     integer(kind=ik)       :: tc_length, lgt_n_tmp
 
-    integer(kind=ik) :: lgt_n
-    integer(kind=ik) :: hvy_n
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:, :)
     logical :: help1, help2
 
 

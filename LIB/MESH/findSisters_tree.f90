@@ -4,7 +4,7 @@
 !! output:   - light data array
 ! ********************************************************************************************
 
-subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n, lgt_sortednumlist, tree_ID)
+subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, tree_ID)
 
     implicit none
 
@@ -14,9 +14,6 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n,
     !! this routine, and it can be either 4 or 8 or in length (2D / 3D), depending on whether
     !! you want to include the block whose sisters we look for or not.
     integer(kind=ik), intent(inout)     :: lgt_sisters_id(:)
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
-    integer(kind=ik), intent(in)        :: lgt_n(:)                   !> number of active blocks (light data)
-    integer(kind=tsize), intent(in)     :: lgt_sortednumlist(:,:,:)   !> sorted list of numerical treecodes, used for block finding
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik)                    :: i                          ! loop variables
     integer(kind=ik), allocatable, save :: all_treecodes(:,:)         ! treecode variable
@@ -62,7 +59,7 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, lgt_block, lgt_n,
 !!!            tree_ID = lgt_block(lgt_my_id, params%max_treelevel + IDX_TREE_ID)
             ! look for the sisters in the list of blocks (light data), store their ID if found
             ! (-1 otherwise)
-            call doesBlockExist_tree(all_treecodes(i,:), exists, lgt_sisters_id(i), lgt_sortednumlist, lgt_n, tree_ID)
+            call doesBlockExist_tree(all_treecodes(i,:), exists, lgt_sisters_id(i), tree_ID)
 
         end if
     enddo

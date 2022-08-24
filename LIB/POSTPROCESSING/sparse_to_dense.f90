@@ -5,6 +5,7 @@ subroutine sparse_to_dense(params)
     use module_IO
     use module_mpi
     use module_globals
+    use module_forestMetaData
 
     implicit none
 
@@ -15,12 +16,7 @@ subroutine sparse_to_dense(params)
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer(kind=ik), allocatable      :: hvy_n(:), lgt_n(:)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
     integer(kind=ik)                        :: max_neighbors, level, k, tc_length
@@ -162,33 +158,27 @@ subroutine sparse_to_dense(params)
     endif
 
     ! allocate data
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
-    ! read field
-    call read_mesh(file_in, params, lgt_n, hvy_n, lgt_block, tree_ID)
-    call read_field(file_in, 1, params, hvy_block, hvy_n, tree_ID)
+    ! read input data
+    call readHDF5vct_tree( (/file_in/), params, hvy_block, tree_ID)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
     ! balance the load
-    call balanceLoad_tree(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call balanceLoad_tree(params, hvy_block, tree_ID)
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (operator=="sparse-to-dense") then
-        call toEquidistant_tree(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, tree_ID, target_level=level)
+        call toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
     elseif (operator=="refine-coarsen") then
         write(*,*) "starting at", lgt_n(tree_ID)
 
-        call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID )
+        call refine_tree( params, hvy_block, "everywhere", tree_ID )
 
         write(*,*) "refined to", lgt_n(tree_ID)
 
@@ -201,23 +191,20 @@ subroutine sparse_to_dense(params)
         params%force_maxlevel_dealiasing = .false.
         params%min_treelevel = 1
 
-        call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp )
+        call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
 
         write(*,*) "coarsened to", lgt_n(tree_ID)
     endif
 
-    call saveHDF5_tree(file_out, time, iteration, 1, params, lgt_block, &
-    hvy_block, lgt_active, lgt_n, hvy_n, hvy_active, tree_ID)
+    call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
         trim(adjustl(file_in)), level, trim(adjustl(file_out))
         write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now)")') &
-        minActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n ),&
-        maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
+        minActiveLevel_tree( tree_ID ),&
+        maxActiveLevel_tree( tree_ID )
     end if
 
-    call deallocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist, hvy_tmp=hvy_tmp, hvy_n=hvy_n, lgt_n=lgt_n)
+    call deallocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 end subroutine sparse_to_dense

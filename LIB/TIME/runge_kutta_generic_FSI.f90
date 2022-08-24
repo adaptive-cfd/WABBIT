@@ -1,7 +1,6 @@
 ! Time stepper to advance coupled fluid/rigid solid system with the same order and
 ! method for both subproblems
-subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist, tree_ID)
+subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
     ! it is unfortunate but this routine breaks the encapsulation concept, as it requires to
     ! have access to the "INSECT" structure for time stepping. hence, but ACM and INSECT modules
     ! have to be loaded here.
@@ -13,8 +12,6 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
     integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
@@ -22,19 +19,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
     integer(kind=ik), intent(in)        :: tree_ID
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
 
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: j, k, hvy_id, z1, z2, g, l
@@ -70,13 +55,11 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! calculate time step
-    call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_block, &
-        lgt_active(:,tree_ID), lgt_n(tree_ID), dt)
+    call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
     ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
     ! slot after the copy of the state vector (hence 2)
-    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), &
-    hvy_mask, hvy_tmp, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID)
+    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), hvy_mask, hvy_tmp, tree_ID)
 
     ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
     call rigid_solid_rhs(time + dt*rk_coeffs(1,1), iteration, Insect%STATE, Insect%rhs(:,2), &
@@ -111,9 +94,10 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
         ! first: k_j = RHS(data_field(t) + ...
         ! loop over all active heavy data blocks
         do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
             ! first slot in hvy_work is previous time step
-            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,:,hvy_active(k,tree_ID)) = &
-            hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,:,hvy_active(k,tree_ID),1)
+            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,:,hvy_id) = &
+            hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,:,hvy_id,1)
         end do
         Insect%STATE(:) = Insect%rhs(:,1)
 
@@ -125,11 +109,12 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
 
             ! loop over all active heavy data blocks
             do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID)) = &
-                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID)) &
-                + dt * rk_coeffs(j,l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k, tree_ID), l)
+                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) = &
+                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) &
+                + dt * rk_coeffs(j,l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, l)
             end do
 
             Insect%STATE(:) = Insect%STATE(:) + dt * rk_coeffs(j,l) * Insect%rhs(:,l)
@@ -145,8 +130,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
         t = time + dt*rk_coeffs(j,1)
 
         ! computes mask from Insect%STATE, computes aerodyn forces using hvy_block, both hvy_block and Insect%STATE are updated above
-        call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor, tree_ID)
+        call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp, tree_ID)
 
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
         call rigid_solid_rhs(t, iteration, Insect%STATE, Insect%rhs(:,j+1), &
@@ -159,9 +143,10 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
     ! for the RK4 the final stage looks like this:
     ! data_field(t+dt) = data_field(t) + dt*(b1*k1 + b2*k2 + b3*k3 + b4*k4)
     do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
         ! u_n = u_n +...
-        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID)) = &
-        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID), 1)
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) = &
+        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, 1)
 
         do j = 2, size(rk_coeffs, 2)
             ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
@@ -172,9 +157,9 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, lgt_block, hvy_blo
             ! ... dt*(b1*k1 + b2*k2+ ..)
             ! rk_coeffs(size(rk_coeffs,1)) , since we want to access last line,
             ! e.g. b1 = butcher(last line,2)
-            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID)) = &
-            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID)) + &
-            dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_active(k,tree_ID), j)
+            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) = &
+            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) + &
+            dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, j)
         end do
     end do
 

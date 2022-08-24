@@ -15,6 +15,7 @@ subroutine post_dry_run
     ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
     ! to dump kinematics data.
     use module_ACM
+    use module_forestMetaData
 
     implicit none
 
@@ -23,20 +24,19 @@ subroutine post_dry_run
     real(kind=rk)                       :: t0, t1, t2       ! cpu time variables for running time calculation
     type (type_params)                  :: params           ! user defined parameter structure
 
-    integer(kind=ik), allocatable       :: lgt_block(:, :)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), allocatable       :: hvy_neighbor(:,:)
-    integer(kind=tsize), allocatable    :: lgt_sortednumlist(:, :, :)
-    integer(kind=ik), allocatable       :: lgt_active(:,:)
-    integer(kind=ik), allocatable       :: hvy_active(:,:)
-    integer(kind=ik), allocatable       :: lgt_n(:)
-    integer(kind=ik), allocatable       :: hvy_n(:)
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename,fname   ! filename of *.ini file used to read parameters
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, tree_n, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
     type(inifile) :: FILE
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     !---------------------------------------------------------------------------
     ! If called with '--help' or '-h', print a help message and exit.
@@ -134,8 +134,7 @@ subroutine post_dry_run
     call init_physics_modules( params, filename, params%N_mask_components )
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_forest(params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_mask)
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -175,18 +174,16 @@ subroutine post_dry_run
     do while ( time < params%time_max )
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
-        call createEquidistantGrid_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist,&
-        hvy_active, hvy_n, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
+        call createEquidistantGrid_tree( params, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
 
 
         if (params%rank==0) then
             write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7)') &
-            maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n), lgt_n
+            maxActiveLevel_tree(tree_ID_flow), lgt_n
         endif
 
         ! generate complete mask on the initial equidistant grid
-        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
+        call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
 
 
         ! refine the grid near the interface and re-generate the mask function.
@@ -200,26 +197,22 @@ subroutine post_dry_run
 
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
-            call refine_tree( params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, "mask-threshold", tree_ID_flow )
+            call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again
-            call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
+            call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
             Nmask = lgt_n(tree_ID_flow)
 
             ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
             ! is effectively ignored. It seems redundant; if we set a small eps (done independent
             ! of the parameter file), this yields the same result
-            call adapt_tree( time, params, lgt_block, hvy_mask, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, params%coarsening_indicator, hvy_mask )
+            call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_mask )
 
             ! on new grid, create the mask again
-            call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-            hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
+            call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
 
             ! current finest level is:
-            Jnow = maxActiveLevel_tree(lgt_block, tree_ID_flow, lgt_active, lgt_n)
+            Jnow = maxActiveLevel_tree(tree_ID_flow)
 
             if (params%rank==0) then
                 write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
@@ -232,8 +225,7 @@ subroutine post_dry_run
         enddo
 
         ! on new grid, create the mask again
-        call create_mask_tree(params, time, lgt_block, hvy_mask, hvy_mask, &
-        hvy_neighbor, hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist, .false.)
+        call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
         Nmask = lgt_n(tree_ID_flow)
 
         call WRITE_INSECT_DATA(time)
@@ -241,8 +233,7 @@ subroutine post_dry_run
         if (pruned) then
             if (params%rank==0) write(*,*) "now pruning!"
 
-            call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-            hvy_mask, hvy_active, hvy_n, hvy_neighbor, tree_ID=tree_ID_flow)
+            call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow)
         endif
 
         !***********************************************************************
@@ -253,10 +244,7 @@ subroutine post_dry_run
 
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
-        ! call saveHDF5_tree( fname, time, -99, 1, params, lgt_block, hvy_mask, lgt_active, lgt_n, hvy_n, hvy_active)
-
-        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-        lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+        call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow)
 
         !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
         !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )

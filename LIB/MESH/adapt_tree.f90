@@ -14,16 +14,13 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
     implicit none
 
     real(kind=rk), intent(in)           :: time
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
@@ -34,19 +31,6 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
     ! Optional: if the grid is not adapted to the mask, passing hvy_mask is not required.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:, :, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> coarsening indicator
     character(len=*), intent(in)        :: indicator
     !> Well, what now. The grid coarsening is an iterative process that runs until no more blocks can be
     !! coarsened. One iteration is not enough. If called without "external_loop", this routine
@@ -68,6 +52,12 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
     integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin
 
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
 
     ! start time
     t0 = MPI_Wtime()
@@ -76,8 +66,8 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     iteration = 0
     iterate   = .true.
     Jmin      = params%min_treelevel
-    Jmin_active = minActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
-    Jmax_active = maxActiveLevel_tree( lgt_block, tree_ID, lgt_active, lgt_n )
+    Jmin_active = minActiveLevel_tree(tree_ID)
+    Jmax_active = maxActiveLevel_tree(tree_ID)
     level       = Jmax_active ! algorithm starts on maximum *active* level
 
     if (present(ignore_maxlevel)) then
@@ -90,8 +80,7 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
     t0 = MPI_Wtime()
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-    lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
     call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
     !! we iterate from the highest current level to the lowest current level and then iterate further
@@ -109,32 +98,29 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
-        !! calculate detail on the entire grid. Note this is a wrapper for block_coarsening_indicator, which
+        !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
         !! acts on a single block only
         t0 = MPI_Wtime()
         if (params%threshold_mask .and. present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
-            ! as the grid changes within this routine, the mask will have to be constructed in CoarseningIndicator_tree
-            call CoarseningIndicator_tree( time, params, level, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, iteration, hvy_neighbor, ignore_maxlevel2, hvy_mask)
+            ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
         else
-            call CoarseningIndicator_tree( time, params, level, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, iteration, hvy_neighbor, ignore_maxlevel2)
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2)
         endif
-        call toc( "adapt_tree (CoarseningIndicator_tree)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
 
 
         !> (b) check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
         if (ignore_maxlevel2 .eqv. .false.) then
-            call respectJmaxJmin_tree( params, lgt_block, lgt_active, lgt_n, tree_ID )
+            call respectJmaxJmin_tree( params, tree_ID )
         endif
         call toc( "adapt_tree (respectJmaxJmin_tree)", MPI_Wtime()-t0 )
 
         !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
-        call ensureGradedness_tree( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+        call ensureGradedness_tree( params, tree_ID )
         call toc( "adapt_tree (ensureGradedness_tree)", MPI_Wtime()-t0 )
 
         !> (d) adapt the mesh, i.e. actually merge blocks
@@ -151,20 +137,17 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
             ! then it can happen that the mask is gone after executeCoarsening_tree.
             ! There is some overhead involved with keeping both structures the same, in the sense
             ! that MPI-communication is increased, if blocks on different CPU have to merged.
-            call executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID, hvy_mask )
+            call executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
         else
 
-            call executeCoarsening_tree( params, lgt_block, hvy_block, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+            call executeCoarsening_tree( params, hvy_block, tree_ID )
         endif
         call toc( "adapt_tree (executeCoarsening_tree)", MPI_Wtime()-t0 )
 
 
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
-        call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+        call updateMetadata_tree(params, tree_ID)
         call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
 
@@ -212,8 +195,7 @@ subroutine adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !! they may have passed several level also. Now, the distribution of blocks may no longer
     !! be balanced, so we have to balance load now
     t0 = MPI_Wtime()
-    call balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID )
+    call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
 

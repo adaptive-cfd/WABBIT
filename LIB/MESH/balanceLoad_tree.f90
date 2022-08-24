@@ -1,19 +1,11 @@
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
-subroutine balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID, predictable_dist)
+subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
 
     implicit none
 
     type (type_params), intent(in)      :: params                     !> user defined parameter structure
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)            !> light data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)          !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)            !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)                     !> number of active blocks (light data)
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)     !> sorted list of numerical treecodes, used for block finding
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)              !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)                     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: tree_ID
     !> if true balance the load will always give the same block distribution
     !> for the same treestructure (default is False)
@@ -28,6 +20,12 @@ subroutine balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_act
                      affinity(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
     real(kind=rk) :: t0, t1
     logical       :: is_predictable
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     ! check if argument is present or not
     is_predictable=.False.
@@ -68,9 +66,9 @@ subroutine balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! First step: define how many blocks each mpirank should have.
     !---------------------------------------------------------------------------------
     if (is_predictable) then
-       call set_desired_num_blocks_per_rank(params, opt_dist_list, lgt_n(tree_ID))
+       call set_desired_num_blocks_per_rank(params, opt_dist_list, tree_ID)
     else
-       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, lgt_n(tree_ID), hvy_n(tree_ID))
+       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, tree_ID)
     endif
 
     ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
@@ -202,15 +200,14 @@ subroutine balanceLoad_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     !---------------------------------------------------------------------------------
     ! 3rd: actual communication (send/recv)
     !---------------------------------------------------------------------------------
-    call block_xfer( params, sfc_com_list, com_i, lgt_block, hvy_block, msg="balanceLoad_tree" )
+    call block_xfer( params, sfc_com_list, com_i, hvy_block, msg="balanceLoad_tree" )
     call toc( "balanceLoad_tree (comm)", MPI_wtime()-t1 )
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     ! NOTE: an idea would be to also xfer the neighboring information (to save the updateNeighbors_tree
     ! call) but that is tricky: the neighbor list contains light ID of the neighbors, and those
     ! also change with the xfer.
-    call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
+    call updateMetadata_tree(params, tree_ID)
 
     ! timing
     call toc( "balanceLoad_tree (TOTAL)", MPI_wtime()-t0 )

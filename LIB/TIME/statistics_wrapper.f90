@@ -32,7 +32,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     Bs    = params%Bs
     g     = params%n_ghosts
 
-    call create_mask_tree(params, time, hvy_mask, hvy_tmp)
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)

@@ -17,7 +17,6 @@ program main
     use module_time_step        ! time step module
     use module_unit_test        ! unit test module
     use module_bridge_interface ! bridge implementation of wabbit
-    use module_mask
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
     ! it exists to disentangle module_forest and module_IO
     use module_saving
@@ -143,7 +142,7 @@ program main
         call unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
-    call reset_tree( params, .true., tree_ID=tree_ID_flow )
+    call reset_tree(params, .true., tree_ID=tree_ID_flow)
 
 
     !---------------------------------------------------------------------------
@@ -243,7 +242,7 @@ program main
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then
-            ! NOTE: those routines must be updated to work on the right TREEs
+            call abort(2408229, "those routines must be updated to work on the right TREEs")
             ! call send_lgt_data (params)
             ! call serve_data_request(hvy_block, hvy_tmp, params)
         endif
@@ -350,7 +349,7 @@ program main
             ! Hence the mask is created here.
             if (params%threshold_mask) then
                 ! create mask function at current time
-                call create_mask_tree(params, time, hvy_mask, hvy_tmp)
+                call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )

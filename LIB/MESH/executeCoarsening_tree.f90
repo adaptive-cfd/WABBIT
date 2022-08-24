@@ -1,17 +1,13 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    ! It can be useful to simultaneously coarsen more than one array, in most cases this
-    ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
-    ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
@@ -85,14 +81,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
     enddo
 
     ! actual xfer
-    if (present(hvy_mask)) then
-        ! It can be useful to simultaneously coarsen more than one array, in most cases this
-        ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
-        ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-        call block_xfer( params, xfer_list, n_xfer, hvy_block, hvy_mask, msg="executeCoarsening_tree" )
-    else
-        call block_xfer( params, xfer_list, n_xfer, hvy_block, msg="executeCoarsening_tree" )
-    endif
+    call block_xfer( params, xfer_list, n_xfer, hvy_block )
 
     ! the active lists are outdates after the transfer: we need to create
     ! them or findSisters_tree will not be able to do its job
@@ -114,15 +103,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
             ! Then only the responsible rank will perform the heavy data merging.
             call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
             ! note the newly merged block has status 0
-
-            if (present(hvy_mask)) then
-                ! It can be useful to simultaneously coarsen more than one array, in most cases this
-                ! will be the flow grid and a penalization mask. Thus, if hvy_mask is present, the same
-                ! coarsening will be applied to it. If it is not present, we just coarsen one grid (the usual hvy_block)
-                call merge_blocks( params, hvy_block, light_ids(1:N), hvy_mask )
-            else
-                call merge_blocks( params, hvy_block, light_ids(1:N) )
-            endif
+            call merge_blocks( params, hvy_block, light_ids(1:N) )
         endif
     enddo
 end subroutine executeCoarsening_tree

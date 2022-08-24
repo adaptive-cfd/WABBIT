@@ -13,7 +13,7 @@
 ! performance is better. note you have to wait somewhere! always!
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
-subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
+subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     implicit none
 
     !> user defined parameter structure
@@ -23,11 +23,6 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
     integer(kind=ik), intent(in)        :: N_xfers
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> sometimes, it may be useful to perform the same xfer on multiple inputs, in
-    !! which case you can pass a second heavy data array. this is for example used to
-    !! simultaneously coarsen the flow grid and the corresponding mask grid.
-    !! Note the secondary array can have different #components.
-    real(kind=rk), intent(inout), optional :: hvy_block2(:, :, :, :, :)
     character(len=*), intent(in), optional :: msg
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
@@ -55,8 +50,6 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
     source_block_deleted = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
-
-    if (present(hvy_block2)) npoints2 = size(hvy_block2,1)*size(hvy_block2,2)*size(hvy_block2,3)*size(hvy_block2,4)
 
     Nxfer_done = 0
     Nxfer_total = N_xfers
@@ -120,18 +113,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
 
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
 
-            if (present(hvy_block2)) then
-                ireq = ireq + 1
-                tag = 2*k+1 ! recall tag must be unique..
-
-                ! open channel to receive one block.
-                call MPI_irecv( hvy_block2(:,:,:,:,hvy_id_new), npoints2, MPI_DOUBLE_PRECISION, mpirank_sender, &
-                tag, WABBIT_COMM, requests(ireq), ierr)
-
-                if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
-            endif
-
-            ! Am I the owner of this block, so will I have to send data?
+        ! Am I the owner of this block, so will I have to send data?
         elseif (myrank == mpirank_sender) then
             !-------------------------------------------------------------------
             ! SEND CASE
@@ -149,16 +131,6 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, hvy_block2, msg )
 
             if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
 
-            if (present(hvy_block2)) then
-                ireq = ireq + 1
-                tag = 2*k+1 ! recall tag must be unique..
-                ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
-                ! we have to wait for the MPI_REQUEST to be finnished.
-                call MPI_isend( hvy_block2(:,:,:,:,hvy_id), npoints2, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
-                WABBIT_COMM, requests(ireq), ierr)
-
-                if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
-            endif
         endif
 
         ! AVOID race condition:

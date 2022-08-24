@@ -16,7 +16,6 @@ module module_saving
     ! actual storing and reading of HDF5 files:
     use module_IO
     use module_helpers, only : check_file_exists, block_contains_NaN
-    use module_mask
     use module_forestMetaData
 
     implicit none

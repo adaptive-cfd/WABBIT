@@ -312,7 +312,7 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
 
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif

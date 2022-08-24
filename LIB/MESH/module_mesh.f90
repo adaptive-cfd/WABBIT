@@ -30,6 +30,7 @@ contains
 
     ! create all active (lgt/hvy) lists, create also sorted lgt data list
 #include "create_active_and_sorted_lists.f90"
+#include "createMask_tree.f90"
 
 #include "block_xfer_nonblocking.f90"
 

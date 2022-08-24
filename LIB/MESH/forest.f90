@@ -337,7 +337,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             ! only the interface is very important, interior blocks are dictated by
             ! gradedness. Hence: assuming that the fluid/solid interface is always
             ! on the finest level, only a refinement in the interior is possible (and
-            ! not a coarsening) => look for sister blocks on higher levels
+            ! not a coarsening) => look for sister blocks on higher levels (refined)
 
             ! find all sister blocks and add 1 to them. no xfer required.
             treecode1 = treecode2int( lgt_block(lgt_id1, 1:level1) )

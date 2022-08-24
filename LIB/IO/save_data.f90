@@ -41,9 +41,9 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     n_domain = 0
 
     ! create mask function at current time. (this routine is rarely called and thus
-    ! the overhead of calling create_mask_tree if the mask is not stored is supposed
+    ! the overhead of calling createMask_tree if the mask is not stored is supposed
     ! to be small)
-    call create_mask_tree(params, time, hvy_mask, hvy_tmp)
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
 
     ! preparatory step. The physics modules have to copy everything they want to

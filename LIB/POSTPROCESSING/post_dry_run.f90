@@ -11,7 +11,6 @@ subroutine post_dry_run
     use module_time_step
     use module_unit_test
     use module_bridge_interface     ! bridge implementation of wabbit
-    use module_mask
     ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
     ! to dump kinematics data.
     use module_ACM
@@ -81,7 +80,8 @@ subroutine post_dry_run
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
 
-
+    ! This number is the maximum number of vector components that can be syn'ced by
+    ! sync_ghosts routine
     N_MAX_COMPONENTS = 6
 
 
@@ -183,7 +183,7 @@ subroutine post_dry_run
         endif
 
         ! generate complete mask on the initial equidistant grid
-        call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
+        call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
 
 
         ! refine the grid near the interface and re-generate the mask function.
@@ -200,7 +200,7 @@ subroutine post_dry_run
             call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again
-            call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
             Nmask = lgt_n(tree_ID_flow)
 
             ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
@@ -209,7 +209,7 @@ subroutine post_dry_run
             call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_mask )
 
             ! on new grid, create the mask again
-            call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
 
             ! current finest level is:
             Jnow = maxActiveLevel_tree(tree_ID_flow)
@@ -225,7 +225,7 @@ subroutine post_dry_run
         enddo
 
         ! on new grid, create the mask again
-        call create_mask_tree(params, time, hvy_mask, hvy_mask, .false.)
+        call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
         Nmask = lgt_n(tree_ID_flow)
 
         call WRITE_INSECT_DATA(time)

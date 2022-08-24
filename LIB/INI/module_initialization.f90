@@ -8,7 +8,6 @@ module module_initialization
     ! to set the initial condition depending on pysics, we have to include them here
     use module_physics_metamodule
 
-    use module_mask
     use module_treelib
     use module_forestMetaData
 

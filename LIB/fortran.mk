@@ -20,7 +20,7 @@ MFILES = module_precision.f90 module_forestMetaData.f90 module_globals.f90 modul
 	module_bridge.f90 module_navier_stokes_params.f90 module_helpers.f90 module_insects_integration_flusi_wabbit.f90 \
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
-	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90 module_mask.f90 \
+	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
 	module_t_files.f90 module_saving.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
@@ -216,11 +216,6 @@ $(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJD
 $(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mask.o: module_mask.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_physics_metamodule.o \
-	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_params.o \
-	$(OBJDIR)/module_IO.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -265,7 +260,7 @@ $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mask.o \
+	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o  \
 	setInitialCondition_tree.f90 setInicondBlocks_tree.f90 $(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -277,7 +272,7 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_mpi.o \
 	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
 	calculate_time_step.f90 timeStep_tree.f90 RHS_wrapper.f90	 \
-	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90 $(OBJDIR)/module_mask.o $(OBJDIR)/module_treelib.o \
+	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90  $(OBJDIR)/module_treelib.o \
 	runge_kutta_generic.f90 runge_kutta_generic_FSI.f90 runge_kutta_chebychev.f90 runge_kutta_chebychev_FSI.f90 $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -299,7 +294,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 \
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 coarseningIndicator_tree.f90 \
 	createEquidistantGrid_tree.f90 createRandomGrid_tree.f90 allocate_forest.f90 reset_tree.f90 block_xfer_nonblocking.f90 \
-	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90
+	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90 createMask_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
@@ -328,7 +323,7 @@ $(OBJDIR)/module_forestMetaData.o: module_forestMetaData.f90 $(OBJDIR)/module_pr
 
 $(OBJDIR)/module_saving.o: module_saving.f90 \
 	$(OBJDIR)/module_IO.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mesh.o \
-	save_data.f90 $(OBJDIR)/module_mask.o
+	save_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90 $(OBJDIR)/module_IO.o \

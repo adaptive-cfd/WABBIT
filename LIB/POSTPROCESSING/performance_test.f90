@@ -10,7 +10,6 @@ subroutine performance_test(params)
     use module_time_step
     use module_unit_test
     use module_bridge_interface ! bridge implementation of wabbit
-    use module_mask
     use module_forestMetaData
 
     implicit none

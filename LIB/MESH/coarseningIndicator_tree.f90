@@ -72,6 +72,17 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
+    ! construct mask function, if it is used as secondary criterion. This criterion
+    ! ensures that regions with gradients in the mask function (the fluid/solid interface)
+    ! are not coarsened (except in the "dealiasing step", because all blocks on Jmax are coarsened)
+    if (params%threshold_mask .and. present(hvy_mask).and. indicator/="everywhere" .and. indicator/="random") then
+        ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
+        ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
+        ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
+        call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    endif
+
+
     ! the indicator primary-variables is for compressible Navier-Stokes and first
     ! converts the actual state vector to "traditional" quantities (the primary variables)
     ! and then applies thresholding to that. The result is stored in hvy_tmp

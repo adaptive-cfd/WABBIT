@@ -150,7 +150,7 @@ subroutine rhs_operator_reconstruction(params)
 
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
-        call adapt_tree( time, params, hvy_block, tree_ID_u, "everywhere", hvy_tmp, external_loop=.true. )
+        call adapt_tree( time, params, hvy_block, tree_ID_u, "everywhere", hvy_tmp )
 
     endif
 

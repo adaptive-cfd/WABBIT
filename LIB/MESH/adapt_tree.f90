@@ -14,7 +14,7 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_mask, ignore_maxlevel)
 
     implicit none
 
@@ -32,14 +32,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Optional: if the grid is not adapted to the mask, passing hvy_mask is not required.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     character(len=*), intent(in)        :: indicator
-    !> Well, what now. The grid coarsening is an iterative process that runs until no more blocks can be
-    !! coarsened. One iteration is not enough. If called without "external_loop", this routine
-    !! performs this loop until it is converged. In some situations, this might be undesired, and
-    !! the loop needs to be outsourced to the calling routine. This happens currently (07/2019)
-    !! only in the initial condition, where the first grid can be so coarse that the inicond is different
-    !! only on one point, which is then completely removed (happens for a mask function, for example.)
-    !! if external_loop=.true., only one iteration step is performed.
-    logical, intent(in), optional       :: external_loop
     ! during mask generation it can be required to ignore the maxlevel coarsening....life can suck, at times.
     logical, intent(in), optional       :: ignore_maxlevel
 
@@ -101,7 +93,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
         !! acts on a single block only
         t0 = MPI_Wtime()
-        if (params%threshold_mask .and. present(hvy_mask)) then
+        if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
             call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
@@ -125,23 +117,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
-        if (params%threshold_mask .and. present(hvy_mask)) then
-            ! if the mask function is used as secondary coarsening criterion, we also pass the mask data array.
-            ! the idea is that now coarse-mesh will keep both hvy_block and hvy_mask on the same grid, i.e.
-            ! the same coarsening is applied to both. the mask does not have to be re-created here, because
-            ! regions with sharp gradients (that's where the mask is interesting) will remain unchanged
-            ! by the coarsening function.
-            ! This is not entirely true: often, adapt_tree is called after refine_tree, which pushes the grid
-            ! to Jmax. If the dealiasing function is on (params%force_maxlevel_dealiasing=.true.), the coarsening
-            ! has to go down one level. If the mask is on Jmax on input and yet still poorly resolved (say, only one point nonzero)
-            ! then it can happen that the mask is gone after executeCoarsening_tree.
-            ! There is some overhead involved with keeping both structures the same, in the sense
-            ! that MPI-communication is increased, if blocks on different CPU have to merged.
-            call executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask )
-        else
-
-            call executeCoarsening_tree( params, hvy_block, tree_ID )
-        endif
+        call executeCoarsening_tree( params, hvy_block, tree_ID )
         call toc( "adapt_tree (executeCoarsening_tree)", MPI_Wtime()-t0 )
 
 
@@ -149,12 +125,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         t0 = MPI_Wtime()
         call updateMetadata_tree(params, tree_ID)
         call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
-
-
-        ! see description above in argument list.
-        if (present(external_loop)) then
-            if (external_loop) exit ! exit loop
-        endif
 
         iteration = iteration + 1
         level = level - 1

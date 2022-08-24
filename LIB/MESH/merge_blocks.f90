@@ -9,12 +9,11 @@
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
-subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, hvy_mask )
+subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
-    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)         !> list of blocks to merge, can contain 4 or 8 blocks
     real(kind=rk), ALLOCATABLE, save    :: tmpblock(:,:,:,:)
     integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
@@ -212,42 +211,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, hvy_mask )
                 hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
             endif
         endif
-
-        ! for decimation of the mask function, hartens multiresolution is appropriate.
-        ! (this is used for indicator functions only, during the adaptation step)
-        if (present(hvy_mask)) then
-            if (N_merge == 4) then
-                ! ************ 2D case ***********************
-                ! sister 0
-                hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(1) )
-                ! sister 1
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(2) )
-                ! sister 2
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(3) )
-                ! sister 3
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(4) )
-            elseif (N_merge == 8) then
-                ! ************ 3D case ***********************
-                ! sister 0
-                hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
-                ! sister 1
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
-                ! sister 2
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
-                ! sister 3
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
-                ! sister 4
-                hvy_mask(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(5) )
-                ! sister 5
-                hvy_mask(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(6) )
-                ! sister 6
-                hvy_mask(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(7) )
-                ! sister 7
-                hvy_mask(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_mask( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(8) )
-            endif
-        endif
-
-    end if
+    endif
 
     ! merging is complete now, remove the original blocks from light data:
     do i = 1, N_merge

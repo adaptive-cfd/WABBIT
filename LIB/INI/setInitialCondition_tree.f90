@@ -68,18 +68,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                lgt_n_tmp = -99
-                ! what happens on very coarse grids is that the first coarsening interation (internal to adapt_tree) removes
-                ! the mask completely... This is because we do not currently reconstruct the mask inside this iteration loop (to avoid overhead)
-                ! we therefore outsource the iteration loop here. (argument external_loop to adapt_tree)
-
-                do while ( lgt_n_tmp /= lgt_n(tree_ID) )
-                    lgt_n_tmp = lgt_n(tree_ID)
-
-                    call create_mask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.true. )
-
-                    call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
-                enddo
+                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
             else
                 call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp )
             endif
@@ -163,18 +152,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        lgt_n_tmp = -99
-                        ! what happens on very coarse grids is that the first coarsening interation removes
-                        ! the mask completely...
-                        ! we therefore outsource the iteration loop here. (argument external_loop to
-                        ! adapt_tree). This loop iterates until the grid does no longer change, then lgt_n_tmp = lgt_n(tree_ID)
-                        do while ( lgt_n_tmp /= lgt_n(tree_ID) )
-                            lgt_n_tmp = lgt_n(tree_ID)
-
-                            call create_mask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.true. )
-
-                            call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask, external_loop=.true. )
-                        enddo
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask )
                     else
                         call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp )
                     endif

@@ -42,8 +42,8 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     ! create mask function at current time
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()
-    call create_mask_tree(params, time, hvy_mask, hvy_tmp)
-    call toc( "RHS_wrapper::create_mask_tree", MPI_wtime()-t1 )
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
+    call toc( "RHS_wrapper::createMask_tree", MPI_wtime()-t1 )
 
 
     !-------------------------------------------------------------------------

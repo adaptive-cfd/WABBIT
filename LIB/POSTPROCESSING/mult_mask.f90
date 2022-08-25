@@ -2,7 +2,6 @@ subroutine mult_mask(params)
     use module_precision
     use module_mesh
     use module_params
-    use module_IO
     use module_mpi
     use module_operators
     use module_physics_metamodule

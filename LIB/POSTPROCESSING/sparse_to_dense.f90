@@ -2,7 +2,6 @@ subroutine sparse_to_dense(params)
     use module_precision
     use module_mesh
     use module_params
-    use module_IO
     use module_mpi
     use module_globals
     use module_forestMetaData

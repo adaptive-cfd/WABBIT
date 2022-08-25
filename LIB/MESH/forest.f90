@@ -20,7 +20,7 @@ subroutine prune_tree( params, hvy_block, tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, rank, N )
 
-            ! pruning condition: all entries of the block are small
+            ! pruning condition: all entries of the block are zero (or below)
             if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
                 ! pruning: delete the block from the tree
                 lgt_block(lgt_id, :) = -1_ik
@@ -36,7 +36,7 @@ subroutine prune_tree( params, hvy_block, tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, rank, N )
 
-            ! pruning condition: all entries of the block are small
+            ! pruning condition: all entries of the block are zero (or below)
             if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
                 ! pruning: delete the block from the tree
                 lgt_block(lgt_id, :) = -1_ik
@@ -52,9 +52,9 @@ subroutine prune_tree( params, hvy_block, tree_ID)
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     call createActiveSortedLists_forest(params)
+    ! do not call updateNeighbors_tree on the pruned tree..
 
     if (rank==0) write(*,'("Tree-pruning, pruned to Nb=",i7)') lgt_n(tree_ID)
-    ! do not call updateNeighbors_tree on the pruned tree..
 end subroutine
 
 !---------------------------------------------------------------------------------
@@ -256,6 +256,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
         lgt_id1 = lgt_active(k, tree_ID_pruned)
         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
 
+        ! do we find the treecode of the pruned tree-block in the full grid?
         call doesBlockExist_tree( lgt_block(lgt_id1, 1:level1), exists, lgt_id2, tree_ID_full)
 
         if (exists) then
@@ -278,15 +279,17 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     ! Step 1b: actual xfer.
     call block_xfer( params, comm_list, n_comm, hvy_block )
 
+    ! As some blocks have been transferred, the active lists are outdated.
+    call createActiveSortedLists_tree(params, tree_ID_pruned)
+
     ! since we have moved some blocks around, not only the active lists are outdated
     ! but also the neighbor relations. Of course, pruned trees are incomplete, so
     ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
     ! it.
     call updateMetadata_tree(params, tree_ID_full)
 
-
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
-    ! same mpirank. therefore, the responsible rank can just add them together.
+    ! same mpirank. therefore, the responsible mpirank can just add them together.
     do k = 1, hvy_n(tree_ID_pruned)
 
         hvy_id1  = hvy_active(k, tree_ID_pruned)
@@ -352,7 +355,6 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
                     if (params%rank == rank_full) then
                         call lgt2hvy( hvy_id2, lgt_id2, rank_full, N)
-                        ! hvy_block(:,:,:,1,hvy_id2) = hvy_block(:,:,:,1,hvy_id2) + 1.0_rk
                         hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id1)
                     endif
                 endif

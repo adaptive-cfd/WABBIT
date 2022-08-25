@@ -10,8 +10,6 @@
 !           save this interpolated slice
 
 subroutine post_extract_slice(params)
-
-    use module_IO
     use module_precision
     use module_params
     use module_mesh

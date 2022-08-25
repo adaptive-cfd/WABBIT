@@ -3,7 +3,6 @@ subroutine rhs_operator_reconstruction(params)
     use module_precision
     use module_mesh
     use module_params
-    use module_IO
     use module_mpi
     use module_acm
     use module_time_step

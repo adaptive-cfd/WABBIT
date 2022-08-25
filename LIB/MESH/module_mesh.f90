@@ -4,6 +4,7 @@
 module module_mesh
 
     use mpi
+    use module_hdf5_wrapper
     use module_forestMetaData
     use module_params               ! global parameters
     use module_timing               ! debug module
@@ -11,9 +12,9 @@ module module_mesh
     ! use MPI module, since threshold_block needs to synch ghosts
     use module_MPI
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
-    use module_operators, only: component_wise_tree_norm
+    use module_operators
     ! used in executeCoarsening_tree
-    use module_helpers, only: most_common_element
+    use module_helpers
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
     use module_physics_metamodule
@@ -28,7 +29,9 @@ module module_mesh
 
 contains
 
-    ! create all active (lgt/hvy) lists, create also sorted lgt data list
+#include "InputOutput_Flusi.f90"
+#include "InputOutput.f90"
+
 #include "create_active_and_sorted_lists.f90"
 #include "createMask_tree.f90"
 

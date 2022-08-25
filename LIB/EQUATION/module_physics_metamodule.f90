@@ -66,6 +66,7 @@ contains
 
         case ('navier_stokes')
             call create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
+            
         case default
             call abort(1212,'unknown physics...say whaaat?')
 

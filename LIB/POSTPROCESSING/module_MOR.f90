@@ -9,9 +9,9 @@ module module_MOR
     use module_precision
     use module_globals
     use module_params
-    use module_IO
     use module_helpers
     use module_forestMetaData
+    use module_mesh
 
     implicit none
 

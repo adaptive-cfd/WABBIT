@@ -13,7 +13,6 @@ program main
     use module_initialization   ! init data module
     use module_mesh             ! mesh manipulation subroutines
     use module_forestMetaData
-    use module_IO               ! IO module
     use module_time_step        ! time step module
     use module_unit_test        ! unit test module
     use module_bridge_interface ! bridge implementation of wabbit

@@ -14,7 +14,6 @@ module module_saving
     ! use physics modules to save the data
     use module_physics_metamodule
     ! actual storing and reading of HDF5 files:
-    use module_IO
     use module_helpers, only : check_file_exists, block_contains_NaN
     use module_forestMetaData
 

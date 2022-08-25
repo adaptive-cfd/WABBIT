@@ -3,7 +3,6 @@ subroutine post_filtertest(params)
     use module_precision
     use module_mesh
     use module_params
-    use module_IO
     use module_mpi
     use module_bridge_interface, only : initialize_communicator
     use module_time_step, only: filter_wrapper

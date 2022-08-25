@@ -6,7 +6,6 @@ subroutine flusi_to_wabbit(params)
     use module_precision
     use module_mesh
     use module_params
-    use module_IO
     use mpi
     use module_MPI
     use module_forestMetaData

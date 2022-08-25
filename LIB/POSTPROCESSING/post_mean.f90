@@ -1,5 +1,4 @@
 subroutine post_mean(params)
-    use module_IO
     use module_precision
     use module_params
     use module_mesh

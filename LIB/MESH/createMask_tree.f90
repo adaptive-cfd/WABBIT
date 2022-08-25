@@ -1,15 +1,9 @@
-! because its a fucking forest operation
-! it cannot go to module mesh
-! mesh CANNOT CALL forest routines
-
-! ==> hence the adapt-mesh also coarsens the mask (instead of recomputing it)
-
 subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! to test update insect here (HACK)
     use module_ACM
     implicit none
 
-    type (type_params), intent(in)         :: params                        !> user defined parameter structure
+    type (type_params), intent(in)         :: params
     real(kind=rk), intent(in)              :: time
     real(kind=rk), intent(inout)           :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
@@ -66,7 +60,8 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     !     NOTE: expensive mask functions should always use mask_thresholding.
     ! (3) force_all
     !     Sometimes we know that the pruned-trees will not work, specifically during the initial condition.
-    !     In this case, we force the code to generate all parts of the mask.
+    !     In this case, we force the code to generate all parts of the mask. NB: as of 08/2022, even in the
+    !     initial condition, pruned trees are used.
     !-----------------------------------------------------------------------
     if ((Jactive < Jmax-1) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
         ! generate complete mask (may be expensive)
@@ -141,10 +136,9 @@ end subroutine
 
 
 subroutine createCompleteMaskDirect_tree(params, time, hvy_mask)
-
     implicit none
 
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     real(kind=rk), intent(in)           :: time
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     integer :: k, hvy_id, Bs(1:3), g, lgt_id
@@ -172,10 +166,9 @@ end subroutine
 
 
 subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
-
     implicit none
 
-    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     real(kind=rk), intent(in)           :: time
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
@@ -213,7 +206,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     do iter = 1, Jmax - Jmin
         ! synchronization before refinement (because the interpolation takes place on the extended blocks
         ! including the ghost nodes)
-        ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
+        ! Note: at this point he grid is rather coarse (fewer blocks), and the sync step is rather cheap.
         ! Snyc'ing becomes much more expensive once the grid is refined.
         ! sync possible only before pruning
         call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
@@ -222,6 +215,10 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
         ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
         ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
         call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_mask )
+        
+        ! if its mask-anynonzero, then the grid is refined inside the body. however, this is not what we assume
+        ! in the add-pruned-tree: blocks on the actual grid are then coarser than in the pruned one, and still all 0
+        ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_mask )
 
 
         if (params%rank==0) then
@@ -255,6 +252,8 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
             maxActiveLevel_tree(tree_ID_mask), lgt_n(tree_ID_mask), lgt_n
         endif
     enddo
+
+    ! call saveHDF5_tree('timeindepmasknoprung_0000000001.h5', time, 0_ik, 1, params, hvy_mask, tree_ID_mask)
 
     ! required strictly speaking only if we intent to save TREE_ID_MASK separately to disk.
     ! is called only once so performance does not matter here.

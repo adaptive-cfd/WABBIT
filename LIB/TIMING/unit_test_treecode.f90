@@ -1,6 +1,5 @@
 subroutine unit_test_treecode( params )
 
-use module_IO
 use module_treelib
 
     implicit none

@@ -177,8 +177,8 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
 
             ! save this send+receive operation in the list of planned communications
             ! column
-            !    1     sender proc
-            !    2     receiver proc
+            !    1     sender mpirank
+            !    2     receiver mpirank
             !    3     block light data id
             com_i = com_i + 1
             sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank

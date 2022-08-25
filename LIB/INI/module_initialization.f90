@@ -3,8 +3,6 @@ module module_initialization
     use module_params
     use module_timing
     use module_mesh
-    ! read routines
-    use module_IO
     ! to set the initial condition depending on pysics, we have to include them here
     use module_physics_metamodule
 

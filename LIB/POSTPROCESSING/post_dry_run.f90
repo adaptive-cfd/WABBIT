@@ -7,7 +7,6 @@ subroutine post_dry_run
     use module_timing
     use module_initialization       ! init data module
     use module_mesh                 ! mesh manipulation subroutines
-    use module_IO
     use module_time_step
     use module_unit_test
     use module_bridge_interface     ! bridge implementation of wabbit
@@ -178,8 +177,8 @@ subroutine post_dry_run
 
 
         if (params%rank==0) then
-            write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7)') &
-            maxActiveLevel_tree(tree_ID_flow), lgt_n
+            write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7," time=",g12.4)') &
+            maxActiveLevel_tree(tree_ID_flow), lgt_n(tree_ID_flow), time
         endif
 
         ! generate complete mask on the initial equidistant grid
@@ -197,6 +196,7 @@ subroutine post_dry_run
 
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
+            ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
             call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again

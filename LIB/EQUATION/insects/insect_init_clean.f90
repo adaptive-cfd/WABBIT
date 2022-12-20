@@ -86,6 +86,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! determine whether the second pair of wings is present
     call read_param_mpi(PARAMS,"Insects","LeftWing2",Insect%LeftWing2,"no")
     call read_param_mpi(PARAMS,"Insects","RightWing2",Insect%RightWing2,"no")
+
     if ( ( Insect%LeftWing2 == "yes" ) .or. ( Insect%RightWing2 == "yes" ) ) then
         Insect%second_wing_pair = .true.
     else
@@ -308,7 +309,13 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! NOTE: 05/2020 Thomas, I changed the default back to local.
     call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
     call read_param_mpi(PARAMS,"Insects","C_smooth",Insect%C_smooth,1.0d0)
+    ! when using CT data, code computes the mask function in a shell around fluid-solid interface.
+    ! The tickness of the shell is not a critical parameter, but it affects performance. Thicker shell
+    ! means more points and thus more comput effort. It is given in multiples of C_smooth, that means
+    ! shell_thickness = C_shell_thickness * C_smooth * dx_min
+    call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness,5.0d0)
 
+    Insect%dx_reference = dx_reference
     Insect%smooth = Insect%C_smooth*dx_reference
     Insect%safety = 3.5d0*Insect%smooth
 

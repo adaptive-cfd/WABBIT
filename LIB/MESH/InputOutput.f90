@@ -362,7 +362,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     enddo
 
     ! will the file fit in the allocated memory?
-    if (NblocksFile > size(hvy_block,5)) then
+    if (NblocksFile > size(hvy_block,5)*number_procs) then
         call abort(2408223, "The file we read is larger than the allocated array!")
     endif
 

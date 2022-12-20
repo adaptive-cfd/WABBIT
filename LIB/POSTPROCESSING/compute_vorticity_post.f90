@@ -142,9 +142,9 @@ subroutine compute_vorticity_post(params)
 
     ! read input data
     if (params%dim == 3) then
-        call readHDF5vct_tree( (/file_ux, file_uy/), params, hvy_block, tree_ID)
-    else
         call readHDF5vct_tree( (/file_ux, file_uy, file_uz/), params, hvy_block, tree_ID)
+    else
+        call readHDF5vct_tree( (/file_ux, file_uy/), params, hvy_block, tree_ID)
     end if
 
     ! create lists of active blocks (light and heavy data)

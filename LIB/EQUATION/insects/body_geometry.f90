@@ -95,6 +95,9 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     case ("bumblebee")
         call draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
 
+    case ("emundus")
+        call draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
+
     case ("paratuposa_simple")
         call draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
 
@@ -367,6 +370,161 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     endif
 
 end subroutine draw_body_bumblebee
+
+
+
+! The eretmocerus mundus body model is actually just a minor modification of the
+! "drosophila_maeda" body shape (note there is also a "slim" version of that, but this
+! guy is too slim)
+subroutine draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
+    implicit none
+
+    type(diptera),intent(inout) :: Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+
+    integer :: ix,iy,iz
+    real(kind=rk) :: x,y,z,s,s1, a_body, R,R0,R_tmp,x1, a_body0
+    real(kind=rk) :: x_glob(1:3),x_body(1:3),x_head(1:3)
+    real(kind=rk) :: rbc,thbc1,thbc2,x0bc,z0bc,xcs,zcs
+    real(kind=rk) :: xx_head,zz_head,dx_head,dz_head,a_head
+    real(kind=rk)   :: M_body(1:3,1:3)
+    integer(kind=2) :: color_body
+
+    color_body = Insect%color_body
+    M_body     = Insect%M_body
+
+
+    !-----------------------------------------------------------------------------
+    ! Body
+    !-----------------------------------------------------------------------------
+    a_body0 = 1.0d0
+
+    do iz = g, size(mask,3)-1-g
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+        do iy = g, size(mask,2)-1-g
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+            do ix = g, size(mask,1)-1-g
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! x_body is in the body coordinate system
+                x_body = matmul(M_body,x_glob)
+
+                ! ------------------------------------
+                ! approximation to mesh from Maeda
+                ! similar to Aono et al.
+                ! ------------------------------------
+                x = x_body(1)
+                y = x_body(2)
+                z = x_body(3)
+
+                ! symmetry plane is xz
+                ! +x direction is forward
+                ! body centerline is an arc with center at x0bc,y0bc
+                ! radius rbc and angles th counted from negative z
+                rbc = 0.9464435146443515d0
+                thbc1 = 112.0d0 *pi/180.0d0
+                thbc2 = 53.0d0 *pi/180.0d0
+                x0bc = -0.24476987447698745d0
+                z0bc = -0.9301255230125524d0
+
+                ! chordwise dimensionless coordinate, from head to abdomen
+                s = (datan2(z-z0bc,-(x-x0bc))-thbc1)/(thbc2-thbc1)
+                ! body center coordinates at s
+                xcs = x0bc + (x-x0bc)*rbc/dsqrt((x-x0bc)**2+(z-z0bc)**2)
+                zcs = z0bc + (z-z0bc)*rbc/dsqrt((x-x0bc)**2+(z-z0bc)**2)
+
+                ! check if inside body bounds (in s-direction)
+                if ( (s>=-Insect%safety) .and. (s<=1.075d0+Insect%safety) ) then
+                    R0 = 0.0d0
+                    a_body = a_body0
+                    ! distortion of s
+                    s1 = 1.0d0 - ( s + 0.08d0*dtanh(30.0d0*s) ) / (1.0d0+0.08d0*dtanh(30.0d0))
+                    s1 = ( s1 + 0.04d0*dtanh(60.0d0*s1) ) / (1.0d0+0.04d0*dtanh(60.0d0))
+
+                    ! s1 = ( dsin(1.2d0*s1)/dsin(1.2d0) )**1.25
+                    s1 = dsin(1.2d0*s1)/dsin(1.2d0)
+                    s1 = sign(abs(s1)**1.25,s1)
+
+                    x1 = 1.075d0 * s1
+                    ! compute radius as a function of x1 (counting from the tail on)
+                    ! same shape as 'drosophila'
+                    if (x1 < 0.6333d0) then
+                        ! we're in the ABDOMEN
+                        R0 = max( -1.2990d0*x1**2 + 0.9490d0*x1 + 0.0267d0, 0.d0)
+                    elseif ((x1 >= 0.6333d0) .and. (x1 <=1.075d0 )) then
+                        ! we're in the THORAX
+                        R0 = max( -2.1667d0*x1**2 + 3.4661d0*x1 - 1.2194d0, 0.d0)
+                        ! slim body
+                        if (Insect%BodyType == 'drosophila_slim') &
+                        a_body = 1.09d0-0.19d0*(x1-0.6333d0)*(x1-1.075d0)/0.0488d0
+                    endif
+                    ! distortion of R0
+                    R0 = 0.8158996d0 * (1.0d0+0.6d0*(1.0d0-s)**2) * R0
+                    ! distance to the body center at s
+                    R = dsqrt( (x-xcs)**2 + (a_body*y)**2 + (z-zcs)**2 )
+
+                    ! smoothing
+                    if (( R < R0 + Insect%safety ).and.(R0>0.d0)) then
+                        R_tmp = steps(R,R0, Insect%smooth)
+                        mask(ix,iy,iz)= max( R_tmp , mask(ix,iy,iz) )
+                        mask_color(ix,iy,iz) = color_body
+                    endif
+
+                endif
+            enddo
+        enddo
+    enddo
+
+    !-----------------------------------------------------------------------------
+    ! Head
+    !-----------------------------------------------------------------------------
+    a_head = 1.0d0
+
+    ! ellipsoid head, assumes xc_head=0 in .ini file
+    xx_head = 0.17d0
+    zz_head = 0.0d0 !-0.1
+    dx_head = 0.5d0 * 0.185d0
+    dz_head = 0.5d0 * 0.27d0
+
+    do iz = g, size(mask,3)-1-g
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
+        do iy = g, size(mask,2)-1-g
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
+            do ix = g, size(mask,1)-1-g
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
+                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! x_body is in the body coordinate system
+                x_body = matmul(M_body,x_glob)
+                x_head   = x_body
+
+                ! check if inside the surrounding box (save comput. time)
+                if ( dabs(x_head(2)) <= dz_head + Insect%safety ) then
+                    if ( dabs(x_head(3)-zz_head) <= dz_head + Insect%safety ) then
+                        ! check for length inside ellipsoid:
+                        if ( dabs(x_head(1)-xx_head) < dx_head + Insect%safety ) then
+
+                            R  = dsqrt ( (a_head*x_head(2))**2 + (x_head(3)-zz_head)**2 )
+                            ! this gives the R(x) shape
+                            if ( ((x_head(1)-xx_head)/dx_head)**2 <= 1.d0) then
+                                R0 = dz_head*dsqrt(1.d0- ((x_head(1)-xx_head)/dx_head)**2 )
+                                if ( R < R0 + Insect%safety ) then
+                                    mask(ix,iy,iz)= max(steps(R,R0, Insect%smooth),mask(ix,iy,iz))
+                                    mask_color(ix,iy,iz) = color_body
+                                endif
+                            endif
+                        endif
+                    endif
+                endif
+
+
+            enddo
+        enddo
+    enddo
+
+end subroutine draw_body_emundus
 
 !------------------------------------------------------------------------------
 ! A very small bug Paratuposa, highly simplified body shape
@@ -1535,8 +1693,9 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     real(kind=rk), dimension(1:3) :: vertex2_normal, vertex3_normal, face_normal, edge1_normal, edge2_normal, edge3_normal
     real(kind=rk) :: M_body(1:3,1:3), M_body_inv(1:3,1:3)
     real(kind=rk) :: scale, origin(1:3), tmp, x, y, z
-    real(kind=rk) :: x_glob(1:3), x_body(1:3)
+    real(kind=rk) :: x_glob(1:3), x_body(1:3), signed_distance, shell_thickness, shell_thickness_safe
     character(len=clong) :: fname_stl
+    logical :: informed = .false.
 
     color_body = Insect%color_body
     M_body     = Insect%M_body
@@ -1553,9 +1712,23 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     Bs(3) = size(mask,3) - 2*g
 
     ! initialize signed distance as very far away
-    tmp_block = 9.0e6_rk ! distance as far away
-    safety = 6
+    tmp_block = 9.0e6_rk
+
+    ! number of traingles to loop over
     ntri = size(xyz_nxnynz, 1)
+
+    ! thickness of the shell around the surface we compute. (the real thickness not half the value)
+    shell_thickness = Insect%C_shell_thickness * Insect%smooth * Insect%dx_reference
+    shell_thickness_safe = shell_thickness + 2.0_rk*Insect%smooth
+    ! safety = 10 ! in grid points
+    safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference )
+
+    if (.not. informed) then
+        if (root) then
+            write(*,'("Safety in STL body generation is ",i3)') safety
+        endif
+    endif
+    informed = .true.
 
     ! loop over all triangles
     do i = 1, ntri
@@ -1622,12 +1795,20 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             enddo
         enddo
     enddo ! loop over triangles
+
     !
     ! signed distance to mask function
+    !
     do iz = 0, size(mask,3)-1
         do iy = 0, size(mask,2)-1
             do ix = 0, size(mask,1)-1
-                tmp = smoothstep( tmp_block(ix,iy,iz), 0.0_rk, 1.5_rk*dx(1) )
+                signed_distance = tmp_block(ix,iy,iz)
+                ! tmp = smoothstep( signed_distance, 0.0_rk, Insect%smooth )
+
+                ! revised version, 11/2022:
+                ! now we compute a thin layer around the surface which is smoothed both towards the inside and
+                ! outside of the body
+                tmp = smoothstep( abs(signed_distance+0.5_rk*shell_thickness), 0.5_rk*shell_thickness, Insect%smooth )
 
                 if (mask(ix,iy,iz) <= tmp) then
                     mask(ix,iy,iz) = tmp

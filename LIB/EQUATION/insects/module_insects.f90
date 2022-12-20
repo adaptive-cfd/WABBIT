@@ -267,7 +267,7 @@ module module_insects
     ! parameters for wing shape:
     real(kind=rk) :: b_top=0.d0, b_bot=0.d0, L_span=0.d0, WingThickness=0.d0
     ! this is a safety distance for smoothing:
-    real(kind=rk) :: safety=0.d0, smooth=0.d0, C_smooth=1.0d0
+    real(kind=rk) :: safety=0.d0, smooth=0.d0, C_smooth=1.0d0, dx_reference=0.0d0, C_shell_thickness=5.0d0
     ! parameter for hovering:
     real(kind=rk) :: distance_from_sponge=0.d0
     ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
@@ -676,17 +676,20 @@ contains
   !-------------------------------------------------------------------------------
   ! Compute interial power, i.e. the power the insect would have to invest
   ! when flapping its wings in vacuum.
+  !
   ! OUTPUT:
   !       ipowtotal: total inertial power
   !       iwmoment_g: inertial force moment components of the wings about the hinge in the laboratory reference frame
   !                          first index - component: x, y, z
   !                          second index - 1:body (unused), 2:left wing, 3:right wing, 4:2nd left wing, 5:2nd right wing
   !       Insect%PartIntegrals%IPow: (global): individual inertial power
+  !
   ! INPUT:
-  !       Insect%rot_dt_wing_l_w (global): left wing angular acceleration
-  !       Insect%rot_dt_wing_r_w (global): right wing angular acceleration
-  !       Insect%Jxx,Jyy,Jxy,Jzz (global) Wing inertia
-  !       Insect%Jxx2,Jyy2,Jxy2,Jzz2 (global) Wing inertia of the second pair
+  !       Insect%rot_dt_wing_l_w (in wing system): left wing angular acceleration
+  !       Insect%rot_dt_wing_r_w (in wing system): right wing angular acceleration
+  !       Insect%Jxx,Jyy,Jxy,Jzz (in wing system) Wing inertia
+  !       Insect%Jxx2,Jyy2,Jxy2,Jzz2 (in wing system) Wing inertia of the second pair
+  !
   ! MATHEMATICS:
   !       P_inertia = omega*( J*omega_dt + omega \cross (J*omega) )
   !                 = omega*( a + omega \cross b )
@@ -694,6 +697,7 @@ contains
   !           / Jxx Jxy 0   \
   !       J = | Jxy Jyy 0   |
   !           \ 0   0   Jzz /
+  !
   ! SEE ALSO
   !       Berman, Wang: Energy minimizing kinematics in hovering insect flight
   !       (JFM 582, 2007), eqn 2.22 (looks a bit different)

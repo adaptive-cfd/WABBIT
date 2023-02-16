@@ -98,6 +98,27 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             end do
         end if
 
+    case("jet-x")
+        ! a jet with constant (unit) velocity, with a bit of noise to trigger the instability
+        do iy = 1, Bs(2)+2*g
+            ! compute x,y coordinates from spacing and origin
+            y = abs(dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk)
+
+            if (y <= 0.25_rk * params_acm%domain_size(2)) then
+                ! ux is =1
+                u(:,iy,:,1) = 1.0
+            endif
+        end do
+
+        ! noise in uy
+        do iz = 1, size(u,3)
+            do iy = 1, size(u,2)
+                do ix = 1, size(u,1)
+                    u(ix,iy,iz,2) = 1.0e-3_rk * rand_nbr()
+                enddo
+            enddo
+        enddo
+
     case("velocity-blob")
         if (params_acm%dim==2) then
             ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.

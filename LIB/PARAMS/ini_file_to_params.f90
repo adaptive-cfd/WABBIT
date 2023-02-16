@@ -417,4 +417,11 @@ end subroutine ini_file_to_params
                 Bs(1:dims) = Bs(1)
             endif
         endif
+
+        do i = 1, dims
+            if (mod(Bs(i), 2) == 0) then
+                write(*,*) "Bs=", Bs
+                call abort(202392929, "Block-size must be ODD number")
+            end if
+        end do
     end function

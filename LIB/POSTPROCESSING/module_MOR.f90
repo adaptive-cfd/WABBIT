@@ -6,7 +6,7 @@
 module module_MOR
 
     use mpi
-    use module_precision
+    use module_globals
     use module_globals
     use module_params
     use module_helpers
@@ -46,7 +46,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)        :: params                    !> user defined parameter structure
+        type (type_params), intent(inout)        :: params                    
         real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
         !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
@@ -173,7 +173,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)        :: params                    !> user defined parameter structure
+        type (type_params), intent(inout)        :: params                    
         real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
         !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
@@ -354,7 +354,7 @@ contains
     !> specified on input and use it as snapshot data. After
     !> decomposition the Modes will be safed to a file!
     subroutine post_POD(params)
-        use module_precision
+        use module_globals
         use module_params
         use module_mpi
 
@@ -435,7 +435,7 @@ contains
         params%block_distribution="sfc_hilbert"
         ! no time stepping:
         params%time_step_method="none"
-        params%min_treelevel=1
+        params%Jmin=1
         ! coarsening indicator
         params%physics_type="POD"
         params%eps_normalized=.True. ! normalize the statevector before thresholding
@@ -508,11 +508,11 @@ contains
                 if ( i == 1 .and. j == 1 ) then
                     ! read all geometric parameters of grid
                     call read_attributes(file_in(i,j), lgt_n_tmp, time(1), iteration(1), params%domain_size, &
-                    params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+                    params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
                 endif
                 call read_attributes(file_in(i,j), lgt_n_tmp, time(i), iteration(i), domain, bs, level, dim)
 
-                params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
 
                 if (any(params%Bs /= Bs)) call abort( 203191, " Block size is not consistent ")
 
@@ -531,7 +531,7 @@ contains
         end if
 
         params%forest_size = fsize
-        number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+        number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
         params%n_eqn = n_components
         allocate(params%threshold_state_vector_component(params%n_eqn))
         params%threshold_state_vector_component(1:params%n_eqn)=.True.
@@ -580,7 +580,7 @@ contains
                 write(*, '("Snapshot=",i3 , " it=",i7,1x," time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
                 i, iteration(i), time(i), lgt_n(i), &
                 100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree(i))**params%dim ), &
-                100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+                100.0*dble(lgt_n(i))/dble( (2**params%Jmax)**params%dim ), &
                 minActiveLevel_tree(i), &
                 maxActiveLevel_tree(i)
                 write(*, '("Files:")')
@@ -594,13 +594,13 @@ contains
             write(*,'("Domain size is ",3(g12.4,1x))') domain
             write(*,'("NCPU=",i6)') params%number_procs
             write(*,'("Number Trees=",1x,i4)') fsize
-            write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+            write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%Jmin, params%Jmax
             write(*,'("Nblocks Available from Memory =",i9)') params%number_blocks
             write(*,'("Nblocks (if all trees dense)=",i9)') number_dense_blocks
             write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
             write(*,'("Predictor=",A)') params%order_predictor
             write(*,'("wavelet=",A)') params%wavelet
-            write(*,'("Number ghosts=",i2)') params%n_ghosts
+            write(*,'("Number ghosts=",i2)') params%g
             write(*,'("block_distribution=",A)') params%block_distribution
             write(*,'(80("-"))')
         endif
@@ -629,7 +629,7 @@ contains
 
     !##############################################################
     subroutine post_PODerror(params)
-        use module_precision
+        use module_globals
         use module_params
         use module_mpi
 
@@ -723,7 +723,7 @@ contains
         params%block_distribution="sfc_hilbert"
         ! no time stepping:
         params%time_step_method="none"
-        params%min_treelevel=1
+        params%Jmin=1
         ! coarsening indicator
         params%physics_type="POD"
         params%eps_normalized=.True. ! normalize the statevector before thresholding
@@ -799,10 +799,10 @@ contains
                 if ( i == 1 .and. j == 1 ) then
                     ! read all geometric parameters of grid
                     call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(1), iter_list(1), params%domain_size, &
-                    params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+                    params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
                 endif
                 call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(i), iter_list(i), domain, bs, level, dim)
-                params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
                 if (any(params%Bs .ne. Bs)) call abort( 204191, " Block size is not consistent ")
                 if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
                 if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
@@ -842,7 +842,7 @@ contains
                 ! check and find common params in all h5-files
                 !-------------------------------------------
                 call read_attributes(mode_in(i,j), lgt_n_tmp, unused_var, unused_int, domain, bs, level, dim)
-                params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
                 if (any(params%Bs .ne. Bs)) then
                     write(*,*) "Bs: ",Bs, " vs ",params%Bs;
                     call abort( 203199, " Block size is not consistent ")
@@ -861,7 +861,7 @@ contains
         ! now we have all information to allocate the grid and set up the forest:
         fsize = N_snapshots + N_modes + 2 !we need some extra fields for storing etc
         params%forest_size = fsize
-        number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+        number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
         params%n_eqn = n_components
         allocate(params%threshold_state_vector_component(params%n_eqn))
         params%threshold_state_vector_component(1:params%n_eqn)=.True.
@@ -890,7 +890,7 @@ contains
             min_lvl = min( min_lvl, minActiveLevel_tree(tree_ID) )
         end do
 
-        if (min_lvl==params%max_treelevel) then
+        if (min_lvl==params%Jmax) then
             all_snapshots_dense = .True.
             params%adapt_tree=.False.
             ! it is faster to bring all modes to the same mesh at this point,
@@ -913,7 +913,7 @@ contains
             ! since otherwise they will be refined and coarsed when reconstructing
             ! the snapshots. this produces a lot of overhead and makes the calculations slow
             if ( all_snapshots_dense ) then
-                call toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=params%max_treelevel)
+                call toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=params%Jmax)
             endif
             if ( params%rank == 0 ) then
                 write(*,'("Mode", i3," Stored in Tree_id: ",i3)') j, tree_ID
@@ -921,7 +921,7 @@ contains
             endif
         end do
 
-        if ( all_snapshots_dense ) params%min_treelevel = params%max_treelevel
+        if ( all_snapshots_dense ) params%Jmin = params%Jmax
         ! --------------------
         ! Compute the L2 norm
         !---------------------
@@ -935,7 +935,7 @@ contains
                 write(*, '("Snapshot=",i3 , " time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
                 i, time(i), lgt_n(i), &
                 100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree(i))**params%dim ), &
-                100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+                100.0*dble(lgt_n(i))/dble( (2**params%Jmax)**params%dim ), &
                 minActiveLevel_tree(i), &
                 maxActiveLevel_tree(i)
             end do
@@ -951,13 +951,13 @@ contains
             write(*,'("Domain size is ",3(g12.4,1x))') domain
             write(*,'("NCPU=",i6)') params%number_procs
             write(*,'("Number Trees=",1x,i4)') fsize
-            write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+            write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%Jmin, params%Jmax
             write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
             write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
             write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
             write(*,'("Predictor=",A)') params%order_predictor
             write(*,'("wavelet=",A)') params%wavelet
-            write(*,'("Number ghosts=",i2)') params%n_ghosts
+            write(*,'("Number ghosts=",i2)') params%g
             write(*,'("block_distribution=",A)') params%block_distribution
             write(*,'(80("-"))')
         endif
@@ -1077,7 +1077,7 @@ contains
         if (present(verbosity)) verbose = verbosity
         rank = params%rank
         Bs= params%Bs
-        g = params%n_ghosts
+        g = params%g
         Volume = product(params%domain_size(1:params%dim))
         L2norm = 0.0_rk
         ! Loop over the active hvy_data
@@ -1099,7 +1099,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)   :: params                     !> user defined parameter structure
+        type (type_params), intent(inout)   :: params                     
         real(kind=rk),  intent(inout)       :: C(:,:)                     !> Covariance matrix for snapshot POD
         real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
         !> heavy temp data: needed in blockxfer which is called in add_two_trees
@@ -1168,7 +1168,7 @@ contains
     !> specified on input and use it as snapshot data. After
     !> decomposition the Modes will be safed to a file!
     subroutine post_reconstruct(params)
-        use module_precision
+        use module_globals
         use module_params
         use module_mpi
 
@@ -1295,7 +1295,7 @@ contains
             params%block_distribution="sfc_hilbert"
             ! no time stepping:
             params%time_step_method="no"
-            params%min_treelevel=1
+            params%Jmin=1
             ! coarsening indicator
             params%physics_type="POD"
             params%eps_normalized=.True. ! normalize the statevector before thresholding
@@ -1330,10 +1330,10 @@ contains
                     if ( i == 1 .and. j == 1 ) then
                         ! read all geometric parameters of grid
                         call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(1), params%domain_size, &
-                        params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+                        params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
                     endif
                     call read_attributes(file_in(i,j), lgt_n_tmp, tmp_time, mode_number(i), domain, bs, level, dim)
-                    params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                    params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
                     if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
                     if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
                     if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
@@ -1348,7 +1348,7 @@ contains
             enddo
             fsize = N_modes_used +  2 !we need one more additional field for the reconstructed field
             params%forest_size = fsize
-            number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+            number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
             allocate(params%threshold_state_vector_component(params%n_eqn))
             params%threshold_state_vector_component=.True.
             if (maxmem < 0.0_rk) then
@@ -1375,8 +1375,8 @@ contains
                 min_lvl = min(min_lvl, minActiveLevel_tree(tree_ID) )
             end do
 
-            if (min_lvl == params%max_treelevel) then
-                params%min_treelevel= params%max_treelevel
+            if (min_lvl == params%Jmax) then
+                params%Jmin= params%Jmax
             endif
 
 
@@ -1389,7 +1389,7 @@ contains
                     write(*, '("Mode=",i3, " Nblocks=", i6," sparsity=(",f5.1,"% / ",f3.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
                     mode_number(i), lgt_n(i), &
                     100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( i ))**params%dim ), &
-                    100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+                    100.0*dble(lgt_n(i))/dble( (2**params%Jmax)**params%dim ), &
                     minActiveLevel_tree( i ), &
                     maxActiveLevel_tree( i )
                     do j = 1, n_components
@@ -1403,7 +1403,7 @@ contains
                 write(*,'("Domain size is ",3(g12.4,1x))') domain
                 write(*,'("NCPU=",i6)') params%number_procs
                 write(*,'("Number Trees=",1x,i4)') fsize
-                write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+                write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%Jmin, params%Jmax
                 write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
                 write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
                 write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
@@ -1453,7 +1453,7 @@ contains
             implicit none
 
             !-----------------------------------------------------------------
-            type (type_params), intent(inout)   :: params                     !> user defined parameter structure
+            type (type_params), intent(inout)   :: params                     
             real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
             !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
             real(kind=rk),  intent(inout)       :: hvy_tmp(:, :, :, :, :)
@@ -1543,7 +1543,7 @@ contains
 
         !##############################################################
         subroutine post_timecoef_POD(params)
-            use module_precision
+            use module_globals
             use module_params
             use module_mpi
 
@@ -1638,7 +1638,7 @@ contains
             params%block_distribution="sfc_hilbert"
             ! no time stepping:
             params%time_step_method="none"
-            params%min_treelevel=1
+            params%Jmin=1
             ! coarsening indicator
             params%physics_type="POD"
             params%eps_normalized=.True. ! normalize the statevector before thresholding
@@ -1712,10 +1712,10 @@ contains
                     if ( i == 1 .and. j == 1 ) then
                         ! read all geometric parameters of grid
                         call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(1), iter_list(1), params%domain_size, &
-                        params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+                        params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
                     endif
                     call read_attributes(snapshot_in(i,j), lgt_n_tmp, time(i), iter_list(i), domain, bs, level, dim)
-                    params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                    params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
                     if (any(params%Bs .ne. Bs)) call abort( 204191, " Block size is not consistent ")
                     if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
                     if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
@@ -1755,7 +1755,7 @@ contains
                     ! check and find common params in all h5-files
                     !-------------------------------------------
                     call read_attributes(mode_in(i,j), lgt_n_tmp, unused_var, unused_int, domain, bs, level, dim)
-                    params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+                    params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
                     if (any(params%Bs .ne. Bs)) then
                         write(*,*) "Bs: ",Bs, " vs ",params%Bs;
                         call abort( 203199, " Block size is not consistent ")
@@ -1774,7 +1774,7 @@ contains
             ! now we have all information to allocate the grid and set up the forest:
             fsize = N_snapshots + N_modes + 2 !we need some extra fields for storing etc
             params%forest_size = fsize
-            number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+            number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
             params%n_eqn = n_components
             allocate(params%threshold_state_vector_component(params%n_eqn))
             params%threshold_state_vector_component(1:params%n_eqn)=.True.
@@ -1822,7 +1822,7 @@ contains
                     write(*, '("Snapshot=",i3 , " time=",f16.9,1x," Nblocks=", i6," sparsity=(",f5.1,"% / ",f5.1,"%) [Jmin,Jmax]=[",i2,",",i2,"]")')&
                     i, time(i), lgt_n(i), &
                     100.0*dble(lgt_n(i))/dble( (2**maxActiveLevel_tree( i ))**params%dim ), &
-                    100.0*dble(lgt_n(i))/dble( (2**params%max_treelevel)**params%dim ), &
+                    100.0*dble(lgt_n(i))/dble( (2**params%Jmax)**params%dim ), &
                     minActiveLevel_tree( i ), &
                     maxActiveLevel_tree( i )
                 end do
@@ -1838,13 +1838,13 @@ contains
                 write(*,'("Domain size is ",3(g12.4,1x))') domain
                 write(*,'("NCPU=",i6)') params%number_procs
                 write(*,'("Number Trees=",1x,i4)') fsize
-                write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%min_treelevel, params%max_treelevel
+                write(*,'("[Jmin,Jmax] =[",i2,",",i2,"]")')params%Jmin, params%Jmax
                 write(*,'("Nblocks Available from Memory =",i6)') params%number_blocks
                 write(*,'("Nblocks (if all trees dense)=",i6)') number_dense_blocks
                 write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
                 write(*,'("Predictor=",A)') params%order_predictor
                 write(*,'("wavelet=",A)') params%wavelet
-                write(*,'("Number ghosts=",i2)') params%n_ghosts
+                write(*,'("Number ghosts=",i2)') params%g
                 write(*,'("block_distribution=",A)') params%block_distribution
                 write(*,'(80("-"))')
             endif
@@ -1891,21 +1891,18 @@ contains
             character(len=cshort), intent(in)    :: order
 
             ! Check parameters for correct inputs:
-            if (order == "CDF20" .or. order == "CDF2,0") then
-                params%wavelet_transform_type = 'harten-multiresolution'
+            if (order == "CDF20") then
                 params%order_predictor = "multiresolution_2nd"
-                params%wavelet='CDF2,0'
-                params%n_ghosts = 2_ik
-            elseif (order == "CDF40" .or. order == "CDF4,0") then
-                params%wavelet_transform_type = 'harten-multiresolution'
+                params%wavelet='CDF20'
+                params%g = 2_ik
+            elseif (order == "CDF40") then
                 params%order_predictor = "multiresolution_4th"
-                params%wavelet='CDF4,0'
-                params%n_ghosts = 4_ik
-            elseif (order == "CDF44" .or. order == "CDF4,4") then
-                params%wavelet_transform_type = 'biorthogonal'
+                params%wavelet='CDF40'
+                params%g = 4_ik
+            elseif (order == "CDF44" ) then
                 params%order_predictor = "multiresolution_4th"
-                params%wavelet='CDF4,4'
-                params%n_ghosts = 6_ik
+                params%wavelet='CDF44'
+                params%g = 6_ik
             else
                 call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
             end if
@@ -1925,12 +1922,12 @@ contains
 
             Bs = params%Bs
 
-            if (params%order_predictor == "multiresolution_4th" .and. params%n_ghosts<5) then
+            if (params%order_predictor == "multiresolution_4th" .and. params%g<5) then
                 if (params%dim == 3) then
                     ! note setting n_ghosts to 5 is only allowed if the block is big enough
-                    if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2 .and. 5<(Bs(3)+1)/2) params%n_ghosts = 6 ! however we adjust it to 6 because its even
+                    if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2 .and. 5<(Bs(3)+1)/2) params%g = 6 ! however we adjust it to 6 because its even
                 else
-                    if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2) params%n_ghosts = 6
+                    if (5<(Bs(1)+1)/2 .and. 5<(Bs(2)+1)/2) params%g = 6
                 endif
             endif
 

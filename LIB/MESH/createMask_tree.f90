@@ -14,9 +14,9 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     logical                                :: force_all_parts
 
     Bs      = params%Bs
-    g       = params%n_ghosts
+    g       = params%g
     Jactive = maxActiveLevel_tree(tree_ID_flow)
-    Jmax    = params%max_treelevel
+    Jmax    = params%Jmax
     tree_n  = params%forest_size ! used only for resetting at this point
 
     ! without penalization, do nothing.
@@ -117,12 +117,12 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
 
 
     if ( params%mask_time_independent_part ) then
-        if (Jactive == params%max_treelevel ) then
+        if (Jactive == params%Jmax ) then
             ! flow is on finest level: add complete mask on finest level
             ! this is the case when computing the right hand side.
             call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask, tree_ID_flow)
 
-        elseif (Jactive == params%max_treelevel-1 ) then
+        elseif (Jactive == params%Jmax-1 ) then
 
             call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
         else
@@ -145,7 +145,7 @@ subroutine createCompleteMaskDirect_tree(params, time, hvy_mask)
     real(kind=rk) :: x0(1:3), dx(1:3)
 
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
 
     do k = 1, hvy_n(tree_ID_flow)
         hvy_id = hvy_active(k, tree_ID_flow)
@@ -182,15 +182,15 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     endif
 
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     Jactive = maxActiveLevel_tree(tree_ID_flow)
-    Jmax = params%max_treelevel
-    Jmin = params%min_treelevel
+    Jmax = params%Jmax
+    Jmin = params%Jmin
     tree_n = params%forest_size ! used only for resetting at this point
 
     ! start with an equidistant grid on coarsest level.
     ! routine also deletes any existing mesh in the tree.
-    call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID_mask )
+    call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID_mask )
 
 
     do k = 1, hvy_n(tree_ID_mask)
@@ -214,8 +214,8 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
         ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
         ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-        call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_mask )
-        
+        call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_mask )
+
         ! if its mask-anynonzero, then the grid is refined inside the body. however, this is not what we assume
         ! in the add-pruned-tree: blocks on the actual grid are then coarser than in the pruned one, and still all 0
         ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_mask )

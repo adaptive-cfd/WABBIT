@@ -32,12 +32,12 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, tree_ID)
 #endif
 
     ! allocate an array for all treecodes (including all 4/8 sisters)
-    if (.not.allocated(all_treecodes)) allocate( all_treecodes(1:N_sisters,1:params%max_treelevel) )
+    if (.not.allocated(all_treecodes)) allocate( all_treecodes(1:N_sisters,1:params%Jmax) )
     ! initialize array as -1, since we do not use all of it, possibly (if we do not happen to
     ! be on the highest level)
     all_treecodes = -1
 
-    my_level = lgt_block( lgt_my_id, params%max_treelevel + IDX_MESH_LVL )
+    my_level = lgt_block( lgt_my_id, params%Jmax + IDX_MESH_LVL )
 
     lgt_sisters_id = -1
 
@@ -56,7 +56,7 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, tree_ID)
             all_treecodes(i,1:mother_level) = lgt_block(lgt_my_id, 1:mother_level)
             ! the last treecode digit is (0..3) or (0..7)
             all_treecodes(i,mother_level+1) = i-1
-!!!            tree_ID = lgt_block(lgt_my_id, params%max_treelevel + IDX_TREE_ID)
+!!!            tree_ID = lgt_block(lgt_my_id, params%Jmax + IDX_TREE_ID)
             ! look for the sisters in the list of blocks (light data), store their ID if found
             ! (-1 otherwise)
             call doesBlockExist_tree(all_treecodes(i,:), exists, lgt_sisters_id(i), tree_ID)

@@ -284,7 +284,7 @@ end subroutine create_mask_2D_ACM
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -337,7 +337,7 @@ end subroutine draw_cylinder
 subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -395,7 +395,7 @@ end subroutine draw_free_cylinder
 subroutine draw_free_sphere(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -450,7 +450,7 @@ end subroutine draw_free_sphere
 subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -510,7 +510,7 @@ end subroutine draw_fixed_sphere
 subroutine draw_cylinderz(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -557,7 +557,7 @@ end subroutine draw_cylinderz
 subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -625,7 +625,7 @@ end subroutine draw_rotating_cylinder
 subroutine draw_cavity(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -693,7 +693,7 @@ end subroutine draw_cavity
 subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -770,7 +770,7 @@ end subroutine draw_two_cylinders
 subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -899,7 +899,7 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
     !                body
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -1032,7 +1032,7 @@ end subroutine draw_2d_flapping_wings
 
 subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 

@@ -1,5 +1,5 @@
 subroutine post_superstl(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi

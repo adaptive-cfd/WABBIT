@@ -28,7 +28,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     real(kind=rk), allocatable, save  :: rk_coeffs(:,:)
 
     Bs   = params%Bs
-    g    = params%n_ghosts
+    g    = params%g
 
     if (params%dim==2) then
         z1 = 1

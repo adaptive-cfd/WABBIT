@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID, ignorePrefilter )
     implicit none
 
     !> user defined parameter structure
@@ -17,6 +17,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     integer(kind=ik), allocatable, save :: xfer_list(:,:)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID
+    logical, intent(in) :: ignorePrefilter
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -25,7 +26,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     ! to the last subroutine.)  -Thomas
 
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
@@ -103,7 +104,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
             ! Then only the responsible rank will perform the heavy data merging.
             call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
             ! note the newly merged block has status 0
-            call merge_blocks( params, hvy_block, light_ids(1:N) )
+            call merge_blocks( params, hvy_block, light_ids(1:N), ignorePrefilter )
         endif
     enddo
 end subroutine executeCoarsening_tree

@@ -6,11 +6,6 @@ module module_interpolation
 
     implicit none
 
-    PRIVATE
-
-    PUBLIC  :: restriction_2D,restriction_3D,prediction_2D,prediction_3D, &
-    restriction_prefilter_2D, restriction_prefilter_3D, restriction_prefilter_2D_vct, restriction_prefilter_3D_vct
-
 contains
 
     ! coarsen the block by one level
@@ -27,6 +22,7 @@ contains
         nfine(2)   = size(fine,2)
 
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
+            write(*,*) shape(coarse), ":", shape(fine)
             call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
 
@@ -34,69 +30,29 @@ contains
 
     end subroutine restriction_2D
 
-    ! coarsen the block by one level
-    subroutine restriction_prefilter_2D(fine, fine_filtered2, wavelet)
+    subroutine restriction_prefilter(params, u, u_filtered)
         implicit none
+        type(type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:), intent(out) :: u_filtered
 
-        real(kind=rk), dimension(1:,1:), intent(in) :: fine
-        real(kind=rk), dimension(1:,1:), intent(out) :: fine_filtered2
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), dimension(1:size(fine,1),1:size(fine,2)) :: fine_filtered
+        if (.not. allocated(params%HD)) call abort(71717172, "wavelet not setup")
 
-        call restriction_lowPassFilter_2D_x(fine, fine_filtered, wavelet)
-        call restriction_lowPassFilter_2D_y(fine_filtered, fine_filtered2, wavelet)
+        call blockFilterXYZ(params, u, u_filtered, params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
     end subroutine
 
 
-    ! takes full block (4D, ix,iy,iz,ieqn) even though nz=1
-    subroutine restriction_prefilter_2D_vct(fine, fine_filtered2, wavelet)
+    subroutine restriction_prefilter_vct(params, u, u_filtered)
         implicit none
+        type(type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: u_filtered
 
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: fine
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: fine_filtered2
-        character(len=*), intent(in) :: wavelet
-        integer(kind=ik) :: i, neqn
-        integer(kind=ik), parameter :: nz=1
+        if (.not. allocated(params%HD)) call abort(71717172, "wavelet not setup")
 
-        neqn = size(fine,4)
-
-        do i = 1, neqn
-            call restriction_prefilter_2D(fine(:,:,nz,i), fine_filtered2(:,:,nz,i), wavelet)
-        enddo
+        call blockFilterXYZ_vct(params, u, u_filtered, params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
     end subroutine
 
-
-    subroutine restriction_prefilter_3D(fine, fine_filtered2, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:,1:), intent(in) :: fine
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: fine_filtered2
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), allocatable, save :: fine_filtered(:,:,:)
-
-        if (.not.allocated(fine_filtered)) allocate(fine_filtered(1:size(fine,1),1:size(fine,2),1:size(fine,3)))
-
-        call restriction_lowPassFilter_3D_x(fine, fine_filtered, wavelet)
-        call restriction_lowPassFilter_3D_y(fine_filtered, fine_filtered2, wavelet)
-        call restriction_lowPassFilter_3D_z(fine_filtered2, fine_filtered, wavelet)
-        fine_filtered2 = fine_filtered
-    end subroutine
-
-
-    subroutine restriction_prefilter_3D_vct(fine, fine_filtered2, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: fine
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: fine_filtered2
-        character(len=*), intent(in) :: wavelet
-        integer(kind=ik) :: i, neqn
-
-        neqn = size(fine,4)
-        do i = 1, neqn
-            call restriction_prefilter_3D(fine(:,:,:,i), fine_filtered2(:,:,:,i), wavelet)
-        enddo
-
-    end subroutine
 
     ! periodic index
     ! uses one-based indexing
@@ -206,14 +162,14 @@ contains
             ! first columns (x: const y: variable )
             ! these points require one-sided interpolation.
             fine( 2, 1:nyfine:2 ) = &
-              a(1)*fine( 1, 1:nyfine:2 ) &
+            a(1)*fine( 1, 1:nyfine:2 ) &
             + a(2)*fine( 3, 1:nyfine:2 ) &
             + a(3)*fine( 5, 1:nyfine:2 ) &
             + a(4)*fine( 7, 1:nyfine:2 )
 
             ! last column (same as above)
             fine( nxfine-1, 1:nyfine:2 ) = &
-              a(4)*fine( nxfine-6, 1:nyfine:2 ) &
+            a(4)*fine( nxfine-6, 1:nyfine:2 ) &
             + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
             + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
             + a(1)*fine( nxfine,   1:nyfine:2 )
@@ -221,7 +177,7 @@ contains
             ! interpolate regular columns
             do ixfine =  4, nxfine-3, 2
                 fine( ixfine, 1:nyfine:2 ) = &
-                  b(2)*fine( ixfine-3, 1:nyfine:2 ) &
+                b(2)*fine( ixfine-3, 1:nyfine:2 ) &
                 + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
                 + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
                 + b(2)*fine( ixfine+3, 1:nyfine:2 )
@@ -406,217 +362,553 @@ contains
     end subroutine prediction_3D
 
 
-    subroutine setup_CDF_lowPassFilters(wavelet, HD)
+    ! Please note applying a filter requires also manipulating the ghost nodes
+    subroutine blockFilterXYZ( params, u, u_filtered, coefs_filter, a, b )
         implicit none
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), allocatable, intent(inout) :: HD(:)
-        integer(kind=ik) :: rank, mpierr
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:), intent(inout) :: u_filtered
+        integer(kind=ik) :: a, b
+        real(kind=rk), intent(in) :: coefs_filter(a:b)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, shift, g, Bs(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:)
 
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) then
-            select case(wavelet)
-            case("CDF4,4", "CDF44")
-                ! H TILDE filter
-                allocate( HD(-6:6) )
-                HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
-                87.0_rk*2.0_rk**(-7.0_rk), &
-                9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
-                !         ! attention. sweldens gives also the coefficients for CDF40, and there he does not have 1/16, but 1/32.
-                !         ! his coefficients are thus divided by two. therefore, as we copy (g and h_tilde) from this paper
-                !         ! and mix it with the 1/16 we had before, we need to multiply by TWO here.
-                !         !!!!!!!!!!!!!!!! HD  = HD*2.0_rk
-            case ("CDF4,2","CDF42")
-                allocate( HD(-4:4) )
-                HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
+        ! if the filter is just 1, then we copy and we're done.
+        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+            u_filtered = u
+            return
+        endif
 
-            case ("CDF4,0", "CDF40", "CDF2,0", "CDF20")
-                allocate( HD(-1:1) )
-                HD = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        g  = params%g
+        Bs = params%Bs
 
-            case("CDF2,2", "CDF22")
-                ! H TILDE filter
-                allocate( HD(-2:2) )
-                HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302209, "For applying the filter, not enough ghost nodes")
+        endif
 
-            case ("dummy")
-                allocate( HD(-6:6) )
-                HD = 1.0_rk
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz) )
+        u_tmp = u
 
-            case default
-                call abort(0309192, "unkown biorothonal wavelet specified. Set course for adventure!")
+        u_filtered = u_tmp
+        u_filtered(g+1:Bs(1)+g, :, :) = 0.0_rk
+        do ix = g+1, Bs(1)+g
+        ! do ix = -a+1, nx-b
+            do shift = a, b
+                u_filtered(ix, :, :) = u_filtered(ix, :, :) + u_tmp(ix+shift, :, :)*coefs_filter(shift)
+            enddo
+        enddo
 
-            end select
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, g+1:Bs(2)+g, :) = 0.0_rk
+        do iy = g+1, Bs(2)+g
+        ! do iy = -a+1, ny-b
+            do shift = a, b
+                u_filtered(:, iy, :) = u_filtered(:, iy, :) + u_tmp(:, iy+shift, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        if (nz == 1) return
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, :, g+1:Bs(3)+g) = 0.0_rk
+        do iz = g+1, Bs(3)+g
+            do shift = a, b
+                u_filtered(:, :, iz) = u_filtered(:, :, iz) + u_tmp(:, :, iz+shift)*coefs_filter(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+    subroutine blockFilterXYZ_vct( params, u, u_filtered, coefs_filter, a, b)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        integer(kind=ik) :: a, b
+        real(kind=rk), intent(in) :: coefs_filter(a:b)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift, g, Bs(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+
+        ! if the filter is just 1, then we copy and we're done.
+        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+            u_filtered = u
+            return
+        endif
+
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302209, "For applying the filter, not enough ghost nodes")
+        endif
+
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+        u_tmp = u
+
+        u_filtered = u_tmp
+        u_filtered(g+1:Bs(1)+g, :, :, :) = 0.0_rk
+        do ix = g+1, Bs(1)+g
+            do shift = a, b
+                u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, g+1:Bs(2)+g, :, :) = 0.0_rk
+        do iy = g+1, Bs(2)+g
+            do shift = a, b
+                u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+
+        if (nz == 1) return
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, :, g+1:Bs(3)+g, :) = 0.0_rk
+        do iz = g+1, Bs(3)+g
+            do shift = a, b
+                u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+
+    ! apply the filter only inside the block, where the filter coefficients are
+    ! not reaching into the ghost nodes layer.
+    subroutine blockFilterXYZ_interior_vct( u, u_filtered, coefs_filter, a, b, g)
+        implicit none
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        integer(kind=ik) :: a, b, g
+        real(kind=rk), intent(in) :: coefs_filter(a:b)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+
+        ! if the filter is just 1, then we copy and we're done.
+        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+            u_filtered = u
+            return
+        endif
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+        u_tmp = u
+
+        u_filtered = u_tmp
+        u_filtered(-a+1+g:nx-b-g, :, :, :) = 0.0_rk
+        do ix = -a+1+g, nx-b-g
+            do shift = a, b
+                u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, -a+1+g:ny-b-g, :, :) = 0.0_rk
+        do iy = -a+1+g, ny-b-g
+            do shift = a, b
+                u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+
+        if (nz == 1) return
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, :, -a+1+g:nz-b-g, :) = 0.0_rk
+        do iz = -a+1+g, nz-b-g
+            do shift = a, b
+                u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+    ! applies one of params% HD GD HR GR filters in each direction
+    subroutine blockFilterCustom_vct( params, u, u_filtered, filter_x, filter_y, filter_z )
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        character(len=*), intent(in) :: filter_x, filter_y, filter_z
+        integer(kind=ik) :: a, b
+        real(kind=rk), allocatable :: coefs_filter(:)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift, g, Bs(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+        !-----------------------------------------------------------------------
+        ! Filter x
+        !-----------------------------------------------------------------------
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx, 1:ny, 1:nz, 1:nc) )
+        u_tmp = u
+
+        select case(filter_x)
+        case("HD")
+            if (.not. allocated(params%HD)) call abort(202302203, "Wavelet setup not done yet?! HD")
+            a = lbound(params%HD, dim=1)
+            b = ubound(params%HD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HD
+
+        case("GD")
+            if (.not. allocated(params%GD)) call abort(202302203, "Wavelet setup not done yet?! GD")
+            a = lbound(params%GD, dim=1)
+            b = ubound(params%GD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GD
+
+        case("HR")
+            if (.not. allocated(params%HR)) call abort(202302203, "Wavelet setup not done yet?! HR")
+            a = lbound(params%HR, dim=1)
+            b = ubound(params%HR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HR
+
+        case("GR")
+            if (.not. allocated(params%GR)) call abort(202302203, "Wavelet setup not done yet?! GR")
+            a = lbound(params%GR, dim=1)
+            b = ubound(params%GR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GR
+
+        case default
+            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+
+        end select
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302211, "For applying the filter, not enough ghost nodes")
+        endif
+
+        u_filtered = u_tmp
+        u_filtered(g+1:Bs(1)+g, :, :, :) = 0.0_rk
+        do ix = g+1, Bs(1)+g
+            do shift = a, b
+                u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        !-----------------------------------------------------------------------
+        ! Filter y
+        !-----------------------------------------------------------------------
+        select case(filter_y)
+        case("HD")
+            a = lbound(params%HD, dim=1)
+            b = ubound(params%HD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HD
+
+        case("GD")
+            a = lbound(params%GD, dim=1)
+            b = ubound(params%GD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GD
+
+        case("HR")
+            a = lbound(params%HR, dim=1)
+            b = ubound(params%HR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HR
+
+        case("GR")
+            a = lbound(params%GR, dim=1)
+            b = ubound(params%GR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GR
+
+        case default
+            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+
+        end select
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302211, "For applying the filter, not enough ghost nodes")
+        endif
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, g+1:Bs(2)+g, :, :) = 0.0_rk
+        do iy = g+1, Bs(2)+g
+            do shift = a, b
+                u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        !-----------------------------------------------------------------------
+        ! Filter z
+        !-----------------------------------------------------------------------
+        if (nz == 1) return
+
+        select case(filter_z)
+        case("HD")
+            a = lbound(params%HD, dim=1)
+            b = ubound(params%HD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HD
+
+        case("GD")
+            a = lbound(params%GD, dim=1)
+            b = ubound(params%GD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GD
+
+        case("HR")
+            a = lbound(params%HR, dim=1)
+            b = ubound(params%HR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HR
+
+        case("GR")
+            a = lbound(params%GR, dim=1)
+            b = ubound(params%GR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GR
+
+        case ("--")
+            return
+
+        case default
+            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+
+        end select
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302211, "For applying the filter, not enough ghost nodes")
+        endif
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, :, g+1:Bs(3)+g, :) = 0.0_rk
+        do iz = g+1, Bs(3)+g
+            do shift = a, b
+                u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+    end subroutine
+
+
+    ! computes a one-level wavelet decomposition of a block.
+    ! The computation of coefficients is possible on the entire block, but
+    ! without sync'ing the reconstruction is not possible on the entire data.
+    ! We have to sync wavelet-transformed blocks.
+    ! Data are stored in Spaghetti-order (not Mallat-Order)
+    subroutine waveletDecomposition_block(params, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u ! input: function, output=wc
+
+        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+#ifdef DEV
+        if (nz /= 1) call abort(7223839, "currently 2D only")
+        if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+        if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+#endif
+
+        if (.not. allocated(sc )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcx)) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcy)) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+
+        call blockFilterCustom_vct( params, u, sc  , "HD", "HD", "--" )
+        call blockFilterCustom_vct( params, u, wcx , "HD", "GD", "--" )
+        call blockFilterCustom_vct( params, u, wcy , "GD", "HD", "--" )
+        call blockFilterCustom_vct( params, u, wcxy, "GD", "GD", "--" )
+
+        call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, u)
+    end subroutine
+
+    subroutine waveletReconstruction_block(params, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+
+        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+
+        if (.not. allocated(sc  )) allocate(   sc(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcx )) allocate(  wcx(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcy )) allocate(  wcy(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+
+
+#ifdef DEV
+        if (nz /= 1) call abort(7223839, "currently 2D only")
+        if (modulo(Bs(1), 2) /= 0) call abort(99111,"This code requires Bs even")
+        if (modulo(Bs(2), 2) /= 0) call abort(99111,"This code requires Bs even")
+#endif
+
+
+
+        call spaghetti2mallat_block(params, u, sc, wcx, wcy, wcxy)
+
+        call blockFilterCustom_vct( params, sc  , sc  , "HR", "HR", "--" ) ! inplace should work, only a copy statement from the input
+        call blockFilterCustom_vct( params, wcx , wcx , "HR", "GR", "--" ) ! inplace should work, only a copy statement from the input
+        call blockFilterCustom_vct( params, wcy , wcy , "GR", "HR", "--" ) ! inplace should work, only a copy statement from the input
+        call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" ) ! inplace should work, only a copy statement from the input
+
+        u = sc + wcx + wcy + wcxy
+
+    end subroutine
+
+    ! ensures that 3/4 of the numbers are zero - required for reconstruction
+    ! note when copying Spaghetti to Mallat, this is automatically done, but
+    ! when manipulating coefficients, it may happen that we set nonzero values
+    ! where a zero should be.
+    subroutine setRequiredZerosWCSC_block(params, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+
+        integer(kind=ik) :: nx, ny
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+
+        if (modulo(params%g, 2) == 0) then
+            ! even ghost nodes: 2nd coefficient will be set to zero
+            !
+            ! x 0 x 0 x 0
+            ! 0 0 0 0 0 0
+            ! x 0 x 0 x 0
+            !
+            u(2:nx:2, 2:ny:2, :, :) = 0.0_rk ! diagonal
+            u(2:nx:2, 1:ny:2, :, :) = 0.0_rk ! to the right (+x)
+            u(1:nx:2, 2:ny:2, :, :) = 0.0_rk ! to the top (+y)
         else
-            call abort(210315, "setup_CDF_lowPassFilters called on already allocated filter bank")
+            ! odd ghost nodes: 1st coefficient will be set to zero
+            !
+            ! 0 0 0 0 0
+            ! 0 x 0 x 0
+            ! 0 0 0 0 0
+            ! 0 x 0 x 0
+            !
+            u(1:nx:2, 1:ny:2, :, :) = 0.0_rk ! diagonal
+            u(1:nx:2, 2:ny:2, :, :) = 0.0_rk ! +y
+            u(2:nx:2, 1:ny:2, :, :) = 0.0_rk ! +x
         endif
 
 
-        call MPI_Comm_rank(MPI_COMM_WORLD, rank, mpierr)
+    end subroutine
 
-        if (rank==0) then
-            write(*,'(A)') "Setup of wavelet low-pass filters complete (you may see this message several times, once for each dimension)"
-            write(*,'(A)') trim(adjustl(wavelet))
-            write(*,'("HD(",i2,":",i2,")=")') lbound(HD, dim=1), ubound(HD, dim=1)
-            write(*,'(15(es12.4,1x))') HD
+
+    subroutine spaghetti2mallat_block(params, u, sc, wcx, wcy, wcxy)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        sc   = 0.0_rk
+        wcx  = 0.0_rk
+        wcy  = 0.0_rk
+        wcxy = 0.0_rk
+
+        ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
+        ! in the sense that Nx*Ny data gives 4 * Nx*Ny decomposition.
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
+        ! copy from Spaghetti to Mallat ordering
+        if (modulo(g, 2) == 0) then
+            ! even g
+            sc(   1:nx:2, 1:ny:2, :, :) = u(1:nx:2, 1:ny:2, :, 1:nc)
+            wcx(  1:nx:2, 1:ny:2, :, :) = u(2:nx:2, 1:ny:2, :, 1:nc)
+            wcy(  1:nx:2, 1:ny:2, :, :) = u(1:nx:2, 2:ny:2, :, 1:nc)
+            wcxy( 1:nx:2, 1:ny:2, :, :) = u(2:nx:2, 2:ny:2, :, 1:nc)
+        else
+            ! odd g
+            sc(   2:nx-1:2, 2:ny-1:2, :, :) = u(2:nx-1:2, 2:ny-1:2, :, 1:nc)
+            wcx(  2:nx-1:2, 2:ny-1:2, :, :) = u(3:nx:2, 2:ny-1:2  , :, 1:nc)
+            wcy(  2:nx-1:2, 2:ny-1:2, :, :) = u(2:nx-1:2, 3:ny:2  , :, 1:nc)
+            wcxy( 2:nx-1:2, 2:ny-1:2, :, :) = u(3:nx:2, 3:ny:2    , :, 1:nc)
         endif
 
     end subroutine
 
 
-    ! Please note applying a filter requires also manipulating the ghost nodes
-    subroutine restriction_lowPassFilter_2D_x(block_data, block_data_filtered, wavelet)
+
+    subroutine mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, u)
         implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
-        real(kind=rk), dimension(1:,1:), intent(in) :: block_data
-        real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-        character(len=*), intent(in) :: wavelet
-        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
-        real(kind=rk), allocatable, save :: HD(:)
+        g  = params%g
+        Bs = params%bs
 
-        nx = size(block_data,1)
-        ny = size(block_data,2)
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        block_data_filtered(:, :) = block_data
-        block_data_filtered(-a+1:nx-b, :) = 0.0_rk
-
-        ! apply the filter
-        do ix = -a+1, nx-b
-            do shift = a, b
-                block_data_filtered(ix, :) = block_data_filtered(ix, :) + block_data(ix+shift, :)*HD(shift)
-            enddo
-        enddo
-    end subroutine
-
-
-    ! Please note applying a filter requires also manipulating the ghost nodes
-    subroutine restriction_lowPassFilter_2D_y(block_data, block_data_filtered, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:), intent(in) :: block_data
-        real(kind=rk), dimension(1:,1:), intent(out) :: block_data_filtered
-        character(len=*), intent(in) :: wavelet
-        integer(kind=ik) :: ix, iy, shift, a, b, nx, ny
-        real(kind=rk), allocatable, save :: HD(:)
-
-        nx = size(block_data,1)
-        ny = size(block_data,2)
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        block_data_filtered(:, :) = block_data
-        block_data_filtered(:, -a+1:ny-b) = 0.0_rk
-
-        ! apply the filter
-        do iy = -a+1, ny-b ! the x-loop runs only over interior nodes (excluding the ghost nodes)
-            do shift = a, b
-                ! the filter is applied in all y positions, INCLUDING the ghost nodes (this was a bug, fix: Thomas, 08 Jun 2020)
-                block_data_filtered(:,iy) = block_data_filtered(:,iy) + block_data(:,iy+shift)*HD(shift)
-            enddo
-        enddo
-    end subroutine
-
-
-    ! Please note applying a filter requires also manipulating the ghost nodes
-    subroutine restriction_lowPassFilter_3D_x(block_data, block_data_filtered, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), allocatable, save :: HD(:)
-        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
-
-        nx = size(block_data,1)
-        ny = size(block_data,2)
-        nz = size(block_data,3)
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        block_data_filtered(:, :, :) = block_data
-        block_data_filtered(-a+1:nx-b, :, :) = 0.0_rk
-
-        do ix = -a+1, nx-b
-            do shift = a, b
-                block_data_filtered(ix, :, :) = block_data_filtered(ix, :, :) + block_data(ix+shift, :, :)*HD(shift)
-            enddo
-        enddo
+        ! copy to Spaghetti-order (interior nodes only - the ghosts cannot be filtered anyways)
+        u( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) =   sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :)
+        u( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) =  wcx( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
+        u( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) =  wcy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
+        u( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = wcxy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
 
     end subroutine
-
-    ! Please note applying a filter requires also manipulating the ghost nodes
-    subroutine restriction_lowPassFilter_3D_y(block_data, block_data_filtered, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), allocatable, save :: HD(:)
-        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
-
-        nx = size(block_data,1)
-        ny = size(block_data,2)
-        nz = size(block_data,3)
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        block_data_filtered(:, :, :) = block_data
-        block_data_filtered(:, -a+1:ny-b, :) = 0.0_rk
-
-        do iy = -a+1, ny-b
-            do shift = a, b
-                block_data_filtered(:, iy, :) = block_data_filtered(:, iy, :) + block_data(:, iy+shift, :)*HD(shift)
-            enddo
-        enddo
-
-    end subroutine
-
-    ! Please note applying a filter requires also manipulating the ghost nodes
-    subroutine restriction_lowPassFilter_3D_z(block_data, block_data_filtered, wavelet)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:,1:), intent(in) :: block_data
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: block_data_filtered
-        character(len=*), intent(in) :: wavelet
-        real(kind=rk), allocatable, save :: HD(:)
-        integer(kind=ik) :: ix, iy, iz, shift, a, b, nx, ny, nz
-
-        nx = size(block_data,1)
-        ny = size(block_data,2)
-        nz = size(block_data,3)
-
-        ! initialize filter according to wavelet
-        if (.not. allocated(HD)) call setup_CDF_lowPassFilters(wavelet, HD)
-
-        a = lbound(HD, dim=1)
-        b = ubound(HD, dim=1)
-
-        block_data_filtered(:, :, :) = block_data
-        block_data_filtered(:, :, -a+1:nz-b) = 0.0_rk
-
-        do iz = -a+1, nz-b
-            do shift = a, b
-                block_data_filtered(:, :, iz) = block_data_filtered(:, :, iz) + block_data(:, :, iz+shift)*HD(shift)
-            enddo
-        enddo
-    end subroutine
-
 
 end module

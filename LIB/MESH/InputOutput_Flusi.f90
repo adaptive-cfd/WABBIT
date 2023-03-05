@@ -70,7 +70,7 @@ subroutine read_field_flusi(fname, hvy_block, params, Bs_f, tree_ID)
 
 end subroutine read_field_flusi
 
-subroutine read_field_flusi_MPI(fname, hvy_block, params, Bs_f, tree_ID)
+subroutine read_field_flusi_MPI(fname, hvy_block, params, tree_ID)
 
   implicit none
   !> file name
@@ -81,24 +81,23 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, Bs_f, tree_ID)
   type (type_params), intent(in)      :: params
   integer(kind=ik), intent(in)        :: tree_ID
 
-  integer(kind=ik), dimension(3)      :: Bs_f
+  integer(kind=ik), dimension(3)      :: nxyz
   integer(kind=ik)                    :: g
   integer(kind=ik), dimension(3)      :: Bs
   integer(kind=ik)                    :: k, lgt_id, start_x, start_y, start_z
   ! offset variables
   integer(kind=ik), dimension(3)      :: ubounds, lbounds, num_Bs
-  real(kind=rk), dimension(3)         :: x0, dx
+  real(kind=rk), dimension(3)         :: x0, dx, domain
+  real(kind=rk) :: time
   ! file id integer
   integer(hid_t)                      :: file_id
-  real(kind=rk), dimension(:,:,:), allocatable   :: blockbuffer
+  real(kind=rk), dimension(:,:,:), allocatable   :: blockbuffer, data_flusi
 
-!----------------------------------------------------------------------------
+  ! read attributes such as number of discretisation points, time, domain size
+  call get_attributes_flusi(fname, nxyz, time, domain)
+
   Bs = params%Bs
-  g  = params%n_ghosts
-  ! this is necessary in 2D because flusi data is organised as field(1,1:Bs_f,1:Bs_f)
-  ! whereas in wabbit the field has only one component in z direction
-  if (.not. params%dim==3) allocate(blockbuffer(0:Bs(1)-1,0:Bs(2)-1, 1))
-  !----------------------------------------------------------------------------
+  g  = params%g
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
   ! print a message
@@ -106,6 +105,19 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, Bs_f, tree_ID)
       write(*,'(80("_"))')
       write(*,'("READING: Reading Flusi datafield from file ",A)') trim(adjustl(fname))
   end if
+
+  if (params%number_procs /= 1) then
+      ! we read the entire flusi datafield to memory. This means the routine is
+      ! monoprocessing only. It can be fixed, but I encountered a HDF5 problem and
+      ! am too busy to fight it. -Thomas
+      call abort(2023232999, "This routine works only with one CPU")
+  endif
+
+  allocate( data_flusi(0:nxyz(1)-1,0:nxyz(2)-1,0:nxyz(3)-1) )
+  call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), (/0,0,0/), (/nxyz(1)-1,nxyz(2)-1,nxyz(3)-1/), data_flusi)
+
+  ! would be fairly easy but I have no time.
+  if (nxyz(1) /= 0) call abort(13738213, "Only 2D right now")
 
   !> \todo test for 3D
   do k = 1, hvy_n(tree_ID)
@@ -116,27 +128,35 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, Bs_f, tree_ID)
       start_x = nint( x0(1) / dx(1) )
       start_y = nint( x0(2) / dx(2) )
 
-      if (params%dim == 3) then
-          start_z = nint(x0(3)/dx(3))
+      ! ! if (params%dim == 3) then
+      ! !     start_z = nint(x0(3)/dx(3))
+      ! !
+      ! !     lbounds = (/start_x, start_y, start_z/)
+      ! !     ubounds = (/end_bound(start_x,Bs(1),nxyz(1)), end_bound(start_y,Bs(2),nxyz(2)),&
+      ! !         end_bound(start_z,Bs(3),nxyz(3))/)
+      ! !
+      ! !     num_Bs = ubounds-lbounds+1
+      ! !
+      ! !     call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
+      ! !     hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k,tree_ID)))
+      ! ! else
+      !     lbounds = (/ 0, start_x        , start_y         /)
+      !     ubounds = (/ 0, start_x+Bs(1)-1, start_y+Bs(2)-1 /)
+      !     ! lbounds = (/ start_x        , start_y        , 0 /)
+      !     ! ubounds = (/ start_x+Bs(1)-1, start_y+Bs(2)-1, 0 /)
+      !     num_Bs = ubounds - lbounds + 1
+      !
+      !     write(*,*) "lbound", lbounds
+      !     write(*,*) "ubound", ubounds
+      !     write(*,*) "numbs", num_bs
+      !
+      !     call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
+      !     blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1))
 
-          lbounds = (/start_x, start_y, start_z/)
-          ubounds = (/end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2)),&
-              end_bound(start_z,Bs(3),Bs_f(3))/)
-
-          num_Bs = ubounds-lbounds+1
-
-          call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
-          hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k,tree_ID)))
-      else
-          lbounds = (/ start_x, start_y,0/)
-          ubounds = (/ end_bound(start_x,Bs(1),Bs_f(1)), end_bound(start_y,Bs(2),Bs_f(2)),0/)
-          num_Bs = ubounds-lbounds+1
-
-          call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
-          blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1))
-
-          hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k,tree_ID)) = blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1)
-      end if
+          ! hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k,tree_ID)) = blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1)
+      hvy_block(g+1:g+Bs(1), g+1:g+Bs(2), 1, 1, hvy_active(k,tree_ID)) = &
+      data_flusi(0, start_x:start_x+Bs(1)-1, start_y:start_y+Bs(2)-1 )
+      ! end if
   end do
 
   ! close file and HDF5 library
@@ -172,17 +192,3 @@ subroutine get_attributes_flusi(fname, nxyz, time, domain)
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
 end subroutine get_attributes_flusi
-
-
-integer(kind=ik) function end_bound(start, Bs, Bs_f)
-  implicit none
-  integer(kind=ik), intent(in) :: start, Bs, Bs_f
-
-  ! if I'm the last block in x, y and/or z direction, I get to read only Bs-1 points,
-  ! otherwise all Bs points
-  if (start==Bs_f-Bs+1) then
-      end_bound = start + Bs - 2
-  else
-      end_bound = start + Bs - 1
-  end if
-end function end_bound

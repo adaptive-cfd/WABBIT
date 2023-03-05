@@ -1,5 +1,5 @@
 subroutine post_rhs(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -78,7 +78,7 @@ subroutine post_rhs(params)
     ! !> \todo change that for 3d case
     ! params%number_blocks = 4*lgt_n/params%number_procs
     ! Bs = params%Bs
-    ! g = params%n_ghosts
+    ! g = params%g
     !
     ! ! allocate data
     ! call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, &

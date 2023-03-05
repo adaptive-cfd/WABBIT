@@ -39,7 +39,7 @@ use module_treelib
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     write(*,*) "===old lib==="
-    treeN = params%max_treelevel
+    treeN = params%Jmax
     allocate (treecode(1:treeN), n(1:treeN))
 
     t = MPI_wtime()
@@ -48,13 +48,13 @@ use module_treelib
             ! call encoding_2D(treecode, ix, iy, 2**treeN, 2**treeN, treeN)
             ! call decoding(treecode, ix, iy, iz, treeN)
             !
-            ! call adjacent_block_2D(treecode, n, "__N", params%max_treelevel, params%max_treelevel)
-            ! call adjacent_block_2D(n, treecode, "__S", params%max_treelevel, params%max_treelevel)
-            ! call adjacent_block_2D(treecode, n, "__W", params%max_treelevel, params%max_treelevel)
-            ! call adjacent_block_2D(n, treecode, "__E", params%max_treelevel, params%max_treelevel)
+            ! call adjacent_block_2D(treecode, n, "__N", params%Jmax, params%Jmax)
+            ! call adjacent_block_2D(n, treecode, "__S", params%Jmax, params%Jmax)
+            ! call adjacent_block_2D(treecode, n, "__W", params%Jmax, params%Jmax)
+            ! call adjacent_block_2D(n, treecode, "__E", params%Jmax, params%Jmax)
 
             do iz = 1,1000
-            if (array_compare(treecode, n, params%max_treelevel)) then
+            if (array_compare(treecode, n, params%Jmax)) then
               call abort(123980)
             endif
           enddo

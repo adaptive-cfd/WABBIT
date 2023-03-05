@@ -1,6 +1,6 @@
 module module_t_files
     use mpi
-    use module_precision
+    use module_globals
     implicit none
 
     ! precision statement

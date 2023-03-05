@@ -34,7 +34,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
     ! grid parameter
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     t0 = MPI_wtime()
     n_domain = 0
 
@@ -72,7 +72,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 
@@ -107,7 +107,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 

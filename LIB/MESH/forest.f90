@@ -9,7 +9,7 @@ subroutine prune_tree( params, hvy_block, tree_ID)
 
     rank = params%rank
     N = params%number_blocks
-    g = params%n_ghosts
+    g = params%g
     Bs = params%Bs
 
 
@@ -82,7 +82,7 @@ end subroutine
 !     integer(kind=tsize) :: treecode1, treecode2
 !
 !     fsize = params%forest_size
-!     Jmax = params%max_treelevel ! max treelevel
+!     Jmax = params%Jmax ! max treelevel
 !     rank = params%rank
 !     N = params%number_blocks
 !
@@ -229,7 +229,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     integer(kind=tsize) :: treecode1, treecode2
 
     fsize = params%forest_size
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     rank = params%rank
     N = params%number_blocks
 
@@ -408,7 +408,7 @@ subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
     integer(kind=ik)    :: k, N, rank
     real(kind=rk) :: t_elapse
 
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
     rank = params%rank
     N = params%number_blocks
@@ -546,7 +546,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
     integer(kind=tsize) :: treecode_ref, treecode
     logical :: verbose = .false.
 
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
 
     if (present(verbosity)) verbose=verbosity
@@ -626,7 +626,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 
             call ensureGradedness_tree(params, tree_ID)
 
-            call executeCoarsening_tree(params, hvy_block, tree_ID)
+            call executeCoarsening_tree(params, hvy_block, tree_ID, .false.)
 
             call updateMetadata_tree(params, tree_ID)
 
@@ -690,7 +690,7 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
     integer(kind=tsize) :: treecode1, treecode2
     logical :: verbose = .false.
 
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
 
     if (present(verbosity)) verbose=verbosity
@@ -828,7 +828,7 @@ subroutine refine_tree2(params, hvy_block, hvy_tmp, tree_ID)
     integer(kind=tsize) :: treecode1, treecode2
     logical :: verbose = .true.
 
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     fsize = params%forest_size   ! maximal number of trees in forest
 
     do k = 1, lgt_n(tree_ID)
@@ -913,11 +913,11 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
     character(len=cshort) :: MR
-    Jmax = params%max_treelevel ! max treelevel
+    Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
     N    = params%number_blocks ! number of blocks per rank
     rank = params%rank       ! proc rank
-    g = params%n_ghosts         ! number of ghost nodes
+    g = params%g         ! number of ghost nodes
     Bs= params%Bs               ! number of grid points per block
 
     ! decide if inplace or out of place operation
@@ -945,7 +945,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     ! try to keep the finest levels of all trees. This means we refine
     ! all blocks which are not on the same level.
 
-    if (tree_ID1 .ne. tree_ID2 .and. params%max_treelevel .ne. params%min_treelevel) then
+    if (tree_ID1 .ne. tree_ID2 .and. params%Jmax .ne. params%Jmin) then
         t_elapse = MPI_WTIME()
         call store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, tree_ID2)
 
@@ -1415,8 +1415,8 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
 
     !!! Attention we should not use prefilter of CDF44 wavelets here. Because
     !!! it will change the original data!!!
-    MR = params%wavelet_transform_type
-    params%wavelet_transform_type = "harten-multiresolution"
+    MR = params%wavelet
+    params%wavelet = "CDF40"
 
     if (present(dest_tree_ID)) then
         ! we have to synchronize lgt data since we were updating it locally on this procesor
@@ -1424,12 +1424,12 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
 
         call createActiveSortedLists_forest(params)
         !
-        if (tree_ID1 .ne. tree_ID2 .and. params%max_treelevel .ne. params%min_treelevel) then
+        if (tree_ID1 .ne. tree_ID2 .and. params%Jmax .ne. params%Jmin) then
             call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,1), lgt_n_ref(1), hvy_block, hvy_tmp, tree_ID1, verbosity=.False.)
             call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), hvy_block, hvy_tmp, tree_ID2, verbosity=.False.)
         endif
     else
-        if (tree_ID1 .ne. tree_ID2 .and. params%max_treelevel .ne. params%min_treelevel) then
+        if (tree_ID1 .ne. tree_ID2 .and. params%Jmax .ne. params%Jmin) then
             call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), hvy_block, hvy_tmp, tree_ID2, verbosity=.False.)
         endif
 
@@ -1438,7 +1438,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
     endif
 
-    params%wavelet_transform_type = MR
+    params%wavelet = MR
 
 
 
@@ -1640,8 +1640,8 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
 
     N = params%number_blocks
     rank = params%rank
-    Jmax = params%max_treelevel
-    g = params%n_ghosts
+    Jmax = params%Jmax
+    g = params%g
     Bs= params%Bs
     Volume = product(params%domain_size(1:params%dim))
 
@@ -1654,7 +1654,7 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
         ! FOR THE WAVELET WEIGHTED SCALAR PRODUCT WE NEED 6
         ! ANYHOW IF ON CHOOSES TO HAVE ONLY 4 GHOST POINTS WE STILL COMPUTE
         ! THE SCALAR PRODUCT WITH A WARNING
-        if (params%n_ghosts < 5) then
+        if (params%g < 5) then
             Nord = 1
             if(.not.allocated(M)) then
                 allocate( M(Nord))
@@ -1796,14 +1796,14 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
     MPI_SUM,WABBIT_COMM, mpierr)
     !!! Attention we should not use prefilter of CDF44 wavelets here. Because
     !!! it will change the original data!!!
-    MR = params%wavelet_transform_type
-    params%wavelet_transform_type = "harten-multiresolution"
+    MR = params%wavelet
+    params%wavelet = "CDF40"
 
     if (tree_ID1 .ne. tree_ID2) then
         call coarse_tree_2_reference_mesh( params, lgt_block_ref, lgt_active_ref(:,1), lgt_n_ref(1), hvy_block, hvy_tmp, tree_ID1, verbosity=.False.)
         call coarse_tree_2_reference_mesh( params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), hvy_block, hvy_tmp, tree_ID2, verbosity=.False.)
     endif
-    params%wavelet_transform_type = MR
+    params%wavelet = MR
 
     t_elapse = MPI_WTIME() - t_elapse
 
@@ -1852,8 +1852,8 @@ function scalar_product_two_trees_old( params, hvy_block, hvy_tmp, &
 
     N = params%number_blocks
     rank = params%rank
-    Jmax = params%max_treelevel
-    g = params%n_ghosts
+    Jmax = params%Jmax
+    g = params%g
     Bs= params%Bs
     Volume = product(params%domain_size(1:params%dim))
 
@@ -1961,7 +1961,7 @@ subroutine same_block_distribution(params, hvy_block, tree_ID1, tree_ID2)
 
     N = params%number_blocks
     fsize = params%forest_size
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
 
     !! Loop over all treecodes of both trees and check if they are identical.

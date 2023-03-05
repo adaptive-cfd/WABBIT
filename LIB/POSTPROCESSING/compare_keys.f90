@@ -6,7 +6,7 @@
 
 subroutine compare_keys(key1, key2)
     use module_helpers, only: check_file_exists
-    use module_precision
+    use module_globals
 
     implicit none
     character(len=*), intent(in) :: key1, key2

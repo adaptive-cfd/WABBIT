@@ -30,7 +30,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
 
     ! grid parameter
     Bs    = params%Bs
-    g     = params%n_ghosts
+    g     = params%g
 
     call createMask_tree(params, time, hvy_mask, hvy_tmp)
 

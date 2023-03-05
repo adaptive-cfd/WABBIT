@@ -75,8 +75,6 @@ subroutine ini_file_to_params( params, filename )
     !
     ! discretization order
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
-    ! order of predictor for refinement
-    call read_param_mpi(FILE, 'Discretization', 'order_predictor', params%order_predictor, "---" )
     ! filter frequency
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
     call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
@@ -114,9 +112,9 @@ subroutine ini_file_to_params( params, filename )
     ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
     ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
     ! prior to downsampling.
-    call read_param_mpi(FILE, 'Wavelet', 'transform_type', params%wavelet_transform_type, 'harten-multiresolution')
-    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF4,4')
+    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
 
+    call setup_wavelet(params)
 
     !***************************************************************************
     ! read DEBUG parameters
@@ -124,9 +122,6 @@ subroutine ini_file_to_params( params, filename )
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
     call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
-    call read_param_mpi(FILE, 'Debug', 'check_redundant_nodes', params%check_redundant_nodes, .false.)
-    call read_param_mpi(FILE, 'Debug', 'ghost_nodes_redundant_point_coarseWins', params%ghost_nodes_redundant_point_coarseWins, .false.)
-    call read_param_mpi(FILE, 'Debug', 'iter_ghosts', params%iter_ghosts, .false.)
 
     !***************************************************************************
     ! read MPI parameters
@@ -141,19 +136,19 @@ subroutine ini_file_to_params( params, filename )
 
     ! check ghost nodes number
     if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-    if ( (params%n_ghosts < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
+    if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%n_ghosts < 6) .and. ((params%wavelet=='CDF44').or.(params%wavelet=='CDF4,4')) .and. (params%wavelet_transform_type == 'biorthogonal') ) then
+    if ( (params%g < 6) .and. (params%wavelet=='CDF44') )  then
         call abort(050920194, "ERROR: for CDF44 wavelet, 6 ghost nodes are required")
     end if
-    if ( (params%n_ghosts < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
+    if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
         call abort("ERROR: need more ghost nodes for given refinement order")
     end if
-    if ( (params%n_ghosts < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
+    if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
-    if ( (params%n_ghosts < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
+    if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
         call abort("ERROR: need more ghost nodes for given derivative order")
     end if
 
@@ -256,20 +251,20 @@ end subroutine ini_file_to_params
     params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%n_ghosts, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, 1 )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
     call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
     call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
-    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%max_treelevel, 5 )
-    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%min_treelevel, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
+    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
 
-    if ( params%max_treelevel < params%min_treelevel ) then
+    if ( params%Jmax < params%Jmin ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
     end if
 
-    if ( params%max_treelevel > 18 ) then
+    if ( params%Jmax > 18 ) then
         ! as we internally convert the treecode to a single integer number, the number of digits is
         ! limited by that type. The largest 64-bit integer is 9 223 372 036 854 775 807
         ! which is 19 digits, but the 18th digit cannot be arbitrarily set. Therefore, 18 refinement levels
@@ -279,7 +274,7 @@ end subroutine ini_file_to_params
 
     ! the default case is that we synchronize (ghosts) with n-eqn compontents in the vector
     ! may be overwritten if pruned tree mask is used (by six)
-    N_MAX_COMPONENTS = params%n_eqn
+    N_MAX_COMPONENTS = max(6, params%n_eqn)
 
     ! read switch to turn on|off mesh refinement
     call read_param_mpi(FILE, 'Blocks', 'adapt_tree', params%adapt_tree, .true. )
@@ -419,9 +414,124 @@ end subroutine ini_file_to_params
         endif
 
         do i = 1, dims
-            if (mod(Bs(i), 2) == 0) then
+            if (mod(Bs(i), 2) /= 0) then
                 write(*,*) "Bs=", Bs
-                call abort(202392929, "Block-size must be ODD number")
+                call abort(202392929, "Block-size must be EVEN number")
             end if
         end do
     end function
+
+
+    subroutine setup_wavelet(params)
+    implicit none
+    type (type_params), intent(inout) :: params
+    ! the wavelet filter banks:
+    ! HD - low pass decomposition filter, H_TILDE
+    ! GD - high pass decomposition filter, G_TILDE
+    ! HR - low pass reconstruction filter, H
+    ! GR - high pass reconstruction filter, G
+    select case(params%wavelet)
+    case("CDF44")
+        ! H TILDE filter
+        allocate( params%HD(-6:6) )
+        params%HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
+        87.0_rk*2.0_rk**(-7.0_rk), &
+        9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
+
+        ! G TILDE filter
+        allocate( params%GD(-2:4) )
+        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+        ! H filter
+        allocate( params%HR(-3:3) )
+        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+        ! G filter
+        allocate( params%GR(-7:5) )
+        params%GR = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), +2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  -9.0_rk*2.0_rk**(-5.0_rk), &
+        87.0_rk*2.0_rk**(-7.0_rk), &
+        -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
+
+        params%order_predictor = "multiresolution_4th"
+
+    case ("CDF42")
+        ! H TILDE filter
+        allocate( params%HD(-4:4) )
+        params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
+
+        ! G TILDE filter
+        allocate( params%GD(-2:4) )
+        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+        ! H filter
+        allocate( params%HR(-3:3) )
+        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+        ! G filter
+        allocate( params%GR(-5:3) )
+        params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
+
+        params%order_predictor = "multiresolution_4th"
+
+    case ("CDF40")
+        ! H TILDE filter
+        allocate( params%HD(0:0) )
+        params%HD = (/1.0_rk/)
+
+        ! G TILDE filter
+        allocate( params%GD(-2:4) )
+        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+        ! H filter
+        allocate( params%HR(-3:3) )
+        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+        ! G filter
+        allocate( params%GR(-2:0) )
+        params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+
+        params%order_predictor = "multiresolution_4th"
+
+    case ("CDF20")
+        ! H TILDE filter
+        allocate( params%HD(0:0) )
+        params%HD = (/1.0_rk/)
+
+        ! G TILDE filter
+        allocate( params%GD(0:2) )
+        params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
+
+        ! H filter
+        allocate( params%HR(-1:1) )
+        params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
+
+        ! G filter
+        allocate( params%GR(-2:0) )
+        params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+
+        params%order_predictor = "multiresolution_2nd"
+
+    case("CDF22")
+        ! H TILDE filter
+        allocate( params%HD(-2:2) )
+        params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
+
+        ! G TILDE filter
+        allocate( params%GD(0:2) )
+        params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
+
+        ! H filter
+        allocate( params%HR(-1:1) )
+        params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
+
+        ! G filter
+        allocate( params%GR(-3:1) )
+        params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
+
+        params%order_predictor = "multiresolution_2nd"
+
+    case default
+        call abort( 3006221, "Unkown biorothonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+
+    end select
+    end subroutine

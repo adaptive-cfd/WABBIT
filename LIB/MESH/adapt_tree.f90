@@ -9,9 +9,6 @@
 !! As the grid changes, active lists and neighbor relations are updated, and load balancing
 !! is applied.
 !
-!> \note The block thresholding is done with the restriction/prediction operators acting on the
-!! entire block, INCLUDING GHOST NODES. Ghost node syncing is performed in threshold_block.
-!
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
 subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_mask, ignore_maxlevel)
@@ -19,13 +16,12 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     implicit none
 
     real(kind=rk), intent(in)           :: time
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask data. we can use different trees (forest module) to generate time-dependent/indenpedent
     ! mask functions separately. This makes the mask routines tree-level routines (and no longer
     ! block level) so the physics modules have to provide an interface to create the mask at a tree
     ! level. All parts of the mask shall be included: chi, boundary values, sponges.
@@ -57,7 +53,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     lgt_n_old = 0
     iteration = 0
     iterate   = .true.
-    Jmin      = params%min_treelevel
+    Jmin      = params%Jmin
     Jmin_active = minActiveLevel_tree(tree_ID)
     Jmax_active = maxActiveLevel_tree(tree_ID)
     level       = Jmax_active ! algorithm starts on maximum *active* level
@@ -67,6 +63,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     else
         ignore_maxlevel2 = .false.
     endif
+
+    ! 03/2023:  The new version of this routine
+    ! * perform a wavelet decomposition for the blocks
+    ! * apply the coarse extension to the WC/SC 
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -87,7 +87,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         t0 = MPI_Wtime()
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
+        ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
+call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
@@ -117,7 +118,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         !> (d) adapt the mesh, i.e. actually merge blocks
         t0 = MPI_Wtime()
-        call executeCoarsening_tree( params, hvy_block, tree_ID )
+        call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
         call toc( "adapt_tree (executeCoarsening_tree)", MPI_Wtime()-t0 )
 
 
@@ -134,32 +135,12 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! be that on some level, nothing can be coarsened, but on the levels below, it is possible.
         ! Hence checking for a constant grid is misleading at this time.)
         ! for harten-multiresolution, its sufficient to iterate until the grid is constant
-        if (params%wavelet_transform_type=="biorthogonal") then
-            iterate = (level >= Jmin)
-        else
+        if (params%wavelet=="CDF40" .or. params%wavelet=="CDF20") then
             iterate = (lgt_n_old /= lgt_n(tree_ID))
+        else
+            iterate = (level >= Jmin)
         endif
     end do
-
-    ! The grid adaptation is done now, the blocks that can be coarsened are coarser.
-    ! If a block is on Jmax now, we assign it the status +11.
-    !
-    ! NOTE: Consider two blocks, a coarse on Jmax-1 and a fine on Jmax. If you refine only
-    ! the coarse one (Jmax-1 -> Jmax), because you cannot refine the other one anymore
-    ! (by defintion of Jmax), then the redundant layer in both blocks is different.
-    ! To corrent that, you need to know which of the blocks results from interpolation and
-    ! which one has previously been at Jmax. This latter one gets the 11 status.
-    !
-    ! NOTE: If the flag ghost_nodes_redundant_point_coarseWins is true, then the +11 status is useless
-    ! because the redundant points are overwritten on the fine block with the coarser values
-    if ( .not. params%ghost_nodes_redundant_point_coarseWins ) then
-        do k = 1, lgt_n(tree_ID)
-            lgt_id = lgt_active(k, tree_ID)
-            if ( lgt_block( lgt_id, params%max_treelevel+ IDX_MESH_LVL) == params%max_treelevel ) then
-                lgt_block( lgt_id, params%max_treelevel + IDX_REFINE_STS ) = 11
-            end if
-        end do
-    end if
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
     !! they may have passed several level also. Now, the distribution of blocks may no longer
@@ -168,6 +149,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
+call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)
 end subroutine adapt_tree

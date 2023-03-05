@@ -86,7 +86,7 @@ subroutine post_dry_run
 
 
     call get_cmd_arg( "--pruned", pruned, default=.false. )
-    call get_cmd_arg( "--Jmin", Jmin_equi, default=params%min_treelevel )
+    call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
 
 
 
@@ -121,9 +121,9 @@ subroutine post_dry_run
     endif
 
     Bs = params%Bs
-    g  = params%n_ghosts
-    Jmax = params%max_treelevel
-    Jmin = params%min_treelevel
+    g  = params%g
+    Jmax = params%Jmax
+    Jmin = params%Jmin
     tree_n = params%forest_size ! used only for resetting at this point
     time = 0.0_rk
 
@@ -197,7 +197,8 @@ subroutine post_dry_run
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
             ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
-            call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
+        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+            ! call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again
             call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)

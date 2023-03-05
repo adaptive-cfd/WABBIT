@@ -96,7 +96,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         if (params%inicond_refinements > 0) then
             do k = 1, params%inicond_refinements
                 ! refine entire mesh.
-                call refine_tree( params, hvy_block,  "everywhere", tree_ID)
+                call refine_tree( params, hvy_block, hvy_tmp,  "everywhere", tree_ID)
 
                 if (params%rank == 0) then
                     write(*,'(" did ",i2," refinement stage (beyond what is required for the &
@@ -115,7 +115,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             !---------------------------------------------------------------------------
             ! Create the first mesh on the coarsest treelevel
             !---------------------------------------------------------------------------
-            call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID )
+            call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID )
 
             !---------------------------------------------------------------------------
             ! on the grid, evaluate the initial condition
@@ -131,7 +131,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                 ! we have to repeat the adapation process until the grid has reached a final
                 ! state. Since we start on the coarsest level, in each iteration we cannot loose
                 ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%max_treelevel-params%min_treelevel))
+                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%Jmax-params%Jmin))
                     lgt_n_old = lgt_n(tree_ID)
 
                     ! push up the entire grid one level.
@@ -139,7 +139,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     !! go up one level where a refinement indicator tells us to do so, but in the current code
                     !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
                     !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID  )
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
 
                     ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                     ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -172,7 +172,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%inicond_refinements > 0) then
                 do k = 1, params%inicond_refinements
                     ! refine entire mesh.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID)
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID)
 
                     ! set initial condition
                     call setInicondBlocks_tree(params, hvy_block, tree_ID)

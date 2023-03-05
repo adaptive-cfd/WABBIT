@@ -15,7 +15,7 @@ subroutine reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
     integer(kind=ik), dimension(3)      :: Bs
 
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
 
     ! delete layer of ghost nodes for all blocks (not just active ones)
 

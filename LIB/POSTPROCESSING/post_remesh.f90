@@ -1,5 +1,5 @@
 subroutine post_remesh(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -44,12 +44,12 @@ subroutine post_remesh(params)
     !
     ! select case(wavelet)
     ! case ('CDF40')
-    !     params%n_ghosts = 3_ik
+    !     params%g = 3_ik
     !     params%order_predictor = "multiresolution_4th"
     !     params%wavelet = "CDF40"
     !     params%wavelet_transform_type = "harten-multiresolution"
     ! case ('CDF44')
-    !     params%n_ghosts = 6_ik
+    !     params%g = 6_ik
     !     params%order_predictor = "multiresolution_4th"
     !     params%wavelet = "CDF4,4"
     !     params%wavelet_transform_type = "biorthogonal"
@@ -60,7 +60,7 @@ subroutine post_remesh(params)
     ! end select
     !
     !
-    ! params%max_treelevel = tc_length
+    ! params%Jmax = tc_length
     ! params%n_eqn = 1
     ! params%coarsening_indicator = "threshold-state-vector"
     ! params%threshold_state_vector_component = (/.true./)

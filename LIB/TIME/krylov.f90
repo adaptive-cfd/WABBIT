@@ -7,7 +7,6 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     !> time varible
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
@@ -388,7 +387,6 @@ END subroutine DGPADM
 !     real(kind=rk),dimension(:,:,:,:,:)      :: v
 !     real(kind=rk),dimension(:,:)            :: h
 !     integer                                 :: j
-!     !> user defined parameter structure
 !     type (type_params), intent(in)      :: params
 !     !> light data array
 !     integer(kind=ik), intent(in)        :: lgt_block(:, :)
@@ -482,7 +480,6 @@ end subroutine get_sum_all
 
 subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
@@ -496,7 +493,7 @@ subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     norm = 0.0_rk
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! loop over active blocks
     if (params%dim == 3) then
@@ -528,7 +525,6 @@ end subroutine wabbit_norm
 
 subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block1(:, :, :, :, :)
@@ -543,7 +539,7 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
     result = 0.0_rk
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! loop over active blocks
     if (params%dim == 3) then

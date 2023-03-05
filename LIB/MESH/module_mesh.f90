@@ -29,6 +29,8 @@ module module_mesh
 
 contains
 
+#include "waveletDecomposition_tree.f90"
+
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"
 
@@ -150,7 +152,7 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
     else
         lgt_n_afterRefinement = 0
         do k = 1, lgt_n(tree_ID)
-            if (lgt_block( lgt_active(k, tree_ID), params%max_treelevel + IDX_MESH_LVL ) < params%max_treelevel) then
+            if (lgt_block( lgt_active(k, tree_ID), params%Jmax + IDX_MESH_LVL ) < params%Jmax) then
                 ! this block can be refined (and will be) (it is refined to it has 8 children
                 ! but disappears, so 7 new blocks)
                 lgt_n_afterRefinement = lgt_n_afterRefinement + (2**params%dim)-1
@@ -207,7 +209,7 @@ subroutine toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level,
     if (present(target_level)) then
         level = target_level
     else
-        level = params%max_treelevel
+        level = params%Jmax
     endif
 
     ! refine/coarse to attain desired level, respectively
@@ -217,15 +219,15 @@ subroutine toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level,
         do k = 1, lgt_n(tree_ID)
             lgt_id = lgt_active(k, tree_ID)
 
-            if (treecode_size(lgt_block(lgt_id,:), params%max_treelevel) > level) then
-                lgt_block(lgt_id, params%max_treelevel + IDX_REFINE_STS) = -1
+            if (treecode_size(lgt_block(lgt_id,:), params%Jmax) > level) then
+                lgt_block(lgt_id, params%Jmax + IDX_REFINE_STS) = -1
             endif
         end do
 
         ! this might not be necessary since we start from an admissible grid
         call ensureGradedness_tree( params, tree_ID )
 
-        call executeCoarsening_tree( params, hvy_block, tree_ID)
+        call executeCoarsening_tree( params, hvy_block, tree_ID, .false.)
 
         call updateMetadata_tree(params, tree_ID)
     end do
@@ -236,8 +238,8 @@ subroutine toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level,
         do k = 1, lgt_n(tree_ID)
             lgt_id = lgt_active(k, tree_ID)
 
-            if (treecode_size(lgt_block(lgt_id,:), params%max_treelevel) < level) then
-                lgt_block(lgt_id, params%max_treelevel + IDX_REFINE_STS) = 1
+            if (treecode_size(lgt_block(lgt_id,:), params%Jmax) < level) then
+                lgt_block(lgt_id, params%Jmax + IDX_REFINE_STS) = 1
             endif
         end do
 

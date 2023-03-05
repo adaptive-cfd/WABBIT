@@ -1,5 +1,5 @@
 subroutine sparse_to_dense(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -80,20 +80,17 @@ subroutine sparse_to_dense(params)
     call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
 
     if (order == "4") then
-        params%wavelet_transform_type = 'harten-multiresolution'
         params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
-        params%wavelet = "CDF4,0"
+        params%g = 4_ik
+        params%wavelet = "CDF40"
     elseif (order == "44") then
-        params%wavelet_transform_type = "biorthogonal"
         params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 6_ik
-        params%wavelet = "CDF4,4"
+        params%g = 6_ik
+        params%wavelet = "CDF44"
     elseif (order == "2") then
-        params%wavelet_transform_type = "harten-multiresolution"
         params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
-        params%wavelet = "CDF2,0"
+        params%g = 2_ik
+        params%wavelet = "CDF20"
     else
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
@@ -125,16 +122,15 @@ subroutine sparse_to_dense(params)
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
 
-        write(*,'(A40,1x,A40)') "params%wavelet_transform_type", params%wavelet_transform_type
         write(*,'(A40,1x,A40)') "params%order_predictor", params%order_predictor
         write(*,'(A40,1x,A40)') "params%wavelet", params%wavelet
-        write(*,'(A40,1x,i2)') "params%n_ghosts", params%n_ghosts
+        write(*,'(A40,1x,i2)') "params%g", params%g
         write(*,'(80("-"))')
     endif
 
     ! set max_treelevel for allocation of hvy_block
-    params%max_treelevel = max(level, tc_length)
-    params%min_treelevel = level
+    params%Jmax = max(level, tc_length)
+    params%Jmin = level
     params%Bs = Bs
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
@@ -149,7 +145,7 @@ subroutine sparse_to_dense(params)
         write(*,'("File contains Nb=",i6," blocks of size Bs=",i4," x ",i4," x ",i4)') lgt_n(tree_ID), Bs(1),Bs(2),Bs(3)
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("Time=",g12.4," it=",i9)') time, iteration
-        write(*,'("Length of treecodes in file=",i3," in memory=",i3)') tc_length, params%max_treelevel
+        write(*,'("Length of treecodes in file=",i3," in memory=",i3)') tc_length, params%Jmax
         write(*,'("   NCPU=",i6)') params%number_procs
         write(*,'("File   Nb=",i6," blocks")') lgt_n(tree_ID)
         write(*,'("Memory Nb=",i6)') params%number_blocks
@@ -176,19 +172,17 @@ subroutine sparse_to_dense(params)
 
     elseif (operator=="refine-coarsen") then
         write(*,*) "starting at", lgt_n(tree_ID)
-
-        call refine_tree( params, hvy_block, "everywhere", tree_ID )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        ! call refine_tree( params, hvy_block, "everywhere", tree_ID )
 
         write(*,*) "refined to", lgt_n(tree_ID)
 
         params%threshold_mask = .false.
         params%coarsening_indicator = "threshold-state-vector"
         params%physics_type = "ConvDiff-new"
-        params%ghost_nodes_redundant_point_coarseWins = .false.
-        params%iter_ghosts = .false.
         params%eps_normalized = .false.
         params%force_maxlevel_dealiasing = .false.
-        params%min_treelevel = 1
+        params%Jmin = 1
 
         call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
 

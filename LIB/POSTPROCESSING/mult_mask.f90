@@ -1,5 +1,5 @@
 subroutine mult_mask(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -88,13 +88,13 @@ subroutine mult_mask(params)
         end if
     endif
 
-    params%max_treelevel = tc_length
+    params%Jmax = tc_length
     params%n_eqn = 2
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
     params%Bs = Bs
-    params%n_ghosts = 2_ik
+    params%g = 2_ik
     params%order_predictor = "multiresolution_2nd"
 
     allocate(params%butcher_tableau(1,1))

@@ -1,6 +1,6 @@
 module module_forestMetaData
 
-    use module_precision
+    use module_globals
 
     ! This module contains the memory for the forest meta data.
     !
@@ -23,6 +23,10 @@ module module_forestMetaData
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
 
+    ! Note how neither HVY_BLOCK (usually the state vector)
+    ! nor HVY_TMP (a work array)
+    ! are included here !! 
+
     integer(kind=ik), allocatable, public    :: lgt_block(:, :)
 
     integer(kind=ik), allocatable, public    :: hvy_neighbor(:,:)
@@ -35,6 +39,9 @@ module module_forestMetaData
     integer(kind=ik), allocatable, public    :: hvy_active(:,:)
     ! number of active blocks (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_n(:)
+
+    ! if only a subset of blocks is synchronized, this flag is used to determine which
+    logical, allocatable, public :: lgt_BlocksToSync(:)
 
     ! The following list contains the numerical treecode and the lightID for the active blocks
     ! in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,

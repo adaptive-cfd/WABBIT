@@ -1,17 +1,3 @@
-!> \brief Set coarsening status for all active blocks, different methods possible
-!
-!> \details This routine sets the coarsening flag for all blocks. We allow for different
-!! mathematical methods (everywhere / random) currently not very complex, but expected to grow
-!! in the future.
-!! \n
-!! ------------------ \n
-!! Refinement status: \n
-!! ------------------ \n
-!! +1 refine \n
-!! 0 do nothing \n
-!! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
-!! -2 block will coarsen and be merged with her sisters \n
-! ********************************************************************************************
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
     tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
 
@@ -60,11 +46,11 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
     consider_hvy_tmp = .false.
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     neq = params%n_eqn
     Bs = params%Bs
-    g = params%n_ghosts
-    biorthogonal = (params%wavelet_transform_type=="biorthogonal")
+    g = params%g
+    biorthogonal = ((params%wavelet/="CDF40").and.(params%wavelet/="CDF20"))
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n(tree_ID)
@@ -215,7 +201,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
+            level = lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
@@ -250,7 +236,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
         do k = 1, lgt_n(tree_ID)
             lgt_id = lgt_active(k, tree_ID)
-            if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then
+            if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%Jmax) then
                 ! force blocks on maxlevel to coarsen
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
             endif

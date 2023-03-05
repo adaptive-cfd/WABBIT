@@ -38,7 +38,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
         endif
 
         ! randomly refine some blocks
-        call refine_tree( params, hvy_block, "random", tree_ID=tree_ID   )
+        call refine_tree( params, hvy_block, hvy_tmp, "random", tree_ID=tree_ID   )
 
         ! randomly coarsen some blocks
         call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "random", hvy_tmp  )

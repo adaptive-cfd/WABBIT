@@ -5,7 +5,7 @@
 !! input:     - heavy id
 !!            - proc rank
 !!            - number of blocks per proc
-!! output:    - ligth data id
+!! output:    - light data id
 ! ********************************************************************************************
 
 subroutine hvy2lgt( lgt_id, hvy_id, rank, N )

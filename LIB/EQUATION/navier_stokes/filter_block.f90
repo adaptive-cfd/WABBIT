@@ -197,11 +197,6 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
               endif
       end do
 
-    case('wavelet')
-      do dF = 1, N_dF
-          call wavelet_filter(filter%order_predictor, Bs, g, work_array(:,:,:,dF))
-      enddo
-
     case default
       call abort(100918,"No filter called: "//filter%name //" is known.")
 
@@ -211,45 +206,6 @@ subroutine filter_block(filter, time, u, g, Bs, x0, dx, work_array)
 
 
 end subroutine filter_block
-
-
-
-!=====================================================================
-!  WAVELET FILTER
-!=====================================================================
-subroutine wavelet_filter(order_predictor, Bs, g, block_data)
-    use module_interpolation, only :  restriction_3D, restriction_2D, prediction_2D, prediction_3D
-
-    implicit none
-    !> params structure of navier stokes
-    character(len=*), intent(in) :: order_predictor
-    !> mesh params
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    integer(kind=ik), intent(in) :: g
-    !> heavy data array - block data
-    real(kind=rk), intent(inout) :: block_data(:, :, :)
-    real(kind=rk), allocatable, save :: u3(:,:,:)
-
-
-    if ( size(block_data,3)>1 ) then
-        ! ********** 3D **********
-        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,(Bs(3)+1)/2+g))
-        ! now, coarsen array u1 (restriction)
-        call restriction_3D( block_data, u3 )  ! fine, coarse
-        ! then, re-interpolate to the initial level (prediciton)
-        call prediction_3D ( u3, block_data, order_predictor )  ! coarse, fine
-
-    else
-        ! ********** 2D **********
-        if (.not.allocated(u3)) allocate(u3((Bs(1)+1)/2+g,(Bs(2)+1)/2+g,1))
-        ! now, coarsen array u1 (restriction)
-        call restriction_2D( block_data(:,:,1), u3(:,:,1) )  ! fine, coarse
-        ! then, re-interpolate to the initial level (prediciton)
-        call prediction_2D ( u3(:,:,1), block_data(:,:,1), order_predictor )  ! coarse, fine
-
-    end if
-
-end subroutine wavelet_filter
 
 
 !=====================================================================
@@ -570,7 +526,7 @@ end subroutine bogey_filter2D_
 !
 !     ! grid parameter
 !     ! Bs  = params%Bs
-!     ! g   = params%n_ghosts
+!     ! g   = params%g
 !     ! N_dF= params%n_eqn
 !
 !     ! allocate old data array

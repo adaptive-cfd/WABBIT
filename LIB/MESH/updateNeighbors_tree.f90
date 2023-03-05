@@ -15,7 +15,7 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
 
     N = params%number_blocks
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
 
 
     if ( params%dim == 3 ) then
@@ -38,7 +38,7 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call hvy2lgt( lgtID, hvyID, params%rank, N )
 
-            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
 
             ! faces
@@ -95,7 +95,7 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call hvy2lgt( lgtID, hvyID, params%rank, N )
 
-            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
 
             call find_neighbor( params, hvyID, lgtID, Jmax, '__N', error, n_domain)

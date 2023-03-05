@@ -7,7 +7,7 @@ module module_acm
   use module_insects
   use module_t_files
 
-  use module_precision
+  use module_globals
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
@@ -341,10 +341,15 @@ end subroutine
         ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
-    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
+    ! uniqueGrid modification
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
+    ! ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
 
     dx_min = minval( ddx(1:params_acm%dim) )
-    nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
+    ! uniqueGrid modification
+    ! nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
+    nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
+    
     if (params_acm%c_0 > 0.0_rk) then
         dt_min = params_acm%CFL*dx_min/params_acm%c_0
     else

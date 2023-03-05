@@ -1,5 +1,5 @@
 subroutine post_mean(params)
-    use module_precision
+    use module_globals
     use module_params
     use module_mesh
     use mpi
@@ -52,9 +52,9 @@ subroutine post_mean(params)
 
     params%Bs = Bs
     params%n_eqn = 1
-    params%n_ghosts = 2_ik
+    params%g = 2_ik
     params%order_predictor = "multiresolution_2nd"
-    params%max_treelevel = tc_length
+    params%Jmax = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
@@ -79,7 +79,7 @@ subroutine post_mean(params)
 
     meanl = 0.0_rk
 
-    g = params%n_ghosts
+    g = params%g
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
 

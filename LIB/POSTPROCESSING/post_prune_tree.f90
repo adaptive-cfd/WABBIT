@@ -1,5 +1,5 @@
 subroutine post_prune_tree(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -50,10 +50,10 @@ subroutine post_prune_tree(params)
     ! just to get some memory:
     params%number_blocks = 20 + N1 / params%number_procs
     params%domain_size = domain
-    params%max_treelevel = tc_length1
-    params%min_treelevel = 1
+    params%Jmax = tc_length1
+    params%Jmin = 1
     params%n_eqn = 1
-    params%n_ghosts = 2
+    params%g = 2
     params%forest_size = 4
     fsize = params%forest_size
     params%order_predictor = "multiresolution_2nd"

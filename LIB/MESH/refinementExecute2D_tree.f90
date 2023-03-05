@@ -24,13 +24,13 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk), allocatable, save    :: new_data(:,:,:), data_predict_fine(:,:)  ! data fields for interpolation
     integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
-    integer(kind=ik)                    :: treecode(params%max_treelevel)
+    integer(kind=ik)                    :: treecode(params%Jmax)
     integer(kind=ik)                    :: level
 
     N = params%number_blocks
     rank = params%rank
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
@@ -40,7 +40,9 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
     if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1 ) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    if (.not. allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, N_MAX_COMPONENTS) )
+        ! if (.not. allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, N_MAX_COMPONENTS) )
+    ! uniqueGrid modification
+    if (.not. allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), N_MAX_COMPONENTS) )
 
 
     ! every proc loop over its active heavy data array
@@ -50,11 +52,11 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
         call hvy2lgt( lgt_id, hvy_active(k, tree_ID), rank, N )
 
         ! block wants to refine
-        if ( (lgt_block( lgt_id, params%max_treelevel + idx_refine_sts) == +1) ) then
+        if ( (lgt_block( lgt_id, params%Jmax + idx_refine_sts) == +1) ) then
 
             ! extract treecode and mesh level
-            treecode = lgt_block( lgt_id, 1:params%max_treelevel )
-            level    = lgt_block( lgt_id, params%max_treelevel + IDX_MESH_LVL )
+            treecode = lgt_block( lgt_id, 1:params%Jmax )
+            level    = lgt_block( lgt_id, params%Jmax + IDX_MESH_LVL )
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
             ! loop over all data fields
@@ -63,7 +65,9 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
                 ! interpolate data
                 call prediction_2D(hvy_block(:, :, dF, hvy_active(k, tree_ID)), data_predict_fine, params%order_predictor)
                 ! save new data, but cut ghost nodes.
-                new_data(:,:,dF) = data_predict_fine( 2*g+1:Bs(1)+2*g+(Bs(1)+2*g-1)-2*g, 2*g+1:Bs(2)+2*g+(Bs(2)+2*g-1)-2*g )
+                    ! new_data(:,:,dF) = data_predict_fine( 2*g+1:Bs(1)+2*g+(Bs(1)+2*g-1)-2*g, 2*g+1:Bs(2)+2*g+(Bs(2)+2*g-1)-2*g )
+                ! uniqueGrid modification
+                new_data(:,:,dF) = data_predict_fine( 2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g )
             end do
 
             ! ------------------------------------------------------------------------------------------------------
@@ -76,19 +80,20 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
 
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%Jmax ) = treecode
             ! new treecode one level up - "0" block
-            lgt_block( lgt_free_id, level+1 )                = 0
+            lgt_block( lgt_free_id, level+1 ) = 0
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
+            lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
+            lgt_block( lgt_free_id, params%Jmax + idx_refine_sts ) = 0
             ! the tree_ID is the same as the one of the mother block
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_ID
+            lgt_block( lgt_free_id, params%Jmax + IDX_TREE_ID ) = tree_ID
 
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,3)
+                ! hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), dF)
                 hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), dF)
             end do
 
@@ -100,20 +105,21 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
 
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%Jmax ) = treecode
             ! new treecode one level up - "1" block
-            lgt_block( lgt_free_id, level+1 )                = 1
+            lgt_block( lgt_free_id, level+1 ) = 1
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
+            lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
+            lgt_block( lgt_free_id, params%Jmax + idx_refine_sts ) = 0
             ! the tree_ID is the same as the one of the mother block
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_ID
+            lgt_block( lgt_free_id, params%Jmax + IDX_TREE_ID ) = tree_ID
 
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,3)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, dF)
+                ! hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2)+1:2*Bs(2), dF)
             end do
 
             !--------------------------
@@ -124,20 +130,21 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
 
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%Jmax ) = treecode
             ! new treecode one level up - "1" block
-            lgt_block( lgt_free_id, level+1 )                = 2
+            lgt_block( lgt_free_id, level+1 ) = 2
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
+            lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
+            lgt_block( lgt_free_id, params%Jmax + idx_refine_sts ) = 0
             ! the tree_ID is the same as the one of the mother block
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_ID
+            lgt_block( lgt_free_id, params%Jmax + IDX_TREE_ID ) = tree_ID
 
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,3)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), dF)
+                ! hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), 1:Bs(2), dF)
             end do
 
             !--------------------------
@@ -148,20 +155,21 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
 
             ! write new light data
             ! old treecode
-            lgt_block( lgt_free_id, 1:params%max_treelevel ) = treecode
+            lgt_block( lgt_free_id, 1:params%Jmax ) = treecode
             ! new treecode one level up - "1" block
-            lgt_block( lgt_free_id, level+1 )                = 3
+            lgt_block( lgt_free_id, level+1 ) = 3
             ! new level + 1
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_MESH_LVL ) = level+1
+            lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
             ! reset refinement status
-            lgt_block( lgt_free_id, params%max_treelevel + idx_refine_sts ) = 0
+            lgt_block( lgt_free_id, params%Jmax + idx_refine_sts ) = 0
             ! the tree_ID is the same as the one of the mother block
-            lgt_block( lgt_free_id, params%max_treelevel + IDX_TREE_ID ) = tree_ID
+            lgt_block( lgt_free_id, params%Jmax + IDX_TREE_ID ) = tree_ID
 
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,3)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, dF)
+                ! hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), Bs(2)+1:2*Bs(2), dF)
             end do
 
         end if

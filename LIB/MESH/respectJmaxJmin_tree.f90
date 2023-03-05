@@ -6,8 +6,8 @@ subroutine respectJmaxJmin_tree( params, tree_ID)
     integer(kind=ik)                    :: Jmax, Jmin       ! treelevel restrictions
     integer(kind=ik)                    :: k , lgt_id               ! loop variables
 
-    Jmax = params%max_treelevel
-    Jmin = params%min_treelevel
+    Jmax = params%Jmax
+    Jmin = params%Jmin
 
     ! loop over all active blocks
     do k = 1, lgt_n(tree_ID)

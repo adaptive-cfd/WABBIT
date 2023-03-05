@@ -17,7 +17,7 @@ subroutine reset_tree(params, verbosity, tree_ID )
     endif
 
     do k = 1, size(lgt_block,1)
-        if (lgt_block(k,params%max_treelevel+IDX_TREE_ID) == tree_ID) then
+        if (lgt_block(k,params%Jmax+IDX_TREE_ID) == tree_ID) then
             ! this block is a part of this tree -> delete it
             lgt_block(k,:) = -1
         endif
@@ -55,7 +55,7 @@ subroutine reset_forest(params)
     ! lgt_block = -1 ! Thomas (30-11-2018): do not reset anymore, use 'pseudo-dynamic' memory management
     ! lgt_active = -1
     n_trees = params%forest_size
-    max_treelevel = params%max_treelevel
+    max_treelevel = params%Jmax
     ! reset data:
     ! all blocks are inactive, reset treecode
     lgt_block(:,:) = -1

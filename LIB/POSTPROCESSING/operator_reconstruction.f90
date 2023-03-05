@@ -1,5 +1,5 @@
 subroutine operator_reconstruction(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -46,7 +46,7 @@ subroutine operator_reconstruction(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
-    params%max_treelevel = tc_length+2 ! to allow refinement
+    params%Jmax = tc_length+2 ! to allow refinement
     params%n_eqn = 2
     params%domain_size = domain
     params%Bs = Bs
@@ -67,8 +67,6 @@ subroutine operator_reconstruction(params)
     call get_cmd_arg( "--predictor", params%order_predictor, default="multiresolution_4th" )
     ! viscosity
     call get_cmd_arg( "--viscosity", nu, default=0.0_rk )
-    ! coarseWins or fineWins
-    call get_cmd_arg( "--coarse-wins", params%ghost_nodes_redundant_point_coarseWins, default=.false. )
     call get_cmd_arg( "--refine-coarsen", refine, default=.false. )
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF40" )
 
@@ -76,12 +74,6 @@ subroutine operator_reconstruction(params)
     ! Adjustable PARAMETERS
     !---------------------------------------------------------------------------
     dir = "x"
-    if (params%wavelet=="CDF40") then
-        params%wavelet_transform_type = "harten-multiresolution"
-    else
-        params%wavelet_transform_type = "biorthogonal"
-    endif
-    params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
 
@@ -94,7 +86,7 @@ subroutine operator_reconstruction(params)
         allocate(stencil2(-2:+2))
         stencil2 = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-        params%n_ghosts = 4_ik
+        params%g = 4_ik
 
     case("FD_4th_central")
         ! standard 4th central FD stencil
@@ -104,7 +96,7 @@ subroutine operator_reconstruction(params)
         allocate(stencil2(-2:+2))
         stencil2 = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-        params%n_ghosts = 2_ik
+        params%g = 2_ik
 
     case("FD_2nd_central")
         ! Tam & Webb, 4th order optimized (for first derivative)
@@ -114,7 +106,7 @@ subroutine operator_reconstruction(params)
         allocate(stencil2(-1:+1))
         stencil2 = (/1.0_rk, -2.0_rk, 1.0_rk/)
 
-        params%n_ghosts = 2_ik
+        params%g = 2_ik
 
     case default
         call abort(1919191222,"unknown discretization set?!")
@@ -122,17 +114,17 @@ subroutine operator_reconstruction(params)
     end select
 
     if (params%wavelet=="CDF44") then
-        params%n_ghosts = 6_ik
+        params%g = 6_ik
     endif
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",es12.4," refineCoarsen=",L1,1x,A)') trim(params%order_discretization), &
-    trim(params%order_predictor), dir, params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu, refine, params%wavelet
+    write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2," nu=",es12.4," refineCoarsen=",L1,1x,A)') trim(params%order_discretization), &
+    trim(params%order_predictor), dir, params%g, params%Bs(1), nu, refine, params%wavelet
     close(17)
 
     !---------------------------------------------------------------------------
 
-    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%n_ghosts<4)) then
+    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<4)) then
         call abort(33,"not enough g")
     endif
 
@@ -142,7 +134,7 @@ subroutine operator_reconstruction(params)
     !---------------------------------------------------------------------------
 
 
-    g = params%n_ghosts
+    g = params%g
     a1 = lbound(stencil1, dim=1)
     b1 = ubound(stencil1, dim=1)
     a2 = lbound(stencil2, dim=1)
@@ -178,7 +170,7 @@ subroutine operator_reconstruction(params)
         call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+        level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
 
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
@@ -266,7 +258,8 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-                call refine_tree( params, hvy_block, "everywhere", tree_ID )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+!                call refine_tree( params, hvy_block, "everywhere", tree_ID )
 
                 call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             endif

@@ -47,7 +47,7 @@ subroutine unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, h
     end if
 
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     number_procs  = params%number_procs
     number_blocks = params%number_blocks
 

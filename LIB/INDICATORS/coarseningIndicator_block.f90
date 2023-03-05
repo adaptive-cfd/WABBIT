@@ -13,7 +13,6 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     iteration, refinement_status, norm, level, block_mask)
 
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
@@ -52,9 +51,9 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     real(kind=rk) :: nnorm2(1:20) ! just take a larger one...lazy tommy
 
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     !> This routine sets the -1 coarsening flag on a block. it uses different methods to
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness

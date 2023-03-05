@@ -1,4 +1,4 @@
-subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp)
+subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp, nrhs_slots1)
     implicit none
 
     !> user defined parameter structure
@@ -15,14 +15,14 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp
+    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp, nrhs_slots1
     ! local shortcuts:
     integer(kind=ik)                                    :: g, Neqn, number_blocks,&
     rank, number_procs,  dim
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: memory_this, memory_total
-    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
+    integer             :: status, nwork, nx, ny, nz, max_neighbors, mpierr, nrhs_slots
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
@@ -39,7 +39,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     rank            = params%rank
     Bs              = params%Bs
     dim             = params%dim
-    g               = params%n_ghosts
+    g               = params%g
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
     memory_total    = 0.0_rk
@@ -77,16 +77,20 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
     ! Hence, nrhs_slots is number of slots for RHS saving:
-    if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
-        nrhs_slots = size(params%butcher_tableau,1)
-    elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
-        nrhs_slots = 6
-    elseif (params%time_step_method == "Krylov") then
-        nrhs_slots = params%M_krylov +3
-    elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
-        nrhs_slots = 0
+    if (present(nrhs_slots1)) then
+        nrhs_slots = nrhs_slots1
     else
-        call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+        if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
+            nrhs_slots = size(params%butcher_tableau,1)
+        elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
+            nrhs_slots = 6
+        elseif (params%time_step_method == "Krylov") then
+            nrhs_slots = params%M_krylov +3
+        elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
+            nrhs_slots = 0
+        else
+            call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+        endif
     endif
 
 
@@ -235,12 +239,22 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     !---------------------------------------------------------------------------)
     if (allocated(lgt_block)) deallocate(lgt_block)
-    allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
+    allocate( lgt_block( number_procs*params%number_blocks, params%Jmax+EXTRA_LGT_FIELDS) )
     memory_this = product(real(shape(lgt_block)))*4.0e-9
     memory_total = memory_total + memory_this
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
         "lgt_block", memory_this, shape(lgt_block)
+    endif
+
+    !---------------------------------------------------------------------------)
+    if (allocated(lgt_BlocksToSync)) deallocate(lgt_BlocksToSync)
+    allocate( lgt_BlocksToSync( number_procs*params%number_blocks) )
+    memory_this = 0.0
+    memory_total = memory_total + memory_this
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "lgt_BlocksToSync", memory_this, shape(lgt_BlocksToSync)
     endif
 
     !---------------------------------------------------------------------------

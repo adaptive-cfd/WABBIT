@@ -6,7 +6,7 @@
 
 module module_navier_stokes_params
 
-  use module_precision
+  use module_globals
   use module_ini_files_parser_mpi
   use mpi
   use module_params, only: read_bs

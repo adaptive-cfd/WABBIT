@@ -1,12 +1,12 @@
 subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     implicit none
 
-    character(len=*), intent(in)        :: fname                                !> file name
-    real(kind=rk), intent(in)           :: time                                 !> time loop parameters
+    character(len=*), intent(in)        :: fname                    !> file name
+    real(kind=rk), intent(in)           :: time                     !> time loop parameters
     integer(kind=ik), intent(in)        :: iteration
-    integer(kind=ik), intent(in)        :: dF                                   !> datafield number
-    type (type_params), intent(in)      :: params                               !> user defined parameter structure
-    real(kind=rk), intent(in)           :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: dF                       !> datafield number
+    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
@@ -37,9 +37,13 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
 
 
+    ! uniqueGrid modification
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+    hvy_active(:,tree_ID), hvy_n(tree_ID) )
+
     rank = params%rank
     Bs   = params%Bs
-    g    = params%n_ghosts
+    g    = params%g
     dim  = params%dim
     periodic_BC = 0_ik
     symmetry_BC = 0_ik
@@ -58,7 +62,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     if (save_ghosts) then
         allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n(tree_ID) ), stat=status)
     else
-        allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n(tree_ID) ), stat=status)
+        ! allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n(tree_ID) ), stat=status)
+        ! uniqueGrid modification:
+        allocate(myblockbuffer( 1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:hvy_n(tree_ID) ), stat=status)
     endif
 
     if (status /= 0) then
@@ -71,7 +77,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     allocate(lgt_ids(1:hvy_n(tree_ID)))
     allocate(refinement_status(1:hvy_n(tree_ID)))
     procs = rank
-    allocate(block_treecode(1:params%max_treelevel, 1:hvy_n(tree_ID)))
+    allocate(block_treecode(1:params%Jmax, 1:hvy_n(tree_ID)))
 
     coords_origin = 7.0e6_rk
 
@@ -80,17 +86,18 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         call abort(291019, "you try to save an empty mesh.")
     endif
 
-
+#ifdef DEV
     ! first: check if field contains NaNs
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         if (block_contains_NaN(hvy_block(:,:,:,dF,hvy_id))) call abort(0201, "ERROR: Field "//get_dsetname(fname)//" contains NaNs!! We should not save this...")
     end do
+#endif
 
     ! output on screen
     if (rank == 0) then
         sparsity_Jcurrent = dble(lgt_n(tree_ID)) / dble(2**maxActiveLevel_tree(tree_ID))**dim
-        sparsity_Jmax = dble(lgt_n(tree_ID)) / dble(2**params%max_treelevel)**dim
+        sparsity_Jmax = dble(lgt_n(tree_ID)) / dble(2**params%Jmax)**dim
 
         write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
         time, trim(adjustl(fname)), lgt_n(tree_ID), 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
@@ -109,7 +116,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        ! ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        ! uniqueGrid modification:
+        ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n(tree_ID)/) - 1
         if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
 
     else
@@ -118,7 +127,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         ! array we hold, so that all CPU can write to the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
-        ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        ! ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        ! uniqueGrid modification:
+        ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n(tree_ID)/) - 1
         if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
 
     endif
@@ -144,7 +155,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
                 if (save_ghosts) then
                     myblockbuffer(:,:,:,l) = hvy_block( :, :, :, dF, hvy_id)
                 else
-                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                    ! myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
+                    ! uniqueGrid modification:
+                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, hvy_id)
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -162,13 +175,15 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
                 endif
 
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = lgt_block( lgt_id, 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
             else
                 ! 2D
                 if (save_ghosts) then
                     myblockbuffer(:,:,1,l) = hvy_block(:, :, 1, dF, hvy_id)
                 else
-                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                    ! myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
+                    ! uniqueGrid modification:
+                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, 1, dF, hvy_id)
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -182,11 +197,11 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
                 ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = lgt_block( lgt_id, 1:params%max_treelevel )
+                block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
             endif
 
 
-            refinement_status(l) = lgt_block( lgt_id, params%max_treelevel+IDX_REFINE_STS )
+            refinement_status(l) = lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS )
             lgt_ids(l) = lgt_id
 
             ! next block
@@ -207,7 +222,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
-        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%max_treelevel-1,ubounds3D(4)/), block_treecode)
+        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%Jmax-1,ubounds3D(4)/), block_treecode)
         call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds3D(4)/), (/ubounds3D(4)/), procs)
         call write_int_dset_mpi_hdf5_1D(file_id, "refinement_status", (/lbounds3D(4)/), (/ubounds3D(4)/), refinement_status)
         call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds3D(4)/), (/ubounds3D(4)/), lgt_ids)
@@ -219,7 +234,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
         call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
         call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
-        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%max_treelevel-1,ubounds2D(3)/), block_treecode)
+        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%Jmax-1,ubounds2D(3)/), block_treecode)
         call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds2D(3)/), (/ubounds2D(3)/), procs)
         call write_int_dset_mpi_hdf5_1D(file_id, "refinement_status", (/lbounds2D(3)/), (/ubounds2D(3)/), refinement_status)
         call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
@@ -227,7 +242,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
 
 
     ! add additional annotations
-    call write_attribute(file_id, "blocks", "version", (/20200902/)) ! this is used to distinguish wabbit file formats
+    call write_attribute(file_id, "blocks", "version", (/20231602/)) ! this is used to distinguish wabbit file formats
     call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
@@ -307,7 +322,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     number_procs = params%number_procs
     N            = params%number_blocks
     Bs           = params%Bs
-    g            = params%n_ghosts
+    g            = params%g
     NblocksFile  = getNumberBlocksH5File(fnames(1))
     N_files      = size(fnames)
 
@@ -428,7 +443,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
     ! compare treecode lengths
-    if (dims_treecode(1) > params%max_treelevel) then
+    if (dims_treecode(1) > params%Jmax) then
         ! treecode in input file is greater than the new one, abort and output on screen
         ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
         ! but active level=4). On the other hand, that appears to be rare.
@@ -514,11 +529,11 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         ! copy treecode
         lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
-        lgt_block(free_lgt_id, params%max_treelevel+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+        lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
-        lgt_block(free_lgt_id, params%max_treelevel+IDX_REFINE_STS) = 0
+        lgt_block(free_lgt_id, params%Jmax+IDX_REFINE_STS) = 0
         ! set number of the tree
-        lgt_block(free_lgt_id, params%max_treelevel+IDX_TREE_ID) = tree_id
+        lgt_block(free_lgt_id, params%Jmax+IDX_TREE_ID) = tree_id
         ! copy actual data
         do dF = 1, N_files
             hvy_block( :, :, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
@@ -580,7 +595,8 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
     integer(kind=ik), dimension(1)                :: iiteration, number_blocks, version
     real(kind=rk), dimension(1)                   :: ttime
     integer(hid_t)                                :: file_id
-    integer(kind=ik)                              :: datarank, Nb, rank, ierr, tmp1(1:3), tmp2(1:3)
+    integer                                       :: datarank
+    integer(kind=ik)                              :: rank, ierr, tmp1(1:3), tmp2(1:3), Nb
     integer(kind=hsize_t)                         :: size_field(1:4)
     integer(hsize_t), dimension(2)                :: dims_treecode
     logical :: verbose = .true.
@@ -593,7 +609,6 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
     ! open the file
     call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
 
-
     !----------------------------------------------------------------------------------
     ! version check
     !----------------------------------------------------------------------------------
@@ -601,30 +616,30 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
     ! if the number is not found, version=0.
     call read_attribute( file_id, "blocks", "version", version)
 
-    if (version(1) == 20200408 .and. rank==0) then
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "The file we are trying to read is generated with an intermediate version"
-        write(*,*) "of wabbit (after 08 April 2020). In this the file, the grid"
-        write(*,*) "definition does not include a redundant point, i.e., a block is defined"
-        write(*,*) "with spacing dx = L*2^-J / Bs. This definition was a dead-end, as it lead"
-        write(*,*) "to instabilities and other problems. Current versions of WABBIT include a redundant point again."
-        write(*,*) ""
-        write(*,*) "The newGhostNodes branch still STORED the redundant point for visualization."
-        write(*,*) "This was simply the first ghost node. If Bs was odd, this lead to an even number"
-        write(*,*) "of points, and this cannot be read with present code versions."
-        write(*,*) ""
-        write(*,*) "A workaround must be done in preprocessing: upsampling to equidistant resolution and"
-        write(*,*) "re-gridding is required. I am truely sorry for this."
-        write(*,*) ""
-        write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"
-        write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"
-        write(*,*) "have been obtained with the newGhostNodes branch"
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
-    endif
+    ! if (version(1) == 20200408 .and. rank==0) then
+    !     write(*,*) "--------------------------------------------------------------------"
+    !     write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+    !     write(*,*) "--------------------------------------------------------------------"
+    !     write(*,*) "The file we are trying to read is generated with an intermediate version"
+    !     write(*,*) "of wabbit (after 08 April 2020). In this the file, the grid"
+    !     write(*,*) "definition does not include a redundant point, i.e., a block is defined"
+    !     write(*,*) "with spacing dx = L*2^-J / Bs. This definition was a dead-end, as it lead"
+    !     write(*,*) "to instabilities and other problems. Current versions of WABBIT include a redundant point again."
+    !     write(*,*) ""
+    !     write(*,*) "The newGhostNodes branch still STORED the redundant point for visualization."
+    !     write(*,*) "This was simply the first ghost node. If Bs was odd, this lead to an even number"
+    !     write(*,*) "of points, and this cannot be read with present code versions."
+    !     write(*,*) ""
+    !     write(*,*) "A workaround must be done in preprocessing: upsampling to equidistant resolution and"
+    !     write(*,*) "re-gridding is required. I am truely sorry for this."
+    !     write(*,*) ""
+    !     write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"
+    !     write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"
+    !     write(*,*) "have been obtained with the newGhostNodes branch"
+    !     write(*,*) "--------------------------------------------------------------------"
+    !     write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
+    !     write(*,*) "--------------------------------------------------------------------"
+    ! endif
 
     if (present(periodic_BC)) then
         call read_attribute(file_id, "blocks", "periodic_BC", tmp1, (/1_ik, 1_ik, 1_ik/))
@@ -656,23 +671,25 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
     ! Number of blocks and blocksize
     !---------------------------------------------------------------------------
     ! check if we deal with 2D or 3D data
+
+    call read_attribute(file_id, "blocks", "block-size", Bs)
     call get_rank_datafield(file_id, "blocks", datarank)
+
     if (datarank == 3) then
         ! 2D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs(1) = int( size_field(1), kind=ik)
-        Bs(2) = int( size_field(2), kind=ik)
+        Bs(1) = int( size_field(1), kind=ik)-1 !uniqueGrid modification
+        Bs(2) = int( size_field(2), kind=ik)-1 !uniqueGrid modification
         Bs(3) = 1
         Nb = int( size_field(3), kind=ik)
         domain(3) = 0.0_rk
         dim = 2
-
     elseif (datarank == 4) then
         ! 3D data
         call get_size_datafield( datarank, file_id, "blocks", size_field(1:datarank))
-        Bs(1) = int( size_field(1), kind=ik)
-        Bs(2) = int( size_field(2), kind=ik)
-        Bs(3) = int( size_field(3), kind=ik)
+        Bs(1) = int( size_field(1), kind=ik)-1 !uniqueGrid modification
+        Bs(2) = int( size_field(2), kind=ik)-1 !uniqueGrid modification
+        Bs(3) = int( size_field(3), kind=ik)-1 !uniqueGrid modification
         Nb = int( size_field(4), kind=ik)
         dim = 3
 
@@ -682,23 +699,6 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
 
     endif
 
-    if (modulo(Bs(1),2) == 0) then
-        call abort(202009021, "Blocksize Bs(1) is an even number, which this code version cannot handle.")
-    endif
-    if (modulo(Bs(2),2) == 0) then
-        call abort(202009021, "Blocksize Bs(2) is an even number, which this code version cannot handle.")
-    endif
-    if (modulo(Bs(3),2) == 0) then
-        call abort(202009021, "Blocksize Bs(3) is an even number, which this code version cannot handle.")
-    endif
-
-    if ( Nb /= nBlocksFile ) then
-        ! the number of blocks stored in metadata and the actual size of the
-        ! array do not match.
-        write(*,*) "Nb= ", Nb, "nBlocksFile= ", nBlocksFile
-        call abort(333139, "the number of blocks stored in metadata and the actual size of the array do not match.")
-    endif
-
     !---------------------------------------------------------------------------
     ! length of treecodes in file
     !---------------------------------------------------------------------------
@@ -706,8 +706,6 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
     ! so the length of this array is indeed the treecode length, and not treecode_length+2
     call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
     tc_length = int(dims_treecode(1), kind=ik)
-
-
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
@@ -724,13 +722,23 @@ subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_l
         write(*,'(" Bs           = ",3(i3,1x))') Bs
         write(*,'(" domain       = ",3(g15.8,1x))') domain
         write(*,'(" tc_length    = ",i3)') tc_length
-        write(*,'(" nBlocksFile        = ",i8)') nBlocksFile
+        write(*,'(" nBlocksFile  = ",i8)') nBlocksFile
         write(*,'(" dim          = ",i8)') dim
         if (present(periodic_BC)) write(*,'(" periodic_BC  = ",3(L1))') periodic_BC
         if (present(symmetry_BC)) write(*,'(" symmetry_BC  = ",3(L1))') symmetry_BC
         write(*,'(80("~"))')
     endif
 
+    if (modulo(Bs(1),2) /= 0) then
+        write(*,*) Bs
+        call abort(202009021, "Blocksize Bs(1) is an odd number, which this code version cannot handle.")
+    endif
+    if (modulo(Bs(2),2) /= 0) then
+        call abort(202009021, "Blocksize Bs(2) is an odd number, which this code version cannot handle.")
+    endif
+    if (modulo(Bs(3),2) /= 0 .and. dim==3) then
+        call abort(202009021, "Blocksize Bs(3) is an odd number, which this code version cannot handle.")
+    endif
 end subroutine read_attributes
 
 
@@ -804,9 +812,9 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
             call abort(100119, "ERROR: Trying to read a tree (grid) with Bs different from existing trees in forest!")
         endif
 
-        if (params%max_treelevel < tc_length) call abort(10119, "maximal treelevel incompatible")
+        if (params%Jmax < tc_length) call abort(10119, "maximal treelevel incompatible")
     else
-        params%max_treelevel = tc_length
+        params%Jmax = tc_length
         params%dim = dim
         params%n_eqn = N_files
         params%N_fields_saved = N_files

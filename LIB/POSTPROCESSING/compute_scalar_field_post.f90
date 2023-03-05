@@ -2,7 +2,7 @@
 !-----------------------------------------------------------------------------------------------------
 
 subroutine compute_scalar_field_post(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -73,19 +73,19 @@ subroutine compute_scalar_field_post(params)
     if (order == "4") then
         params%order_discretization = "FD_4th_central_optimized"
         params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
+        params%g = 4_ik
 
     elseif (order == "2") then
         params%order_discretization = "FD_2nd_central"
         params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
+        params%g = 2_ik
 
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
 
     end if
 
-    params%max_treelevel = tc_length
+    params%Jmax = tc_length
     params%n_eqn = params%dim
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
@@ -122,10 +122,10 @@ subroutine compute_scalar_field_post(params)
 
         if (operator == "--gradient") then
             if (params%dim == 3) then
-                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%n_ghosts, &
+                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
                 params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id))
             else
-                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%n_ghosts, &
+                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
                 params%order_discretization, hvy_tmp(:,:,:,1:2,hvy_id))
             end if
 

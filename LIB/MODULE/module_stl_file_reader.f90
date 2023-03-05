@@ -3,7 +3,7 @@
 ! https://sukhbinder.wordpress.com/2011/08/07/stl-files-and-fortran/
 module module_stl_file_reader
 
-    use module_precision
+    use module_globals
     use module_globals
     use mpi
 

@@ -30,33 +30,33 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     integer(kind=ik)                    :: g, dim, Jmax
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
-    real(kind=rk), allocatable, save    :: u2(:,:,:), u3(:,:,:)
-    logical :: harten_multiresolution
+    integer(kind=ik) :: n_coarse(1:3), n_fine(1:3), idim
+    real(kind=rk), SAVE, allocatable :: ufine(:,:,:), ucoarse(:,:,:)
 
     t0 = MPI_Wtime()
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     dim = params%dim
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     detail = -1.0_rk
 
-    select case(params%wavelet_transform_type)
-    case ("harten-multiresolution")
-        harten_multiresolution = .true.
-    case ("biorthogonal")
-        harten_multiresolution = .false.
-    case default
-        call abort(21052813, "params%wavelet_transform_type="//trim(adjustl(params%wavelet_transform_type))//" is not known!")
-    end select
+    do idim = 1, params%dim
+        if ( modulo(Bs(idim),2)==0) then
+            ! Bs even
+            n_coarse(idim) = (Bs(idim) + 2*g) / 2
+            n_fine(idim) = Bs(idim) + 2*g - 1
+        else
+            ! Bs odd
+            n_coarse(idim) = (Bs(idim) + 2*g + 1)/2
+            n_fine(idim) = Bs(idim) + 2*g
+        endif
+    enddo
 
     ! --------------------------- 3D -------------------------------------------
 
     if (params%dim == 3) then
-
-        ! allocate interpolation fields
-        if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g ) )
-        ! coarsened field is half block size + 1/2
-        if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1:(Bs(3)+1)/2 + g) )
+        if (.not.allocated(ufine)) allocate( ufine( 1:n_fine(1), 1:n_fine(2), 1:n_fine(3) ) )
+        if (.not.allocated(ucoarse)) allocate( ucoarse( 1:n_coarse(1) , 1:n_coarse(2), 1:n_coarse(3)) )
 
         ! loop over all datafields
         do dF = 1, size(block_data,4)
@@ -64,57 +64,32 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
             if (thresholding_component(dF)) then
                 if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
 
-                if (harten_multiresolution) then
-                    ! coarsen block data (restriction)
-                    call restriction_3D( block_data( :, :, :, dF ), u3 )  ! fine, coarse
-                    ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
+                ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+                call restriction_prefilter( params, block_data(1:n_fine(1), 1:n_fine(2), 1:n_fine(3), dF), ufine(:,:,:) )
+                ! now, coarsen block data (restriction)
+                call restriction_3D( ufine, ucoarse )  ! fine, coarse
+                ! then, re-interpolate to the initial level (prediciton)
+                call prediction_3D ( ucoarse, ufine, params%order_predictor )  ! coarse, fine
 
-                    ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
-                    ! Notes:
-                    !          Previous versions were more conservative: they checked all details in the ghost
-                    !          node layer, which included using one-sided interpolation stencils. This was
-                    !          maybe too much: blocks were refined quite long before they became significant.
-                    !          Also note, that the first detail is using points from the ghost nodes for interpolation
-                    !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
-                    !          in any case.
-                    do l = g+1, Bs(3)+g
-                        do j = g+1, Bs(2)+g
-                            do i = g+1, Bs(1)+g
-                                detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
-                            end do
+                ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
+                ! NOTE: we EXCLUDE ghost nodes
+                do l = g+1, Bs(3)+g
+                    do j = g+1, Bs(2)+g
+                        do i = g+1, Bs(1)+g
+                            detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-ufine(i,j,l)) / norm(dF) )
                         end do
                     end do
-                else
-                    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-                    call restriction_prefilter_3D( block_data( :, :, :, dF ), u2(:,:,:), params%wavelet )
-                    ! now, coarsen block data (restriction)
-                    call restriction_3D( u2, u3 )  ! fine, coarse
-                    ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_3D ( u3, u2, params%order_predictor )  ! coarse, fine
-
-                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    ! NOTE: we EXCLUDE ghost nodes
-                    do l = g+1, Bs(3)+g
-                        do j = g+1, Bs(2)+g
-                            do i = g+1, Bs(1)+g
-                                detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-u2(i,j,l)) / norm(dF) )
-                            end do
-                        end do
-                    end do
-                end if
-
+                end do
             end if
+
         end do
     end if
 
     ! --------------------------- 2D -------------------------------------------
 
     if (params%dim == 2 ) then
-        ! allocate interpolation fields
-        if (.not.allocated(u2)) allocate( u2( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1 ) )
-        ! coarsened field is half block size + 1/2
-        if (.not.allocated(u3)) allocate( u3( 1:(Bs(1)+1)/2 + g , 1:(Bs(2)+1)/2 + g, 1) )
+        if (.not.allocated(ufine)) allocate( ufine(1:n_fine(1), 1:n_fine(2), 1) )
+        if (.not.allocated(ucoarse)) allocate( ucoarse(1:n_coarse(1), 1:n_coarse(2), 1) )
 
         ! loop over all datafields
         do dF = 1, size(block_data,4)
@@ -122,41 +97,19 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
             if (thresholding_component(dF)) then
                 if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
 
-                ! Harten multiresolution or biorthogonal?
-                if (harten_multiresolution) then
-                    ! coarsen block data (restriction)
-                    call restriction_2D( block_data( :, :, 1, dF ), u3(:,:,1) )  ! fine, coarse
+    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
+    call restriction_prefilter(params, block_data(1:n_fine(1), 1:n_fine(2), :, dF), ufine)
+                ! now, coarsen block data (restriction)
+                    call restriction_2D( ufine(:,:,1), ucoarse(:,:,1) )  ! fine, coarse
                     ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
+                    call prediction_2D ( ucoarse(:,:,1), ufine(:,:,1), params%order_predictor )  ! coarse, fine
 
-                    ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
-                    ! Notes:
-                    !          Previous versions were more conservative: they checked all details in the ghost
-                    !          node layer, which included using one-sided interpolation stencils. This was
-                    !          maybe too much: blocks were refined quite long before they became significant.
-                    !          Also note, that the first detail is using points from the ghost nodes for interpolation
-                    !          and, in the biorthogonal case, for the low-pass filter. Hence the ghost nodes do play a role
-                    !          in any case.
-                    do j = g+1, Bs(2)+g
-                        do i = g+1, Bs(1)+g
-                            detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
-                        end do
+                ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
+                do j = g+1, Bs(2)+g
+                    do i = g+1, Bs(1)+g
+                        detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-ufine(i,j,1)) / norm(dF) )
                     end do
-                else
-                    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-                    call restriction_prefilter_2D(block_data( :, :, 1, dF ), u2(:,:,1), params%wavelet)
-                    ! now, coarsen block data (restriction)
-                    call restriction_2D( u2(:,:,1), u3(:,:,1) )  ! fine, coarse
-                    ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_2D ( u3(:,:,1), u2(:,:,1), params%order_predictor )  ! coarse, fine
-
-                    ! Calculate detail by comparing u1 (original data) and u2 (result of predict(restrict(u1)))
-                    do j = g+1, Bs(2)+g
-                        do i = g+1, Bs(1)+g
-                            detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-u2(i,j,1)) / norm(dF) )
-                        end do
-                    end do
-                end if
+                end do
             end if
         end do
     end if

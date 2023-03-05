@@ -2,7 +2,7 @@
 ! ********************************************************************************************
 module module_convdiff_new
 
-  use module_precision
+  use module_globals
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
@@ -28,8 +28,8 @@ module module_convdiff_new
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
     real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
-    integer(kind=ik) :: dim, N_scalars, N_fields_saved
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary, blobs_x0, blobs_y0, blobs_width
+    integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
     character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
@@ -91,6 +91,14 @@ contains
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
+    allocate( params_convdiff%blobs_width(1:params_convdiff%Nblobs) )
+    allocate( params_convdiff%blobs_x0(1:params_convdiff%Nblobs) )
+    allocate( params_convdiff%blobs_y0(1:params_convdiff%Nblobs) )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_width', params_convdiff%blobs_width )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_x0', params_convdiff%blobs_x0 )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_y0', params_convdiff%blobs_y0 )
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
@@ -308,7 +316,7 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, i
+    integer(kind=ik) :: ix, iy, iz, i, iblob
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
@@ -411,6 +419,28 @@ contains
                 call abort(66273,"this inicond is 2d only..")
             endif
 
+
+     case ("many-blobs")
+         do iblob = 1, params_convdiff%Nblobs
+             do iy = 1, Bs(2)+2*g
+                 do ix = 1, Bs(1)+2*g
+                     ! compute x,y coordinates from spacing and origin
+                     x = dble(ix-(g+1)) * dx(1) + x0(1) - params_convdiff%blobs_x0(iblob)
+                     y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%blobs_y0(iblob)
+
+                     if (params_convdiff%periodic_BC(1)) then
+                       if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+                       if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
+                     endif
+                     if (params_convdiff%periodic_BC(2)) then
+                       if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+                       if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
+                     endif
+                     ! set actual inicond gauss blob
+                     u(ix,iy,:,i) = u(ix,iy,:,i) + dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blobs_width(iblob) )
+                 end do
+             end do
+         enddo
 
       case("blob")
           if (params_convdiff%dim==2) then

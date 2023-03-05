@@ -27,7 +27,7 @@
 !    volume_int = 0.0_rk
 !
 !    Bs = params%Bs
-!    g  = params%n_ghosts
+!    g  = params%g
 !
 !
 !    do k = 1, hvy_n

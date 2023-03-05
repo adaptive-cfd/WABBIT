@@ -1,5 +1,5 @@
 subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
-    use module_precision
+    use module_globals
     implicit none
 
     real(kind=rk), intent(in) :: time

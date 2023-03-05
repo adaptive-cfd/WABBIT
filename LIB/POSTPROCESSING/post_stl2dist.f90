@@ -1,5 +1,5 @@
 subroutine post_stl2dist(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -106,7 +106,7 @@ subroutine post_stl2dist(params)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = .false.
     params%threshold_state_vector_component(1) = .true.
-    ! params%n_ghosts =
+    ! params%g =
 
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
     ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
@@ -114,7 +114,7 @@ subroutine post_stl2dist(params)
     allocate(params%butcher_tableau(1,1))
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! allocate data
     call allocate_forest(params, hvy_block)
@@ -122,7 +122,7 @@ subroutine post_stl2dist(params)
     call reset_tree( params, .true., tree_ID)
 
     ! start with an equidistant grid on coarsest level
-    call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID)
+    call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID)
 
     ! reset grid to zeros
     do k = 1, hvy_n(1)
@@ -149,10 +149,11 @@ subroutine post_stl2dist(params)
 
 
     safety = 6 !Bs(1)
-    do iter = params%min_treelevel, params%max_treelevel
+    do iter = params%Jmin, params%Jmax
 
         ! refine the mesh where the mask function is interesting
-        call refine_tree( params, hvy_block, "mask-threshold", tree_ID )
+        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        ! call refine_tree( params, hvy_block, "mask-threshold", tree_ID )
 
         skips = 0
 
@@ -165,7 +166,7 @@ subroutine post_stl2dist(params)
             ! nodes as well. Then, a refined block should always end up with nonzero values
             ! only if its mother had nonzero values.
             ! That implies: if the block is zero, we can skip it
-            if ( maxval(hvy_block(:,:,:,1,hvy_id)) <= 1.0e-6 .and. iter>params%min_treelevel ) then
+            if ( maxval(hvy_block(:,:,:,1,hvy_id)) <= 1.0e-6 .and. iter>params%Jmin ) then
                 hvy_block(:,:,:,1,hvy_id) = 9e8_rk ! distance as far away
                 skips = skips + 1
                 cycle

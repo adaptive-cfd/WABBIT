@@ -5,7 +5,7 @@ module module_insects_integration_flusi_wabbit
   ! itdrag, Integrals, nu
 
 
-  use module_precision
+  use module_globals
 
   ! interp2_nonper: we need this to interpolate wing thickness and corrugation
   use module_helpers

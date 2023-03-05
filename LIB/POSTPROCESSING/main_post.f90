@@ -101,7 +101,14 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--vorticity", "--divergence", "--vor-abs", "--Q")
+    case("--wavelettest")
+        call wavelet_test(params)
+    case("--wavelet-coarsening")
+        call wavelet_test_coarsening(params)
+    case("--wavelet-equi")
+        call wavelet_test_equi(params)
+
+    case("--vorticity", "--divergence", "--vor-abs", "--Q", "--copy")
         call compute_vorticity_post(params)
 
     case("--gradient")

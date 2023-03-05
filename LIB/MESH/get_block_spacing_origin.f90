@@ -11,7 +11,7 @@ subroutine get_block_spacing_origin( params, lgt_id, x0, dx )
   real(kind=rk), dimension(1:3), intent(out) :: x0, dx              !> output
   integer(kind=ik)                           :: J
 
-  J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+  J = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
   call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, params%Bs, params%dim, x0, dx )
 
 end subroutine get_block_spacing_origin

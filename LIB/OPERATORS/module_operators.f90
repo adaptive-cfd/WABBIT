@@ -39,7 +39,7 @@ subroutine component_wise_tree_norm(params, hvy_block, tree_ID, which_norm, norm
     ! note: if norm and hvy_block components are of different size, we use the smaller one.
     n_eqn = min( size(norm, 1), size(hvy_block,4) )
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
     D = params%dim
 
     select case (which_norm)
@@ -50,7 +50,7 @@ subroutine component_wise_tree_norm(params, hvy_block, tree_ID, which_norm, norm
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+                J = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
@@ -63,7 +63,7 @@ subroutine component_wise_tree_norm(params, hvy_block, tree_ID, which_norm, norm
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                J = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+                J = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn

@@ -5,7 +5,7 @@
 
 subroutine keyvalues(fname, params)
 
-    use module_precision
+    use module_globals
     use module_params
     use module_mesh
     use module_forestMetaData
@@ -67,9 +67,9 @@ subroutine keyvalues(fname, params)
 
     params%dim = dim
     params%Bs = Bs
-    params%max_treelevel = tc_length
+    params%Jmax = tc_length
     params%n_eqn = 1
-    params%n_ghosts = 0
+    params%g = 0
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
@@ -92,8 +92,8 @@ subroutine keyvalues(fname, params)
     ! (the others are translation invariant)
     if (params%dim==2) Bs(3)=1
 
-    allocate(tree(1:params%max_treelevel))
-    allocate(sum_tree(1:params%max_treelevel))
+    allocate(tree(1:params%Jmax))
+    allocate(sum_tree(1:params%Jmax))
     allocate(blocks_per_rank(1:params%number_procs))
 
     ! test all existing space filling curves
@@ -112,10 +112,10 @@ subroutine keyvalues(fname, params)
 
             call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
 
-            tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%max_treelevel)
+            tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%Jmax)
         end do
 
-        call MPI_REDUCE(tree,sum_tree, params%max_treelevel, MPI_INTEGER, &
+        call MPI_REDUCE(tree,sum_tree, params%Jmax, MPI_INTEGER, &
         MPI_SUM, 0, WABBIT_COMM, mpicode)
         sum_curve(i) = sum(sum_tree)
     end do

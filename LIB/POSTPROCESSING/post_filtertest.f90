@@ -1,6 +1,6 @@
 
 subroutine post_filtertest(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -77,10 +77,10 @@ subroutine post_filtertest(params)
 !     call hvy2lgt( lgt_id, hvy_active(k,tree_ID_flow), params%rank, params%number_blocks )
 !     call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
 !
-!     do iy = 1, params%Bs(2)+2*params%n_ghosts
-!         y = real(iy-(params%n_ghosts+1), kind=rk) * dx(2) + x0(2)
-!         do ix = 1, params%Bs(1)+2*params%n_ghosts
-!             x = real(ix-(params%n_ghosts+1), kind=rk) * dx(1) + x0(1)
+!     do iy = 1, params%Bs(2)+2*params%g
+!         y = real(iy-(params%g+1), kind=rk) * dx(2) + x0(2)
+!         do ix = 1, params%Bs(1)+2*params%g
+!             x = real(ix-(params%g+1), kind=rk) * dx(1) + x0(1)
 !
 !             ! use cos functions because theyre symmetric (symmetry BC)
 !             hvy_block(ix, iy, :, :, hvy_active(k,tree_ID_flow)) = cos(14._rk*x/params%domain_size(1) * 2.0_rk*pi) * cos(14._rk*y/params%domain_size(2) * 2.0_rk*pi)

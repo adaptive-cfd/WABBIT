@@ -107,7 +107,7 @@ contains
             ! - receive the discretization parameters
             discretizationParams=(/ params%Bs(1),  &
             params%number_blocks,       &
-            params%max_treelevel,       &
+            params%Jmax,       &
             params%dim,                 &
             params%number_procs/)
             call MPI_send(discretizationParams, 5, MPI_integer, myBridge%minOtherWorldRank, &
@@ -147,7 +147,7 @@ contains
             n = size(lgt_block,1)
 
             ! number of columns in matrix
-            m = params%max_treelevel + EXTRA_LGT_FIELDS-1
+            m = params%Jmax + EXTRA_LGT_FIELDS-1
 
             ! send number of active and maximal number of blocks
             call MPI_send((/lgt_n/), 1, MPI_integer, &
@@ -400,7 +400,7 @@ contains
 
     !===========================================================================
 
-    !> \brief return the ligth_id for the given position
+    !> \brief return the light_id for the given position
     integer(kind=tsize) function position_to_lgt_id (position, params)
         ! Function-declarations
         double precision, dimension(3)  , intent(in)    :: position         !< position vector \f$ 0<position(i)\le 1\f$
@@ -519,10 +519,10 @@ contains
             !  write(*,'("hvy_id=",i6,i6,i6)')particle_id(k),params%bridge%myWorldRank,params%number_blocks
             call get_block_spacing_origin( params, lgt_id, x0, dx )
             !!! calculate grid point ibx, iby, ibz
-            ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%n_ghosts +1
-            iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%n_ghosts +1
+            ibx   = int( (positions(1,k)-x0(1))/dx(1) ) + params%g +1
+            iby   = int( (positions(2,k)-x0(2))/dx(2) ) + params%g +1
             if (params%dim == 3) then
-                ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%n_ghosts +1
+                ibz = int( (positions(3,k)-x0(3))/dx(3) ) + params%g +1
             else
                 ibz = 1
             endif

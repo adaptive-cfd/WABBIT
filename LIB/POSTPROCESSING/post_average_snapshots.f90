@@ -1,6 +1,6 @@
 
 subroutine post_average_snapshots(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -60,13 +60,13 @@ subroutine post_average_snapshots(params)
         !! read attributes
         if ( i == 1 ) then
             call read_attributes(fname_in(i), Nblocks(1), time, iteration, &
-            params%domain_size, params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+            params%domain_size, params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
         endif
         call read_attributes(fname_in(i), Nblocks(i), time, iteration, &
         domain, bs, level, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
         ! check attributes for consistency
-        params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+        params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
         if (any(params%Bs .ne. Bs)) call abort( 203191, " Block size is not consistent ")
         if ( abs(sum(params%domain_size(1:dim) - domain(1:dim))) > 1e-14 ) call abort( 203192, "Domain size is not consistent ")
         if (params%dim .ne. dim) call abort( 203193, "Dimension is not consistent ")
@@ -77,9 +77,9 @@ subroutine post_average_snapshots(params)
 
 
     params%number_blocks = (N_snapshots+1)*maxval(Nblocks) ! just to get some memory:
-    params%min_treelevel = 1
+    params%Jmin = 1
     params%n_eqn = 1
-    params%n_ghosts = 4
+    params%g = 4
     params%forest_size = N_snapshots + 1
     params%order_predictor = "multiresolution_4th"
     params%block_distribution = "sfc_hilbert"

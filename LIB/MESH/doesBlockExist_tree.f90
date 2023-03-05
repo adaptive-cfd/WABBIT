@@ -17,7 +17,7 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, tree_ID)
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-    exists   = .false.
+    exists = .false.
     lgtID = -1
 
     !> 1st: given the array treecode, compute the numerical value of the treecode we're

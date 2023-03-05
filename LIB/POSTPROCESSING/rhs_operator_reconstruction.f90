@@ -1,6 +1,6 @@
 subroutine rhs_operator_reconstruction(params)
     use mpi
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -73,7 +73,7 @@ subroutine rhs_operator_reconstruction(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
-    params%max_treelevel = tc_length + 2
+    params%Jmax = tc_length + 2
     params%forest_size = 10
     fsize = params%forest_size
     params%domain_size = domain
@@ -90,15 +90,12 @@ subroutine rhs_operator_reconstruction(params)
     call get_cmd_arg( "--adapt", params%adapt_tree, default= params%adapt_tree )! if not set we take the parameter from the ini file
     CFL_number = params%CFL
     !params%adapt_tree = .False.
-    params%iter_ghosts = .false.
     !---------------------------------------------------------------------------
 
     if (params%wavelet=="CDF44") then
-        params%wavelet_transform_type = "biorthogonal"
-        params%n_ghosts = 6_ik
+        params%g = 6_ik
     else
-        params%wavelet_transform_type = "harten-multiresolution"
-        params%n_ghosts = 4_ik
+        params%g = 4_ik
     endif
 
     ! we have to allocate grid if this routine is called for the first time
@@ -117,24 +114,24 @@ subroutine rhs_operator_reconstruction(params)
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
     if (params%adapt_tree) then
-        write(17,'(A,1x,A,1x,A,1x,A,1x,A,1x,A," g=",i1," Bs=",i2, " coarseWins=",L1," nu=",e12.4," CFL=",e12.4)') trim(params%order_discretization), &
+        write(17,'(A,1x,A,1x,A,1x,A,1x,A,1x,A," g=",i1," Bs=",i2," nu=",e12.4," CFL=",e12.4)') trim(params%order_discretization), &
         trim(params%order_predictor), " ",trim(params%wavelet)," ",trim(OPERATOR), &
-        params%n_ghosts, params%Bs(1), params%ghost_nodes_redundant_point_coarseWins, nu, &
+        params%g, params%Bs(1), nu, &
         CFL_number
     else
         write(17,'(A,1x,A,1x,A," g=",i1," Bs=",i2," nu=",e12.4," CFL=",e12.4)') trim(params%order_discretization), &
-        " static grid ",trim(OPERATOR), params%n_ghosts, params%Bs(1), nu, CFL_number
+        " static grid ",trim(OPERATOR), params%g, params%Bs(1), nu, CFL_number
     endif
     close(17)
 
     !---------------------------------------------------------------------------
 
-    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%n_ghosts<4)) then
+    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<4)) then
         call abort(33,"not enough g")
     endif
 
 
-    g = params%n_ghosts
+    g = params%g
     !---------------------------------------------------------------------------
     !---------------------------------------------------------------------------
     !---------------------------------------------------------------------------
@@ -145,7 +142,8 @@ subroutine rhs_operator_reconstruction(params)
     if (params%adapt_tree) then
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
-        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
 
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
@@ -179,7 +177,7 @@ subroutine rhs_operator_reconstruction(params)
     do iblock = 1, hvy_n(tree_ID_u)
         call hvy2lgt(lgt_id, hvy_active(iblock,tree_ID_u), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
-        level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+        level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
 
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g
@@ -215,8 +213,8 @@ subroutine rhs_operator_reconstruction(params)
         ! refine grid ones
         !---------------------------------------------------------------------------
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp) )
-
-        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp )
 
         call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp))
     endif
@@ -272,8 +270,8 @@ subroutine rhs_operator_reconstruction(params)
 
                 if ( params%adapt_tree ) then
                     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei) )
-
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+                    ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
 
                 endif
 

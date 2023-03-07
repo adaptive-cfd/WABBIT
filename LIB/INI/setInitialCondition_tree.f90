@@ -36,6 +36,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         write(*,*) "Adaptive initial condition is: ", adapt
     endif
 
+    call setup_wavelet(params)
     ! this is a HACK
     if (params%physics_type == 'ACM-new') then
         tmp = params%threshold_mask
@@ -68,9 +69,11 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
+                !call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask
+                call adaptBiorthogonal_tree(time, params, hvy_block, tree_ID, hvy_tmp)
             else
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp )
+                !call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp )
+                call adaptBiorthogonal_tree(time, params, hvy_block, tree_ID, hvy_tmp)
             endif
 
             iter = iter + 1
@@ -152,9 +155,11 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask )
+                        !call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask )
+                        call adaptBiorthogonal_tree(time, params, hvy_block, tree_ID, hvy_tmp)
                     else
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp )
+                        !call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp )
+                        call adaptBiorthogonal_tree(time, params, hvy_block, tree_ID, hvy_tmp)
                     endif
 
                     iter = iter + 1

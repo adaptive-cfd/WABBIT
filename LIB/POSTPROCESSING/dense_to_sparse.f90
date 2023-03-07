@@ -80,12 +80,12 @@ subroutine dense_to_sparse(params)
         params%wavelet='CDF20'
     elseif (order == "CDF40") then
         params%order_predictor = "multiresolution_4th"
-        params%g = 4_ik
+        params%g = 3_ik
         params%wavelet='CDF40'
     elseif (order == "CDF44") then
         params%order_predictor = "multiresolution_4th"
         params%wavelet='CDF44'
-        params%g = 6_ik
+        params%g = 7_ik
     else
         call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
     end if

@@ -85,7 +85,7 @@ subroutine sparse_to_dense(params)
         params%wavelet = "CDF40"
     elseif (order == "44") then
         params%order_predictor = "multiresolution_4th"
-        params%g = 6_ik
+        params%g = 7_ik
         params%wavelet = "CDF44"
     elseif (order == "2") then
         params%order_predictor = "multiresolution_2nd"

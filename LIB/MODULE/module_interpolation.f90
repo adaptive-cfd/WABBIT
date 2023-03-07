@@ -500,7 +500,7 @@ contains
         integer(kind=ik) :: a, b, g
         real(kind=rk), intent(in) :: coefs_filter(a:b)
         integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift
-        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+        real(kind=rk), allocatable :: u_tmp(:,:,:,:)
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
@@ -514,7 +514,7 @@ contains
         nz = size(u, 3)
         nc = size(u, 4)
 
-        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+        allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
         u_tmp = u
 
         u_filtered = u_tmp
@@ -546,6 +546,7 @@ contains
             enddo
         enddo
 
+        deallocate(u_tmp)
     end subroutine
 
     ! applies one of params% HD GD HR GR filters in each direction
@@ -908,6 +909,311 @@ contains
         u( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) =  wcx( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
         u( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) =  wcy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
         u( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = wcxy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
+
+    end subroutine
+
+
+
+    ! manipulate wavelet coefficients in a neighborhood direction: applied
+    ! if we find a coarser neighbor in this direction (coarse extension)
+    subroutine coarseExtensionManipulateWC_block(params, wcx, wcy, wcxy, neighborhood)
+        implicit none
+
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wcx, wcy, wcxy
+        integer(kind=ik), intent(in) :: neighborhood
+
+        integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(wcx, 1)
+        ny = size(wcx, 2)
+        nz = size(wcx, 3)
+        nc = size(wcx, 4)
+        g = params%g
+        Bs = params%bs
+        Nscl    = params%Nscl
+        Nscr    = params%Nscr
+        Nwcl    = params%Nwcl
+        Nwcr    = params%Nwcr
+        Nreconl = params%Nreconl
+        Nreconr = params%Nreconr
+
+
+        select case(neighborhood)
+        case (9:10)
+            ! -x
+            ! FIXME to be modified for any other than CDF44
+            ! NOTE: even though we set Nwcl=12 points to zero, this does not mean we
+            ! kill 12 WC. They are on the extended grid, so effectively only 12/2
+            ! are killed, many of which are in the ghost nodes layer
+            wcx(1:Nwcl, :, :, 1:nc) = 0.0_rk
+            wcy(1:Nwcl, :, :, 1:nc) = 0.0_rk
+            wcxy(1:Nwcl, :, :, 1:nc) = 0.0_rk
+        case (15:16)
+            ! -y
+            wcx(:, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcxy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
+        case (11:12)
+            ! +x
+            wcx(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
+            wcy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
+            wcxy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
+        case (13:14)
+            ! +y
+            wcx(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcxy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+        case(5)
+            wcx(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcxy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+        case(6)
+            wcx(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcxy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
+        case(7)
+            wcx(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wcxy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+        case(8)
+            wcx(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wcxy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
+        end select
+    end subroutine
+
+
+
+    subroutine coarseExtensionManipulateSC_block(params, sc, u_copy, neighborhood)
+        implicit none
+
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: sc, u_copy
+        integer(kind=ik), intent(in) :: neighborhood
+
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
+
+        nx = size(sc, 1)
+        ny = size(sc, 2)
+        nz = size(sc, 3)
+        nc = size(sc, 4)
+        g = params%g
+        Bs = params%bs
+        Nscl    = params%Nscl
+        Nscr    = params%Nscr
+        Nwcl    = params%Nwcl
+        Nwcr    = params%Nwcr
+        Nreconl = params%Nreconl
+        Nreconr = params%Nreconr
+
+
+        select case(neighborhood)
+        case (9:10)
+            ! -x
+            sc(1:Nscl, :, :, 1:nc) = u_copy(1:Nscl,:,:,1:nc)
+        case (15:16)
+            ! -y
+            sc(:, 1:Nscl, :, 1:nc) = u_copy(:, 1:Nscl,:,1:nc)
+        case (11:12)
+            ! +x
+            sc(nx-Nscr:nx, :, :, 1:nc) = u_copy(nx-Nscr:nx,:,:,1:nc)
+        case (13:14)
+            ! +y
+            sc(:, ny-Nscr:ny, :, 1:nc) = u_copy(:, ny-Nscr:ny,:,1:nc)
+        case(5)
+            sc(1:Nscl, ny-Nscr:ny, :, 1:nc) = u_copy(1:Nscl, ny-Nscr:ny,:,1:nc)
+        case(6)
+            sc(1:Nscl, 1:Nscl, :, 1:nc) = u_copy(1:Nscl, 1:Nscl,:,1:nc)
+        case(7)
+            sc(nx-Nscr:ny, ny-Nscr:ny, :, 1:nc) = u_copy(nx-Nscr:ny, ny-Nscr:ny,:,1:nc)
+        case(8)
+            sc(nx-Nscr:ny, 1:Nscl, :, 1:nc) = u_copy(nx-Nscr:ny, 1:Nscl,:,1:nc)
+        end select
+    end subroutine
+
+    subroutine setup_wavelet(params)
+        implicit none
+        type (type_params), intent(inout) :: params
+        ! the wavelet filter banks:
+        ! HD - low pass decomposition filter, H_TILDE
+        ! GD - high pass decomposition filter, G_TILDE
+        ! HR - low pass reconstruction filter, H
+        ! GR - high pass reconstruction filter, G
+        select case(params%wavelet)
+        case("CDF44")
+            ! H TILDE filter
+            allocate( params%HD(-6:6) )
+            params%HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
+            87.0_rk*2.0_rk**(-7.0_rk), &
+            9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
+
+            ! G TILDE filter
+            allocate( params%GD(-2:4) )
+            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+            ! H filter
+            allocate( params%HR(-3:3) )
+            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+            ! G filter
+            allocate( params%GR(-7:5) )
+            params%GR = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), +2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  -9.0_rk*2.0_rk**(-5.0_rk), &
+            87.0_rk*2.0_rk**(-7.0_rk), &
+            -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
+
+            params%order_predictor = "multiresolution_4th"
+
+            ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
+            ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
+            ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
+            ! scaling function coeffs to be copied:
+            params%Nscl = params%g+5 ! dictated by support of h_tilde (HD) filter for SC
+            params%Nscr = params%g+5
+            ! wavelet coefficients to be deleted:
+            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcr = params%Nscr+5
+            ! last reocnstructed point is the support of GR filter not seing any WC set to zero anymore
+            params%Nreconl = params%Nwcl+7 ! support of GR -7:5
+            params%Nreconr = params%Nwcr+5
+
+            if (params%g<7) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=7 ghost nodes.")
+            endif
+
+        case ("CDF42")
+            ! H TILDE filter
+            allocate( params%HD(-4:4) )
+            params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
+
+            ! G TILDE filter
+            allocate( params%GD(-2:4) )
+            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+            ! H filter
+            allocate( params%HR(-3:3) )
+            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+            ! G filter
+            allocate( params%GR(-5:3) )
+            params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
+
+            params%order_predictor = "multiresolution_4th"
+
+            params%Nscl = params%g+3
+            params%Nscr = params%g+3
+            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcr = params%Nscr+5
+            params%Nreconl = params%Nwcl+5 ! support of GR -5:3
+            params%Nreconr = params%Nwcr+3
+
+            if (params%g<5) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=5 ghost nodes.")
+            endif
+
+        case ("CDF40")
+            ! H TILDE filter
+            allocate( params%HD(0:0) )
+            params%HD = (/1.0_rk/)
+
+            ! G TILDE filter
+            allocate( params%GD(-2:4) )
+            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+            ! H filter
+            allocate( params%HR(-3:3) )
+            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+            ! G filter
+            allocate( params%GR(-2:0) )
+            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+
+            params%order_predictor = "multiresolution_4th"
+
+            if (params%g<4) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=4 ghost nodes.")
+            endif
+
+        case ("CDF20")
+            ! H TILDE filter
+            allocate( params%HD(0:0) )
+            params%HD = (/1.0_rk/)
+
+            ! G TILDE filter
+            allocate( params%GD(0:2) )
+            params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
+
+            ! H filter
+            allocate( params%HR(-1:1) )
+            params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
+
+            ! G filter
+            allocate( params%GR(-2:0) )
+            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+
+            params%order_predictor = "multiresolution_2nd"
+
+            if (params%g<2) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=2 ghost nodes.")
+            endif
+
+        case("CDF22")
+            ! H TILDE filter
+            allocate( params%HD(-2:2) )
+            params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
+
+            ! G TILDE filter
+            allocate( params%GD(0:2) )
+            params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
+
+            ! H filter
+            allocate( params%HR(-1:1) )
+            params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
+
+            ! G filter
+            allocate( params%GR(-3:1) )
+            params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
+
+            params%order_predictor = "multiresolution_2nd"
+
+            params%Nscl = params%g+1
+            params%Nscr = params%g+1
+            params%Nwcl = params%Nscl + 0 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcr = params%Nscr + 2
+            params%Nreconl = params%Nwcl+3 ! support of GR -3:1
+            params%Nreconr = params%Nwcr+1
+
+            if (params%g<3) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=3 ghost nodes.")
+            endif
+
+        case default
+            call abort( 3006221, "Unkown biorothonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+
+        end select
+
+        if (params%rank==0) then
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,*) "                      Wavelet-setup"
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,*) "The wavelet is ", trim(adjustl(params%wavelet))
+            write(*,*) "During coarse extension, we will copy SC:", params%Nscl, params%Nscr
+            write(*,*) "During coarse extension, we will delete WC:", params%Nwcl, params%Nwcr
+            write(*,*) "During coarse extension, we will reconstruct u:", params%Nreconl, params%Nreconr
+            write(*,*) "The predictor is: ", trim(adjustl(params%order_predictor))
+            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
+            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
+            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
+            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
+            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        endif
 
     end subroutine
 

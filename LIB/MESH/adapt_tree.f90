@@ -66,7 +66,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     ! 03/2023:  The new version of this routine
     ! * perform a wavelet decomposition for the blocks
-    ! * apply the coarse extension to the WC/SC 
+    ! * apply the coarse extension to the WC/SC
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -152,4 +152,4 @@ call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy
 call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)
-end subroutine adapt_tree
+end subroutine

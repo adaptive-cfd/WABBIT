@@ -1,8 +1,4 @@
-!> \note input only params struct to this subroutine
-!!       create new light/heavy data arrays here and deallocate them after this function
-! ********************************************************************************************
-
-subroutine unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
@@ -196,4 +192,4 @@ subroutine unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, h
         write(*,'(" done - Linfty mean convergence order was ",g12.4)')  sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
     endif
 
-end subroutine unit_test_ghost_nodes_synchronization
+end subroutine

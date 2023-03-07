@@ -6,6 +6,7 @@
 program main
 
     use mpi
+    use module_interpolation
     use module_helpers
     use module_MPI
     use module_params           ! global parameters
@@ -115,6 +116,7 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    call setup_wavelet(params)
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
     ! have the pysics module read their own parameters
@@ -138,9 +140,15 @@ program main
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
-        call unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
+    ! check if the wavelet filter banks are okay.
+    if (params%test_wavelet_decomposition) then
+        call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+    endif
+
+    ! unit tests have created some grid, delete that now.
     call reset_tree(params, .true., tree_ID=tree_ID_flow)
 
 
@@ -151,7 +159,7 @@ program main
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
 
     if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
-        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
@@ -328,14 +336,15 @@ program main
             ! routine that relies on forests and pruned trees, which are not available in the module_mesh.
             ! Hence the mask is created here.
             if (params%threshold_mask) then
+                call abort(2303051, "as threshold_mask is not implemented this currently works only without penalizatin")
                 ! create mask function at current time
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                call adaptBiorthogonal_tree( time, params, hvy_block, tree_ID_flow, hvy_tmp)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp )
+                call adaptBiorthogonal_tree( time, params, hvy_block, tree_ID_flow, hvy_tmp )
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)

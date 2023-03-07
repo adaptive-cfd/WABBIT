@@ -26,7 +26,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     logical, intent(in) :: ignore_maxlevel
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr, level
+    integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
@@ -54,8 +54,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n(tree_ID)
-        lgt_id = lgt_active(k, tree_ID)
-        lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
+        lgtID = lgt_active(k, tree_ID)
+        lgt_block( lgtID, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
     ! construct mask function, if it is used as secondary criterion. This criterion
@@ -91,18 +91,18 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! case with derived quantities.
         ! loop over my active hvy data:
         do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
+            hvyID = hvy_active(k, tree_ID)
 
             ! get lgt id of block
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
             ! some indicators may depend on the grid (e.g. the vorticity), hence
             ! we pass the spacing and origin of the block
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
+            call get_block_spacing_origin( params, lgtID, x0, dx )
 
             ! actual computation of thresholding quantity (vorticity etc)
-            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
-            g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), N_thresholding_components )
+            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvyID), &
+            g, x0, dx, hvy_tmp(:,:,:,:,hvyID), hvy_mask(:,:,:,:,hvyID), N_thresholding_components )
         enddo
 
         ! note here we sync hvy_tmp (=derived qty) and not hvy_block
@@ -180,12 +180,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
 
                 do k = 1, lgt_n(tree_ID)
-                    lgt_id = lgt_active(k, tree_ID)
+                    lgtID = lgt_active(k, tree_ID)
                     ! random number
                     call random_number(r)
                     ! set refinement status to coarsen based on random numbers.
                     if ( r <= crsn_chance ) then
-                        lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                        lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
                         tags = tags + 1
                     endif
                 enddo
@@ -199,9 +199,9 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.
         do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level = lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL)
+            hvyID = hvy_active(k, tree_ID)
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+            level = lgt_block( lgtID, params%Jmax+IDX_MESH_LVL)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
@@ -211,17 +211,17 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! some indicators may depend on the grid, hence
             ! we pass the spacing and origin of the block (as we have to compute vorticity
             ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
+            call get_block_spacing_origin( params, lgtID, x0, dx )
 
             ! evaluate the criterion on this block.
             if (params%threshold_mask .and. present(hvy_mask)) then
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
-                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
+                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
             else
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
-                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
+                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level)
             endif
         enddo
     end select
@@ -235,10 +235,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! Note this behavior can be bypassed using the ignore_maxlevel switch
     if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
         do k = 1, lgt_n(tree_ID)
-            lgt_id = lgt_active(k, tree_ID)
-            if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%Jmax) then
+            lgtID = lgt_active(k, tree_ID)
+            if (lgt_block(lgtID, Jmax + IDX_MESH_LVL) == params%Jmax) then
                 ! force blocks on maxlevel to coarsen
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
             endif
         enddo
     endif
@@ -247,4 +247,4 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !> after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
-end subroutine coarseningIndicator_tree
+end subroutine

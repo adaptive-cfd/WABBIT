@@ -59,6 +59,8 @@ module module_params
         character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
+
+
         character(len=cshort) :: wavelet="not-initialized"
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE
@@ -66,6 +68,9 @@ module module_params
         ! HR - low pass reconstruction filter, H
         ! GR - high pass reconstruction filter, G
         real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
+        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+
+
         ! minimal level for blocks in data tree
         integer(kind=ik) :: Jmin=0
         ! maximal level for blocks in data tree
@@ -146,7 +151,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test
         ! -------------------------------------------------------------------------------------
-        logical :: test_treecode=.false., test_ghost_nodes_synch=.false.
+        logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
 
         ! -------------------------------------------------------------------------------------
         ! filter

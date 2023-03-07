@@ -114,14 +114,13 @@ subroutine ini_file_to_params( params, filename )
     ! prior to downsampling.
     call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
 
-    call setup_wavelet(params)
-
     !***************************************************************************
     ! read DEBUG parameters
     !
     ! unit test treecode flag
     call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
-    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .false.)
+    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .true.)
+    call read_param_mpi(FILE, 'Debug', 'test_wavelet_decomposition', params%test_wavelet_decomposition, .true.)
 
     !***************************************************************************
     ! read MPI parameters
@@ -420,118 +419,3 @@ end subroutine ini_file_to_params
             end if
         end do
     end function
-
-
-    subroutine setup_wavelet(params)
-    implicit none
-    type (type_params), intent(inout) :: params
-    ! the wavelet filter banks:
-    ! HD - low pass decomposition filter, H_TILDE
-    ! GD - high pass decomposition filter, G_TILDE
-    ! HR - low pass reconstruction filter, H
-    ! GR - high pass reconstruction filter, G
-    select case(params%wavelet)
-    case("CDF44")
-        ! H TILDE filter
-        allocate( params%HD(-6:6) )
-        params%HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
-        87.0_rk*2.0_rk**(-7.0_rk), &
-        9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
-
-        ! G TILDE filter
-        allocate( params%GD(-2:4) )
-        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-        ! H filter
-        allocate( params%HR(-3:3) )
-        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-        ! G filter
-        allocate( params%GR(-7:5) )
-        params%GR = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), +2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  -9.0_rk*2.0_rk**(-5.0_rk), &
-        87.0_rk*2.0_rk**(-7.0_rk), &
-        -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
-
-        params%order_predictor = "multiresolution_4th"
-
-    case ("CDF42")
-        ! H TILDE filter
-        allocate( params%HD(-4:4) )
-        params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
-
-        ! G TILDE filter
-        allocate( params%GD(-2:4) )
-        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-        ! H filter
-        allocate( params%HR(-3:3) )
-        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-        ! G filter
-        allocate( params%GR(-5:3) )
-        params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
-
-        params%order_predictor = "multiresolution_4th"
-
-    case ("CDF40")
-        ! H TILDE filter
-        allocate( params%HD(0:0) )
-        params%HD = (/1.0_rk/)
-
-        ! G TILDE filter
-        allocate( params%GD(-2:4) )
-        params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-        ! H filter
-        allocate( params%HR(-3:3) )
-        params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-        ! G filter
-        allocate( params%GR(-2:0) )
-        params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-
-        params%order_predictor = "multiresolution_4th"
-
-    case ("CDF20")
-        ! H TILDE filter
-        allocate( params%HD(0:0) )
-        params%HD = (/1.0_rk/)
-
-        ! G TILDE filter
-        allocate( params%GD(0:2) )
-        params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
-
-        ! H filter
-        allocate( params%HR(-1:1) )
-        params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
-
-        ! G filter
-        allocate( params%GR(-2:0) )
-        params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-
-        params%order_predictor = "multiresolution_2nd"
-
-    case("CDF22")
-        ! H TILDE filter
-        allocate( params%HD(-2:2) )
-        params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
-
-        ! G TILDE filter
-        allocate( params%GD(0:2) )
-        params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
-
-        ! H filter
-        allocate( params%HR(-1:1) )
-        params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
-
-        ! G filter
-        allocate( params%GR(-3:1) )
-        params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
-
-        params%order_predictor = "multiresolution_2nd"
-
-    case default
-        call abort( 3006221, "Unkown biorothonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-
-    end select
-    end subroutine

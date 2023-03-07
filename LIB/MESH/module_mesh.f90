@@ -29,7 +29,13 @@ module module_mesh
 
 contains
 
+
+#include "unitTest_ghostSync.f90"
+#include "unitTest_waveletDecomposition.f90"
 #include "waveletDecomposition_tree.f90"
+
+#include "adaptBiorthogonal_tree.f90"
+#include "coarseningIndicatorBiorthogonal_tree.f90"
 
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"

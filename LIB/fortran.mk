@@ -288,11 +288,12 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 coarseningIndicator_tree.f90 \
 	createEquidistantGrid_tree.f90 createRandomGrid_tree.f90 allocate_forest.f90 reset_tree.f90 block_xfer_nonblocking.f90 \
 	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90 createMask_tree.f90 InputOutput.f90 InputOutput_Flusi.f90 \
-	waveletDecomposition_tree.f90
+	waveletDecomposition_tree.f90 adaptBiorthogonal_tree.f90 coarseningIndicatorBiorthogonal_tree.f90 \
+	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
-	unit_test_ghost_nodes_synchronization.f90 unit_test_treecode.f90
+	unit_test_treecode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o get_neighbor_treecode.f90

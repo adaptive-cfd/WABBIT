@@ -54,11 +54,9 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
 
     ! local variables
     integer(kind=ik)                :: ix, iy, iz, dF
-    real(kind=rk), allocatable, save :: tmp_block(:,:,:,:)
+    real(kind=rk), allocatable :: tmp_block(:,:,:,:)
 
-    if (.not. allocated(tmp_block)) then
-        allocate(tmp_block(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ))
-    endif
+    allocate(tmp_block(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ))
 
     call blockFilterXYZ_interior_vct( hvy_block(:,:,:,:,hvy_id), tmp_block, params%HD, &
     lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%g)
@@ -78,6 +76,8 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
             end do
         end do
     end do
+
+    deallocate(tmp_block)
 end subroutine restrict_data
 
 

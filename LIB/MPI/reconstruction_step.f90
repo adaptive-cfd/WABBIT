@@ -3,7 +3,7 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
 
     type (type_params), intent(in)      :: params
     !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
@@ -27,49 +27,18 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     nc = size(hvy_block, 4)
     g = params%g
     Bs = params%bs
+    Nscl    = params%Nscl
+    Nscr    = params%Nscr
+    Nwcl    = params%Nwcl
+    Nwcr    = params%Nwcr
+    Nreconl = params%Nreconl
+    Nreconr = params%Nreconr
 
     if (.not. allocated(sc  )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(wcx )) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(wcy )) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(wcxy)) allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
-
-    !~~~~~~~~~~~~~setup~~~~~~~~~~~~~~~~~~
-    select case(params%wavelet)
-    case ("CDF44")
-        ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
-        ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
-        ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
-        ! scaling function coeffs to be copied:
-        Nscl = g+5 ! dictated by support of h_tilde (HD) filter for SC
-        Nscr = g+5
-        ! wavelet coefficients to be deleted:
-        Nwcl = Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr+5
-        ! last reocnstructed point is the support of GR filter not seing any WC set to zero anymore
-        Nreconl = Nwcl+7 ! support of GR -7:5
-        Nreconr = Nwcr+5
-
-    case ("CDF42")
-        Nscl = g+3
-        Nscr = g+3
-        Nwcl = Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr+5
-        Nreconl = Nwcl+5 ! support of GR -5:3
-        Nreconr = Nwcr+3
-
-    case ("CDF22")
-        Nscl = g+1
-        Nscr = g+1
-        Nwcl = Nscl + 0 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr + 2
-        Nreconl = Nwcl+3 ! support of GR -3:1
-        Nreconr = Nwcr+1
-
-    case default
-        call abort(23030416, "Unknown wavelet. How about a cup of coffee? Go make some.")
-    end select
-    !~~~~~~~~~~~~~setup~~~~~~~~~~~~~~~~~~
 
     ! maybe this call is redundant - FIXME
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
@@ -109,9 +78,9 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
-
-
+        call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
         manipulated = .false.
+
         ! loop over all relevant neighbors
         do neighborhood = 5, 16
             ! neighbor exists ?
@@ -122,60 +91,10 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
                 if (level_neighbor < level_me) then
-                    if (.not. manipulated) call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy) !then ! only on first encounter
                     manipulated = .true.
-
                     ! manipulation of coeffs
-                    select case(neighborhood)
-                    case (9:10)
-                        ! -x
-                        ! FIXME to be modified for any other than CDF44
-                        ! NOTE: even though we set Nwcl=12 points to zero, this does not mean we
-                        ! kill 12 WC. They are on the extended grid, so effectively only 12/2
-                        ! are killed, many of which are in the ghost nodes layer
-                        wcx(1:Nwcl, :, :, 1:nc) = 0.0_rk
-                        wcy(1:Nwcl, :, :, 1:nc) = 0.0_rk
-                        wcxy(1:Nwcl, :, :, 1:nc) = 0.0_rk
-                        sc(1:Nscl, :, :, 1:nc) = hvy_work(1:Nscl,:,:,1:nc,hvyID)
-                    case (15:16)
-                        ! -y
-                        wcx(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcxy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        sc(:, 1:Nscl, :, 1:nc) = hvy_work(:, 1:Nscl,:,1:nc,hvyID)
-                    case (11:12)
-                        ! +x
-                        wcx(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                        wcy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                        wcxy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                        sc(nx-Nscr:nx, :, :, 1:nc) = hvy_work(nx-Nscr:nx,:,:,1:nc,hvyID)
-                    case (13:14)
-                        ! +y
-                        wcx(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcxy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        sc(:, ny-Nscr:ny, :, 1:nc) = hvy_work(:, ny-Nscr:ny,:,1:nc,hvyID)
-                    case(5)
-                        wcx(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcxy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        sc(1:Nscl, ny-Nscr:ny, :, 1:nc) = hvy_work(1:Nscl, ny-Nscr:ny,:,1:nc,hvyID)
-                    case(6)
-                        wcx(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcxy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        sc(1:Nscl, 1:Nscl, :, 1:nc) = hvy_work(1:Nscl, 1:Nscl,:,1:nc,hvyID)
-                    case(7)
-                        wcx(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        wcxy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                        sc(nx-Nscr:ny, ny-Nscr:ny, :, 1:nc) = hvy_work(nx-Nscr:ny, ny-Nscr:ny,:,1:nc,hvyID)
-                    case(8)
-                        wcx(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        wcxy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-                        sc(nx-Nscr:ny, 1:Nscl, :, 1:nc) = hvy_work(nx-Nscr:ny, 1:Nscl,:,1:nc,hvyID)
-                    end select
+                    call coarseExtensionManipulateWC_block(params, wcx, wcy, wcxy, neighborhood)
+                    call coarseExtensionManipulateSC_block(params, sc, hvy_work(:,:,:,:,hvyID), neighborhood)
                 endif
             endif
         enddo

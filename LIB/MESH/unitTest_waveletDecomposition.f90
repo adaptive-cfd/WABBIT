@@ -69,7 +69,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     end do
 
     ! compute norm of error
-    call component_wise_tree_norm(params, hvy_block, tree_ID, "L2", norm)
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
     if (params%rank==0) write(*,*) "Error in IWT(FWT(u)) is: ", norm(1)
 

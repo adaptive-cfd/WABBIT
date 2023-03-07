@@ -12,8 +12,6 @@
 ! ********************************************************************************************
 
 subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
-    use module_forestMetaData
-    use module_helpers
     implicit none
     type (type_params), intent(in)      :: params
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement

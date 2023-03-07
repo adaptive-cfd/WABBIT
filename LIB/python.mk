@@ -86,7 +86,7 @@ LIBSRC_FPP_FILES = $(LIBSRC_SOURCES:%=$(OBJDIR)/%.fpp)
 
 # names for python modules 
 PYSRC  = module_precision.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
-	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
+	module_wavelets.f90 module_initialization.f90 module_mesh.f90 module_IO.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \

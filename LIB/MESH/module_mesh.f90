@@ -8,7 +8,7 @@ module module_mesh
     use module_forestMetaData
     use module_params               ! global parameters
     use module_timing               ! debug module
-    use module_interpolation        ! interpolation routines
+    use module_wavelets        ! interpolation routines
     ! use MPI module, since threshold_block needs to synch ghosts
     use module_MPI
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
@@ -22,8 +22,7 @@ module module_mesh
     implicit none
 
     interface set_desired_num_blocks_per_rank
-        module procedure set_desired_num_blocks_per_rank1, &
-                         set_desired_num_blocks_per_rank2
+        module procedure set_desired_num_blocks_per_rank1, set_desired_num_blocks_per_rank2
     end interface
 
 

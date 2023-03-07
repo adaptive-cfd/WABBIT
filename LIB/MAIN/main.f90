@@ -6,7 +6,7 @@
 program main
 
     use mpi
-    use module_interpolation
+    use module_wavelets
     use module_helpers
     use module_MPI
     use module_params           ! global parameters

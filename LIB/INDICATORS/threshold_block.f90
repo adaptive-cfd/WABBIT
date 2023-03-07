@@ -1,5 +1,4 @@
 subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, eps )
-
     implicit none
 
     !> user defined parameter structure

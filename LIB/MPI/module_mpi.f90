@@ -3,7 +3,7 @@ module module_MPI
     use mpi
     use module_params
     use module_timing
-    use module_interpolation
+    use module_wavelets
     use module_treelib
     use module_helpers
 

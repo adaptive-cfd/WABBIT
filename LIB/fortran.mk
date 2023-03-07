@@ -12,7 +12,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
-	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
+	module_wavelets.f90 module_initialization.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
@@ -242,7 +242,7 @@ $(OBJDIR)/module_timing.o: module_timing.f90
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
+$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_globals.o \
@@ -257,7 +257,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	setInitialCondition_tree.f90 setInicondBlocks_tree.f90 $(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
+$(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_treelib.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
 	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 sync_ghosts_symmetry_condition.f90 reconstruction_step.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
@@ -270,13 +270,13 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_interpolation.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
+$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
 	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 waveletDecomposition_tree.f90 refineToEquidistant_tree.f90 \
@@ -287,7 +287,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
-	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 	
+	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
@@ -298,8 +298,8 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
-	$(OBJDIR)/module_treelib.o
+	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
+	componentWiseNorm_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \

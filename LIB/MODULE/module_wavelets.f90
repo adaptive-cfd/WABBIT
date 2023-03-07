@@ -1,7 +1,7 @@
 !> \brief refinement and coarsening subroutines
 ! ********************************************************************************************
 
-module module_interpolation
+module module_wavelets
     use module_params
 
     implicit none

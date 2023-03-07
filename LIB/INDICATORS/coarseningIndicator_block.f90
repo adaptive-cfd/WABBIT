@@ -35,7 +35,6 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
     ! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
-
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !

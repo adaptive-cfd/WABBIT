@@ -130,10 +130,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
         if ( .not. consider_hvy_tmp ) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
-            call component_wise_tree_norm(params, hvy_block, tree_ID, params%eps_norm, norm)
+            call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
         else
             ! use derived qtys instead (hvy_tmp)
-            call component_wise_tree_norm(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)

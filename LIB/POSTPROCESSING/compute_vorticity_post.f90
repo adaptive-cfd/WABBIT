@@ -364,7 +364,7 @@ subroutine wavelet_test(params)
     end do
 
     do k=1,50
-    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 enddo
 
     !------------------------------------------------------------------------
@@ -713,7 +713,7 @@ do iter= 1, 1
 
     call saveHDF5_tree("coarsening_332.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
-    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
     call saveHDF5_tree("coarsening_333.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 enddo
@@ -809,7 +809,7 @@ do iter= 1, 1
     call updateMetadata_tree(params, tree_ID)
 
     ! do kk = 1, 50
-        call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
     ! enddo
     call saveHDF5_tree("coarsening_334.h5", time, iteration, 1, params, hvy_block, tree_ID )
 

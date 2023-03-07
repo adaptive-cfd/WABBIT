@@ -1,16 +1,11 @@
-!! The block thresholding is done with the restriction/prediction operators acting on the
-!! entire block \n
-! ********************************************************************************************
-!> \image html threshold.svg width=400
-
-subroutine threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, eps )
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, eps )
 
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
-    real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
+    real(kind=rk), intent(inout)        :: u(:, :, :, :)
     !> it can be useful not to consider all components for thresholding here.
     !! e.g. to work only on the pressure or vorticity.
     logical, intent(in)                 :: thresholding_component(:)
@@ -20,135 +15,97 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
     ! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
     !
-    real(kind=rk), intent(inout)        :: norm( size(block_data,4) )
+    real(kind=rk), intent(inout)        :: norm( size(u,4) )
     ! if different from the default eps (params%eps), you can pass a different value here. This is optional
     ! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
 
-    integer(kind=ik)                    :: dF, i, j, l
-    real(kind=rk)                       :: detail( size(block_data,4) )
-    integer(kind=ik)                    :: g, dim, Jmax
+    integer(kind=ik)                    :: dF, i, j, l, p
+    real(kind=rk)                       :: detail( size(u,4) )
+    integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
-    integer(kind=ik) :: n_coarse(1:3), n_fine(1:3), idim
-    real(kind=rk), SAVE, allocatable :: ufine(:,:,:), ucoarse(:,:,:)
+    real(kind=rk), allocatable, dimension(:,:,:,:) :: u_wc, sc, wcx, wcy, wcxy
 
     t0 = MPI_Wtime()
+    nx = size(u, 1)
+    ny = size(u, 2)
+    nz = size(u, 3)
+    nc = size(u, 4)
     Bs = params%Bs
     g  = params%g
     dim = params%dim
     Jmax = params%Jmax
     detail = -1.0_rk
+    allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
+    allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
+    allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
+    allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+    allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
 
-    do idim = 1, params%dim
-        if ( modulo(Bs(idim),2)==0) then
-            ! Bs even
-            n_coarse(idim) = (Bs(idim) + 2*g) / 2
-            n_fine(idim) = Bs(idim) + 2*g - 1
-        else
-            ! Bs odd
-            n_coarse(idim) = (Bs(idim) + 2*g + 1)/2
-            n_fine(idim) = Bs(idim) + 2*g
-        endif
+
+#ifdef DEV
+    if (.not. allocated(params%GD)) call abort(1213149, "The cat is angry: Wavelet-setup not yet called?")
+    if (modulo(Bs(1),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
+    if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
+#endif
+
+    ! perform the wavlet decomposition of the block
+    ! Note we could not reonstruct here, because the neighboring WC/SC are not
+    ! synced. However, here, we only check the details on a block, so there is no
+    ! need for reconstruction.
+    u_wc = u
+    call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
+
+    ! NOTE: if the coarse reconstruction is performed before this routine is called, then
+    ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
+    ! them again.
+    call spaghetti2mallat_block(params, u_wc, sc, wcx, wcy, wcxy)
+
+    do p = 1, nc
+        ! if all details are smaller than C_eps, we can coarsen.
+        ! check interior WC only
+        detail(p) = maxval(abs(wcx(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p)))
+        detail(p) = max( detail(p), maxval(abs(wcy(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p))) )
+        detail(p) = max( detail(p), maxval(abs(wcxy(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p))) )
+
+        detail(p) = detail(p) / norm(p)
     enddo
 
-    ! --------------------------- 3D -------------------------------------------
+    deallocate(u_wc, sc, wcx, wcy, wcxy)
 
-    if (params%dim == 3) then
-        if (.not.allocated(ufine)) allocate( ufine( 1:n_fine(1), 1:n_fine(2), 1:n_fine(3) ) )
-        if (.not.allocated(ucoarse)) allocate( ucoarse( 1:n_coarse(1) , 1:n_coarse(2), 1:n_coarse(3)) )
+    ! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
+    ! ich schicke dir die notizen gleich (photos).
+    !
+    ! also wir brauchen einen scale(level)- dependent threshold, d.h. \epsilon_j
+    ! zudem ist dieser abhaengig von der raum dimension d.
+    !
+    ! Fuer die L^2 normalisierung (mit wavelets welche in der L^\infty norm normalisiert sind) haben wir
+    !
+    ! \epsilon_j = 2^{-jd/2} \epsilon
+    !
+    ! d.h. der threshold wird kleiner auf kleinen skalen.
+    !
+    ! Fuer die vorticity (anstatt der velocity) kommt nochmal ein faktor 2^{-j} dazu, d.h.
+    !
+    ! \epsilon_j = 2^{-j(d+2)/2} \epsilon
+    !
+    ! Zum testen waere es gut in 1d oder 2d zu pruefen, ob die L^2 norm von u - u_\epsilon
+    ! linear mit epsilon abnimmt, das gleiche koennte man auch fuer H^1 (philipp koennte dies doch mal ausprobieren?).
+    !
+    ! fuer CVS brauchen wir dann noch \epsilon was von Z (der enstrophy) und der feinsten
+    ! aufloesung abhaengt. fuer L^2 normalisierte wavelets ist
+    ! der threshold:
+    !
+    ! \epsilon = \sqrt{2/3 \sigma^2 \ln N}
+    !
+    ! wobei \sigma^2 die varianz (= 2 Z) der incoh. vorticity ist.
+    ! typischerweise erhaelt man diese mit 1-3 iterationen.
+    ! als ersten schritt koennen wir einfach Z der totalen stroemung nehmen.
+    ! N ist die maximale aufloesung, typicherweise 2^{d J}.
+    !
 
-        ! loop over all datafields
-        do dF = 1, size(block_data,4)
-            ! is this component of the block used for thresholding or not?
-            if (thresholding_component(dF)) then
-                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
-
-                ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-                call restriction_prefilter( params, block_data(1:n_fine(1), 1:n_fine(2), 1:n_fine(3), dF), ufine(:,:,:) )
-                ! now, coarsen block data (restriction)
-                call restriction_3D( ufine, ucoarse )  ! fine, coarse
-                ! then, re-interpolate to the initial level (prediciton)
-                call prediction_3D ( ucoarse, ufine, params%order_predictor )  ! coarse, fine
-
-                ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
-                ! NOTE: we EXCLUDE ghost nodes
-                do l = g+1, Bs(3)+g
-                    do j = g+1, Bs(2)+g
-                        do i = g+1, Bs(1)+g
-                            detail(dF) = max( detail(dF), abs(block_data(i,j,l,dF)-ufine(i,j,l)) / norm(dF) )
-                        end do
-                    end do
-                end do
-            end if
-
-        end do
-    end if
-
-    ! --------------------------- 2D -------------------------------------------
-
-    if (params%dim == 2 ) then
-        if (.not.allocated(ufine)) allocate( ufine(1:n_fine(1), 1:n_fine(2), 1) )
-        if (.not.allocated(ucoarse)) allocate( ucoarse(1:n_coarse(1), 1:n_coarse(2), 1) )
-
-        ! loop over all datafields
-        do dF = 1, size(block_data,4)
-            ! is this component of the block used for thresholding or not?
-            if (thresholding_component(dF)) then
-                if (abs(norm(dF))<1.e-10_rk) norm(dF) = 1.0_rk ! avoid division by zero
-
-    ! apply a smoothing filter (low-pass, in wavelet terminology h_tilde)
-    call restriction_prefilter(params, block_data(1:n_fine(1), 1:n_fine(2), :, dF), ufine)
-                ! now, coarsen block data (restriction)
-                    call restriction_2D( ufine(:,:,1), ucoarse(:,:,1) )  ! fine, coarse
-                    ! then, re-interpolate to the initial level (prediciton)
-                    call prediction_2D ( ucoarse(:,:,1), ufine(:,:,1), params%order_predictor )  ! coarse, fine
-
-                ! Calculate detail by comparing u1 (original data) and ufine (result of predict(restrict(u1)))
-                do j = g+1, Bs(2)+g
-                    do i = g+1, Bs(1)+g
-                        detail(dF) = max( detail(dF), abs(block_data(i,j,1,dF)-ufine(i,j,1)) / norm(dF) )
-                    end do
-                end do
-            end if
-        end do
-    end if
-
-
-
-
-! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
-! ich schicke dir die notizen gleich (photos).
-!
-! also wir brauchen einen scale(level)- dependent threshold, d.h. \epsilon_j
-! zudem ist dieser abhaengig von der raum dimension d.
-!
-! Fuer die L^2 normalisierung (mit wavelets welche in der L^\infty norm normalisiert sind) haben wir
-!
-! \epsilon_j = 2^{-jd/2} \epsilon
-!
-! d.h. der threshold wird kleiner auf kleinen skalen.
-!
-! Fuer die vorticity (anstatt der velocity) kommt nochmal ein faktor 2^{-j} dazu, d.h.
-!
-! \epsilon_j = 2^{-j(d+2)/2} \epsilon
-!
-! Zum testen waere es gut in 1d oder 2d zu pruefen, ob die L^2 norm von u - u_\epsilon
-! linear mit epsilon abnimmt, das gleiche koennte man auch fuer H^1 (philipp koennte dies doch mal ausprobieren?).
-!
-! fuer CVS brauchen wir dann noch \epsilon was von Z (der enstrophy) und der feinsten
-! aufloesung abhaengt. fuer L^2 normalisierte wavelets ist
-! der threshold:
-!
-! \epsilon = \sqrt{2/3 \sigma^2 \ln N}
-!
-! wobei \sigma^2 die varianz (= 2 Z) der incoh. vorticity ist.
-! typischerweise erhaelt man diese mit 1-3 iterationen.
-! als ersten schritt koennen wir einfach Z der totalen stroemung nehmen.
-! N ist die maximale aufloesung, typicherweise 2^{d J}.
-!
-
-    ! default threshlding level is the one in the parameter struct
+    ! default thresholding level is the one in the parameter struct
     eps2 = params%eps
     ! but if we pass another one, use that.
     if (present(eps)) eps2 = eps
@@ -160,12 +117,11 @@ subroutine threshold_block( params, block_data, thresholding_component, refineme
         ! a simple threshold controls this norm
         eps2 = eps2
 
-
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
         eps2 = eps2 * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
-        if (params%dim==2) eps2 = eps2*0.1
+        ! if (params%dim==2) eps2 = eps2*0.1
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity

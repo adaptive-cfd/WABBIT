@@ -84,10 +84,11 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.
-
+#ifdef DEV
         if (.not. allocated(params%threshold_state_vector_component)) then
             call abort(7363823, "params%threshold_state_vector_component not allocated....")
         endif
+#endif
 
         thresholding_component = params%threshold_state_vector_component
         call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level )

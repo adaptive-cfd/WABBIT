@@ -33,7 +33,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     integer(kind=ik), intent(in)        :: tree_ID
     ! loop variables
-    integer(kind=ik)                    :: lgt_n_old, iteration, k, lgt_id
+    integer(kind=ik)                    :: iteration, k, lgt_id
     real(kind=rk)                       :: t0, t1
     integer(kind=ik)                    :: ierr, k1, hvy_id
     logical                             :: ignore_maxlevel2, iterate
@@ -50,7 +50,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! start time
     t0 = MPI_Wtime()
     t1 = t0
-    lgt_n_old = 0
     iteration = 0
     iterate   = .true.
     Jmin      = params%Jmin
@@ -64,11 +63,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ignore_maxlevel2 = .false.
     endif
 
-    ! 03/2023:  The new version of this routine
-    ! * perform a wavelet decomposition for the blocks
-    ! * apply the coarse extension to the WC/SC
-
-
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
     t0 = MPI_Wtime()
@@ -80,16 +74,18 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
     do while (iterate)
-        lgt_n_old = lgt_n(tree_ID)
-
         !> (a) check where coarsening is possible
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
         ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
         t0 = MPI_Wtime()
-        ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
-call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
+
+        ! coarse extension: remove wavelet coefficients near a fine/coarse interface
+        ! on the fine block. Does nothing in the case of CDF40 or CDF20.
+        call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+        hvy_n(tree_ID), inputDataSynced=.true. )
 
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
         !! acts on a single block only
@@ -121,25 +117,16 @@ call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy
         call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
         call toc( "adapt_tree (executeCoarsening_tree)", MPI_Wtime()-t0 )
 
-
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
         call updateMetadata_tree(params, tree_ID)
         call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
+        ! iteration counter (used for random coarsening criterion)
         iteration = iteration + 1
         level = level - 1
-
-        ! loop condition for outer iteration depends on the transform type:
-        ! for biorthogonal, we have to consider all levels individidually (Note: it may well
-        ! be that on some level, nothing can be coarsened, but on the levels below, it is possible.
-        ! Hence checking for a constant grid is misleading at this time.)
-        ! for harten-multiresolution, its sufficient to iterate until the grid is constant
-        if (params%wavelet=="CDF40" .or. params%wavelet=="CDF20") then
-            iterate = (lgt_n_old /= lgt_n(tree_ID))
-        else
-            iterate = (level >= Jmin)
-        endif
+        ! loop continues until we are on the lowest level.
+        iterate = (level >= Jmin)
     end do
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
@@ -149,7 +136,9 @@ call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
-call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    ! final coarse extension step
+    call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+    hvy_n(tree_ID), inputDataSynced=.false. )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)
 end subroutine

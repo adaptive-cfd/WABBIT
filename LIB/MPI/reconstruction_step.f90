@@ -1,4 +1,5 @@
-subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n )
+subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, &
+    inputDataSynced )
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -13,6 +14,9 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n
+    ! if the input data are sync'ed we do not do it here: otherwise, call
+    ! ghost nodes synchronization
+    logical, intent(in) :: inputDataSynced
 
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor, Nwcl
     integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr
@@ -43,7 +47,9 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     ! maybe this call is redundant - FIXME
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
     ! HD and GD to the data. It may be that this is done before calling.
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    if (.not. inputDataSynced) then
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+    endif
 
 
     ! 2nd. We compute the decomposition by applying the HD GD filters to the data.

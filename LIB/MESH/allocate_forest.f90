@@ -338,7 +338,9 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     endif
 
     if (allocated(hvy_block)) deallocate( hvy_block )
-    if (allocated(hvy_work)) deallocate( hvy_work )
+    if (present(hvy_work)) then
+        if (allocated(hvy_work)) deallocate( hvy_work )
+    endif
     if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )

@@ -95,6 +95,8 @@ subroutine sparse_to_dense(params)
         call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
     end if
 
+    call setup_wavelet(params)
+
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
     ! the ini files parser takes care of that (by the passed default arguments). But in postprocessing
@@ -168,7 +170,7 @@ subroutine sparse_to_dense(params)
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (operator=="sparse-to-dense") then
-        call toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
+        call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
     elseif (operator=="refine-coarsen") then
         write(*,*) "starting at", lgt_n(tree_ID)

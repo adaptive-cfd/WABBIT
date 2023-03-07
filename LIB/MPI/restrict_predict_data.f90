@@ -58,6 +58,10 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
 
     allocate(tmp_block(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ))
 
+#ifdef DEV
+    if (.not. allocated(params%HD)) call abort(230301051, "Pirates! Maybe setup_wavelet was not called?")
+#endif
+
     call blockFilterXYZ_interior_vct( hvy_block(:,:,:,:,hvy_id), tmp_block, params%HD, &
     lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%g)
 

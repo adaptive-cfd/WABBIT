@@ -1037,6 +1037,19 @@ contains
     subroutine setup_wavelet(params)
         implicit none
         type (type_params), intent(inout) :: params
+
+        if (allocated(params%GR)) deallocate(params%HD)
+        if (allocated(params%GD)) deallocate(params%GD)
+        if (allocated(params%HR)) deallocate(params%HR)
+        if (allocated(params%GR)) deallocate(params%GR)
+
+        params%Nscl = 0
+        params%Nscr = 0
+        params%Nwcl = 0
+        params%Nwcr = 0
+        params%Nreconl = 0
+        params%Nreconr = 0
+
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE
         ! GD - high pass decomposition filter, G_TILDE

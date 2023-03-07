@@ -336,15 +336,14 @@ program main
             ! routine that relies on forests and pruned trees, which are not available in the module_mesh.
             ! Hence the mask is created here.
             if (params%threshold_mask) then
-                call abort(2303051, "as threshold_mask is not implemented this currently works only without penalizatin")
                 ! create mask function at current time
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                call adaptBiorthogonal_tree( time, params, hvy_block, tree_ID_flow, hvy_tmp)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask)
             else
                 ! actual coarsening (no mask function is required)
-                call adaptBiorthogonal_tree( time, params, hvy_block, tree_ID_flow, hvy_tmp )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)

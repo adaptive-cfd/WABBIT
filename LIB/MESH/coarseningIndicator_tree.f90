@@ -35,7 +35,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     integer(kind=2), allocatable, save :: mask_color(:,:,:)
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:,:,:,:)
-    logical :: consider_hvy_tmp, biorthogonal
+    logical :: consider_hvy_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -50,7 +50,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     neq = params%n_eqn
     Bs = params%Bs
     g = params%g
-    biorthogonal = ((params%wavelet/="CDF40").and.(params%wavelet/="CDF20"))
 
     !> reset refinement status to "stay" on all blocks
     do k = 1, lgt_n(tree_ID)
@@ -61,7 +60,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! construct mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except in the "dealiasing step", because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask).and. indicator/="everywhere" .and. indicator/="random") then
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random") then
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
@@ -120,7 +119,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
     !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
-    !! or vorticity). The nor is specified in params%eps_norm, default is Linfty.
+    !! or vorticity). The norm is specified in params%eps_norm, default is Linfty.
 
     !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
     !! is an absolute value.
@@ -206,7 +205,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
             ! this should prevent filtering artifacts at block-block interfaces.
-            if ((level /= level_this).and.(biorthogonal)) cycle
+            if (level /= level_this) cycle
 
             ! some indicators may depend on the grid, hence
             ! we pass the spacing and origin of the block (as we have to compute vorticity

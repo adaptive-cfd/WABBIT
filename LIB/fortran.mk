@@ -278,18 +278,16 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o find_neighbors.f90 doesBlockExist_tree.f90 \
-	refine_tree.f90 respectJmaxJmin_tree.f90 refinementExecute2D_tree.f90 adapt_tree.f90 threshold_block.f90 \
-	ensureGradedness_tree.f90 ensure_completeness.f90 executeCoarsening_tree.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
-	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
-    treecode_to_hilbertcode_3D.f90 forest.f90 reset_tree.f90 \
-    refinementExecute3D_tree.f90 get_block_spacing_origin.f90 updateNeighbors_tree.f90 check_lgt_block_synchronization.f90 \
-	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 \
-	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 coarseningIndicator_tree.f90 \
-	createEquidistantGrid_tree.f90 createRandomGrid_tree.f90 allocate_forest.f90 reset_tree.f90 block_xfer_nonblocking.f90 \
-	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90 createMask_tree.f90 InputOutput.f90 InputOutput_Flusi.f90 \
-	waveletDecomposition_tree.f90 adaptBiorthogonal_tree.f90 coarseningIndicatorBiorthogonal_tree.f90 \
-	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
+	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 waveletDecomposition_tree.f90 refineToEquidistant_tree.f90 \
+	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
+	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
+	refinementExecute2D_tree.f90 refinementExecute3D_tree.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 \
+	ensure_completeness.f90 executeCoarsening_tree.f90 merge_blocks.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
+	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
+	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
+	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
+	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 	
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

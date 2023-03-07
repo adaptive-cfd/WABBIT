@@ -913,7 +913,7 @@ contains
             ! since otherwise they will be refined and coarsed when reconstructing
             ! the snapshots. this produces a lot of overhead and makes the calculations slow
             if ( all_snapshots_dense ) then
-                call toEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=params%Jmax)
+                call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=params%Jmax)
             endif
             if ( params%rank == 0 ) then
                 write(*,'("Mode", i3," Stored in Tree_id: ",i3)') j, tree_ID

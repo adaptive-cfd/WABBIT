@@ -192,4 +192,6 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
         write(*,'(" done - Linfty mean convergence order was ",g12.4)')  sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
     endif
 
+    ! delete the grid we created for this subroutine
+    call reset_tree(params, .true., tree_ID=tree_ID)
 end subroutine

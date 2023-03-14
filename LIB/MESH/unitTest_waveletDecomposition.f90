@@ -10,9 +10,9 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     integer(kind=ik), intent(in)            :: tree_ID
 
     integer(kind=ik)                        :: k, hvyID
-    integer(kind=ik)                        :: g, ix, iy, iz, nc
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic
     integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk), allocatable :: norm(:)
+    real(kind=rk), allocatable :: norm(:), norm_ref(:)
 
     if (params%rank == 0) then
         write(*,'(80("~"))')
@@ -22,9 +22,12 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         write(*,'("Wavelet=",A," g=", i2)') trim(adjustl(params%wavelet)), params%g
     end if
 
-    nc = 1
+    Bs = params%Bs
+    g = params%g
+    nc = params%n_eqn
 
     allocate(norm(1:params%n_eqn))
+    allocate(norm_ref(1:params%n_eqn))
 
     !----------------------------------------------------------------------------
     ! create an equidistant grid on level J=1 (and not Jmin, because that may well be 0)
@@ -36,15 +39,19 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                hvy_block(ix,iy,:,1:nc,hvyID) = rand_nbr()
+        do ic = 1, nc
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    hvy_block(ix,iy,:,ic,hvyID) = rand_nbr()
+                end do
             end do
         end do
     end do
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
+
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
     !----------------------------------------------------------------------------
     ! FWT
@@ -71,7 +78,9 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     ! compute norm of error
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
-    if (params%rank==0) write(*,*) "Error in IWT(FWT(u)) is: ", norm(1)
+    norm = norm / norm_ref
+
+    if (params%rank==0) write(*,*) "Relative L2 error in IWT(FWT(u)) is: ", norm
 
     if (norm(1)>1.0e-14_rk) then
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police. Dial 17 in France." )
@@ -82,4 +91,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     if (params%rank == 0) then
         write(*,'(80("~"))')
     end if
+
+    ! delete the grid we created for this subroutine
+    call reset_tree(params, .true., tree_ID=tree_ID)
 end subroutine

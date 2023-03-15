@@ -960,6 +960,73 @@ u  = sc
                 ! stop
     end subroutine
 
+
+    ! computes a one-level wavelet decomposition of a block.
+    ! The computation of coefficients is possible on the entire block, but
+    ! without sync'ing the reconstruction is not possible on the entire data.
+    ! We have to sync wavelet-transformed blocks.
+    ! Data are stored in Spaghetti-order (not Mallat-Order)
+    subroutine waveletDecomposition_block_old(params, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u ! input: function, output=wc
+
+        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
+        ! integer(kind=ik) :: ag, bg, ah, bh, ix, iy, iz, ic, shift
+        ! real(kind=rk) :: ug, uh
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+#ifdef DEV
+        if (nz /= 1) call abort(7223839, "currently 2D only")
+        if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+        if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+#endif
+
+        if (allocated(sc)) then
+            if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
+        endif
+        if (allocated(wc)) then
+            if ((size(wc,1)/=nx).or.(size(wc,2)/=ny).or.(size(wc,3)/=nz).or.(size(wc,4)/=nc)) deallocate(wc)
+        endif
+
+        if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
+        if (.not. allocated(wc)) allocate( wc(1:nx, 1:ny, 1:nz, 1:nc) )
+        ! if (.not. allocated(u_wc)) allocate( u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
+
+        ! alternative algorithm (true Mallat ordering, but with ghost nodes)
+        call blockFilterCustom1_vct( params, u, sc, "HD", "x" )
+        call blockFilterCustom1_vct( params, u, wc, "GD", "x" )
+
+        u( 1:Bs(1)/2, :, :, :)       = sc( (g+1):(Bs(1)+g):2, :, :, :)
+        u( Bs(1)/2+1:Bs(1), :, :, :) = wc( (g+1):(Bs(1)+g):2, :, :, :)
+
+        call blockFilterCustom1_vct( params, u, sc, "HD", "y" )
+        call blockFilterCustom1_vct( params, u, wc, "GD", "y" )
+
+        u(:, 1:Bs(2)/2, :, :) =  sc(:, (g+1):(Bs(2)+g):2, :, :)
+        u(:, Bs(2)/2+1:Bs(2), :, :) = wc(:, (g+1):(Bs(2)+g):2, :, :)
+
+        ! Note at this point U contains SC/WC in "true Mallat ordering", but note
+        ! that data includes ghost nodes.
+
+        ! copy to Spaghetti ordering
+        sc=0.0_rk
+        sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, 1:Bs(2)/2, :, :)
+        sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
+        sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
+        sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
+
+        ! copy to the back spaghetti-ordered coefficients to the block
+        u = sc
+    end subroutine
+
     !-------------------------------------------------------------------------------
 
     subroutine waveletReconstruction_block(params, u)
@@ -1071,16 +1138,16 @@ u  = sc
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
 #ifdef DEV
-        if ((size(sc,1)/=size(u,1)).or.(size(sc,2)/=size(u,2)).or.(size(sc,3)/=size(u,3)).or.(size(sc,4)/=size(u,4))) then
+        if (.not.areArraysSameSize(u, sc)) then
             call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
         endif
-        if ((size(wcx,1)/=size(u,1)).or.(size(wcx,2)/=size(u,2)).or.(size(wcx,3)/=size(u,3)).or.(size(wcx,4)/=size(u,4))) then
+        if (.not.areArraysSameSize(u, wcx)) then
             call abort(27222120, "Allocated arrays are not compatible?! Time for a drink.")
         endif
-        if ((size(wcy,1)/=size(u,1)).or.(size(wcy,2)/=size(u,2)).or.(size(wcy,3)/=size(u,3)).or.(size(wcy,4)/=size(u,4))) then
+        if (.not.areArraysSameSize(u, wcy)) then
             call abort(27222121, "Allocated arrays are not compatible?! Time for a drink.")
         endif
-        if ((size(wcxy,1)/=size(u,1)).or.(size(wcxy,2)/=size(u,2)).or.(size(wcxy,3)/=size(u,3)).or.(size(wcxy,4)/=size(u,4))) then
+        if (.not.areArraysSameSize(u, wcxy)) then
             call abort(27222122, "Allocated arrays are not compatible?! Time for a drink.")
         endif
 #endif

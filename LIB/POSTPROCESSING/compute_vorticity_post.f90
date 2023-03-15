@@ -485,8 +485,8 @@ subroutine wavelet_test_coarsening(params)
     !----------------------------------------------------------------------------
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
-call unitTest_waveletDecomposition(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
-stop
+    call unitTest_waveletDecomposition(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+
     ! call createEquidistantGrid_tree( params, 4, .true., tree_ID )
     !
     ! ! create just some data...
@@ -523,15 +523,6 @@ stop
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-    end do
-    stop
-
-
-
 ! ****''''*** here the loop begins
 do iter= 1, 1
 
@@ -542,8 +533,6 @@ do iter= 1, 1
         hvyID = hvy_active(k,tree_ID)
         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
     end do
-
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! flag for coarsening
     do k = 1, lgt_n(tree_ID)
@@ -597,28 +586,8 @@ do iter= 1, 1
         ! ... as well as blocks the have neighbors which will be coarsened
         ! (proper "coarse extension")
         if (lgt_block( lgtID, Jmax+IDX_REFINE_STS ) == 0) then
-
-            !....................
             ! unpack/inflated Mallat ordering
-            sc   = 0.0_rk
-            wcx  = 0.0_rk
-            wcy  = 0.0_rk
-            wcxy = 0.0_rk
-            ! copy from Spaghetti to inflated Mallat ordering
-            if (modulo(g, 2) == 0) then
-                ! even g
-                sc(   1:nx:2, 1:ny:2, :, :) = hvy_block(1:nx:2, 1:ny:2, :, 1:nc, hvyID)
-                wcx(  1:nx:2, 1:ny:2, :, :) = hvy_block(2:nx:2, 1:ny:2, :, 1:nc, hvyID)
-                wcy(  1:nx:2, 1:ny:2, :, :) = hvy_block(1:nx:2, 2:ny:2, :, 1:nc, hvyID)
-                wcxy( 1:nx:2, 1:ny:2, :, :) = hvy_block(2:nx:2, 2:ny:2, :, 1:nc, hvyID)
-            else
-                ! odd g
-                sc(   2:nx-1:2, 2:ny-1:2, :, :) = hvy_block(2:nx-1:2, 2:ny-1:2, :, 1:nc, hvyID)
-                wcx(  2:nx-1:2, 2:ny-1:2, :, :) = hvy_block(3:nx:2, 2:ny-1:2  , :, 1:nc, hvyID)
-                wcy(  2:nx-1:2, 2:ny-1:2, :, :) = hvy_block(2:nx-1:2, 3:ny:2  , :, 1:nc, hvyID)
-                wcxy( 2:nx-1:2, 2:ny-1:2, :, :) = hvy_block(3:nx:2, 3:ny:2    , :, 1:nc, hvyID)
-            endif
-            !....................
+            call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
 
             do neighborhood = 1, 8
                 ! neighbor exists ?
@@ -666,19 +635,7 @@ do iter= 1, 1
             enddo
 
             ! repack to Spaghetti-ordering
-            hvy_block(:,:, :, 1:nc, hvyID) = 0.0_rk
-            if (modulo(g, 2) == 0) then
-                hvy_block(1:nx:2, 1:ny:2, :, 1:nc, hvyID) =   sc(1:nx:2, 1:ny:2, :, 1:nc)
-                hvy_block(2:nx:2, 1:ny:2, :, 1:nc, hvyID) =  wcx(1:nx:2, 1:ny:2, :, 1:nc)
-                hvy_block(1:nx:2, 2:ny:2, :, 1:nc, hvyID) =  wcy(1:nx:2, 1:ny:2, :, 1:nc)
-                hvy_block(2:nx:2, 2:ny:2, :, 1:nc, hvyID) = wcxy(1:nx:2, 1:ny:2, :, 1:nc)
-            else
-                hvy_block(2:nx-1:2, 2:ny-1:2, :, 1:nc, hvyID) =   sc(2:nx-1:2, 2:ny-1:2, :, 1:nc)
-                hvy_block(3:nx:2, 2:ny-1:2  , :, 1:nc, hvyID) =  wcx(2:nx-1:2, 2:ny-1:2, :, 1:nc)
-                hvy_block(2:nx-1:2, 3:ny:2  , :, 1:nc, hvyID) =  wcy(2:nx-1:2, 2:ny-1:2, :, 1:nc)
-                hvy_block(3:nx:2, 3:ny:2    , :, 1:nc, hvyID) = wcxy(2:nx-1:2, 2:ny-1:2, :, 1:nc)
-            endif
-
+            call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, hvy_block(:,:, :,:,hvyID))
         endif
     end do
 

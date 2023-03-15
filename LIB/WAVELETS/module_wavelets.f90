@@ -1137,6 +1137,13 @@ u  = sc
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
 #ifdef DEV
         if (.not.areArraysSameSize(u, sc)) then
             call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
@@ -1160,13 +1167,6 @@ u  = sc
         ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
         ! in the sense that Nx*Ny data gives 4 * Nx*Ny decomposition.
 
-        nx = size(u, 1)
-        ny = size(u, 2)
-        nz = size(u, 3)
-        nc = size(u, 4)
-        g  = params%g
-        Bs = params%bs
-
         ! copy from Spaghetti to Mallat ordering
         if (modulo(g, 2) == 0) then
             ! even g
@@ -1181,7 +1181,6 @@ u  = sc
             wcy(  2:nx-1:2, 2:ny-1:2, :, :) = u(2:nx-1:2, 3:ny:2  , :, 1:nc)
             wcxy( 2:nx-1:2, 2:ny-1:2, :, :) = u(3:nx:2, 3:ny:2    , :, 1:nc)
         endif
-
     end subroutine
 
 
@@ -1192,17 +1191,28 @@ u  = sc
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
         g  = params%g
         Bs = params%bs
 
-        ! copy to Spaghetti-order (interior nodes only - the ghosts cannot be filtered anyways)
-        u( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) =   sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :)
-        u( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) =  wcx( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
-        u( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) =  wcy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
-        u( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = wcxy( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) ! bounds on right stay same (shift included in filters)
+        if (modulo(g, 2) == 0) then
+            ! even g
+            u(1:nx:2, 1:ny:2, :, :)= sc(   1:nx:2, 1:ny:2, :, :)
+            u(2:nx:2, 1:ny:2, :, :)= wcx(  1:nx:2, 1:ny:2, :, :)
+            u(1:nx:2, 2:ny:2, :, :)= wcy(  1:nx:2, 1:ny:2, :, :)
+            u(2:nx:2, 2:ny:2, :, :)= wcxy( 1:nx:2, 1:ny:2, :, :)
+        else
+            ! odd g
+            u(2:nx-1:2, 2:ny-1:2, :, :)= sc(   2:nx-1:2, 2:ny-1:2, :, :)
+            u(3:nx:2, 2:ny-1:2  , :, :)= wcx(  2:nx-1:2, 2:ny-1:2, :, :)
+            u(2:nx-1:2, 3:ny:2  , :, :)= wcy(  2:nx-1:2, 2:ny-1:2, :, :)
+            u(3:nx:2, 3:ny:2    , :, :)= wcxy( 2:nx-1:2, 2:ny-1:2, :, :)
+        endif
 
     end subroutine
-
 
 
     ! manipulate wavelet coefficients in a neighborhood direction: applied
@@ -1592,8 +1602,8 @@ u  = sc
         real(kind=rk), dimension(:, :, :, :), intent(in) :: u
         character(len=*) :: file
         integer :: ii
-
-        open(unit=32, file="u_wc.csv", status="replace")
+        write(*,*) "Dumping block to "//file
+        open(unit=32, file=file, status="replace")
         do ii = 1, size(u,2)
         write(32,'(48(es12.4,";"))') u(:, ii, 1, 1)
         enddo

@@ -12,7 +12,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     integer(kind=ik)                        :: k, hvyID
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii
     integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk), allocatable :: norm(:), norm_ref(:)
+    real(kind=rk), allocatable :: norm(:), norm_ref(:), sc(:,:,:,:), wcx(:,:,:,:), wcy(:,:,:,:), wcxy(:,:,:,:)
 
     if (params%rank == 0) then
         write(*,'(80("~"))')
@@ -89,6 +89,22 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
+
+
+    !---------------------------------------------------------------------------
+    ! testing of conversion routines on FWT transformed data
+    !---------------------------------------------------------------------------
+    allocate(sc(1:size(hvy_block,1),1:size(hvy_block,2),1:size(hvy_block,3),1:size(hvy_block,4) ))
+    allocate(wcx(1:size(hvy_block,1),1:size(hvy_block,2),1:size(hvy_block,3),1:size(hvy_block,4) ))
+    allocate(wcy(1:size(hvy_block,1),1:size(hvy_block,2),1:size(hvy_block,3),1:size(hvy_block,4) ))
+    allocate(wcxy(1:size(hvy_block,1),1:size(hvy_block,2),1:size(hvy_block,3),1:size(hvy_block,4) ))
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k,tree_ID)
+        call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
+        call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, hvy_block(:,:,:,:,hvyID))
+    end do
+    deallocate(sc, wcx, wcy, wcxy)
+
 
     !----------------------------------------------------------------------------
     ! IWT

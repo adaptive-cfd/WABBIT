@@ -39,6 +39,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     Nreconl = params%Nreconl
     Nreconr = params%Nreconr
 
+    ! if (.not. areArraysSameSize(sc, hvy_block(:,:,:,:)))
+
     if (.not. allocated(sc  )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(wcx )) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(wcy )) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
@@ -118,19 +120,9 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
 
         if (manipulated) then
-            ! ensures that 3/4 of the numbers are zero - required for reconstruction
-            ! note when copying Spaghetti to Mallat, this is automatically done, but
-            ! when manipulating coefficients, it may happen that we set nonzero values
-            ! where a zero should be. Here: only SC (WC are set to zero anyways)
-            call setRequiredZerosWCSC_block(params, sc)
-            ! wavelet reconstruction - we do not call the routine in module_interplation
-            ! because this requires us to copy data back to Spaghetti-ordering (which is
-            ! unnecessary here, even though it would not hurt)
-            call blockFilterCustom_vct( params, sc  , sc  , "HR", "HR", "--" )
-            call blockFilterCustom_vct( params, wcx , wcx , "HR", "GR", "--" )
-            call blockFilterCustom_vct( params, wcy , wcy , "GR", "HR", "--" )
-            call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" )
-            tmp_reconst = sc + wcx + wcy + wcxy
+            ! reconstruct from the manipulated coefficients
+            call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, tmp_reconst)
+            call waveletReconstruction_block(params, tmp_reconst)
 
             ! reconstruction part. We manipulated the data and reconstructed it in some regions.
             ! Now, we copy those reconstructed data back to the original block - this is

@@ -128,8 +128,8 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
         call toc( "refine_tree (balanceLoad_tree)", MPI_Wtime()-t1 )
     endif
 
-    call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, &
+    ! hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 
     call toc( "refine_tree (lists+neighbors)", t_misc )
     call toc( "refine_tree (TOTAL)", MPI_wtime()-t0 )

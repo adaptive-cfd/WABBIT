@@ -1,4 +1,4 @@
-subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, &
+subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, &
     inputDataSynced )
     implicit none
 
@@ -21,6 +21,7 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor, Nwcl
     integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy, tmp_reconst
+    real(kind=rk) :: t0
     logical :: manipulated
 
     if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20")) return
@@ -48,7 +49,9 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
     ! HD and GD to the data. It may be that this is done before calling.
     if (.not. inputDataSynced) then
+        t0 = MPI_Wtime()
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+        call toc( "coarseExtension (sync 1)", MPI_Wtime()-t0 )
     endif
 
 
@@ -59,6 +62,7 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
     ! layer). The first point (g+1),(g+1) is a scaling function coefficient, regardless of g
     ! odd or even. Bs must be even. We also make a copy of the sync'ed data n hvy_work - we use this
     ! to fix up the SC in the coarse extension case.
+    t0 = MPI_Wtime()
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         ! hvy_work now is a copy with sync'ed ghost points.
@@ -67,19 +71,22 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
         ! data WC/SC now in Spaghetti order
         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
     end do
-
+    call toc( "coarseExtension (FWT)", MPI_Wtime()-t0 )
 
     ! 3rd we sync the decompose coefficients, but only on the same level. This is
     ! required as several fine blocks hit a coarse one, and this means we have to sync
     ! those in order to be able to reconstruct with modified WC/SC. Note it does not matter
     ! if all blocks are sync'ed: we'll not reconstruct on the coarse block anyways, and the
     ! ghost nodes on the fine bloc (WC/SC) are overwritten in the coarse-extension assumption anyways.
+    t0 = MPI_Wtime()
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active, hvy_n, syncSameLevelOnly1=.true. )
+    call toc( "coarseExtension (sync 2)", MPI_Wtime()-t0 )
 
     ! routine operates on a single tree (not a forest)
     ! 4th. Loop over all blocks and check if they have *coarser* neighbors. Neighborhood 1..4 are
     ! always equidistant.
+    t0 = MPI_Wtime()
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
@@ -165,8 +172,15 @@ subroutine substitution_step( params, lgt_block, hvy_block, hvy_work, hvy_neighb
             enddo
         end if
     end do
+    call toc( "coarseExtension (manipulation loop)", MPI_Wtime()-t0 )
+    ! unfortunately, the above loop affects the load balancing. in the sync_ghosts
+    ! step, CPUS will be in sync again, but since they arrive at different times at this line of
+    ! code, idling occurs -> bad for performance.
 
-    ! this is probably an optional sync step
+    ! final sync step. The reason is: we have kept some SC and zeroed some WC, and
+    ! reconstructed the signal. The ghost nodes are outdated now: the reconstruction
+    ! step altered the signal.
+    t0 = MPI_Wtime()
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-
+    call toc( "coarseExtension (sync 3)", MPI_Wtime()-t0 )
 end subroutine

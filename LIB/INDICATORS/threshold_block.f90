@@ -58,7 +58,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 
     ! NOTE: if the coarse reconstruction is performed before this routine is called, then
     ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
-    ! them again.
+    ! them again. -> checked in postprocessing that this is indeed the case.
     call spaghetti2mallat_block(params, u_wc, sc, wcx, wcy, wcxy)
 
     do p = 1, nc

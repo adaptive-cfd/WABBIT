@@ -186,6 +186,16 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     end do
 
     if (rank==0) then
+        write(*,*) ""
+        write(*,*) "        .-."
+        write(*,*) "       ( o )"
+        write(*,*) "    /\_.' '._/\"
+        write(*,*) "    |         |"
+        write(*,*) "     \       /"
+        write(*,*) "      \    /`"
+        write(*,*) "    (__)  /"
+        write(*,*) "    `.__.'"
+        write(*,*) ""
         write(*,'(" done - L2 convergence order was ",6(g12.4,1x))')  sqrt(error1(2:6) / error1(1:5))
         write(*,'(" done - L2 mean convergence order was ",g12.4)')  sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
         write(*,'(" done - Linfty convergence order was ",6(g12.4,1x))')  sqrt(error2(2:6) / error2(1:5))

@@ -75,24 +75,30 @@ subroutine dense_to_sparse(params)
 
     ! Check parameters for correct inputs:
     if (order == "CDF20") then
-        params%order_predictor = "multiresolution_2nd"
         params%g = 2_ik
         params%wavelet='CDF20'
+
     elseif (order == "CDF40") then
-        params%order_predictor = "multiresolution_4th"
         params%g = 3_ik
         params%wavelet='CDF40'
+
     elseif (order == "CDF44") then
-        params%order_predictor = "multiresolution_4th"
         params%wavelet='CDF44'
         params%g = 7_ik
+
+    elseif (order == "CDF42") then
+        params%wavelet='CDF42'
+        params%g = 5_ik
+
     else
-        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
+        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
     end if
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
     endif
+
+    call setup_wavelet(params)
 
     params%coarsening_indicator = indicator
     params%forest_size = 1

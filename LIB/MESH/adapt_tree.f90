@@ -84,7 +84,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         ! coarse extension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF40 or CDF20.
-        call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
         hvy_n(tree_ID), inputDataSynced=.true. )
 
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
@@ -113,6 +113,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call toc( "adapt_tree (ensureGradedness_tree)", MPI_Wtime()-t0 )
 
         !> (d) adapt the mesh, i.e. actually merge blocks
+        ! this applies the wavelet low-pass filter as well (h*h) before decimation
         t0 = MPI_Wtime()
         call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
         call toc( "adapt_tree (executeCoarsening_tree)", MPI_Wtime()-t0 )
@@ -137,7 +138,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
     ! final coarse extension step
-    call substitution_step( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
     hvy_n(tree_ID), inputDataSynced=.false. )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)

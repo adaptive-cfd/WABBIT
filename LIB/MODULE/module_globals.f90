@@ -37,14 +37,52 @@ module module_globals
     integer, parameter, public :: ik=int_prec
     real(kind=rk),parameter, public :: pi  = 4.0_rk * atan(1.0_rk)
     !> global communicator for WABBIT! Dont use MPI_COMM_WORLD!!!!!
-    integer(kind=ik) :: WABBIT_COMM
+    integer(kind=ik) ::  WABBIT_COMM
 
     !subroutines of this module
     interface abort
         module procedure abort1, abort2, abort3
     end interface
 
+    interface areArraysSameSize
+        module procedure areArraysSameSize_1d, areArraysSameSize_2d, areArraysSameSize_3d, areArraysSameSize_4d
+    end interface
+
+
     contains
+
+        function areArraysSameSize_1d(a,b)
+            implicit none
+            real(kind=rk),dimension(1:),intent(in) :: a,b
+            logical :: areArraysSameSize_1d
+
+            areArraysSameSize_1d = (size(a,1)==size(b,1))
+        end function
+
+        function areArraysSameSize_2d(a,b)
+            implicit none
+            real(kind=rk),dimension(1:,1:),intent(in) :: a,b
+            logical :: areArraysSameSize_2d
+
+            areArraysSameSize_2d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2))
+        end function
+
+        function areArraysSameSize_3d(a,b)
+            implicit none
+            real(kind=rk),dimension(1:,1:,1:),intent(in) :: a,b
+            logical :: areArraysSameSize_3d
+
+            areArraysSameSize_3d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2)).and.(size(a,3)==size(b,3))
+        end function
+
+        function areArraysSameSize_4d(a,b)
+            implicit none
+            real(kind=rk),dimension(1:,1:,1:,1:),intent(in) :: a,b
+            logical :: areArraysSameSize_4d
+
+            areArraysSameSize_4d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2)).and.(size(a,3)==size(b,3)).and.(size(a,4)==size(b,4))
+        end function
+
 
         ! helper routine to print when entering a routine. DEBUG only!
         ! all MPIRANKS do print

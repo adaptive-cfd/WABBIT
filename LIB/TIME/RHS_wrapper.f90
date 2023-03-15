@@ -39,6 +39,13 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     n_domain = 0
 
     !-------------------------------------------------------------------------
+    ! CoarseExtension update of input data
+    !-------------------------------------------------------------------------
+    ! we assume data are sync'ed on call
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+    ! hvy_n(tree_ID), inputDataSynced=.true. )
+
+    !-------------------------------------------------------------------------
     ! create mask function at current time
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()

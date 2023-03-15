@@ -131,7 +131,7 @@ contains
             write(*, '("time (average value +- standard deviation) :")')
             k = 1
             do while (  name_comp_time(k) /= "---" )
-                write(*,'(A100, 2(2x, f12.3))') name_comp_time(k), avg(k), std(k)
+                write(*,'(A80, 2(2x, f12.3),1x,f12.2)') name_comp_time(k), avg(k), std(k), comp_time(k, 1)
                 k = k + 1
             end do
             write(*,'(80("_"))')

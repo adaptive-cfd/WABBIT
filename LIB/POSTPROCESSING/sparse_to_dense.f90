@@ -80,19 +80,23 @@ subroutine sparse_to_dense(params)
     call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
 
     if (order == "4") then
-        params%order_predictor = "multiresolution_4th"
         params%g = 4_ik
         params%wavelet = "CDF40"
+
     elseif (order == "44") then
-        params%order_predictor = "multiresolution_4th"
         params%g = 7_ik
         params%wavelet = "CDF44"
+
     elseif (order == "2") then
-        params%order_predictor = "multiresolution_2nd"
         params%g = 2_ik
         params%wavelet = "CDF20"
+
+    elseif (order == "42") then
+        params%g = 5_ik
+        params%wavelet = "CDF42"
+
     else
-        call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. choose between 4 (multiresolution_4th) and 2 (multiresolution_2nd)")
+        call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. [2,4,42,44]" )
     end if
 
     call setup_wavelet(params)
@@ -103,8 +107,8 @@ subroutine sparse_to_dense(params)
     ! we do not read an ini file, so defaults may not be set.
     allocate(params%butcher_tableau(1,1))
     ! we read only one datafield in this routine
-    params%n_eqn  = 1
-    params%block_distribution="sfc_hilbert"
+    params%n_eqn = 1
+    params%block_distribution = "sfc_hilbert"
 
     if (params%dim==3) then
         ! how many blocks do we need for the desired level?

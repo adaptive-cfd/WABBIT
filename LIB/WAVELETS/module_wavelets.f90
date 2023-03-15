@@ -1,6 +1,3 @@
-!> \brief refinement and coarsening subroutines
-! ********************************************************************************************
-
 module module_wavelets
     use module_params
 
@@ -21,14 +18,16 @@ contains
         nfine(1)   = size(fine,1)
         nfine(2)   = size(fine,2)
 
+#ifdef DEV
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
             write(*,*) shape(coarse), ":", shape(fine)
             call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
         endif
+#endif
 
         coarse(:, :) = fine(1:nfine(1):2, 1:nfine(2):2)
 
-    end subroutine restriction_2D
+    end subroutine
 
     subroutine restriction_prefilter(params, u, u_filtered)
         implicit none
@@ -87,13 +86,15 @@ contains
         nfine(2) = size(fine,2)
         nfine(3) = size(fine,3)
 
+#ifdef DEV
         if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2) .or. 2*ncoarse(3)-1 /= nfine(3) ) then
             call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
         endif
+#endif
 
         coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
 
-    end subroutine restriction_3D
+    end subroutine
 
     ! refine the block by one level
     subroutine prediction_2D(coarse, fine, order_predictor)
@@ -116,6 +117,7 @@ contains
         nxfine   = size(fine  , 1)
         nyfine   = size(fine  , 2)
 
+#ifdef DEV
         if ( (2*nxcoarse-1 /= nxfine) .or. (2*nycoarse-1 /= nyfine)) then
             write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
             call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
@@ -125,6 +127,7 @@ contains
             write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
             call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
         endif
+#endif
 
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point)
@@ -213,7 +216,7 @@ contains
             call abort(888194,"ERROR: prediction_2D: wrong method..")
         endif
 
-    end subroutine prediction_2D
+    end subroutine
 
 
     ! refine the block by one level
@@ -359,7 +362,7 @@ contains
             call abort(888196,"ERROR: prediction_2D: wrong method..")
         endif
 
-    end subroutine prediction_3D
+    end subroutine
 
 
     ! Please note applying a filter requires also manipulating the ghost nodes
@@ -397,7 +400,7 @@ contains
         u_filtered = u_tmp
         u_filtered(g+1:Bs(1)+g, :, :) = 0.0_rk
         do ix = g+1, Bs(1)+g
-        ! do ix = -a+1, nx-b
+            ! do ix = -a+1, nx-b
             do shift = a, b
                 u_filtered(ix, :, :) = u_filtered(ix, :, :) + u_tmp(ix+shift, :, :)*coefs_filter(shift)
             enddo
@@ -407,7 +410,7 @@ contains
         u_filtered = u_tmp
         u_filtered(:, g+1:Bs(2)+g, :) = 0.0_rk
         do iy = g+1, Bs(2)+g
-        ! do iy = -a+1, ny-b
+            ! do iy = -a+1, ny-b
             do shift = a, b
                 u_filtered(:, iy, :) = u_filtered(:, iy, :) + u_tmp(:, iy+shift, :)*coefs_filter(shift)
             enddo
@@ -734,6 +737,109 @@ contains
 
     end subroutine
 
+    !-------------------------------------------------------------------------------
+    ! applies one of params% HD GD HR GR filters in one direction
+    subroutine blockFilterCustom1_vct( params, u, u_filtered, filter, direction )
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        character(len=*), intent(in) :: filter, direction
+        integer(kind=ik) :: a, b
+        real(kind=rk), allocatable :: coefs_filter(:)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift, g, Bs(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx, 1:ny, 1:nz, 1:nc) )
+        u_tmp = u
+
+        select case(filter)
+        case("HD")
+            if (.not. allocated(params%HD)) call abort(202302203, "Wavelet setup not done yet?! HD")
+            a = lbound(params%HD, dim=1)
+            b = ubound(params%HD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HD
+
+        case("GD")
+            if (.not. allocated(params%GD)) call abort(202302203, "Wavelet setup not done yet?! GD")
+            a = lbound(params%GD, dim=1)
+            b = ubound(params%GD, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GD
+
+        case("HR")
+            if (.not. allocated(params%HR)) call abort(202302203, "Wavelet setup not done yet?! HR")
+            a = lbound(params%HR, dim=1)
+            b = ubound(params%HR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%HR
+
+        case("GR")
+            if (.not. allocated(params%GR)) call abort(202302203, "Wavelet setup not done yet?! GR")
+            a = lbound(params%GR, dim=1)
+            b = ubound(params%GR, dim=1)
+            if (allocated(coefs_filter)) deallocate(coefs_filter)
+            allocate( coefs_filter(a:b) )
+            coefs_filter = params%GR
+
+        case default
+            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+
+        end select
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302211, "For applying the filter, not enough ghost nodes")
+        endif
+
+        select case(direction)
+        case("x")
+            u_filtered = u_tmp
+            u_filtered(g+1:Bs(1)+g, :, :, :) = 0.0_rk
+            do ix = g+1, Bs(1)+g
+                do shift = a, b
+                    u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+                enddo
+            enddo
+
+        case("y")
+            u_filtered = u_tmp
+            u_filtered(:, g+1:Bs(2)+g, :, :) = 0.0_rk
+            do iy = g+1, Bs(2)+g
+                do shift = a, b
+                    u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+                enddo
+            enddo
+
+        case("z")
+            u_filtered = u_tmp
+            u_filtered(:, :, g+1:Bs(3)+g, :) = 0.0_rk
+            do iz = g+1, Bs(3)+g
+                do shift = a, b
+                    u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+                enddo
+            enddo
+
+        case default
+            call abort(202302201, "Unknown direction [xyz]. You should go to bed more early, its better.")
+
+        end select
+
+
+    end subroutine
+
+    !-------------------------------------------------------------------------------
 
     ! computes a one-level wavelet decomposition of a block.
     ! The computation of coefficients is possible on the entire block, but
@@ -745,8 +851,13 @@ contains
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u ! input: function, output=wc
 
-        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
+        ! integer(kind=ik) :: ag, bg, ah, bh, ix, iy, iz, ic, shift
+        ! real(kind=rk) :: ug, uh
+
+        call WaveDecomposition_dim1( params, u )
+        return
 
         nx = size(u, 1)
         ny = size(u, 2)
@@ -755,26 +866,113 @@ contains
         g  = params%g
         Bs = params%Bs
 
-#ifdef DEV
-        if (nz /= 1) call abort(7223839, "currently 2D only")
-        if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-        if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-#endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!
+! copy to Spaghetti ordering
+if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
+if (.not. allocated(sc)) allocate( ucopy(1:nx, 1:ny, 1:nz, 1:nc) )
+if (.not. allocated(sc)) allocate( test(1:nx, 1:ny, 1:nz, 1:nc) )
 
-        if (.not. allocated(sc )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcx)) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcy)) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+ucopy= u
 
-        call blockFilterCustom_vct( params, u, sc  , "HD", "HD", "--" )
-        call blockFilterCustom_vct( params, u, wcx , "HD", "GD", "--" )
-        call blockFilterCustom_vct( params, u, wcy , "GD", "HD", "--" )
-        call blockFilterCustom_vct( params, u, wcxy, "GD", "GD", "--" )
+sc =0.0_rk
+sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = ucopy(1:Bs(1)/2, 1:Bs(2)/2, :, :)
+sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = ucopy(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
+sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = ucopy(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
+sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = ucopy(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
+! copy to the back spaghetti-ordered coefficients to the block
+! ucopy  = sc
+u  = sc
 
-        call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, u)
+! return
+! open(unit=32, file="new.csv", status="replace")
+!         do ii = 1, Bs(2)+2*g
+!             write(32,'(48(es12.4,";"))') ucopy(:, ii, 1, 1)
+!         enddo
+!         close(32)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! #ifdef DEV
+!         if (nz /= 1) call abort(7223839, "currently 2D only")
+!         if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+!         if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
+! #endif
+!
+!         if (allocated(sc)) then
+!             if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
+!         endif
+!         if (allocated(wc)) then
+!             if ((size(wc,1)/=nx).or.(size(wc,2)/=ny).or.(size(wc,3)/=nz).or.(size(wc,4)/=nc)) deallocate(wc)
+!         endif
+!
+!         if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
+!         if (.not. allocated(wc)) allocate( wc(1:nx, 1:ny, 1:nz, 1:nc) )
+!         ! if (.not. allocated(u_wc)) allocate( u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
+!
+!         ! alternative algorithm (true Mallat ordering, but with ghost nodes)
+!         call blockFilterCustom1_vct( params, u, sc, "HD", "x" )
+!         call blockFilterCustom1_vct( params, u, wc, "GD", "x" )
+!
+!
+!         ! do ic = 1, nc
+!         ! do iz = g+1, Bs(3)+g
+!         ! do iy = g+1, Bs(2)+g
+!         ! do ix = g+1, Bs(1)+g
+!         !     ug = 0.0_rk
+!         !     uh = 0.0_rk
+!         !     do shift = a, b
+!         !         ug = ug + u(ix+shift, iy, iz, ic)*coefs_filter(shift)
+!         !         uh = uh + u(ix+shift, iy, iz, ic)*coefs_filter(shift)
+!         !     enddo
+!         ! enddo
+!         ! enddo
+!         ! enddo
+!         ! enddo
+!
+!         u( 1:Bs(1)/2, :, :, :)       = sc( (g+1):(Bs(1)+g):2, :, :, :)
+!         u( Bs(1)/2+1:Bs(1), :, :, :) = wc( (g+1):(Bs(1)+g):2, :, :, :)
+!
+!         call blockFilterCustom1_vct( params, u, sc, "HD", "y" )
+!         call blockFilterCustom1_vct( params, u, wc, "GD", "y" )
+!
+!         u(:, 1:Bs(2)/2, :, :) =  sc(:, (g+1):(Bs(2)+g):2, :, :)
+!         u(:, Bs(2)/2+1:Bs(2), :, :) = wc(:, (g+1):(Bs(2)+g):2, :, :)
+!
+!         ! Note at this point U contains SC/WC in "true Mallat ordering", but note
+!         ! that data includes ghost nodes.
+!
+!         ! copy to Spaghetti ordering
+!         sc=0.0_rk
+!         sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, 1:Bs(2)/2, :, :)
+!         sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
+!         sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
+!         sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
+!
+!         ! copy to the back spaghetti-ordered coefficients to the block
+!         u = sc
+
+        ! write(*,*) "err=", maxval(u-ucopy), maxval(   u)
+        !
+        ! open(unit=32, file="old.csv", status="replace")
+        ! do ii = 1, Bs(2)+2*g
+        !     write(32,'(48(es12.4,";"))') u( :, ii, 1, 1)
+        ! enddo
+        ! close(32)
+                ! stop
     end subroutine
 
+    !-------------------------------------------------------------------------------
+
     subroutine waveletReconstruction_block(params, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+
+        call WaveReconstruction_dim1( params, u )
+    end subroutine
+
+    !-------------------------------------------------------------------------------
+
+    subroutine waveletReconstruction_block_old(params, u)
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
@@ -789,20 +987,29 @@ contains
         g  = params%g
         Bs = params%Bs
 
+        if (allocated(sc)) then
+            if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
+        endif
+        if (allocated(wcx)) then
+            if ((size(wcx,1)/=nx).or.(size(wcx,2)/=ny).or.(size(wcx,3)/=nz).or.(size(wcx,4)/=nc)) deallocate(wcx)
+        endif
+        if (allocated(wcy)) then
+            if ((size(wcy,1)/=nx).or.(size(wcy,2)/=ny).or.(size(wcy,3)/=nz).or.(size(wcy,4)/=nc)) deallocate(wcy)
+        endif
+        if (allocated(wcxy)) then
+            if ((size(wcxy,1)/=nx).or.(size(wcxy,2)/=ny).or.(size(wcxy,3)/=nz).or.(size(wcxy,4)/=nc)) deallocate(wcxy)
+        endif
 
         if (.not. allocated(sc  )) allocate(   sc(1:nx, 1:ny, 1:nz, 1:nc) )
         if (.not. allocated(wcx )) allocate(  wcx(1:nx, 1:ny, 1:nz, 1:nc) )
         if (.not. allocated(wcy )) allocate(  wcy(1:nx, 1:ny, 1:nz, 1:nc) )
         if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
 
-
 #ifdef DEV
         if (nz /= 1) call abort(7223839, "currently 2D only")
         if (modulo(Bs(1), 2) /= 0) call abort(99111,"This code requires Bs even")
         if (modulo(Bs(2), 2) /= 0) call abort(99111,"This code requires Bs even")
 #endif
-
-
 
         call spaghetti2mallat_block(params, u, sc, wcx, wcy, wcxy)
 
@@ -812,8 +1019,9 @@ contains
         call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" ) ! inplace should work, only a copy statement from the input
 
         u = sc + wcx + wcy + wcxy
-
     end subroutine
+
+    !-------------------------------------------------------------------------------
 
     ! ensures that 3/4 of the numbers are zero - required for reconstruction
     ! note when copying Spaghetti to Mallat, this is automatically done, but
@@ -861,6 +1069,22 @@ contains
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+#ifdef DEV
+        if ((size(sc,1)/=size(u,1)).or.(size(sc,2)/=size(u,2)).or.(size(sc,3)/=size(u,3)).or.(size(sc,4)/=size(u,4))) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+        if ((size(wcx,1)/=size(u,1)).or.(size(wcx,2)/=size(u,2)).or.(size(wcx,3)/=size(u,3)).or.(size(wcx,4)/=size(u,4))) then
+            call abort(27222120, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+        if ((size(wcy,1)/=size(u,1)).or.(size(wcy,2)/=size(u,2)).or.(size(wcy,3)/=size(u,3)).or.(size(wcy,4)/=size(u,4))) then
+            call abort(27222121, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+        if ((size(wcxy,1)/=size(u,1)).or.(size(wcxy,2)/=size(u,2)).or.(size(wcxy,3)/=size(u,3)).or.(size(wcxy,4)/=size(u,4))) then
+            call abort(27222122, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+#endif
+
         sc   = 0.0_rk
         wcx  = 0.0_rk
         wcy  = 0.0_rk
@@ -1043,6 +1267,7 @@ contains
         if (allocated(params%HR)) deallocate(params%HR)
         if (allocated(params%GR)) deallocate(params%GR)
 
+        ! for non-lifted wavelets: (Donoho wavelets)
         params%Nscl = 0
         params%Nscr = 0
         params%Nwcl = 0
@@ -1230,4 +1455,411 @@ contains
 
     end subroutine
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ! one-dimensional, periodized filter
+    subroutine filter1P(params, u, u_filtered, filter, a1, b1)
+        implicit none
+        type (type_params), intent(in) :: params
+        ! filter bound indices
+        integer, intent(in) :: a1, b1
+        ! the actual filter
+        real(kind=rk), dimension(a1:b1), intent(in) :: filter
+        ! the signal to be filtered
+        real(kind=rk), dimension(1:), intent(in) :: u
+        ! the resulting filtered signal
+        real(kind=rk), dimension(1:), intent(inout) :: u_filtered
+
+        integer(kind=ik) :: N, i, j
+
+        N = size(u)
+        u_filtered = 0.0_rk
+
+        do i = 1, N
+            do j = a1, b1
+                u_filtered(i) = u_filtered(i) + u( perindex(i+j,N) ) * filter(j)
+            enddo
+        enddo
+
+    end subroutine
+
+    ! 1D filter excluding ghost nodes
+    subroutine filter1G(params, u, u_filtered, filter, a1, b1)
+        implicit none
+        type (type_params), intent(in) :: params
+        ! filter bound indices
+        integer, intent(in) :: a1, b1
+        ! the actual filter
+        real(kind=rk), dimension(a1:b1), intent(in) :: filter
+        ! the signal to be filtered
+        real(kind=rk), dimension(1:), intent(in) :: u
+        ! the resulting filtered signal
+        real(kind=rk), dimension(1:), intent(inout) :: u_filtered
+
+        integer(kind=ik) :: N, i, j
+
+        N = size(u)
+        u_filtered = 0.0_rk
+
+        ! apply filter f to periodic signal u, i.e. convolute with filter
+        do i =  params%g+1, N-params%g
+            do j = a1, b1
+                u_filtered(i) = u_filtered(i) + u(i+j) * filter(j)
+            enddo
+        enddo
+    end subroutine
+
+    subroutine dump_block(u, file)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u
+        character(len=*) :: file
+        integer :: ii
+
+        open(unit=32, file="u_wc.csv", status="replace")
+        do ii = 1, size(u,2)
+        write(32,'(48(es12.4,";"))') u(:, ii, 1, 1)
+        enddo
+        close(32)
+    end subroutine
+
+
+
+    !-----------------------------------------------------------------------------
+    ! Along the first dimension of array u, apply low- and high-pass filters, decimate
+    ! their result and sort them into the first nc elements of the array.
+    ! The code acts only on the first nc datapoints (which is nc=nx in the beginning)
+    ! in the second iteration, nc=nx/2 and so forth.
+    !
+    ! Input:  uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    ! Output: hhhhhhhhhhhhhhhhgggggggggggggggg
+    !         | low pass     ||  high pass   |
+    !-----------------------------------------------------------------------------
+    subroutine WaveDecomposition_dim1( params, u_wc )
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(:, :, :, :), intent(inout) :: u_wc
+        real(kind=rk), dimension(:, :, :, :), allocatable, save :: u_wc_copy
+        real(kind=rk), dimension(:), allocatable, save :: buffer1, buffer2
+        integer(kind=ik) :: ix, iy, iz, ic, g, Bs(1:3), nx, ny, nz, nc
+        iz = 1 ! 2d
+        nx = size(u_wc, 1)
+        ny = size(u_wc, 2)
+        nz = size(u_wc, 3)
+        nc = size(u_wc, 4)
+        g  = params%g
+        Bs = params%Bs
+
+        if (allocated(u_wc_copy)) then
+            if (.not.areArraysSameSize(u_wc_copy, u_wc)) deallocate(u_wc_copy)
+        endif
+        if (.not. allocated(u_wc_copy)) allocate(u_wc_copy(1:nx,1:ny,1:nz,1:nc))
+        if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
+        if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
+
+        do ic = 1, nc
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=nx) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:nx))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=nx) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:nx))
+
+            do iy = 1, ny
+                ! do iz = 1, nz
+
+                ! low-pass filter (scaling function)
+                call filter1G(params, u_wc(:,iy,iz,ic), buffer1, params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1))
+
+                ! high-pass filter (these guys are the details)
+                call filter1G(params, u_wc(:,iy,iz,ic), buffer2, params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1))
+
+                ! decimation by 2, sort into array
+                u_wc(1:Bs(1)/2,iy,iz,ic)       = buffer1( (g+1):(Bs(1)+g):2 )
+                u_wc(Bs(1)/2+1:Bs(1),iy,iz,ic) = buffer2( (g+1):(Bs(1)+g):2 )
+                ! enddo
+            enddo
+
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=ny) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:ny))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=ny) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:ny))
+
+            do ix = 1, nx
+                ! do iz = 1, nz
+
+                ! low-pass filter (scaling function)
+                call filter1G(params, u_wc(ix,:,iz,ic), buffer1, params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1))
+
+                ! high-pass filter (these guys are the details)
+                call filter1G(params, u_wc(ix,:,iz,ic), buffer2, params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1))
+
+                ! decimation by 2, sort into array
+                u_wc(ix,1:Bs(2)/2,iz,ic)       = buffer1( (g+1):(Bs(2)+g):2 )
+                u_wc(ix,Bs(2)/2+1:Bs(2),iz,ic) = buffer2( (g+1):(Bs(2)+g):2 )
+                ! enddo
+            enddo
+        enddo
+
+        ! coefficients are now in compressed Mallat ordering, ie for u_wc:
+        !
+        ! hh hh hh hh hg hg hg hg ** ** **
+        ! hh hh hh hh hg hg hg hg ** ** **
+        ! hh hh hh hh hg hg hg hg ** ** **
+        ! hh hh hh hh hg hg hg hg ** ** **
+        ! gh gh gh gh gg gg gg gg ** ** **
+        ! gh gh gh gh gg gg gg gg ** ** **
+        ! gh gh gh gh gg gg gg gg ** ** **
+        ! gh gh gh gh gg gg gg gg ** ** **
+        ! ** ** ** ** ** ** ** ** ** ** **
+        ! ** ** ** ** ** ** ** ** ** ** **
+        ! ** ** ** ** ** ** ** ** ** ** **
+        !
+        ! Note ** marks coefficients that could not be computed (in the ghost nodes layer)
+        ! compressed Mallat means the valid coeffs run 1:Bs and NOT 1:Bs+2*g
+        u_wc_copy = u_wc
+
+        ! copy to the back spaghetti-ordered coefficients to the block
+        u_wc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u_wc_copy(1:Bs(1)/2, 1:Bs(2)/2, :, :)
+        u_wc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u_wc_copy(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
+        u_wc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u_wc_copy(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
+        u_wc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u_wc_copy(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
+    end subroutine
+
+
+    !-----------------------------------------------------------------------------
+    ! Reconstruction from low- and high pass filtered coefficients.
+    ! Data is first upsampled, then filtered with the reconstruction filters.
+    ! Note reconstruction filters are reverse of decomposition filters.
+    !
+    ! Input: hh hg hh hg hh hg hh hg
+    !        gh gg gh gg gh gg gh gg
+    !        hh hg hh hg hh hg hh hg
+    !        gh gg gh gg gh gg gh gg
+    !        hh hg hh hg hh hg hh hg
+    !        gh gg gh gg gh gg gh gg
+    ! Note: in input in spaghetti ordering is synced
+    !-----------------------------------------------------------------------------
+    subroutine WaveReconstruction_dim1( params, u_wc )
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(:, :, :, :), intent(inout) :: u_wc
+        real(kind=rk), dimension(:), allocatable, save :: buffer1, buffer2, buffer3
+        real(kind=rk), allocatable, save :: u_wc_tmp(:,:,:,:)
+        integer(kind=ik) :: ix, iy, iz, ic, g, Bs(1:3), nx, ny, nz, nc, n(1:3), ii
+        iz = 1 ! 2d
+        nx = size(u_wc, 1)
+        ny = size(u_wc, 2)
+        nz = size(u_wc, 3)
+        nc = size(u_wc, 4)
+        g  = params%g
+        Bs = params%Bs
+        n = (params%Bs+2*g) / 2
+
+
+        if (allocated(u_wc_tmp)) then
+            if (.not. areArraysSameSize(u_wc, u_wc_tmp)) deallocate(u_wc_tmp)
+        endif
+        if (.not. allocated(u_wc_tmp)) then
+            allocate (u_wc_tmp(size(u_wc,1), size(u_wc,2), size(u_wc,3), size(u_wc,4)))
+        endif
+        if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
+        if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
+
+        ! Input is (synchronized, ie with ghost nodes) spaghetti ordering
+        ! re-arrange to (synchronized) Mallat ordering
+        if (modulo(g,2)==0) then
+            ! even: 1st point (in u_wc, spaghetti order) is SC
+            u_wc_tmp( 1:n(1), 1:n(2)              , :, :) = u_wc(1:Bs(1)+2*g-1:2 , 1:Bs(1)+2*g-1:2, :, :)
+            u_wc_tmp( n(1)+1:2*n(1), 1:n(2)       , :, :) = u_wc(1:Bs(1)+2*g-1:2 , 2:Bs(2)+2*g:2, :, :)
+            u_wc_tmp( 1:n(1), n(2)+1:2*n(2)       , :, :) = u_wc(2:Bs(1)+2*g:2   , 1:Bs(2)+2*g-1:2, :, :)
+            u_wc_tmp( n(1)+1:2*n(1), n(2)+1:2*n(2), :, :) = u_wc(2:Bs(1)+2*g:2   , 2:Bs(2)+2*g:2, :, :)
+
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=nx) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:nx))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=nx) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:nx))
+            if (allocated(buffer3)) then
+                if (size(buffer3, dim=1)/=nx) deallocate(buffer3)
+            endif
+            if (.not.allocated(buffer3)) allocate(buffer3(1:nx))
+
+            do ic = 1, nc
+                do iy = 1, ny
+                    ! do iz = 1, nz
+                    ! fill upsampling buffer for low-pass filter: every second point
+                    ! apply low-pass filter to upsampled signal
+                    buffer3 = 0.0_rk
+                    ! even g: 1st point is collocation point
+                    buffer3(1:nx-1:2) = u_wc_tmp(1:n(1), iy, iz, ic) ! SC
+                    call filter1G(params, buffer3, buffer1, params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1))
+
+                    ! fill upsampling buffer for high-pass filter: every second point
+                    buffer3 = 0.0_rk
+                    buffer3(1:nx-1:2) = u_wc_tmp(n(1)+1:2*n(1), iy, iz, ic) ! WC
+                    call filter1G(params, buffer3, buffer2, params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1))
+
+                    u_wc(:, iy, iz, ic) = buffer1 + buffer2
+                    ! enddo
+                enddo
+            enddo
+
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=ny) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:ny))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=ny) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:ny))
+            if (allocated(buffer3)) then
+                if (size(buffer3, dim=1)/=ny) deallocate(buffer3)
+            endif
+            if (.not.allocated(buffer3)) allocate(buffer3(1:ny))
+
+            do ic = 1, nc
+                do ix = 1, nx
+                    ! fill upsampling buffer for low-pass filter: every second point
+                    ! apply low-pass filter to upsampled signal
+                    buffer3 = 0.0_rk
+                    buffer3(1:ny-1:2) = u_wc(ix, 1:n(2), iz, ic)
+                    call filter1G(params, buffer3, buffer1, params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1))
+
+                    ! fill upsampling buffer for high-pass filter: every second point
+                    buffer3 = 0.0_rk
+                    buffer3(1:ny-1:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
+                    call filter1G(params, buffer3, buffer2, params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1))
+
+                    u_wc(ix, :, iz, ic) = buffer1 + buffer2
+                enddo
+            enddo
+        else
+            ! odd: 1st point (in u_wc, spaghetti order) is WC
+            ! NOTE: if g is odd, then there is a goofy shift in the coefficients: the
+            ! spaghetti ordering is arranged like this:
+            !
+            ! SC WC SC WC
+            ! WC WC WC WC
+            ! SC WC SC WC
+            ! WC WC WC WC
+            !
+            ! Thus, if g is odd, we do have the same number of coefficients for all of SC, WCx, WCy, WCxy
+            ! but they are not symmetric: on the left and right block boundary their number differs.
+            ! To correct for this shift we discard some coefficients (which is not a problem because not all
+            ! filters have the same length, in particular they are not left/right symmetric anyways)
+            u_wc_tmp = 0.0_rk ! not required because we'll
+            ! SC
+            u_wc_tmp( 1:n(1)       , 1:n(2)       , :, :) = u_wc(2:Bs(1)+2*g  :2 , 2:Bs(2)+2*g  :2, :, :)
+            ! WCx
+            u_wc_tmp( n(1)+1:2*n(1), 1:n(2)-1       , :, :) = u_wc(2:Bs(1)+2*g  :2 , 3:Bs(2)+2*g-1:2, :, :)
+            ! WCy
+            u_wc_tmp( 1:n(1)-1       , n(2)+1:2*n(2), :, :) = u_wc(3:Bs(1)+2*g-1:2 , 2:Bs(2)+2*g  :2, :, :)
+            ! WCxy
+            u_wc_tmp( n(1)+1:2*n(1)-1, n(2)+1:2*n(2)-1, :, :) = u_wc(3:Bs(1)+2*g-1:2 , 3:Bs(2)+2*g-1:2, :, :)
+
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=nx) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:nx))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=nx) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:nx))
+            if (allocated(buffer3)) then
+                if (size(buffer3, dim=1)/=nx) deallocate(buffer3)
+            endif
+            if (.not.allocated(buffer3)) allocate(buffer3(1:nx))
+
+            do ic = 1, nc
+                do iy = 1, ny ! TODO: may run (g+1),... exclude ghosts
+                    ! do iz = 1, nz
+                    ! fill upsampling buffer for low-pass filter: every second point
+                    ! apply low-pass filter to upsampled signal
+                    buffer3 = 0.0_rk
+                    ! odd g, 2nd point is collocation point
+                    buffer3(2:nx:2) = u_wc_tmp(1:n(1), iy, iz, ic) ! SC
+                    call filter1G(params, buffer3, buffer1, params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1))
+
+                    ! fill upsampling buffer for high-pass filter: every second point
+                    buffer3 = 0.0_rk
+                    buffer3(2:nx:2) = u_wc_tmp(n(1)+1:2*n(1), iy, iz, ic) ! WC
+                    ! buffer3(1:nx-1:2) = u_wc_tmp(n(1)+1:2*n(1), iy, iz, ic) ! WC
+                    call filter1G(params, buffer3, buffer2, params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1))
+
+                    u_wc(:, iy, iz, ic) = buffer2 + buffer1
+                    ! enddo
+                enddo
+            enddo
+
+            if (allocated(buffer1)) then
+                if (size(buffer1, dim=1)/=ny) deallocate(buffer1)
+            endif
+            if (.not.allocated(buffer1)) allocate(buffer1(1:ny))
+            if (allocated(buffer2)) then
+                if (size(buffer2, dim=1)/=ny) deallocate(buffer2)
+            endif
+            if (.not.allocated(buffer2)) allocate(buffer2(1:ny))
+            if (allocated(buffer3)) then
+                if (size(buffer3, dim=1)/=ny) deallocate(buffer3)
+            endif
+            if (.not.allocated(buffer3)) allocate(buffer3(1:ny))
+
+            do ic = 1, nc
+                do ix = 1, nx
+                    ! fill upsampling buffer for low-pass filter: every second point
+                    ! apply low-pass filter to upsampled signal
+                    buffer3 = 0.0_rk
+                    buffer3(2:ny:2) = u_wc(ix, 1:n(2), iz, ic)
+                    call filter1G(params, buffer3, buffer1, params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1))
+
+                    ! fill upsampling buffer for high-pass filter: every second point
+                    buffer3 = 0.0_rk
+                    buffer3(2:ny:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
+                    ! buffer3(1:ny-1:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
+                    call filter1G(params, buffer3, buffer2, params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1))
+
+                    u_wc(ix, :, iz, ic) = buffer2 + buffer1
+                enddo
+            enddo
+
+        endif
+
+    end subroutine
+
+
+
+
+
+
 end module
+
+! Note: the precise naming of SC/WC is not really important. we just apply
+! the correct decomposition/reconstruction filters - thats it.
+! u_scwc(:,:,:,:,1) -- HH -- HHH  -- sc -- scaling function coefficients
+! u_scwc(:,:,:,:,2) -- HG -- HGH  -- wcx -- wavelet coefficients
+! u_scwc(:,:,:,:,3) -- GH -- GHH     wcy -- wavelet coefficients
+! u_scwc(:,:,:,:,4) -- GG -- GGH     wcxy -- wavelet coefficients
+! u_scwc(:,:,:,:,5) --    -- HHG     wcz -- wavelet coefficients
+! u_scwc(:,:,:,:,6) --    -- HGG     wcxz -- wavelet coefficients
+! u_scwc(:,:,:,:,7) --    -- GHG     wcyz -- wavelet coefficients
+! u_scwc(:,:,:,:,8) --    -- GGG     wcxyz -- wavelet coefficients

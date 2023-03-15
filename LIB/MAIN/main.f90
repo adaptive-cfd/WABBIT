@@ -144,10 +144,9 @@ program main
     endif
 
     ! check if the wavelet filter banks are okay.
-    ! if (params%test_wavelet_decomposition) then
+    if (params%test_wavelet_decomposition) then
         call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
-        stop
-    ! endif
+    endif
 
 
     !---------------------------------------------------------------------------

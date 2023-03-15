@@ -364,7 +364,7 @@ subroutine wavelet_test(params)
     end do
 
     do k=1,50
-    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
+    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 enddo
 
     !------------------------------------------------------------------------
@@ -396,7 +396,7 @@ enddo
     call saveHDF5_tree("delta1_111.h5", time, iteration, 1, params, hvy_tmp, tree_ID )
     ! call saveHDF5_tree("delta2_111.h5", time, iteration, 2, params, hvy_tmp, tree_ID )
 
-    ! call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
     ! call saveHDF5_tree("twice1_111.h5", time, iteration, 1, params, hvy_block, tree_ID )
 end subroutine
 
@@ -432,7 +432,7 @@ subroutine wavelet_test_coarsening(params)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
     integer(kind=ik)                   :: nwork, ierr, iter , kk, Jmax, nx,ny,nz,&
-    nc,neighborhood, Nwcl, Nwcr, lgtID_neighbor, Nscl, Nscr
+    nc, neighborhood, lgtID_neighbor, ii
     logical :: coarsen, block1, block2, block3
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy, tmp_reconst
 
@@ -465,7 +465,7 @@ subroutine wavelet_test_coarsening(params)
 
 
     params%Bs = 32
-    params%Jmax = 4
+    params%Jmax = 5
     Jmax = params%Jmax
     params%dim = 2
     params%domain_size = (/1.0_rk, 1.0_rk, 1.0_rk/)
@@ -485,7 +485,9 @@ subroutine wavelet_test_coarsening(params)
     !----------------------------------------------------------------------------
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
-    ! call createEquidistantGrid_tree( params, params%Jmax, .true., tree_ID )
+call unitTest_waveletDecomposition(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+stop
+    ! call createEquidistantGrid_tree( params, 4, .true., tree_ID )
     !
     ! ! create just some data...
     ! do k = 1, hvy_n(tree_ID)
@@ -513,27 +515,7 @@ subroutine wavelet_test_coarsening(params)
 
 
 
-
-    select case(params%wavelet)
-    case ("CDF44")
-        Nscl = g+5 ! dictated by support of h_tilde (HD) filter for SC
-        Nscr = g+5
-        Nwcl = Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr+5
-    case ("CDF42")
-        Nscl = g+3 ! dictated by support of h_tilde (HD) filter for SC
-        Nscr = g+3
-        Nwcl = Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr+5
-    case ("CDF22")
-        Nscl = g+1 ! dictated by support of h_tilde (HD) filter for SC
-        Nscr = g+1
-        Nwcl = Nscl + 0 ! chosen such that g_tilde (GD) not not see the copied SC
-        Nwcr = Nscr + 2
-    case default
-        call abort(6252, "not yet implemented waveler rsub")
-    end select
-
+    call readHDF5vct_tree( (/"coarsening_331.h5"/), params, hvy_block, tree_ID)
 
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -542,8 +524,13 @@ subroutine wavelet_test_coarsening(params)
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k,tree_ID)
+        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
+    end do
+    stop
 
-    call readHDF5vct_tree( (/"coarsening_331.h5"/), params, hvy_block, tree_ID)
+
 
 ! ****''''*** here the loop begins
 do iter= 1, 1
@@ -642,37 +629,37 @@ do iter= 1, 1
                     if (lgt_block(lgtID_neighbor, Jmax+IDX_REFINE_STS)==-1) then
                         select case(neighborhood)
                         case(1)
-                            wcx(1:Nwcl, :, :, 1:nc) = 0.0_rk
-                            wcy(1:Nwcl, :, :, 1:nc) = 0.0_rk
-                            wcxy(1:Nwcl, :, :, 1:nc) = 0.0_rk
+                            wcx(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
+                            wcy(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
+                            wcxy(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
                         case(2)
-                            wcx(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcx(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcy(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcxy(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
                         case(3)
-                            wcx(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                            wcy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                            wcxy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
+                            wcx(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
+                            wcy(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
+                            wcxy(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
                         case(4)
-                            wcx(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
+                            wcx(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcy(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcxy(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
                         case(5)
-                            wcx(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcx(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcy(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcxy(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
                         case(6)
-                            wcx(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
+                            wcx(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcy(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcxy(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
                         case(7)
-                            wcx(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcx(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcy(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wcxy(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
                         case(8)
-                            wcx(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
+                            wcx(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcy(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wcxy(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
                         end select
                     endif
                 endif
@@ -713,7 +700,7 @@ do iter= 1, 1
 
     call saveHDF5_tree("coarsening_332.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
-    call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
     call saveHDF5_tree("coarsening_333.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 enddo
@@ -809,12 +796,54 @@ do iter= 1, 1
     call updateMetadata_tree(params, tree_ID)
 
     ! do kk = 1, 50
-        call substitution_step( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
     ! enddo
     call saveHDF5_tree("coarsening_334.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
+call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
+
+call saveHDF5_tree("coarsening_335.h5", time, iteration, 1, params, hvy_block, tree_ID )
+call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+call saveHDF5_tree("coarsening_336.h5", time, iteration, 1, params, hvy_block, tree_ID )
 enddo
 ! end of loop here
+
+
+
+! do k = 1, hvy_n(tree_ID)
+!     hvyID = hvy_active(k,tree_ID)
+!     call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
+!     ! keep blocks 3001,
+!     !             0331,
+!     !             2121
+!     block1 = ( (lgt_block(lgtID,1)==3).and.(lgt_block(lgtID,2)==0).and.(lgt_block(lgtID,3)==0).and.(lgt_block(lgtID,4)==1) )
+!     block2 = ( (lgt_block(lgtID,1)==0).and.(lgt_block(lgtID,2)==3).and.(lgt_block(lgtID,3)==3).and.(lgt_block(lgtID,4)==1) )
+!     block3 = ( (lgt_block(lgtID,1)==2).and.(lgt_block(lgtID,2)==1).and.(lgt_block(lgtID,3)==2).and.(lgt_block(lgtID,4)==1) )
+!
+!     if (block1) then
+!
+!         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
+!
+!         call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
+!
+!         open(unit=32, file="wcx.csv", status="replace")
+!         do ii = g+1, Bs(2)+g
+!             write(32,'(48(es12.4,";"))') wcx( g+1:Bs(1)+g, ii, 1, 1)
+!         enddo
+!         close(32)
+!         open(unit=32, file="wcy.csv", status="replace")
+!         do ii = g+1, Bs(2)+g
+!             write(32,'(48(es12.4,";"))') wcy( g+1:Bs(1)+g, ii, 1, 1)
+!         enddo
+!         close(32)
+!         open(unit=32, file="wcxy.csv", status="replace")
+!         do ii = g+1, Bs(2)+g
+!             write(32,'(48(es12.4,";"))') wcxy( g+1:Bs(1)+g, ii, 1, 1)
+!         enddo
+!         close(32)
+!     endif
+! end do
+
 
 
 

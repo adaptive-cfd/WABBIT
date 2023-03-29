@@ -958,9 +958,9 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
         ! and therefore balance the load will try to distribute blocks with the same
         ! treecode (but on different trees) at the same rank.
         t_elapse = MPI_WTIME()
-        call balanceLoad_tree( params, hvy_block, tree_ID1, .true. )
+        call balanceLoad_tree( params, hvy_block, tree_ID1 )
 
-        call balanceLoad_tree( params, hvy_block, tree_ID2, .true. )
+        call balanceLoad_tree( params, hvy_block, tree_ID2 )
     end if
 
     call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
@@ -1711,9 +1711,9 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
         ! because all trees have the same treestructrue thier hilbertcurve is identical
         ! and therefore balance the load will try to distribute blocks with the same
         ! treecode (but on different trees) at the same rank.
-        call balanceLoad_tree( params, hvy_block, tree_ID1, .true. )
+        call balanceLoad_tree( params, hvy_block, tree_ID1 )
 
-        call balanceLoad_tree( params, hvy_block, tree_ID2, .true. )
+        call balanceLoad_tree( params, hvy_block, tree_ID2 )
     end if
     t_inc(2) = MPI_WTIME()
 

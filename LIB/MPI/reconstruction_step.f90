@@ -22,7 +22,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy, tmp_reconst
     real(kind=rk) :: t0
-    logical :: manipulated
+    logical, allocatable, save :: toBeManipulated(:)
 
     if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20")) return
 
@@ -30,7 +30,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ny = size(hvy_block, 2)
     nz = size(hvy_block, 3)
     nc = size(hvy_block, 4)
-    g = params%g
+    g  = params%g
     Bs = params%bs
     Nscl    = params%Nscl
     Nscr    = params%Nscr
@@ -47,7 +47,45 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     if (.not. allocated(wcxy)) allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
 
-    ! maybe this call is redundant - FIXME
+    !---------------------------------------------------------------------------
+    t0 = MPI_Wtime()
+
+    ! create the list of blocks that will be affected by coarseExtension.
+    ! It is a heavy array (distributed). This avoids checking again and again
+    ! and improves code readability - performance-wise it does not matter
+    if (allocated(toBeManipulated)) then
+        if (size(toBeManipulated,1) < hvy_n) deallocate(toBeManipulated)
+    endif
+    if (.not. allocated(toBeManipulated)) allocate(toBeManipulated(1:hvy_n))
+
+    ! default no block is to be manipulated
+    toBeManipulated(1:hvy_n) = .false.
+
+    ! check for all blocks if they have coarser neighbors - in this case they'll be manipulated
+    do k = 1, hvy_n
+        hvyID = hvy_active(k)
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        do neighborhood = 5, 16
+            ! neighbor exists ?
+            if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                ! neighbor light data id
+                lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+
+                if (level_neighbor < level_me) then
+                    toBeManipulated(k) = .true.
+                    ! its enough if one is true
+                    exit
+                endif
+            endif
+        enddo
+    end do
+    call toc( "coarseExtension (toBeManipulated list)", MPI_Wtime()-t0 )
+    !---------------------------------------------------------------------------
+
+
+
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
     ! HD and GD to the data. It may be that this is done before calling.
     if (.not. inputDataSynced) then
@@ -67,13 +105,16 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     t0 = MPI_Wtime()
     do k = 1, hvy_n
         hvyID = hvy_active(k)
-        ! hvy_work now is a copy with sync'ed ghost points.
-        hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
 
-        ! data WC/SC now in Spaghetti order
-        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
+        if (toBeManipulated(k)) then
+            ! hvy_work now is a copy with sync'ed ghost points.
+            hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
+            ! data WC/SC now in Spaghetti order
+            call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
+        endif
     end do
     call toc( "coarseExtension (FWT)", MPI_Wtime()-t0 )
+
 
     ! 3rd we sync the decompose coefficients, but only on the same level. This is
     ! required as several fine blocks hit a coarse one, and this means we have to sync
@@ -85,16 +126,21 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     hvy_active, hvy_n, syncSameLevelOnly1=.true. )
     call toc( "coarseExtension (sync 2)", MPI_Wtime()-t0 )
 
+
     ! routine operates on a single tree (not a forest)
     ! 4th. Loop over all blocks and check if they have *coarser* neighbors. Neighborhood 1..4 are
     ! always equidistant.
     t0 = MPI_Wtime()
     do k = 1, hvy_n
+        ! this block just remains the same as before..
+        if (.not. toBeManipulated(k)) cycle
+
+        ! ===> the following code is only executed for blocks that are manipulated by CE
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
+        ! copy transform data in "inflated mallat ordering":
         call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
-        manipulated = .false.
 
         ! loop over all relevant neighbors
         do neighborhood = 5, 16
@@ -106,7 +152,6 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
                 if (level_neighbor < level_me) then
-                    manipulated = .true.
                     ! manipulation of coeffs
                     call coarseExtensionManipulateWC_block(params, wcx, wcy, wcxy, neighborhood)
                     call coarseExtensionManipulateSC_block(params, sc, hvy_work(:,:,:,:,hvyID), neighborhood)
@@ -119,50 +164,48 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         ! relevant for coarse extension
         hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
 
-        if (manipulated) then
-            ! reconstruct from the manipulated coefficients
-            call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, tmp_reconst)
-            call waveletReconstruction_block(params, tmp_reconst)
+        ! reconstruct from the manipulated coefficients
+        call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, tmp_reconst)
+        call waveletReconstruction_block(params, tmp_reconst)
 
-            ! reconstruction part. We manipulated the data and reconstructed it in some regions.
-            ! Now, we copy those reconstructed data back to the original block - this is
-            ! the actual coarseExtension.
-            do neighborhood = 5, 16
-                if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
-                    ! neighbor light data id
-                    lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                    level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-                    level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+        ! reconstruction part. We manipulated the data and reconstructed it in some regions.
+        ! Now, we copy those reconstructed data back to the original block - this is
+        ! the actual coarseExtension.
+        do neighborhood = 5, 16
+            if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                ! neighbor light data id
+                lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
-                    if (level_neighbor < level_me) then
-                        ! coarse extension case (neighbor is coarser)
-                        select case (neighborhood)
-                        case (9:10)
-                            ! -x
-                            hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
-                        case (11:12)
-                            ! +x
-                            hvy_block(nx-Nreconr:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx,:,:,1:nc)
-                        case (13:14)
-                            ! +y
-                            hvy_block(:, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr:ny,:,1:nc)
-                        case (15:16)
-                            ! -y
-                            hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
-                        case (5)
-                            hvy_block(1:Nreconl, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr:ny,:,1:nc)
-                        case (6)
-                            hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
-                        case (7)
-                            ! top right corner
-                            hvy_block(nx-Nreconr:nx, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, ny-Nreconr:ny,:,1:nc)
-                        case (8)
-                            hvy_block(nx-Nreconr:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, 1:Nreconl,:,1:nc)
-                        end select
-                    endif
+                if (level_neighbor < level_me) then
+                    ! coarse extension case (neighbor is coarser)
+                    select case (neighborhood)
+                    case (9:10)
+                        ! -x
+                        hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
+                    case (11:12)
+                        ! +x
+                        hvy_block(nx-Nreconr:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx,:,:,1:nc)
+                    case (13:14)
+                        ! +y
+                        hvy_block(:, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr:ny,:,1:nc)
+                    case (15:16)
+                        ! -y
+                        hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
+                    case (5)
+                        hvy_block(1:Nreconl, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr:ny,:,1:nc)
+                    case (6)
+                        hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
+                    case (7)
+                        ! top right corner
+                        hvy_block(nx-Nreconr:nx, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, ny-Nreconr:ny,:,1:nc)
+                    case (8)
+                        hvy_block(nx-Nreconr:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, 1:Nreconl,:,1:nc)
+                    end select
                 endif
-            enddo
-        end if
+            endif
+        enddo
     end do
     call toc( "coarseExtension (manipulation loop)", MPI_Wtime()-t0 )
     ! unfortunately, the above loop affects the load balancing. in the sync_ghosts

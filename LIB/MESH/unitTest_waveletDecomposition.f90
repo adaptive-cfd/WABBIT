@@ -127,12 +127,12 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
     else
         if (params%rank==0) then
-            write(*,*) "           ( ("
-            write(*,*) "            ) )"
-            write(*,*) "          ........"
-            write(*,*) "          |      |]"
-            write(*,*) "          \      /    How lovely that this test suceeded! You've earned yourself a refreshing beverage."
-            write(*,*) "           `----'"
+            write(*,'(A)') "           ( ("
+            write(*,'(A)') "            ) )"
+            write(*,'(A)') "          ........"
+            write(*,'(A)') "          |      |]"
+            write(*,'(A)') "          \      /    How lovely that this test suceeded! You've earned yourself a refreshing beverage."
+            write(*,'(A)') "           `----'"
         endif
     endif
 

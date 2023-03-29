@@ -37,7 +37,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     endif
 
     call setup_wavelet(params)
-    
+
     ! this is a HACK
     if (params%physics_type == 'ACM-new') then
         tmp = params%threshold_mask

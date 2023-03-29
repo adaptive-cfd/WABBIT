@@ -9,7 +9,7 @@
 subroutine set_desired_num_blocks_per_rank1(params, blocks_per_rank_optimal, tree_ID) ! predictable
     implicit none
 
-    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(out)       :: blocks_per_rank_optimal(0:)          !> block distribution lists. Note zero-based indexing. (as in MPI library)
     integer(kind=ik), intent(in)        :: tree_ID
 
@@ -37,12 +37,12 @@ end subroutine
 subroutine set_desired_num_blocks_per_rank2(params, blocks_per_rank, blocks_per_rank_optimal, tree_ID)
     implicit none
 
-    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(out)       :: blocks_per_rank(:), blocks_per_rank_optimal(:)   !> block distribution lists. Note 1-based indexing.
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer                             :: num_blocks, proc_id, avg_blocks, number_procs, rank, excess_blocks
-    integer(kind=ik)                    :: ierr                                 ! MPI error variable
+    integer(kind=ik)                    :: ierr
 
     rank                    = params%rank
     number_procs            = params%number_procs

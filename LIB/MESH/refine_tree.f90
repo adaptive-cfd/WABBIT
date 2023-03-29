@@ -13,7 +13,6 @@
 ! ********************************************************************************************
 
 subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
-
     use module_indicators
 
     implicit none

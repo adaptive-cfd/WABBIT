@@ -849,7 +849,7 @@ contains
     subroutine waveletDecomposition_block(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u ! input: function, output=wc
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
 
         real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
@@ -857,107 +857,6 @@ contains
         ! real(kind=rk) :: ug, uh
 
         call WaveDecomposition_dim1( params, u )
-        return
-
-        nx = size(u, 1)
-        ny = size(u, 2)
-        nz = size(u, 3)
-        nc = size(u, 4)
-        g  = params%g
-        Bs = params%Bs
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!
-! copy to Spaghetti ordering
-if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
-if (.not. allocated(sc)) allocate( ucopy(1:nx, 1:ny, 1:nz, 1:nc) )
-if (.not. allocated(sc)) allocate( test(1:nx, 1:ny, 1:nz, 1:nc) )
-
-ucopy= u
-
-sc =0.0_rk
-sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = ucopy(1:Bs(1)/2, 1:Bs(2)/2, :, :)
-sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = ucopy(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
-sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = ucopy(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
-sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = ucopy(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
-! copy to the back spaghetti-ordered coefficients to the block
-! ucopy  = sc
-u  = sc
-
-! return
-! open(unit=32, file="new.csv", status="replace")
-!         do ii = 1, Bs(2)+2*g
-!             write(32,'(48(es12.4,";"))') ucopy(:, ii, 1, 1)
-!         enddo
-!         close(32)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-! #ifdef DEV
-!         if (nz /= 1) call abort(7223839, "currently 2D only")
-!         if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-!         if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-! #endif
-!
-!         if (allocated(sc)) then
-!             if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
-!         endif
-!         if (allocated(wc)) then
-!             if ((size(wc,1)/=nx).or.(size(wc,2)/=ny).or.(size(wc,3)/=nz).or.(size(wc,4)/=nc)) deallocate(wc)
-!         endif
-!
-!         if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
-!         if (.not. allocated(wc)) allocate( wc(1:nx, 1:ny, 1:nz, 1:nc) )
-!         ! if (.not. allocated(u_wc)) allocate( u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
-!
-!         ! alternative algorithm (true Mallat ordering, but with ghost nodes)
-!         call blockFilterCustom1_vct( params, u, sc, "HD", "x" )
-!         call blockFilterCustom1_vct( params, u, wc, "GD", "x" )
-!
-!
-!         ! do ic = 1, nc
-!         ! do iz = g+1, Bs(3)+g
-!         ! do iy = g+1, Bs(2)+g
-!         ! do ix = g+1, Bs(1)+g
-!         !     ug = 0.0_rk
-!         !     uh = 0.0_rk
-!         !     do shift = a, b
-!         !         ug = ug + u(ix+shift, iy, iz, ic)*coefs_filter(shift)
-!         !         uh = uh + u(ix+shift, iy, iz, ic)*coefs_filter(shift)
-!         !     enddo
-!         ! enddo
-!         ! enddo
-!         ! enddo
-!         ! enddo
-!
-!         u( 1:Bs(1)/2, :, :, :)       = sc( (g+1):(Bs(1)+g):2, :, :, :)
-!         u( Bs(1)/2+1:Bs(1), :, :, :) = wc( (g+1):(Bs(1)+g):2, :, :, :)
-!
-!         call blockFilterCustom1_vct( params, u, sc, "HD", "y" )
-!         call blockFilterCustom1_vct( params, u, wc, "GD", "y" )
-!
-!         u(:, 1:Bs(2)/2, :, :) =  sc(:, (g+1):(Bs(2)+g):2, :, :)
-!         u(:, Bs(2)/2+1:Bs(2), :, :) = wc(:, (g+1):(Bs(2)+g):2, :, :)
-!
-!         ! Note at this point U contains SC/WC in "true Mallat ordering", but note
-!         ! that data includes ghost nodes.
-!
-!         ! copy to Spaghetti ordering
-!         sc=0.0_rk
-!         sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, 1:Bs(2)/2, :, :)
-!         sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
-!         sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
-!         sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
-!
-!         ! copy to the back spaghetti-ordered coefficients to the block
-!         u = sc
-
-        ! write(*,*) "err=", maxval(u-ucopy), maxval(   u)
-        !
-        ! open(unit=32, file="old.csv", status="replace")
-        ! do ii = 1, Bs(2)+2*g
-        !     write(32,'(48(es12.4,";"))') u( :, ii, 1, 1)
-        ! enddo
-        ! close(32)
-                ! stop
     end subroutine
 
 
@@ -969,7 +868,7 @@ u  = sc
     subroutine waveletDecomposition_block_old(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u ! input: function, output=wc
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
 
         real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii

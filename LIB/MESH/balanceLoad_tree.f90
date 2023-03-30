@@ -229,6 +229,12 @@ subroutine assignLoadbalancingWeight_tree(params, treeID, total_weight)
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
+    !
+    !
+    ! NOTE Functionality currently disabled NOTE
+    !
+    ! we just assign the same weight for all blocks
+
     ! ! Problem: hvy_weight is a distributed dataset and not available on all procs.
     ! ! Solution: use the slot for "refinement status" temporarily for the wheight and also
     ! ! sync it with refinementStatusOnly

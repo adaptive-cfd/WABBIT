@@ -200,7 +200,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         do k = 1, hvy_n(tree_ID)
             hvyID = hvy_active(k, tree_ID)
             call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-            level = lgt_block( lgtID, params%Jmax+IDX_MESH_LVL)
+            level = lgt_block( lgtID, Jmax+IDX_MESH_LVL)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
@@ -212,15 +212,22 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! here, this can actually be omitted.)
             call get_block_spacing_origin( params, lgtID, x0, dx )
 
-            ! evaluate the criterion on this block.
-            if (params%threshold_mask .and. present(hvy_mask)) then
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
-                hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
+            ! force blocks on maximum refinement level to coarsen, if parameter is set.
+            ! Note this behavior can be bypassed using the ignore_maxlevel switch.
+            if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) then
+                ! coarsen (no need to evaluate the possibly expensive coarseningIndicator_block)
+                lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
             else
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
-                hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level)
+                ! evaluate the criterion on this block.
+                if (params%threshold_mask .and. present(hvy_mask)) then
+                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
+                else
+                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level)
+                endif
             endif
         enddo
     end select
@@ -228,19 +235,19 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
 
 
-    !---------------------------------------------------------------------------
-    !> force blocks on maximum refinement level to coarsen, if parameter is set
-    !---------------------------------------------------------------------------
-    ! Note this behavior can be bypassed using the ignore_maxlevel switch
-    if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
-        do k = 1, lgt_n(tree_ID)
-            lgtID = lgt_active(k, tree_ID)
-            if (lgt_block(lgtID, Jmax + IDX_MESH_LVL) == params%Jmax) then
-                ! force blocks on maxlevel to coarsen
-                lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
-            endif
-        enddo
-    endif
+    ! !---------------------------------------------------------------------------
+    ! !> force blocks on maximum refinement level to coarsen, if parameter is set
+    ! !---------------------------------------------------------------------------
+    ! ! Note this behavior can be bypassed using the ignore_maxlevel switch
+    ! if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
+    !     do k = 1, lgt_n(tree_ID)
+    !         lgtID = lgt_active(k, tree_ID)
+    !         if (lgt_block(lgtID, Jmax + IDX_MESH_LVL) == params%Jmax) then
+    !             ! force blocks on maxlevel to coarsen
+    !             lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
+    !         endif
+    !     enddo
+    ! endif
 
 
     !> after modifying all refinement flags, we need to synchronize light data

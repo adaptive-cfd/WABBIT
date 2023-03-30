@@ -20,7 +20,23 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor, Nwcl
     integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr
-    real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy, tmp_reconst
+    ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+    ! Note: the precise naming of SC/WC is not really important. we just apply
+    ! the correct decomposition/reconstruction filters - thats it.
+    !
+    ! INDEX            2D     3D     LABEL
+    ! -----            --    ---     ---------------------------------
+    ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+    ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+    ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+    ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+    ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+    ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+    !
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
     real(kind=rk) :: t0
     logical, allocatable, save :: toBeManipulated(:)
 
@@ -41,10 +57,13 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
     ! if (.not. areArraysSameSize(sc, hvy_block(:,:,:,:)))
 
-    if (.not. allocated(sc  )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcx )) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcy )) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcxy)) allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+    if (allocated(tmp_reconst)) then
+        if (.not. areArraysSameSize(hvy_block(:,:,:,:,1), tmp_reconst) ) deallocate(tmp_reconst)
+    endif
+    if (allocated(wc)) then
+        if (.not. areArraysSameSize(hvy_block(:,:,:,:,1), wc(:,:,:,:,1)) ) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
 
     !---------------------------------------------------------------------------
@@ -140,7 +159,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
         ! copy transform data in "inflated mallat ordering":
-        call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
+        call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
         ! loop over all relevant neighbors
         do neighborhood = 5, 16
@@ -153,8 +172,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
                 if (level_neighbor < level_me) then
                     ! manipulation of coeffs
-                    call coarseExtensionManipulateWC_block(params, wcx, wcy, wcxy, neighborhood)
-                    call coarseExtensionManipulateSC_block(params, sc, hvy_work(:,:,:,:,hvyID), neighborhood)
+                    call coarseExtensionManipulateWC_block(params, wc, neighborhood)
+                    call coarseExtensionManipulateSC_block(params, wc, hvy_work(:,:,:,:,hvyID), neighborhood)
                 endif
             endif
         enddo
@@ -165,7 +184,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
 
         ! reconstruct from the manipulated coefficients
-        call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, tmp_reconst)
+        call mallat2spaghetti_block(params, wc, tmp_reconst)
         call waveletReconstruction_block(params, tmp_reconst)
 
         ! reconstruction part. We manipulated the data and reconstructed it in some regions.

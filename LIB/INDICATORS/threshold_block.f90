@@ -24,7 +24,23 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
-    real(kind=rk), allocatable, dimension(:,:,:,:) :: u_wc, sc, wcx, wcy, wcxy
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
+    ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+    ! Note: the precise naming of SC/WC is not really important. we just apply
+    ! the correct decomposition/reconstruction filters - thats it.
+    !
+    ! INDEX            2D     3D     LABEL
+    ! -----            --    ---     ---------------------------------
+    ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+    ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+    ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+    ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+    ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+    ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+    !
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
     t0 = MPI_Wtime()
     nx = size(u, 1)
@@ -36,11 +52,16 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     dim = params%dim
     Jmax = params%Jmax
     detail = -1.0_rk
-    allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
-    allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-    allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-    allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
-    allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
+
+    if (allocated(u_wc)) then
+        if (.not. areArraysSameSize(u, u_wc) ) deallocate(u_wc)
+    endif
+    if (allocated(wc)) then
+        if (.not. areArraysSameSize(u, wc(:,:,:,:,1)) ) deallocate(wc)
+    endif
+
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
+    if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
 
 
 #ifdef DEV
@@ -59,19 +80,14 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! NOTE: if the coarse reconstruction is performed before this routine is called, then
     ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
     ! them again. -> checked in postprocessing that this is indeed the case.
-    call spaghetti2mallat_block(params, u_wc, sc, wcx, wcy, wcxy)
+    call spaghetti2inflatedMallat_block(params, u_wc, wc)
 
     do p = 1, nc
         ! if all details are smaller than C_eps, we can coarsen.
         ! check interior WC only
-        detail(p) = maxval(abs(wcx(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p)))
-        detail(p) = max( detail(p), maxval(abs(wcy(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p))) )
-        detail(p) = max( detail(p), maxval(abs(wcxy(g+1:Bs(1)+g,g+1:Bs(2)+g,:,p))) )
-
+        detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
         detail(p) = detail(p) / norm(p)
     enddo
-
-    deallocate(u_wc, sc, wcx, wcy, wcxy)
 
     ! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
     ! ich schicke dir die notizen gleich (photos).

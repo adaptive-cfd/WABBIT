@@ -938,54 +938,54 @@ contains
 
     !-------------------------------------------------------------------------------
 
-    subroutine waveletReconstruction_block_old(params, u)
-        implicit none
-        type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
-
-        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
-
-        nx = size(u, 1)
-        ny = size(u, 2)
-        nz = size(u, 3)
-        nc = size(u, 4)
-        g  = params%g
-        Bs = params%Bs
-
-        if (allocated(sc)) then
-            if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
-        endif
-        if (allocated(wcx)) then
-            if ((size(wcx,1)/=nx).or.(size(wcx,2)/=ny).or.(size(wcx,3)/=nz).or.(size(wcx,4)/=nc)) deallocate(wcx)
-        endif
-        if (allocated(wcy)) then
-            if ((size(wcy,1)/=nx).or.(size(wcy,2)/=ny).or.(size(wcy,3)/=nz).or.(size(wcy,4)/=nc)) deallocate(wcy)
-        endif
-        if (allocated(wcxy)) then
-            if ((size(wcxy,1)/=nx).or.(size(wcxy,2)/=ny).or.(size(wcxy,3)/=nz).or.(size(wcxy,4)/=nc)) deallocate(wcxy)
-        endif
-
-        if (.not. allocated(sc  )) allocate(   sc(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcx )) allocate(  wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcy )) allocate(  wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
-
-#ifdef DEV
-        if (nz /= 1) call abort(7223839, "currently 2D only")
-        if (modulo(Bs(1), 2) /= 0) call abort(99111,"This code requires Bs even")
-        if (modulo(Bs(2), 2) /= 0) call abort(99111,"This code requires Bs even")
-#endif
-
-        call spaghetti2mallat_block(params, u, sc, wcx, wcy, wcxy)
-
-        call blockFilterCustom_vct( params, sc  , sc  , "HR", "HR", "--" ) ! inplace should work, only a copy statement from the input
-        call blockFilterCustom_vct( params, wcx , wcx , "HR", "GR", "--" ) ! inplace should work, only a copy statement from the input
-        call blockFilterCustom_vct( params, wcy , wcy , "GR", "HR", "--" ) ! inplace should work, only a copy statement from the input
-        call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" ) ! inplace should work, only a copy statement from the input
-
-        u = sc + wcx + wcy + wcxy
-    end subroutine
+!     subroutine waveletReconstruction_block_old(params, u)
+!         implicit none
+!         type (type_params), intent(in) :: params
+!         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+!
+!         real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+!         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+!
+!         nx = size(u, 1)
+!         ny = size(u, 2)
+!         nz = size(u, 3)
+!         nc = size(u, 4)
+!         g  = params%g
+!         Bs = params%Bs
+!
+!         if (allocated(sc)) then
+!             if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
+!         endif
+!         if (allocated(wcx)) then
+!             if ((size(wcx,1)/=nx).or.(size(wcx,2)/=ny).or.(size(wcx,3)/=nz).or.(size(wcx,4)/=nc)) deallocate(wcx)
+!         endif
+!         if (allocated(wcy)) then
+!             if ((size(wcy,1)/=nx).or.(size(wcy,2)/=ny).or.(size(wcy,3)/=nz).or.(size(wcy,4)/=nc)) deallocate(wcy)
+!         endif
+!         if (allocated(wcxy)) then
+!             if ((size(wcxy,1)/=nx).or.(size(wcxy,2)/=ny).or.(size(wcxy,3)/=nz).or.(size(wcxy,4)/=nc)) deallocate(wcxy)
+!         endif
+!
+!         if (.not. allocated(sc  )) allocate(   sc(1:nx, 1:ny, 1:nz, 1:nc) )
+!         if (.not. allocated(wcx )) allocate(  wcx(1:nx, 1:ny, 1:nz, 1:nc) )
+!         if (.not. allocated(wcy )) allocate(  wcy(1:nx, 1:ny, 1:nz, 1:nc) )
+!         if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+!
+! #ifdef DEV
+!         if (nz /= 1) call abort(7223839, "currently 2D only")
+!         if (modulo(Bs(1), 2) /= 0) call abort(99111,"This code requires Bs even")
+!         if (modulo(Bs(2), 2) /= 0) call abort(99111,"This code requires Bs even")
+! #endif
+!
+!         call spaghetti2inflatedMallat_block(params, u, sc, wcx, wcy, wcxy)
+!
+!         call blockFilterCustom_vct( params, sc  , sc  , "HR", "HR", "--" ) ! inplace should work, only a copy statement from the input
+!         call blockFilterCustom_vct( params, wcx , wcx , "HR", "GR", "--" ) ! inplace should work, only a copy statement from the input
+!         call blockFilterCustom_vct( params, wcy , wcy , "GR", "HR", "--" ) ! inplace should work, only a copy statement from the input
+!         call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" ) ! inplace should work, only a copy statement from the input
+!
+!         u = sc + wcx + wcy + wcxy
+!     end subroutine
 
     !-------------------------------------------------------------------------------
 
@@ -1029,11 +1029,29 @@ contains
 
     end subroutine
 
-
-    subroutine spaghetti2mallat_block(params, u, sc, wcx, wcy, wcxy)
+    ! Inflated Mallat ordering is a HACK. I was just easier to code.
+    ! That does not mean its wrong, it isn't. But is uses extra memory (although
+    ! that is negligible) and does unnecessary copy actions.
+    subroutine spaghetti2inflatedMallat_block(params, u, wc)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
         nx = size(u, 1)
@@ -1044,24 +1062,12 @@ contains
         Bs = params%bs
 
 #ifdef DEV
-        if (.not.areArraysSameSize(u, sc)) then
+        if (.not.areArraysSameSize(u, wc(:,:,:,:,1))) then
             call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
-        endif
-        if (.not.areArraysSameSize(u, wcx)) then
-            call abort(27222120, "Allocated arrays are not compatible?! Time for a drink.")
-        endif
-        if (.not.areArraysSameSize(u, wcy)) then
-            call abort(27222121, "Allocated arrays are not compatible?! Time for a drink.")
-        endif
-        if (.not.areArraysSameSize(u, wcxy)) then
-            call abort(27222122, "Allocated arrays are not compatible?! Time for a drink.")
         endif
 #endif
 
-        sc   = 0.0_rk
-        wcx  = 0.0_rk
-        wcy  = 0.0_rk
-        wcxy = 0.0_rk
+        wc = 0.0_rk
 
         ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
         ! in the sense that Nx*Ny data gives 4 * Nx*Ny decomposition.
@@ -1069,25 +1075,41 @@ contains
         ! copy from Spaghetti to Mallat ordering
         if (modulo(g, 2) == 0) then
             ! even g
-            sc(   1:nx:2, 1:ny:2, :, :) = u(1:nx:2, 1:ny:2, :, 1:nc)
-            wcx(  1:nx:2, 1:ny:2, :, :) = u(2:nx:2, 1:ny:2, :, 1:nc)
-            wcy(  1:nx:2, 1:ny:2, :, :) = u(1:nx:2, 2:ny:2, :, 1:nc)
-            wcxy( 1:nx:2, 1:ny:2, :, :) = u(2:nx:2, 2:ny:2, :, 1:nc)
+            wc( 1:nx:2, 1:ny:2, :, :, 1) = u(1:nx:2, 1:ny:2, :, 1:nc)
+            wc( 1:nx:2, 1:ny:2, :, :, 2) = u(2:nx:2, 1:ny:2, :, 1:nc)
+            wc( 1:nx:2, 1:ny:2, :, :, 3) = u(1:nx:2, 2:ny:2, :, 1:nc)
+            wc( 1:nx:2, 1:ny:2, :, :, 4) = u(2:nx:2, 2:ny:2, :, 1:nc)
         else
             ! odd g
-            sc(   2:nx-1:2, 2:ny-1:2, :, :) = u(2:nx-1:2, 2:ny-1:2, :, 1:nc)
-            wcx(  2:nx-1:2, 2:ny-1:2, :, :) = u(3:nx:2, 2:ny-1:2  , :, 1:nc)
-            wcy(  2:nx-1:2, 2:ny-1:2, :, :) = u(2:nx-1:2, 3:ny:2  , :, 1:nc)
-            wcxy( 2:nx-1:2, 2:ny-1:2, :, :) = u(3:nx:2, 3:ny:2    , :, 1:nc)
+            wc( 2:nx-1:2, 2:ny-1:2, :, :, 1) = u(2:nx-1:2, 2:ny-1:2, :, 1:nc)
+            wc( 2:nx-1:2, 2:ny-1:2, :, :, 2) = u(3:nx:2, 2:ny-1:2  , :, 1:nc)
+            wc( 2:nx-1:2, 2:ny-1:2, :, :, 3) = u(2:nx-1:2, 3:ny:2  , :, 1:nc)
+            wc( 2:nx-1:2, 2:ny-1:2, :, :, 4) = u(3:nx:2, 3:ny:2    , :, 1:nc)
         endif
     end subroutine
 
 
 
-    subroutine mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, u)
+    subroutine mallat2spaghetti_block(params, wc, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u, sc, wcx, wcy, wcxy
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
         nx = size(u, 1)
@@ -1097,18 +1119,24 @@ contains
         g  = params%g
         Bs = params%bs
 
+#ifdef DEV
+        if (.not.areArraysSameSize(u, wc(:,:,:,:,1))) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink. You look handsome today.")
+        endif
+#endif
+
         if (modulo(g, 2) == 0) then
             ! even g
-            u(1:nx:2, 1:ny:2, :, :)= sc(   1:nx:2, 1:ny:2, :, :)
-            u(2:nx:2, 1:ny:2, :, :)= wcx(  1:nx:2, 1:ny:2, :, :)
-            u(1:nx:2, 2:ny:2, :, :)= wcy(  1:nx:2, 1:ny:2, :, :)
-            u(2:nx:2, 2:ny:2, :, :)= wcxy( 1:nx:2, 1:ny:2, :, :)
+            u(1:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
+            u(2:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
+            u(1:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
+            u(2:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
         else
             ! odd g
-            u(2:nx-1:2, 2:ny-1:2, :, :)= sc(   2:nx-1:2, 2:ny-1:2, :, :)
-            u(3:nx:2, 2:ny-1:2  , :, :)= wcx(  2:nx-1:2, 2:ny-1:2, :, :)
-            u(2:nx-1:2, 3:ny:2  , :, :)= wcy(  2:nx-1:2, 2:ny-1:2, :, :)
-            u(3:nx:2, 3:ny:2    , :, :)= wcxy( 2:nx-1:2, 2:ny-1:2, :, :)
+            u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
+            u(3:nx:2, 2:ny-1:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
+            u(2:nx-1:2, 3:ny:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
+            u(3:nx:2, 3:ny:2    , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
         endif
 
     end subroutine
@@ -1116,20 +1144,35 @@ contains
 
     ! manipulate wavelet coefficients in a neighborhood direction: applied
     ! if we find a coarser neighbor in this direction (coarse extension)
-    subroutine coarseExtensionManipulateWC_block(params, wcx, wcy, wcxy, neighborhood)
+    subroutine coarseExtensionManipulateWC_block(params, wc, neighborhood)
         implicit none
 
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wcx, wcy, wcxy
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik), intent(in) :: neighborhood
 
         integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
-        nx = size(wcx, 1)
-        ny = size(wcx, 2)
-        nz = size(wcx, 3)
-        nc = size(wcx, 4)
+        nx = size(wc, 1)
+        ny = size(wc, 2)
+        nz = size(wc, 3)
+        nc = size(wc, 4)
         g = params%g
         Bs = params%bs
         Nscl    = params%Nscl
@@ -1147,59 +1190,75 @@ contains
             ! NOTE: even though we set Nwcl=12 points to zero, this does not mean we
             ! kill 12 WC. They are on the extended grid, so effectively only 12/2
             ! are killed, many of which are in the ghost nodes layer
-            wcx(1:Nwcl, :, :, 1:nc) = 0.0_rk
-            wcy(1:Nwcl, :, :, 1:nc) = 0.0_rk
-            wcxy(1:Nwcl, :, :, 1:nc) = 0.0_rk
+            wc(1:Nwcl, :, :, 1:nc, 2) = 0.0_rk
+            wc(1:Nwcl, :, :, 1:nc, 3) = 0.0_rk
+            wc(1:Nwcl, :, :, 1:nc, 4) = 0.0_rk
         case (15:16)
             ! -y
-            wcx(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcxy(:, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wc(:, 1:Nwcl, :, 1:nc, 2) = 0.0_rk
+            wc(:, 1:Nwcl, :, 1:nc, 3) = 0.0_rk
+            wc(:, 1:Nwcl, :, 1:nc, 4) = 0.0_rk
         case (11:12)
             ! +x
-            wcx(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-            wcy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
-            wcxy(nx-Nwcr:nx, :, :, 1:nc) = 0.0_rk
+            wc(nx-Nwcr:nx, :, :, 1:nc, 2) = 0.0_rk
+            wc(nx-Nwcr:nx, :, :, 1:nc, 3) = 0.0_rk
+            wc(nx-Nwcr:nx, :, :, 1:nc, 4) = 0.0_rk
         case (13:14)
             ! +y
-            wcx(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcxy(:, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wc(:, ny-Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+            wc(:, ny-Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+            wc(:, ny-Nwcr:ny, :, 1:nc, 4) = 0.0_rk
         case(5)
-            wcx(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcxy(1:Nwcl, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wc(1:Nwcl, ny-Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+            wc(1:Nwcl, ny-Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+            wc(1:Nwcl, ny-Nwcr:ny, :, 1:nc, 4) = 0.0_rk
         case(6)
-            wcx(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcxy(1:Nwcl, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2) = 0.0_rk
+            wc(1:Nwcl, 1:Nwcl, :, 1:nc, 3) = 0.0_rk
+            wc(1:Nwcl, 1:Nwcl, :, 1:nc, 4) = 0.0_rk
         case(7)
-            wcx(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
-            wcxy(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc) = 0.0_rk
+            wc(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+            wc(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+            wc(nx-Nwcr:ny, ny-Nwcr:ny, :, 1:nc, 4) = 0.0_rk
         case(8)
-            wcx(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
-            wcxy(nx-Nwcr:ny, 1:Nwcl, :, 1:nc) = 0.0_rk
+            wc(nx-Nwcr:ny, 1:Nwcl, :, 1:nc, 2) = 0.0_rk
+            wc(nx-Nwcr:ny, 1:Nwcl, :, 1:nc, 3) = 0.0_rk
+            wc(nx-Nwcr:ny, 1:Nwcl, :, 1:nc, 4) = 0.0_rk
         end select
     end subroutine
 
 
 
-    subroutine coarseExtensionManipulateSC_block(params, sc, u_copy, neighborhood)
+    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood)
         implicit none
 
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: sc, u_copy
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_copy
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik), intent(in) :: neighborhood
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
         integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
 
-        nx = size(sc, 1)
-        ny = size(sc, 2)
-        nz = size(sc, 3)
-        nc = size(sc, 4)
+        nx = size(wc, 1)
+        ny = size(wc, 2)
+        nz = size(wc, 3)
+        nc = size(wc, 4)
         g = params%g
         Bs = params%bs
         Nscl    = params%Nscl
@@ -1213,26 +1272,27 @@ contains
         select case(neighborhood)
         case (9:10)
             ! -x
-            sc(1:Nscl, :, :, 1:nc) = u_copy(1:Nscl,:,:,1:nc)
+            wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl,:,:,1:nc)
         case (15:16)
             ! -y
-            sc(:, 1:Nscl, :, 1:nc) = u_copy(:, 1:Nscl,:,1:nc)
+            wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl,:,1:nc)
         case (11:12)
             ! +x
-            sc(nx-Nscr:nx, :, :, 1:nc) = u_copy(nx-Nscr:nx,:,:,1:nc)
+            wc(nx-Nscr:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr:nx,:,:,1:nc)
         case (13:14)
             ! +y
-            sc(:, ny-Nscr:ny, :, 1:nc) = u_copy(:, ny-Nscr:ny,:,1:nc)
+            wc(:, ny-Nscr:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr:ny,:,1:nc)
         case(5)
-            sc(1:Nscl, ny-Nscr:ny, :, 1:nc) = u_copy(1:Nscl, ny-Nscr:ny,:,1:nc)
+            wc(1:Nscl, ny-Nscr:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr:ny,:,1:nc)
         case(6)
-            sc(1:Nscl, 1:Nscl, :, 1:nc) = u_copy(1:Nscl, 1:Nscl,:,1:nc)
+            wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl,:,1:nc)
         case(7)
-            sc(nx-Nscr:ny, ny-Nscr:ny, :, 1:nc) = u_copy(nx-Nscr:ny, ny-Nscr:ny,:,1:nc)
+            wc(nx-Nscr:ny, ny-Nscr:ny, :, 1:nc, 1) = u_copy(nx-Nscr:ny, ny-Nscr:ny,:,1:nc)
         case(8)
-            sc(nx-Nscr:ny, 1:Nscl, :, 1:nc) = u_copy(nx-Nscr:ny, 1:Nscl,:,1:nc)
+            wc(nx-Nscr:ny, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr:ny, 1:Nscl,:,1:nc)
         end select
     end subroutine
+
 
     subroutine setup_wavelet(params)
         implicit none
@@ -1828,14 +1888,3 @@ contains
 
 
 end module
-
-! Note: the precise naming of SC/WC is not really important. we just apply
-! the correct decomposition/reconstruction filters - thats it.
-! u_scwc(:,:,:,:,1) -- HH -- HHH  -- sc -- scaling function coefficients
-! u_scwc(:,:,:,:,2) -- HG -- HGH  -- wcx -- wavelet coefficients
-! u_scwc(:,:,:,:,3) -- GH -- GHH     wcy -- wavelet coefficients
-! u_scwc(:,:,:,:,4) -- GG -- GGH     wcxy -- wavelet coefficients
-! u_scwc(:,:,:,:,5) --    -- HHG     wcz -- wavelet coefficients
-! u_scwc(:,:,:,:,6) --    -- HGG     wcxz -- wavelet coefficients
-! u_scwc(:,:,:,:,7) --    -- GHG     wcyz -- wavelet coefficients
-! u_scwc(:,:,:,:,8) --    -- GGG     wcxyz -- wavelet coefficients

@@ -297,8 +297,6 @@ subroutine wavelet_test(params)
     call check_file_exists(trim(fname1))
     call check_file_exists(trim(fname2))
 
-
-
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname1, lgt_n(tree_ID), time, iteration, params%domain_size, &
     params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
@@ -434,7 +432,8 @@ subroutine wavelet_test_coarsening(params)
     integer(kind=ik)                   :: nwork, ierr, iter , kk, Jmax, nx,ny,nz,&
     nc, neighborhood, lgtID_neighbor, ii
     logical :: coarsen, block1, block2, block3
-    real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wcx, wcy, wcxy, tmp_reconst
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
@@ -561,10 +560,7 @@ do iter= 1, 1
     nz = size(hvy_block, 3)
     nc = size(hvy_block, 4)
 
-    if (.not. allocated(sc  )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcx )) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcy )) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcxy)) allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+    if (.not. allocated(wc  )) allocate( wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
 
 
@@ -587,7 +583,7 @@ do iter= 1, 1
         ! (proper "coarse extension")
         if (lgt_block( lgtID, Jmax+IDX_REFINE_STS ) == 0) then
             ! unpack/inflated Mallat ordering
-            call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
+            call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
             do neighborhood = 1, 8
                 ! neighbor exists ?
@@ -598,44 +594,44 @@ do iter= 1, 1
                     if (lgt_block(lgtID_neighbor, Jmax+IDX_REFINE_STS)==-1) then
                         select case(neighborhood)
                         case(1)
-                            wcx(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
-                            wcy(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
-                            wcxy(1:params%Nwcl, :, :, 1:nc) = 0.0_rk
+                            wc(1:params%Nwcl, :, :, 1:nc, 2) = 0.0_rk
+                            wc(1:params%Nwcl, :, :, 1:nc, 3) = 0.0_rk
+                            wc(1:params%Nwcl, :, :, 1:nc, 4) = 0.0_rk
                         case(2)
-                            wcx(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(:, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wc(:, ny-params%Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+                            wc(:, ny-params%Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+                            wc(:, ny-params%Nwcr:ny, :, 1:nc, 4) = 0.0_rk
                         case(3)
-                            wcx(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                            wcy(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
-                            wcxy(nx-params%Nwcr:nx, :, :, 1:nc) = 0.0_rk
+                            wc(nx-params%Nwcr:nx, :, :, 1:nc, 2) = 0.0_rk
+                            wc(nx-params%Nwcr:nx, :, :, 1:nc, 3) = 0.0_rk
+                            wc(nx-params%Nwcr:nx, :, :, 1:nc, 4) = 0.0_rk
                         case(4)
-                            wcx(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(:, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wc(:, 1:params%Nwcl, :, 1:nc, 2) = 0.0_rk
+                            wc(:, 1:params%Nwcl, :, 1:nc, 3) = 0.0_rk
+                            wc(:, 1:params%Nwcl, :, 1:nc, 4) = 0.0_rk
                         case(5)
-                            wcx(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wc(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+                            wc(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+                            wc(1:params%Nwcl, ny-params%Nwcr:ny, :, 1:nc, 4) = 0.0_rk
                         case(6)
-                            wcx(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(1:params%Nwcl, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wc(1:params%Nwcl, 1:params%Nwcl, :, 1:nc, 2) = 0.0_rk
+                            wc(1:params%Nwcl, 1:params%Nwcl, :, 1:nc, 3) = 0.0_rk
+                            wc(1:params%Nwcl, 1:params%Nwcl, :, 1:nc, 4) = 0.0_rk
                         case(7)
-                            wcx(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcy(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
-                            wcxy(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc, 2) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc, 3) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, ny-params%Nwcr:ny, :, 1:nc, 4) = 0.0_rk
                         case(8)
-                            wcx(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcy(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
-                            wcxy(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc, 2) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc, 3) = 0.0_rk
+                            wc(nx-params%Nwcr:ny, 1:params%Nwcl, :, 1:nc, 4) = 0.0_rk
                         end select
                     endif
                 endif
             enddo
 
             ! repack to Spaghetti-ordering
-            call mallat2spaghetti_block(params, sc, wcx, wcy, wcxy, hvy_block(:,:, :,:,hvyID))
+            call mallat2spaghetti_block(params, wc, hvy_block(:,:, :,:,hvyID))
         endif
     end do
 
@@ -713,13 +709,8 @@ do iter= 1, 1
     nz = size(hvy_block, 3)
     nc = size(hvy_block, 4)
 
-    if (.not. allocated(sc  )) allocate(  sc(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcx )) allocate( wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcy )) allocate( wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-    if (.not. allocated(wcxy)) allocate(wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
+    if (.not. allocated(wc  )) allocate(  wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
-
-
 
 
     ! removal of WC
@@ -781,7 +772,7 @@ enddo
 !
 !         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
 !
-!         call spaghetti2mallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
+!         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), sc, wcx, wcy, wcxy)
 !
 !         open(unit=32, file="wcx.csv", status="replace")
 !         do ii = g+1, Bs(2)+g

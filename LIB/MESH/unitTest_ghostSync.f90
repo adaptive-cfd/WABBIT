@@ -66,7 +66,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     if (params%rank == 0) then
         write(*,'(80("-"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
-        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n, maxActiveLevel_tree(tree_ID)
+        write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n(tree_ID), maxActiveLevel_tree(tree_ID)
         write(*,'(" ready for testing.")')
     endif
 

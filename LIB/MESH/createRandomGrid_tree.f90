@@ -32,7 +32,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     do l = 1, iterations
         if (params%rank==0 .and. verbosity) then
             write(*,'("RANDOM GRID GENERATION: iteration ",i2," active=",i9," Jmin=",i2," Jmax=",i2)') &
-            l, lgt_n, &
+            l, lgt_n(tree_ID), &
             minActiveLevel_tree(tree_ID), &
             maxActiveLevel_tree(tree_ID)
         endif

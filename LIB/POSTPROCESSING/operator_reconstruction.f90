@@ -159,7 +159,7 @@ subroutine operator_reconstruction(params)
     nx_fine = nint(domain(2)/dx_fine)
 
     write(*,*) "nx_fine=", nx_fine
-    write(*,*) "nblocks=", lgt_n(tree_ID), "bs=", Bs, "npoints (op. matrix size!)=", lgt_n(tree_ID)*bs(1)*bs(2) ! note actual operator size is smaller because of redundant points
+    write(*,*) "nblocks=", lgt_n(tree_ID), "bs=", Bs, "npoints (op. matrix size!)=", lgt_n(tree_ID)*bs(1)*bs(2)
 
     !---------------------------------------------------------------------------
     ! save the grid (for plotting in python)
@@ -246,13 +246,7 @@ subroutine operator_reconstruction(params)
             if (.not. notAllPointsAreZero) cycle
 
             !---------------------------------------------------------------
-            ! synchronize ghosts (important! if e.g. coarseWins is active and you happen to set the redundant value of a refined block, its overwritten to be zero again)
-            ! Note: this also applies to coarse block bordering on a coarse block, if its ID is lower.
-            ! In fact, each point is then computed only once. Note: if you set the point on a high lgt_id, then
-            ! it will be "sync'ed down" to lower light IDs, so you can find the point more than once
-            ! NOTE: with the new version, where the outer loops are ixx and iyy (so we loop over the grid point on
-            ! the finest active level), this sync is no longer required: we set ALL points (x_in,y_in) to one, on ALL blocks
-            ! that have those points
+            ! synchronize ghosts. This was done for the redundantGrid -> check if still required for the uniqueGrid (as of 2023)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

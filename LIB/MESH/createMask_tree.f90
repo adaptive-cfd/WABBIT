@@ -212,8 +212,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
         call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
 
-        ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
-        ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
+        ! refine the mesh
         call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_mask )
 
         ! if its mask-anynonzero, then the grid is refined inside the body. however, this is not what we assume

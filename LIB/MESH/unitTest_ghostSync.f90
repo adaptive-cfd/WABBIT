@@ -59,8 +59,8 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     params%max_grid_density = 0.10_rk
-    ! perform 5 iterations of random refinement/coarsening
-    l = 5
+    ! perform at most 5 iterations of random refinement/coarsening
+    l = min(5, params%Jmax-params%Jmin)
     call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., l, tree_ID )
 
     if (params%rank == 0) then

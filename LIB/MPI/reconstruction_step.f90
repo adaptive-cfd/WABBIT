@@ -84,7 +84,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-        do neighborhood = 5, 16
+        do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
@@ -162,7 +162,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
         ! loop over all relevant neighbors
-        do neighborhood = 5, 16
+        do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
@@ -190,7 +190,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         ! reconstruction part. We manipulated the data and reconstructed it in some regions.
         ! Now, we copy those reconstructed data back to the original block - this is
         ! the actual coarseExtension.
-        do neighborhood = 5, 16
+        do neighborhood = 1, size(hvy_neighbor,2)
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
@@ -199,29 +199,95 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
                 if (level_neighbor < level_me) then
                     ! coarse extension case (neighbor is coarser)
-                    select case (neighborhood)
-                    case (9:10)
-                        ! -x
-                        hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
-                    case (11:12)
-                        ! +x
-                        hvy_block(nx-Nreconr:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx,:,:,1:nc)
-                    case (13:14)
-                        ! +y
-                        hvy_block(:, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr:ny,:,1:nc)
-                    case (15:16)
-                        ! -y
-                        hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
-                    case (5)
-                        hvy_block(1:Nreconl, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr:ny,:,1:nc)
-                    case (6)
-                        hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
-                    case (7)
-                        ! top right corner
-                        hvy_block(nx-Nreconr:nx, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, ny-Nreconr:ny,:,1:nc)
-                    case (8)
-                        hvy_block(nx-Nreconr:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, 1:Nreconl,:,1:nc)
-                    end select
+                    if (params%dim == 2) then
+                        select case (neighborhood)
+                        case (9:10)
+                            ! -x
+                            hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
+                        case (11:12)
+                            ! +x
+                            hvy_block(nx-Nreconr:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx,:,:,1:nc)
+                        case (13:14)
+                            ! +y
+                            hvy_block(:, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr:ny,:,1:nc)
+                        case (15:16)
+                            ! -y
+                            hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
+                        case (5)
+                            hvy_block(1:Nreconl, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr:ny,:,1:nc)
+                        case (6)
+                            hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
+                        case (7)
+                            ! top right corner
+                            hvy_block(nx-Nreconr:nx, ny-Nreconr:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, ny-Nreconr:ny,:,1:nc)
+                        case (8)
+                            hvy_block(nx-Nreconr:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr:nx, 1:Nreconl,:,1:nc)
+                        end select
+                    else
+                        select case(neighborhood)
+                            ! ---faces---
+                        case (35:38)
+                            ! +x
+                            hvy_block(nx-Nscr:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, :, :, 1:nc)
+                        case (43:46)
+                            ! -x
+                            hvy_block(1:Nscl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nscl, :, :, 1:nc)
+                        case (39:42)
+                            ! +y
+                            hvy_block(:, ny-Nscr:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nscr:ny, :, 1:nc)
+                        case (31:34)
+                            ! -y
+                            hvy_block(:, 1:Nscl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nscl, :, 1:nc)
+                        case (27:30)
+                            ! +z
+                            hvy_block(:, :, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(:, :, nz-Nscr:nz, 1:nc)
+                        case (47:50)
+                            ! -z
+                            hvy_block(:, :, 1:Nscl, 1:nc, hvyID) = tmp_reconst(:, :, 1:Nscl, 1:nc)
+                            ! --- corners ---
+                        case (26)
+                            hvy_block(1:Nscl, 1:Nscl, 1:Nscl, 1:nc, hvyID) = tmp_reconst(1:Nscl, 1:Nscl, 1:Nscl, 1:nc)
+                        case (23)
+                            hvy_block(nx-Nscr:nx, 1:Nscl, 1:Nscl, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, 1:Nscl, 1:Nscl, 1:nc)
+                        case (22)
+                            hvy_block(1:Nscl, 1:Nscl, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(1:Nscl, 1:Nscl, nz-Nscr:nz, 1:nc)
+                        case (19)
+                            hvy_block(nx-Nscr:nx, 1:Nscl, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, 1:Nscl, nz-Nscr:nz, 1:nc)
+                        case (25)
+                            hvy_block(1:Nscl, ny-Nscr:ny, 1:Nscl, 1:nc, hvyID) = tmp_reconst(1:Nscl, ny-Nscr:ny, 1:Nscl, 1:nc)
+                        case (21)
+                            hvy_block(1:Nscl, ny-Nscr:ny, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(1:Nscl, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                        case (20)
+                            hvy_block(nx-Nscr:nx, ny-Nscr:ny, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                        case (24)
+                            hvy_block(nx-Nscr:nx, ny-Nscr:ny, 1:Nscl, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, ny-Nscr:ny, 1:Nscl, 1:nc)
+                            ! ---(partial) edges---
+                        case (51:52)
+                            hvy_block(:, 1:Nscl, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(:, 1:Nscl, nz-Nscr:nz, 1:nc)
+                        case (53:54)
+                            hvy_block(nx-Nscr:nx, :, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, :, nz-Nscr:nz, 1:nc)
+                        case (55:56)
+                            hvy_block(:, ny-Nscr:ny, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(:, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                        case (57:58)
+                            hvy_block(1:Nscl, :, nz-Nscr:nz, 1:nc, hvyID) = tmp_reconst(1:Nscl, :, nz-Nscr:nz, 1:nc)
+                        case (59:60)
+                            hvy_block(:, 1:Nscl, 1:Nscl, 1:nc, hvyID) = tmp_reconst(:, 1:Nscl, 1:Nscl, 1:nc)
+                        case (61:62)
+                            hvy_block(nx-Nscr:nx, :, 1:Nscl, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, :, 1:Nscl, 1:nc)
+                        case (63:64)
+                            hvy_block(:, ny-Nscr:ny, 1:Nscl, 1:nc, hvyID) = tmp_reconst(:, ny-Nscr:ny, 1:Nscl, 1:nc)
+                        case (65:66)
+                            hvy_block(1:Nscl, :, 1:Nscl, 1:nc, hvyID) = tmp_reconst(1:Nscl, :, 1:Nscl, 1:nc)
+                        case (67:68)
+                            hvy_block(nx-Nscr:nx, 1:Nscl, :, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, 1:Nscl, :, 1:nc)
+                        case (69:70)
+                            hvy_block(1:Nscl, 1:Nscl, :, 1:nc, hvyID) = tmp_reconst(1:Nscl, 1:Nscl, :, 1:nc)
+                        case (71:72)
+                            hvy_block(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc)
+                        case (73:74)
+                            hvy_block(1:Nscl, ny-Nscr:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nscl, ny-Nscr:ny, :, 1:nc)
+                        end select
+                    endif
                 endif
             endif
         enddo

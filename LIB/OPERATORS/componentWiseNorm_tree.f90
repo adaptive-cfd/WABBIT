@@ -27,8 +27,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    ! attention: exclude redundant point here
-                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, p, hvy_id )**2 )
+                    norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, p, hvy_id )**2 )
                 enddo
             enddo
         else
@@ -40,8 +39,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
 
                 do p = 1, n_eqn
-                    ! attention: exclude redundant point here
-                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, p, hvy_id )**2 )
+                    norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, hvy_id )**2 )
                 enddo
             enddo
         endif

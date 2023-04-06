@@ -1,4 +1,4 @@
-subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
@@ -16,10 +16,9 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
 
     if (params%rank == 0) then
         write(*,'(80("~"))')
-        write(*,'("UNIT TEST: testing if IWT(FWT(u)) = Id")')
+        write(*,'("UNIT TEST: testing if Coarsen(Refine(u)) = Id")')
         write(*,'("This test is performed on an equidistant grid.")')
-        write(*,'("It checks if the filter banks HD,GD,HR,GR are correct.")')
-        write(*,'("Wavelet=",A," g=", i2)') trim(adjustl(params%wavelet)), params%g
+        write(*,'("It checks if the implementation of Interpolation, Refinement and Block Merging are correct.")')
     end if
 
     Bs = params%Bs
@@ -28,6 +27,11 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
 
     allocate(norm(1:params%n_eqn))
     allocate(norm_ref(1:params%n_eqn))
+
+    if (params%Jmax<2) then
+        if (params%rank==0) write(*,*) "Test cannot be performed because of level restrictions: params%jmax=", params%jmax
+        return
+    endif
 
     !----------------------------------------------------------------------------
     ! create an equidistant grid on level J=1 (and not Jmin, because that may well be 0)
@@ -63,74 +67,23 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    ! call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "everywhere", hvy_tmp)!, hvy_work)
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    ! call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID) )
-!!!!!!!!!!!!!!!!!!!!!!!
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-    !     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-    !     hvy_block( g+1:Bs(1)-1+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID) = 0.0
-    !     ! hvy_block( g+2:Bs(1)+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID) = 0.0e-3_rk * hvy_block( g+2:Bs(1)+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID)
-    !     hvy_block( g+1:Bs(1)-1+g:2, g+2:Bs(1)+g:2,:,:,hvyID) = 0.0e-2_rk * hvy_block( g+1:Bs(1)-1+g:2, g+2:Bs(1)+g:2,:,:,hvyID)
-    !     hvy_block( g+2:Bs(1)+g:2, g+2:Bs(1)+g:2,:,:,hvyID) = 0.0e-2_rk !* hvy_block( g+2:Bs(1)+g:2, g+2:Bs(1)+g:2,:,:,hvyID)
-    ! end do
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     call waveletReconstruction_block_old(params, hvy_block(:,:,:,:,hvyID))
-    !     hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-    ! end do
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-!!!!!!!!!!!!!!
-
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
-    !----------------------------------------------------------------------------
-    ! FWT
-    !----------------------------------------------------------------------------
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-    end do
+    ! refine
+    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
+    ! coarsening (back to the original level)
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "everywhere", hvy_tmp)
 
-    !---------------------------------------------------------------------------
-    ! testing of conversion routines on FWT transformed data
-    !---------------------------------------------------------------------------
-    allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:size(hvy_block,4), 1:8 ))
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-        call mallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
-    end do
-    deallocate(wc)
-
-
-    !----------------------------------------------------------------------------
-    ! IWT
-    !----------------------------------------------------------------------------
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvyID))
-        ! error IWT(FWT(u)) - u
-        hvy_block(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID) - hvy_tmp(:,:,:,1:nc,hvyID)
-    end do
-
-    ! compute norm of error
+    ! we compare norms - this is not the most elegant way, but it'll do the trick for now.
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
-    norm = norm / norm_ref
+    norm = norm / norm_ref - 1.0_rk
 
-    if (params%rank==0) write(*,*) "Relative L2 error in IWT(FWT(u)) is: ", norm
+    if (params%rank==0) write(*,*) "Relative L2 error in Coarsen(Refine(u)) is: ", norm
 
     if (norm(1)>1.0e-14_rk) then
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )

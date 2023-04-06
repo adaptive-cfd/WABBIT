@@ -4,12 +4,12 @@
 subroutine remove_nonperiodic_neighbors(params, tree_ID)
     implicit none
 
-    type (type_params), intent(in)      :: params               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik) :: k, hvy_id, lgt_id, lgt_id_neighbor, J1, J2, a
-    logical                             :: remove
-    integer(kind=2)                     :: n_domain(1:3)
+    logical          :: remove
+    integer(kind=2)  :: n_domain(1:3)
 
     do k = 1, hvy_n(tree_ID)
         ! the block w're looking at ...

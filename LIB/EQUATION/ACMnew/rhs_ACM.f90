@@ -51,9 +51,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
-
-
-    ! local variables
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
@@ -122,8 +119,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 dV2 = dV * 0.5_rk
 
                 iz = 1
-                do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
-                    do ix = g+1, Bs(1)+g-1
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
                         ! note dV2 contains the 0.5 from energy as well as the spacing
                         params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) )
 
@@ -134,9 +131,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 dV = dx(1)*dx(2)*dx(3)
                 dV2 = dV * 0.5_rk
 
-                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
-                    do iy = g+1, Bs(2)+g-1
-                        do ix = g+1, Bs(1)+g-1
+                do iz = g+1, Bs(3)+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
                             ! note dV2 contains the 0.5 from energy as well as the spacing
                             params_acm%e_kin = params_acm%e_kin + dv2*( u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) &
                             + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
@@ -159,9 +156,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 f_block = 0.0_rk
 
 
-                do iy = g+1, Bs(2)+g-1
+                do iy = g+1, Bs(2)+g
                     y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                    do ix = g+1, Bs(1)+g-1
+                    do ix = g+1, Bs(1)+g
                         x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
 
                         ! get this points color
@@ -189,11 +186,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
-                do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
+                do iz = g+1, Bs(3)+g
                     z = x0(3) + dble(iz-(g+1)) * dx(3) - Insect%xc_body_g(3) ! note: x-xc insect
-                    do iy = g+1, Bs(2)+g-1
+                    do iy = g+1, Bs(2)+g
                         y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                        do ix = g+1, Bs(1)+g-1
+                        do ix = g+1, Bs(1)+g
                             x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
 
                             ! get this points color

@@ -387,29 +387,25 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     !----------------------------------------------------------------------------------
     ! Files created using the newGhostNodes branch (after 08 April 2020) contain a version number.
     ! if the number is not found, version=0.
-    if (version(1) == 20200408 .and. rank==0) then
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "The file we are trying to read is generated with an intermediate version"
-        write(*,*) "of wabbit (after 08 April 2020). In this the file, the grid"
-        write(*,*) "definition does not include a redundant point, i.e., a block is defined"
-        write(*,*) "with spacing dx = L*2^-J / Bs. This definition was a dead-end, as it lead"
-        write(*,*) "to instabilities and other problems. Current versions of WABBIT include a redundant point again."
-        write(*,*) ""
-        write(*,*) "The newGhostNodes branch still STORED the redundant point for visualization."
-        write(*,*) "This was simply the first ghost node. If Bs was odd, this lead to an even number"
-        write(*,*) "of points, and this cannot be read with present code versions."
-        write(*,*) ""
-        write(*,*) "A workaround must be done in preprocessing: upsampling to equidistant resolution and"
-        write(*,*) "re-gridding is required. I am truely sorry for this."
-        write(*,*) ""
-        write(*,*) "If bs was even, the resulting data size is odd, and the file can be read. note however"
-        write(*,*) "that the resolution changes slightly, and results cannot be perfectly identical to what would"
-        write(*,*) "have been obtained with the newGhostNodes branch"
-        write(*,*) "--------------------------------------------------------------------"
-        write(*,*) "-----WARNING----------WARNING----------WARNING----------WARNING-----"
-        write(*,*) "--------------------------------------------------------------------"
+    !
+    ! VERSION   DESCRIPTION
+    ! =======   ===========
+    !        0  redundantGrid created by all WABBIT versions before 1st attempt to use uniqueGrid
+    ! 20200408  uniqueGrid created by the intermediate
+    ! 20200902  redundantGrid after we first abandonned the uniqueGrid
+    ! 20231602  Current: uniqueGrid and with biorthogonal wavelets: equivalent to 20200408
+    !
+    if (version(1) < 20231602) then
+        if (rank == 0) then
+            write(*,*) "--------------------------------------------------------------------"
+            write(*,*) "-----ERROR------------ERROR------------ERROR------------ERROR-------"
+            write(*,*) "--------------------------------------------------------------------"
+            write(*,*) "The file we are trying to read is generated with an old version"
+            write(*,*) "of wabbit (before 2023). In this the file, the grid"
+            write(*,*) "definition includes a redundant point, i.e., a block is defined"
+            write(*,*) "with spacing dx = L*2^-J / Bs-1. This definition was replaced by uniqueGrid."
+        endif
+        call abort(2304061, "Wrong WABBIT file format.")
     endif
 
 

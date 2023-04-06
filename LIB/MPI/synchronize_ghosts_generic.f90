@@ -3,7 +3,6 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
 
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in) :: params
     !> light data array
     integer(kind=ik), intent(in)   :: lgt_block(:, :)
@@ -19,14 +18,8 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     logical, optional, intent(in)  :: syncSameLevelOnly1
     logical, optional, intent(in)  :: lgt_BlocksToSync(:)
 
-    ! MPI parameter
-    integer(kind=ik)   :: myrank, mpisize
-    ! grid parameter
-    integer(kind=ik)   :: ii0, ii1
-    integer(kind=ik), dimension(3) :: Bs
-    ! loop variables
+    integer(kind=ik)   :: myrank, mpisize, ii0, ii1, Bs(1:3)
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
-    ! id integers
     integer(kind=ik)   :: recver_lgtID, recver_rank, recver_hvyID
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
     logical :: flaggedBlocksOnly
@@ -202,7 +195,6 @@ subroutine send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, 
     recver_hvyID, neighborhood, level_diff )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in)   :: recver_rank ! zero-based
     integer(kind=ik), intent(in)   :: sender_hvyID, recver_hvyID
@@ -308,7 +300,6 @@ end subroutine unpack_ghostlayers_external
 subroutine unpack_ghostlayers_internal( params, hvy_block, flaggedBlocksOnly1, lgt_BlocksToSync )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     logical, optional, intent(in)  :: flaggedBlocksOnly1
@@ -361,7 +352,6 @@ end subroutine unpack_ghostlayers_internal
 subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)   :: params
     !> data buffer
     real(kind=rk), intent(inout)     :: line_buffer(:)
@@ -396,7 +386,6 @@ end subroutine GhostLayer2Line
 subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)  :: params
     !> data buffer
     real(kind=rk), intent(inout)    :: line_buffer(:)
@@ -598,7 +587,6 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
 
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> light data array
     integer(kind=ik), intent(in)        :: lgt_block(:, :)

@@ -38,7 +38,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
     if (.not.allocated(data_predict_fine)) allocate( data_predict_fine(2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 2*(Bs(3)+2*g)-1) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, 2*Bs(3)-1, N_MAX_COMPONENTS) )
+    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 2*Bs(3), N_MAX_COMPONENTS) )
 
 
     ! every proc loop over its active heavy data array
@@ -62,7 +62,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
                 ! interpolate data
                 call prediction_3D(hvy_block(:, :, :, dF, hvy_active(k, tree_ID)), data_predict_fine, params%order_predictor)
                 ! save new data, but cut ghost nodes.
-                new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+1+2*Bs(1)-2, 2*g+1:2*g+1+2*Bs(2)-2, 2*g+1:2*g+1+2*Bs(3)-2)
+                new_data(:, :, :, dF) = data_predict_fine(2*g+1:2*g+2*Bs(1), 2*g+1:2*g+2*Bs(2), 2*g+1:2*g+2*Bs(3))
             end do
 
             ! ------------------------------------------------------------------------------------------------------
@@ -110,7 +110,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2)+1:2*Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -133,7 +133,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), 1:Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -156,7 +156,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, 1:Bs(3), dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), Bs(2)+1:2*Bs(2), 1:Bs(3), dF)
             end do
 
             !--------------------------
@@ -179,7 +179,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), 1:Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -202,7 +202,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2):2*Bs(2)-1, Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(1:Bs(1), Bs(2)+1:2*Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -225,7 +225,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, 1:Bs(2), Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), 1:Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
             !--------------------------
@@ -249,7 +249,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! save interpolated data, loop over all datafields
             do dF = 1, size(hvy_block,4)
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1):2*Bs(1)-1, Bs(2):2*Bs(2)-1, Bs(3):2*Bs(3)-1, dF)
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) = new_data(Bs(1)+1:2*Bs(1), Bs(2)+1:2*Bs(2), Bs(3)+1:2*Bs(3), dF)
             end do
 
         end if

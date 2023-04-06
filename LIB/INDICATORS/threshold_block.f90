@@ -82,12 +82,21 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! them again. -> checked in postprocessing that this is indeed the case.
     call spaghetti2inflatedMallat_block(params, u_wc, wc)
 
-    do p = 1, nc
-        ! if all details are smaller than C_eps, we can coarsen.
-        ! check interior WC only
-        detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-        detail(p) = detail(p) / norm(p)
-    enddo
+    if (params%dim == 2) then
+        do p = 1, nc
+            ! if all details are smaller than C_eps, we can coarsen.
+            ! check interior WC only
+            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+            detail(p) = detail(p) / norm(p)
+        enddo
+    else
+        do p = 1, nc
+            ! if all details are smaller than C_eps, we can coarsen.
+            ! check interior WC only
+            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+            detail(p) = detail(p) / norm(p)
+        enddo
+    endif
 
     ! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
     ! ich schicke dir die notizen gleich (photos).

@@ -8,7 +8,7 @@
 
 subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, g )
     implicit none
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in) :: params
     integer(kind=ik), intent(in) :: ijkrecv(2,3)
     integer(kind=ik), intent(out) :: ijkbuffer(2,3)
     integer(kind=ik), intent(out) :: ijksend(2,3)
@@ -399,6 +399,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     Bs            = params%Bs
 
 
+    ! this file contains a list of all neighboring relations
+    ! used for development in 2D only.
     if ((dir == 1) .and. (params%rank == 0)) then
         open(16, file='neighbor_blocks2D.dat', status='replace')
         do ineighbor = 1, 16
@@ -485,7 +487,7 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         ! but requires on the other side to have the ghost node layer on the interpolating
         ! block already filled (two stages!)
         do i = 1, params%dim
-            ijksend(1, i) = max(1, ijksend(1, i) - S)
+            ijksend(1, i) = max(1,         ijksend(1, i) - S)
             ijksend(2, i) = min(Bs(i)+2*g, ijksend(2, i) + S)
         enddo
 
@@ -572,7 +574,6 @@ end function
 subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, g)
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)                  :: params
     !> data_bounds
     integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
@@ -584,11 +585,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, g)
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: sh_start, sh_end
 
-    !---------------------------------------------------------------------------------------------
-
-    ! grid parameter
-    Bs    = params%Bs
-
+    Bs       = params%Bs
     sh_start = 1
     sh_end   = 0
 

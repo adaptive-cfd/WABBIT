@@ -148,6 +148,7 @@ program main
         call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
+    call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -245,11 +246,10 @@ program main
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
-            ! Snych'ing becomes much mor expensive one the grid is refined.
+            ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
-            ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
-            ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
+            ! refine the mesh
             call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
         endif
         call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)

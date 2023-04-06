@@ -129,7 +129,7 @@ subroutine init_ghost_nodes( params )
             endif
         else
             if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2) then
-              call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+              call abort(821151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
               & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
               & number_ghost_nodes or increase number_block_nodes.")
             endif
@@ -295,117 +295,120 @@ subroutine init_ghost_nodes( params )
         endif
 
         ! set up table with inverse neighbor relations
-        inverse_neighbor = -1
-        ! ---2D------2D------2D---
-        inverse_neighbor(1,2) = 3
-        inverse_neighbor(2,2) = 4
-        inverse_neighbor(3,2) = 1
-        inverse_neighbor(4,2) = 2
-        inverse_neighbor(5,2) = 8
-        inverse_neighbor(6,2) = 7
-        inverse_neighbor(7,2) = 6
-        inverse_neighbor(8,2) = 5
-        inverse_neighbor(9,2) = 11
-        inverse_neighbor(10,2) = 12
-        inverse_neighbor(11,2) = 9
-        inverse_neighbor(12,2) = 10
-        inverse_neighbor(13,2) = 15
-        inverse_neighbor(14,2) = 16
-        inverse_neighbor(15,2) = 13
-        inverse_neighbor(16,2) = 14
-        ! ---3D------3D------3D------3D---
-        !'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
-        inverse_neighbor(1,3) = 6
-        inverse_neighbor(2,3) = 4
-        inverse_neighbor(3,3) = 5
-        inverse_neighbor(4,3) = 2
-        inverse_neighbor(5,3) = 3
-        inverse_neighbor(6,3) = 1
-        !'_12/___', '_13/___', '_14/___', '_15/___'
-        inverse_neighbor(7,3) = 13
-        inverse_neighbor(8,3) = 14
-        inverse_neighbor(9,3) = 11
-        inverse_neighbor(10,3) = 12
-        !'_62/___', '_63/___', '_64/___', '_65/___'
-        inverse_neighbor(11,3) = 9
-        inverse_neighbor(12,3) = 10
-        inverse_neighbor(13,3) = 7
-        inverse_neighbor(14,3) = 8
-        !'_23/___', '_25/___'
-        inverse_neighbor(15,3) = 18
-        inverse_neighbor(16,3) = 17
-        !'_43/___', '_45/___'
-        inverse_neighbor(17,3) = 16
-        inverse_neighbor(18,3) = 15
-        !'123/___', '134/___', '145/___', '152/___'
-        inverse_neighbor(19,3) = 25
-        inverse_neighbor(20,3) = 26
-        inverse_neighbor(21,3) = 23
-        inverse_neighbor(22,3) = 24
-        !'623/___', '634/___', '645/___', '652/___'
-        inverse_neighbor(23,3) = 21
-        inverse_neighbor(24,3) = 22
-        inverse_neighbor(25,3) = 19
-        inverse_neighbor(26,3) = 20
-        !'__1/123', '__1/134', '__1/145', '__1/152'
-        inverse_neighbor(27,3) = 47
-        inverse_neighbor(28,3) = 48
-        inverse_neighbor(29,3) = 49
-        inverse_neighbor(30,3) = 50
-        !'__2/123', '__2/623', '__2/152', '__2/652'
-        inverse_neighbor(31,3) = 39
-        inverse_neighbor(32,3) = 40
-        inverse_neighbor(33,3) = 41
-        inverse_neighbor(34,3) = 42
-        !'__3/123', '__3/623', '__3/134', '__3/634'
-        inverse_neighbor(35,3) = 45
-        inverse_neighbor(36,3) = 46
-        inverse_neighbor(37,3) = 43
-        inverse_neighbor(38,3) = 44
-        !'__4/134', '__4/634', '__4/145', '__4/645'
-        inverse_neighbor(39,3) = 31
-        inverse_neighbor(40,3) = 32
-        inverse_neighbor(41,3) = 33
-        inverse_neighbor(42,3) = 34
-        !'__5/145', '__5/645', '__5/152', '__5/652'
-        inverse_neighbor(43,3) = 37
-        inverse_neighbor(44,3) = 38
-        inverse_neighbor(45,3) = 35
-        inverse_neighbor(46,3) = 36
-        !'__6/623', '__6/634', '__6/645', '__6/652'
-        inverse_neighbor(47,3) = 27
-        inverse_neighbor(48,3) = 28
-        inverse_neighbor(49,3) = 29
-        inverse_neighbor(50,3) = 30
-        !'_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152'
-        inverse_neighbor(51,3) = 63
-        inverse_neighbor(52,3) = 64
-        inverse_neighbor(53,3) = 66!65
-        inverse_neighbor(54,3) = 65!66
-        inverse_neighbor(55,3) = 59
-        inverse_neighbor(56,3) = 60
-        inverse_neighbor(57,3) = 62
-        inverse_neighbor(58,3) = 61
-        !'_62/623', '_62/652', '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652'
-        inverse_neighbor(59,3) = 55
-        inverse_neighbor(60,3) = 56
-        inverse_neighbor(61,3) = 58
-        inverse_neighbor(62,3) = 57
-        inverse_neighbor(63,3) = 51
-        inverse_neighbor(64,3) = 52
-        inverse_neighbor(65,3) = 54!53
-        inverse_neighbor(66,3) = 53!54
-        !'_23/123', '_23/623', '_25/152', '_25/652'
-        inverse_neighbor(67,3) = 73
-        inverse_neighbor(68,3) = 74
-        inverse_neighbor(69,3) = 71
-        inverse_neighbor(70,3) = 72
-        !'_43/134', '_43/634', '_45/145', '_45/645'
-        inverse_neighbor(71,3) = 69
-        inverse_neighbor(72,3) = 70
-        inverse_neighbor(73,3) = 67
-        inverse_neighbor(74,3) = 68
+        if (.true.) then ! for folding only
+            inverse_neighbor = -1
+            ! ---2D------2D------2D---
+            inverse_neighbor(1,2) = 3
+            inverse_neighbor(2,2) = 4
+            inverse_neighbor(3,2) = 1
+            inverse_neighbor(4,2) = 2
+            inverse_neighbor(5,2) = 8
+            inverse_neighbor(6,2) = 7
+            inverse_neighbor(7,2) = 6
+            inverse_neighbor(8,2) = 5
+            inverse_neighbor(9,2) = 11
+            inverse_neighbor(10,2) = 12
+            inverse_neighbor(11,2) = 9
+            inverse_neighbor(12,2) = 10
+            inverse_neighbor(13,2) = 15
+            inverse_neighbor(14,2) = 16
+            inverse_neighbor(15,2) = 13
+            inverse_neighbor(16,2) = 14
+            ! ---3D------3D------3D------3D---
+            !'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
+            inverse_neighbor(1,3) = 6
+            inverse_neighbor(2,3) = 4
+            inverse_neighbor(3,3) = 5
+            inverse_neighbor(4,3) = 2
+            inverse_neighbor(5,3) = 3
+            inverse_neighbor(6,3) = 1
+            !'_12/___', '_13/___', '_14/___', '_15/___'
+            inverse_neighbor(7,3) = 13
+            inverse_neighbor(8,3) = 14
+            inverse_neighbor(9,3) = 11
+            inverse_neighbor(10,3) = 12
+            !'_62/___', '_63/___', '_64/___', '_65/___'
+            inverse_neighbor(11,3) = 9
+            inverse_neighbor(12,3) = 10
+            inverse_neighbor(13,3) = 7
+            inverse_neighbor(14,3) = 8
+            !'_23/___', '_25/___'
+            inverse_neighbor(15,3) = 18
+            inverse_neighbor(16,3) = 17
+            !'_43/___', '_45/___'
+            inverse_neighbor(17,3) = 16
+            inverse_neighbor(18,3) = 15
+            !'123/___', '134/___', '145/___', '152/___'
+            inverse_neighbor(19,3) = 25
+            inverse_neighbor(20,3) = 26
+            inverse_neighbor(21,3) = 23
+            inverse_neighbor(22,3) = 24
+            !'623/___', '634/___', '645/___', '652/___'
+            inverse_neighbor(23,3) = 21
+            inverse_neighbor(24,3) = 22
+            inverse_neighbor(25,3) = 19
+            inverse_neighbor(26,3) = 20
+            !'__1/123', '__1/134', '__1/145', '__1/152'
+            inverse_neighbor(27,3) = 47
+            inverse_neighbor(28,3) = 48
+            inverse_neighbor(29,3) = 49
+            inverse_neighbor(30,3) = 50
+            !'__2/123', '__2/623', '__2/152', '__2/652'
+            inverse_neighbor(31,3) = 39
+            inverse_neighbor(32,3) = 40
+            inverse_neighbor(33,3) = 41
+            inverse_neighbor(34,3) = 42
+            !'__3/123', '__3/623', '__3/134', '__3/634'
+            inverse_neighbor(35,3) = 45
+            inverse_neighbor(36,3) = 46
+            inverse_neighbor(37,3) = 43
+            inverse_neighbor(38,3) = 44
+            !'__4/134', '__4/634', '__4/145', '__4/645'
+            inverse_neighbor(39,3) = 31
+            inverse_neighbor(40,3) = 32
+            inverse_neighbor(41,3) = 33
+            inverse_neighbor(42,3) = 34
+            !'__5/145', '__5/645', '__5/152', '__5/652'
+            inverse_neighbor(43,3) = 37
+            inverse_neighbor(44,3) = 38
+            inverse_neighbor(45,3) = 35
+            inverse_neighbor(46,3) = 36
+            !'__6/623', '__6/634', '__6/645', '__6/652'
+            inverse_neighbor(47,3) = 27
+            inverse_neighbor(48,3) = 28
+            inverse_neighbor(49,3) = 29
+            inverse_neighbor(50,3) = 30
+            !'_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152'
+            inverse_neighbor(51,3) = 63
+            inverse_neighbor(52,3) = 64
+            inverse_neighbor(53,3) = 66!65
+            inverse_neighbor(54,3) = 65!66
+            inverse_neighbor(55,3) = 59
+            inverse_neighbor(56,3) = 60
+            inverse_neighbor(57,3) = 62
+            inverse_neighbor(58,3) = 61
+            !'_62/623', '_62/652', '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652'
+            inverse_neighbor(59,3) = 55
+            inverse_neighbor(60,3) = 56
+            inverse_neighbor(61,3) = 58
+            inverse_neighbor(62,3) = 57
+            inverse_neighbor(63,3) = 51
+            inverse_neighbor(64,3) = 52
+            inverse_neighbor(65,3) = 54!53
+            inverse_neighbor(66,3) = 53!54
+            !'_23/123', '_23/623', '_25/152', '_25/652'
+            inverse_neighbor(67,3) = 73
+            inverse_neighbor(68,3) = 74
+            inverse_neighbor(69,3) = 71
+            inverse_neighbor(70,3) = 72
+            !'_43/134', '_43/634', '_45/145', '_45/645'
+            inverse_neighbor(71,3) = 69
+            inverse_neighbor(72,3) = 70
+            inverse_neighbor(73,3) = 67
+            inverse_neighbor(74,3) = 68
+        endif
 
+        
         ghost_nodes_module_ready = .true.
 
         ! this routine is not performance-critical

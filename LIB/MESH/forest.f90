@@ -1892,9 +1892,9 @@ function scalar_product_two_trees_old( params, hvy_block, hvy_tmp, &
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ( params%dim == 3 ) then
-            sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, :, hvy_id))
+            sprod = sprod + dx(1)*dx(2)*dx(3)* sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, :, hvy_id))
         else
-            sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, :, hvy_id))
+            sprod = sprod + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, :, hvy_id))
         endif
     end do
     t_inc(2) = MPI_wtime()-t_inc(2)

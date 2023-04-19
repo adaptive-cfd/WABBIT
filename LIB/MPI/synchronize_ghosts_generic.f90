@@ -55,7 +55,7 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
 ! 2nd IDEA: stage-free ghost nodes.
 ! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
 ! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
-! are directly interpolated correctly. 19 apr 2023: This can be made work, but it is tedious and does not yield an 
+! are directly interpolated correctly. 19 apr 2023: This can be made work, but it is tedious and does not yield an
 ! immense speedup neither. On my local machine, its ~5%, but on large scale parallel sims, it may be more significant.
 ! Idea is described in inskape notes.
 
@@ -837,7 +837,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
 
     ! NOTE: this feature is against wabbits memory policy: we try to allocate the
     ! whole memory of the machine on startup, then work with that. however, we have to
-    ! reserver portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
+    ! reserve portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
     ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
     if (sum(Data_recvCounter) > size(rData_recvBuffer, 1)) then
         ! out-of-memory case: the preallocated buffer is not large enough.

@@ -101,7 +101,6 @@ subroutine post_stl2dist(params)
 
     ! one field for the result, one field to tag error points where we have trouble determining the sign.
     params%n_eqn = 1
-    N_MAX_COMPONENTS = params%n_eqn
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = .false.

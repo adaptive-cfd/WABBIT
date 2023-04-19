@@ -40,7 +40,6 @@ subroutine post_superstl(params)
     ! defaults
     scale = 1.0_rk
     origin = 0.0_rk
-    N_MAX_COMPONENTS = 1
 
     ! fetch parameters from command line call
     do i = 1, COMMAND_ARGUMENT_COUNT()

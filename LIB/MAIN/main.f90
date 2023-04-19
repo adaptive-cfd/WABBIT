@@ -1,8 +1,3 @@
-!> \brief main program, init all data, start time loop, output on screen during program run
-! ********************************************************************************************
-!> \image html rhs.svg width=600
-!> \image html rhs.eps
-
 program main
 
     use mpi

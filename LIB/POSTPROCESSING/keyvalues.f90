@@ -30,9 +30,8 @@ subroutine keyvalues(fname, params)
     integer(kind=ik)                        :: sum_curve(2)
     character(len=12)                       :: curves(2)
     real(kind=rk)                           :: x,y,z
-    real(kind=rk)                           :: maxi,mini,squari,meani,qi
-    real(kind=rk)                           :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik)                        :: ix,iy,iz,mpicode, ioerr, rank, i
+    real(kind=rk)                           :: val_max, val_min, val_squares, val_mean, val_Q, val_grid
+    integer(kind=ik)                        :: ix,iy,iz,mpicode, ioerr, rank, i, g
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -69,13 +68,16 @@ subroutine keyvalues(fname, params)
     params%Bs = Bs
     params%Jmax = tc_length
     params%n_eqn = 1
-    params%g = 0
+    params%g = 2
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
     ! make sure there is enough memory allocated
-    params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
-    params%order_predictor = "multiresolution_2nd"
+    params%number_blocks = 2*ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
+    ! actually unused, but initialization needs to be done
+    params%wavelet = "CDF20"
+    call setup_wavelet(params)
+    g = params%g
 
     call allocate_forest(params, hvy_block)
 
@@ -84,13 +86,9 @@ subroutine keyvalues(fname, params)
     allocate( hvy_tmp( size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4), size(hvy_block,5)) )
 
     ! read data
-    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID, verbosity=.true.)
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID, verbosity=.true., synchronize_ghosts=.false.)
 
     call updateMetadata_tree(params, tree_ID)
-
-    ! compute an additional quantity that depends also on the position
-    ! (the others are translation invariant)
-    if (params%dim==2) Bs(3)=1
 
     allocate(tree(1:params%Jmax))
     allocate(sum_tree(1:params%Jmax))
@@ -121,11 +119,12 @@ subroutine keyvalues(fname, params)
     end do
 
 
-    maxl = 0.0_rk
-    minl = 99e99_rk
-    squarl = 0.0_rk
-    meanl = 0.0_rk
-    ql = 0.0_rk
+    val_max     = 0.0_rk
+    val_min     = 99e99_rk
+    val_squares = 0.0_rk
+    val_mean    = 0.0_rk
+    val_q       = 0.0_rk
+    val_grid    = 0.0_rk
 
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
@@ -133,43 +132,58 @@ subroutine keyvalues(fname, params)
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        do iz = 1, Bs(3)
-            do iy = 1, Bs(2)
-                do ix = 1, Bs(1)
-                    x = dble(ix-1)*dx(1)/dble(Bs(1)) + x0(1)
-                    y = dble(iy-1)*dx(2)/dble(Bs(2)) + x0(2)
-                    z = dble(iz-1)*dx(3)/dble(Bs(3)) + x0(3)
+        if (params%dim == 3) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        x = dble(ix-1)*dx(1) + x0(1)
+                        y = dble(iy-1)*dx(2) + x0(2)
+                        z = dble(iz-1)*dx(3) + x0(3)
 
-                    ql = ql + hvy_block(ix,iy,iz,1,hvy_id)*(x+y+z)
+                        val_squares = val_squares + product(dx(1:3))*hvy_block(ix,iy,iz,1,hvy_id)**2
+                        val_mean    = val_mean + product(dx(1:3))*hvy_block(ix,iy,iz,1,hvy_id)
+                        val_Q       = val_Q + product(dx(1:3))*hvy_block(ix,iy,iz,1,hvy_id)*(x+y+z)
+                        val_max     = max(val_max, hvy_block(ix,iy,iz,1,hvy_id))
+                        val_min     = min(val_min, hvy_block(ix,iy,iz,1,hvy_id))
+                    end do
                 end do
             end do
-        end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    x = dble(ix-1)*dx(1) + x0(1)
+                    y = dble(iy-1)*dx(2) + x0(2)
 
-        maxl = max(maxl,maxval(hvy_block(:,:,:,:,hvy_id)))
-        minl = min(minl,minval(hvy_block(:,:,:,:,hvy_id)))
-        squarl = squarl + sum(hvy_block(:,:,:,:,hvy_id)**2)
-        meanl  = meanl +sum(hvy_block(:,:,:,:,hvy_id))
+                    val_squares = val_squares + product(dx(1:2))*hvy_block(ix,iy,1,1,hvy_id)**2
+                    val_mean    = val_mean + product(dx(1:2))*hvy_block(ix,iy,1,1,hvy_id)
+                    val_Q       = val_Q + product(dx(1:2))*hvy_block(ix,iy,1,1,hvy_id)*(x+y)
+                    val_max     = max(val_max, hvy_block(ix,iy,1,1,hvy_id))
+                    val_min     = min(val_min, hvy_block(ix,iy,1,1,hvy_id))
+                end do
+            end do
+        endif
+
+        val_grid = val_grid + sum(x0)
     end do
 
-    call MPI_REDUCE(ql,qi,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
-    call MPI_REDUCE(maxl,maxi,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,WABBIT_COMM,mpicode)
-    call MPI_REDUCE(minl,mini,1,MPI_DOUBLE_PRECISION,MPI_MIN,0,WABBIT_COMM,mpicode)
-    call MPI_REDUCE(squarl,squari,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
-    call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_Q,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_max,1,MPI_DOUBLE_PRECISION,MPI_MAX,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_min,1,MPI_DOUBLE_PRECISION,MPI_MIN,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_squares,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_mean,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,val_grid,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
 
-    qi = qi / lgt_n(tree_ID)
-    squari = squari / lgt_n(tree_ID)
-    meani = meani / lgt_n(tree_ID)
+    val_mean = val_mean / product(params%domain_size(1:params%dim))
 
     if (rank == 0) then
         open  (59, file=fname(1:index(fname,'.'))//'key', &
         status = 'replace', action='write', iostat=ioerr)
-        write (59,'(6(es15.8,1x), 2(i10,1x))') time, maxi, mini, meani, squari, qi , &
+        write (59,'(7(es15.8,1x), 2(i10,1x))') time, val_max, val_min, val_mean, val_squares, val_Q, val_grid , &
         sum_curve(1), sum_curve(2)
         write (*,'(A)') "Result:"
-        write (* ,'(6(A15,1x),2(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
-        "Q-integral", curves(1), curves(2)
-        write (* ,'(6(es15.8,1x),2(i12,1x))') time, maxi, mini, meani, squari, qi, &
+        write (* ,'(7(A15,1x),2(A12,1x))') "time","maxval","minval","meanval","sumsquares", &
+        "Q-integral","grid-integral", curves(1), curves(2)
+        write (* ,'(7(es15.8,1x),2(i12,1x))') time, val_max, val_min, val_mean, val_squares, val_Q, val_grid, &
         sum_curve(1), sum_curve(2)
         write (*,'(A)') "These values can be used to compare two HDF5 files"
         close (59)

@@ -59,8 +59,6 @@ subroutine post_generate_forest(params)
 
     N_treeGenerate = tree_N ! note tree_N is overwritten elsewhere
 
-    N_MAX_COMPONENTS = params%n_eqn ! used for ghost node sync'ing (buffer allocation)
-
 
     ! we have to allocate grid if this routine is called for the first time
     call allocate_forest(params, hvy_block, hvy_work, hvy_tmp=hvy_tmp)

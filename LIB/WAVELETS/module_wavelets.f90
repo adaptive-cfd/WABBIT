@@ -293,7 +293,7 @@ contains
                 ! --> in the planes, execute the 2d code
                 ! step (a)
                 ! first columns (x: const y: variable )
-                ! these points requie one-sided interpolation.
+                ! these points require one-sided interpolation.
                 fine( 2, 1:nyfine:2, izfine ) = a(1)*fine( 1, 1:nyfine:2, izfine ) &
                 + a(2)*fine( 3, 1:nyfine:2, izfine ) &
                 + a(3)*fine( 5, 1:nyfine:2, izfine ) &
@@ -318,7 +318,7 @@ contains
                 ! so from now on, no step size 2 anymore
 
                 ! first row
-                ! these points requie one-sided interpolation.
+                ! these points require one-sided interpolation.
                 fine( 1:nxfine, 2, izfine ) = a(1)*fine( 1:nxfine, 1, izfine ) &
                 + a(2)*fine( 1:nxfine, 3, izfine ) &
                 + a(3)*fine( 1:nxfine, 5, izfine ) &
@@ -429,6 +429,19 @@ contains
 
     end subroutine
 
+    ! Filters a block, all internal nodes, assuming g >= support of filter (crashes otherwise)
+    !
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g i i i i i i i g g          g g f f f f f f f g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! Fig1: g= ghost i=internal      Fig2: f=filtered
     subroutine blockFilterXYZ_vct( params, u, u_filtered, coefs_filter, a, b)
         implicit none
         type (type_params), intent(in) :: params
@@ -493,9 +506,100 @@ contains
 
     end subroutine
 
+    ! filter everywhere where possible: do not start at the interior points, but
+    ! start at the support of the filter
+    !
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g g g g g g g g g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g i i i i i i i g g          g f f f f f f f f f g
+    ! g g g g g g g g g g g          g f f f f f f f f f g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! Fig1: g= ghost i=internal      Fig2: f=filtered
+    subroutine blockFilterXYZ_wherePossible_vct( params, u, u_filtered, coefs_filter, a, b)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        integer(kind=ik) :: a, b
+        real(kind=rk), intent(in) :: coefs_filter(a:b)
+        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift, g, Bs(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+
+        ! if the filter is just 1, then we copy and we're done.
+        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+            u_filtered = u
+            return
+        endif
+
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%Bs
+
+        if ((abs(a) > g).or.(b>g)) then
+            write(*,*) a, b, "but g=", g
+            call abort(202302209, "For applying the filter, not enough ghost nodes")
+        endif
+
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+        u_tmp = u
+
+        u_filtered = u_tmp
+        u_filtered(-a+1:nx-b, :, :, :) = 0.0_rk
+        do ix = -a+1, nx-b
+            do shift = a, b
+                u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, -a+1:ny-b, :, :) = 0.0_rk
+        do iy = -a+1, ny-b
+            do shift = a, b
+                u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+
+        if (nz == 1) return
+
+        u_tmp = u_filtered
+        u_filtered = u_tmp
+        u_filtered(:, :, -a+1:nz-b, :) = 0.0_rk
+        do iz = -a+1, nz-b
+            do shift = a, b
+                u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+            enddo
+        enddo
+
+    end subroutine
+
 
     ! apply the filter only inside the block, where the filter coefficients are
     ! not reaching into the ghost nodes layer.
+    ! Here, interior == a subset of the blocks interior values, so that the filter is
+    ! applied without using the ghost nodes at al. NOT the interior of the block (g+1):(Bs+g)
+    !
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g i i i i i i i g g          g g i i i i i i i g g
+    ! g g i i i i i i i g g          g g i f f f f f i g g
+    ! g g i i i i i i i g g          g g i f f f f f i g g
+    ! g g i i i i i i i g g          g g i f f f f f i g g
+    ! g g i i i i i i i g g          g g i i i i i i i g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! g g g g g g g g g g g          g g g g g g g g g g g
+    ! Fig1: g= ghost i=internal      Fig2: f=filtered
     subroutine blockFilterXYZ_interior_vct( u, u_filtered, coefs_filter, a, b, g)
         implicit none
         real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
@@ -503,7 +607,7 @@ contains
         integer(kind=ik) :: a, b, g
         real(kind=rk), intent(in) :: coefs_filter(a:b)
         integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift
-        real(kind=rk), allocatable :: u_tmp(:,:,:,:)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
@@ -517,7 +621,10 @@ contains
         nz = size(u, 3)
         nc = size(u, 4)
 
-        allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+        if (allocated(u_tmp)) then
+            if (.not. areArraysSameSize(u_tmp, u)) deallocate(u_tmp)
+        endif
+        if (.not.allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
         u_tmp = u
 
         u_filtered = u_tmp
@@ -549,7 +656,6 @@ contains
             enddo
         enddo
 
-        deallocate(u_tmp)
     end subroutine
 
     ! applies one of params% HD GD HR GR filters in each direction
@@ -1775,17 +1881,17 @@ contains
         if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
         if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
 
-        do ic = 1, nc
-            ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            if (allocated(buffer1)) then
-                if (size(buffer1, dim=1)/=nx) deallocate(buffer1)
-            endif
-            if (.not.allocated(buffer1)) allocate(buffer1(1:nx))
-            if (allocated(buffer2)) then
-                if (size(buffer2, dim=1)/=nx) deallocate(buffer2)
-            endif
-            if (.not.allocated(buffer2)) allocate(buffer2(1:nx))
+        ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if (allocated(buffer1)) then
+            if (size(buffer1, dim=1)/=nx) deallocate(buffer1)
+        endif
+        if (.not.allocated(buffer1)) allocate(buffer1(1:nx))
+        if (allocated(buffer2)) then
+            if (size(buffer2, dim=1)/=nx) deallocate(buffer2)
+        endif
+        if (.not.allocated(buffer2)) allocate(buffer2(1:nx))
 
+        do ic = 1, nc
             do iy = 1, ny
                 do iz = 1, nz
                     ! low-pass filter (scaling function)
@@ -1799,18 +1905,20 @@ contains
                     u_wc(Bs(1)/2+1:Bs(1),iy,iz,ic) = buffer2( (g+1):(Bs(1)+g):2 )
                 enddo
             enddo
+        enddo
 
-            ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            if (allocated(buffer1)) then
-                if (size(buffer1, dim=1)/=ny) deallocate(buffer1)
-            endif
-            if (.not.allocated(buffer1)) allocate(buffer1(1:ny))
-            if (allocated(buffer2)) then
-                if (size(buffer2, dim=1)/=ny) deallocate(buffer2)
-            endif
-            if (.not.allocated(buffer2)) allocate(buffer2(1:ny))
+        ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if (allocated(buffer1)) then
+            if (size(buffer1, dim=1)/=ny) deallocate(buffer1)
+        endif
+        if (.not.allocated(buffer1)) allocate(buffer1(1:ny))
+        if (allocated(buffer2)) then
+            if (size(buffer2, dim=1)/=ny) deallocate(buffer2)
+        endif
+        if (.not.allocated(buffer2)) allocate(buffer2(1:ny))
 
-            do ix = 1, nx
+        do ic = 1, nc
+            do ix = 1, Bs(1)
                 do iz = 1, nz
                     ! low-pass filter (scaling function)
                     call filter1G(params, u_wc(ix,:,iz,ic), buffer1, params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1))
@@ -1823,10 +1931,10 @@ contains
                     u_wc(ix,Bs(2)/2+1:Bs(2),iz,ic) = buffer2( (g+1):(Bs(2)+g):2 )
                 enddo
             enddo
+        enddo
 
-            ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            if (nz==1) cycle
-
+        ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if (params%dim == 3) then
             if (allocated(buffer1)) then
                 if (size(buffer1, dim=1)/=nz) deallocate(buffer1)
             endif
@@ -1836,20 +1944,22 @@ contains
             endif
             if (.not.allocated(buffer2)) allocate(buffer2(1:nz))
 
-            do ix = 1, nx
-                do iy = 1, ny
-                    ! low-pass filter (scaling function)
-                    call filter1G(params, u_wc(ix,iy,:,ic), buffer1, params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1))
+            do ic = 1, nc
+                do ix = 1, Bs(1)
+                    do iy = 1, Bs(2)
+                        ! low-pass filter (scaling function)
+                        call filter1G(params, u_wc(ix,iy,:,ic), buffer1, params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1))
 
-                    ! high-pass filter (these guys are the details)
-                    call filter1G(params, u_wc(ix,iy,:,ic), buffer2, params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1))
+                        ! high-pass filter (these guys are the details)
+                        call filter1G(params, u_wc(ix,iy,:,ic), buffer2, params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1))
 
-                    ! decimation by 2, sort into array
-                    u_wc(ix,iy,1:Bs(3)/2,ic)       = buffer1( (g+1):(Bs(3)+g):2 )
-                    u_wc(ix,iy,Bs(3)/2+1:Bs(3),ic) = buffer2( (g+1):(Bs(3)+g):2 )
+                        ! decimation by 2, sort into array
+                        u_wc(ix,iy,1:Bs(3)/2,ic)       = buffer1( (g+1):(Bs(3)+g):2 )
+                        u_wc(ix,iy,Bs(3)/2+1:Bs(3),ic) = buffer2( (g+1):(Bs(3)+g):2 )
+                    enddo
                 enddo
-            enddo
-        enddo ! loop over components
+            enddo ! loop over components
+        endif
 
         ! coefficients are now in compressed Mallat ordering, ie for u_wc:
         !
@@ -1955,6 +2065,15 @@ contains
                 !         enddo
                 !         enddo
                 !         enddo
+
+                ! Conversion:
+                !
+                !  | sc  Wx  sc  Wx   |       | sc sc Wx  Wx  |
+                !  | Wy  Wxy Wy  Wxy  |       | sc sc Wx  Wx  |
+                !  | sc  Wx  sc  Wx   |       | Wy Wy Wxy Wxy |
+                !  | Wy  Wxy Wy  Wxy  |  ==>  | Wy Wy Wxy Wxy |
+                !
+                ! Note number of coeffs is n(..) = (Bs+2G)/2
 
 
                 u_wc_tmp( 1:n(1), 1:n(2), 1:n(3), :) = u_wc(1:Bs(1)+2*g-1:2 , 1:Bs(2)+2*g-1:2, 1:Bs(3)+2*g-1:2, :)
@@ -2085,6 +2204,16 @@ contains
             ! To correct for this shift we discard some coefficients (which is not a problem because not all
             ! filters have the same length, in particular they are not left/right symmetric anyways)
             u_wc_tmp = 0.0_rk
+
+            ! Conversion:
+            !
+            !  | Wx  sc  Wx  sc |       | sc sc Wx  Wx  |
+            !  | Wxy Wy  Wxy Wy |       | sc sc Wx  Wx  |
+            !  | Wx  sc  Wx  sc |       | Wy Wy Wxy Wxy |
+            !  | Wxy Wy  Wxy Wy |  ==>  | Wy Wy Wxy Wxy |
+            !
+            ! Note number of coeffs is n(..) = (Bs+2G)/2
+            ! Note number of coeffs varies: it is not the same for sc, wcx, etc because g is odd
 
             if (params%dim == 2) then
                 ! SC

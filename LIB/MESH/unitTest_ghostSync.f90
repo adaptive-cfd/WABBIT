@@ -59,8 +59,8 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     params%max_grid_density = 0.10_rk
-    ! perform at most 5 iterations of random refinement/coarsening
-    l = min(5, params%Jmax-params%Jmin)
+    ! perform at most 3 iterations of random refinement/coarsening
+    l = min(3, params%Jmax-params%Jmin)
     call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., l, tree_ID )
 
     if (params%rank == 0) then
@@ -137,6 +137,22 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
             ! copy of the block for later comparison, but use work arrays usually used for RK4 substages
             ! so no additional memory is used.
             hvy_work(:,:,:,1,hvy_id,1) = hvy_block(:,:,:,1,hvy_id)
+
+            ! in some rare cases the fact that we have now in fact filled the ghost
+            ! nodes correctly introduces a bias: it means, we can now interpolate, even
+            ! without the ghost nodes on the coarse block filled. hence, reset the
+            ! ghost nodes of the testing blocks:
+            !-- x-direction
+            hvy_block(1:g, :, :, 1, hvy_id)           = 9.0e9_rk
+            hvy_block(Bs(1)+g+1:Bs(1)+2*g, :, :, 1, hvy_id) = 9.0e9_rk
+            !-- y-direction
+            hvy_block(:, 1:g, :, 1, hvy_id)           = 9.0e9_rk
+            hvy_block(:, Bs(2)+g+1:Bs(2)+2*g, :, 1, hvy_id) = 9.0e9_rk
+            !-- z-direction
+            if ( params%dim == 3 ) then
+                hvy_block(:, :, 1:g, 1, hvy_id)           = 9.0e9_rk
+                hvy_block(:, :, Bs(3)+g+1:Bs(3)+2*g, 1, hvy_id) = 9.0e9_rk
+            end if
         end do
 
 

@@ -40,9 +40,11 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
     if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1 ) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-        ! if (.not. allocated(new_data)) allocate( new_data(2*Bs(1)-1, 2*Bs(2)-1, N_MAX_COMPONENTS) )
     ! uniqueGrid modification
-    if (.not. allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), N_MAX_COMPONENTS) )
+    if (allocated(new_data)) then
+        if (size(new_data, 3) < size(hvy_block,3)) deallocate(new_data)
+    endif
+    if (.not. allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), size(hvy_block,3)) )
 
 
     ! every proc loop over its active heavy data array
@@ -65,7 +67,6 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
                 ! interpolate data
                 call prediction_2D(hvy_block(:, :, dF, hvy_active(k, tree_ID)), data_predict_fine, params%order_predictor)
                 ! save new data, but cut ghost nodes.
-                    ! new_data(:,:,dF) = data_predict_fine( 2*g+1:Bs(1)+2*g+(Bs(1)+2*g-1)-2*g, 2*g+1:Bs(2)+2*g+(Bs(2)+2*g-1)-2*g )
                 ! uniqueGrid modification
                 new_data(:,:,dF) = data_predict_fine( 2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g )
             end do

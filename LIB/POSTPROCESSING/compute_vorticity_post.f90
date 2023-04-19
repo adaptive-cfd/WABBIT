@@ -420,7 +420,7 @@ subroutine wavelet_test(params)
     call saveHDF5_tree("3dtest_774.h5", 774.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
     call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
+    hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
 
     call saveHDF5_tree("3dtest_775.h5", 775.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
@@ -447,7 +447,7 @@ subroutine wavelet_test(params)
     call saveHDF5_tree("3dtest_776.h5", 776.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
     call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
+    hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
 
     call saveHDF5_tree("3dtest_777.h5", 777.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
@@ -946,7 +946,7 @@ do iter= 1, 1
 
     call saveHDF5_tree("coarsening_332.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
-    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID),inputDataSynced=.true. )
     call saveHDF5_tree("coarsening_333.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 enddo
@@ -1037,14 +1037,14 @@ do iter= 1, 1
     call updateMetadata_tree(params, tree_ID)
 
     ! do kk = 1, 50
-        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
     ! enddo
     call saveHDF5_tree("coarsening_334.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
 
 call saveHDF5_tree("coarsening_335.h5", time, iteration, 1, params, hvy_block, tree_ID )
-call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.true. )
+call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
 call saveHDF5_tree("coarsening_336.h5", time, iteration, 1, params, hvy_block, tree_ID )
 enddo
 ! end of loop here

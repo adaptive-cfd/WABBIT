@@ -1,5 +1,5 @@
 subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-    flaggedBlocksOnly1, syncSameLevelOnly1, lgt_BlocksToSync  )
+    syncSameLevelOnly1, lgt_BlocksToSync  )
 
     implicit none
 
@@ -14,7 +14,6 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     integer(kind=ik), intent(in)   :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)   :: hvy_n
-    logical, optional, intent(in)  :: flaggedBlocksOnly1
     logical, optional, intent(in)  :: syncSameLevelOnly1
     logical, optional, intent(in)  :: lgt_BlocksToSync(:)
 
@@ -22,7 +21,6 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
     integer(kind=ik)   :: recver_lgtID, recver_rank, recver_hvyID
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
-    logical :: flaggedBlocksOnly
     logical :: syncSameLevelOnly
 
     integer(kind=ik) :: ijk(2,3), isend, irecv
@@ -30,14 +28,6 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     real(kind=rk) :: t0
 
     t0 = MPI_wtime()
-    if (present(flaggedBlocksOnly1)) then
-        flaggedBlocksOnly = flaggedBlocksOnly1
-        if (.not. present(lgt_BlocksToSync)) then
-            call abort(1802231,"flaggedBlocksOnly=.true. but no flag-list provided. Bad boy.")
-        endif
-    else
-        flaggedBlocksOnly = .false.
-    endif
     if (present(syncSameLevelOnly1)) then
         syncSameLevelOnly = syncSameLevelOnly1
     else
@@ -53,10 +43,21 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n == 0) return
 
-    if (size(hvy_block,4)>N_max_components) then
-        write(*,*) size(hvy_block,4), '>', N_max_components
-        call abort(160720191,"You try to ghost-sync a vector with too many components.")
-    endif
+!
+! New Idea (09 Apr 2023)
+!
+! During adapt_mesh, which is the most performance-hungry part of the algorithm with biorthogonal wavelets
+! we should sync certain levels only. This we need also for the complete wavelet transform and denoising/CVS.
+! Synching a level should mean we syn (J,J-1). We start from Jmax. This means: sync all neighborhoods that
+! involve level J, also on blocks of level J-1. It does not mean a block on (J-1) is completely synced, just those
+! neighborhoods.
+!
+! 2nd IDEA: stage-free ghost nodes.
+! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
+! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
+! are directly interpolated correctly. 19 apr 2023: This can be made work, but it is tedious and does not yield an 
+! immense speedup neither. On my local machine, its ~5%, but on large scale parallel sims, it may be more significant.
+! Idea is described in inskape notes.
 
     Bs    = params%Bs
     N     = params%number_blocks
@@ -134,15 +135,6 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
                         if (level_diff == +1) cycle
                     endif
 
-                    ! sync only a subset of blocks?
-                    ! maybe this does not work properly yet 18 02 2023
-                    if (flaggedBlocksOnly) then
-                        ! if so, is this one synced?
-                        if (.not. lgt_BlocksToSync(sender_lgtID) ) then
-                            cycle
-                        endif
-                    endif
-
                     if ( myrank == recver_rank ) then
                         ! internal relation (no communication) has its own buffer (to avoid senseless copying
                         ! from send to recv buffer)
@@ -166,28 +158,167 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
         ! (iv) Unpack received data in the ghost node layers
         !***************************************************************************
         ! process-internal ghost points (direct copy)
-        if (present(flaggedBlocksOnly1)) then
-            call unpack_ghostlayers_internal( params, hvy_block, flaggedBlocksOnly, lgt_BlocksToSync )
-        else
-            call unpack_ghostlayers_internal( params, hvy_block )
-        endif
+        call unpack_ghostlayers_internal( params, hvy_block )
 
         ! before unpacking the data we received from other ranks, we wait for the transfer
         ! to be completed
         call finalize_xfer_mpi(params, isend, irecv)
 
         ! process-external ghost points (copy from buffer)
-        if (present(flaggedBlocksOnly1)) then
-            call unpack_ghostlayers_external( params, hvy_block, flaggedBlocksOnly, lgt_BlocksToSync )
-        else
-            call unpack_ghostlayers_external( params, hvy_block )
-        endif
+        call unpack_ghostlayers_external( params, hvy_block )
 
     end do ! loop over stages 1,2
 
     call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
 
 end subroutine sync_ghosts
+
+! subroutine sync_ghosts_nostages( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
+!
+!     implicit none
+!
+!     type (type_params), intent(in) :: params
+!     !> light data array
+!     integer(kind=ik), intent(in)   :: lgt_block(:, :)
+!     !> heavy data array - block data
+!     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)
+!     !> heavy data array - neighbor data
+!     integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)
+!     !> list of active blocks (heavy data)
+!     integer(kind=ik), intent(in)   :: hvy_active(:)
+!     !> number of active blocks (heavy data)
+!     integer(kind=ik), intent(in)   :: hvy_n
+!
+!     integer(kind=ik)   :: myrank, mpisize, ii0, ii1, Bs(1:3)
+!     integer(kind=ik)   :: N, k, neighborhood, level_diff
+!     integer(kind=ik)   :: recver_lgtID, recver_rank, recver_hvyID
+!     integer(kind=ik)   :: sender_hvyID, sender_lgtID
+!
+!     integer(kind=ik) :: ijk(2,3), isend, irecv
+!     integer(kind=ik) :: bounds_type, inverse
+!     real(kind=rk) :: t0
+!
+!     t0 = MPI_wtime()
+!
+!     if (.not. ghost_nodes_module_ready) then
+!         ! in order to keep the syntax clean, buffers are module-global and need to be
+!         ! allocated here.
+!         call init_ghost_nodes( params )
+!     endif
+!
+!     ! if this mpirank has no active blocks, it has nothing to do here.
+!     if (hvy_n == 0) return
+!
+! !
+! ! New Idea (09 Apr 2023)
+! !
+! ! During adapt_mesh, which is the most performance-hungry part of the algorithm with biorthogonal wavelets
+! ! we should sync certain levels only. This we need also for the complete wavelet transform and denoising/CVS.
+! ! Synching a level should mean we syn (J,J-1). We start from Jmax. This means: sync all neighborhoods that
+! ! involve level J, also on blocks of level J-1. It does not mean a block on (J-1) is completely synced, just those
+! ! neighborhoods.
+! !
+! ! 2nd IDEA: stage-free ghost nodes.
+! ! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
+! ! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
+! ! are directly interpolated correctly.
+!
+!     Bs    = params%Bs
+!     N     = params%number_blocks
+!     myrank  = params%rank
+!     mpisize = params%number_procs
+!
+!     ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
+!
+!         !***************************************************************************
+!         ! (i) stage initialization
+!         !***************************************************************************
+!         int_pos(:) = 1
+!         real_pos(:) = 0
+!         internalNeighbor_pos = 1
+!
+!         ! compute, locally from the grid info, how much data I recv from and send to all
+!         ! other mpiranks. this gives us the start indices of each rank in the send/recv buffers. Note
+!         ! we do not count our internal nodes (.false. as last argument), as they are not put in the
+!         ! buffer at any time.
+!         call get_my_sendrecv_amount_with_ranks_nostages(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
+!              Data_recvCounter, Data_sendCounter, MetaData_recvCounter, MetaData_sendCounter, &
+!              count_internal=.false., ncomponents=size(hvy_block,4))
+!
+!
+!         ! reset iMetaData_sendBuffer, but only the parts that will actually be treated.
+!         do k = 1, params%number_procs
+!             ii0 = sum(MetaData_sendCounter(0:(k-1)-1)) + 1
+!             ii1 = ii0 + MetaData_sendCounter(k-1)
+!             iMetaData_sendBuffer(ii0:ii1) = -99
+!
+!             ii0 = sum(MetaData_recvCounter(0:(k-1)-1)) + 1
+!             ii1 = ii0 + MetaData_recvCounter(k-1)
+!             iMetaData_recvBuffer(ii0:ii1) = -99
+!         enddo
+!
+!
+!         !***************************************************************************
+!         ! (ii) prepare data for sending
+!         !***************************************************************************
+!         do k = 1, hvy_n
+!             ! calculate light id
+!             sender_hvyID = hvy_active(k)
+!             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
+!
+!             ! loop over all neighbors
+!             do neighborhood = 1, size(hvy_neighbor, 2)
+!                 ! neighbor exists
+!                 if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
+!                     ! neighbor light data id
+!                     recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
+!                     ! calculate neighbor rank
+!                     call lgt2proc( recver_rank, recver_lgtID, N )
+!                     ! neighbor heavy id
+!                     call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+!                     ! define level difference: sender - receiver, so +1 means sender on higher level
+!                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
+!                     ! leveldiff =  0 : sender is same level as recver
+!                     ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
+!                     level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+!
+!                     if ( myrank == recver_rank ) then
+!                         ! internal relation (no communication) has its own buffer (to avoid senseless copying
+!                         ! from send to recv buffer)
+!                         internalNeighborSyncs( internalNeighbor_pos:internalNeighbor_pos+4-1 ) = (/sender_hvyID, recver_hvyID, neighborhood, level_diff/)
+!                         internalNeighbor_pos = internalNeighbor_pos + 4
+!                     else
+!                         ! external relation (MPI communication)
+!                         call send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, recver_hvyID, neighborhood, level_diff )
+!                     end if ! (myrank==recver_rank)
+!                 end if ! neighbor exists
+!             end do ! loop over all possible  neighbors
+!         end do ! loop over all heavy active
+!
+!         !***************************************************************************
+!         ! (iii) transfer part (send/recv)
+!         !***************************************************************************
+!         call start_xfer_mpi( params, iMetaData_sendBuffer, rData_sendBuffer, iMetaData_recvBuffer, rData_recvBuffer, isend, irecv )
+!
+!
+!         !***************************************************************************
+!         ! (iv) Unpack received data in the ghost node layers
+!         !***************************************************************************
+!         ! process-internal ghost points (direct copy)
+!         call unpack_ghostlayers_internal( params, hvy_block )
+!
+!         ! before unpacking the data we received from other ranks, we wait for the transfer
+!         ! to be completed
+!         call finalize_xfer_mpi(params, isend, irecv)
+!
+!         ! process-external ghost points (copy from buffer)
+!         call unpack_ghostlayers_external( params, hvy_block )
+!
+!         ! call fixInterpolatedPoints_postSync( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
+!
+!     call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
+!
+! end subroutine sync_ghosts_nostages
 
 
 
@@ -204,9 +335,18 @@ subroutine send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, 
 
     ! merged information of level diff and an indicator that we have a historic finer sender
     integer(kind=ik)   :: buffer_size
-    integer(kind=ik)   :: ijk1(2,3), nc
+    integer(kind=ik)   :: ijk1(2,3), nc, s(1:4)
 
     nc = size(hvy_block,4)
+
+    if (size(res_pre_data,4) < size(hvy_block,4)) then
+        s(1) = size( res_pre_data, 1 )
+        s(2) = size( res_pre_data, 2 )
+        s(3) = size( res_pre_data, 3 )
+        s(4) = size( hvy_block, 4 )
+        deallocate( res_pre_data )
+        allocate( res_pre_data(s(1), s(2), s(3), s(4)) )
+    endif
 
 
     ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
@@ -239,12 +379,11 @@ subroutine send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, 
 end subroutine send_prepare_external
 
 
-subroutine unpack_ghostlayers_external( params, hvy_block, flaggedBlocksOnly1, lgt_BlocksToSync )
+subroutine unpack_ghostlayers_external( params, hvy_block, lgt_BlocksToSync )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    logical, optional, intent(in)  :: flaggedBlocksOnly1
     logical, optional, intent(in)  :: lgt_BlocksToSync(:)
 
     integer(kind=ik) :: recver_rank ! zero-based
@@ -287,7 +426,7 @@ subroutine unpack_ghostlayers_external( params, hvy_block, flaggedBlocksOnly1, l
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
                 call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, RECVER), hvy_block, recver_hvyID )
 
-                ! increase buffer postion marker
+                ! increase buffer position marker
                 l = l + 6
             end do
         end if
@@ -297,12 +436,11 @@ end subroutine unpack_ghostlayers_external
 
 
 
-subroutine unpack_ghostlayers_internal( params, hvy_block, flaggedBlocksOnly1, lgt_BlocksToSync )
+subroutine unpack_ghostlayers_internal( params, hvy_block, lgt_BlocksToSync )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    logical, optional, intent(in)  :: flaggedBlocksOnly1
     logical, optional, intent(in)  :: lgt_BlocksToSync(:)
 
     integer(kind=ik) :: l, recver_hvyID, neighborhood
@@ -601,7 +739,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     logical, intent(in)                 :: count_internal
 
     integer(kind=ik) :: k, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff
+    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff, status, new_size
 
     call MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
     N = params%number_blocks
@@ -696,4 +834,159 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
     Data_recvCounter(:) = Data_recvCounter(:) * ncomponents
     Data_sendCounter(:) = Data_sendCounter(:) * ncomponents
+
+    ! NOTE: this feature is against wabbits memory policy: we try to allocate the
+    ! whole memory of the machine on startup, then work with that. however, we have to
+    ! reserver portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
+    ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
+    if (sum(Data_recvCounter) > size(rData_recvBuffer, 1)) then
+        ! out-of-memory case: the preallocated buffer is not large enough.
+        write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
+        new_size = size(rData_recvBuffer,1)*125/100
+        deallocate(rData_recvBuffer)
+        allocate( rData_recvBuffer(1:new_size), stat=status )
+        if (status /= 0) call abort(999992, "Buffer allocation failed. Not enough memory?")
+    endif
+
+    if (sum(Data_sendCounter) > size(rData_sendBuffer, 1)) then
+        ! out-of-memory case: the preallocated buffer is not large enough.
+        write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
+        new_size = size(rData_sendBuffer,1)*125/100
+        deallocate(rData_sendBuffer)
+        allocate( rData_sendBuffer(1:new_size), stat=status )
+        if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
+    endif
 end subroutine get_my_sendrecv_amount_with_ranks
+
+
+! ! returns two lists with numbers of points I send to all other procs and how much I
+! ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
+! subroutine get_my_sendrecv_amount_with_ranks_nostages(params, lgt_block, hvy_neighbor, hvy_active,&
+!      hvy_n, Data_recvCounter, Data_sendCounter, MetaData_recvCounter, MetaData_sendCounter, &
+!      count_internal, ncomponents)
+!
+!     implicit none
+!
+!     type (type_params), intent(in)      :: params
+!     !> light data array
+!     integer(kind=ik), intent(in)        :: lgt_block(:, :)
+!     !> heavy data array - neighbor data
+!     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+!     !> list of active blocks (heavy data)
+!     integer(kind=ik), intent(in)        :: hvy_active(:)
+!     !> number of active blocks (heavy data)
+!     integer(kind=ik), intent(in)        :: hvy_n, ncomponents
+!     integer(kind=ik), intent(inout)     :: Data_recvCounter(0:), Data_sendCounter(0:)
+!     integer(kind=ik), intent(inout)     :: MetaData_recvCounter(0:), MetaData_sendCounter(0:)
+!     logical, intent(in)                 :: count_internal
+!
+!     integer(kind=ik) :: k, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
+!     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff, status, new_size
+!
+!     call MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
+!     N = params%number_blocks
+!
+!     Data_recvCounter(:) = 0
+!     Data_sendCounter(:) = 0
+!     MetaData_recvCounter(:) = 0
+!     MetaData_sendCounter(:) = 0
+!
+!     do k = 1, hvy_n
+!         ! calculate light id
+!         sender_hvyID = hvy_active(k)
+!         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
+!
+!         ! loop over all neighbors
+!         do neighborhood = 1, size(hvy_neighbor, 2)
+!             ! neighbor exists
+!             if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
+!                 ! neighbor light data id
+!                 recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
+!                 ! calculate neighbor rank
+!                 call lgt2proc( recver_rank, recver_lgtID, N )
+!                 ! neighbor heavy id
+!                 call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+!
+!                 ! define level difference: sender - receiver, so +1 means sender on higher level
+!                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
+!                 ! leveldiff =  0 : sender is same level as recver
+!                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
+!                 level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+!
+!
+!                 if (recver_rank /= myrank .or. count_internal) then
+!                     ! it now depends on the stage if we have to sent this data
+!                     ! or not.
+!                     ! In stage 1, only level_diff = {+1, 0} is treated
+!                     ! In stage 2, only level_diff = -1
+!
+!                     ! send counter. how much data will I send to other mpiranks?
+!                     ! why is this RECVER and not sender? Well, complicated. The amount of data on the sender patch
+!                     ! is not the same as in the receiver patch, because we interpolate or downsample. We effectively
+!                     ! transfer only the data the recver wants - not the extra data.
+!                     ijk = ijkGhosts(:, :, neighborhood, level_diff, RECVER)
+!
+!                     Data_sendCounter(recver_rank) = Data_sendCounter(recver_rank) + &
+!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
+!
+!                     ! recv counter. how much data will I recv from other mpiranks?
+!                     ! This is NOT the same number as before
+!                     inverse = inverse_neighbor(neighborhood, dim)
+!
+!                     ijk = ijkGhosts(:, :, inverse, -1*level_diff, RECVER)
+!
+!                     Data_recvCounter(recver_rank) = Data_recvCounter(recver_rank) + &
+!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
+!
+!                     ! counter for integer buffer: for each neighborhood, we send 6 integers as metadata
+!                     ! as this is a fixed number it does not depend on the type of neighborhood etc, so
+!                     ! technically one would need only one for send/recv
+!                     MetaData_sendCounter(recver_rank) = MetaData_sendCounter(recver_rank) + 6 ! FIVE
+!
+!                     MetaData_recvCounter(recver_rank) = MetaData_recvCounter(recver_rank) + 6 ! FIVE
+!                 endif
+!
+!
+!
+!             end if ! neighbor exists
+!         end do ! loop over all possible  neighbors
+!     end do ! loop over all heavy active
+!
+!
+!
+!     ! NOTE: for the int buffer, we mosly start at some index l0 and then loop unitl
+!     ! we find a -99 indicating the end of the buffer. this could be avoided by using
+!     ! for instead of while loops in the main routines, but I do not have time now.
+!     !
+!     ! In the meantime, notice we extent the amount of data by one, to copy the last -99
+!     ! to the buffers
+!     MetaData_recvCounter(:) = MetaData_recvCounter(:) + 1
+!     MetaData_sendCounter(:) = MetaData_sendCounter(:) + 1
+!
+!
+!     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
+!     Data_recvCounter(:) = Data_recvCounter(:) * ncomponents
+!     Data_sendCounter(:) = Data_sendCounter(:) * ncomponents
+!
+!     ! NOTE: this feature is against wabbits memory policy: we try to allocate the
+!     ! whole memory of the machine on startup, then work with that. however, we have to
+!     ! reserver portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
+!     ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
+!     if (sum(Data_recvCounter) > size(rData_recvBuffer, 1)) then
+!         ! out-of-memory case: the preallocated buffer is not large enough.
+!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
+!         new_size = size(rData_recvBuffer,1)*125/100
+!         deallocate(rData_recvBuffer)
+!         allocate( rData_recvBuffer(1:new_size), stat=status )
+!         if (status /= 0) call abort(999992, "Buffer allocation failed. Not enough memory?")
+!     endif
+!
+!     if (sum(Data_sendCounter) > size(rData_sendBuffer, 1)) then
+!         ! out-of-memory case: the preallocated buffer is not large enough.
+!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
+!         new_size = size(rData_sendBuffer,1)*125/100
+!         deallocate(rData_sendBuffer)
+!         allocate( rData_sendBuffer(1:new_size), stat=status )
+!         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
+!     endif
+! end subroutine

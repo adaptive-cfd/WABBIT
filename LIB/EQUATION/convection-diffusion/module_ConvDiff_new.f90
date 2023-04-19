@@ -343,6 +343,9 @@ contains
       case ("zero")
           u(:,:,:,i) = 0.0_rk
 
+      case ("const")
+          u(:,:,:,i) = params_convdiff%blob_width(i)
+          
       case ("sin")
           if (params_convdiff%dim==2) then
               do ix = 1, Bs(1)+2*g

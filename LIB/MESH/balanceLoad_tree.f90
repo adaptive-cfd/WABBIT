@@ -235,40 +235,40 @@ subroutine assignLoadbalancingWeight_tree(params, treeID, total_weight)
     !
     ! we just assign the same weight for all blocks
 
-    ! ! Problem: hvy_weight is a distributed dataset and not available on all procs.
-    ! ! Solution: use the slot for "refinement status" temporarily for the wheight and also
-    ! ! sync it with refinementStatusOnly
-    ! do k = 1, hvy_n(treeID)
-    !     hvyID = hvy_active(k, treeID)
-    !     call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
-    !
-    !     ! default weight
-    !     lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 10_ik
-    !
-    !     ! do n = 1, size(hvy_neighbor, 2)
-    !     !     if (hvy_neighbor(hvyID, n) /= -1_ik) then
-    !     !         ! neighbor light data id
-    !     !         lgtID_neighbor = hvy_neighbor( hvyID, n )
-    !     !         level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-    !     !         level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
-    !     !
-    !     !         if (level_neighbor < level_me) then
-    !     !             ! block affect by coarse extension
-    !     !             lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 40_ik
-    !     !             exit ! the neighbor loop
-    !     !         endif
-    !     !     endif
-    !     ! enddo
-    ! enddo
-    !
-    ! ! call synchronize_lgt_data(params, refinement_status_only=.true.)
+    ! Problem: hvy_weight is a distributed dataset and not available on all procs.
+    ! Solution: use the slot for "refinement status" temporarily for the wheight and also
+    ! sync it with refinementStatusOnly
+    do k = 1, hvy_n(treeID)
+        hvyID = hvy_active(k, treeID)
+        call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
 
-    !!!!!!!!!!!!!!!!!!!
-    do k = 1, lgt_n(treeID)
-        lgtID = lgt_active(k, treeID)
         ! default weight
         lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 10_ik
+
+        do n = 1, size(hvy_neighbor, 2)
+            if (hvy_neighbor(hvyID, n) /= -1_ik) then
+                ! neighbor light data id
+                lgtID_neighbor = hvy_neighbor( hvyID, n )
+                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+
+                if (level_neighbor < level_me) then
+                    ! block affect by coarse extension
+                    lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 20_ik
+                    exit ! the neighbor loop
+                endif
+            endif
+        enddo
     enddo
+
+    call synchronize_lgt_data(params, refinement_status_only=.true.)
+
+    !!!!!!!!!!!!!!!!!!!
+    ! do k = 1, lgt_n(treeID)
+    !     lgtID = lgt_active(k, treeID)
+    !     ! default weight
+    !     lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 10_ik
+    ! enddo
     !!!!!!!!!!!!!!!!!!!
 
     total_weight = 0_ik

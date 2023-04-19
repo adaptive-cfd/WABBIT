@@ -275,7 +275,7 @@ end subroutine get_rank_datafield
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,100041,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -392,7 +392,7 @@ end subroutine get_rank_datafield
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,100042,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -544,8 +544,6 @@ end subroutine get_rank_datafield
     integer :: error  ! error flags
 
     integer :: i, mpicode,mindim,maxdim
-    ! what follows is for the attribute "time"
-  !  integer, parameter :: arank = 1
 
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
@@ -592,7 +590,9 @@ end subroutine get_rank_datafield
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) &
     .or.(dims_global(3)/=dims_file(3)) .or.(dims_global(4)/=dims_file(4))) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      write(*,*) "dims_global=", dims_global
+      write(*,*) "dims_file=", dims_file
+      call MPI_ABORT(WABBIT_COMM, 100043, mpicode)
     endif
 
     ! Select hyperslab in the file.

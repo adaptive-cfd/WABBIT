@@ -27,7 +27,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
-    logical, parameter                  :: save_ghosts = .False.
+    logical, parameter                  :: save_ghosts = .false.
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -62,8 +62,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     if (save_ghosts) then
         allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n(tree_ID) ), stat=status)
     else
-        ! allocate(myblockbuffer( 1:Bs(1), 1:Bs(2), 1:Bs(3), 1:hvy_n(tree_ID) ), stat=status)
-        ! uniqueGrid modification:
+        ! uniqueGrid modification: we save the first ghost node in addition to the internal
+        ! points for visualization
         allocate(myblockbuffer( 1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:hvy_n(tree_ID) ), stat=status)
     endif
 
@@ -288,7 +288,7 @@ end subroutine saveHDF5_tree
 ! test is made if that is true: if the grids are different, garbage will be read.
 !
 !-------------------------------------------------------------------------------
-subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity)
+subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts)
     implicit none
 
     character(len=*), intent(in)   :: fnames(1:)      !< list of files to be read (=number of vector components)
@@ -297,6 +297,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - data are stored herein
 
     logical, intent(in), optional  :: verbosity       !< if verbosity==True generates log output
+    logical, intent(in), optional  :: synchronize_ghosts
     real(kind=rk), intent(out), optional   :: time
     integer(kind=ik), intent(out), optional   :: iteration
 
@@ -395,7 +396,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! 20200902  redundantGrid after we first abandonned the uniqueGrid
     ! 20231602  Current: uniqueGrid and with biorthogonal wavelets: equivalent to 20200408
     !
-    if (version(1) < 20231602) then
+    if ((version(1) < 20231602) .and. (version(1)>0)) then
         if (rank == 0) then
             write(*,*) "--------------------------------------------------------------------"
             write(*,*) "-----ERROR------------ERROR------------ERROR------------ERROR-------"
@@ -465,14 +466,15 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     !-----------------------------------------------------------------------------
     ! Step 2: read heavy data from files into the buffer
     !-----------------------------------------------------------------------------
-
     if ( params%dim == 3 ) then
-        allocate( hvy_buffer(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:N_files, 1:my_hvy_n) )
+        ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
+        ! important for visualization. Hence, Bs+1 points are read.
+        allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x Bsz x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
-        lbounds3D = (/0,0,0,sum(blocks_per_rank_list(0:rank-1))/)
-        ubounds3D = (/Bs(1)-1,Bs(2)-1,Bs(3)-1,lbounds3D(4)+my_hvy_n-1/)
+        lbounds3D = (/0, 0, 0, sum(blocks_per_rank_list(0:rank-1))/)
+        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+my_hvy_n-1/)
 
         ! 3D data case
         ! actual reading of file (into hvy_buffer! not hvy_work)
@@ -484,18 +486,20 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             end if
 
             call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
-            hvy_buffer(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, 1:my_hvy_n))
+            hvy_buffer(:, :, :, dF, 1:my_hvy_n))
 
             ! close file and HDF5 library
             call close_file_hdf5(file_id)
         enddo
     else
-        allocate( hvy_buffer(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1, 1:N_files, 1:my_hvy_n) )
+        ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
+        ! important for visualization. Hence, Bs+1 points are read.
+        allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x 1 x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/0,0,sum(blocks_per_rank_list(0:rank-1))/)
-        ubounds2D = (/Bs(1)-1,Bs(2)-1,lbounds2D(3)+my_hvy_n-1/)
+        ubounds2D = (/Bs(1),Bs(2),lbounds2D(3)+my_hvy_n-1/)
 
         ! 2D data case
         ! actual reading of file (into hvy_buffer! not hvy_work)
@@ -507,7 +511,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             end if
 
             call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, &
-            hvy_buffer(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, 1:my_hvy_n))
+            hvy_buffer(:, :, 1, dF, 1:my_hvy_n))
 
             ! close file and HDF5 library
             call close_file_hdf5(file_id)
@@ -530,11 +534,20 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         lgt_block(free_lgt_id, params%Jmax+IDX_REFINE_STS) = 0
         ! set number of the tree
         lgt_block(free_lgt_id, params%Jmax+IDX_TREE_ID) = tree_id
-        ! copy actual data
+        ! copy actual data (form buffer to actual data array)
         do dF = 1, N_files
-            hvy_block( :, :, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
+            if (params%dim == 3) then
+                ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
+                ! important for visualization. Hence, Bs+1 points are read.
+                hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
+            else
+                hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
+            endif
         end do
     end do
+
+    deallocate(hvy_buffer)
+    deallocate(block_treecode)
 
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
@@ -547,10 +560,13 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     call createActiveSortedLists_forest(params)
     call updateNeighbors_tree(params, tree_ID)
 
-    call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-
-    deallocate(hvy_buffer)
-    deallocate(block_treecode)
+    if (present(synchronize_ghosts)) then
+        if (synchronize_ghosts) then
+            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        endif
+    else
+        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    endif
 
     ! it is useful to print out the information on active levels in the file
     ! to get an idea how it looks like and if the desired dense level is larger
@@ -565,7 +581,7 @@ end subroutine readHDF5vct_tree
 
 !> \brief read attributes saved in a hdf5-file
 
-subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, bs, tc_length, dim, &
+subroutine read_attributes(fname, nBlocksFile, time, iteration, domain, Bs, tc_length, dim, &
     periodic_BC, symmetry_BC, verbosity)
 
     implicit none

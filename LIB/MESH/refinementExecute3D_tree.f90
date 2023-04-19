@@ -38,7 +38,10 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
     if (.not.allocated(data_predict_fine)) allocate( data_predict_fine(2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 2*(Bs(3)+2*g)-1) )
     ! the new_data field holds the interior part of the new, refined block (which
     ! will become four blocks), without the ghost nodes.
-    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 2*Bs(3), N_MAX_COMPONENTS) )
+    if (allocated(new_data)) then
+        if (size(new_data, 4) < size(hvy_block,4)) deallocate(new_data)
+    endif
+    if (.not.allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 2*Bs(3), size(hvy_block,4)) )
 
 
     ! every proc loop over its active heavy data array

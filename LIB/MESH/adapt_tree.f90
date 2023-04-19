@@ -69,11 +69,51 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call updateMetadata_tree(params, tree_ID)
     call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
+!
+! New Idea for adapt_tree:
+! avoid repeating FWT. Currently, coarseExtension performs in u-space (and returns in u-space)
+! subsequently, thresholding computes FWT AGAIN !
+! finally, merge blocks applies h_tilde filter AGAIN!
+! ====> does not work, see below.
+! ====> ignores level-wise structure of wavelets
+! ====> This was the reason for YP's first contributions, cannot filter on J-1 unless J is done 1st
+!
+! LOOP: J=Jmax:-1:Jmin
+!   1 - FWT of all blocks on level J
+!   2 - sync all FWT coeffs on level J
+!   3 - coarse extension: manipulate SC/WC but do not perform IWT
+!       This does not require coarser neighbors to have done the FWT: we WC=0 and copy SC anyways
+!   4a - thresholding on level J - set status according to WC
+!   4b - additional criteria on level J (if used, e.g., mask, everywhere etc)
+!   5 - gradedness etc (?? how does this work level-wise ???)
+!   6 - blocks finally flagged for coarsening: delete all WC
+!   7 - IWT of all blocks (even though strictly speaking after 6, we have SC for the lower levels)
+!   8 - execute coarsening (if flagging is done only on J, no modification is required)
+!   J = J-1
+! GOTO 1
+!
+! Q: can we save time of the IWT of all blocks, maybe copy SC to their positions? are they already there? I think so YES
+! Q: can we save time if a block is coarsened and we do nt have to perform coarseExtension? -
+! maybe yes but the main time in coarseExt is spent on FWT/IWT maniuplation is not that critical
+! ___ no we cant -> if coarseExt is not performed, no valid WC are available: we CANNOT KNOW before is we coarsen a block
+!
+! We can actually say that the coarseExt is part of a global FWT transform. --> we CANNOT see below.
+!
+! Note: it is wrong to think that coarsened blocks have then again zero WC
+! on the contrary. They have only zero WC if they are interpolated after removal of WC
+!
+! THIS CANNOT WORK EASILY. It ignores the pyramidal nature of wavelets. Best seen in a block that has both
+! coarse and fine neighbors. This was the reason we do not merge coarseExtension with FWT.
+!
+! Performance: the code performs level wise, but coarseExt and GhostSync are always performed for all blocks!
+!
+
     !! we iterate from the highest current level to the lowest current level and then iterate further
     !! until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
     do while (iterate)
+call balanceLoad_tree( params, hvy_block, tree_ID )
         !> (a) check where coarsening is possible
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
@@ -86,7 +126,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! on the fine block. Does nothing in the case of CDF40 or CDF20.
         t0 = MPI_Wtime()
         call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID), inputDataSynced=.true. )
+        hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.true. )
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
@@ -142,7 +182,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! final coarse extension step
     t0 = MPI_Wtime()
     call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-    hvy_n(tree_ID), inputDataSynced=.false. )
+    hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false. )
     call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)

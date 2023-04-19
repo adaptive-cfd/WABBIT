@@ -112,8 +112,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         ! even if the global eps is very large, we want the mask to be on the finest
         ! level. hence, here we set a small value (just for this call) to be sure that the
         ! mask interface is on Jmax
-        call threshold_block( params, block_mask, tmp_threshold(1:size(block_mask,4)), &
-        refinement_status_mask, nnorm2(1:size(block_mask,4)), level, eps=1.0e-4_rk )
+        call threshold_block( params, block_mask(:,:,:,1:1), tmp_threshold(1:1), &
+        refinement_status_mask, nnorm2(1:1), level, eps=1.0e-4_rk )
 
         ! refinement_status_state: -1 refinement_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0

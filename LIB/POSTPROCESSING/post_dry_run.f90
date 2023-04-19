@@ -79,12 +79,6 @@ subroutine post_dry_run
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
 
-    ! This number is the maximum number of vector components that can be syn'ced by
-    ! sync_ghosts routine
-    N_MAX_COMPONENTS = 6
-
-
-
     call get_cmd_arg( "--pruned", pruned, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
 

@@ -43,8 +43,6 @@ subroutine post_prune_tree(params)
 
     call get_command_argument(3, fname_out)
 
-    N_MAX_COMPONENTS  = 1
-
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     ! just to get some memory:

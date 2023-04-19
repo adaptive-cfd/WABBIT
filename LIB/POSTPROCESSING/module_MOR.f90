@@ -46,7 +46,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)        :: params                    
+        type (type_params), intent(inout)        :: params
         real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
         !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
@@ -173,7 +173,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)        :: params                    
+        type (type_params), intent(inout)        :: params
         real(kind=rk),  intent(inout)            :: hvy_block(:, :, :, :, :)  !> heavy data array - block data
         !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
@@ -425,8 +425,6 @@ contains
         call get_cmd_arg( "--save_all", save_all, default=.true.)
         call get_cmd_arg( "--start_from_eigenbasis", eigenbasis_files)
         call get_cmd_arg( "--components", n_components, default=1_ik)
-
-        N_MAX_COMPONENTS = n_components ! used for ghost node sync'ing (buffer allocation)
 
         !-------------------------------
         ! Set some wabbit specific params
@@ -706,8 +704,6 @@ contains
         call get_cmd_arg( "--save_all", save_all, default=.False.)
         call get_cmd_arg( "--components", n_components, default=1_ik)
         call get_cmd_arg( "--iteration", iteration, default=1_ik)
-
-        N_MAX_COMPONENTS = n_components ! used for ghost node sync'ing (buffer allocation)
 
         if ( iteration>0 ) then
             if ( params%rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration
@@ -1099,7 +1095,7 @@ contains
         implicit none
 
         !-----------------------------------------------------------------
-        type (type_params), intent(inout)   :: params                     
+        type (type_params), intent(inout)   :: params
         real(kind=rk),  intent(inout)       :: C(:,:)                     !> Covariance matrix for snapshot POD
         real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
         !> heavy temp data: needed in blockxfer which is called in add_two_trees
@@ -1242,8 +1238,6 @@ contains
         call get_cmd_arg( "--components", n_components, default=1_ik)
         call get_cmd_arg( "--iteration", iteration, default=-1_ik)
         call get_cmd_arg( "--nmodes", N_modes_used, default=1_ik)
-
-        N_MAX_COMPONENTS = n_components ! used for ghost node sync'ing (buffer allocation)
 
         if ( iteration>0 ) then
             save_all = .False.
@@ -1453,7 +1447,7 @@ contains
             implicit none
 
             !-----------------------------------------------------------------
-            type (type_params), intent(inout)   :: params                     
+            type (type_params), intent(inout)   :: params
             real(kind=rk),  intent(inout)       :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
             !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
             real(kind=rk),  intent(inout)       :: hvy_tmp(:, :, :, :, :)
@@ -1621,8 +1615,6 @@ contains
             call get_cmd_arg( "--save_all", save_all, default=.true.)
             call get_cmd_arg( "--components", n_components, default=1_ik)
             call get_cmd_arg( "--iteration", iteration, default=1)
-
-            N_MAX_COMPONENTS = n_components ! used for ghost node sync'ing (buffer allocation)
 
             if ( iteration>0 ) then
                 if ( params%rank == 0 ) write(*,*) "Iteration reconstructed: " ,iteration

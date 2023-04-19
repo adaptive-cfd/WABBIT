@@ -79,8 +79,6 @@ subroutine post_extract_slice(params)
     params%order_predictor = "multiresolution_4th"
     allocate(params%symmetry_vector_component(1:3))
     params%symmetry_vector_component(1:3) = "0"
-    ! hack to save on memory
-    N_MAX_COMPONENTS = 1
 
     allocate(treecode(1:tc_length))
 

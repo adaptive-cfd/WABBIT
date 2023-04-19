@@ -29,7 +29,6 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     use module_forestMetaData
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> Some operations change the treecodes etc and have to sync the entire array
     !> of light data. But sometimes, only the refinement status is altered: in that case
@@ -40,8 +39,8 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     integer(kind=ik) :: mpisize, mpirank, N, lgt_start, lgt_end, lgt_id, ierr, &
     buffer_size, lgt_num, buffer_start, k, R, Jmax
     ! send/receive buffer for data synchronization
-    integer(kind=ik), allocatable, save     :: my_lgt_block_recv_buffer(:,:)
-    integer(kind=ik), allocatable, save     :: proc_lgt_num(:), proc_lgt_start(:)
+    integer(kind=ik), allocatable, save :: my_lgt_block_recv_buffer(:,:)
+    integer(kind=ik), allocatable, save :: proc_lgt_num(:), proc_lgt_start(:)
     real(kind=rk) :: t0, t1
 
     t0 = MPI_wtime()

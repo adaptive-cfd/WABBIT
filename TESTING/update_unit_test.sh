@@ -46,8 +46,7 @@ echo "and that this is either a bugfix or a new feature."
 echo " Do you understand? (yes,no)"
 read understood
 
-if [ ! "$understood" == "yes" ];
-then
+if [ ! "$understood" == "yes" ]; then
     exit 4
 fi
 

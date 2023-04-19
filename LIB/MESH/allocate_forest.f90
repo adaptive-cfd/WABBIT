@@ -125,6 +125,14 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
                 if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
 
+                ! This is a hackhack. The parameter N_MAX_COMPONENTS determines how many components a vector
+                ! can have if we sync it. It is required for allocating the buffers. However, the buffers are
+                ! a worst case estimate: we assume that all MPIRANKS have to send and receive ALL of their ghost nodes
+                ! layers. This is a worst case scenario. The grid is not full, and many block-block interfaces are internal
+                ! (on the same MPIRANK) and thus do not have to be stored in the buffer. Since 06/04/2023, I change the estimate
+                ! from N_MAX_COMPONENTS to DIM. -Thomas
+                N_MAX_COMPONENTS = params%dim
+
                 ! first compute mem per block in points
                 mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
                 + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts

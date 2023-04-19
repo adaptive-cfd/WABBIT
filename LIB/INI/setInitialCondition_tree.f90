@@ -115,7 +115,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%rank==0) write(*,*) "Grid is auto-generated!"
 
             !---------------------------------------------------------------------------
-            ! Create the first mesh on the coarsest treelevel
+            ! Create the first grid as equidistant on the coarsest treelevel
             !---------------------------------------------------------------------------
             call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID )
 

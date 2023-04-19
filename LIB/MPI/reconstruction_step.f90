@@ -1,4 +1,4 @@
-subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, &
+subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
     inputDataSynced )
     implicit none
 
@@ -13,13 +13,13 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     !> list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_active(:)
     !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
+    integer(kind=ik), intent(in)        :: hvy_n, lgt_n
     ! if the input data are sync'ed we do not do it here: otherwise, call
     ! ghost nodes synchronization
     logical, intent(in) :: inputDataSynced
 
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor, Nwcl
-    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr
+    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr, nnn
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -81,6 +81,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     toBeManipulated(1:hvy_n) = .false.
 
     ! check for all blocks if they have coarser neighbors - in this case they'll be manipulated
+    ! nnn = 0
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
@@ -95,6 +96,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                 if (level_neighbor < level_me) then
                     toBeManipulated(k) = .true.
                     ! its enough if one is true
+                    ! nnn = nnn + 1
                     exit
                 endif
             endif
@@ -102,7 +104,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     end do
     call toc( "coarseExtension (toBeManipulated list)", MPI_Wtime()-t0 )
     !---------------------------------------------------------------------------
-
+    ! write(*,*) "rank", params%rank, "Nblocksforreon", nnn, hvy_n, lgt_n
 
 
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
@@ -143,6 +145,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     t0 = MPI_Wtime()
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active, hvy_n, syncSameLevelOnly1=.true. )
+    ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync) 
     call toc( "coarseExtension (sync 2)", MPI_Wtime()-t0 )
 
 

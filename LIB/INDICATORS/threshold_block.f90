@@ -98,6 +98,13 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         enddo
     endif
 
+    do p = 1, nc
+        ! Disable detail checking for qtys we do not want to consider. NOTE this
+        ! is not very efficient, as it would be better to not even compute the wavelet transform
+        ! in the first place
+        if (.not. thresholding_component(p)) detail(p) = 0.0_rk
+    enddo
+
     ! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
     ! ich schicke dir die notizen gleich (photos).
     !

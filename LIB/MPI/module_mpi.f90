@@ -55,7 +55,7 @@ module module_MPI
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
-    integer(kind=ik) :: dim = 2_ik
+    integer(kind=ik) :: dim
 
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
@@ -72,10 +72,8 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_tree
+    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_tree!, sync_ghosts_nostages
 
-!---------------------------------------------------------------------------------------------
-! main body
 
 contains
 
@@ -116,9 +114,16 @@ subroutine init_ghost_nodes( params )
 
         if (rank==0) then
             write(*,'("---------------------------------------------------------")')
-            write(*,'("                     GHOST-INIT ")')
+            write(*,'("             ╱▔▔▔▔▔▔╲ ╭━━━━━━━━━━╮")')
+            write(*,'("            ▕ ╭━╮╭━╮ ▏┃GHOST-INIT┃")')
+            write(*,'("            ▕ ┃╭╯╰╮┃ ▏╰┳━━━━━━━━━╯")')
+            write(*,'("            ▕ ╰╯╭╮╰╯ ▏ ┃ ")')
+            write(*,'("            ▕   ┃┃   ▏━╯ ")')
+            write(*,'("            ▕   ╰╯   ▏" )')
+            write(*,'("            ▕╱╲╱╲╱╲╱╲▏")')
             write(*,'("---------------------------------------------------------")')
             write(*,'("GHOSTS-INIT: We can synchronize at most N_MAX_COMPONENTS=",i2)') N_MAX_COMPONENTS
+            write(*,'("GHOSTS-INIT: g=",i2)') params%g
         endif
 
         if ( params%dim==3 ) then
@@ -137,9 +142,7 @@ subroutine init_ghost_nodes( params )
 
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
-        ! max neighbor number: 2D = 12, 3D = 56
-        ! max neighborhood size, 2D: (Bs+g+1)*(g+1)
-        ! max neighborhood size, 3D: (Bs+g+1)*(g+1)*(g+1)
+        ! max number of active neighbors: 2D = 12, 3D = 56
         dim = params%dim
         if ( dim == 3 ) then
             !---3d---3d---
@@ -162,7 +165,7 @@ subroutine init_ghost_nodes( params )
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
-        ! for all my blocks. previous versions allocated one of those per "friend"
+        ! for all my blocks
         if ( dim == 3 ) then
             buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
@@ -408,7 +411,7 @@ subroutine init_ghost_nodes( params )
             inverse_neighbor(74,3) = 68
         endif
 
-        
+
         ghost_nodes_module_ready = .true.
 
         ! this routine is not performance-critical

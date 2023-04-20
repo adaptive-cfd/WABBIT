@@ -232,24 +232,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         enddo
     end select
 
-
-
-
-    ! !---------------------------------------------------------------------------
-    ! !> force blocks on maximum refinement level to coarsen, if parameter is set
-    ! !---------------------------------------------------------------------------
-    ! ! Note this behavior can be bypassed using the ignore_maxlevel switch
-    ! if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
-    !     do k = 1, lgt_n(tree_ID)
-    !         lgtID = lgt_active(k, tree_ID)
-    !         if (lgt_block(lgtID, Jmax + IDX_MESH_LVL) == params%Jmax) then
-    !             ! force blocks on maxlevel to coarsen
-    !             lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
-    !         endif
-    !     enddo
-    ! endif
-
-
     !> after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
 

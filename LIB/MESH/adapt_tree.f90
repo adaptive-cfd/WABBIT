@@ -38,7 +38,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     integer(kind=ik)                    :: ierr, k1, hvy_id
     logical                             :: ignore_maxlevel2, iterate
     ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
-    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin, lgt_n_old
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -95,7 +95,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 ! Q: can we save time of the IWT of all blocks, maybe copy SC to their positions? are they already there? I think so YES
 ! Q: can we save time if a block is coarsened and we do nt have to perform coarseExtension? -
 ! maybe yes but the main time in coarseExt is spent on FWT/IWT maniuplation is not that critical
-! ___ no we cant -> if coarseExt is not performed, no valid WC are available: we CANNOT KNOW before is we coarsen a block
+! ___ no we cant -> if coarseExt is not performed, no valid WC are available: we CANNOT KNOW before if we coarsen a block
 !
 ! We can actually say that the coarseExt is part of a global FWT transform. --> we CANNOT see below.
 !
@@ -113,7 +113,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
     do while (iterate)
+        lgt_n_old = lgt_n(tree_ID)
 call balanceLoad_tree( params, hvy_block, tree_ID )
+
         !> (a) check where coarsening is possible
         ! ------------------------------------------------------------------------------------
         ! first: synchronize ghost nodes - thresholding on block with ghost nodes
@@ -126,7 +128,7 @@ call balanceLoad_tree( params, hvy_block, tree_ID )
         ! on the fine block. Does nothing in the case of CDF40 or CDF20.
         t0 = MPI_Wtime()
         call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.true. )
+        hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.true., level=level )
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
         !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
@@ -170,6 +172,8 @@ call balanceLoad_tree( params, hvy_block, tree_ID )
         level = level - 1
         ! loop continues until we are on the lowest level.
         iterate = (level >= Jmin)
+        ! if at Jmin_active nothing happens anymore, then we can escape the loop now.
+        if ((level <= Jmin_active).and.(lgt_n(tree_ID)==lgt_n_old)) iterate = .false.
     end do
 
     !> At this point the coarsening is done. All blocks that can be coarsened are coarsened

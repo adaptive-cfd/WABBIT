@@ -42,7 +42,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     endif
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), skipDiagonalNeighbors=.true. )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -80,7 +80,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), skipDiagonalNeighbors=.true. )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
         hvy_mask, hvy_tmp, tree_ID )
 

@@ -1,5 +1,5 @@
 subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
-    inputDataSynced )
+    inputDataSynced, level )
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -17,6 +17,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ! if the input data are sync'ed we do not do it here: otherwise, call
     ! ghost nodes synchronization
     logical, intent(in) :: inputDataSynced
+    integer(kind=ik), optional :: level
 
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor, Nwcl
     integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), Nwcr, ii, Nscl, Nscr, Nreconl, Nreconr, nnn
@@ -93,16 +94,25 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                 level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
-                if (level_neighbor < level_me) then
-                    toBeManipulated(k) = .true.
-                    ! its enough if one is true
-                    ! nnn = nnn + 1
-                    exit
+                if (present(level)) then
+                    if ((level_neighbor < level_me).and.(level_me==level)) then
+                        toBeManipulated(k) = .true.
+                        ! its enough if one is true
+                        ! nnn = nnn + 1
+                        exit
+                    endif
+                else
+                    if (level_neighbor < level_me) then
+                        toBeManipulated(k) = .true.
+                        ! its enough if one is true
+                        ! nnn = nnn + 1
+                        exit
+                    endif
                 endif
             endif
         enddo
     end do
-    call toc( "coarseExtension (toBeManipulated list)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 1 (toBeManipulated list)", MPI_Wtime()-t0 )
     !---------------------------------------------------------------------------
     ! write(*,*) "rank", params%rank, "Nblocksforreon", nnn, hvy_n, lgt_n
 
@@ -134,7 +144,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
             call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
         endif
     end do
-    call toc( "coarseExtension (FWT)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 2 (FWT)", MPI_Wtime()-t0 )
 
 
     ! 3rd we sync the decompose coefficients, but only on the same level. This is
@@ -144,9 +154,9 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ! ghost nodes on the fine bloc (WC/SC) are overwritten in the coarse-extension assumption anyways.
     t0 = MPI_Wtime()
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    hvy_active, hvy_n, syncSameLevelOnly1=.true. )
-    ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync) 
-    call toc( "coarseExtension (sync 2)", MPI_Wtime()-t0 )
+    hvy_active, hvy_n, syncSameLevelOnly=.true. )
+    ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
+    call toc( "coarseExtension 3 (sync 2)", MPI_Wtime()-t0 )
 
 
     ! routine operates on a single tree (not a forest)
@@ -295,7 +305,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
             endif
         enddo
     end do
-    call toc( "coarseExtension (manipulation loop)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 4 (manipulation loop)", MPI_Wtime()-t0 )
     ! unfortunately, the above loop affects the load balancing. in the sync_ghosts
     ! step, CPUS will be in sync again, but since they arrive at different times at this line of
     ! code, idling occurs -> bad for performance.
@@ -305,5 +315,5 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ! step altered the signal.
     t0 = MPI_Wtime()
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    call toc( "coarseExtension (sync 3)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 5 (sync 3)", MPI_Wtime()-t0 )
 end subroutine

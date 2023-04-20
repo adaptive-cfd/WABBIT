@@ -46,7 +46,7 @@ contains
         real(kind=dp), intent(in)     :: t_elapsed_this
         integer, optional, intent(in) :: call_counter
 
-        integer :: k
+        integer :: k, ierr
 
         ! check if allocate_init_debbuging was called before
         if (.not. allocated( name_comp_time)) then
@@ -80,6 +80,7 @@ contains
         endif
         comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
 
+        ! call MPI_Barrier(MPI_COMM_WORLD, ierr)
     end subroutine toc
 
 

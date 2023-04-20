@@ -255,16 +255,6 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         "lgt_block", memory_this, shape(lgt_block)
     endif
 
-    !---------------------------------------------------------------------------)
-    if (allocated(lgt_BlocksToSync)) deallocate(lgt_BlocksToSync)
-    allocate( lgt_BlocksToSync( number_procs*params%number_blocks) )
-    memory_this = 0.0
-    memory_total = memory_total + memory_this
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
-        "lgt_BlocksToSync", memory_this, shape(lgt_BlocksToSync)
-    endif
-
     !---------------------------------------------------------------------------
     if (allocated(lgt_sortednumlist)) deallocate(lgt_sortednumlist)
     allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )

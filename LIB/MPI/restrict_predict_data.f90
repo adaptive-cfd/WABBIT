@@ -15,14 +15,13 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)                    :: hvy_id
+    integer(kind=ik) :: s(1:4)
 
     ! some neighborhoods are intrinsically on the same level (level_diff=0)
     ! and thus it makes no sense to call the up/downsampling routine for those
     if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
     if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
 
-    !---------------------------------------------------------------------------------------------
-    ! main body
 
     if ( level_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
@@ -51,35 +50,39 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)    :: hvy_id
 
-    ! local variables
-    integer(kind=ik)                :: ix, iy, iz, dF, nc
-    real(kind=rk), allocatable, save :: tmp_block(:,:,:,:)
+    integer(kind=ik)                :: ix, iy, iz, dF, nc, nx, ny, nz
 
+    nx = size(hvy_block,1)
+    ny = size(hvy_block,2)
+    nz = size(hvy_block,3)
     nc = size(hvy_block,4)
-
-    if (allocated(tmp_block)) then
-        if (size(tmp_block,4)<nc) deallocate(tmp_block)
-    endif
-    if (.not.allocated(tmp_block)) allocate(tmp_block(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4) ))
 
 #ifdef DEV
     if (.not. allocated(params%HD)) call abort(230301051, "Pirates! Maybe setup_wavelet was not called?")
 #endif
 
-    call blockFilterXYZ_interior_vct( hvy_block(:,:,:,:,hvy_id), tmp_block(:,:,:,1:nc), params%HD, &
-    lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%g)
+    ! applying the filter is expensive, and we therefor apply it only once to the entire
+    ! block. Result is stored in a large work array. Note we could try to optimize this
+    ! by applying the filter only in the required patch.
+    ! Pro: we maybe save a bi of CPU time, as we usually do not need the entire block filtered
+    ! Con: more work and maybe we compute some values twice (if patches overlap)
+    if (.not. isFiltered(hvy_id)) then
+        call blockFilterXYZ_interior_vct( params, hvy_block(:,:,:,:,hvy_id), hvy_filtered(:,:,:,:,hvy_id), params%HD, &
+        lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%g)
 
-    ! tmp_block = hvy_block(:,:,:,:,hvy_id)
+        isFiltered(hvy_id) = .true.
+    endif
 
-    do dF = 1, size(hvy_block,4)
+    do dF = 1, nc
         do iz = ijk(1,3), ijk(2,3), 2
             do iy = ijk(1,2), ijk(2,2), 2
                 do ix = ijk(1,1), ijk(2,1), 2
 
                     ! write restricted (downsampled) data
                     res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
-                    = tmp_block( ix, iy, iz, dF )
-
+                    = hvy_filtered( ix, iy, iz, dF, hvy_id )
+                    ! res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
+                    ! = hvy_block( ix, iy, iz, dF, hvy_id )
                 end do
             end do
         end do
@@ -99,12 +102,10 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)                    :: hvy_id
 
-    ! local variables
-    integer(kind=ik)                                :: dF, nx, ny, nz
-    integer(kind=ik)                                :: NdF
+    integer(kind=ik) :: dF, nx, ny, nz, nc
 
 
-    NdF = size(hvy_block,4)
+    nc = size(hvy_block,4)
 
     ! data size
     nx = ijk(2,1) - ijk(1,1) + 1
@@ -115,19 +116,19 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
 
     if ( params%dim == 3 ) then      ! 3D
 
-        do dF = 1, NdF
+        do dF = 1, nc
             call prediction_3D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), &
             ijk(1,3):ijk(2,3), dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1:2*nz-1, dF), &
             params%order_predictor)
         end do
 
     else      ! 2D
-        do dF = 1, NdF
+        do dF = 1, nc
             call prediction_2D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2),&
             1, dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1, dF),  params%order_predictor)
         end do
 
-    end if !3d/2D
+    end if
 end subroutine predict_data
 
 

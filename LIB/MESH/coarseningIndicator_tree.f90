@@ -1,5 +1,5 @@
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
+    hvy_details, tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
 
     use module_indicators
 
@@ -20,6 +20,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
+
+    real(kind=rk), intent(inout) :: hvy_details(:,:)
 
     ! for the mask generation (time-independent mask) we require the mask on the highest
     ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
@@ -222,11 +224,11 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 if (params%threshold_mask .and. present(hvy_mask)) then
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID), hvy_mask(:,:,:,:,hvyID))
                 else
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level)
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID))
                 endif
             endif
         enddo

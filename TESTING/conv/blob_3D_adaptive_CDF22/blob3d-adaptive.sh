@@ -4,16 +4,19 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/acm/acm_cyl_adaptive/"
-params=${dir}"acm_test.ini"
+##########################################
+dir=TESTING/conv/blob_3D_adaptive_CDF22/
+params=${dir}"blob3d.ini"
+##########################################
+
+
 happy=0
 sad=0
-echo "testing artificial compressibility"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p mask vor)
-# list of possible times (no need to actually have them)
-times=(000000000000 000000002000)
+prefixes=(phi)
+# list of possible times
+times=(000000000000 000000070477)
 
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}
@@ -36,7 +39,7 @@ do
     reffile=${dir}${p}"_"${t}".ref"
 
     if [ -f $file ]; then
-        # get four characteristic values describing the field
+        # get 7 characteristic values describing the field
         ${mpi_serial} ./wabbit-post --keyvalues ${file}
         # and compare them to the ones stored
         if [ -f $reffile ]; then

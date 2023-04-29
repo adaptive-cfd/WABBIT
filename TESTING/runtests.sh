@@ -39,6 +39,7 @@ tests=( "---post---"
         "TESTING/conv/blob_3D_equi_2nd/blob3d.sh"
         "TESTING/conv/blob_3D_equi_4th/blob3d.sh"
         "TESTING/conv/blob_3D_adaptive_CDF40/blob3d-adaptive.sh"
+        "TESTING/conv/blob_3D_adaptive_CDF22/blob3d-adaptive.sh"
         "TESTING/conv/blob_3D_adaptive_CDF44/blob3d-adaptive.sh"
         # "TESTING/conv/blob_3D_nonequi/blob3d.sh"
         # "TESTING/conv/symmetry-blob-2d/symmetry-blob-2d.sh"
@@ -56,7 +57,8 @@ tests=( "---post---"
         # "TESTING/navier_stokes/filter/explicit_7pt/explicit_7pt.sh"
         # "TESTING/navier_stokes/filter/explicit_9pt/explicit_9pt.sh"
         # "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"
-        # "---acm---"
+        "---acm---"
+        "TESTING/acm/acm_cyl_adaptive_CDF44/run.sh"
         # "TESTING/acm/fruitfly_adaptive/fruitfly_adaptive.sh"
         # "TESTING/acm/bumblebee_adaptive/bumblebee_adaptive.sh"
         # "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
@@ -64,7 +66,6 @@ tests=( "---post---"
         # "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cyl_adaptive_newsponge.sh"
         # "TESTING/acm/acm_cyl_adaptive_krylov/acm_cylinder_adaptive_krylov.sh"
         # "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
-        # "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive_zcurve.sh"
         )
 
 happy_sum=0
@@ -100,10 +101,11 @@ do
         # run the actual test
         T2="$(date +%s)"
         ./${ts} > $logfile
+        err="$?"
         T2="$(($(date +%s)-T2))"
         echo "Time used in test: ${T2} seconds"
 
-        if [ $? == 0 ]; then
+        if [ $err == 0 ]; then
             printf "%s \n" "${pass_color} pass ${end_color}"
             happy_sum=$((happy_sum+1))
             summary[$numtests]=0

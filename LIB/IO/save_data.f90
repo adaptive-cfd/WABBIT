@@ -33,8 +33,6 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
     n_domain = 0
 
-    ! save initial condition to disk (unless we're reading from file and do not adapt,
-    ! in which case this makes no sense)
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 

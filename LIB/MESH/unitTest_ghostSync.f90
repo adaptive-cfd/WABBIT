@@ -9,19 +9,19 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)            :: tree_ID
 
-    integer(kind=ik)                        :: k, l, lgt_id, hvy_id       ! loop variables
-    integer(kind=ik)                        :: rank, number_procs         ! process rank
-    real(kind=rk)                           :: ddx(1:3), xx0(1:3)         ! spacing
-    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz   ! grid parameter
+    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
+    integer(kind=ik)                        :: rank, number_procs
+    real(kind=rk)                           :: ddx(1:3), xx0(1:3)
+    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk)                           :: Lx, Ly, Lz, x, y, z
-    integer(kind=ik)                        :: d,  max_neighbors          ! data dimensionality
-    real(kind=rk)                           :: frequ(1:6)                 ! frequency of sin functions for testing:
+    integer(kind=ik)                        :: d,  max_neighbors
+    real(kind=rk)                           :: frequ(1:6)
     integer(kind=ik)                        :: ifrequ
 
     ! error variable
-    real(kind=rk)                           :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty
-    integer(kind=ik)                        :: ierr                       ! MPI error variable
+    real(kind=rk)                           :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty, t0
+    integer(kind=ik)                        :: ierr, ii
     logical                                 :: test
 
     rank = params%rank

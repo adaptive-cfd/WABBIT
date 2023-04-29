@@ -20,11 +20,12 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     integer :: M_max ! M is M_krylov number of subspace
     real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
     integer :: M_iter
-    integer :: i, j, k, l, iter
+    integer :: i, j, k, l, iter, grhs
     real(kind=rk) :: normv, eps, beta, err_tolerance
     real(kind=rk) :: h_klein, err, t0
 
     M_max = params%M_krylov
+    grhs = params%g_rhs
 
     ! allocate matrices with largest admissible
     if (.not. allocated(H)) then
@@ -42,7 +43,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     endif
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), skipDiagonalNeighbors=.true. )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -80,7 +81,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), skipDiagonalNeighbors=.true. )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs  )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
         hvy_mask, hvy_tmp, tree_ID )
 

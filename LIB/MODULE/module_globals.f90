@@ -45,7 +45,7 @@ module module_globals
     end interface
 
     interface areArraysSameSize
-        module procedure areArraysSameSize_1d, areArraysSameSize_2d, areArraysSameSize_3d, areArraysSameSize_4d
+        module procedure areArraysSameSize_1d, areArraysSameSize_2d, areArraysSameSize_3d, areArraysSameSize_4d, areArraysSameSize_5d
     end interface
 
 
@@ -80,7 +80,17 @@ module module_globals
             real(kind=rk),dimension(1:,1:,1:,1:),intent(in) :: a,b
             logical :: areArraysSameSize_4d
 
-            areArraysSameSize_4d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2)).and.(size(a,3)==size(b,3)).and.(size(a,4)==size(b,4))
+            areArraysSameSize_4d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2)).and.(size(a,3)==size(b,3))&
+            .and.(size(a,4)==size(b,4))
+        end function
+
+        function areArraysSameSize_5d(a,b)
+            implicit none
+            real(kind=rk),dimension(1:,1:,1:,1:,1:),intent(in) :: a,b
+            logical :: areArraysSameSize_5d
+
+            areArraysSameSize_5d = (size(a,1)==size(b,1)).and.(size(a,2)==size(b,2)).and.(size(a,3)==size(b,3))&
+            .and.(size(a,4)==size(b,4)).and.(size(a,5)==size(b,5))
         end function
 
 

@@ -59,7 +59,7 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
-    character(len=cshort)               :: filename
+    character(len=clong)               :: filename
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
@@ -345,9 +345,6 @@ program main
         ! Write fields to HDF5 file
         !***********************************************************************
         if (it_is_time_to_save_data) then
-            ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
@@ -425,14 +422,6 @@ program main
 
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
-        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
-        ! filter before write out
-        if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
-        end if
-
         ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.

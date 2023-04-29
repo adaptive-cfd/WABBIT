@@ -38,7 +38,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     integer(kind=ik)                    :: ierr, k1, hvy_id
     logical                             :: ignore_maxlevel2, iterate
     ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
-    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin, lgt_n_old
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, Jmin, lgt_n_old, g_this
+    real(kind=rk), allocatable, save    :: hvy_details(:,:)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -46,13 +47,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-
-    ! start time
-    t0 = MPI_Wtime()
-    t1 = t0
-    iteration = 0
-    iterate   = .true.
-    Jmin      = params%Jmin
+    t0          = MPI_Wtime()
+    t1          = t0
+    iteration   = 0
+    iterate     = .true.
+    Jmin        = params%Jmin
     Jmin_active = minActiveLevel_tree(tree_ID)
     Jmax_active = maxActiveLevel_tree(tree_ID)
     level       = Jmax_active ! algorithm starts on maximum *active* level
@@ -62,6 +61,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     else
         ignore_maxlevel2 = .false.
     endif
+
+    if (allocated(hvy_details)) then
+        if (size(hvy_details,1)>size(hvy_block,4)) deallocate(hvy_details)
+    endif
+    if (.not.allocated(hvy_details)) then
+        allocate(hvy_details(1:size(hvy_block,4), 1:params%number_blocks))
+    endif
+    do k = 1, hvy_n(tree_ID)
+        hvy_details(:, hvy_active(k, tree_ID)) = -1.0_rk
+    enddo
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
@@ -108,55 +117,56 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 ! Performance: the code performs level wise, but coarseExt and GhostSync are always performed for all blocks!
 !
 
-    !! we iterate from the highest current level to the lowest current level and then iterate further
-    !! until the number of blocks is constant (note: as only coarsening
-    !! is done here, no new blocks arise that could compromise the number of blocks -
-    !! if it's constant, its because no more blocks are coarsened)
+    ! we iterate from the highest current level to the lowest current level and then iterate further
+    ! until the number of blocks is constant (note: as only coarsening
+    ! is done here, no new blocks arise that could compromise the number of blocks -
+    ! if it's constant, its because no more blocks are coarsened)
     do while (iterate)
         lgt_n_old = lgt_n(tree_ID)
-call balanceLoad_tree( params, hvy_block, tree_ID )
 
-        !> (a) check where coarsening is possible
-        ! ------------------------------------------------------------------------------------
-        ! first: synchronize ghost nodes - thresholding on block with ghost nodes
-        ! synchronize ghostnodes, grid has changed, not in the first one, but in later loops
+        ! this call turned out useful for biorthogonal wavelets - the coarse extension deteriorates
+        ! the loadbalancing substantially, thus the best balancing possible is advised
+        call balanceLoad_tree( params, hvy_block, tree_ID )
+
+        ! synchronize ghost nodes - required to apply wavelet filters
         t0 = MPI_Wtime()
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
+        g_this = max(ubound(params%HD,1),ubound(params%GD,1))
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
         ! coarse extension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF40 or CDF20.
         t0 = MPI_Wtime()
         call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.true., level=level )
+        hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
-        !! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
-        !! acts on a single block only
+        ! calculate detail on the entire grid. Note this is a wrapper for coarseningIndicator_block, which
+        ! acts on a single block only
         t0 = MPI_Wtime()
         if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, hvy_details, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
         else
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2)
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, hvy_details, tree_ID, indicator, iteration, ignore_maxlevel2)
         endif
         call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
 
 
-        !> (b) check if block has reached maximal level, if so, remove refinement flags
+        ! check if block has reached maximal level, if so, remove refinement flags
         t0 = MPI_Wtime()
         if (ignore_maxlevel2 .eqv. .false.) then
             call respectJmaxJmin_tree( params, tree_ID )
         endif
         call toc( "adapt_tree (respectJmaxJmin_tree)", MPI_Wtime()-t0 )
 
-        !> (c) unmark blocks that cannot be coarsened due to gradedness and completeness
+        ! unmark blocks that cannot be coarsened due to gradedness and completeness
         t0 = MPI_Wtime()
         call ensureGradedness_tree( params, tree_ID )
         call toc( "adapt_tree (ensureGradedness_tree)", MPI_Wtime()-t0 )
 
-        !> (d) adapt the mesh, i.e. actually merge blocks
+        ! adapt the mesh, i.e. actually merge blocks
         ! this applies the wavelet low-pass filter as well (h*h) before decimation
         t0 = MPI_Wtime()
         call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
@@ -176,9 +186,9 @@ call balanceLoad_tree( params, hvy_block, tree_ID )
         if ((level <= Jmin_active).and.(lgt_n(tree_ID)==lgt_n_old)) iterate = .false.
     end do
 
-    !> At this point the coarsening is done. All blocks that can be coarsened are coarsened
-    !! they may have passed several level also. Now, the distribution of blocks may no longer
-    !! be balanced, so we have to balance load now
+    ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
+    ! they may have passed several level also. Now, the distribution of blocks may no longer
+    ! be balanced, so we have to balance load now
     t0 = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )

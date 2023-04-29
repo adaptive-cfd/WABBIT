@@ -14,7 +14,7 @@ program main_post
     integer(kind=ik)                    :: number_procs           ! number of processes
     type (type_params)                  :: params
     character(len=cshort)               :: mode
-    character(len=cshort)               :: filename, key1, key2
+    character(len=clong)                :: filename, key1, key2
     real(kind=rk)                       :: elapsed_time
 
     call MPI_Init(ierr)                                           ! init mpi
@@ -47,6 +47,9 @@ program main_post
     select case(mode)
     case ("--extract-slice")
         call post_extract_slice(params)
+
+    case ("--wavelet-vs-rhs")
+        call waveletVsRHS_timingTest(params)
 
     case ("--dump-neighbors")
         call post_dump_neighbors(params)

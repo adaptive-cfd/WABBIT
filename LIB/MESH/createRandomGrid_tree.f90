@@ -27,7 +27,6 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     ! the grid is modified
     call createEquidistantGrid_tree( params, 2, .true., tree_ID=tree_ID )
 
-    !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, iterations
         if (params%rank==0 .and. verbosity) then
@@ -51,4 +50,6 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
         maxActiveLevel_tree(tree_ID), &
         dble(lgt_n(tree_ID)) / dble(size(lgt_block, 1)), params%max_grid_density
     endif
+
+    call balanceLoad_tree( params, hvy_block, tree_ID)
 end subroutine createRandomGrid_tree

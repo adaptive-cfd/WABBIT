@@ -22,13 +22,18 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     end if
 
     Bs = params%Bs
-    g = params%g
+    g  = params%g
     nc = params%n_eqn
 
     allocate(norm(1:params%n_eqn))
     allocate(norm_ref(1:params%n_eqn))
 
     if (params%Jmax<2) then
+        if (params%rank==0) write(*,*) "Test cannot be performed because of level restrictions: params%jmax=", params%jmax
+        return
+    endif
+
+    if (params%Jmax==params%Jmin) then
         if (params%rank==0) write(*,*) "Test cannot be performed because of level restrictions: params%jmax=", params%jmax
         return
     endif
@@ -81,7 +86,7 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     ! we compare norms - this is not the most elegant way, but it'll do the trick for now.
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
-    norm = norm / norm_ref - 1.0_rk
+    norm = abs(norm / norm_ref - 1.0_rk)
 
     if (params%rank==0) write(*,*) "Relative L2 error in Coarsen(Refine(u)) is: ", norm
 

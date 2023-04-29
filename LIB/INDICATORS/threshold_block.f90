@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, eps )
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, detail_precomputed, eps )
     implicit none
 
     !> user defined parameter structure
@@ -18,6 +18,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! if different from the default eps (params%eps), you can pass a different value here. This is optional
     ! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
+    real(kind=rk), intent(inout)        :: detail_precomputed(:)
 
     integer(kind=ik)                    :: dF, i, j, l, p
     real(kind=rk)                       :: detail( size(u,4) )
@@ -42,15 +43,15 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
-    t0 = MPI_Wtime()
-    nx = size(u, 1)
-    ny = size(u, 2)
-    nz = size(u, 3)
-    nc = size(u, 4)
-    Bs = params%Bs
-    g  = params%g
-    dim = params%dim
-    Jmax = params%Jmax
+    t0     = MPI_Wtime()
+    nx     = size(u, 1)
+    ny     = size(u, 2)
+    nz     = size(u, 3)
+    nc     = size(u, 4)
+    Bs     = params%Bs
+    g      = params%g
+    dim    = params%dim
+    Jmax   = params%Jmax
     detail = -1.0_rk
 
     if (allocated(u_wc)) then
@@ -70,36 +71,46 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
 #endif
 
-    ! perform the wavlet decomposition of the block
-    ! Note we could not reonstruct here, because the neighboring WC/SC are not
-    ! synced. However, here, we only check the details on a block, so there is no
-    ! need for reconstruction.
-    u_wc = u
-    call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
+    ! no precomputed detail available, compute it here.
+    if (detail_precomputed(1) < -0.1_rk) then
+        ! write(*,*) "recomputing"
+        ! perform the wavlet decomposition of the block
+        ! Note we could not reonstruct here, because the neighboring WC/SC are not
+        ! synced. However, here, we only check the details on a block, so there is no
+        ! need for reconstruction.
+        u_wc = u
+        call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
 
-    ! NOTE: if the coarse reconstruction is performed before this routine is called, then
-    ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
-    ! them again. -> checked in postprocessing that this is indeed the case.
-    call spaghetti2inflatedMallat_block(params, u_wc, wc)
+        ! NOTE: if the coarse reconstruction is performed before this routine is called, then
+        ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
+        ! them again. -> checked in postprocessing that this is indeed the case.
+        call spaghetti2inflatedMallat_block(params, u_wc, wc)
 
-    if (params%dim == 2) then
-        do p = 1, nc
-            ! if all details are smaller than C_eps, we can coarsen.
-            ! check interior WC only
-            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-            detail(p) = detail(p) / norm(p)
-        enddo
+        if (params%dim == 2) then
+            do p = 1, nc
+                ! if all details are smaller than C_eps, we can coarsen.
+                ! check interior WC only
+                detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+                detail(p) = detail(p) / norm(p)
+            enddo
+        else
+            do p = 1, nc
+                ! if all details are smaller than C_eps, we can coarsen.
+                ! check interior WC only
+                detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+                detail(p) = detail(p) / norm(p)
+            enddo
+        endif
     else
+        ! detail is precomputed in coarseExtensionUpdate_tree (because we compute
+        ! the FWT there anyways)
         do p = 1, nc
-            ! if all details are smaller than C_eps, we can coarsen.
-            ! check interior WC only
-            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-            detail(p) = detail(p) / norm(p)
+            detail(p) = detail_precomputed(p) / norm(p)
         enddo
     endif
 
     do p = 1, nc
-        ! Disable detail checking for qtys we do not want to consider. NOTE this
+        ! Disable detail checking for qtys we do not want to consider. NOTE FIXME this
         ! is not very efficient, as it would be better to not even compute the wavelet transform
         ! in the first place
         if (.not. thresholding_component(p)) detail(p) = 0.0_rk

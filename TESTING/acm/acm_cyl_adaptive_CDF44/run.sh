@@ -4,16 +4,15 @@
 # This file contains one specific unit test, and it is called by unittest.sh
 #-------------------------------------------------------------------------------
 # what parameter file
-dir="./TESTING/acm/acm_cyl_adaptive/"
-params=${dir}"acm_test_zcurve.ini"
+dir="./TESTING/acm/acm_cyl_adaptive_CDF44/"
+params=${dir}"PARAMS_cyl.ini"
 happy=0
 sad=0
-echo "testing artificial compressibility"
 
 # list of prefixes the test generates
-prefixes=(Ux Uy p mask vor)
-# list of possible times (no need to actually have them)
-times=(000000000000 000000002000)
+prefixes=(ux uy p mask)
+# list of possible times
+times=(000000000000 000000025000 000000050000 000000075000 000000100000)
 
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}

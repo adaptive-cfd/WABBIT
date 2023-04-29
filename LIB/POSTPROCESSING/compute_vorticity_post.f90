@@ -283,9 +283,12 @@ subroutine wavelet_test(params)
         return
     endif
 
+    !!!!!!!!!!!!!!!!!!!!!!
+    ! yes works in 2D or 3D
     params%dim = 3
+    !!!!!!!!!!!!!!!!!!!!!
     params%wavelet = "CDF44"
-    params%g = 7_ik
+    params%g = 7
     params%Bs = 32
     params%n_eqn = 1
     params%domain_size=1.0_rk
@@ -304,68 +307,6 @@ subroutine wavelet_test(params)
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
     call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID=1)
-
-    ! call createEquidistantGrid_tree( params, 1, .true., tree_ID )
-    !
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     if (params%dim == 3) then
-    !         do ic = 1, params%n_eqn
-    !             do iz = g+1, Bs(3)+g
-    !                 do iy = g+1, Bs(2)+g
-    !                     do ix = g+1, Bs(1)+g
-    !                         hvy_block(ix,iy,iz,ic,hvyID) = rand_nbr()
-    !                     end do
-    !                 end do
-    !             end do
-    !         end do
-    !     else
-    !         do ic = 1, params%n_eqn
-    !             do iy = g+1, Bs(2)+g
-    !                 do ix = g+1, Bs(1)+g
-    !                     hvy_block(ix,iy,:,ic,hvyID) = rand_nbr()
-    !                 end do
-    !             end do
-    !         end do
-    !     endif
-    ! end do
-    !
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    !
-    ! call saveHDF5_tree("3dtest_771.h5", 771.0_rk, iteration, 1, params, hvy_block, tree_ID )
-    !
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-    ! end do
-    !
-    !
-    ! allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:size(hvy_block,4), 1:8 ))
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-    !
-    !     wc(:,:,:,:,1) = 0.0_rk ! delete SC
-    !     wc(:,:,:,:,2:7) = 0.0_rk ! delete WC
-    !
-    !     call mallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
-    ! end do
-    ! deallocate(wc)
-    !
-    !
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    !
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvyID))
-    ! end do
-    !
-    ! call saveHDF5_tree("3dtest_772.h5", 772.0_rk, iteration, 1, params, hvy_block, tree_ID )
-
-    !
-    ! part II: coarse extension, exact solution
-    !
-
     call reset_tree(params, .true., tree_ID)
 
     call createEquidistantGrid_tree( params, 3, .true., tree_ID )
@@ -411,45 +352,39 @@ subroutine wavelet_test(params)
     end do
 
     call ensureGradedness_tree( params, tree_ID )
-
     call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
     call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
-
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-
     call saveHDF5_tree("3dtest_774.h5", 774.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
     call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
-
     call saveHDF5_tree("3dtest_775.h5", 775.0_rk, iteration, 1, params, hvy_block, tree_ID )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    ! flag for coarsening
-    do k = 1, lgt_n(tree_ID)
-        lgtID = lgt_active(k, tree_ID)
-        ! keep a single block ( which will be 8 blocks due to completeness)
-        coarsen = .not. ( (lgt_block(lgtID,1)==0).and.(lgt_block(lgtID,2)==0).and.(lgt_block(lgtID,3)==0) )
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k,tree_ID)
+        hvy_tmp(:,:,:,:,hvyID) = hvy_block(:,:,:,:,hvyID)
+    enddo
 
-        if (coarsen) then
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = -1
-        else
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = 0
-        endif
-    end do
-
-    call ensureGradedness_tree( params, tree_ID )
-
-    call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
-    call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
+    do k = 1, 10
+        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
+        hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
+    enddo
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
+    write(*,*) "After a second coarse extension, the solution (output block-wise) changed:"
+
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k,tree_ID)
+        hvy_block(:,:,:,:,hvyID) = abs(hvy_block(:,:,:,:,hvyID) - hvy_tmp(:,:,:,:,hvyID))
+        ! write(*,*) maxval( hvy_block(g+1:Bs(1)+g,g+1:Bs(1)+g,g+1:Bs(1)+g,:,hvyID) )
+        write(*,*) maxval( hvy_block(:,:,:,:,hvyID) )
+    enddo
+
     call saveHDF5_tree("3dtest_776.h5", 776.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
-    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
-
-    call saveHDF5_tree("3dtest_777.h5", 777.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
 end subroutine
 
@@ -757,9 +692,9 @@ subroutine wavelet_test_coarsening(params)
 
 
     params%Bs = 32
-    params%Jmax = 5
+    params%Jmax = 3
     Jmax = params%Jmax
-    params%dim = 2
+    params%dim = 3
     params%domain_size = (/1.0_rk, 1.0_rk, 1.0_rk/)
     params%n_eqn = 2
     allocate(params%butcher_tableau(1,1))
@@ -1088,4 +1023,81 @@ enddo
 
 
 
+end subroutine
+
+
+
+
+subroutine waveletVsRHS_timingTest(params)
+    use module_globals
+    use module_mesh
+    use module_params
+    use module_mpi
+    use module_operators
+    use module_forestMetaData
+    use module_time_step
+
+    implicit none
+
+    !> parameter struct
+    type (type_params), intent(inout)  :: params
+    character(len=cshort)              :: filename
+    real(kind=rk)                      :: time, x, y, t0
+    integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g, ix,iy,iz, ic
+    integer(kind=ik), dimension(3)     :: Bs
+    character(len=2)                   :: order
+
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
+    real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
+    integer(kind=ik)                   :: tree_ID=1, hvyID, dim
+
+    character(len=cshort)              :: fname
+    real(kind=rk), dimension(3)        :: dx, x0
+    integer(hid_t)                     :: file_id
+    real(kind=rk), dimension(3)        :: domain
+    integer(kind=ik)                   :: nwork, ii, hvy_ID
+    real(kind=rk), allocatable :: wc(:,:,:,:,:)
+    logical :: coarsen
+
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
+
+    Bs = params%Bs
+    g  = params%g
+
+    call get_command_argument( 2, filename )
+    ! read ini-file and save parameters in struct
+    call ini_file_to_params( params, filename )
+    call setup_wavelet(params)
+    ! have the pysics module read their own parameters
+    call init_physics_modules( params, filename, params%N_mask_components )
+
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work, nrhs_slots1=1)
+
+    ! N_MAX_COMPONENTS = 4
+    params%max_grid_density = 0.10_rk
+    ! The ghost nodes will call their own setup on the first call, but for cleaner output
+    ! we can also just do it now.
+    call init_ghost_nodes( params )
+
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., 4, tree_ID )
+
+
+    t0 = MPI_wtime()
+    do k = 1, 100
+        call RHS_wrapper(0.0_rk, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID)
+    enddo
+    write(*,*) "rhs", MPI_wtime()-t0
+
+    t0 = MPI_wtime()
+    do ii = 1, 100
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+            call WaveDecomposition_dim1( params, hvy_block(:,:,:,:,hvy_id) )
+            call WaveReconstruction_dim1( params, hvy_block(:,:,:,:,hvy_id) )
+        enddo
+    enddo
+    write(*,*) "wavelet", MPI_wtime()-t0
 end subroutine

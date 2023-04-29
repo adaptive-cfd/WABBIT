@@ -79,8 +79,6 @@ contains
             comp_time(k, 1)   =  comp_time(k, 1) + 1.0_dp
         endif
         comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
-
-        ! call MPI_Barrier(MPI_COMM_WORLD, ierr)
     end subroutine toc
 
 

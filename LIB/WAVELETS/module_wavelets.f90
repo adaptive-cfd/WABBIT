@@ -378,7 +378,7 @@ contains
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+        if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
             u_filtered = u
             return
         endif
@@ -454,7 +454,7 @@ contains
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+        if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
             u_filtered = u
             return
         endif
@@ -532,7 +532,7 @@ contains
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+        if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
             u_filtered = u
             return
         endif
@@ -588,7 +588,7 @@ contains
     ! apply the filter only inside the block, where the filter coefficients are
     ! not reaching into the ghost nodes layer.
     ! Here, interior == a subset of the blocks interior values, so that the filter is
-    ! applied without using the ghost nodes at al. NOT the interior of the block (g+1):(Bs+g)
+    ! applied without using the ghost nodes at all. NOT the interior of the block (g+1):(Bs+g)
     !
     ! g g g g g g g g g g g          g g g g g g g g g g g
     ! g g g g g g g g g g g          g g g g g g g g g g g
@@ -600,8 +600,9 @@ contains
     ! g g g g g g g g g g g          g g g g g g g g g g g
     ! g g g g g g g g g g g          g g g g g g g g g g g
     ! Fig1: g= ghost i=internal      Fig2: f=filtered
-    subroutine blockFilterXYZ_interior_vct( u, u_filtered, coefs_filter, a, b, g)
+    subroutine blockFilterXYZ_interior_vct(params, u, u_filtered, coefs_filter, a, b, g)
         implicit none
+        type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
         integer(kind=ik) :: a, b, g
@@ -611,7 +612,7 @@ contains
 
         ! if the filter is just 1, then we copy and we're done.
         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-        if (a==0 .and. b==0 .and. coefs_filter(0)==1.0_rk) then
+        if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
             u_filtered = u
             return
         endif
@@ -627,6 +628,13 @@ contains
         if (.not.allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
         u_tmp = u
 
+!---
+        ! call blockFilterXYZ_wherePossible_vct( params, u, u_filtered, coefs_filter, a, b)
+        !
+        ! u_tmp( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :) = u_filtered( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :)
+        ! u_filtered = u_tmp
+!---
+
         u_filtered = u_tmp
         u_filtered(-a+1+g:nx-b-g, :, :, :) = 0.0_rk
         do ix = -a+1+g, nx-b-g
@@ -636,7 +644,6 @@ contains
         enddo
 
         u_tmp = u_filtered
-        u_filtered = u_tmp
         u_filtered(:, -a+1+g:ny-b-g, :, :) = 0.0_rk
         do iy = -a+1+g, ny-b-g
             do shift = a, b
@@ -648,7 +655,6 @@ contains
         if (nz == 1) return
 
         u_tmp = u_filtered
-        u_filtered = u_tmp
         u_filtered(:, :, -a+1+g:nz-b-g, :) = 0.0_rk
         do iz = -a+1+g, nz-b-g
             do shift = a, b
@@ -1764,7 +1770,7 @@ contains
             endif
 
         case default
-            call abort( 3006221, "Unkown biorothonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
 
         end select
 

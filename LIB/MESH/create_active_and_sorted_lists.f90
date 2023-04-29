@@ -12,7 +12,7 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -46,7 +46,6 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
 
     if (lgt_n(tree_ID)<=0) lgt_n(tree_ID) = size(lgt_active, 1)
     if (hvy_n(tree_ID)<=0) hvy_n(tree_ID) = size(hvy_active, 1)
-
 
     ! reset the active lists
     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
@@ -130,7 +129,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -171,7 +170,6 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     if (lgt_n(tree_ID)<=0) lgt_n(tree_ID) = size(lgt_active, 1)
     if (hvy_n(tree_ID)<=0) hvy_n(tree_ID) = size(hvy_active, 1)
-
 
     ! reset the active lists
     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
@@ -259,7 +257,7 @@ subroutine createActiveSortedLists_tree_old( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -367,7 +365,7 @@ subroutine createActiveSortedLists_forest_comm( params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params    !< user defined parameter structure
+    type (type_params), intent(in) :: params
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, hvy_id, block_rank, fsize
@@ -529,7 +527,7 @@ subroutine createActiveSortedLists_forest(params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params    !< user defined parameter structure
+    type (type_params), intent(in) :: params
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, heavy_id, block_rank, fsize

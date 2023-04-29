@@ -93,8 +93,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level. Note that those blocks have
-    !! the status +11
+    !! except if they are already on the highest level.
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
         call refinementExecute3D_tree( params, hvy_block, tree_ID )

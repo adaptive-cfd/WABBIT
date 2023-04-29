@@ -18,7 +18,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(in)      :: params                       !> user defined parameter structure, hvy_active
-    real(kind=rk), intent(inout)        :: hvy_rhs(:, :, :, :, :)       !> heavy work data array - block data
+    real(kind=rk), intent(inout)        :: hvy_rhs  (:, :, :, :, :)       !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)      !> hvy_mask are qtys that depend on grid and not explicitly on time
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)

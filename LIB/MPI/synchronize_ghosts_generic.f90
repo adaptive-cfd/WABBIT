@@ -1,5 +1,5 @@
 subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-    syncSameLevelOnly, skipDiagonalNeighbors  )
+    syncSameLevelOnly, g_minus, g_plus  )
 
     implicit none
 
@@ -14,17 +14,18 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     integer(kind=ik), intent(in)   :: hvy_active(:)
     !> number of active blocks (heavy data)
     integer(kind=ik), intent(in)   :: hvy_n
-    logical, intent(in), optional  :: syncSameLevelOnly, skipDiagonalNeighbors
+    logical, intent(in), optional  :: syncSameLevelOnly
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
 
-    logical :: syncSameLevelOnly1=.false., skipDiagonalNeighbors1=.false.
+    logical :: syncSameLevelOnly1=.false.
 
     integer(kind=ik)   :: myrank, mpisize, ii0, ii1, Bs(1:3)
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
     integer(kind=ik)   :: recver_lgtID, recver_rank, recver_hvyID
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
 
-    integer(kind=ik) :: ijk(2,3), isend, irecv
-    integer(kind=ik) :: bounds_type, istage, inverse
+    integer(kind=ik) :: ijk(2,3), isend, irecv, s(1:4)
+    integer(kind=ik) :: bounds_type, istage, inverse, gminus, gplus
     real(kind=rk) :: t0
 
     t0 = MPI_wtime()
@@ -39,14 +40,44 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
     if (hvy_n == 0) return
 
     syncSameLevelOnly1 = .false.
-    skipDiagonalNeighbors1 = .false.
     if (present(syncSameLevelOnly)) syncSameLevelOnly1 = syncSameLevelOnly
-    if (present(skipDiagonalNeighbors)) skipDiagonalNeighbors1 = skipDiagonalNeighbors
+
+    gminus  = params%g
+    gplus   = params%g
+    Bs      = params%Bs
+    N       = params%number_blocks
+    myrank  = params%rank
+    mpisize = params%number_procs
+    ! default is two stages: first, copy&decimate, then interpolate
+    Nstages = 2
+    ! but if we sync only sameLevel neighbors, then we don't need the second stage
+    if (syncSameLevelOnly1) Nstages = 1
+    ! if we sync a different number of ghost nodes
+    if (present(g_minus)) gminus = g_minus
+    if (present(g_plus))   gplus = g_plus
+
+#ifdef DEV
+    if (.not.syncSameLevelOnly1) call reset_ghost_nodes( params, hvy_block, hvy_active, hvy_n )
+#endif
+
+    !-----------------------------------------------------------------------
+    ! set up constant arrays
+    !-----------------------------------------------------------------------
+    ! We frequently need to know the indices of a ghost nodes patch. Thus we save them
+    ! once in a module-global array (which is faster than computing it every time with tons
+    ! of IF-THEN clauses).
+    ! This arrays indices are:
+    ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+    ! As g can be varied (as long as it does not exceed the maximum value params%g), it is set up
+    ! each time we sync (at negligibble cost)
+    call ghosts_setup_patches(params, gminus=gminus, gplus=gplus, output_to_file=.false.)
+    ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
+    ! make sure they have the right size
+    call ghosts_ensure_correct_buffer_size(params, hvy_block)
 
 ! Diagonal neighbors (not required for the RHS)
 ! 2D: 5,6,7,8
 ! 3D: 7-18, 19-26, 51-74
-
 !
 ! New Idea (09 Apr 2023)
 !
@@ -57,22 +88,17 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
 ! neighborhoods.
 !
 ! 2nd IDEA: stage-free ghost nodes.
+! ==> did not work yet
 ! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
 ! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
 ! are directly interpolated correctly. 19 apr 2023: This can be made work, but it is tedious and does not yield an
 ! immense speedup neither. On my local machine, its ~5%, but on large scale parallel sims, it may be more significant.
 ! Idea is described in inskape notes.
+!
 
-    Bs    = params%Bs
-    N     = params%number_blocks
-    myrank  = params%rank
-    mpisize = params%number_procs
-    ! default is two stages: first, copy&decimate, then interpolate
-    Nstages = 2
-    ! but if we sync only sameLevel neighbors, then we don't need the second stage
-    if (syncSameLevelOnly1) Nstages = 1
 
-    ! call reset_ghost_nodes( params, hvy_block, hvy_active, hvy_n )
+
+
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
@@ -90,18 +116,17 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
         ! buffer at any time.
         call get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
              Data_recvCounter, Data_sendCounter, MetaData_recvCounter, MetaData_sendCounter, istage, &
-             count_internal=.false., ncomponents=size(hvy_block,4), syncSameLevelOnly=syncSameLevelOnly1, &
-             skipDiagonalNeighbors=skipDiagonalNeighbors1)
+             count_internal=.false., ncomponents=size(hvy_block,4), syncSameLevelOnly=syncSameLevelOnly1)
 
 
-        ! reset iMetaData_sendBuffer, but only the parts that will actually be treated.
+        ! reset iMetaData_sendBuffer, but only the parts that will actually be used.
         do k = 1, params%number_procs
             ii0 = sum(MetaData_sendCounter(0:(k-1)-1)) + 1
-            ii1 = ii0 + MetaData_sendCounter(k-1)
+            ii1 = ii0 + MetaData_sendCounter(k-1)-1
             iMetaData_sendBuffer(ii0:ii1) = -99
 
             ii0 = sum(MetaData_recvCounter(0:(k-1)-1)) + 1
-            ii1 = ii0 + MetaData_recvCounter(k-1)
+            ii1 = ii0 + MetaData_recvCounter(k-1)-1
             iMetaData_recvBuffer(ii0:ii1) = -99
         enddo
 
@@ -733,7 +758,7 @@ end subroutine
 ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
 subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hvy_active,&
      hvy_n, Data_recvCounter, Data_sendCounter, MetaData_recvCounter, MetaData_sendCounter, istage, &
-     count_internal, ncomponents, syncSameLevelOnly, skipDiagonalNeighbors)
+     count_internal, ncomponents, syncSameLevelOnly)
 
     implicit none
 
@@ -748,7 +773,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
     integer(kind=ik), intent(in)        :: hvy_n, ncomponents, istage
     integer(kind=ik), intent(inout)     :: Data_recvCounter(0:), Data_sendCounter(0:)
     integer(kind=ik), intent(inout)     :: MetaData_recvCounter(0:), MetaData_sendCounter(0:)
-    logical, intent(in)                 :: count_internal, syncSameLevelOnly, skipDiagonalNeighbors
+    logical, intent(in)                 :: count_internal, syncSameLevelOnly
 
     integer(kind=ik) :: k, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff, status, new_size

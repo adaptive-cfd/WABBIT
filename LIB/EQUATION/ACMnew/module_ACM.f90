@@ -349,7 +349,7 @@ end subroutine
     ! uniqueGrid modification
     ! nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
-    
+
     if (params_acm%c_0 > 0.0_rk) then
         dt_min = params_acm%CFL*dx_min/params_acm%c_0
     else
@@ -436,8 +436,8 @@ end subroutine
     real(kind=rk), intent(out) :: dt
     ! temporary array. note this is just one block and hence not important for overall memory consumption
     real(kind=rk), allocatable, save :: u_mag(:,:,:)
-    real(kind=rk) :: u_eigen, kappa
-    integer :: iscalar, dim
+    real(kind=rk) :: u_eigen, kappa, uu
+    integer :: iscalar, dim, ix, iy ,iz
 
     if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
 
@@ -447,9 +447,24 @@ end subroutine
 
     ! compute square of velocity magnitude
     if (params_acm%dim == 2) then
-        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2)
+        u_mag = 0.0_rk
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                uu = u(ix,iy,1,1)*u(ix,iy,1,1)+u(ix,iy,1,2)*u(ix,iy,1,2)
+                u_mag = max( u_mag, uu)
+            enddo
+        enddo
+
     else
-        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2) + u(:,:,:,3)*u(:,:,:,3)
+        u_mag = 0.0_rk
+        do iz=g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    uu = u(ix,iy,iz,1)*u(ix,iy,iz,1)+u(ix,iy,iz,2)*u(ix,iy,iz,2)+u(ix,iy,iz,3)*u(ix,iy,iz,3)
+                    u_mag = max( u_mag, uu)
+                enddo
+            enddo
+        enddo
     endif
 
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)

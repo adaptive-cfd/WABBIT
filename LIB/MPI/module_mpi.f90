@@ -60,8 +60,15 @@ module module_MPI
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
 
+    ! FIXME: This is a very large work array - equivalent of a whole statevector copy.
+    ! only a subset of it will be actually used, still.
+    ! Its tedious to pass another work array (and hvy_tmp is not the right size neither)
+    ! So for now this is a HACK solution
+    real(kind=rk), allocatable :: hvy_filtered(:, :, :, :, :)
+    ! the 2nd one is small:
+    logical, allocatable :: isFiltered(:)
 
-    logical :: filter = .false.
+
 
     ! two shift parameters (asymmetric and symmetric ) used for selection of interpolation
     ! bounds on sender side. used to avoid one-sided interpolation if desired. They're
@@ -89,7 +96,6 @@ contains
 !! which we use to rapidly identify a ghost nodes layer
 subroutine init_ghost_nodes( params )
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in) :: params
     ! local variables
     integer(kind=ik) :: buffer_N_int, buffer_N, g, Neqn, number_blocks, rank
@@ -151,8 +157,6 @@ subroutine init_ghost_nodes( params )
             buffer_N_int = number_blocks * 56 * 6
             ! how many possible neighbor relations are there?
             Nneighbor = 74
-
-            allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, Neqn) )
         else
             !---2d---2d---
             ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
@@ -160,8 +164,6 @@ subroutine init_ghost_nodes( params )
             buffer_N_int = number_blocks * 12 * 6
             ! how many possible neighbor relations are there?
             Nneighbor = 16
-
-            allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, Neqn) )
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
@@ -242,60 +244,12 @@ subroutine init_ghost_nodes( params )
         !-----------------------------------------------------------------------
         ! set up constant arrays
         !-----------------------------------------------------------------------
-        ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
-        ! once in a large, module-global array (which is faster than computing it every time with tons
+        ! We frequently need to know the indices of a ghost nodes patch. Thus we save them
+        ! once in a module-global array (which is faster than computing it every time with tons
         ! of IF-THEN clauses).
         ! This arrays indices are:
         ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
-
-        ijkGhosts = 1
-        do ineighbor = 1, Nneighbor
-            do leveldiff = -1, 1
-                !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
-                ! The receiver bounds are hard-coded with a huge amount of tedious indices.
-                call set_recv_bounds( params, ijkrecv, ineighbor, leveldiff, g)
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, RECVER) = ijkrecv
-
-                ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
-                ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
-                ! up or down sampled.
-                call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, ineighbor, leveldiff, g )
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, SENDER) = ijksend
-                ijkGhosts(1:2, 1:3, ineighbor, leveldiff, RESPRE) = ijkbuffer
-
-            enddo
-        enddo
-
-        ! now we know how large the patches are we'd like to store in the RESPRE buffer
-        i = maxval( ijkGhosts(2,1,:,:,RESPRE) )*2
-        j = maxval( ijkGhosts(2,2,:,:,RESPRE) )*2
-        k = maxval( ijkGhosts(2,3,:,:,RESPRE) )*2
-
-        allocate( res_pre_data( i, j, k, Neqn) )
-        res_pre_data = 9.9_rk
-
-        ! this output can be plotted using the python script
-        if (params%rank==0) Then
-            open(16,file='ghost_bounds.dat',status='replace')
-            write(16,'(i3)') Bs(1)
-            write(16,'(i3)') Bs(2)
-            write(16,'(i3)') Bs(3)
-            write(16,'(i3)') g
-            write(16,'(i3)') S
-            write(16,'(i3)') A
-            do ineighbor = 1, Nneighbor
-                do leveldiff = -1, 1
-                    do i = 1, 2
-                        do j = 1, 3
-                            do k = 1, 3
-                                write(16,'(i3)') ijkGhosts(i, j, ineighbor, leveldiff, k)
-                            enddo
-                        enddo
-                    enddo
-                enddo
-            enddo
-            close(16)
-        endif
+        ! call ghosts_setup_patches(params, gminus=7, gplus=5, output_to_file=.true.)
 
         ! set up table with inverse neighbor relations
         if (.true.) then ! for folding only
@@ -411,9 +365,6 @@ subroutine init_ghost_nodes( params )
             inverse_neighbor(74,3) = 68
         endif
 
-
-        ghost_nodes_module_ready = .true.
-
         ! this routine is not performance-critical
         call MPI_barrier( WABBIT_COMM, status(1))
 
@@ -422,8 +373,138 @@ subroutine init_ghost_nodes( params )
             write(*,'("                     GHOST-INIT complete :)")')
             write(*,'("---------------------------------------------------------")')
         endif
+
+        ghost_nodes_module_ready = .true.
     endif
 
+end subroutine
+
+subroutine ghosts_ensure_correct_buffer_size(params, hvy_block)
+    implicit none
+    type (type_params), intent(in) :: params
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)
+
+    integer(kind=ik) :: i,j,k, Bs(1:3), g, nx, ny, nz, nc
+
+    if (allocated(res_pre_data)) deallocate(res_pre_data)
+    if (allocated(tmp_block)) deallocate(tmp_block)
+
+    Bs = params%Bs
+    g  = params%g
+    nx = size(hvy_block,1)
+    ny = size(hvy_block,2)
+    nz = size(hvy_block,3)
+    nc = size(hvy_block,4)
+
+    ! now we know how large the patches are we'd like to store in the RESPRE buffer
+    i = maxval( ijkGhosts(2,1,:,:,RESPRE) )*2
+    j = maxval( ijkGhosts(2,2,:,:,RESPRE) )*2
+    k = maxval( ijkGhosts(2,3,:,:,RESPRE) )*2
+
+    allocate( res_pre_data( i, j, k, nc) )
+
+    if (params%dim == 3) then
+        allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc) )
+    else
+        allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, nc) )
+    endif
+
+    if (allocated(isFiltered)) then
+        if (size(isFiltered,1)<size(hvy_block,5)) deallocate(isFiltered)
+    endif
+    if (.not. allocated(isFiltered)) allocate(isFiltered(1:size(hvy_block,5)))
+    ! this one needs initializing:
+    isFiltered = .false.
+
+    if (allocated(hvy_filtered)) then
+        if (.not. areArraysSameSize(hvy_block, hvy_filtered)) deallocate(hvy_filtered)
+    endif
+    ! FIXME: This is a very large work array - equivalent of a whole statevector copy.
+    ! only a subset of it will be actually used, still
+    if (.not. allocated(hvy_filtered)) allocate(hvy_filtered(1:nx, 1:ny, 1:nz, 1:nc, 1:size(hvy_block,5)) )
+
+
+end subroutine
+
+
+! setup the ghost patches (i.e. the indices of the sender/receiver parts
+! for any neighborhood relation), where a smaller subset of the ghost nodes
+! can be synced (the g you pass must be <= params%g)
+subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
+    implicit none
+    type (type_params), intent(in) :: params
+    integer(kind=ik), intent(in) :: gminus, gplus
+    logical, intent(in) :: output_to_file
+
+    integer(kind=ik) :: N_neighbors, level_diff, neighborhood, i, j, k
+    integer(kind=ik) :: ijkrecv(2,3)
+    integer(kind=ik) :: ijkbuffer(2,3)
+    integer(kind=ik) :: ijksend(2,3)
+
+    ! full reset of all patch definitions. Note we set 1 not 0
+    ijkGhosts = 1
+
+    N_neighbors = 74
+    if (params%dim==2) N_neighbors=16
+
+    do neighborhood = 1, N_neighbors
+        do level_diff = -1, 1
+            !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
+            ! The receiver bounds are hard-coded with a huge amount of tedious indices.
+            call set_recv_bounds( params, ijkrecv, neighborhood, level_diff, gminus, gplus)
+            ijkGhosts(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv
+
+            ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+            ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+            ! up or down sampled.
+            call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, gminus, gplus )
+            ijkGhosts(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend
+            ijkGhosts(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer
+
+            ! apply a shift (if we sync only a subset of the layer)
+            !
+            ! g g g g g g g g g g g g        g g g g g g g g g g g g
+            ! g g g g g g g g g g g g        g g g g g g g g g g g g
+            ! g g g g g g g g g g g g        g g S S S S S S S S g g
+            ! g g g u u u u u u g g g        g g S u u u u u u S g g
+            ! g g g u u u u u u g g g        g g S u u u u u u S g g
+            ! g g g u u u u u u g g g        g g S u u u u u u S g g
+            ! g g g u u u u u u g g g        g g S u u u u u u S g g
+            ! g g g u u u u u u g g g        g g S u u u u u u S g g
+            ! g g g g g g g g g g g g        g g S S S S S S S S g g
+            ! g g g g g g g g g g g g        g g g g g g g g g g g g
+            ! g g g g g g g g g g g g        g g g g g g g g g g g g
+            !
+            ! g: ghost u: interior s: synced
+            ! here, params%g=3 and g=1
+
+            ijkGhosts(1:2,1:dim, neighborhood, level_diff,RECVER) = ijkGhosts(1:2,1:dim, neighborhood, level_diff,RECVER) + (params%g-gminus)
+            ijkGhosts(1:2,1:dim, neighborhood, level_diff,SENDER) = ijkGhosts(1:2,1:dim, neighborhood, level_diff,SENDER) + (params%g-gminus)
+        enddo
+    enddo
+
+    ! this output can be plotted using the python script
+    if ((params%rank==0) .and. output_to_file) then
+        open(16,file='ghost_bounds.dat',status='replace')
+        write(16,'(i3)') params%Bs(1)
+        write(16,'(i3)') params%Bs(2)
+        write(16,'(i3)') params%Bs(3)
+        write(16,'(i3)') params%g
+        write(16,'(i3)') S
+        write(16,'(i3)') A
+        do neighborhood = 1, N_neighbors
+            do level_diff = -1, 1
+                do i = 1, 2
+                    do j = 1, 3
+                        do k = 1, 3
+                            write(16,'(i3)') ijkGhosts(i, j, neighborhood, level_diff, k)
+                        enddo
+                    enddo
+                enddo
+            enddo
+        enddo
+        close(16)
+    endif
 end subroutine
 
 end module module_MPI

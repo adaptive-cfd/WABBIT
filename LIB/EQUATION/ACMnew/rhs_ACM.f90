@@ -100,8 +100,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         !
         ! called for each block.
         do i = 1, size(u,4)
-            if (maxval(abs(u(:,:,:,i))) > 1.0e4_rk) then
-                write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') i, maxval(abs(u(:,:,:,i)))
+            if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e4_rk) then
+                write(*,'("maxval in u(",i2,") = ", es15.8)') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i)))
                 call abort(0409201933,"ACM fail: very very large values in state vector.")
             endif
         enddo
@@ -535,9 +535,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
-       !  ! create the mask for the sponge on this block
-       ! call sponge_2D(sponge, x0, dx, Bs, g)
-
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
@@ -847,9 +844,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
-        ! create the mask for the sponge on this block
-       ! call sponge_3D(sponge, x0, dx, Bs, g)
-
         ! avoid division by multiplying with inverse
         eps_inv = 1.0_rk / params_acm%C_sponge
 
@@ -858,7 +852,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 do ix = g+1, Bs(1)+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
-                    ! NOTE: sponge mask set in grid_qty
+                    ! NOTE: sponge mask set in hvy_mask
                     spo = mask(ix,iy,iz,6) * eps_inv
 
                     rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo

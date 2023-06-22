@@ -6,7 +6,7 @@ module module_t_files
     ! precision statement
     integer, parameter :: flush_frequency = 5
     integer, parameter :: max_parallel_files = 50
-    integer, parameter :: max_columns = 45
+    integer, parameter :: max_columns = 160
     integer, save :: mpirank = 7
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)

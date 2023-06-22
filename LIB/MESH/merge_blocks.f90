@@ -9,13 +9,12 @@
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
-subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter )
+subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)         !> list of blocks to merge, can contain 4 or 8 blocks
-    logical, intent(in) :: ignorePrefilter
     real(kind=rk), ALLOCATABLE, save    :: tmpblock(:,:,:,:)
     integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
     ! what CPU is responsible for merging:
@@ -80,7 +79,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
         ! it may happen that we use this routine for fields with different # components: in this case,
         ! tmp block has to change size.
         if (size(tmpblock,1)/=size(hvy_block,1) .or.size(tmpblock,2)/=size(hvy_block,2) &
-            .or.size(tmpblock,4)/=size(hvy_block,4) .or.size(tmpblock,3)/=size(hvy_block,3) ) then
+        .or.size(tmpblock,4)/=size(hvy_block,4) .or.size(tmpblock,3)/=size(hvy_block,3) ) then
             deallocate(tmpblock)
             allocate( tmpblock(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4)) )
         endif
@@ -95,7 +94,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
     !-------------------------------------------------------------------------------
     ! a) light data (collective operation)
     ! fetch a free light ID for the merged blocks
-    call get_free_local_light_id( params, data_rank(1), lgt_merge_id)
+    call get_free_local_light_id(params, data_rank(1), lgt_merge_id, message="merge_blocks")
     ! create light data entry for the new block
     lgt_block( lgt_merge_id, : ) = -1
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
@@ -115,17 +114,14 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
         ! get heavy id of merge block
         call lgt2hvy( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
 
+        ! detail is not computed (yet)
+        hvy_details(:, hvy_merge_id) = -1.0_rk
+
         ! indices of subblocks on new, merged, coarser block
         do i = 1, params%dim
             icoars1(i) = g+1
             icoars2(i) = Bs(i)+g
-            if (modulo(Bs(i),2) == 0) then
-                ! even
-                icoarsm(i) = Bs(i)/2 + g
-            else
-                ! odd
-                icoarsm(i) = (Bs(i)+1)/2 + g
-            endif
+            icoarsm(i) = Bs(i)/2 + g
         enddo
 
         ! indices on the finer blocks which we merge to a coarse one
@@ -133,15 +129,9 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
             ! [INKSCAPE]: Please note the fortran code always runs
             ! until X:2:Bs+g the important number is the
             ! starting index
-            if (modulo(Bs(i),2) == 0) then
-                ! BS even
-                ifine1(i) = g+1 ! start point of first index, low range
-                ifine2(i) = g+1 ! start point of second index, high range
-            else
-                ! BS odd
-                ifine1(i) = g+1
-                ifine2(i) = g+2
-            endif
+            ! BS even
+            ifine1(i) = g+1 ! start point of first index, low range
+            ifine2(i) = g+1 ! start point of second index, high range
         enddo
 
 
@@ -149,7 +139,6 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
             ! ************ 2D case ***********************
             ! biorthogonal wavelets: apply a low-pass filter (called H) prior to decimation
             ! sister 0
-            if (.not. ignorePrefilter) then
             call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock) ! low-pass filtering
             hvy_block(icoars1(1):icoarsm(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:)
 
@@ -164,18 +153,6 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, ignorePrefilter
             ! sister 3
             call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(4) ), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:)
-        else
-            hvy_block(icoars1(1):icoarsm(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = hvy_block( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:, heavy_ids(1))
-
-            ! sister 1
-            hvy_block(icoars1(1):icoarsm(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = hvy_block( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:, heavy_ids(2))
-
-            ! sister 2
-            hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = hvy_block( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:, heavy_ids(3))
-
-            ! sister 3
-            hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = hvy_block( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:, heavy_ids(4))
-        endif
 
         elseif (N_merge == 8) then
             ! ************ 3D case ***********************

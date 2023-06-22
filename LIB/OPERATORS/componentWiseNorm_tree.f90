@@ -53,9 +53,11 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             do p = 1, n_eqn
-                ! yes, we can include the ghost nodes: it does not matter for the infty
-                ! norm.
-                norm(p) = max( norm(p), maxval( abs(hvy_block(:,:,:,p,hvy_id))) )
+                if (params%dim == 2) then
+                    norm(p) = max( norm(p), maxval( abs(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1,p,hvy_id))) )
+                else
+                    norm(p) = max( norm(p), maxval( abs(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g,p,hvy_id))) )
+                endif
             enddo
         enddo
 

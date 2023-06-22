@@ -190,6 +190,16 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     endif
 
     !---------------------------------------------------------------------------
+    allocate( hvy_details(Neqn, params%number_blocks) )
+    memory_this = product(real(shape(hvy_details)))*8.0e-9
+    memory_total = memory_total + memory_this
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",2(i9,1x))') &
+        "hvy_details", memory_this, shape(hvy_details)
+    endif
+
+
+    !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
         if (allocated(hvy_work)) deallocate(hvy_work)

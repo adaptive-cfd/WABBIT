@@ -97,13 +97,13 @@ subroutine compute_vorticity_post(params)
     ! is used in ghost nodes sync'ing
     if (order == "4") then
         params%order_discretization = "FD_4th_central_optimized"
-        params%order_predictor = "multiresolution_4th"
         params%g = 4_ik
+        params%wavelet="CDF40"
 
     elseif (order == "2") then
         params%order_discretization = "FD_2nd_central"
-        params%order_predictor = "multiresolution_2nd"
         params%g = 2_ik
+        params%wavelet="CDF20"
 
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
@@ -128,7 +128,7 @@ subroutine compute_vorticity_post(params)
     Bs = params%Bs
     g  = params%g
 
-    params%wavelet="CDF40"
+
     call setup_wavelet(params)
 
     ! no refinement is made in this postprocessing tool; we therefore allocate about
@@ -352,7 +352,9 @@ subroutine wavelet_test(params)
     end do
 
     call ensureGradedness_tree( params, tree_ID )
-    call executeCoarsening_tree( params, hvy_block, tree_ID, .false. )
+    call executeCoarsening_tree( params, hvy_block, tree_ID )
+
+
     call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
     call saveHDF5_tree("3dtest_774.h5", 774.0_rk, iteration, 1, params, hvy_block, tree_ID )
@@ -876,7 +878,9 @@ do iter= 1, 1
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    call executeCoarsening_tree( params, hvy_block, tree_ID, .true. )
+    ! call executeCoarsening_tree( params, hvy_block, tree_ID, .true. )
+    call abort(150623, "we removed the ignore_prefilter, check if that is okay still")
+
     call updateMetadata_tree(params, tree_ID)
 
     call saveHDF5_tree("coarsening_332.h5", time, iteration, 1, params, hvy_block, tree_ID )
@@ -968,7 +972,8 @@ do iter= 1, 1
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    call executeCoarsening_tree( params, hvy_block, tree_ID, .true. )
+    call executeCoarsening_tree( params, hvy_block, tree_ID )
+    call abort(150623, "we removed the ignore_prefilter, check if that is okay still")
     call updateMetadata_tree(params, tree_ID)
 
     ! do kk = 1, 50

@@ -41,6 +41,7 @@ tests=( "---post---"
         "TESTING/conv/blob_3D_adaptive_CDF40/blob3d-adaptive.sh"
         "TESTING/conv/blob_3D_adaptive_CDF22/blob3d-adaptive.sh"
         "TESTING/conv/blob_3D_adaptive_CDF44/blob3d-adaptive.sh"
+
         # "TESTING/conv/blob_3D_nonequi/blob3d.sh"
         # "TESTING/conv/symmetry-blob-2d/symmetry-blob-2d.sh"
         # "TESTING/conv/symmetry-blob-3d/symmetry-blob-3d.sh"

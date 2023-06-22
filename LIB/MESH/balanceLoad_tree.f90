@@ -1,18 +1,24 @@
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
-subroutine balanceLoad_tree( params, hvy_block, tree_ID)
+subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
+
     implicit none
 
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)      :: params                     !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
+    !> if true balance the load will always give the same block distribution
+    !> for the same treestructure (default is False)
+    logical, intent(in),optional        :: predictable_dist
     !=============================================================================
 
-    integer(kind=ik)  :: myrank, mpirank, mpirank_owner, ierr, &
+    integer(kind=ik)  :: rank, proc_dist_id, proc_data_id, ierr, number_procs, &
                          k, N, l, com_i, com_N, heavy_id, sfc_id, neq, &
-                         lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), total_weight, mpisize
-    integer(kind=ik), allocatable, save :: sfc_com_list(:,:), sfc_sorted_list(:,:), cpu_weight(:)
-    real(kind=rk) :: t0, t1, avg_weight, remaining_weight, ideal_weight
+                         lgt_free_id, hvy_free_id, hilbertcode(params%Jmax)
+    ! block distribution lists
+    integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), &
+                     affinity(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
+    real(kind=rk) :: t0, t1
     logical       :: is_predictable
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -21,35 +27,62 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID)
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-    ! on only one proc, no balancing is required
-    if (params%number_procs == 1) return
+    ! check if argument is present or not
+    is_predictable=.False.
+    if (present(predictable_dist)) then
+      is_predictable=predictable_dist
+    endif
 
+    if (params%number_procs == 1) then
+        ! on only one proc, no balancing is required
+        return
+    endif
+
+    ! start time
     t0 = MPI_Wtime()
-    myrank = params%rank
-    mpisize = params%number_procs
+
+    ! MPI_parameters
+    rank = params%rank
+    number_procs = params%number_procs
+
+    ! allocate block to proc lists
+    if (.not.allocated(opt_dist_list)) allocate( opt_dist_list(1:number_procs))
+    if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))
+    ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
+    ! NOTE: it is not necessary or wise to reset this array (it is large!)
+    if (.not.allocated(sfc_com_list)) allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
+
+    ! allocate space filling curve list, number of elements is the number of active blocks
+    ! and for each block, we store the space-filling-curve-index and the lgt ID
+    if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( size(lgt_block,1), 2) )
+
+    ! number of blocks
     N = params%number_blocks
     neq = params%n_eqn
 
-    ! allocate block to proc lists
-    if (.not.allocated(cpu_weight)) allocate( cpu_weight(1:mpisize))
-    ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
-    ! NOTE: it is not necessary or wise to reset this array (it is huge!)
-    if (.not.allocated(sfc_com_list)) allocate( sfc_com_list( mpisize*params%number_blocks, 3 ) )
-    ! allocate space filling curve list, number of elements is the number of active blocks
-    ! and for each block, we store the space-filling-curve-index and the lgt ID
-    if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( size(lgt_block,1), 3) )
 
-    ! for each block compute its weight. Note for technical reasons, weight is an integer
-    ! but ne can assign a default weight of say 10 for ordinary blocks, which means we can
-    ! in pratice also assign say 13/10 weight for a block. Total_weight is the sum of all blocks
-    ! to be distributed: this number is divided my N_cpu to get the approx. local portion of the weight.
-    call assignLoadbalancingWeight_tree(params, tree_ID, total_weight)
 
+    !---------------------------------------------------------------------------------
+    ! First step: define how many blocks each mpirank should have.
+    !---------------------------------------------------------------------------------
+    if (is_predictable) then
+       call set_desired_num_blocks_per_rank(params, opt_dist_list, tree_ID)
+    else
+       call set_desired_num_blocks_per_rank(params, dist_list, opt_dist_list, tree_ID)
+    endif
+
+    ! at this point, we know how many blocks a mpirank has: "dist_list(myrank+1)"
+    ! and how many it should have, if equally distributed: "opt_dist_list(myrank+1)"
+
+    ! if (rank==0) then
+    !     call append_t_file( "balancing.t", (/ real(maxval(opt_dist_list-dist_list),kind=rk),&
+    !     real(minval(opt_dist_list-dist_list),kind=rk),&
+    !     real(sum(abs(opt_dist_list-dist_list)),kind=rk) /))
+    ! endif
 
     !---------------------------------------------------------------------------------
     ! 1st: calculate space filling curve index for all blocks
     !---------------------------------------------------------------------------------
-    ! COLLECTIVE OPERATION (performed redundantly on all ranks, no comm)
     t1 = MPI_wtime()
     select case (params%block_distribution)
     case("sfc_z")
@@ -59,12 +92,12 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID)
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
                 call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), params%Jmax )
-                sfc_sorted_list(k, 1:3) = (/sfc_id, lgt_active(k, tree_ID), lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_REFINE_STS)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
             do k = 1, lgt_n(tree_ID)
                 call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), params%Jmax )
-                sfc_sorted_list(k, 1:3) = (/sfc_id, lgt_active(k, tree_ID), lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_REFINE_STS)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif
     case("sfc_hilbert")
@@ -77,7 +110,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID)
                 call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), hilbertcode, params%Jmax)
                 ! calculate sfc position from hilbertcode
                 call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%Jmax )
-                sfc_sorted_list(k, 1:3) = (/sfc_id, lgt_active(k, tree_ID), lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_REFINE_STS)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
             do k = 1, lgt_n(tree_ID)
@@ -85,7 +118,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID)
                 call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), hilbertcode, params%Jmax)
                 ! calculate sfc position from hilbertcode
                 call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%Jmax )
-                sfc_sorted_list(k, 1:3) = (/sfc_id, lgt_active(k, tree_ID), lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_REFINE_STS)/)
+                sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif
 
@@ -94,92 +127,53 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID)
 
     end select
 
+
     ! sort sfc_list according to the first dimension, thus the position on
     ! the space filling curve (this was a bug, fixed: Thomas, 13/03/2018)
     if (lgt_n(tree_ID) > 1) then
-        call quicksort_ik(sfc_sorted_list, 1, lgt_n(tree_ID), 1, 3)
+        call quicksort_ik(sfc_sorted_list, 1, lgt_n(tree_ID), 1, 2)
     end if
     call toc( "balanceLoad_tree (SFC+sort)", MPI_wtime()-t1 )
-
-
-    ! We now know what the total weight to be distributed is, and each block has been assigned
-    ! a unique index on the space filling curve. This list of blocks is sorted by the
-    ! space filling curve index.
-    ! -> It is now a matter of distributing (contiguous) chunks of blocks to the
-    !    mpiranks, and doing so as well as possible: We want the maximum number of load
-    !    on a mpirank to be as small as possible. The slowest CPU determines execution speed
-    !    (if one idles that is not as bad as if one is very slow because then all other CPU idle)
 
     !---------------------------------------------------------------------------------
     ! 2nd: plan communication (fill list of blocks to transfer)
     !---------------------------------------------------------------------------------
     t1 = MPI_wtime()
-    ! mpirank: process responsible for current part of sfc
-    ! mpirank_owner: process who stores data of sfc element
+    ! proc_dist_id: process responsible for current part of sfc
+    ! proc_data_id: process who stores data of sfc element
 
     ! we start the loop on the root rank (0), then assign the first elements
-    ! of the SFC, then to second rank, etc. (thus: mpirank is a loop variable)
-    mpirank = 0
+    ! of the SFC, then to second rank, etc. (thus: proc_dist_id is a loop variable)
+    proc_dist_id = 0
 
     ! communication counter. each communication (=send and receive) is stored
     ! in a long list
     com_i = 0
-    cpu_weight = 0_ik
-
-    ideal_weight = dble(total_weight) / dble(mpisize)
-
-remaining_weight = real( sum(sfc_sorted_list(1:lgt_n(tree_ID), 3)), kind=rk)
-avg_weight = remaining_weight / real( mpisize-mpirank, kind=rk)
-! write(*,*) avg_weight
 
     ! prepare lists for transfering of blocks
-    ! COLLECTIVE OPERATION (performed redundantly on all ranks, no comm)
+    ! COLLECTIVE OPERATION
     do k = 1, lgt_n(tree_ID)
-        ! if (mpirank /= mpisize-1) then
-        !     ! for the last rank, the weight is not recomputed (it gets the remaining
-        !     ! blocks anyways). Otherwise, from the remaining blocks, recompute the desired
-        !     ! average weight per mpirank:
-        !     remaining_weight = real( sum(sfc_sorted_list(k:lgt_n(tree_ID), 3)), kind=rk)
-        !     avg_weight = remaining_weight / real( mpisize-mpirank, kind=rk)
-        ! endif
-
-
-        ! if ((cpu_weight(mpirank+1) + sfc_sorted_list(k,3) < nint(avg_weight)) .or. (mpirank==mpisize-1)) then
-        !     ! cpu can take more and is still not full:
-        !     ! (or we are at the last mpirank, which gets the rest)
-        !     cpu_weight(mpirank+1) = cpu_weight(mpirank+1) + sfc_sorted_list(k,3)
-        ! else
-        !     ! if adding one more block is effectively only one more weight unit (ie the weight of a
-        !     ! standard block)
-        !     if (cpu_weight(mpirank+1) + sfc_sorted_list(k,3) - nint(avg_weight) <= 20_ik) then
-        !         cpu_weight(mpirank+1) = cpu_weight(mpirank+1) + sfc_sorted_list(k,3)
-        !     endif
-        !     ! Now, the mpirank is full -> the next blocks will be distributed to the next mpirank
-        !     ! increase cpu counter, but only until we are at the last rank
-        !     mpirank = min(mpirank+1, mpisize-1)
-        ! endif
-
-        if (cpu_weight(mpirank+1) + sfc_sorted_list(k,3) >= nint(avg_weight) + 10_ik) then
-            ! Now, the mpirank is full -> the next blocks will be distributed to the next mpirank
-            ! increase cpu counter, but only until we are at the last rank
-            mpirank = min(mpirank+1, mpisize-1)
-
-            remaining_weight = real( sum(sfc_sorted_list(k:lgt_n(tree_ID), 3)), kind=rk)
-            avg_weight = remaining_weight / real( mpisize-mpirank, kind=rk)
-            ! write(*,*) avg_weight
-        endif
-
-        cpu_weight(mpirank+1) = cpu_weight(mpirank+1) + sfc_sorted_list(k,3)
+        ! if the current owner of the SFC is supposed to have zero blocks
+        ! then it does not really own this part of the SFC. So we look for the
+        ! first rank which is supposed to hold at least one block, and declare it as owner
+        ! of this part. NOTE: as we try to minimize communication during send/recv in
+        ! load balancing, it may well be that the list of active mpiranks (ie those
+        ! which have nonzero number of blocks) is non contiguous, i.e.
+        ! opt_dist_list = 1 1 1 0 0 0 0 1 0 1
+        ! can happen.
+        do while ( opt_dist_list(proc_dist_id+1) == 0 )
+            proc_dist_id = proc_dist_id + 1
+        end do
 
         ! find out on which mpirank lies the block that we're looking at
-        call lgt2proc( mpirank_owner, sfc_sorted_list(k,2), params%number_blocks )
+        call lgt2proc( proc_data_id, sfc_sorted_list(k,2), params%number_blocks )
 
         ! does this block lie on the right mpirank, i.e., the current part of the
         ! SFC? if so, nothing needs to be done. otherwise, the following if is active
-        if ( mpirank /= mpirank_owner ) then
+        if ( proc_dist_id /= proc_data_id ) then
             ! as this block is one the wrong rank, it will be sent away from its
-            ! current owner (mpirank_owner) to the owner of this part of the
-            ! SFC (mpirank)
+            ! current owner (proc_data_id) to the owner of this part of the
+            ! SFC (proc_dist_id)
 
             ! save this send+receive operation in the list of planned communications
             ! column
@@ -187,18 +181,21 @@ avg_weight = remaining_weight / real( mpisize-mpirank, kind=rk)
             !    2     receiver mpirank
             !    3     block light data id
             com_i = com_i + 1
-            sfc_com_list(com_i, 1) = mpirank_owner        ! sender mpirank
-            sfc_com_list(com_i, 2) = mpirank              ! receiver mpirank
-            sfc_com_list(com_i, 3) = sfc_sorted_list(k,2) ! light id of block
+            sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
+            sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
+            sfc_com_list(com_i, 3) = sfc_sorted_list(k,2)   ! light id of block
+        end if
+
+        ! The opt_dist_list defines how many blocks this rank should have, and
+        ! we just treated one (which either already was on the mpirank or will be on
+        ! it after communication), so remove one item from the opt_dist_list
+        opt_dist_list( proc_dist_id+1 ) = opt_dist_list( proc_dist_id+1 ) - 1
+
+        ! if there is no more blocks to be checked, increase mpirank counter by one
+        if ( opt_dist_list( proc_dist_id+1 ) == 0 ) then
+            proc_dist_id = proc_dist_id + 1
         end if
     end do
-
-    ! if (myrank==0) then
-    !     write(*,'(300(i2,1x))') sfc_sorted_list(1:lgt_n(tree_ID),3)
-    !     write(*,*) "ideal_weight", ideal_weight, lgt_n(tree_ID), total_weight
-    !     write(*,'("cpu_weight=",16(i3,1x))') cpu_weight
-    !     write(*,*) "xfers", com_i
-    ! endif
 
     !---------------------------------------------------------------------------------
     ! 3rd: actual communication (send/recv)
@@ -215,64 +212,3 @@ avg_weight = remaining_weight / real( mpisize-mpirank, kind=rk)
     ! timing
     call toc( "balanceLoad_tree (TOTAL)", MPI_wtime()-t0 )
 end subroutine balanceLoad_tree
-
-
-subroutine assignLoadbalancingWeight_tree(params, treeID, total_weight)
-    implicit none
-    type (type_params), intent(in)      :: params
-    integer(kind=ik) :: total_weight
-    integer(kind=ik) :: k, hvyID, lgtID, treeID, n, lgtID_neighbor, level_me, level_neighbor
-
-    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
-    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
-    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
-    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
-    ! to the last subroutine.)  -Thomas
-
-    !
-    !
-    ! NOTE Functionality currently disabled NOTE
-    !
-    ! we just assign the same weight for all blocks
-
-    ! Problem: hvy_weight is a distributed dataset and not available on all procs.
-    ! Solution: use the slot for "refinement status" temporarily for the wheight and also
-    ! sync it with refinementStatusOnly
-    do k = 1, hvy_n(treeID)
-        hvyID = hvy_active(k, treeID)
-        call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
-
-        ! default weight
-        lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 10_ik
-
-        do n = 1, size(hvy_neighbor, 2)
-            if (hvy_neighbor(hvyID, n) /= -1_ik) then
-                ! neighbor light data id
-                lgtID_neighbor = hvy_neighbor( hvyID, n )
-                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
-
-                if (level_neighbor < level_me) then
-                    ! block affect by coarse extension
-                    lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 20_ik
-                    exit ! the neighbor loop
-                endif
-            endif
-        enddo
-    enddo
-
-    call synchronize_lgt_data(params, refinement_status_only=.true.)
-
-    !!!!!!!!!!!!!!!!!!!
-    ! do k = 1, lgt_n(treeID)
-    !     lgtID = lgt_active(k, treeID)
-    !     ! default weight
-    !     lgt_block( lgtID, params%Jmax+IDX_REFINE_STS ) = 10_ik
-    ! enddo
-    !!!!!!!!!!!!!!!!!!!
-
-    total_weight = 0_ik
-    do k = 1, lgt_n(treeID)
-        total_weight = total_weight + lgt_block( lgt_active(k, treeID), params%Jmax+IDX_REFINE_STS )
-    enddo
-end subroutine

@@ -1,4 +1,4 @@
-subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
+subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync)
     implicit none
 
     character(len=*), intent(in)        :: fname                    !> file name
@@ -8,6 +8,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
+    logical, optional, intent(in)       :: no_sync
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
@@ -35,11 +36,20 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
+    logical :: no_sync2
+    integer(kind=ik) :: Jmin_active, Jmax_active
 
+    no_sync2 = .false.
+    if (present(no_sync)) no_sync2 = no_sync
 
     ! uniqueGrid modification
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    if (.not. no_sync2) then
+        ! because when saving pruned trees, sync is not possible...
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    endif
+    Jmin_active = minActiveLevel_tree(tree_ID)
+    Jmax_active = maxActiveLevel_tree(tree_ID)
 
     rank = params%rank
     Bs   = params%Bs
@@ -99,8 +109,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID)
         sparsity_Jcurrent = dble(lgt_n(tree_ID)) / dble(2**maxActiveLevel_tree(tree_ID))**dim
         sparsity_Jmax = dble(lgt_n(tree_ID)) / dble(2**params%Jmax)**dim
 
-        write(*,'("IO: writing data for time = ", f15.8," file = ",A," Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
-        time, trim(adjustl(fname)), lgt_n(tree_ID), 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
+        write(*,'("IO: saving HDF5 file t=", f15.8," file = ",A," J=(",i2," | ",i2,")", " Nblocks=",i7," sparsity=(",f5.1,"% / ",f5.1,"%)")') &
+        time, trim(adjustl(fname)), Jmin_active, Jmax_active, lgt_n(tree_ID), 100.0*sparsity_Jcurrent, 100.0*sparsity_Jmax
     endif
 
     ! we need to know how many blocks each rank actually holds, and all procs need to

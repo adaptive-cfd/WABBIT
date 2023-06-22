@@ -343,11 +343,9 @@ end subroutine
 
     ! uniqueGrid modification
     ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
-    ! ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
 
     dx_min = minval( ddx(1:params_acm%dim) )
     ! uniqueGrid modification
-    ! nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
     if (params_acm%c_0 > 0.0_rk) then
@@ -435,11 +433,8 @@ end subroutine
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
     ! temporary array. note this is just one block and hence not important for overall memory consumption
-    real(kind=rk), allocatable, save :: u_mag(:,:,:)
-    real(kind=rk) :: u_eigen, kappa, uu
+    real(kind=rk) :: u_eigen, kappa, uu, u_mag
     integer :: iscalar, dim, ix, iy ,iz
-
-    if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: GET_DT_BLOCK_ACM called but ACM not initialized"
 
@@ -468,8 +463,7 @@ end subroutine
     endif
 
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
-    u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
-
+    u_eigen = sqrt(u_mag) + sqrt(params_acm%c_0**2 + u_mag )
 
     ! ususal CFL condition
     ! if the characteristic velocity is very small, avoid division by zero

@@ -119,7 +119,7 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     if (Insect%body_moves == "no") return
 
     ! add the solid velocity field to the body mask (i.e. create us)
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -177,7 +177,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! Body
     !-----------------------------------------------------------------------------
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -261,7 +261,7 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     dx_head = 0.5d0 * 0.2035d0
     dz_head = 0.5d0 * 0.297d0
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -402,7 +402,7 @@ subroutine draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     a_body0 = 1.0d0
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -489,7 +489,7 @@ subroutine draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
     dx_head = 0.5d0 * 0.185d0
     dz_head = 0.5d0 * 0.27d0
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -554,7 +554,7 @@ subroutine draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_body     = Insect%M_body
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -649,7 +649,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
         a_body0 = 1.0d0
     endif
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -740,7 +740,7 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     dx_head = 0.5d0 * 0.185d0
     dz_head = 0.5d0 * 0.27d0
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -820,7 +820,7 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! Jerry's body is an ellipsoid
     !-----------------------------------------------------------------------------
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -990,7 +990,7 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_body     = Insect%M_body
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1047,7 +1047,7 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_body     = Insect%M_body
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1103,7 +1103,7 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
     R0 = ( 0.5d0*Insect%WingThickness + Insect%Safety )**2
     RR0 = 0.5d0*Insect%WingThickness
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1168,7 +1168,7 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! The body is an ellipsoid
     !-----------------------------------------------------------------------------
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1275,7 +1275,7 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     b = 0.1603d0
     c = b ! HACK: for simplicity, assume b=c, otherwise it can be very tough to draw
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1318,7 +1318,7 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
     ! angle by which the abdomen is tilted (measured from figure 1 in [1])
     alpha = deg2rad(-30.44d0)
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1403,7 +1403,7 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
         endif
     endif
 
-    do iz = g, size(mask,3)-1-g
+    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
@@ -1714,18 +1714,32 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     ! initialize signed distance as very far away
     tmp_block = 9.0e6_rk
 
-    ! number of traingles to loop over
+    ! number of triangles to loop over
     ntri = size(xyz_nxnynz, 1)
 
     ! thickness of the shell around the surface we compute. (the real thickness not half the value)
-    shell_thickness = Insect%C_shell_thickness * Insect%smooth * Insect%dx_reference
-    shell_thickness_safe = shell_thickness + 2.0_rk*Insect%smooth
-    ! safety = 10 ! in grid points
-    safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference )
+    shell_thickness = Insect%C_shell_thickness * Insect%C_smooth * Insect%dx_reference
+
+    ! Note: if Insect%smoothing_thickness=="local", then Insect%safety is not
+    ! a constant; it depends on the level of the block
+    ! On coarse levels, the safety is 8 points, then on the finest it is the value Insect%safety (3.5 points)
+    shell_thickness_safe = shell_thickness + min(8.0_rk*Insect%C_smooth*Insect%dx_reference, Insect%safety)
+
+    safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference ) ! in grid points
+
+    ! The below code may be misleading  because the important number for performance,
+    ! "safety", is not a constant, if Insect%smoothing_thickness=="local"
+    ! hence, showing the information may be misleading (although is is not incorrect).
 
     if (.not. informed) then
         if (root) then
-            write(*,'("Safety in STL body generation is ",i3)') safety
+            write(*,'("STL body generation dx_min               =",es12.3)') Insect%dx_reference
+            write(*,'("STL body generation C_smooth             =",g12.4)') Insect%C_smooth
+            write(*,'("STL body generation C_shell_thickness    =",g12.4)') Insect%C_shell_thickness
+            write(*,'("STL body generation Insect%safety        =",g12.4)') Insect%safety
+            write(*,'("STL body generation shell_thickness      =",g12.4)') shell_thickness
+            write(*,'("STL body generation shell_thickness_safe =",g12.4)') shell_thickness_safe
+            write(*,'("STL body generation safety (upper limit) =",i3)') safety
         endif
     endif
     informed = .true.

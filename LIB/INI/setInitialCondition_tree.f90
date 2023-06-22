@@ -11,7 +11,6 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     integer(kind=ik), intent(in)         :: tree_ID
     real(kind=rk), intent(inout)         :: time                        !> time loop variables
     integer(kind=ik), intent(inout)      :: iteration
-
     !> if .false. the code initializes on the coarsest grid, if .true. iterations
     !> are performed and the mesh is refined to gurantee the error eps
     logical, intent(in) :: adapt
@@ -24,7 +23,6 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
-
 
     lgt_n_old = 9999999
     iter = 0

@@ -22,7 +22,7 @@ subroutine post_dry_run
     real(kind=rk)                       :: t0, t1, t2       ! cpu time variables for running time calculation
     type (type_params)                  :: params           ! user defined parameter structure
 
-    real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
+    real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename,fname   ! filename of *.ini file used to read parameters
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
@@ -82,7 +82,9 @@ subroutine post_dry_run
     call get_cmd_arg( "--pruned", pruned, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
 
-
+    ! for the dry run we dont need to use the fancy wavelets
+    params%wavelet = "CDF20"
+    call setup_wavelet(params)
 
     ! modifications to parameters (because we use hvy_block instead of hvy_mask, NEQN set
     ! in ini file is not correct)
@@ -126,8 +128,10 @@ subroutine post_dry_run
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
 
+
+
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_forest(params, hvy_mask)
+    call allocate_forest(params, hvy_mask, hvy_tmp=hvy_tmp, neqn_hvy_tmp=6)
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -191,8 +195,7 @@ subroutine post_dry_run
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
             ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
-        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-            ! call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow )
+            call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
 
             ! on new grid, create the mask again
             call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -201,7 +204,7 @@ subroutine post_dry_run
             ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
             ! is effectively ignored. It seems redundant; if we set a small eps (done independent
             ! of the parameter file), this yields the same result
-            call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_mask )
+            call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
 
             ! on new grid, create the mask again
             call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -225,6 +228,10 @@ subroutine post_dry_run
 
         call WRITE_INSECT_DATA(time)
 
+        ! before (possible) pruning, we sync the ghosts
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, &
+        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+
         if (pruned) then
             if (params%rank==0) write(*,*) "now pruning!"
 
@@ -239,7 +246,7 @@ subroutine post_dry_run
 
         ! create filename
         write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
-        call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow)
+        call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
         !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
         !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )

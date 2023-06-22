@@ -197,7 +197,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                             color = int( mask(ix, iy, iz, 5), kind=2 )
 
                             ! exclude walls, trees, etc... (they have color 0)
-                            ! if (color>0_2 .and. color < 6_2) then
+                            if (color>0_2 .and. color < 6_2) then
                                 ! penalization term
                                 penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
@@ -207,7 +207,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
                                 ! moments. For insects, we compute the total moment wrt to the body center
                                 params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
-                            ! endif
+                            endif
                         enddo
                     enddo
                 enddo

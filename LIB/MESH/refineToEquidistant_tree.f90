@@ -38,7 +38,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
         ! this might not be necessary since we start from an admissible grid
         call ensureGradedness_tree( params, tree_ID )
 
-        call executeCoarsening_tree( params, hvy_block, tree_ID, .false.)
+        call executeCoarsening_tree( params, hvy_block, tree_ID)
 
         call updateMetadata_tree(params, tree_ID)
     end do

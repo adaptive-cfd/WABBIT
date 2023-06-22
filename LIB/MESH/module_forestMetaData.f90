@@ -40,6 +40,8 @@ module module_forestMetaData
     ! number of active blocks (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_n(:)
 
+    ! maximum wavelet coefficient for each component of the state vector.
+    real(kind=rk), allocatable, public    :: hvy_details(:,:)
 
     ! The following list contains the numerical treecode and the lightID for the active blocks
     ! in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,

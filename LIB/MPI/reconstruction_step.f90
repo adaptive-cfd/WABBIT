@@ -105,7 +105,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     toBeManipulated(1:hvy_n) = .false.
 
     ! check for all blocks if they have coarser neighbors - in this case they'll be manipulated
-    nnn = 0
+    ! nnn = 0
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
@@ -119,16 +119,18 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
                 if (present(level)) then
+                    ! if a level is given, we only work on this level ...
                     if ((level_neighbor < level_me).and.(level_me==level)) then
                         toBeManipulated(k) = .true.
-                        nnn = nnn + 1
+                        ! nnn = nnn + 1
                         ! its enough if one neighborhood is true
                         exit
                     endif
+                    ! ... otherwise, we check all blocks
                 else
                     if (level_neighbor < level_me) then
                         toBeManipulated(k) = .true.
-                        nnn = nnn + 1
+                        ! nnn = nnn + 1
                         ! its enough if one neighborhood is true
                         exit
                     endif
@@ -137,7 +139,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         enddo
     end do
     call toc( "coarseExtension 1 (toBeManipulated list)", MPI_Wtime()-t0 )
-    ! write(*,*) "rank", params%rank, "Nblocksforreon", nnn, hvy_n, lgt_n
+    ! write(*,*) "rank", params%rank, "N", nnn, hvy_n, lgt_n, "level=", level
     !---------------------------------------------------------------------------
 
 
@@ -228,7 +230,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         if (.not. toBeManipulated(k)) cycle
         ! ===> the following code is only executed for blocks that are manipulated by CE
 
-        ! copy transform data in "inflated mallat ordering":
+        ! copy transformed data to "inflated mallat ordering":
         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
         ! loop over all relevant neighbors

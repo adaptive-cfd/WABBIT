@@ -1,5 +1,5 @@
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    hvy_details, tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
+    tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
 
     use module_indicators
 
@@ -21,8 +21,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
 
-    real(kind=rk), intent(inout) :: hvy_details(:,:)
-
     ! for the mask generation (time-independent mask) we require the mask on the highest
     ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
     logical, intent(in) :: ignore_maxlevel
@@ -33,10 +31,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    !> mask term for every grid point in this block
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
-    !> velocity of the solid
-    real(kind=rk), allocatable, save :: us(:,:,:,:)
     logical :: consider_hvy_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -53,7 +47,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     Bs = params%Bs
     g = params%g
 
-    !> reset refinement status to "stay" on all blocks
+    ! reset refinement status to "stay" on all active blocks
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
         lgt_block( lgtID, Jmax + IDX_REFINE_STS ) = 0

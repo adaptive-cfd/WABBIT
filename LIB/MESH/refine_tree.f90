@@ -45,7 +45,8 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     call toc( "refine_tree (refinementIndicator_tree)", MPI_Wtime()-t1 )
 
 
-    !> (b) check if block has reached maximal level, if so, remove refinement flags
+    !> (b) remove refinement flag for blocks that are on the finest level and thus
+    !! cannot be refined anymore.
     t1 = MPI_Wtime()
     call respectJmaxJmin_tree( params, tree_ID )
     call toc( "refine_tree (respectJmaxJmin_tree)", MPI_Wtime()-t1 )

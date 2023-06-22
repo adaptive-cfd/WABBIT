@@ -141,9 +141,9 @@ program main
     ! check if the wavelet filter banks are okay.
     if (params%test_wavelet_decomposition) then
         call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
-    call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -369,7 +369,7 @@ program main
              call append_t_file( 'performance.t', (/time, dble(iteration), t2, dble(Nblocks_rhs), dble(Nblocks), &
              dble(minActiveLevel_tree(tree_ID_flow)), &
              dble(maxActiveLevel_tree(tree_ID_flow)), &
-             dble(params%number_procs) /) )
+             dble(params%number_procs), dble(size(lgt_block,1)) /) )
         end if
 
         !***********************************************************************

@@ -174,6 +174,37 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
             end do
         end do
 
+    elseif (params_acm%sponge_type == "p-norm-insect-centered") then
+        ! p-norm sponge. The shape of the sponge is dictated as the p-norm
+        ! https://de.wikipedia.org/wiki/P-Norm
+        ! which is a nice and simple way to get a rectangle with round corners.
+        ! This sponge type is moving with the insect, which we assume to be in the centre
+        ! of it
+
+        if ( maxval(abs(params_acm%domain_size-params_acm%domain_size(1))) > 1.0e-10_rk) then
+            call abort(1610184,"ERROR: for the p-norm sponge, the domain has to be same size in all directions.")
+        endif
+
+        p = params_acm%p_sponge
+        pinv = 1.0_rk / p
+        offset = 0.5_rk * params_acm%domain_size(1)
+
+        do iz = g+1, Bs(3)+g
+            z = (dble(iz-(g+1)) * dx(3) + x0(3) - Insect%xc_body_g(3))**p
+            do iy = g+1, Bs(2)+g
+                y = (dble(iy-(g+1)) * dx(2) + x0(2) - Insect%xc_body_g(2))**p
+                do ix = g+1, Bs(1)+g
+                    x = (dble(ix-(g+1)) * dx(1) + x0(1) - Insect%xc_body_g(1))**p
+
+                    ! distance to borders of domain
+                    tmp = -( (x + y + z)**pinv - offset)
+
+                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
+                    0.5_rk*params_acm%L_sponge)
+                end do
+            end do
+        end do
+
     else
         call abort(1610181,"Sponge-type is unknown")
     endif

@@ -626,7 +626,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 
             call ensureGradedness_tree(params, tree_ID)
 
-            call executeCoarsening_tree(params, hvy_block, tree_ID, .false.)
+            call executeCoarsening_tree(params, hvy_block, tree_ID)
 
             call updateMetadata_tree(params, tree_ID)
 

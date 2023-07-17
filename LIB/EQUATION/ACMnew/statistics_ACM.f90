@@ -146,7 +146,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
             C_eta_inv = 1.0_rk / params_acm%C_eta
 
-            ! note in 2D case, uz is ignored, so we pass p just for fun.
+            ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
@@ -297,24 +297,24 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
-        params_acm%u_residual = params_acm%u_residual + residual_block * dV
-        params_acm%mean_flow = params_acm%mean_flow + meanflow_block * dV
-        params_acm%mask_volume = params_acm%mask_volume + tmp_volume * dV
+        params_acm%u_residual    = params_acm%u_residual    + residual_block * dV
+        params_acm%mean_flow     = params_acm%mean_flow     + meanflow_block * dV
+        params_acm%mask_volume   = params_acm%mask_volume   + tmp_volume * dV
         params_acm%sponge_volume = params_acm%sponge_volume + tmp_volume2 * dV
-        params_acm%force_color = params_acm%force_color + force_block * dV
-        params_acm%moment_color = params_acm%moment_color + moment_block * dV
-        params_acm%e_kin = params_acm%e_kin + ekin_block * dV
-        params_acm%penal_power = params_acm%penal_power + penal_power_block * dV
+        params_acm%force_color   = params_acm%force_color   + force_block * dV
+        params_acm%moment_color  = params_acm%moment_color  + moment_block * dV
+        params_acm%e_kin         = params_acm%e_kin         + ekin_block * dV
+        params_acm%penal_power   = params_acm%penal_power   + penal_power_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
-        call compute_vorticity(u(:,:,:,1), u(:,:,:,2), work(:,:,:,2), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+        ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
+        call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
-        if (params_acm%dim ==2) then
-            params_acm%enstrophy = params_acm%enstrophy + sum(work(g+1:Bs(1)+g,g+1:Bs(2)+g,1,1)**2)*dx(1)*dx(2)
+        if (params_acm%dim == 2) then
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
         else
-            params_acm%enstrophy = 0.0_rk
-            ! call abort(6661,"ACM 3D not implemented.")
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
         end if
 
     case ("post_stage")

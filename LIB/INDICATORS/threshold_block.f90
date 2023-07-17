@@ -109,6 +109,8 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         enddo
     endif
 
+    detail_precomputed = detail
+
     do p = 1, nc
         ! Disable detail checking for qtys we do not want to consider. NOTE FIXME this
         ! is not very efficient, as it would be better to not even compute the wavelet transform
@@ -183,7 +185,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     else
         refinement_status = 0
     end if
-
 
     ! timings
     call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )

@@ -14,8 +14,7 @@ subroutine ini_file_to_params( params, filename )
     ! maximum memory available on all cpus
     real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
     ! string read from command line call
-    character(len=cshort)                               :: memstring
-    !
+    character(len=cshort)                           :: memstring
     integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
     integer(kind=ik), dimension(3)                  :: Bs
 
@@ -31,6 +30,9 @@ subroutine ini_file_to_params( params, filename )
     ! place in those modules, i.e., they are not read here.)
     call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
 
+    ! what wavelet to use?
+    ! (check that here as default for number ghost nodes g depends on it)
+    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
 
     call ini_domain(params, FILE )
     call ini_blocks(params,FILE)
@@ -100,10 +102,7 @@ subroutine ini_file_to_params( params, filename )
     call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
     call read_param_mpi(FILE, 'VPM', 'dont_use_pruned_tree_mask', params%dont_use_pruned_tree_mask, .false.)
 
-    ! decide if we use hartens point value multiresolution transform, which uses a coarsening operator
-    ! that just takes every 2nd grid point or biorthogonal wavlets, which apply a smoothing filter (lowpass)
-    ! prior to downsampling.
-    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
+
 
     !***************************************************************************
     ! read DEBUG parameters
@@ -228,7 +227,7 @@ end subroutine ini_file_to_params
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
     !> power used for dimensionality (d=2 or d=3)
-    integer(kind=ik) :: i
+    integer(kind=ik) :: i, g_default
     real(kind=rk), dimension(:), allocatable  :: tmp
     if (params%rank==0) then
       write(*,*)
@@ -240,8 +239,24 @@ end subroutine ini_file_to_params
     ! read number_block_nodes
     params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
+    select case(params%wavelet)
+    case ('CDF20')
+        g_default = 2
+    case ('CDF22')
+        g_default = 3
+    case ('CDF40')
+        g_default = 4
+    case ('CDF42')
+        g_default = 5
+    case ('CDF44')
+        g_default = 7
+    case default
+        g_default = 1
+    end select
+
+
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, params%g )
     call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
@@ -250,6 +265,7 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
+    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
 
     if ( params%Jmax < params%Jmin ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")

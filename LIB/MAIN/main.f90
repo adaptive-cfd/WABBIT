@@ -275,6 +275,7 @@ program main
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
                 it_is_time_to_save_data = .true.
             endif
+
             ! do not save any output before this time (so maybe revoke the previous decision)
             if (time<=params%write_time_first) then
                 it_is_time_to_save_data = .false.
@@ -357,11 +358,12 @@ program main
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_wall=",es9.3," Nb=(",i6,"/",i6,") J_rhs=",i2,":",i2," J_coarsened=",i2,":",i2, " dt=",es8.1)') &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_wall=",es9.3," Nb=(",i6,"/",i6,") J_rhs=",i2,":",i2," J_coarsened=",i2,":",i2, " dt=",es8.1," mem=",i3,"%")') &
              iteration, time, t2, Nblocks_rhs, Nblocks, &
              Jmin1, Jmax1, &
              minActiveLevel_tree(tree_ID_flow), &
-             maxActiveLevel_tree(tree_ID_flow), dt
+             maxActiveLevel_tree(tree_ID_flow), dt, &
+             nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible

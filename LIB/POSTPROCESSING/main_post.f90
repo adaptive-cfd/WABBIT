@@ -48,6 +48,9 @@ program main_post
     case ("--extract-slice")
         call post_extract_slice(params)
 
+    case ("--evaluate-wavelet-thresholding")
+        call post_evaluate_thresholding(params)
+
     case ("--wavelet-vs-rhs")
         call waveletVsRHS_timingTest(params)
 
@@ -179,6 +182,7 @@ program main_post
             write(*,*) "--post_rhs"
             write(*,*) "--average"
             write(*,*) "--generate_forest"
+            write(*,*) "--evaluate-wavelet-thresholding"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

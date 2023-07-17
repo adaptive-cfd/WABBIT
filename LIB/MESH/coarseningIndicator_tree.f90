@@ -117,8 +117,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
     !! or vorticity). The norm is specified in params%eps_norm, default is Linfty.
 
-    !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
-    !! is an absolute value.
+    !! default norm is 1 so in this case eps is an absolute value.
     if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
     norm = 1.0_rk
 
@@ -130,6 +129,15 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         else
             ! use derived qtys instead (hvy_tmp)
             call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+        endif
+
+        ! HACK
+!        if (params%physics_type == "ACM-new") then
+!            if (params%eps_norm == "Linfty") then
+!                norm(1:params%dim) = maxval( norm(1:params%dim) )
+!            elseif (params%eps_norm == "L2") then
+!                norm(1:params%dim) = sqrt( sum(norm(1:params%dim)**2) )
+!            endif
         endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)

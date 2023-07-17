@@ -429,6 +429,7 @@ contains
 
     end subroutine
 
+
     ! Filters a block, all internal nodes, assuming g >= support of filter (crashes otherwise)
     !
     ! g g g g g g g g g g g          g g g g g g g g g g g

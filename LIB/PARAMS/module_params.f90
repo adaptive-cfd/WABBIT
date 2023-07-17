@@ -75,6 +75,7 @@ module module_params
         integer(kind=ik) :: Jmin=0
         ! maximal level for blocks in data tree
         integer(kind=ik) :: Jmax=0
+        integer(kind=ik) :: Jini=-1
         ! maximal numbers of trees in the forest
         integer(kind=ik) :: forest_size=1
         ! order of refinement predictor

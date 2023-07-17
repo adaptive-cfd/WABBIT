@@ -93,13 +93,13 @@ module module_acm
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=cshort) :: sponge_type=""
+    character(len=cshort) :: nonlinear_formulation="convective" ! or "divergence"
     character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: wingsection_inifiles(1:2)
     character(len=cshort), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
-    ! the error compared to an analytical solution (e.g. taylor-green)
-    real(kind=rk) :: error(1:6), start_time = 0.0_rk
+    real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
     real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
     ! we need to know which mpirank prints output..
@@ -229,6 +229,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
     call read_param_mpi(FILE, 'ACM-new', 'use_HIT_linear_forcing', params_acm%use_HIT_linear_forcing, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
 
 
     ! initial condition
@@ -604,7 +605,6 @@ end subroutine
         call init_t_file('forces_1.t', overwrite)
         call init_t_file('forces_2.t', overwrite)
       endif
-      call init_t_file('error_taylor_green.t', overwrite)
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)

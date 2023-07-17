@@ -12,17 +12,17 @@ subroutine sparse_to_dense(params)
     type (type_params), intent(inout)  :: params
     character(len=cshort)  :: file_in
     character(len=cshort)  :: file_out
-    real(kind=rk)          :: time
+    real(kind=rk)          :: time, time_given
     integer(kind=ik)       :: iteration
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
-    integer(kind=ik)                   :: tree_ID=1, hvy_id
+    integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID
 
     integer(kind=ik)                        :: max_neighbors, level, k, tc_length
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
-    character(len=2)                        :: level_in, order
-    character(len=cshort)                       :: operator
+    character(len=cshort)                   :: order
+    character(len=cshort)                   :: operator
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks
@@ -41,7 +41,7 @@ subroutine sparse_to_dense(params)
             write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform"
             write(*,*) "grid (up and downsampling ensured)."
             write(*,*) "Command:"
-            write(*,*) "./wabbit-post --sparse-to-dense source.h5 target.h5 [target_treelevel order-predictor(2 or 4)]"
+            write(*,*) "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
             write(*,*) "-------------------------------------------------------------"
             write(*,*) "Optional Inputs: "
             write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
@@ -64,39 +64,29 @@ subroutine sparse_to_dense(params)
         call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
 
-    ! check if optional arguments are specified
-    if (command_argument_count()<4) then
-        ! set defaults
-        order = "4"
-        level = tc_length
-    else
-        call get_command_argument(4, level_in)
-        read(level_in,*) level
-        call get_command_argument(5, order)
-    endif
-
-    write(*,*) "order=", order
-
+    call get_cmd_arg( "--wavelet", order, default="CFD44" )
+    call get_cmd_arg( "--J_target", level, default=tc_length )
     call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
+    call get_cmd_arg( "--time", time_given, default=-1.0_rk)
 
-    if (order == "4") then
-        params%g = 4_ik
-        params%wavelet = "CDF40"
-
-    elseif (order == "44") then
-        params%g = 7_ik
-        params%wavelet = "CDF44"
-
-    elseif (order == "2") then
+    ! setup wavelet
+    if (order == "CDF20") then
         params%g = 2_ik
-        params%wavelet = "CDF20"
-
-    elseif (order == "42") then
+        params%wavelet='CDF20'
+    elseif (order == "CDF22") then
+        params%g = 3_ik
+        params%wavelet='CDF22'
+    elseif (order == "CDF40") then
+        params%g = 4_ik
+        params%wavelet='CDF40'
+    elseif (order == "CDF44") then
+        params%wavelet='CDF44'
+        params%g = 7_ik
+    elseif (order == "CDF42") then
+        params%wavelet='CDF42'
         params%g = 5_ik
-        params%wavelet = "CDF42"
-
     else
-        call abort(392,"ERROR: chosen predictor order invalid or not (yet) implemented. [2,4,42,44]" )
+        call abort(20030202, "The --wavelet parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
     end if
 
     call setup_wavelet(params)
@@ -176,24 +166,49 @@ subroutine sparse_to_dense(params)
     if (operator=="sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
+    elseif (operator=="refine-single-block") then
+        
+        if (params%rank==0) then
+            hvyID = hvy_active(1, tree_ID)
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+            lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1 ! refine
+        endif
+
+        call synchronize_lgt_data( params,  refinement_status_only=.true. )
+
+        ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
+        call ensureGradedness_tree( params, tree_ID )
+
+        ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
+        if (params%dim == 3) then
+            call refinementExecute3D_tree( params, hvy_block, tree_ID )
+        else
+            call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
+        endif
+
+        ! grid has changed...
+        call updateMetadata_tree(params, tree_ID)
+
     elseif (operator=="refine-coarsen") then
-        write(*,*) "starting at", lgt_n(tree_ID)
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-        ! call refine_tree( params, hvy_block, "everywhere", tree_ID )
-
-        write(*,*) "refined to", lgt_n(tree_ID)
-
-        params%threshold_mask = .false.
-        params%coarsening_indicator = "threshold-state-vector"
-        params%physics_type = "ConvDiff-new"
-        params%eps_normalized = .false.
-        params%force_maxlevel_dealiasing = .false.
-        params%Jmin = 1
-
-        call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
-
-        write(*,*) "coarsened to", lgt_n(tree_ID)
+!         write(*,*) "starting at", lgt_n(tree_ID)
+! call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+!         ! call refine_tree( params, hvy_block, "everywhere", tree_ID )
+!
+!         write(*,*) "refined to", lgt_n(tree_ID)
+!
+!         params%threshold_mask = .false.
+!         params%coarsening_indicator = "threshold-state-vector"
+!         params%physics_type = "ConvDiff-new"
+!         params%eps_normalized = .false.
+!         params%force_maxlevel_dealiasing = .false.
+!         params%Jmin = 1
+!
+!         call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
+!
+!         write(*,*) "coarsened to", lgt_n(tree_ID)
     endif
+
+    if (time_given >= 0.0_rk) time = time_given
 
     call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 

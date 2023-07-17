@@ -123,7 +123,7 @@ module module_globals
             ! you may be tempted to use (if mprank=0) to have nicer output: do not do that.
             ! if root does not come to the error, then you will not see it. better all ranks
             ! display it.
-            write(*,*) msg
+            write(*,'(A)') msg
             call MPI_ABORT( WABBIT_COMM, code, mpierr)
         end subroutine
 
@@ -143,7 +143,7 @@ module module_globals
             ! you may be tempted to use (if mprank=0) to have nicer output: do not do that.
             ! if root does not come to the error, then you will not see it. better all ranks
             ! display it.
-            write(*,*) msg
+            write(*,'(A)') msg
             call MPI_ABORT( WABBIT_COMM, 666, mpierr)
         end subroutine
 

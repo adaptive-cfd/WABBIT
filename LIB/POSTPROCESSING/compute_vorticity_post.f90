@@ -96,7 +96,7 @@ subroutine compute_vorticity_post(params)
     ! decide which order for discretization and predictor is used. Note predictor
     ! is used in ghost nodes sync'ing
     if (order == "4") then
-        params%order_discretization = "FD_4th_central_optimized"
+        params%order_discretization = "FD_4th_central"
         params%g = 4_ik
         params%wavelet="CDF40"
 
@@ -106,7 +106,7 @@ subroutine compute_vorticity_post(params)
         params%wavelet="CDF20"
 
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central_optimized) and 2 (FD_2nd_central)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central) and 2 (FD_2nd_central)")
 
     end if
 
@@ -184,6 +184,13 @@ subroutine compute_vorticity_post(params)
             dx, Bs, g, &
             params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
+        ! elseif (operator == "--laplace") then
+        !     call divergence( hvy_block(:,:,:,1,hvyID), &
+        !     hvy_block(:,:,:,2,hvyID), &
+        !     hvy_block(:,:,:,3,hvyID),&
+        !     dx, Bs, g, &
+        !     params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+
         elseif (operator == "--Q") then
             call compute_Qcriterion( hvy_block(:,:,:,1,hvyID), &
             hvy_block(:,:,:,2,hvyID), &
@@ -199,9 +206,6 @@ subroutine compute_vorticity_post(params)
 
         endif
     end do
-
-    ! unique grid has to sync before saving to HDF5 as we store the 1st ghost node as well for visualization
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
 
     if (operator == "--vorticity") then
         write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)

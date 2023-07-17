@@ -16,7 +16,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
     D = params%dim
 
     select case (which_norm)
-    case ("L2")
+    case ("L2", "H1")
         norm = 0.0_rk
         if (params%dim == 2) then
             do k = 1, hvy_n(tree_ID)

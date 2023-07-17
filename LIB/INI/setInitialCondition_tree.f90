@@ -34,6 +34,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         write(*,*) "Adaptive initial condition is: ", adapt
     endif
 
+    ! default is Jmin, if Jini is not set
+    if (params%Jini<0) params%Jini = params%Jmin
+
     call setup_wavelet(params)
 
     ! this is a HACK
@@ -115,7 +118,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             !---------------------------------------------------------------------------
             ! Create the first grid as equidistant on the coarsest treelevel
             !---------------------------------------------------------------------------
-            call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID )
+            call createEquidistantGrid_tree( params, params%Jini, .true., tree_ID )
 
             !---------------------------------------------------------------------------
             ! on the grid, evaluate the initial condition

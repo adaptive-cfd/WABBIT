@@ -194,37 +194,33 @@
           u( :, :, :, UyF) = phi_init(UyF)*sqrt(phi_init(rhoF))
         endif
      case("taylor_green")
-     do iz= 1,Bs(3)+2*g
-          do iy= 1,Bs(2)+2*g
-              do ix= 1, Bs(1)+2*g
-                  x = x0(1) + dble(ix-g-1)*dx(1)
-                  y = x0(2) + dble(iy-g-1)*dx(2)
-                  z = x0(3) + dble(iz-g-1)*dx(3)
+      do iz= 1,Bs(3)+2*g
+            do iy= 1,Bs(2)+2*g
+                do ix= 1, Bs(1)+2*g
+                    x = x0(1) + dble(ix-g-1)*dx(1)
+                    y = x0(2) + dble(iy-g-1)*dx(2)
+                    z = x0(3) + dble(iz-g-1)*dx(3)
+                   
+                    u( ix, iy, iz, rhoF) = phi_init(rhoF)
 
-                  call continue_periodic(x,params_ns%domain_size(1))
-                  call continue_periodic(y,params_ns%domain_size(2))
-                  call continue_periodic(z,params_ns%domain_size(3))
-                  
-                  u( :, :, :, rhoF) = phi_init(rhoF)
+                    u( ix, iy, iz, UxF) = phi_init(UxF)*sqrt(phi_init(rhoF)) * &
+                                      dsin(x) * &
+                                      dcos(y) * &
+                                      dcos(z)
+                    u( ix, iy, iz, UyF) = - phi_init(UxF)*sqrt(phi_init(rhoF))* &
+                                      dcos(x)* &
+                                      dsin(y)* &
+                                      dcos(z)
+                    u( ix, iy, iz, UzF) = 0.0_rk
 
-                  u( :, :, :, UxF) = phi_init(UxF)*sqrt(phi_init(rhoF)) * &
-                                     dsin(x/params_ns%domain_size(1)) * &
-                                     dcos(y/params_ns%domain_size(2)) * &
-                                     dcos(z/params_ns%domain_size(3))
-                  u( :, :, :, UyF) = - phi_init(UxF)*sqrt(phi_init(rhoF))* &
-                                     dcos(x/params_ns%domain_size(1))* &
-                                     dsin(y/params_ns%domain_size(2))* &
-                                     dcos(z/params_ns%domain_size(3))
-                  u( :, :, :, UzF) = 0.0_rk
+                    u( ix, iy, iz, pF) = phi_init(pF) + phi_init(rhoF)*phi_init(UxF)**2/16.0_rk * &
+                                      (dcos(2.0_rk*x) + &
+                                      dcos(2.0_rk*y)) * &
+                                      (dcos(2.0_rk*z) + 2.0_rk)
 
-                  u( :, :, :, pF) = phi_init(pF) + phi_init(rhoF)*phi_init(UxF)**2/16.0_rk * &
-                                    (dcos(2.0_rk*x/params_ns%domain_size(1)) + &
-                                     dcos(2.0_rk*y/params_ns%domain_size(2))) * &
-                                    (dcos(2.0_rk*z/params_ns%domain_size(3)) + 2.0_rk)
-
-              end do
-          end do
-      end do
+                end do
+            end do
+        end do
     case default
         call abort(7771,"the initial condition is unkown: "//trim(adjustl(params_ns%inicond)))
     end select

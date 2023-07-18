@@ -669,11 +669,12 @@ contains
             endif
             if ( params_ns%penalization ) then
                 call get_mask(params_ns, x0, dx, Bs, g , mask)
+                eta_inv = 1.0_rk/params_ns%C_eta
             else
-                mask=0.0_rk
+                eta_inv = 0.0_rk
+                mask    =0.0_rk
             end if
 
-            eta_inv                 = 1.0_rk/params_ns%C_eta
 
             if (params_ns%dim==2) then
                 ! compute density and pressure only in physical domain
@@ -702,6 +703,7 @@ contains
                 params_ns%force(2)     = params_ns%force(2)       + tmp(4)*dx(1)*dx(2)*eta_inv
                 params_ns%force(3)     = 0
                 area                   = area                     + tmp(5)*dx(1)*dx(2)
+
             endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
         case ("post_stage")
@@ -727,15 +729,17 @@ contains
 
             if (params_ns%mpirank == 0) then
                 ! write mean flow to disk...
-                write(*,*) 'density=', params_ns%mean_density/area ,&
-                'pressure=',params_ns%mean_pressure/area, &
-                'drag=',params_ns%force(1),&!*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
-                'Fy=',params_ns%force(2)
-
-                call append_t_file('meandensity.t', (/time, params_ns%mean_density/area/) )
-                call append_t_file('Force.t', (/time, params_ns%force/) )
-                call append_t_file('meanpressure.t', (/time, params_ns%mean_pressure/area/) )
-
+                if (params_ns%dim==2) then
+             
+                  write(*,*) 'density=', params_ns%mean_density/area ,&
+                  'pressure=',params_ns%mean_pressure/area, &
+                  'drag=',params_ns%force(1),&!*2/params_ns%initial_density/params_ns%initial_velocity(1)**2/0.01, &
+                  'Fy=',params_ns%force(2)
+                
+                  call append_t_file('meandensity.t', (/time, params_ns%mean_density/area/) )
+                  call append_t_file('Force.t', (/time, params_ns%force/) )
+                  call append_t_file('meanpressure.t', (/time, params_ns%mean_pressure/area/) )
+                endif
             end if
 
         case default

@@ -138,7 +138,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 !            elseif (params%eps_norm == "L2") then
 !                norm(1:params%dim) = sqrt( sum(norm(1:params%dim)**2) )
 !            endif
-        endif
+        ! endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
         do p = 1, N_thresholding_components

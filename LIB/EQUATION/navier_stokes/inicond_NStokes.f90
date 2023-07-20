@@ -201,22 +201,23 @@
                     y = x0(2) + dble(iy-g-1)*dx(2)
                     z = x0(3) + dble(iz-g-1)*dx(3)
 
-                    u( ix, iy, iz, UxF) = phi_init(UxF)*sqrt(phi_init(rhoF)) * &
-                                      dsin(x) * &
-                                      dcos(y) * &
-                                      dcos(z)
-                    u( ix, iy, iz, UyF) = - phi_init(UxF)*sqrt(phi_init(rhoF))* &
-                                      dcos(x)* &
-                                      dsin(y)* &
-                                      dcos(z)
-                    u( ix, iy, iz, UzF) = 0.0_rk
 
                     u( ix, iy, iz, pF) = phi_init(pF) + phi_init(rhoF)*phi_init(UxF)**2/16.0_rk * &
                                       (dcos(2.0_rk*x) + &
                                       dcos(2.0_rk*y)) * &
                                       (dcos(2.0_rk*z) + 2.0_rk)
-                    
                     u(ix, iy, iz, rhoF) = sqrt(u(ix, iy, iz, pF)/params_ns%Rs/params_ns%initial_temp)
+                    u( ix, iy, iz, UxF) = phi_init(UxF)*sqrt(u(ix, iy, iz, rhoF)) * &
+                                      dsin(x) * &
+                                      dcos(y) * &
+                                      dcos(z)
+                    u( ix, iy, iz, UyF) = - phi_init(UxF)*sqrt(u(ix, iy, iz, rhoF))* &
+                                      dcos(x)* &
+                                      dsin(y)* &
+                                      dcos(z)
+                    u( ix, iy, iz, UzF) = 0.0_rk
+
+                    
           
                 end do
             end do

@@ -148,6 +148,8 @@ program main
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
+    ! reset the grid: all blocks are inactive and empty (in case the unit tests leave us with some data)
+    call reset_tree( params, .true., tree_ID=tree_ID_flow )
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
 

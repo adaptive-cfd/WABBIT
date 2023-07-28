@@ -328,7 +328,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     if (present(verbosity)) verbose=verbosity
 
-
     rank         = params%rank
     number_procs = params%number_procs
     N            = params%number_blocks
@@ -367,12 +366,16 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     call close_file_hdf5(file_id)
 
 
-    if (params%rank==0 .and. verbose) then
-        do i = 1, N_files
+    do i = 1, N_files
+        NblocksFile  = getNumberBlocksH5File(fnames(i))
+        if (params%rank==0 .and. verbose) then
             write(*,'("READING: Filename #",i2," = ",A)') i, trim(adjustl(fnames(i)))
-        enddo
+            write(*,'("READING: Expected Nblocks  = ",i9," (on all cpus)")') NblocksFile
+        endif
+    enddo
+
+    if (params%rank==0 .and. verbose) then
         write(*,'("READING: VERSION of file(s)= ",i9)') version(1)
-        write(*,'("READING: Expected Nblocks  = ",i9," (on all cpus)")') NblocksFile
         write(*,'("READING: datarank          = ",i1," ---> ",i1,"D data")') datarank, datarank-1
         write(*,'("READING: Bs_file           = ",3(i3,1x),"Bs_memory = ",3(i3,1x))') Bs_file, params%Bs
         write(*,'("READING: Stored in tree_ID = ",i3)') tree_ID
@@ -558,7 +561,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     deallocate(hvy_buffer)
     deallocate(block_treecode)
-
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to

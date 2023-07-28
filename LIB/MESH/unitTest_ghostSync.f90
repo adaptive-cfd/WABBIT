@@ -73,6 +73,8 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     if (maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)) then
         if (params%rank==0) write(*,*) "By chance, generated an equidistant mesh: skipping ghost nodes test"
+        ! delete the grid we created for this subroutine
+        call reset_tree(params, .true., tree_ID=tree_ID)
         return
     endif
 

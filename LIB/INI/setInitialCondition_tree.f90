@@ -27,16 +27,19 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     lgt_n_old = 9999999
     iter = 0
     time = 0.0_rk
+    ! default is Jmin, if Jini is not set
+    if (params%Jini<0) params%Jini = params%Jmin
 
     if (params%rank==0) then
         write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
+        write(*,*) "read_from_files: ", params%read_from_files
+        write(*,*) "inicond_refinements: ", params%inicond_refinements
     endif
 
-    ! default is Jmin, if Jini is not set
-    if (params%Jini<0) params%Jini = params%Jmin
-
+    ! we need the wavelet here (refinement and coarsening), so if its not yet done
+    ! initialize it here:
     call setup_wavelet(params)
 
     ! this is a HACK
@@ -228,6 +231,8 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! it is a safety issue. Better simply keep it.
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
+    call MPI_barrier(WABBIT_COMM, k)
+
     ! footer...and done!
     if (params%rank == 0) then
         write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n(tree_ID), &
@@ -241,4 +246,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     if (params%physics_type == 'ACM-new') then
         params%threshold_mask = tmp
     endif
+
+    call MPI_barrier(WABBIT_COMM, k)
+
 end subroutine setInitialCondition_tree

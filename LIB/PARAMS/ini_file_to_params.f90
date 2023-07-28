@@ -266,6 +266,9 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
     call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
+    call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, .true. )
+
 
     if ( params%Jmax < params%Jmin ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")

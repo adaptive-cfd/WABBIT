@@ -59,6 +59,8 @@ module module_params
         character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
+        logical :: useCoarseExtension = .true.
+        logical :: useSecurityZone = .true.
 
 
         character(len=cshort) :: wavelet="not-initialized"

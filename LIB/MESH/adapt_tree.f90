@@ -137,8 +137,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! coarse extension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF40 or CDF20.
         t0 = MPI_Wtime()
-        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
+        if (params%useCoarseExtension) then
+            call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
+        endif
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
         !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
@@ -167,8 +169,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! afterwards, the newly created blocks should have status 0 (check that!!)
         ! can we call refinement if the refinement_status incudes "-1" ? ===> to be checked.
 
-        if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
-            call addSecurityZone_tree( time, params, level, tree_ID, hvy_block, hvy_tmp )
+        if (params%useSecurityZone) then
+            if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
+                call addSecurityZone_tree( time, params, level, tree_ID, hvy_block, hvy_tmp )
+            endif
         endif
 
         !>>>>> some blocks on level J have revoked their -1 status to 0, some new blocks may have been created
@@ -218,8 +222,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     ! final coarse extension step
     t0 = MPI_Wtime()
-    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-    hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false. )
+    if (params%useCoarseExtension) then
+        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false. )
+    endif
     call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)

@@ -1,7 +1,0 @@
-# This is wabbit's runtime control file
-# Stops the run but makes a backup first
-# Memory is properly dealloacted, unlike KILL
-#       runtime_control=save_stop;
-
-[runtime_control]
-runtime_control=nothing;

@@ -103,7 +103,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         Insect%STATE(:) = Insect%rhs(:,1)
 
         do l = 2, j
-            ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
+            ! check if coefficient is zero - if so, avoid loop over all components and active blocks
             if (abs(rk_coeffs(j,l)) < 1.0e-8_rk) then
                 cycle
             end if
@@ -150,7 +150,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, 1)
 
         do j = 2, size(rk_coeffs, 2)
-            ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
+            ! check if coefficient is zero - if so, avoid loop over all components and active blocks
             if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1.0e-8_rk) then
                 cycle
             endif

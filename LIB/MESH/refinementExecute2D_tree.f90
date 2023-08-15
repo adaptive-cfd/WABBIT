@@ -61,7 +61,7 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
             level    = lgt_block( lgt_id, params%Jmax + IDX_MESH_LVL )
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
-            ! loop over all data fields
+            ! loop over all components
             do dF = 1, size(hvy_block,3)
                 ! NOTE: the refinement interpolation acts on the entire block including ghost nodes.
                 ! interpolate data

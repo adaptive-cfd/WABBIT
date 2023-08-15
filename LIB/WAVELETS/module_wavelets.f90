@@ -72,7 +72,6 @@ contains
 
     ! coarsen the block by one level
     subroutine restriction_3D(fine, coarse)
-
         implicit none
 
         real(kind=rk), dimension(1:,1:,1:), intent(in)  :: fine
@@ -93,8 +92,9 @@ contains
 #endif
 
         coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
-
     end subroutine
+
+
 
     ! refine the block by one level
     subroutine prediction_2D(coarse, fine, order_predictor)
@@ -107,15 +107,59 @@ contains
         integer(kind=ik) :: i, j, l
         integer(kind=ik) :: nxcoarse, nxfine
         integer(kind=ik) :: nycoarse, nyfine
-        integer(kind=ik) :: ixfine, iyfine
-        ! interpolation coefficients
-        ! a: one sided, b: central
-        real(kind=rk) :: a(4), b(2)
+        integer(kind=ik) :: ixfine, iyfine, N, shift, shift_fine
+        real(kind=rk), allocatable :: c(:)
 
         nxcoarse = size(coarse, 1)
         nycoarse = size(coarse, 2)
         nxfine   = size(fine  , 1)
         nyfine   = size(fine  , 2)
+
+        !
+        ! NOTE:
+        ! ======
+        ! As of 07 Aug 2023, this routine does no longer include once-sided interpolation stencils
+        ! because they must not be used anyways. One-sided interpolation corresponds to different
+        ! wavelet functions near the boundaries. This functionality was used a long time ago with
+        ! the "lazy wavelets" CDF20 and CDF40, but we have always seen to the code not using the one-sided
+        ! stencils. Points that cannot be interpolated (where onse-sided interpolation would be used) are returned
+        ! zero.
+        !
+        ! o: matching points (checkerboard copy)
+        ! x: points to be interpolated
+        !
+        ! Input:
+        ! o x o x o x o x o x o x o
+        ! x x x x x x x x x x x x x
+        ! o x o x o x o x o x o x o
+        ! x x x x x x x x x x x x x
+        ! o x o x o x o x o x o x o
+        ! x x x x x x x x x x x x x
+        ! o x o x o x o x o x o x o
+        ! x x x x x x x x x x x x x
+        ! o x o x o x o x o x o x o
+        !
+        ! Output: (here, for 4th order interpolation; x=zeros returned i=interpolated properly)
+        ! o x o x o x o x o x o x o
+        ! x x x x x x x x x x x x x
+        ! o x o i o i o i o i o x o
+        ! x x i i i i i i i i i x x
+        ! o x o i o i o i o i o x o
+        ! x x i i i i i i i i i x x
+        ! o x o i o i o i o i o x o
+        ! x x x x x x x x x x x x x
+        ! o x o x o x o x o x o x o
+        !
+        !
+        ! Why do we have this routine?
+        ! We could, after copying (checkerboard), also simply apply the wavelet%HR filter
+        ! to all points. This yields the same result as this special routine. However,
+        ! note how even for copied (odd indices) points, a number of multiplications and subsequent summation
+        ! is required (although we multiply by zeros). For even points (which are indeed interpolated)
+        ! we require as many multiplications as the filter HR, which contains zeros.
+        ! This routine is thus more efficient (it skips odd points entirely and does not multiply by zero).
+        ! As it is called for every ghost nodes patch (not just to upsample entire blocks), it is performance-critical.
+
 
 #ifdef DEV
         if ( (2*nxcoarse-1 /= nxfine) .or. (2*nycoarse-1 /= nyfine)) then
@@ -129,93 +173,56 @@ contains
         endif
 #endif
 
+        ! setup interpolation coefficients
+        select case(order_predictor)
+        case ("multiresolution_2nd")
+            allocate(c(1:2))
+            c = (/ 0.5_rk, 0.5_rk /)
+
+        case ("multiresolution_4th")
+            allocate(c(1:4))
+            c = (/ -1.0_rk, 9.0_rk, 9.0_rk, -1.0_rk /) / 16.0_rk
+
+        case ("multiresolution_6th")
+            allocate(c(1:6))
+            c = (/ 3.0_rk, -25.0_rk, 150.0_rk, 150.0_rk, -25.0_rk, 3.0_rk /) / 256.0_rk
+
+        case default
+            call abort(23070811,"Error: unkown order_predictor="//trim(adjustl(order_predictor)))
+
+        end select
+        N = size(c,1)/2
+
+
         ! fill matching points: the coarse and fine grid share a lot of points (as the
-        ! fine grid results from insertion of one point between each coarse point)
+        ! fine grid results from insertion of one point between each coarse point).
+        ! Sometimes called checkerboard copying
+        fine = 0.0_rk
         fine(1:nxfine:2, 1:nyfine:2) = coarse(:,:)
 
-
-        if ( order_predictor == "multiresolution_2nd" ) then
-            !-------------------------------------------------------------------
-            ! second order interpolation
-            !-------------------------------------------------------------------
-            ! y direction
-            do i = 2, nxfine, 2
-                do j = 1, nyfine, 2
-                    fine(i,j) = ( fine(i-1, j) + fine(i+1, j) ) * 0.5_rk
+        do ixfine= 2*N, nxfine-(2*N-1), 2
+            ! do iyfine =  2*N-1, nyfine-(2*N-2), 2
+            do iyfine =  1, nyfine, 2
+                ! note in this implementation, interp coeffs run
+                ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+                do shift = 1, size(c,1)
+                    shift_fine = -size(c,1)+(2*shift-1)
+                    fine(ixfine,iyfine) = fine(ixfine,iyfine) + c(shift)*fine(ixfine+shift_fine,iyfine)
                 end do
             end do
+        end do
 
-            ! x direction
-            do i = 1, nxfine
-                do j = 2, nyfine, 2
-                    fine(i,j) = ( fine(i, j-1) + fine(i, j+1) ) * 0.5_rk
+        ! do ixfine = 2*N-1, nxfine-(2*N-2), 1
+        do ixfine = 1, nxfine, 1
+            do iyfine =  2*N, nyfine-(2*N-1), 2
+                ! note in this implementation, interp coeffs run
+                ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+                do shift = 1, size(c,1)
+                    shift_fine = -size(c,1)+(2*shift-1)
+                    fine(ixfine,iyfine) = fine(ixfine,iyfine) + c(shift)*fine(ixfine, iyfine+shift_fine)
                 end do
             end do
-
-        elseif ( order_predictor == "multiresolution_4th"  ) then
-            !-------------------------------------------------------------------
-            ! fourth order interpolation
-            !-------------------------------------------------------------------
-            ! one-side coeffs:
-            a = (/ 5.0_rk/16.0_rk, 15.0_rk/16.0_rk, -5.0_rk/16.0_rk, 1.0_rk/16.0_rk /)
-            ! centered coeffs (symmetric)
-            b = (/ 9.0_rk/16.0_rk, -1.0_rk/16.0_rk /)
-
-            ! step (a)
-            ! first columns (x: const y: variable )
-            ! these points require one-sided interpolation.
-            fine( 2, 1:nyfine:2 ) = &
-            a(1)*fine( 1, 1:nyfine:2 ) &
-            + a(2)*fine( 3, 1:nyfine:2 ) &
-            + a(3)*fine( 5, 1:nyfine:2 ) &
-            + a(4)*fine( 7, 1:nyfine:2 )
-
-            ! last column (same as above)
-            fine( nxfine-1, 1:nyfine:2 ) = &
-            a(4)*fine( nxfine-6, 1:nyfine:2 ) &
-            + a(3)*fine( nxfine-4, 1:nyfine:2 ) &
-            + a(2)*fine( nxfine-2, 1:nyfine:2 ) &
-            + a(1)*fine( nxfine,   1:nyfine:2 )
-
-            ! interpolate regular columns
-            do ixfine =  4, nxfine-3, 2
-                fine( ixfine, 1:nyfine:2 ) = &
-                b(2)*fine( ixfine-3, 1:nyfine:2 ) &
-                + b(1)*fine( ixfine-1, 1:nyfine:2 ) &
-                + b(1)*fine( ixfine+1, 1:nyfine:2 ) &
-                + b(2)*fine( ixfine+3, 1:nyfine:2 )
-            enddo
-
-
-            ! At this point, we have only every 2nd complete row missing
-            ! so from now on, no step size 2 anymore
-
-            ! first row
-            ! these points require one-sided interpolation.
-            fine( 1:nxfine, 2 ) = a(1)*fine( 1:nxfine, 1 ) &
-            + a(2)*fine( 1:nxfine, 3 ) &
-            + a(3)*fine( 1:nxfine, 5 ) &
-            + a(4)*fine( 1:nxfine, 7 )
-
-            ! last row (same as above)
-            fine( 1:nxfine, nyfine-1 ) = a(4)*fine( 1:nxfine, nyfine-6) &
-            + a(3)*fine( 1:nxfine, nyfine-4 ) &
-            + a(2)*fine( 1:nxfine, nyfine-2 ) &
-            + a(1)*fine( 1:nxfine, nyfine )
-
-            ! remaining interior rows
-            do iyfine =  4, nyfine-3, 2
-                fine( 1:nxfine, iyfine ) = b(2)*fine( 1:nxfine, iyfine-3 ) &
-                + b(1)*fine( 1:nxfine, iyfine-1 ) &
-                + b(1)*fine( 1:nxfine, iyfine+1 ) &
-                + b(2)*fine( 1:nxfine, iyfine+3 )
-            enddo
-
-        else
-            ! error case
-            call abort(888194,"ERROR: prediction_2D: wrong method..")
-        endif
-
+        end do
     end subroutine
 
 
@@ -229,10 +236,9 @@ contains
 
         integer(kind=ik) :: i, j, k
         integer(kind=ik) :: nxcoarse, nxfine, nycoarse, nyfine, nzcoarse, nzfine
-        integer(kind=ik) :: ixfine, iyfine, izfine
+        integer(kind=ik) :: ixfine, iyfine, izfine, N, shift, shift_fine
         ! interpolation coefficients
-        ! a: one sided, b: central
-        real(kind=rk) :: a(4), b(2)
+        real(kind=rk), allocatable :: c(:)
 
         nxcoarse = size(coarse, 1)
         nxfine   = size(fine  , 1)
@@ -241,126 +247,73 @@ contains
         nzcoarse = size(coarse, 3)
         nzfine   = size(fine  , 3)
 
+        ! setup interpolation coefficients
+        select case(order_predictor)
+        case ("multiresolution_2nd")
+            allocate(c(1:2))
+            c = (/ 0.5_rk, 0.5_rk /)
+
+        case ("multiresolution_4th")
+            allocate(c(1:4))
+            c = (/ -1.0_rk, 9.0_rk, 9.0_rk, -1.0_rk /) / 16.0_rk
+
+        case ("multiresolution_6th")
+            allocate(c(1:6))
+            c = (/ 3.0_rk, -25.0_rk, 150.0_rk, 150.0_rk, -25.0_rk, 3.0_rk /) / 256.0_rk
+
+        case default
+            call abort(23070811,"Error: unkown order_predictor="//trim(adjustl(order_predictor)))
+
+        end select
+        N = size(c,1)/2
+
+#ifdef DEV
         if ( 2*nxcoarse-1 /= nxfine .or. 2*nycoarse-1 /= nyfine .or. 2*nzcoarse-1 /= nzfine ) then
             call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
         endif
+#endif
 
         ! fill matching points: the coarse and fine grid share a lot of points (as the
-        ! fine grid results from insertion of one point between each coarse point)
+        ! fine grid results from insertion of one point between each coarse point).
+        ! Sometimes called checkerboard copying
+        fine = 0.0_rk
         fine(1:nxfine:2, 1:nyfine:2, 1:nzfine:2) = coarse(:, :, :)
 
-        if ( order_predictor == "multiresolution_2nd" ) then
-            !-------------------------------------------------------------------
-            ! second order interpolation
-            !-------------------------------------------------------------------
-            ! y direction
-            do k = 1, nzfine, 2
-                do j = 1, nyfine, 2
-                    do i = 2, nxfine, 2
-                        fine(i,j,k) = ( fine(i-1, j, k) + fine(i+1, j, k) ) * 0.5_rk
+
+        do izfine = 1, nzfine, 2
+            ! in the z=const planes, we execute the 2D code.
+            do ixfine= 2*N, nxfine-(2*N-1), 2
+                do iyfine =  1, nyfine, 2
+                    ! note in this implementation, interp coeffs run
+                    ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+                    do shift = 1, size(c,1)
+                        shift_fine = -size(c,1)+(2*shift-1)
+                        fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine+shift_fine,iyfine,izfine)
                     end do
                 end do
             end do
 
-            ! x direction
-            do k = 1, nzfine, 2
-                do j = 2, nyfine, 2
-                    do i = 1, nxfine
-                        fine(i,j,k) = ( fine(i, j-1, k) + fine(i, j+1, k) ) * 0.5_rk
+            do ixfine = 1, nxfine, 1
+                do iyfine =  2*N, nyfine-(2*N-1), 2
+                    ! note in this implementation, interp coeffs run
+                    ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+                    do shift = 1, size(c,1)
+                        shift_fine = -size(c,1)+(2*shift-1)
+                        fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine, iyfine+shift_fine,izfine)
                     end do
                 end do
             end do
+        enddo
 
-            ! z direction
-            do k = 2, nzfine, 2
-                do j = 1, nyfine
-                    do i = 1, nxfine
-                        fine(i,j,k) = ( fine(i, j, k-1) + fine(i, j, k+1) ) * 0.5_rk
-                    end do
-                end do
+        ! finally, only 1D interpolation along z is missing.
+        do izfine =  2*N, nzfine-(2*N-1), 2
+            ! note in this implementation, interp coeffs run
+            ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(:,:,izfine) = fine(:,:,izfine) + c(shift)*fine(:,:,izfine+shift_fine)
             end do
-
-        elseif ( order_predictor == "multiresolution_4th"  ) then
-            !-----------------------------------------------------------------------
-            ! fourth order interpolation
-            !-----------------------------------------------------------------------
-            ! one-side coeffs:
-            a = (/ 5.0_rk/16.0_rk, 15.0_rk/16.0_rk, -5.0_rk/16.0_rk, 1.0_rk/16.0_rk /)
-            ! centered coeffs (symmetric)
-            b = (/ 9.0_rk/16.0_rk, -1.0_rk/16.0_rk /)
-
-            do izfine = 1, nzfine, 2
-                ! --> in the planes, execute the 2d code
-                ! step (a)
-                ! first columns (x: const y: variable )
-                ! these points require one-sided interpolation.
-                fine( 2, 1:nyfine:2, izfine ) = a(1)*fine( 1, 1:nyfine:2, izfine ) &
-                + a(2)*fine( 3, 1:nyfine:2, izfine ) &
-                + a(3)*fine( 5, 1:nyfine:2, izfine ) &
-                + a(4)*fine( 7, 1:nyfine:2, izfine )
-
-                ! last columns (same as above)
-                fine( nxfine-1, 1:nyfine:2, izfine ) = a(4)*fine( nxfine-6, 1:nyfine:2, izfine ) &
-                + a(3)*fine( nxfine-4, 1:nyfine:2, izfine ) &
-                + a(2)*fine( nxfine-2, 1:nyfine:2, izfine ) &
-                + a(1)*fine( nxfine,   1:nyfine:2, izfine )
-
-                ! interpolate regular columns
-                do ixfine =  4, nxfine-3, 2
-                    fine( ixfine, 1:nyfine:2, izfine ) = b(2)*fine( ixfine-3, 1:nyfine:2, izfine ) &
-                    + b(1)*fine( ixfine-1, 1:nyfine:2, izfine ) &
-                    + b(1)*fine( ixfine+1, 1:nyfine:2, izfine ) &
-                    + b(2)*fine( ixfine+3, 1:nyfine:2, izfine )
-                enddo
-
-
-                ! At this point, we have only every 2nd complete row missing
-                ! so from now on, no step size 2 anymore
-
-                ! first row
-                ! these points require one-sided interpolation.
-                fine( 1:nxfine, 2, izfine ) = a(1)*fine( 1:nxfine, 1, izfine ) &
-                + a(2)*fine( 1:nxfine, 3, izfine ) &
-                + a(3)*fine( 1:nxfine, 5, izfine ) &
-                + a(4)*fine( 1:nxfine, 7, izfine )
-                ! last row (same as above)
-                fine( 1:nxfine, nyfine-1, izfine ) = a(4)*fine( 1:nxfine, nyfine-6, izfine ) &
-                + a(3)*fine( 1:nxfine, nyfine-4, izfine ) &
-                + a(2)*fine( 1:nxfine, nyfine-2, izfine ) &
-                + a(1)*fine( 1:nxfine, nyfine, izfine )
-                ! remaining interior rows
-                do iyfine =  4, nyfine-3, 2
-                    fine( 1:nxfine, iyfine, izfine ) = b(2)*fine( 1:nxfine, iyfine-3, izfine ) &
-                    + b(1)*fine( 1:nxfine, iyfine-1, izfine ) &
-                    + b(1)*fine( 1:nxfine, iyfine+1, izfine ) &
-                    + b(2)*fine( 1:nxfine, iyfine+3, izfine )
-                enddo
-            enddo
-
-            ! interpolate the z-direction (completely missing planes, no step 2)
-            ! first plane
-            fine( :, :, 2 ) = a(1)*fine( :, :, 1 ) &
-            + a(2)*fine( :, :, 3 ) &
-            + a(3)*fine( :, :, 5 ) &
-            + a(4)*fine( :, :, 7 )
-            ! last plane
-            fine( :, :, nzfine-1 ) = a(4)*fine( :, :, nzfine-6 ) &
-            + a(3)*fine( :, :, nzfine-4 ) &
-            + a(2)*fine( :, :, nzfine-2 ) &
-            + a(1)*fine( :, :, nzfine )
-            ! remaining planes
-            do izfine =  4, nzfine-3, 2
-                fine( :, :, izfine ) = b(2)*fine( :, :, izfine-3 ) &
-                + b(1)*fine( :, :, izfine-1 ) &
-                + b(1)*fine( :, :, izfine+1 ) &
-                + b(2)*fine( :, :, izfine+3 )
-            enddo
-
-
-        else
-            ! error case
-            call abort(888196,"ERROR: prediction_2D: wrong method..")
-        endif
+        enddo
 
     end subroutine
 
@@ -1599,6 +1552,7 @@ contains
     subroutine setup_wavelet(params)
         implicit none
         type (type_params), intent(inout) :: params
+        integer(kind=ik) :: i
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
@@ -1619,6 +1573,67 @@ contains
         ! HR - low pass reconstruction filter, H
         ! GR - high pass reconstruction filter, G
         select case(params%wavelet)
+        case("CDF62")
+            ! H TILDE filter
+            allocate( params%HD(-6:6) )
+            params%HD = (/ -3.0_rk*2.0_rk**(-10.0_rk), &
+                            0.0_rk, &
+                            11.0_rk*2.0_rk**(-9.0_rk), &
+                            0.0_rk, &
+                            -125.0_rk*2.0_rk**(-10.0_rk), &
+                            2.0_rk**(-2.0_rk), &
+                            181.0_rk*2.0_rk**(-8.0_rk), &
+                            2.0_rk**(-2.0_rk), &
+                            -125.0_rk*2.0_rk**(-10.0_rk), &
+                            0.0_rk, &
+                            11.0_rk*2.0_rk**(-9.0_rk), &
+                            0.0_rk, &
+                            -3.0_rk*2.0_rk**(-10.0_rk)/)
+
+            ! H filter
+            allocate( params%HR(-5:5) )
+            params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
+
+            ! G TILDE filter
+            allocate( params%GD(-4:6) )
+            do i = -4, +6
+                if (mod(i,2)==0) then
+                    params%GD(i) = -1.0_rk*params%HR(i-1)
+                else
+                    params%GD(i) = +1.0_rk*params%HR(i-1)
+                endif
+            enddo
+
+            ! G filter
+            allocate( params%GR(-7:5) )
+            do i = -7, 5
+                if (mod(i,2)==0) then
+                    params%GR(i) = -1.0_rk*params%HD(i+1)
+                else
+                    params%GR(i) = +1.0_rk*params%HD(i+1)
+                endif
+            enddo
+
+            params%order_predictor = "multiresolution_6th"
+
+            ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
+            ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
+            ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
+            ! scaling function coeffs to be copied:
+            params%Nscl = params%g+5 ! dictated by support of h_tilde (HD) filter for SC
+            params%Nscr = params%g+5
+            ! wavelet coefficients to be deleted:
+            params%Nwcl = params%Nscl+5 ! chosen such that g_tilde (GD) does not see the copied SC
+            params%Nwcr = params%Nscr+7
+            ! last reconstructed point is the support of GR filter not seing any WC set to zero anymore
+            params%Nreconl = params%Nwcl+7 ! support of GR -7:5
+            params%Nreconr = params%Nwcr+5
+
+            if (params%g<7) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                call abort(88888881, "The selected wavelet requires at least g=7 ghost nodes.")
+            endif
+
         case("CDF44")
             ! H TILDE filter
             allocate( params%HD(-6:6) )
@@ -1649,9 +1664,9 @@ contains
             params%Nscl = params%g+5 ! dictated by support of h_tilde (HD) filter for SC
             params%Nscr = params%g+5
             ! wavelet coefficients to be deleted:
-            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr+5
-            ! last reocnstructed point is the support of GR filter not seing any WC set to zero anymore
+            ! last reconstructed point is the support of GR filter not seing any WC set to zero anymore
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
 
@@ -1681,7 +1696,7 @@ contains
 
             params%Nscl = params%g+3
             params%Nscr = params%g+3
-            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr+5
             params%Nreconl = params%Nwcl+5 ! support of GR -5:3
             params%Nreconr = params%Nwcr+3
@@ -1760,7 +1775,7 @@ contains
 
             params%Nscl = params%g+1
             params%Nscr = params%g+1
-            params%Nwcl = params%Nscl + 0 ! chosen such that g_tilde (GD) not not see the copied SC
+            params%Nwcl = params%Nscl + 0 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr + 2
             params%Nreconl = params%Nwcl+3 ! support of GR -3:1
             params%Nreconr = params%Nwcr+1

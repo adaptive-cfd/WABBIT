@@ -77,12 +77,6 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
                 endif
             enddo
         endif
-
-        ! if ((lgtID==27) .and. (level_me==4)) then
-        ! if ((level_me==2).and.(Jmax_active>=5)) then
-        !     lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1
-        !     write(*,*) "It happened: a new block emerges omg omg"
-        ! endif
     enddo
 
     ! finally lop over all blocks and convert 17 to 0

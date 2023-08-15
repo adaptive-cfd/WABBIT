@@ -248,7 +248,7 @@ end subroutine ini_file_to_params
         g_default = 4
     case ('CDF42')
         g_default = 5
-    case ('CDF44')
+    case ('CDF44', 'CDF62')
         g_default = 7
     case default
         g_default = 1

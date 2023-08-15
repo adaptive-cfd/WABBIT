@@ -1,4 +1,4 @@
-subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
@@ -8,6 +8,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)            :: tree_ID
+    logical, intent(in)                     :: abort_on_fail
 
     integer(kind=ik)                        :: k, l, lgt_id, hvy_id
     integer(kind=ik)                        :: rank, number_procs
@@ -218,6 +219,23 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
         write(*,'(" done - L2 mean convergence order was ",g12.4)')  sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
         write(*,'(" done - Linfty convergence order was ",6(g12.4,1x))')  sqrt(error2(2:6) / error2(1:5))
         write(*,'(" done - Linfty mean convergence order was ",g12.4)')  sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
+    endif
+
+    if (abort_on_fail) then
+        select case(params%order_predictor)
+        case("multiresolution_2nd")
+            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 1.50_rk) then
+                call abort(70820231, "2nd order convergence not satisfied")
+            endif
+        case("multiresolution_4th")
+            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 3.50_rk) then
+                call abort(70820231, "4th order convergence not satisfied")
+            endif
+        case("multiresolution_6th")
+            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 5.50_rk) then
+                call abort(70820231, "6th order convergence not satisfied")
+            endif
+        end select
     endif
 
     ! delete the grid we created for this subroutine

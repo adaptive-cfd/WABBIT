@@ -1,5 +1,5 @@
 subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
-   implicit none
+    implicit none
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(inout)   :: params                       !> user defined parameter structure, hvy_active
@@ -11,37 +11,88 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
     integer(kind=ik), intent(in)        :: tree_ID
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
     integer(kind=ik)                    :: k, dF, neqn, lgt_id, i       ! loop variables
-    integer(kind=ik)                    :: g                            ! grid parameter, error variable
+    integer(kind=ik)                    :: g, a, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     integer(kind=2)                     :: n_domain(1:3)                ! surface normal
     integer(kind=ik)                    :: level, hvy_id
+    real(kind=rk)                       :: stencil(-19:19)          ! stencil array, note: size is fixed
+    integer(kind=ik)                    :: stencil_size         ! filter position (array postion of value to filter)
+    real(kind=rk), allocatable, save    :: u_filtered(:,:,:,:)
 
     Bs = params%Bs
     g  = params%g
     n_domain = 0
+    nx = size(hvy_block, 1)
+    ny = size(hvy_block, 2)
+    nz = size(hvy_block, 3)
+    nc = size(hvy_block, 4)
+
+    if (.not. allocated(u_filtered)) allocate( u_filtered(1:nx,1:ny,1:nz,1:nc) )
 
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
 
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-        level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
+        select case(params%filter_type)
+        case('explicit_3pt')
+            stencil_size = 3
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ 1.0_rk/4.0_rk, -1.0_rk/2.0_rk, 1.0_rk/4.0_rk /)
 
-        if ((params%filter_only_maxlevel .and. level==params%Jmax) .or. &
-            (.not.params%filter_only_maxlevel .and. .not.params%filter_all_except_maxlevel) .or. &
-            (params%filter_all_except_maxlevel .and. level/=params%Jmax) ) then
+        case('explicit_5pt')
+            stencil_size = 5
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/ 16.0_rk, &
+            1.0_rk/  4.0_rk, &
+            -3.0_rk/  8.0_rk, &
+            1.0_rk/  4.0_rk, &
+            -1.0_rk/ 16.0_rk/)
 
-            ! get block spacing for RHS
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
+        case('explicit_7pt')
+            stencil_size = 7
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/  1.0_rk/ 64.0_rk, &
+            -3.0_rk/ 32.0_rk, &
+            15.0_rk/ 64.0_rk, &
+            -5.0_rk/ 16.0_rk, &
+            15.0_rk/ 64.0_rk, &
+            -3.0_rk/ 32.0_rk, &
+            1.0_rk/ 64.0_rk/)
 
-            if ( .not. All(params%periodic_BC) ) then
-                ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-                call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
-                params%domain_size, params%Bs, params%dim, n_domain )
-            endif
+        case('explicit_9pt')
+            stencil_size = 9
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/256.0_rk, &
+            1.0_rk/ 32.0_rk, &
+            -7.0_rk/ 64.0_rk, &
+            7.0_rk/ 32.0_rk, &
+            -35.0_rk/128.0_rk, &
+            7.0_rk/ 32.0_rk, &
+            -7.0_rk/ 64.0_rk, &
+            1.0_rk/ 32.0_rk, &
+            -1.0_rk/256.0_rk/)
 
-            call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
-            hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), n_domain)
-        endif
+        case('explicit_11pt')
+            stencil_size = 11
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/  1.0_rk/1024.0_rk, &
+            -5.0_rk/ 512.0_rk, &
+            45.0_rk/1024.0_rk, &
+            -15.0_rk/ 128.0_rk, &
+            105.0_rk/ 512.0_rk, &
+            -63.0_rk/ 256.0_rk, &
+            105.0_rk/ 512.0_rk, &
+            -15.0_rk/ 128.0_rk, &
+            45.0_rk/1024.0_rk, &
+            -5.0_rk/ 512.0_rk, &
+            1.0_rk/1024.0_rk/)
+        end select
+
+        stencil(0) = stencil(0) + 1.0_rk
+
+        call blockFilterXYZ_vct( params, hvy_block(:,:,:,:, hvy_id), u_filtered, stencil(-a:+a), -a, +a)
+        hvy_block(:,:,:,:, hvy_id) = u_filtered
+
     enddo
 end subroutine filter_wrapper

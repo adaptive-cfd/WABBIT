@@ -6,7 +6,7 @@ init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 c
 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 \
 post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_remesh.f90 \
 post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
-post_evaluate_thresholding.f90
+post_evaluate_thresholding.f90 post_unit_test.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -157,11 +157,11 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
-$(OBJDIR)/module_t_files.o: module_t_files.f90 $(OBJDIR)/module_globals.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 # compile module containing all globals
 $(OBJDIR)/module_globals.o: module_globals.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_t_files.o: module_t_files.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_stl_file_reader.o: module_stl_file_reader.f90 $(OBJDIR)/module_globals.o

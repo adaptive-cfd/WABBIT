@@ -25,7 +25,7 @@ subroutine sparse_to_dense(params)
     character(len=cshort)                   :: operator
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: number_dense_blocks
+    integer(kind=ik)                        :: number_dense_blocks, Nb_file
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
@@ -40,16 +40,20 @@ subroutine sparse_to_dense(params)
             write(*,*) "--------------------------------------------------------------"
             write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform"
             write(*,*) "grid (up and downsampling ensured)."
+            write(*,*) ""
             write(*,*) "Command:"
+            write(*,*) ""
             write(*,*) "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
+            write(*,*) ""
             write(*,*) "-------------------------------------------------------------"
-            write(*,*) "Optional Inputs: "
-            write(*,*) "  1. target_treelevel = number specifying the desired treelevel"
-            write(*,*) "  (default is the max treelevel of the source file) "
-            write(*,*) "  2. order-predictor = consistency order or the predictor stencil"
-            write(*,*) "  (default is preditor order 4) "
-            write(*,*)
-            write(*,*)
+            write(*,*) "./wabbit-post --sparse-to-dense --operator=refine-everywhere source.h5 target.h5 --wavelet=CDF44"
+            write(*,*) ""
+            write(*,*) "-------------------------------------------------------------"
+            write(*,*) "Parameters: "
+            write(*,*) "  --J_target=4"
+            write(*,*) "  If --sparse-to-dense is used, this is the level of the equidistant output grid"
+            write(*,*) ""
+            write(*,*) ""
         end if
         return
     end if
@@ -59,6 +63,8 @@ subroutine sparse_to_dense(params)
     call check_file_exists(trim(file_in))
     call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, &
     params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
+    Nb_file = lgt_n(tree_ID)
 
     if (len_trim(file_out)==0) then
         call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
@@ -85,6 +91,9 @@ subroutine sparse_to_dense(params)
     elseif (order == "CDF42") then
         params%wavelet='CDF42'
         params%g = 5_ik
+    elseif (order == "CDF62") then
+        params%wavelet='CDF62'
+        params%g = 7_ik
     else
         call abort(20030202, "The --wavelet parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
     end if
@@ -118,23 +127,28 @@ subroutine sparse_to_dense(params)
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
 
-        write(*,'(A40,1x,A40)') "params%order_predictor", params%order_predictor
-        write(*,'(A40,1x,A40)') "params%wavelet", params%wavelet
-        write(*,'(A40,1x,i2)') "params%g", params%g
+        write(*,'(A40,1x,A40)') "params%order_predictor=", params%order_predictor
+        write(*,'(A40,1x,A40)') "params%wavelet=", params%wavelet
+        write(*,'(A40,1x,i2)') "params%g=", params%g
+        write(*,'(A40,1x,A40)') "operator=", operator
         write(*,'(80("-"))')
     endif
 
     ! set max_treelevel for allocation of hvy_block
     params%Jmax = max(level, tc_length)
-    params%Jmin = level
+    params%Jmin = 1 !!!!!????
     params%Bs = Bs
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
 
-    ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks
-    !> \todo change that for 3d case
-    params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
+    if (operator=="sparse-to-dense") then
+        params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
+    elseif (operator=="refine-everywhere") then
+        params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
+    elseif (operator=="coarsen-everywhere") then
+        params%number_blocks = lgt_n(tree_ID) / params%number_procs + 7_ik
+    endif
 
     if (params%rank==0) then
         write(*,'("Data dimension: ",i1,"D")') params%dim
@@ -166,46 +180,36 @@ subroutine sparse_to_dense(params)
     if (operator=="sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
-    elseif (operator=="refine-single-block") then
-        
-        if (params%rank==0) then
-            hvyID = hvy_active(1, tree_ID)
-            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-            lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1 ! refine
-        endif
+    elseif (operator=="refine-everywhere") then
+        call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID )
 
-        call synchronize_lgt_data( params,  refinement_status_only=.true. )
+    elseif (operator=="coarsen-everywhere") then
+        call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )
 
-        ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
-        call ensureGradedness_tree( params, tree_ID )
+    ! elseif (operator=="refine-single-block") then
+    !
+    !     if (params%rank==0) then
+    !         hvyID = hvy_active(1, tree_ID)
+    !         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+    !         lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1 ! refine
+    !     endif
+    !
+    !     call synchronize_lgt_data( params,  refinement_status_only=.true. )
+    !
+    !     ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
+    !     call ensureGradedness_tree( params, tree_ID )
+    !
+    !     ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
+    !     if (params%dim == 3) then
+    !         call refinementExecute3D_tree( params, hvy_block, tree_ID )
+    !     else
+    !         call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
+    !     endif
+    !
+    !     ! grid has changed...
+    !     call updateMetadata_tree(params, tree_ID)
 
-        ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-        if (params%dim == 3) then
-            call refinementExecute3D_tree( params, hvy_block, tree_ID )
-        else
-            call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-        endif
 
-        ! grid has changed...
-        call updateMetadata_tree(params, tree_ID)
-
-    elseif (operator=="refine-coarsen") then
-!         write(*,*) "starting at", lgt_n(tree_ID)
-! call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-!         ! call refine_tree( params, hvy_block, "everywhere", tree_ID )
-!
-!         write(*,*) "refined to", lgt_n(tree_ID)
-!
-!         params%threshold_mask = .false.
-!         params%coarsening_indicator = "threshold-state-vector"
-!         params%physics_type = "ConvDiff-new"
-!         params%eps_normalized = .false.
-!         params%force_maxlevel_dealiasing = .false.
-!         params%Jmin = 1
-!
-!         call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
-!
-!         write(*,*) "coarsened to", lgt_n(tree_ID)
     endif
 
     if (time_given >= 0.0_rk) time = time_given
@@ -215,7 +219,7 @@ subroutine sparse_to_dense(params)
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
         trim(adjustl(file_in)), level, trim(adjustl(file_out))
-        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now)")') &
+        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now if --sparse-to-dense is used)")') &
         minActiveLevel_tree( tree_ID ),&
         maxActiveLevel_tree( tree_ID )
     end if

@@ -114,15 +114,16 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
 
     ! The neighbor is finer: we have to interpolate the data
 
-    if ( params%dim == 3 ) then      ! 3D
-
+    if ( params%dim == 3 ) then
+        ! 3D
         do dF = 1, nc
             call prediction_3D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), &
             ijk(1,3):ijk(2,3), dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1:2*nz-1, dF), &
             params%order_predictor)
         end do
 
-    else      ! 2D
+    else
+        ! 2D
         do dF = 1, nc
             call prediction_2D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2),&
             1, dF, hvy_id ), pre_data( 1:2*nx-1, 1:2*ny-1, 1, dF),  params%order_predictor)

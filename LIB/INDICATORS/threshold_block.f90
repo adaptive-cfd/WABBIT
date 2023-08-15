@@ -25,12 +25,11 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: t0, eps2
-    real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
     !
-    ! INDEX            2D     3D     LABEL
+    ! INDEX            2D     3D     LABEL (NAME)
     ! -----            --    ---     ---------------------------------
     ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
     ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
@@ -42,6 +41,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
     t0     = MPI_Wtime()
     nx     = size(u, 1)
@@ -91,30 +91,27 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
                 ! if all details are smaller than C_eps, we can coarsen.
                 ! check interior WC only
                 detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-                detail(p) = detail(p) / norm(p)
             enddo
         else
             do p = 1, nc
                 ! if all details are smaller than C_eps, we can coarsen.
                 ! check interior WC only
                 detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-                detail(p) = detail(p) / norm(p)
             enddo
         endif
+
     else
         ! detail is precomputed in coarseExtensionUpdate_tree (because we compute
         ! the FWT there anyways)
-        do p = 1, nc
-            detail(p) = detail_precomputed(p) / norm(p)
-        enddo
+        detail(1:nc) = detail_precomputed(1:nc)
     endif
 
-    detail_precomputed = detail
+    detail(1:nc) = detail(1:nc) / norm(1:nc)
 
+    ! Disable detail checking for qtys we do not want to consider. NOTE FIXME this
+    ! is not very efficient, as it would be better to not even compute the wavelet transform
+    ! in the first place (but this is more work and selective thresholding is rarely used..)
     do p = 1, nc
-        ! Disable detail checking for qtys we do not want to consider. NOTE FIXME this
-        ! is not very efficient, as it would be better to not even compute the wavelet transform
-        ! in the first place
         if (.not. thresholding_component(p)) detail(p) = 0.0_rk
     enddo
 

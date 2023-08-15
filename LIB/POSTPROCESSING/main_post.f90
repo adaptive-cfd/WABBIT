@@ -92,8 +92,11 @@ program main_post
     case("--average")
         call post_average_snapshots(params)
 
-    case("--sparse-to-dense")
+    case("--sparse-to-dense", "--refine-everywhere")
         call sparse_to_dense(params)
+
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test")
+        call post_unit_test(params)
 
     case ("--performance-test")
         call performance_test(params)
@@ -183,6 +186,7 @@ program main_post
             write(*,*) "--average"
             write(*,*) "--generate_forest"
             write(*,*) "--evaluate-wavelet-thresholding"
+            write(*,*) "--refine-everywhere"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

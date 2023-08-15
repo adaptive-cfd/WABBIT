@@ -59,14 +59,7 @@ if [ ! -f $curdir/../wabbit ]; then
     exit 5
 fi
 
-if [ ! -f $curdir/create_ref_files.sh ]; then
-    echo -e $Red"$curdir/create_ref_files.sh not found.."$Color_Off
-    exit 6
-fi
-
 ln -s $curdir/../wabbit
-ln -s $curdir/../wabbit-post
-ln -s $curdir/create_ref_files.sh
 
 if [[ $inifile == "pod.sh" ]]; then
     sh $inifile
@@ -74,8 +67,6 @@ else
     $mpi ./wabbit $inifile ${memory}
 fi
 
-./create_ref_files.sh
+rm -f *times.dat *.t
 
-rm -f *times.dat
-
-rm wabbit wabbit-post create_ref_files.sh
+rm wabbit wabbit-post

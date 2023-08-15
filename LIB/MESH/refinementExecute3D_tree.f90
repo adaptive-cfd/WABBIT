@@ -59,7 +59,7 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
-            ! loop over all data fields
+            ! loop over all components
             do dF = 1, size(hvy_block,4)
                 ! NOTE: the refinement interpolation acts on the entire block including ghost nodes.
                 ! interpolate data

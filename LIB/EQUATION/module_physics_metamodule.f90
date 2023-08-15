@@ -27,7 +27,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, FILTER_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
+    STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
     !**********************************************************************************************
 
 contains
@@ -528,67 +528,6 @@ contains
         end select
 
     end subroutine INICOND_meta
-
-
-
-    !-----------------------------------------------------------------------------
-    ! wrapper for filter u -> u_tilde
-    ! Note this function is completely
-    ! independent of the grid and any MPI formalism, neighboring relations and the like.
-    ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
-    ! Ghost nodes are assumed to be sync'ed.
-    !-----------------------------------------------------------------------------
-    subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array, mask, n_domain)
-        implicit none
-        !> physics type
-        character(len=*), intent(in) :: physics
-        !> time in physical units
-        real(kind=rk), intent (in) :: time
-
-        ! block data, containg the state vector. In general a 4D field (3 dims+components)
-        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
-        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
-
-        !> number of ghost nodes
-        integer, intent(in) :: g
-
-        ! for each block, you'll need to know where it lies in physical space. The first
-        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
-        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
-
-        ! the work array is an additional array which can be used to store temporal
-        ! values of the statevector field
-        real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
-
-        ! penalization mask function
-        real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
-
-        ! when implementing boundary conditions, it is necessary to know if the local field (block)
-        ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
-        ! The n_domain tells you if the local field is adjacent to a domain boundary:
-        ! n_domain(i) can be either 0, 1, -1,
-        !  0: no boundary in the direction +/-e_i
-        !  1: boundary in the direction +e_i
-        ! -1: boundary in the direction - e_i
-        ! currently only acessible in the local stage
-        integer(kind=2), optional, intent(in):: n_domain(3)
-
-        select case(physics)
-        case ("ACM-new")
-            call filter_ACM(time, u, g, x0, dx,  work_array, mask)
-
-        case ("ConvDiff-new")
-            call abort(1009181817, "filter not implemented for convection-diffusion.")
-
-        case ("navier_stokes")
-            call filter_NStokes(time, u, g, x0, dx, work_array, n_domain)
-
-        case default
-            call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))
-
-        end select
-
-    end subroutine FILTER_meta
 
 
 

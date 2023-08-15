@@ -135,7 +135,7 @@ program main
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
-        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
     endif
 
     ! check if the wavelet filter banks are okay.

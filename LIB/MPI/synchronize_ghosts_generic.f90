@@ -540,7 +540,7 @@ subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
     ! reset buffer size
     buffer_counter = 0
 
-    ! loop over all data fields
+    ! loop over all components
     do dF = 1, size(hvy_data,4)
         do k = 1, size(hvy_data, 3) ! third dimension, note: for 2D cases k is always 1
             do j = 1, size(hvy_data, 2)
@@ -575,7 +575,7 @@ subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id 
     integer(kind=ik) :: i, j, k, dF, buffer_i
 
     buffer_i = 1
-    ! loop over all data fields
+    ! loop over all components
     do dF = 1, size(hvy_block,4)
         do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
             do j = data_bounds(1,2), data_bounds(2,2)

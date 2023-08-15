@@ -198,6 +198,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         endif
 
     case default
+        ! Default is wavelet thresholding...
+        
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.

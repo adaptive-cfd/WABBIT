@@ -63,31 +63,6 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    ! call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "everywhere", hvy_tmp)!, hvy_work)
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    ! call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID) )
-!!!!!!!!!!!!!!!!!!!!!!!
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-    !     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-    !     hvy_block( g+1:Bs(1)-1+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID) = 0.0
-    !     ! hvy_block( g+2:Bs(1)+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID) = 0.0e-3_rk * hvy_block( g+2:Bs(1)+g:2, g+1:Bs(1)-1+g:2,:,:,hvyID)
-    !     hvy_block( g+1:Bs(1)-1+g:2, g+2:Bs(1)+g:2,:,:,hvyID) = 0.0e-2_rk * hvy_block( g+1:Bs(1)-1+g:2, g+2:Bs(1)+g:2,:,:,hvyID)
-    !     hvy_block( g+2:Bs(1)+g:2, g+2:Bs(1)+g:2,:,:,hvyID) = 0.0e-2_rk !* hvy_block( g+2:Bs(1)+g:2, g+2:Bs(1)+g:2,:,:,hvyID)
-    ! end do
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvyID = hvy_active(k,tree_ID)
-    !     call waveletReconstruction_block_old(params, hvy_block(:,:,:,:,hvyID))
-    !     hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-    ! end do
-    ! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-!!!!!!!!!!!!!!
-
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
     !----------------------------------------------------------------------------

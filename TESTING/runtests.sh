@@ -14,12 +14,14 @@ if [ -z "$nprocs" ]; then
 fi
 
 if [ -z "$mpi_command" ]; then
-    export mpi_command="nice mpiexec -n ${nprocs}"
+    export mpi_command="nice mpirun -n ${nprocs} "
 fi
 
 if [ "${memory}" == "" ]; then
     export memory="--memory=5.0GB"
 fi
+
+#export mpi_serial="nice mpirun -n 1 "
 
 fail_color=$'\033[31;1m'
 pass_color=$'\033[92;1m'
@@ -29,6 +31,31 @@ end_color=$'\033[0m'
 # they structure teh output on the screen. Note the three dashes mark those headers
 tests=( "---post---"
         # "TESTING/wabbit_post/pod/pod_test.sh"
+        "---wavelets---"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF20.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF22.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF40.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF42.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF44.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_2D_CDF62.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF20.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF22.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF40.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF42.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF44.sh"
+        "TESTING/wavelets/equi_refineCoarsen_FWT-IWT_3D_CDF62.sh"
+        "TESTING/wavelets/ghost_nodes_2D_2nd.sh"
+        "TESTING/wavelets/ghost_nodes_2D_4th.sh"
+        "TESTING/wavelets/ghost_nodes_2D_6th.sh"
+        "TESTING/wavelets/ghost_nodes_3D_2nd.sh"
+        "TESTING/wavelets/ghost_nodes_3D_4th.sh"
+        "TESTING/wavelets/ghost_nodes_3D_6th.sh"
+        "TESTING/wavelets/adaptive_CDF20/run.sh"
+        "TESTING/wavelets/adaptive_CDF22/run.sh"
+        "TESTING/wavelets/adaptive_CDF40/run.sh"
+        "TESTING/wavelets/adaptive_CDF42/run.sh"
+        "TESTING/wavelets/adaptive_CDF44/run.sh"
+        "TESTING/wavelets/adaptive_CDF62/run.sh"
         "---convection---"
         "TESTING/conv/blob_2D_equi_4th/blob-convection-adaptive.sh"
         "TESTING/conv/blob_2D_adaptive_CDF20/blob-convection-adaptive.sh"
@@ -42,9 +69,6 @@ tests=( "---post---"
         "TESTING/conv/blob_3D_adaptive_CDF22/blob3d-adaptive.sh"
         "TESTING/conv/blob_3D_adaptive_CDF44/blob3d-adaptive.sh"
 
-        # "TESTING/conv/blob_3D_nonequi/blob3d.sh"
-        # "TESTING/conv/symmetry-blob-2d/symmetry-blob-2d.sh"
-        # "TESTING/conv/symmetry-blob-3d/symmetry-blob-3d.sh"
         # "---navier-stokes---"
         # "TESTING/navier_stokes/simple_geometry/rhombus/rhombus_moving_shock.sh"
         # "TESTING/navier_stokes/simple_geometry/triangle/triangle_adapt.sh"
@@ -60,13 +84,6 @@ tests=( "---post---"
         # "TESTING/navier_stokes/filter/explicit_11pt/explicit_11pt.sh"
         "---acm---"
         "TESTING/acm/acm_cyl_adaptive_CDF44/run.sh"
-        # "TESTING/acm/fruitfly_adaptive/fruitfly_adaptive.sh"
-        # "TESTING/acm/bumblebee_adaptive/bumblebee_adaptive.sh"
-        # "TESTING/acm/acm_cyl_equi/acm_cylinder_equi.sh"
-        # "TESTING/acm/acm_cyl_nonequi/acm_cylinder_nonequi.sh"
-        # "TESTING/acm/acm_cyl_adaptive_newsponge/acm_cyl_adaptive_newsponge.sh"
-        # "TESTING/acm/acm_cyl_adaptive_krylov/acm_cylinder_adaptive_krylov.sh"
-        # "TESTING/acm/acm_cyl_adaptive/acm_cylinder_adaptive.sh"
         )
 
 happy_sum=0
@@ -104,17 +121,18 @@ do
         ./${ts} > $logfile
         err="$?"
         T2="$(($(date +%s)-T2))"
-        echo "Time used in test: ${T2} seconds"
+
 
         if [ $err == 0 ]; then
-            printf "%s \n" "${pass_color} pass ${end_color}"
+            printf "%s \t" "${pass_color} pass ${end_color}"
             happy_sum=$((happy_sum+1))
             summary[$numtests]=0
         else
-            printf "%s \n" "${fail_color} fail ${end_color}"
+            printf "%s \t" "${fail_color} fail ${end_color}"
             sad_sum=$((sad_sum+1))
             summary[$numtests]=1
         fi
+        echo "Time used in test: ${T2} seconds"
         numtests=$((numtests+1))
         rm -f *.key *.h5 *.t *.dat
         printf "\n"

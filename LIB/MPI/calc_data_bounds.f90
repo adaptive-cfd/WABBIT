@@ -472,6 +472,9 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
         elseif (params%order_predictor == "multiresolution_2nd" ) then
             S  = 0
             min_size = 2
+        elseif (params%order_predictor == "multiresolution_6th" ) then
+            S  = 2
+            min_size = 6
         else
             call abort(2875490, "The predictor method is unknown")
         endif

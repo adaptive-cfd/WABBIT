@@ -249,7 +249,7 @@ subroutine init_ghost_nodes( params )
         ! of IF-THEN clauses).
         ! This arrays indices are:
         ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
-        ! call ghosts_setup_patches(params, gminus=7, gplus=5, output_to_file=.true.)
+        call ghosts_setup_patches(params, gminus=params%g, gplus=params%g, output_to_file=.true.)
 
         ! set up table with inverse neighbor relations
         if (.true.) then ! for folding only

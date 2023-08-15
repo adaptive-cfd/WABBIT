@@ -46,7 +46,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     logical, allocatable, save :: toBeManipulated(:)
     character(len=80) ::fname
 
-    if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20")) return
+    if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20").or.(params%wavelet=="CDF60")) return
 
     t0 = MPI_Wtime()
     nx = size(hvy_block, 1)
@@ -184,7 +184,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                     ! extract largest wavelet coeffcienct
                     do p = 1, nc
                         if (params%dim==3) then
-                            hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3), p, 2:8)) )
+                            hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
                         else
                             hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
                         endif

@@ -77,29 +77,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call updateMetadata_tree(params, tree_ID)
     call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
-!
-! New Idea for adapt_tree:
-! avoid repeating FWT. Currently, coarseExtension performs in u-space (and returns in u-space)
-! subsequently, thresholding computes FWT AGAIN !
-! finally, merge blocks applies h_tilde filter AGAIN!
-! ====> does not work, see below.
-! ====> ignores level-wise structure of wavelets
-! ====> This was the reason for YP's first contributions, cannot filter on J-1 unless J is done 1st
-!
-! LOOP: J=Jmax:-1:Jmin
-!   1 - FWT of all blocks on level J
-!   2 - sync all FWT coeffs on level J
-!   3 - coarse extension: manipulate SC/WC but do not perform IWT
-!       This does not require coarser neighbors to have done the FWT: we WC=0 and copy SC anyways
-!   4a - thresholding on level J - set status according to WC
-!   4b - additional criteria on level J (if used, e.g., mask, everywhere etc)
-!   5 - gradedness etc (?? how does this work level-wise ???)
-!   6 - blocks finally flagged for coarsening: delete all WC
-!   7 - IWT of all blocks (even though strictly speaking after 6, we have SC for the lower levels)
-!   8 - execute coarsening (if flagging is done only on J, no modification is required)
-!   J = J-1
-! GOTO 1
-!
 ! Q: can we save time of the IWT of all blocks, maybe copy SC to their positions? are they already there? I think so YES
 ! Q: can we save time if a block is coarsened and we do nt have to perform coarseExtension? -
 ! maybe yes but the main time in coarseExt is spent on FWT/IWT maniuplation is not that critical
@@ -134,8 +111,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
-        ! coarse extension: remove wavelet coefficients near a fine/coarse interface
-        ! on the fine block. Does nothing in the case of CDF40 or CDF20.
+        ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
+        ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
+        ! If the coarseExtension is used, it also computes the FWT of all blocks on the current level -
+        ! this reduces load imbalancing. We need to compute the FWT anyways in coarseningIndicator_tree (for
+        ! thresholding). In this case, the detail (largest wavelet coeff) is passed via hvy_details.
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
             call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
@@ -145,11 +125,15 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
 
-        ! calculate detail on the entire grid level. Note this is a wrapper for coarseningIndicator_block, which
+        ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
         ! acts on a single block only.
-        ! The routine sets all blocks to 0 (STAY) and if its wavelet coeffs are below the threshold
-        ! it assigns -1 (COARSEN) to a block. This status may however be revoked below.
-! ADD EXPLANATION HERE
+        ! We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the default, other indicators
+        ! are used mostly for testing.
+        ! The routine first sets all blocks (regardless of level) to 0 (STAY).
+        ! In the wavelet case, we check the blocks for their largest detail (=wavelet coeff). If the coarseExtension is used,
+        ! the FWT of all blocks (on this level) is performed there (even for blocks that are not modified) - this reduces load
+        ! imbalancing. If coarseExtension is not used, the actual FWT of blocks (on this level) is performed in coarseningIndicator_tree.
+        ! The routine assigns -1 (COARSEN) to a block, if it matches the criterion. This status may however be revoked below.
         t0 = MPI_Wtime()
         if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
@@ -160,9 +144,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         endif
         call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
 
-        !> coarseningIndicator_tree works on LEVEL.
-        !> blocks that are significant on that level now have status 0, all others have -1
-        !> blocks on different levels have status 0
+        ! After coarseningIndicator_tree, the situation is:
+        ! coarseningIndicator_tree works on LEVEL.
+        ! blocks that are significant on that level now have status 0, others (on this level) have -1
+        ! Any blocks on other levels have status 0.
 
         ! here, we should refine the coarse frontier blocks
 
@@ -175,10 +160,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             endif
         endif
 
-        !>>>>> some blocks on level J have revoked their -1 status to 0, some new blocks may have been created
-        !      and they have the status 0 as well
-        !      Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it
-        !      is not possible to 'accidentally' delete the newly created blocks later on.
+        ! In addSecurityZone_tree, some blocks on level J have revoked their -1 status to 0, some
+        ! new blocks may have been created and they have the status 0 as well.
+        ! Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it
+        ! is not possible to 'accidentally' delete the newly created blocks later on.
 
 
         ! check if block has reached maximal level, if so, remove refinement flags

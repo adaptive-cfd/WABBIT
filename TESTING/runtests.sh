@@ -8,6 +8,10 @@ echo "   "
 echo -e "\t \033[4m WABBIT: run all existing unit tests \033[0m"
 echo "   "
 
+fail_color=$'\033[31;1m'
+pass_color=$'\033[92;1m'
+end_color=$'\033[0m'
+
 if [ -z "$nprocs" ]; then
     echo "unset"
     nprocs=4
@@ -21,11 +25,26 @@ if [ "${memory}" == "" ]; then
     export memory="--memory=5.0GB"
 fi
 
+if [ "$(which wabbit-compare-hdffiles.py)" == "" ]; then
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "Since 15 Aug 2023, the unit testing framework has evolved. It now stores "
+    echo "full HDF5 files in the TESTING directory, which makes it easier to visualize the reference data"
+    echo "and current results, should they be different. We now calculate the L2 error of the field, if"
+    echo "the grid is identical. This new framework requires the "
+    echo "https://github.com/adaptive-cfd/python-tools repository for comparing two WABBIT HDF5 files. "
+    echo ""
+    echo " You do not seem to have the command ${fail_color}wabbit-compare-hdffiles.py${end_color} available! Either you do not have"
+    echo " the repository, or its directory is not in you \$PYTHONPATH"
+    echo ""
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "${fail_color}Cannot run unit tests !!${end_color}"
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    exit 881
+fi
+
 #export mpi_serial="nice mpirun -n 1 "
 
-fail_color=$'\033[31;1m'
-pass_color=$'\033[92;1m'
-end_color=$'\033[0m'
+
 
 # list all tests here. For readability, we include header lines like ---acm---
 # they structure teh output on the screen. Note the three dashes mark those headers

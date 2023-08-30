@@ -13,6 +13,7 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
     integer(kind=ik)                               :: ix, iy, iz      ! loop variables
     real(kind=rk)                                  :: a(-3:3)         ! coefficients for Tam&Webb
     real(kind=rk) :: Amatrix(1:3,1:3)
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
     Qcrit = 0.0_rk
 
@@ -31,6 +32,40 @@ subroutine compute_Qcriterion(u, v, w, dx, Bs, g, discretization, Qcrit)
         if (discretization == "FD_2nd_central" ) then
             call abort(0112181, "ERROR: Q-criterion using 2nd order not implemented.")
 
+        else if (discretization == "FD_4th_central") then
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        uxdx = (a_FD4(-2)*u(ix-2,iy,iz) + a_FD4(-1)*u(ix-1,iy,iz) + a_FD4(0)*u(ix,iy,iz) &
+                             +  a_FD4(+1)*u(ix+1,iy,iz) + a_FD4(+2)*u(ix+2,iy,iz))*dx_inv
+                        uxdy = (a_FD4(-2)*u(ix,iy-2,iz) + a_FD4(-1)*u(ix,iy-1,iz) + a_FD4(0)*u(ix,iy,iz) &
+                             +  a_FD4(+1)*u(ix,iy+1,iz) + a_FD4(+2)*u(ix,iy+2,iz))*dy_inv
+                        uxdz = (a_FD4(-2)*u(ix,iy,iz-2) + a_FD4(-1)*u(ix,iy,iz-1) + a_FD4(0)*u(ix,iy,iz) &
+                             +  a_FD4(+1)*u(ix,iy,iz+1) + a_FD4(+2)*u(ix,iy,iz+2))*dz_inv
+
+                        uydx = (a_FD4(-2)*v(ix-2,iy,iz) + a_FD4(-1)*v(ix-1,iy,iz) + a_FD4(0)*v(ix,iy,iz) &
+                             +  a_FD4(+1)*v(ix+1,iy,iz) + a_FD4(+2)*v(ix+2,iy,iz))*dx_inv
+                        uydy = (a_FD4(-2)*v(ix,iy-2,iz) + a_FD4(-1)*v(ix,iy-1,iz) + a_FD4(0)*v(ix,iy,iz) &
+                             +  a_FD4(+1)*v(ix,iy+1,iz) + a_FD4(+2)*v(ix,iy+2,iz))*dy_inv
+                        uydz = (a_FD4(-2)*v(ix,iy,iz-2) + a_FD4(-1)*v(ix,iy,iz-1) + a_FD4(0)*v(ix,iy,iz) &
+                             +  a_FD4(+1)*v(ix,iy,iz+1) + a_FD4(+2)*v(ix,iy,iz+2))*dz_inv
+
+                        uzdx = (a_FD4(-2)*w(ix-2,iy,iz) + a_FD4(-1)*w(ix-1,iy,iz) + a_FD4(0)*w(ix,iy,iz) &
+                             +  a_FD4(+1)*w(ix+1,iy,iz) + a_FD4(+2)*w(ix+2,iy,iz))*dx_inv
+                        uzdy = (a_FD4(-2)*w(ix,iy-2,iz) + a_FD4(-1)*w(ix,iy-1,iz) + a_FD4(0)*w(ix,iy,iz) &
+                             +  a_FD4(+1)*w(ix,iy+1,iz) + a_FD4(+2)*w(ix,iy+2,iz))*dy_inv
+                        uzdz = (a_FD4(-2)*w(ix,iy,iz-2) + a_FD4(-1)*w(ix,iy,iz-1) + a_FD4(0)*w(ix,iy,iz) &
+                             +  a_FD4(+1)*w(ix,iy,iz+1) + a_FD4(+2)*w(ix,iy,iz+2))*dz_inv
+
+                        Amatrix(1,:) =  (/ uxdx, uxdy, uxdz/)
+                        Amatrix(2,:) =  (/ uydx, uydy, uydz/)
+                        Amatrix(3,:) =  (/ uzdx, uzdy, uzdz/)
+
+                        Qcrit(ix,iy,iz) = -0.5d0*( sum( Amatrix*transpose(Amatrix) ) )
+
+                    end do
+                end do
+            end do
         else if (discretization == "FD_4th_central_optimized") then
             do ix = g+1, Bs(1)+g
                 do iy = g+1, Bs(2)+g

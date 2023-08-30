@@ -45,7 +45,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     ! any saved file must be sync'ed, because we store
     ! the 1st ghost node for visualization.
     if (params%penalization) then
-        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,TREE_ID_MASK), hvy_n(TREE_ID_MASK) )
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
     endif
 
 

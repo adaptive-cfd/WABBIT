@@ -254,8 +254,8 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
     ! call saveHDF5_tree('timeindepmasknoprung_0000000001.h5', time, 0_ik, 1, params, hvy_mask, tree_ID_mask)
 
-    ! required strictly speaking only if we intent to save TREE_ID_MASK separately to disk.
-    ! is called only once so performance does not matter here.
+    ! syncing now and pruning later keeps the ghost nodes of the time-independent mask function sync'ed (as they
+    ! do not change)
     call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
     ! we need the mask function both on Jmax (during the RHS) and Jmax-1

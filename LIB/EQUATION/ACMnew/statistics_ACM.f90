@@ -51,7 +51,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
-    real(kind=rk), save :: umag, umax, dx_min
+    real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: div(:,:,:)
@@ -72,6 +72,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
+
+    C_eta_inv = 1.0_rk / params_acm%C_eta
 
     if (params_acm%dim==3) then
         if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
@@ -109,6 +111,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%div_max = 0.0_rk
         params_acm%div_min = 0.0_rk
         params_acm%penal_power = 0.0_rk
+        params_acm%scalar_removal = 0.0_rk
         dx_min = 90.0e9_rk
 
         if (is_insect) then
@@ -141,11 +144,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         tmp_volume = 0.0_rk
         tmp_volume2 = 0.0_rk
         penal_power_block = 0.0_rk
+        scalar_removal_block = 0.0_rk
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            C_eta_inv = 1.0_rk / params_acm%C_eta
-
             ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
@@ -193,10 +195,22 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 params_acm%div_min = min( params_acm%div_min, div(ix,iy,1) )
             enddo
             enddo
+
+            ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
+            ! sense to keep track of this. however, note that with Neumann BC, that makes no
+            ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
+            if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! should we ever use more than 1 scalar seriously, this has to be adopted
+                        ! because it uses only the 1st one (:,:,1,4)
+                        ! assumes *homogeneous* dirichlet condition
+                        scalar_removal_block = scalar_removal_block + mask(ix,iy,1,1) * u(ix,iy,1,4) * C_eta_inv
+                    enddo
+                enddo
+            endif
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            C_eta_inv = 1.0_rk / params_acm%C_eta
-
             ! compute divergence on this block
             call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
 
@@ -293,6 +307,23 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     enddo
                 enddo
             enddo
+
+            ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
+            ! sense to keep track of this. however, note that with Neumann BC, that makes no
+            ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
+            if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
+                do iz = g+1, Bs(3)+g
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
+                            ! should we ever use more than 1 scalar seriously, this has to be adopted
+                            ! because it uses only the 1st one (:,:,:,5)
+                            ! assumes *homogeneous* dirichlet condition
+                            scalar_removal_block = scalar_removal_block + mask(ix,iy,iz,1) * u(ix,iy,iz,5) * C_eta_inv
+                        enddo
+                    enddo
+                enddo
+            endif
+
         endif
 
         ! we just computed the values on the current block, which we now add to the
@@ -305,6 +336,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%moment_color  = params_acm%moment_color  + moment_block * dV
         params_acm%e_kin         = params_acm%e_kin         + ekin_block * dV
         params_acm%penal_power   = params_acm%penal_power   + penal_power_block * dV
+        params_acm%scalar_removal= params_acm%scalar_removal+ scalar_removal_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
@@ -348,6 +380,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
+        ! scalar removal
+        if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
+            tmp(1) = params_acm%scalar_removal
+            call MPI_ALLREDUCE(tmp(1), params_acm%scalar_removal, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         !-------------------------------------------------------------------------
         ! kinetic energy
@@ -468,6 +507,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 endif
             endif
 
+            if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
+                call append_t_file( 'scalar_removal.t', (/time, params_acm%scalar_removal/) )
+            endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )

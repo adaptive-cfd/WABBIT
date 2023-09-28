@@ -96,12 +96,13 @@ module module_acm
     character(len=cshort) :: nonlinear_formulation="convective" ! or "divergence"
     character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: wingsection_inifiles(1:2)
+    character(len=cshort) :: scalar_BC_type="neumann"
     character(len=cshort), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation, scalar_removal=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -258,7 +259,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
+!    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
@@ -310,6 +311,7 @@ end subroutine
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_acm%scalar_inicond, params_acm%scalar_inicond )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'source', params_acm%scalar_source_type, params_acm%scalar_source_type )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'scalar_BC_type', params_acm%scalar_BC_type, "neumann" )
 
         if (params_acm%use_sponge) then
             call read_param_mpi( FILE, 'ConvectionDiffusion', 'absorbing_sponge', params_acm%absorbing_sponge, .true. )

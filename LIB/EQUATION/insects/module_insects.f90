@@ -211,6 +211,7 @@ module module_insects
     integer, dimension(1:4) :: nfft_wings=0
     logical, dimension(1:4) :: wingsetup_done = .false.
     logical, dimension(1:4) :: wings_radius_table_ready = .false.
+    real(kind=rk), dimension(:), allocatable :: theta_i, R_i
     ! wing bounding box (xmin, xmax, ymin, ymax, zmin, zmax)
     real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
     ! wing inertia

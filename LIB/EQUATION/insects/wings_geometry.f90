@@ -151,7 +151,6 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
   ! NOTE: for a corrugated wing, up- and downside are different, and therefore a distinction between the
   ! left- and right wing has to be made, essentially inverting the sign of the z_wing coordinate.
   character(len=1), intent(in) :: side ! can be R or L
-  character(len=clong) :: wingshape_str
   integer(kind=2) :: wingID
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
@@ -185,12 +184,10 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body,
 
   case default
       ! if all other options fail, we still might load coefficients from file:
-      wingshape_str = Insect%WingShape(wingID)
-
       ! we assume the default to be defined in fourier coefficients, the subroutine
       ! yells if it does not recongnize the wing.
       select case (Insect%wing_file_type(wingID))
-      case ("fourier")
+      case ("fourier", "linear")
           ! ordinary fourier wing (wing planform described in polar coordinates with fourier coeffs for the radius)
           call draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing, M_body, M_wing, &
           x_pivot_b,rot_rel_wing_w, side)
@@ -246,7 +243,9 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
-  if ( ((Insect%wing_file_type(wingID)) /= "fourier") .and. ((Insect%wing_file_type(wingID)) /= "fourierY") ) call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
+  if ( ((Insect%wing_file_type(wingID))/="linear") .and. ((Insect%wing_file_type(wingID))/="fourier") .and. ((Insect%wing_file_type(wingID))/="fourierY") ) then
+      call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
+  endif
 
   if (side == "R") then
       wsign = +1.0_rk
@@ -285,7 +284,8 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                           !-- get normalized angle (theta)
                           theta = atan2( x_wing(2)-Insect%yc(wingID), x_wing(1)-Insect%xc(wingID) )
-                          theta = ( theta + pi ) / (2.d0*pi)
+                          ! note flusi uses an angle between [0, 2*pi)
+                          theta = theta + pi
 
                           !-- construct R by evaluating the fourier series
                           R0 = Radius_Fourier(theta,Insect,wingID)
@@ -302,7 +302,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                               Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
                           else
                               ! no corrugation - the wing is a flat surface
-                              zz0 = 0.0_pr
+                              zz0 = 0.0_rk
                           endif
 
                           zz0 = zz0 * wsign
@@ -416,7 +416,7 @@ subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_win
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
 
-  if ((Insect%wing_file_type(wingID)) /= "kleemeier") call abort(26111902,"draw_wing_kleemeier called with non-kleemeier wing...")
+  if ((Insect%wing_file_type(wingID)) /= "kleemeier") call abort(26111907,"draw_wing_kleemeier called with non-kleemeier wing...")
 
   s = Insect%safety
   L_membrane = Insect%L_membrane(wingID)
@@ -1414,48 +1414,55 @@ end subroutine draw_wing_bristled
 
 !-------------------------------------------------------------------------------
 ! evaluates the fourier series given in the ai, bi
-! NOTE: angle theta is NORMALIZED!  theta = ( theta + pi ) / (2.d0*pi)
+! NOTE: the angle is [0, 2*pi] (thus the result of ATAN2 is + pi)
 !-------------------------------------------------------------------------------
 real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
-  implicit none
-  integer :: i,j, n_radius
-  real(kind=rk) :: R0, theta2, dphi, area
-  type(diptera),intent(inout)::Insect
-  real(kind=rk), intent(in) :: theta
-  integer(kind=2), intent(in) :: wingID ! wing id number
+    implicit none
+    integer :: i,j, n_radius
+    real(kind=rk) :: R0, theta2, dphi, area
+    type(diptera),intent(inout)::Insect
+    real(kind=rk), intent(in) :: theta
+    integer(kind=2), intent(in) :: wingID ! wing id number
 
-  n_radius = 25000
-  dphi = (2.d0*pi) / (dble(n_radius-1))
+    n_radius = 25000
+    dphi = (2.0_rk*pi) / (dble(n_radius-1))
 
 
-  ! evaluate the entire R(theta) once with very fine resolution, so when
-  ! calling it for the second time we only need linear interpolation.
-  if (.not.Insect%wings_radius_table_ready(wingID)) then
-    !---------------------------------------------------------------------------
-    ! fill radius table
-    !---------------------------------------------------------------------------
-    Insect%R0_table(:,wingID) = 0.d0
-    ! loop over all thetas and compute the radius for all of them, store it
-    ! in the table Insect%R0_table
-    do j = 1, n_radius
-      R0 = Insect%a0_wings(wingID) / 2.d0
-      theta2 = dble(j-1) * dphi
-      ! evaluate Fourier series
-      do i = 1, Insect%nfft_wings(wingID)
-        R0 = R0 + Insect%ai_wings(i,wingID)*dcos(2.d0*pi*dble(i)*theta2) &
-                + Insect%bi_wings(i,wingID)*dsin(2.d0*pi*dble(i)*theta2)
-      enddo
-      Insect%R0_table(j,wingID)=R0
-    enddo
+    ! evaluate the entire R(theta) once with very fine resolution, so when
+    ! calling it for the second time we only need linear interpolation.
+    !
+    ! NOTE: this setup here is a Fourier initialization. It is also possible that the wing contour
+    ! is described using a set {theta, R(theta)} with linear interpolation. In this case, the Insect%R0_table
+    ! is filled in Setup_Wing_from_inifile, and this initialization is bypassed
+    if ( .not. Insect%wings_radius_table_ready(wingID)) then
 
-    ! skip setup on next call
-    Insect%wings_radius_table_ready(wingID) = .true.
-  endif
+        !---------------------------------------------------------------------------
+        ! fill radius table
+        !---------------------------------------------------------------------------
+        Insect%R0_table(:,wingID) = 0.0_rk
+        ! loop over all thetas and compute the radius for all of them, store it
+        ! in the table Insect%R0_table
+        do j = 1, n_radius
+            R0 = Insect%a0_wings(wingID) / 2.0_rk
+            theta2 = real(j-1, kind=rk) * dphi
+            ! evaluate Fourier series
+            do i = 1, Insect%nfft_wings(wingID)
+                ! R0 = R0 + Insect%ai_wings(i,wingID)*cos(2.0_rk*pi*dble(i)*theta2) &
+                        ! + Insect%bi_wings(i,wingID)*sin(2.0_rk*pi*dble(i)*theta2)
+                R0 = R0 + Insect%ai_wings(i,wingID)*cos( real(i,kind=rk)*theta2) &
+                        + Insect%bi_wings(i,wingID)*sin( real(i,kind=rk)*theta2)
+            enddo
+            Insect%R0_table(j,wingID)=R0
+        enddo
 
-  ! linear interpolation, if already stored the radius
-  j = floor( theta / dphi ) + 1
-  Radius_Fourier = Insect%R0_table(j,wingID) + ((theta-dble(j-1)*dphi) / dphi) &
-                 * (Insect%R0_table(j+1,wingID)-Insect%R0_table(j,wingID))
+        ! skip setup on next call
+        Insect%wings_radius_table_ready(wingID) = .true.
+    endif
+
+    ! linear interpolation, if already stored the radius
+    j = floor( theta / dphi ) + 1
+    Radius_Fourier = Insect%R0_table(j,wingID) + ((theta-dble(j-1)*dphi) / dphi) &
+    * (Insect%R0_table(j+1,wingID) - Insect%R0_table(j,wingID))
 end function
 
 
@@ -1994,170 +2001,264 @@ end subroutine Setup_Wing_Fourier_coefficients
 !     - Wing corrugation profile (flat or corrugated)
 !-------------------------------------------------------------------------------
 subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
-  implicit none
-  type(diptera),intent(inout) :: Insect
-  character(len=*), intent(in) :: fname
+    implicit none
+    type(diptera),intent(inout) :: Insect
+    character(len=*), intent(in) :: fname
 
-  type(inifile) :: ifile
-  real(kind=rk), allocatable :: tmparray(:,:)
-  character(len=clong) :: type_str
-  integer :: a,b
-  integer(kind=2), intent(in) :: wingID ! wing id number
-  real(kind=rk) :: init_thickness
+    type(inifile) :: ifile
+    real(kind=rk), allocatable :: tmparray(:,:)
+    character(len=clong) :: type_str
+    integer :: a,b
+    integer(kind=2), intent(in) :: wingID ! wing id number
+    real(kind=rk) :: init_thickness, dphi, theta2
+    integer(kind=ik) :: i, j, n_radius
 
-  if (root) then
-    write(*,'(80("-"))')
-    write(*,'("Reading wing shape from file ",A)') fname
-    write(*,'(80("-"))')
-  endif
-  ! instead of the hard-coded values above, read fourier coefficients for wings from
-  ! an ini-file
-  call read_ini_file_mpi(ifile, fname, .true.  )
+    if (root) then
+        write(*,'(80("-"))')
+        write(*,'("Reading wing shape from file ",A)') fname
+        write(*,'(80("-"))')
+    endif
 
+    ! instead of the hard-coded values above, read fourier coefficients for wings from
+    ! an ini-file
+    call read_ini_file_mpi(ifile, fname, .true.  )
 
-  ! check if this file seem to be valid:
-  call read_param_mpi(ifile, "Wing", "type", Insect%wing_file_type(wingID), "none")
+    ! check if this file seem to be valid (i.e. if TYPE matches a wing that can actually
+    ! be initialized from file)
+    call read_param_mpi(ifile, "Wing", "type", Insect%wing_file_type(wingID), "none")
 
-  if (Insect%wing_file_type(wingID) /= "fourier" .and. Insect%wing_file_type(wingID) /= "fourierY" .and. Insect%wing_file_type(wingID) /= "kleemeier" ) then
-    call abort(6652, "ini file for wing does not seem to be correct type...")
-  endif
-
-  if (Insect%wing_file_type(wingID) == "kleemeier" ) then
-      call read_param_mpi(ifile, "Wing", "B_membrane", Insect%B_membrane(wingID), 8.6_rk/130.0_rk)
-      call read_param_mpi(ifile, "Wing", "L_membrane", Insect%L_membrane(wingID), 100.0_rk/130.0_rk)
-  endif
-
-  !-----------------------------------------------------------------------------
-  ! Read fourier coeffs for wing radius
-  !-----------------------------------------------------------------------------
-  if (Insect%wing_file_type(wingID) == "fourier" .or. Insect%wing_file_type(wingID) == "fourierY") then
-      call read_param_mpi( ifile, "Wing", "a0_wings", Insect%a0_wings(wingID), 0.d0)
-
-      ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
-      ! as arguments. so we have to split the routine in one part that returns the size
-      ! of the array, then let the caller allocate, then read the matrix. very tedious.
-      ! fetch size of matrix
-      call param_matrix_size_mpi( ifile, "Wing", "ai_wings", a, b)
-      ! allocate matrix
-      allocate( tmparray(1:a,1:b) )
-      ! read matrix
-      call param_matrix_read_mpi( ifile, "Wing", "ai_wings", tmparray)
-      Insect%nfft_wings = size(tmparray,2)
-      Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
-      deallocate(tmparray)
+    ! some wings cannot be read from inifile, so if the type of the wing is some rubbish
+    ! then we abort here:
+    select case (Insect%wing_file_type(wingID))
+    case ("xy-points", "fourier", "fourierY", "kleemeier", "linear")
+        ! nothing to do, type is correct, proceed
+    case default
+        call abort(6652, "ini file for wing does not seem to be correct type...")
+    end select
 
 
-      call param_matrix_size_mpi( ifile, "Wing", "bi_wings", a, b)
-      ! allocate matrix
-      allocate( tmparray(1:a,1:b) )
-      ! read matrix
-      call param_matrix_read_mpi( ifile, "Wing", "bi_wings", tmparray)
-      Insect%nfft_wings = size(tmparray,2)
-      Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
-      deallocate(tmparray)
+    ! fourier:
+    !       the wing shape is described in polar coordinates and the radius is encoded as fourier coefficients
+    !       fourier coeffs are read as a0_wings, ai_wings, bi_wings
+    !       note historic oddity that a0 is half the mean value (the 0th Fourier mode)
+    !       T. Engels, D. Kolomenskiy, K. Schneider and J. Sesterhenn. FluSI: A novel parallel simulation tool for flapping insect flight using a Fourier method with volume penalization. SIAM J. Sci. Comp., 38(5), S03-S24, 2016
+    ! linear:
+    !       The wing contour is described in polar coordinates, just like in the "fourier" case, but the R(theta) is
+    !       included as a table, not as Fourier coefficients. This is useful if the wing contains sharp edges, where the
+    !       Fourier series converges badly (Gibbs ringing).
+    ! kleemeier:
+    !       the wing is a rectangular membrane (possibly with bristles)
+    !       T. Engels, D. Kolomenskiy, F.-O. Lehmann, Flight efficiency is key to diverse wing morphologies in small insects, J. R. Soc. Interface 18 20210518, 2021
+    select case(Insect%wing_file_type(wingID))
+    case ("kleemeier")
+        ! the kleemeier wing was used in T. Engels, D. Kolomenskiy, F.-O. Lehmann, Flight efficiency is key to diverse wing morphologies in small insects, J. R. Soc. Interface 18 20210518, 2021
+        ! its a rectangle B x L with bristles. see paper for more info on construction
+        call read_param_mpi(ifile, "Wing", "B_membrane", Insect%B_membrane(wingID), 8.6_rk/130.0_rk)
+        call read_param_mpi(ifile, "Wing", "L_membrane", Insect%L_membrane(wingID), 100.0_rk/130.0_rk)
 
-      ! wing mid-point (of course in wing system..)
-      call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
-      call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
-
-      if (root) then
-          write(*,*) "wingID", wingID
-          write(*,*) "ai", Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID)
-          write(*,*) "bi", Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID)
-      endif
-  endif
-
-  !-----------------------------------------------------------------------------
-  ! wing thickness
-  !-----------------------------------------------------------------------------
-  call read_param_mpi(ifile,"Wing","wing_thickness_distribution",Insect%wing_thickness_distribution(wingID), "constant")
-  if ( Insect%wing_thickness_distribution(wingID) == "constant") then
-
-      if (root) write(*,*) "Wing thickness is constant along the wing"
-
-      ! wing thickness (NOTE: overwrites settings in other params file)
-      if ( (Insect%WingThickness>0.0d0) .and. (Insect%WingThickness<1.0d0) ) then
-         init_thickness = Insect%WingThickness ! Use existing value if it is reasonable
-      else
-         init_thickness = 0.05d0 ! This is the defauls value otherwise, because we may not know dx here
-      endif
-
-      call read_param_mpi(ifile,"Wing","wing_thickness_value",Insect%WingThickness, init_thickness)
-
-  elseif ( Insect%wing_thickness_distribution(wingID) == "variable") then
-
-      if (root) write(*,*) "Wing thickness is variable, i.e. t = t(x,y)"
-
-      ! read matrix from ini file, see comments on SXF90 compiler
-      call param_matrix_size_mpi(ifile,"Wing","wing_thickness_profile",a,b)
-      wing_thickness_a(wingID) = a
-      wing_thickness_b(wingID) = b
-      call Allocate_Arrays(Insect,"wing_thickness_profile",a,b)
-      call param_matrix_read_mpi(ifile,"Wing","wing_thickness_profile",wing_thickness_profile(:,:,wingID))
-
-  else
-      call abort(77623, " Insect wing thickness distribution is unknown (must be constant or variable)")
-  endif
+    case ("linear")
+        !-----------------------------------------------------------------------------
+        ! R(theta) given as a lits of points (for linear interpolation without Fourier series)
+        !-----------------------------------------------------------------------------
+        ! wing mid-point (of course in wing system..)
+        ! used as origin of the polar coordinates R(theta) that describe the
+        ! wing contour
+        call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
+        call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
 
 
-  !-----------------------------------------------------------------------------
-  ! bristles
-  !-----------------------------------------------------------------------------
-  call read_param_mpi(ifile, "Wing","bristles", Insect%bristles(wingID), .false.)
-  call read_param_mpi(ifile, "Wing","bristles_simplex", Insect%bristles_simplex(wingID), .false.)
-  if (Insect%bristles(wingID)) then
-      call param_matrix_size_mpi( ifile, "Wing", "bristles_coords", a, b)
+        call param_matrix_size_mpi( ifile, "Wing", "theta_i", a, b)
+        ! allocate matrix
+        allocate( tmparray(1:a,1:b) )
+        ! allocate arrays (even though we have four wings, we do not allocate four arrays
+        ! since we do need only Insect%R0_table for all four wings)
+        allocate( Insect%theta_i(1:b) )
+        allocate( Insect%R_i(1:b) )
 
-      ! number of bristles on this wing
-      Insect%n_bristles(wingID) = a
+        call param_matrix_read_mpi( ifile, "Wing", "theta_i", tmparray)
+        Insect%theta_i(:) = tmparray(1,:)
 
-      ! check memory allocation
-      if (.not. allocated(Insect%bristles_coords)) then
-          allocate(Insect%bristles_coords(1:4, 1:a, 1:b)) ! four wings...
-      elseif ( size(Insect%bristles_coords, 2) .ne. a ) then
-          call abort(76237, " Unequal number of bristles not yet supported. Modify wing shape files.")
-      endif
-
-      call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID,:,:))
-  endif
+        call param_matrix_read_mpi( ifile, "Wing", "R_i", tmparray)
+        Insect%R_i(:) = tmparray(1,:)
 
 
-  !-----------------------------------------------------------------------------
-  ! wing corrugation
-  !-----------------------------------------------------------------------------
-  call read_param_mpi(ifile,"Wing","corrugated",Insect%corrugated(wingID), .false.)
-  if (Insect%corrugated(wingID)) then
-      if (root) write(*,*) "wing is corrugated, z=z(x,y)"
-      ! read matrix from ini file, see comments on SXF90 compiler
-      call param_matrix_size_mpi(ifile,"Wing","corrugation_profile",a,b)
-      corrugation_a(wingID) = a
-      corrugation_b(wingID) = b
-      call Allocate_Arrays(Insect,"corrugation_profile",a,b)
-      call param_matrix_read_mpi(ifile,"Wing","corrugation_profile",corrugation_profile(:,:,wingID))
+        ! wing contour given as a set of {theta, R(theta)} points. Note: the line root-tip (the span) is the Y-axis,
+        ! and the x coordinate runs from trailing (negative) to leading edge (positive). This is important for the
+        ! definition of theta.
 
-  else
-      if (root) write(*,*) "wing is flat (non-corrugated), z==0"
-  endif
+        ! we need equidistant data, possibly fine-sampled. For sharp-edged features, we need to bypass
+        ! the Fourier series (it works not so well for such functions: Gibbs ringing...)
 
-  !-----------------------------------------------------------------------------
-  ! wing damage
-  !-----------------------------------------------------------------------------
-  call read_param_mpi(ifile, "Wing", "damaged", Insect%damaged(wingID), .false.)
-  if (Insect%damaged(wingID)) then
-      if (root) write(*,*) "wing is damaged, D=D(x,y)"
-      ! read matrix from ini file, see comments on SXF90 compiler
-      call param_matrix_size_mpi(ifile, "Wing", "damage_mask", a, b)
-      damage_a(wingID) = a
-      damage_b(wingID) = b
-      call Allocate_Arrays(Insect, "damage_mask", a, b)
-      call param_matrix_read_mpi(ifile, "Wing", "damage_mask", damage_mask(:,:,wingID))
+        ! if N<25000 we can store it in Insect%R0_table(j,wingID) = R0
+        ! upsampling is required: we cannot read so many values from ini file (max_column_width)
 
-  else
-      if (root) write(*,*) "wing is intact (non-damaged)"
-  endif
+        ! fill the table Insect%R0_table, this is the same as Insect%R_i but it has 25000
+        ! entries and is used in the subroutine "Radius_Fourier"
+        Insect%R0_table(:,wingID) = 0.d0
+        n_radius = size(Insect%R0_table, dim=1)
+
+        ! loop over all thetas and compute the radius for all of them, store it
+        ! in the table Insect%R0_table
+        do j = 1, n_radius
+            ! in the target array (fine spacing with 25000 entries)
+            dphi   = (2.0_rk*pi) / (real(n_radius-1, kind=rk))
+            theta2 = real(j-1, kind=rk) * dphi
+
+            ! In the source array (read from file), we do not even assume equidistant data.
+            ! The way we do that here is not super elegant, but it is done only once anyways.
+            do i = 2, size(Insect%theta_i, 1)
+                if ((Insect%theta_i(i) > theta2).or.(i==size(Insect%theta_i, 1))) then
+                    ! now i is the index of the first element larger than the value we look for
+                    ! so we interpolate between (i-1, i)
+                    ! R_j = R_i-1 + (th_j - th_i-1) / (th_i - th_i-1) * (R_i - R_i-1)
+                    Insect%R0_table(j, wingID) = Insect%R_i(i-1) + &
+                    (Insect%R_i(i)-Insect%R_i(i-1)) * (theta2-Insect%theta_i(i-1)) / (Insect%theta_i(i)-Insect%theta_i(i-1))
+                    ! end of inner for-loop
+                    exit
+                endif
+            enddo
+        enddo
+
+        ! done. This flag bypasses the Fourier-series initialization in Radius_Fourier
+        Insect%wings_radius_table_ready(wingID) = .true.
+
+        ! if several wings are initialized, their number of samples may be different
+        deallocate(Insect%R_i, Insect%theta_i)
+
+    case("fourier", "fourierY")
+        !-----------------------------------------------------------------------------
+        ! Read fourier coeffs for wing radius ("fourier") or y-coordinate of membrane (used for bristled wings)
+        !-----------------------------------------------------------------------------
+        call read_param_mpi( ifile, "Wing", "a0_wings", Insect%a0_wings(wingID), 0.d0)
+
+        ! NOTE: Annoyingly, the fujitsu SXF90 compiler cannot handle allocatable arrays
+        ! as arguments. so we have to split the routine in one part that returns the size
+        ! of the array, then let the caller allocate, then read the matrix. very tedious.
+        ! fetch size of matrix
+        call param_matrix_size_mpi( ifile, "Wing", "ai_wings", a, b)
+        ! allocate matrix
+        allocate( tmparray(1:a,1:b) )
+        ! read matrix
+        call param_matrix_read_mpi( ifile, "Wing", "ai_wings", tmparray)
+
+        Insect%nfft_wings = size(tmparray,2)
+        Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
+        deallocate(tmparray)
 
 
-  call read_param_mpi(ifile,"Wing","corrugation_array_bbox",Insect%corrugation_array_bbox(1:4,wingID), (/0.0_rk,0.0_rk,0.0_rk,0.0_rk/))
+        call param_matrix_size_mpi( ifile, "Wing", "bi_wings", a, b)
+        ! allocate matrix
+        allocate( tmparray(1:a,1:b) )
+        ! read matrix
+        call param_matrix_read_mpi( ifile, "Wing", "bi_wings", tmparray)
+        Insect%nfft_wings = size(tmparray,2)
+        Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = tmparray(1,:)
+        deallocate(tmparray)
+
+        ! wing mid-point (of course in wing system..)
+        ! used as origin of the polar coordinates R(theta) that describe the
+        ! wing contour
+        call read_param_mpi(ifile,"Wing","x0w",Insect%xc(wingID), 0.d0)
+        call read_param_mpi(ifile,"Wing","y0w",Insect%yc(wingID), 0.d0)
+
+        if (root) then
+            write(*,*) "wingID", wingID
+            write(*,*) "ai", Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID)
+            write(*,*) "bi", Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID)
+        endif
+    end select
+
+    !-----------------------------------------------------------------------------
+    ! wing thickness
+    !-----------------------------------------------------------------------------
+    call read_param_mpi(ifile,"Wing","wing_thickness_distribution",Insect%wing_thickness_distribution(wingID), "constant")
+    if ( Insect%wing_thickness_distribution(wingID) == "constant") then
+
+        if (root) write(*,*) "Wing thickness is constant along the wing"
+
+        ! wing thickness (NOTE: overwrites settings in other params file)
+        if ( (Insect%WingThickness>0.0d0) .and. (Insect%WingThickness<1.0d0) ) then
+            init_thickness = Insect%WingThickness ! Use existing value if it is reasonable
+        else
+            init_thickness = 0.05d0 ! This is the defauls value otherwise, because we may not know dx here
+        endif
+
+        call read_param_mpi(ifile,"Wing","wing_thickness_value",Insect%WingThickness, init_thickness)
+
+    elseif ( Insect%wing_thickness_distribution(wingID) == "variable") then
+
+        if (root) write(*,*) "Wing thickness is variable, i.e. t = t(x,y)"
+
+        ! read matrix from ini file, see comments on SXF90 compiler
+        call param_matrix_size_mpi(ifile,"Wing","wing_thickness_profile",a,b)
+        wing_thickness_a(wingID) = a
+        wing_thickness_b(wingID) = b
+        call Allocate_Arrays(Insect,"wing_thickness_profile",a,b)
+        call param_matrix_read_mpi(ifile,"Wing","wing_thickness_profile",wing_thickness_profile(:,:,wingID))
+
+    else
+        call abort(77623, " Insect wing thickness distribution is unknown (must be constant or variable)")
+    endif
+
+
+    !-----------------------------------------------------------------------------
+    ! bristles
+    !-----------------------------------------------------------------------------
+    call read_param_mpi(ifile, "Wing","bristles", Insect%bristles(wingID), .false.)
+    call read_param_mpi(ifile, "Wing","bristles_simplex", Insect%bristles_simplex(wingID), .false.)
+    if (Insect%bristles(wingID)) then
+        call param_matrix_size_mpi( ifile, "Wing", "bristles_coords", a, b)
+
+        ! number of bristles on this wing
+        Insect%n_bristles(wingID) = a
+
+        ! check memory allocation
+        if (.not. allocated(Insect%bristles_coords)) then
+            allocate(Insect%bristles_coords(1:4, 1:a, 1:b)) ! four wings...
+        elseif ( size(Insect%bristles_coords, 2) .ne. a ) then
+            call abort(76237, " Unequal number of bristles not yet supported. Modify wing shape files.")
+        endif
+
+        call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID,:,:))
+    endif
+
+
+    !-----------------------------------------------------------------------------
+    ! wing corrugation
+    !-----------------------------------------------------------------------------
+    call read_param_mpi(ifile,"Wing","corrugated",Insect%corrugated(wingID), .false.)
+    if (Insect%corrugated(wingID)) then
+        if (root) write(*,*) "wing is corrugated, z=z(x,y)"
+        ! read matrix from ini file, see comments on SXF90 compiler
+        call param_matrix_size_mpi(ifile,"Wing","corrugation_profile",a,b)
+        corrugation_a(wingID) = a
+        corrugation_b(wingID) = b
+        call Allocate_Arrays(Insect,"corrugation_profile",a,b)
+        call param_matrix_read_mpi(ifile,"Wing","corrugation_profile",corrugation_profile(:,:,wingID))
+
+    else
+        if (root) write(*,*) "wing is flat (non-corrugated), z==0"
+    endif
+
+    !-----------------------------------------------------------------------------
+    ! wing damage
+    !-----------------------------------------------------------------------------
+    call read_param_mpi(ifile, "Wing", "damaged", Insect%damaged(wingID), .false.)
+    if (Insect%damaged(wingID)) then
+        if (root) write(*,*) "wing is damaged, D=D(x,y)"
+        ! read matrix from ini file, see comments on SXF90 compiler
+        call param_matrix_size_mpi(ifile, "Wing", "damage_mask", a, b)
+        damage_a(wingID) = a
+        damage_b(wingID) = b
+        call Allocate_Arrays(Insect, "damage_mask", a, b)
+        call param_matrix_read_mpi(ifile, "Wing", "damage_mask", damage_mask(:,:,wingID))
+
+    else
+        if (root) write(*,*) "wing is intact (non-damaged)"
+    endif
+
+
+    call read_param_mpi(ifile,"Wing","corrugation_array_bbox",Insect%corrugation_array_bbox(1:4,wingID), (/0.0_rk,0.0_rk,0.0_rk,0.0_rk/))
 
 end subroutine Setup_Wing_from_inifile
 
@@ -2183,12 +2284,14 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
     ymax = -999.d9
 
     ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
-    ! note flusi uses a normalized angle between [0,1)
-    do while ( theta < 1.d0 )
-        ! note this is normalized angle
+    ! note flusi uses an angle between [0, 2*pi)
+    do while ( theta < 2.0_rk*pi )
+        ! note this angle is [0, 2*pi)
         R = Radius_Fourier( theta, Insect, wingID )
 
-        theta_prime = 2.d0*pi*theta - pi
+        ! note how the usual atan2 gives angles [-pi, +pi)
+        ! so here we add pi
+        theta_prime = theta - pi
         x = Insect%xc(wingID) + R * cos( theta_prime )
         y = Insect%yc(wingID) + R * sin( theta_prime )
 
@@ -2196,6 +2299,7 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
         ! and indeed rotates in positve z-direction. That means in the plane
         !
         !  ^ x_wing
+        !  |
         !  |
         !  o-------> y_wing
         !

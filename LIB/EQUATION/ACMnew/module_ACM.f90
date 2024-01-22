@@ -59,7 +59,7 @@ module module_acm
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
@@ -263,6 +263,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
+    call read_param_mpi(FILE, 'VPM', 'thickness', params_acm%thickness, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'C_smooth', params_acm%C_smooth, 1.5_rk )
 
@@ -378,8 +379,10 @@ end subroutine
     endif
 
     ! if used, setup insect. Note fractal tree and active grid are part of the insects: they require the same init module
-    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree" .or. params_acm%geometry=="active_grid" &
-    .or. params_acm%geometry=="cylinder-free".or. params_acm%geometry=="sphere-free") then
+    !
+    ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
+    if (params_acm%geometry == "Insect".or.params_acm%geometry=="fractal_tree".or.params_acm%geometry=="active_grid" &
+    .or. params_acm%geometry=="cylinder-free".or.params_acm%geometry=="sphere-free".or.params_acm%geometry=="plate-free") then
         ! when computing passive scalars, we require derivatives of the mask function, which
         ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
         ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.

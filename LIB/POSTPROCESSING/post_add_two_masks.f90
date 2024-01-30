@@ -1,5 +1,5 @@
 subroutine post_add_two_masks(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -62,16 +62,15 @@ subroutine post_add_two_masks(params)
         params%number_blocks = 3*max(N1,N2) ! just to get some memory:
     end if
     params%domain_size = domain
-    params%max_treelevel = max( tc_length2, tc_length1 )
-    params%min_treelevel = 1
+    params%Jmax = max( tc_length2, tc_length1 )
+    params%Jmin = 1
     params%n_eqn = 1
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn)=.True.
-    params%wavelet_transform_type = 'biorthogonal'
     params%order_predictor = "multiresolution_4th"
-    params%wavelet='CDF4,4'
-    params%n_ghosts = 6_ik
+    params%wavelet='CDF44'
+    params%g = 6_ik
     params%forest_size = 20
     fsize = params%forest_size
     params%block_distribution = "sfc_hilbert"

@@ -1,5 +1,5 @@
 subroutine post_prune_tree(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -43,17 +43,15 @@ subroutine post_prune_tree(params)
 
     call get_command_argument(3, fname_out)
 
-    N_MAX_COMPONENTS  = 1
-
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     ! just to get some memory:
     params%number_blocks = 20 + N1 / params%number_procs
     params%domain_size = domain
-    params%max_treelevel = tc_length1
-    params%min_treelevel = 1
+    params%Jmax = tc_length1
+    params%Jmin = 1
     params%n_eqn = 1
-    params%n_ghosts = 2
+    params%g = 2
     params%forest_size = 4
     fsize = params%forest_size
     params%order_predictor = "multiresolution_2nd"

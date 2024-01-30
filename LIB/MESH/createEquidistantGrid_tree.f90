@@ -83,7 +83,7 @@ subroutine createEquidistantGrid_tree( params, Jmin, verbosity, tree_ID )
     !-----------------------------------------------------------------------------
     ! Generate and distribute the blocks
     !-----------------------------------------------------------------------------
-    allocate( treecode( params%max_treelevel ) )
+    allocate( treecode( params%Jmax ) )
     ! loop over blocks in x,y,z directions (in the 2d case, 3rd loop degenerates)
     ! NOTE: This ordering is necessary for POSTPROCESSING flusi to wabbit!
     do ix = nx, 1, -1
@@ -116,9 +116,9 @@ subroutine createEquidistantGrid_tree( params, Jmin, verbosity, tree_ID )
 
                             lgt_block( lgt_id, : ) = -1
                             lgt_block( lgt_id, 1:Jmin ) = treecode(1:Jmin)
-                            lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL ) = Jmin
-                            lgt_block( lgt_id, params%max_treelevel+IDX_REFINE_STS ) = 0
-                            lgt_block( lgt_id, params%max_treelevel+IDX_TREE_ID ) = tree_ID
+                            lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ) = Jmin
+                            lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS ) = 0
+                            lgt_block( lgt_id, params%Jmax+IDX_TREE_ID ) = tree_ID
                         end if
                         ! as this block is now given to one cpu, we can leave the loop over
                         ! cpus and take care of the next one.

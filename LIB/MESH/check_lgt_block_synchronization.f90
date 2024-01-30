@@ -10,7 +10,7 @@
 subroutine check_lgt_block_synchronization( params )
     implicit none
 
-    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     ! local light data array
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block,1) , size(lgt_block,2)), lgt_block_0( size(lgt_block,1) , size(lgt_block,2))
     integer(kind=ik)                    :: ierr                                 ! MPI error variable
@@ -56,7 +56,6 @@ end subroutine check_lgt_block_synchronization
 
 subroutine write_lgt_data(params, file)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     character(len=*), intent(in) :: file
     integer(kind=ik) :: k
@@ -75,7 +74,6 @@ end subroutine
 
 subroutine read_lgt_data(params, file)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     character(len=*), intent(in) :: file
     integer(kind=ik) :: num_lines, num_cols
@@ -87,7 +85,6 @@ end subroutine
 
 subroutine write_neighbors(params, file, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     integer(kind=ik) , allocatable, save :: tmp(:,:), tmp2(:,:)
     integer(kind=ik), intent(in) :: tree_ID

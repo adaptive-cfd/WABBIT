@@ -95,10 +95,12 @@ subroutine get_block_spacing_origin2( treecode, domain, Bs, dim, x0, dx )
     ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
     ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
     dx = 0.0_rk
-    dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim)-1, kind=rk )
+    dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim), kind=rk )
+    ! dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim)-1, kind=rk )
 
     ! note zero based indexing:
-    x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
+    ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
+    x0 = real( ((/ix,iy,iz/) - 1)*(Bs), kind=rk) * dx
 
 end subroutine get_block_spacing_origin2
 

@@ -8,10 +8,11 @@ module module_indicators
     use mpi
     use module_params
     use module_timing
-    use module_interpolation
+    use module_wavelets
     ! we now have an indicator which computes the vorticity, so include the operator module
     use module_operators
     use module_forestMetaData
+    use module_helpers
 
     ! some operators may depend on the actual data (that is, heavy data), for example
     ! for shock or mask detection. These criteria are computed mpi-locally (because of course

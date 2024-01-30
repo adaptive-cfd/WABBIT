@@ -98,6 +98,28 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             end do
         end if
 
+    case ("taylor-green-vanRees2011")
+        do iz = 1, Bs(3)+2*g
+            do iy = 1, Bs(2)+2*g
+                do ix = 1, Bs(1)+2*g
+                    ! compute x,y coordinates from spacing and origin
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    z = dble(iz-(g+1)) * dx(3) + x0(3)
+
+                    ! the initial condition is known analytically. Note in vanrees JCP2011,
+                    ! there is a parameter \theta which is set to zero.
+                    ! See also: "Problem C3.5 Direct Numerical Simulation of the Taylor-Green Vortex at Re = 1600"
+                    ! the constants rho_0 and p_0 are set to 1.0 and 0.0, respectively
+                    ! NOTE: domain size has to be 2*pi = 6.283185307179586
+                    u(ix, iy, iz, 1) = dsin(x)*dcos(y)*dcos(z)
+                    u(ix, iy, iz, 2) =-dcos(x)*dsin(y)*dcos(z)
+                    u(ix, iy, iz, 3) = 0.0_rk
+                    u(ix, iy, iz, 4) = (dcos(2.0_rk*x) + dcos(2.0_rk*y))*(dcos(2.0_rk*z) + 2.0_rk) / 16.0_rk
+                end do
+            end do
+        end do
+
     case("jet-x")
         ! a jet with constant (unit) velocity, with a bit of noise to trigger the instability
         do iy = 1, Bs(2)+2*g
@@ -111,13 +133,13 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         end do
 
         ! noise in uy
-        do iz = 1, size(u,3)
-            do iy = 1, size(u,2)
-                do ix = 1, size(u,1)
-                    u(ix,iy,iz,2) = 1.0e-3_rk * rand_nbr()
-                enddo
-            enddo
-        enddo
+        ! do iz = 1, size(u,3)
+        !     do iy = 1, size(u,2)
+        !         do ix = 1, size(u,1)
+        !             u(ix,iy,iz,2) = u(ix,iy,iz,2) + 1.0e-5_rk * rand_nbr()
+        !         enddo
+        !     enddo
+        ! enddo
 
     case("velocity-blob")
         if (params_acm%dim==2) then

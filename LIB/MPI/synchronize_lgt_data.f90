@@ -1,4 +1,7 @@
+!> \file
+!> \brief
 !! Synchronize ligt data array among all mpiranks
+!> \details
 !-------------------------------------------------------------------------------
 ! the light data array looks like this (here for 2 mpiranks) (x=used .=unused)
 !
@@ -26,7 +29,6 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     use module_forestMetaData
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> Some operations change the treecodes etc and have to sync the entire array
     !> of light data. But sometimes, only the refinement status is altered: in that case
@@ -37,8 +39,8 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     integer(kind=ik) :: mpisize, mpirank, N, lgt_start, lgt_end, lgt_id, ierr, &
     buffer_size, lgt_num, buffer_start, k, R, Jmax
     ! send/receive buffer for data synchronization
-    integer(kind=ik), allocatable, save     :: my_lgt_block_recv_buffer(:,:)
-    integer(kind=ik), allocatable, save     :: proc_lgt_num(:), proc_lgt_start(:)
+    integer(kind=ik), allocatable, save :: my_lgt_block_recv_buffer(:,:)
+    integer(kind=ik), allocatable, save :: proc_lgt_num(:), proc_lgt_start(:)
     real(kind=rk) :: t0, t1
 
     t0 = MPI_wtime()
@@ -46,7 +48,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     mpirank = params%rank
     mpisize = params%number_procs
     N = params%number_blocks
-    R = params%max_treelevel + IDX_REFINE_STS
+    R = params%Jmax + IDX_REFINE_STS
 
     if (.not.allocated(proc_lgt_num)) allocate( proc_lgt_num(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -111,7 +113,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     ! And synchronize that (in my_lgt_block_recv_buffer)
     ! buffer = aaaabbbbccccccdd
     !
-    ! NOTE: aaaa can contain some holes, but is not expected to be very hollow
+    ! NOTE: aaaa can contain some wholes, but is not expected to be very hollow
     !
     ! ==========================================================================
 
@@ -129,7 +131,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
         ! you have to ensure every proc does the same Jmax)
         Jmax = 0
         do k = lgt_start, lgt_end
-           Jmax = max(Jmax, lgt_block(k, params%max_treelevel + IDX_MESH_LVL) )
+           Jmax = max(Jmax, lgt_block(k, params%Jmax + IDX_MESH_LVL) )
         end do
         call MPI_ALLREDUCE(MPI_IN_PLACE, Jmax, 1, MPI_INTEGER4, MPI_MAX, WABBIT_COMM, ierr)
 
@@ -142,7 +144,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
         enddo
 
         ! ...and their block level and refinement status
-        do k = params%max_treelevel + IDX_MESH_LVL, params%max_treelevel + EXTRA_LGT_FIELDS
+        do k = params%Jmax + IDX_MESH_LVL, params%Jmax + EXTRA_LGT_FIELDS
             call MPI_allgatherv( lgt_block(lgt_start, k), lgt_num, MPI_INTEGER4, &
             my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &
             WABBIT_COMM, ierr)
@@ -150,7 +152,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
 
         ! if we do not transfer all levels, then mark the level after the last transfered
         ! one as inactive.
-        do k = Jmax + IDX_MESH_LVL, params%max_treelevel
+        do k = Jmax + IDX_MESH_LVL, params%Jmax
             my_lgt_block_recv_buffer(1:buffer_size, k) = -1
         enddo
     endif

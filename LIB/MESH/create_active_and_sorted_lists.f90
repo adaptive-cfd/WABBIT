@@ -12,7 +12,7 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -33,7 +33,7 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
     mpisize = params%number_procs
     rank = params%rank
     N    = params%number_blocks
-    TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -46,7 +46,6 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
 
     if (lgt_n(tree_ID)<=0) lgt_n(tree_ID) = size(lgt_active, 1)
     if (hvy_n(tree_ID)<=0) hvy_n(tree_ID) = size(hvy_active, 1)
-
 
     ! reset the active lists
     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
@@ -102,7 +101,7 @@ subroutine createActiveSortedLists_tree_comm( params, tree_ID)
     do k = 1, lgt_n(tree_ID)
         lgt_id = lgt_active(k, tree_ID)
         lgt_sortednumlist(k, 1, tree_ID) = lgt_id
-        lgt_sortednumlist(k, 2, tree_ID) = treecode2int(lgt_block(lgt_id, 1:params%max_treelevel), tree_ID )
+        lgt_sortednumlist(k, 2, tree_ID) = treecode2int(lgt_block(lgt_id, 1:params%Jmax), tree_ID )
     end do
 
     t(4) = MPI_wtime()
@@ -130,7 +129,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -153,7 +152,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     mpisize = params%number_procs
     rank = params%rank
     N    = params%number_blocks
-    TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -171,7 +170,6 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     if (lgt_n(tree_ID)<=0) lgt_n(tree_ID) = size(lgt_active, 1)
     if (hvy_n(tree_ID)<=0) hvy_n(tree_ID) = size(hvy_active, 1)
-
 
     ! reset the active lists
     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
@@ -203,7 +201,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
                 my_lgt_send_buffer(hvy_n(tree_ID), 1) = k
                 ! second index stores the numerical treecode
                 ! + the tree index
-                my_lgt_send_buffer(hvy_n(tree_ID), 2) = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_ID )
+                my_lgt_send_buffer(hvy_n(tree_ID), 2) = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
             end if
         end if
     end do
@@ -259,7 +257,7 @@ subroutine createActiveSortedLists_tree_old( params, tree_ID)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in)      :: params    !< user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     !-----------------------------------------------------------------
 
@@ -297,7 +295,7 @@ subroutine createActiveSortedLists_tree_old( params, tree_ID)
 
     rank = params%rank
     N    = params%number_blocks
-    TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     ! =======================================================
     ! loop over all light data
@@ -331,7 +329,7 @@ subroutine createActiveSortedLists_tree_old( params, tree_ID)
             lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode
             ! + the tree index
-            lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_ID )
+            lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
 
         end if
     end do
@@ -367,7 +365,7 @@ subroutine createActiveSortedLists_forest_comm( params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params    !< user defined parameter structure
+    type (type_params), intent(in) :: params
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, hvy_id, block_rank, fsize
@@ -392,7 +390,7 @@ subroutine createActiveSortedLists_forest_comm( params)
     rank = params%rank
     N    = params%number_blocks
     fsize = params%forest_size
-    TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -456,7 +454,7 @@ subroutine createActiveSortedLists_forest_comm( params)
             hvy_active( hvy_n(tree_ID) , tree_ID ) = hvy_id
 
             ! sorted list
-            treecode_int = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_ID )
+            treecode_int = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
             ! first index stores the light id of the block
             my_lgt_send_buffer(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode
@@ -529,7 +527,7 @@ subroutine createActiveSortedLists_forest(params)
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params    !< user defined parameter structure
+    type (type_params), intent(in) :: params
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, heavy_id, block_rank, fsize
@@ -549,7 +547,7 @@ subroutine createActiveSortedLists_forest(params)
     rank  = params%rank
     N     = params%number_blocks
     fsize = params%forest_size
-    TREE_ID_IDX = params%max_treelevel + IDX_TREE_ID
+    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     ! =======================================================
     ! Reset active lists of all trees
@@ -609,7 +607,7 @@ subroutine createActiveSortedLists_forest(params)
             end if
 
             ! sorted list
-            treecode_int = treecode2int(lgt_block(k, 1:params%max_treelevel), tree_ID )
+            treecode_int = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
             ! first index stores the light id of the block
             lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode

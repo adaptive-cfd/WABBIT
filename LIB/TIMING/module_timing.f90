@@ -46,7 +46,7 @@ contains
         real(kind=dp), intent(in)     :: t_elapsed_this
         integer, optional, intent(in) :: call_counter
 
-        integer :: k
+        integer :: k, ierr
 
         ! check if allocate_init_debbuging was called before
         if (.not. allocated( name_comp_time)) then
@@ -79,7 +79,6 @@ contains
             comp_time(k, 1)   =  comp_time(k, 1) + 1.0_dp
         endif
         comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
-
     end subroutine toc
 
 
@@ -131,7 +130,7 @@ contains
             write(*, '("time (average value +- standard deviation) :")')
             k = 1
             do while (  name_comp_time(k) /= "---" )
-                write(*,'(A100, 2(2x, f12.3))') name_comp_time(k), avg(k), std(k)
+                write(*,'(A80, 2(2x, f12.3),1x,f12.2)') name_comp_time(k), avg(k), std(k), comp_time(k, 1)
                 k = k + 1
             end do
             write(*,'(80("_"))')

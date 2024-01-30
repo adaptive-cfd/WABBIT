@@ -2,18 +2,18 @@
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt2hvy.f90 hvy2lgt.f90 lgt2proc.f90 init_random_seed.f90 \
-init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 \
-compute_vorticity_post.f90 compute_scalar_field_post.f90 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 \
-post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 post_average_snapshots.f90 \
-post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_remesh.f90 \
-post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90
+init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 compute_vorticity_post.f90 compute_scalar_field_post.f90 \
+keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 \
+post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_remesh.f90 \
+post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
+post_evaluate_thresholding.f90 post_unit_test.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
-MFILES = module_precision.f90 module_forestMetaData.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
-	module_interpolation.f90 module_initialization.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
+MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
+	module_wavelets.f90 module_initialization.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
@@ -21,7 +21,7 @@ MFILES = module_precision.f90 module_forestMetaData.f90 module_globals.f90 modul
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
-	module_t_files.f90 module_saving.f90
+	module_t_files.f90 module_saving.f90 # module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -30,7 +30,7 @@ VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQ
 VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
-VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS
+VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/WAVELETS
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -50,9 +50,9 @@ SB_INCL = #-I../../sblas/SOFTWARE
 # AND NEVER FOR PHYSICS MODULES (e.g. switching the viscosity)
 #
 # PRAGMAS are added in the compiler specific section, but here is their list:
-# NOHDF5 : if set, all dependency of HDF5 is removed. The code can not save output anymore.
-#          useful for developmend on some machines only. use only if absolutely necessary
-#          NOT IMPLEMENTED YET
+# DEV : if set, additional tests are done and error messages are issued; these concern
+#       errors in development and are thus useful only for people fiddling around with
+#       the code.
 
 #-------------------------------------------------------------------------------
 # COMPILER-DEPENDEND PART
@@ -70,10 +70,8 @@ FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid -fi
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-HDF_LIB = $(HDF_ROOT)/lib
-HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz
-FFLAGS += -I$(HDF_INC) $(SB_INCL)
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/fortran/src/.libs -L$(HDF_ROOT)/fortran/src $(SB_LIB) -lhdf5_fortran -lhdf5 -lz
+FFLAGS += -I$(HDF_ROOT)/include -I$(HDF_ROOT)/fortran/src $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
 PRAGMAS = #-DSBLAS
@@ -98,7 +96,7 @@ endif
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
-FFLAGS += -FR -O3 -heap-arrays
+FFLAGS += -FR -heap-arrays
 ##FFLAGS += -xcore-avx2  # use avx2
 # timing flags: attention they might disable all optimization!
 ##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
@@ -106,11 +104,9 @@ FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-HDF_LIB = $(HDF_ROOT)/lib
-HDF_INC = $(HDF_ROOT)/include
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_LIB) -L$(HDF_LIB)64 -lhdf5_fortran -lhdf5 -lz
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/fortran/src/.libs -L$(HDF_ROOT)/fortran/src -lhdf5_fortran -lhdf5 -lz
 #####-ldl -lm # -llapack -lblas
-FFLAGS += -I$(HDF_INC)
+FFLAGS += -I$(HDF_ROOT)/include -I$(HDF_ROOT)/fortran/src
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated
 PRAGMAS = #
@@ -161,17 +157,11 @@ wabbit-post: main_post.f90 $(MOBJS) $(OBJS)
 
 # Compile modules (module dependency must be specified by hand in
 # Fortran). Objects are specified in MOBJS (module objects).
-
-
-# compile precision module
-$(OBJDIR)/module_precision.o: module_precision.f90
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
-$(OBJDIR)/module_t_files.o: module_t_files.f90 $(OBJDIR)/module_precision.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 # compile module containing all globals
-$(OBJDIR)/module_globals.o: module_globals.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_globals.o: module_globals.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_t_files.o: module_t_files.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_stl_file_reader.o: module_stl_file_reader.f90 $(OBJDIR)/module_globals.o
@@ -180,7 +170,7 @@ $(OBJDIR)/module_stl_file_reader.o: module_stl_file_reader.f90 $(OBJDIR)/module_
 $(OBJDIR)/module_bridge.o: module_bridge.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_flusi_wabbit.f90  $(OBJDIR)/module_precision.o \
+$(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_flusi_wabbit.f90  $(OBJDIR)/module_globals.o \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -193,7 +183,7 @@ $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integrat
 $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_precision.o $(OBJDIR)/module_t_files.o \
+$(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
 	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -209,14 +199,14 @@ $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_
 	$(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+$(OBJDIR)/module_funnel.o: module_funnel.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ns_penalization.o \
 	funnel2D.f90 funnel3D.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
+$(OBJDIR)/module_pipe_flow.o: module_pipe_flow.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ns_penalization.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o
+$(OBJDIR)/module_simple_geometry.o: module_simple_geometry.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ns_penalization.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_cases.o: module_navier_stokes_cases.f90 $(OBJDIR)/module_funnel.o $(OBJDIR)/module_ns_penalization.o\
@@ -229,7 +219,7 @@ $(OBJDIR)/module_navier_stokes.o: module_navier_stokes.f90  $(OBJDIR)/module_ns_
 	RHS_2D_cylinder.f90 RHS_3D_navier_stokes.f90 inicond_NStokes.f90 save_data_ns.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_precision.o $(OBJDIR)/module_ns_penalization.o \
+$(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ns_penalization.o \
 		$(OBJDIR)/module_navier_stokes_params.o $(OBJDIR)/module_params.o
 		$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -249,7 +239,7 @@ $(OBJDIR)/module_timing.o: module_timing.f90
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_interpolation.o: module_interpolation.f90 $(OBJDIR)/module_params.o
+$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_globals.o \
@@ -264,9 +254,9 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	setInitialCondition_tree.f90 setInicondBlocks_tree.f90 $(OBJDIR)/module_treelib.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o\
-	$(OBJDIR)/module_treelib.o synchronize_ghosts.f90 blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 check_redundant_nodes.f90 \
-	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 sync_ghosts_symmetry_condition.f90
+$(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
+	$(OBJDIR)/module_treelib.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
+	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 sync_ghosts_symmetry_condition.f90 reconstruction_step.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_mpi.o \
@@ -277,43 +267,44 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_interpolation.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_interpolation.o \
+$(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o find_neighbors.f90 doesBlockExist_tree.f90 \
-	refine_tree.f90 respectJmaxJmin_tree.f90 refinementExecute2D_tree.f90 adapt_tree.f90 threshold_block.f90 \
-	ensureGradedness_tree.f90 ensure_completeness.f90 executeCoarsening_tree.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
-	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 \
-    treecode_to_hilbertcode_3D.f90 forest.f90 reset_tree.f90 \
-    refinementExecute3D_tree.f90 get_block_spacing_origin.f90 updateNeighbors_tree.f90 check_lgt_block_synchronization.f90 \
-	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 \
-	merge_blocks.f90 create_active_and_sorted_lists.f90 quicksort.f90 coarseningIndicator_tree.f90 \
-	createEquidistantGrid_tree.f90 createRandomGrid_tree.f90 allocate_forest.f90 reset_tree.f90 block_xfer_nonblocking.f90 \
-	updateMetadata_tree.f90 remove_nonperiodic_neighbors.f90 createMask_tree.f90 InputOutput.f90 InputOutput_Flusi.f90
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
+	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 waveletDecomposition_tree.f90 refineToEquidistant_tree.f90 \
+	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
+	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
+	refinementExecute2D_tree.f90 refinementExecute3D_tree.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 \
+	ensure_completeness.f90 executeCoarsening_tree.f90 merge_blocks.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
+	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
+	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
+	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
+	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90 \
+	securityZone_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
-	unit_test_ghost_nodes_synchronization.f90 unit_test_treecode.f90
+	unit_test_treecode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o get_neighbor_treecode.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_helpers.o volume_integral.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
-	$(OBJDIR)/module_treelib.o
+	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
+	componentWiseNorm_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_sparse_operators.o: module_sparse_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
 	$(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_forestMetaData.o: module_forestMetaData.f90 $(OBJDIR)/module_precision.o
+$(OBJDIR)/module_forestMetaData.o: module_forestMetaData.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_saving.o: module_saving.f90 \
@@ -322,7 +313,7 @@ $(OBJDIR)/module_saving.o: module_saving.f90 \
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90  \
-	$(OBJDIR)/module_precision.o $(OBJDIR)/module_ini_files_parser.o $(OBJDIR)/module_mesh.o
+	$(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o $(OBJDIR)/module_mesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

@@ -1,6 +1,4 @@
 recursive subroutine quicksort(a, first, last, sortdim)
-
-    ! global parameters
     use module_params
 
     implicit none
@@ -67,8 +65,6 @@ subroutine interchange_sort(a, left_end, right_end, sortdim)
 ! Sort a 2d array (: x dim) according to "sortdims" entry in the second dimension
 ! ------------------------------------------------------------------------------
  recursive subroutine quicksort_ik(a, first, last, sortdim, dim)
-
-    ! global parameters
     use module_params
 
     implicit none

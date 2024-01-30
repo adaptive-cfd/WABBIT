@@ -12,10 +12,8 @@
 ! ********************************************************************************************
 
 subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
-    use module_forestMetaData
-    use module_helpers
     implicit none
-    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
@@ -33,9 +31,9 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
 
 
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     !> loop over the blocks and set their refinement status.
     !! \note refinement is an absolute statement, that means once set, the block will be refined
@@ -60,7 +58,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
 
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
+            level = lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL)
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
             nnorm = 1.0_rk

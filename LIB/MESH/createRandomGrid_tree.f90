@@ -25,20 +25,19 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call createEquidistantGrid_tree( params, 2, .true., tree_ID=tree_ID )
+    call createEquidistantGrid_tree( params, min(2, params%Jmin), .true., tree_ID=tree_ID )
 
-    !---------------------------------------------------------------------------------------------
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, iterations
         if (params%rank==0 .and. verbosity) then
             write(*,'("RANDOM GRID GENERATION: iteration ",i2," active=",i9," Jmin=",i2," Jmax=",i2)') &
-            l, lgt_n, &
+            l, lgt_n(tree_ID), &
             minActiveLevel_tree(tree_ID), &
             maxActiveLevel_tree(tree_ID)
         endif
 
         ! randomly refine some blocks
-        call refine_tree( params, hvy_block, "random", tree_ID=tree_ID   )
+        call refine_tree( params, hvy_block, hvy_tmp, "random", tree_ID=tree_ID   )
 
         ! randomly coarsen some blocks
         call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "random", hvy_tmp  )
@@ -51,4 +50,6 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
         maxActiveLevel_tree(tree_ID), &
         dble(lgt_n(tree_ID)) / dble(size(lgt_block, 1)), params%max_grid_density
     endif
+
+    call balanceLoad_tree( params, hvy_block, tree_ID)
 end subroutine createRandomGrid_tree

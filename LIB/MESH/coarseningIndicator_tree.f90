@@ -1,17 +1,3 @@
-!> \brief Set coarsening status for all active blocks, different methods possible
-!
-!> \details This routine sets the coarsening flag for all blocks. We allow for different
-!! mathematical methods (everywhere / random) currently not very complex, but expected to grow
-!! in the future.
-!! \n
-!! ------------------ \n
-!! Refinement status: \n
-!! ------------------ \n
-!! +1 refine \n
-!! 0 do nothing \n
-!! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
-!! -2 block will coarsen and be merged with her sisters \n
-! ********************************************************************************************
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
     tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
 
@@ -40,16 +26,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     logical, intent(in) :: ignore_maxlevel
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgt_id, g, mpierr, hvy_id, p, N_thresholding_components, tags, ierr, level
+    integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    !> mask term for every grid point in this block
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
-    !> velocity of the solid
-    real(kind=rk), allocatable, save :: us(:,:,:,:)
-    logical :: consider_hvy_tmp, biorthogonal
+    logical :: consider_hvy_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -60,22 +42,21 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
     consider_hvy_tmp = .false.
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     neq = params%n_eqn
     Bs = params%Bs
-    g = params%n_ghosts
-    biorthogonal = (params%wavelet_transform_type=="biorthogonal")
+    g = params%g
 
-    !> reset refinement status to "stay" on all blocks
+    ! reset refinement status to "stay" on all active blocks
     do k = 1, lgt_n(tree_ID)
-        lgt_id = lgt_active(k, tree_ID)
-        lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0
+        lgtID = lgt_active(k, tree_ID)
+        lgt_block( lgtID, Jmax + IDX_REFINE_STS ) = 0
     enddo
 
     ! construct mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except in the "dealiasing step", because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask).and. indicator/="everywhere" .and. indicator/="random") then
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random") then
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
@@ -105,18 +86,18 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! case with derived quantities.
         ! loop over my active hvy data:
         do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
+            hvyID = hvy_active(k, tree_ID)
 
             ! get lgt id of block
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
             ! some indicators may depend on the grid (e.g. the vorticity), hence
             ! we pass the spacing and origin of the block
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
+            call get_block_spacing_origin( params, lgtID, x0, dx )
 
             ! actual computation of thresholding quantity (vorticity etc)
-            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
-            g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), N_thresholding_components )
+            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvyID), &
+            g, x0, dx, hvy_tmp(:,:,:,:,hvyID), hvy_mask(:,:,:,:,hvyID), N_thresholding_components )
         enddo
 
         ! note here we sync hvy_tmp (=derived qty) and not hvy_block
@@ -134,10 +115,9 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! versions <30.05.2018 used fixed eps for all qtys of the state vector, but that is not very smart
     !! as each qty can have different mangitudes. If the switch eps_normalized is on, we compute here
     !! the vector of normalization factors for each qty that adaptivity will be based on (state vector
-    !! or vorticity). The nor is specified in params%eps_norm, default is Linfty.
+    !! or vorticity). The norm is specified in params%eps_norm, default is Linfty.
 
-    !! default norm (e.g. for compressible navier-stokes) is 1 so in this case eps
-    !! is an absolute value.
+    !! default norm is 1 so in this case eps is an absolute value.
     if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
     norm = 1.0_rk
 
@@ -145,11 +125,20 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
         if ( .not. consider_hvy_tmp ) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
-            call component_wise_tree_norm(params, hvy_block, tree_ID, params%eps_norm, norm)
+            call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
         else
             ! use derived qtys instead (hvy_tmp)
-            call component_wise_tree_norm(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
+
+        ! HACK
+!        if (params%physics_type == "ACM-new") then
+!            if (params%eps_norm == "Linfty") then
+!                norm(1:params%dim) = maxval( norm(1:params%dim) )
+!            elseif (params%eps_norm == "L2") then
+!                norm(1:params%dim) = sqrt( sum(norm(1:params%dim)**2) )
+!            endif
+        ! endif
 
         ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
         do p = 1, N_thresholding_components
@@ -194,12 +183,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
 
                 do k = 1, lgt_n(tree_ID)
-                    lgt_id = lgt_active(k, tree_ID)
+                    lgtID = lgt_active(k, tree_ID)
                     ! random number
                     call random_number(r)
                     ! set refinement status to coarsen based on random numbers.
                     if ( r <= crsn_chance ) then
-                        lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
+                        lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
                         tags = tags + 1
                     endif
                 enddo
@@ -209,56 +198,47 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         endif
 
     case default
+        ! Default is wavelet thresholding...
+        
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.
         do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
+            hvyID = hvy_active(k, tree_ID)
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+            level = lgt_block( lgtID, Jmax+IDX_MESH_LVL)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
             ! this should prevent filtering artifacts at block-block interfaces.
-            if ((level /= level_this).and.(biorthogonal)) cycle
+            if (level /= level_this) cycle
 
             ! some indicators may depend on the grid, hence
             ! we pass the spacing and origin of the block (as we have to compute vorticity
             ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
+            call get_block_spacing_origin( params, lgtID, x0, dx )
 
-            ! evaluate the criterion on this block.
-            if (params%threshold_mask .and. present(hvy_mask)) then
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
-                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
+            ! force blocks on maximum refinement level to coarsen, if parameter is set.
+            ! Note this behavior can be bypassed using the ignore_maxlevel switch.
+            if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) then
+                ! coarsen (no need to evaluate the possibly expensive coarseningIndicator_block)
+                lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
             else
-                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_id), &
-                hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
+                ! evaluate the criterion on this block.
+                if (params%threshold_mask .and. present(hvy_mask)) then
+                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID), hvy_mask(:,:,:,:,hvyID))
+                else
+                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
+                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
+                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID))
+                endif
             endif
         enddo
     end select
 
-
-
-
-    !---------------------------------------------------------------------------
-    !> force blocks on maximum refinement level to coarsen, if parameter is set
-    !---------------------------------------------------------------------------
-    ! Note this behavior can be bypassed using the ignore_maxlevel switch
-    if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) then
-        do k = 1, lgt_n(tree_ID)
-            lgt_id = lgt_active(k, tree_ID)
-            if (lgt_block(lgt_id, Jmax + IDX_MESH_LVL) == params%max_treelevel) then
-                ! force blocks on maxlevel to coarsen
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = -1
-            endif
-        enddo
-    endif
-
-
     !> after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
-end subroutine coarseningIndicator_tree
+end subroutine

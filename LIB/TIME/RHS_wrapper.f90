@@ -18,7 +18,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(in)      :: params                       !> user defined parameter structure, hvy_active
-    real(kind=rk), intent(inout)        :: hvy_rhs(:, :, :, :, :)       !> heavy work data array - block data
+    real(kind=rk), intent(inout)        :: hvy_rhs  (:, :, :, :, :)       !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)      !> hvy_mask are qtys that depend on grid and not explicitly on time
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
@@ -34,9 +34,16 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
     ! grid parameter
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     t0 = MPI_wtime()
     n_domain = 0
+
+    !-------------------------------------------------------------------------
+    ! CoarseExtension update of input data
+    !-------------------------------------------------------------------------
+    ! we assume data are sync'ed on call
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+    ! hvy_n(tree_ID), inputDataSynced=.true. )
 
     !-------------------------------------------------------------------------
     ! create mask function at current time
@@ -72,7 +79,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 
@@ -107,7 +114,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 

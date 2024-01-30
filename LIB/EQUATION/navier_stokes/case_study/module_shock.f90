@@ -7,7 +7,7 @@
 module module_shock
 
     use module_navier_stokes_params
-    use module_precision
+    use module_globals
     use module_ini_files_parser_mpi
     use module_ns_penalization
 

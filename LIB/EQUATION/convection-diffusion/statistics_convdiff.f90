@@ -64,16 +64,16 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
 
         if (params_convdiff%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
-                do ix = g+1, Bs(1)+g-1
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
                     scalar_integral = scalar_integral + u(ix,iy,1,1)
                 enddo
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
-                do iy = g+1, Bs(2)+g-1
-                    do ix = g+1, Bs(1)+g-1
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
                         scalar_integral = scalar_integral + u(ix,iy,iz,1)
                     enddo
                 enddo

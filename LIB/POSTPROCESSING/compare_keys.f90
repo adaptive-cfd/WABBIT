@@ -6,12 +6,12 @@
 
 subroutine compare_keys(key1, key2)
     use module_helpers, only: check_file_exists
-    use module_precision
+    use module_globals
 
     implicit none
     character(len=*), intent(in) :: key1, key2
     integer(kind=ik)             :: i
-    real(kind=rk)                :: data1(1:6), data2(1:6), error(1:6)
+    real(kind=rk)                :: data1(1:7), data2(1:7), error(1:7)
     integer(kind=ik)             :: curves1(1:2), curves2(1:2), error_curve(1:2)
     !-----------------------------------------------------------------------------------------------------
     ! does the user need help?
@@ -27,22 +27,22 @@ subroutine compare_keys(key1, key2)
         write(*,*) "Key2: ", trim(adjustl(key2))
 
         open(59, file = key1, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x), 2(i12,1x))') data1, curves1
+        read(59,'(7(es15.8,1x), 2(i12,1x))') data1, curves1
         close(59)
 
         open(59, file = key2, status = 'unknown', action='read')
-        read(59,'(6(es15.8,1x),2(i12,1x))') data2, curves2
+        read(59,'(7(es15.8,1x),2(i12,1x))') data2, curves2
         close(59)
 
         write (*,'("present  : time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=" ,i12, " sfc_z=",i12)') &
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " grid=",es15.8," sfc_hilbert=" ,i12, " sfc_z=",i12)') &
         data1, curves1
         write (*,'("reference: time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=" ,i12, " sfc_z=",i12)') &
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " grid=",es15.8," sfc_hilbert=" ,i12, " sfc_z=",i12)') &
         data2, curves2
 
         ! errors:
-        do i = 1, 6
+        do i = 1, 7
             if (dabs(data2(i))>=1.0e-5_rk) then
                 ! relative error
                 error(i) = dabs( (data2(i)-data1(i)) / data2(i) )
@@ -55,7 +55,7 @@ subroutine compare_keys(key1, key2)
             error_curve(i) = abs( (curves2(i)-curves1(i)) )
         end do
         write (*,'("err(rel) : time=",es15.8," max=",es15.8," min=",es15.8," &
-        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " sfc_hilbert=",i12, " sfc_z=", i12)') error, error_curve
+        &sum=",es15.8," sum**2=",es15.8," q=",es15.8, " grid=", es15.8, " sfc_hilbert=",i12, " sfc_z=", i12)') error, error_curve
 
         if ((maxval(error)<1.0e-4)) then !.and. maxval(error_curve)<5_ik) then
             ! all cool

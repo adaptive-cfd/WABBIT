@@ -59,11 +59,25 @@ module module_params
         character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
-        character(len=cshort) :: wavelet="not-initialized", wavelet_transform_type="harten-multiresolution"
+        logical :: useCoarseExtension = .true.
+        logical :: useSecurityZone = .true.
+
+
+        character(len=cshort) :: wavelet="not-initialized"
+        ! the wavelet filter banks:
+        ! HD - low pass decomposition filter, H_TILDE
+        ! GD - high pass decomposition filter, G_TILDE
+        ! HR - low pass reconstruction filter, H
+        ! GR - high pass reconstruction filter, G
+        real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
+        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+
+
         ! minimal level for blocks in data tree
-        integer(kind=ik) :: min_treelevel=0
+        integer(kind=ik) :: Jmin=0
         ! maximal level for blocks in data tree
-        integer(kind=ik) :: max_treelevel=0
+        integer(kind=ik) :: Jmax=0
+        integer(kind=ik) :: Jini=-1
         ! maximal numbers of trees in the forest
         integer(kind=ik) :: forest_size=1
         ! order of refinement predictor
@@ -79,17 +93,8 @@ module module_params
         character(len=cshort), dimension(:), allocatable :: input_files
 
         integer(kind=ik), dimension(3) :: Bs=(/ 0, 0, 0 /)! number of block nodes
-        integer(kind=ik) :: n_ghosts=0 ! number of ghost nodes
-
-        ! In our grid definition with redundant points, at the coarse-fine interface values of one of the
-        ! blocks need to be overwritten with the values from the other one. There are two choices:
-        ! (1) overwrite coarser block with (decimated) fine block values (the solution until April 2020)
-        ! (2) overwrite fine block with (interpolated) coarser block values (the new solution)
-        ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
-        ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
-        ! and (1) appears to be more stable.
-        logical :: ghost_nodes_redundant_point_coarseWins = .false.
-        logical :: iter_ghosts = .false.
+        integer(kind=ik) :: g=0 ! number of ghost nodes
+        integer(kind=ik) :: g_rhs=0 ! number of ghost nodes
 
         ! switch for mesh adaption
         logical :: adapt_tree=.false., adapt_inicond=.false.
@@ -150,7 +155,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! unit test
         ! -------------------------------------------------------------------------------------
-        logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
+        logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
 
         ! -------------------------------------------------------------------------------------
         ! filter
@@ -166,7 +171,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------
-        logical,dimension(3) :: periodic_BC = .true., symmetry_BC = .false.
+        logical, dimension(3) :: periodic_BC = .true., symmetry_BC = .false.
 
     end type type_params
 

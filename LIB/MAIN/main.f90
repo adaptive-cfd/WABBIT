@@ -1,11 +1,6 @@
-!> \brief main program, init all data, start time loop, output on screen during program run
-! ********************************************************************************************
-!> \image html rhs.svg width=600
-!> \image html rhs.eps
-
 program main
-
     use mpi
+    use module_wavelets
     use module_helpers
     use module_MPI
     use module_params           ! global parameters
@@ -63,8 +58,8 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
-    character(len=cshort)               :: filename
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode
+    character(len=clong)               :: filename
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
@@ -115,6 +110,7 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    call setup_wavelet(params)
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
     ! have the pysics module read their own parameters
@@ -138,25 +134,26 @@ program main
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
-        call unit_test_ghost_nodes_synchronization( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
     endif
 
-    call reset_tree(params, .true., tree_ID=tree_ID_flow)
+    ! check if the wavelet filter banks are okay.
+    if (params%test_wavelet_decomposition) then
+        call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+    endif
 
 
     !---------------------------------------------------------------------------
     ! Initial condition
     !---------------------------------------------------------------------------
+    ! reset the grid: all blocks are inactive and empty (in case the unit tests leave us with some data)
+    call reset_tree( params, .true., tree_ID=tree_ID_flow )
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
 
     if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
-        ! save initial condition to disk (unless we're reading from file and do not adapt,
-        ! in which case this makes no sense)
-        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-
-        ! NOte new versions (>16/12/2017) call physics module routines call prepare_save_data. These
+        ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
         call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
@@ -222,22 +219,6 @@ program main
         t2 = MPI_wtime()
 
         !***********************************************************************
-        ! check redundant nodes
-        !***********************************************************************
-        t4 = MPI_wtime()
-        if (params%check_redundant_nodes) then
-            ! run the internal test for the ghost nodes.
-            call check_unique_origin(params, hvy_block, test_failed, tree_ID_flow)
-
-            if (test_failed) then
-                call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
-                call abort(111111,"Same origin of ghost nodes check failed - stopping.")
-            endif
-        endif
-        call toc( "TOPLEVEL: check ghost nodes", MPI_wtime()-t4)
-
-
-        !***********************************************************************
         ! MPI bridge (used e.g. for particle-fluid coupling)
         !***********************************************************************
         if (params%bridge_exists) then
@@ -261,16 +242,17 @@ program main
             ! synchronization before refinement (because the interpolation takes place on the extended blocks
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
-            ! Snych'ing becomes much mor expensive one the grid is refined.
+            ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
-            ! refine the mesh. Note: afterwards, it can happen that two blocks on the same level differ
-            ! in their redundant nodes, but the ghost node sync'ing later on will correct these mistakes.
-            call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )
+            ! refine the mesh
+            call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
         endif
         call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
 
+        Jmin1 = minActiveLevel_tree(tree_ID_flow)
+        Jmax1 = maxActiveLevel_tree(tree_ID_flow)
 
         !***********************************************************************
         ! evolve solution in time
@@ -294,6 +276,7 @@ program main
                 (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
                 it_is_time_to_save_data = .true.
             endif
+
             ! do not save any output before this time (so maybe revoke the previous decision)
             if (time<=params%write_time_first) then
                 it_is_time_to_save_data = .false.
@@ -351,10 +334,10 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
@@ -364,9 +347,6 @@ program main
         ! Write fields to HDF5 file
         !***********************************************************************
         if (it_is_time_to_save_data) then
-            ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
@@ -379,10 +359,12 @@ program main
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_cpu=",es12.4," Nb=(",i6,"/",i6,") Jmin=",i2," Jmax=",i2, " dt=",es8.1)') &
+            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_wall=",es9.3," Nb=(",i6,"/",i6,") J_rhs=",i2,":",i2," J_coarsened=",i2,":",i2, " dt=",es8.1," mem=",i3,"%")') &
              iteration, time, t2, Nblocks_rhs, Nblocks, &
+             Jmin1, Jmax1, &
              minActiveLevel_tree(tree_ID_flow), &
-             maxActiveLevel_tree(tree_ID_flow), dt
+             maxActiveLevel_tree(tree_ID_flow), dt, &
+             nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
@@ -390,7 +372,7 @@ program main
              call append_t_file( 'performance.t', (/time, dble(iteration), t2, dble(Nblocks_rhs), dble(Nblocks), &
              dble(minActiveLevel_tree(tree_ID_flow)), &
              dble(maxActiveLevel_tree(tree_ID_flow)), &
-             dble(params%number_procs) /) )
+             dble(params%number_procs), dble(size(lgt_block,1)) /) )
         end if
 
         !***********************************************************************
@@ -443,14 +425,6 @@ program main
 
     ! save end field to disk, only if this data is not saved already
     if ( abs(output_time-time) > 1e-10_rk ) then
-        ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
-
-        ! filter before write out
-        if ( params%filter_freq > 0 .and. params%filter_type/="no_filter") then
-            call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
-        end if
-
         ! Note new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.

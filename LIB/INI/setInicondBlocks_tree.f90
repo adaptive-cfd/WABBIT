@@ -19,7 +19,7 @@ subroutine setInicondBlocks_tree(params, hvy_block, tree_ID)
 
 
     Bs = params%Bs
-    g  = params%n_ghosts
+    g  = params%g
     ! The normal on the domain indicates (if non-periodic BC are used), if a block
     ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
     ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
@@ -46,7 +46,7 @@ subroutine setInicondBlocks_tree(params, hvy_block, tree_ID)
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 

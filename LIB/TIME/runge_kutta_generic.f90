@@ -17,14 +17,15 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
 
 
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, Neqn, l
+    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, Neqn, l, grhs
     real(kind=rk) :: t
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save  :: rk_coeffs(:,:)
 
     Neqn = params%n_eqn
     Bs   = params%Bs
-    g    = params%n_ghosts
+    g    = params%g
+    grhs = params%g_rhs
 
     if (params%dim==2) then
         z1 = 1
@@ -40,7 +41,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     rk_coeffs = params%butcher_tableau
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -79,7 +80,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
         end do
 
         do l = 2, j
-            ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
+            ! check if coefficient is zero - if so, avoid loop over all components and active blocks
             if (abs(rk_coeffs(j,l)) < 1.0e-8_rk) then
                 cycle
             end if
@@ -96,7 +97,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
         end do
 
         ! synchronize ghost nodes for new input
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs )
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)
@@ -116,7 +117,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
         hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id, 1)
 
         do j = 2, size(rk_coeffs, 2)
-            ! check if coefficient is zero - if so, avoid loop over all data fields and active blocks
+            ! check if coefficient is zero - if so, avoid loop over all components and active blocks
             if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1.0e-8_rk) then
                 cycle
             endif

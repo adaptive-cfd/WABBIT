@@ -22,8 +22,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     integer(kind=ik)                    :: heavy_ids(8), tree_ID          ! list of block ids, proc ranks
 
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
-    integer(kind=ik), dimension(3)      ::  bound1, bound2, boundm, Bs
-    logical :: harten_multiresolution
+    integer(kind=ik), dimension(3)      ::  icoars1, icoars2, icoarsm, Bs, ifine1, ifine2
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors and tree_N are global variables included via the module_forestMetaData. This is not
@@ -34,20 +33,11 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     ! number of blocks to be merged
     N_merge = size(lgt_blocks_to_merge,1)
     Bs = params%Bs
-    g  = params%n_ghosts
-    Jmax = params%max_treelevel
+    g  = params%g
+    Jmax = params%Jmax
     ! level of merged block
     level = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_MESH_LVL )
     tree_ID = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_TREE_ID )
-
-    select case(params%wavelet_transform_type)
-    case ("harten-multiresolution")
-        harten_multiresolution = .true.
-    case ("biorthogonal")
-        harten_multiresolution = .false.
-    case default
-        call abort(2105281, "params%wavelet_transform_type="//trim(adjustl(params%wavelet_transform_type))//" is not known!")
-    end select
 
 
     ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
@@ -55,6 +45,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         call lgt2proc( data_rank(i), lgt_blocks_to_merge(i), params%number_blocks )
     enddo
 
+!-------------------------------------------------------------------------------
 #ifdef DEV
     if ( N_merge /= 4 .and. N_merge /= 8) then
         call abort('You try to merge neither n=4 or 8 blocks...this cannot work.')
@@ -76,6 +67,9 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         enddo
     enddo
 #endif
+!-------------------------------------------------------------------------------
+
+
 
     ! allocate tmp buffer (used only for biorthogonal wavelets, not harten-style multiresolution)
     if ( .not. allocated(tmpblock) ) then
@@ -85,20 +79,22 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         ! it may happen that we use this routine for fields with different # components: in this case,
         ! tmp block has to change size.
         if (size(tmpblock,1)/=size(hvy_block,1) .or.size(tmpblock,2)/=size(hvy_block,2) &
-            .or.size(tmpblock,4)/=size(hvy_block,4) .or.size(tmpblock,3)/=size(hvy_block,3) ) then
+        .or.size(tmpblock,4)/=size(hvy_block,4) .or.size(tmpblock,3)/=size(hvy_block,3) ) then
             deallocate(tmpblock)
             allocate( tmpblock(size(hvy_block,1), size(hvy_block,2), size(hvy_block,3), size(hvy_block,4)) )
         endif
     endif
 
 
+    !-------------------------------------------------------------------------------
     ! merge the specified blocks into one new block. Merging is done in two steps,
     ! first for light data (which all CPUS do redundantly, so light data is kept synched)
     ! Then only the responsible rank will perform the heavy data merging.
 
+    !-------------------------------------------------------------------------------
     ! a) light data (collective operation)
     ! fetch a free light ID for the merged blocks
-    call get_free_local_light_id( params, data_rank(1), lgt_merge_id)
+    call get_free_local_light_id(params, data_rank(1), lgt_merge_id, message="merge_blocks")
     ! create light data entry for the new block
     lgt_block( lgt_merge_id, : ) = -1
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
@@ -106,6 +102,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     lgt_block( lgt_merge_id, Jmax+ idx_refine_sts ) = 0
     lgt_block( lgt_merge_id, Jmax+ IDX_TREE_ID ) = tree_ID
 
+    !-------------------------------------------------------------------------------
     ! b) heavy data merging (individual operation)
     if ( data_rank(1) == params%rank) then
         ! loop over the sisters and store the corresponding mpirank and heavy index
@@ -117,99 +114,79 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         ! get heavy id of merge block
         call lgt2hvy( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
 
-        do i = 1,3
-            bound1(i) = g+1
-            bound2(i) = Bs(i)+g
-            boundm(i) = (Bs(i)-1)/2 + 1 + g
+        ! detail is not computed (yet)
+        hvy_details(:, hvy_merge_id) = -1.0_rk
+
+        ! indices of subblocks on new, merged, coarser block
+        do i = 1, params%dim
+            icoars1(i) = g+1
+            icoars2(i) = Bs(i)+g
+            icoarsm(i) = Bs(i)/2 + g
+        enddo
+
+        ! indices on the finer blocks which we merge to a coarse one
+        do i = 1,  params%dim
+            ! [INKSCAPE]: Please note the fortran code always runs
+            ! until X:2:Bs+g the important number is the
+            ! starting index
+            ! BS even
+            ifine1(i) = g+1 ! start point of first index, low range
+            ifine2(i) = g+1 ! start point of second index, high range
         enddo
 
 
         if (N_merge == 4) then
             ! ************ 2D case ***********************
-            if (harten_multiresolution) then
-                ! hartens multiresolution: coarsening is just taking every 2nd grid point.
+            ! biorthogonal wavelets: apply a low-pass filter (called H) prior to decimation
+            ! sister 0
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock) ! low-pass filtering
+            hvy_block(icoars1(1):icoarsm(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:)
 
-                ! sister 0
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(1) )
-                ! sister 1
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(2) )
-                ! sister 2
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(3) )
-                ! sister 3
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:, heavy_ids(4) )
+            ! sister 1
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(2) ), tmpblock)
+            hvy_block(icoars1(1):icoarsm(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:)
 
-            else
-                ! biorthogonal wavelets: apply a low-pass filter (called H) prior to decimation
+            ! sister 2
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(3) ), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:)
 
-                ! sister 0
-                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock, params%wavelet) ! low-pass filtering
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:) ! decimation (of filtered data)
-
-                ! sister 1
-                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(2) ), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:)
-
-                ! sister 2
-                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(3) ), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:)
-
-                ! sister 3
-                call restriction_prefilter_2D_vct(hvy_block( :,:,:,:, heavy_ids(4) ), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), :, :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, :,:)
-            endif
+            ! sister 3
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(4) ), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:)
 
         elseif (N_merge == 8) then
             ! ************ 3D case ***********************
-            if (harten_multiresolution) then
-                ! sister 0
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(1) )
-                ! sister 1
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(2) )
-                ! sister 2
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(3) )
-                ! sister 3
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(4) )
-                ! sister 4
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(5) )
-                ! sister 5
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(6) )
-                ! sister 6
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(7) )
-                ! sister 7
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id ) = hvy_block( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :, heavy_ids(8) )
-            else
-                ! sister 0
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(1)), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 0
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(1)), tmpblock)
+            hvy_block(icoars1(1):icoarsm(1)  , icoars1(2):icoarsm(2)  , icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
-                ! sister 1
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(2)), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 1
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(2)), tmpblock)
+            hvy_block(icoars1(1):icoarsm(1)  , icoarsm(2)+1:icoars2(2), icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
-                ! sister 2
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(3)), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), bound1(3):boundm(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 2
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(3)), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2)  , icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
-                ! sister 3
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(4)), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), bound1(3):boundm(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 3
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(4)), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
-                ! sister 4
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(5)), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 4
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(5)), tmpblock)
+            hvy_block(icoars1(1):icoarsm(1)  , icoars1(2):icoarsm(2)  , icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
-                ! sister 5
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(6)), tmpblock, params%wavelet)
-                hvy_block(bound1(1):boundm(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 5
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(6)), tmpblock)
+            hvy_block(icoars1(1):icoarsm(1)  , icoarsm(2)+1:icoars2(2), icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
-                ! sister 6
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(7)), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), bound1(2):boundm(2), boundm(3):bound2(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
+            ! sister 6
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(7)), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2)  , icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
-                ! sister 7
-                call restriction_prefilter_3D_vct(hvy_block(:,:,:,:,heavy_ids(8)), tmpblock, params%wavelet)
-                hvy_block(boundm(1):bound2(1), boundm(2):bound2(2), boundm(3):bound2(3), :, hvy_merge_id) = tmpblock( g+1:Bs(1)+g:2, g+1:Bs(2)+g:2, g+1:Bs(3)+g:2, :)
-            endif
+            ! sister 7
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(8)), tmpblock)
+            hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
         endif
     endif
 

@@ -1,6 +1,6 @@
 
 subroutine post_dump_neighbors(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -59,8 +59,8 @@ subroutine post_dump_neighbors(params)
     ! unused so just fill any value
     params%order_discretization = "FD_2nd_central"
     params%order_predictor = "multiresolution_2nd"
-    params%n_ghosts = 2_ik
-    params%max_treelevel = tc_length+1
+    params%g = 2_ik
+    params%Jmax = tc_length+1
     params%n_eqn = params%dim
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)

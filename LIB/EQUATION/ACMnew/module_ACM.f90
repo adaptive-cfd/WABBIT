@@ -7,7 +7,7 @@ module module_acm
   use module_insects
   use module_t_files
 
-  use module_precision
+  use module_globals
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
@@ -59,7 +59,7 @@ module module_acm
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, u_mean_set(1:3),  &
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
@@ -93,15 +93,16 @@ module module_acm
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=cshort) :: sponge_type=""
+    character(len=cshort) :: nonlinear_formulation="convective" ! or "divergence"
     character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: wingsection_inifiles(1:2)
+    character(len=cshort) :: scalar_BC_type="neumann"
     character(len=cshort), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
-    ! the error compared to an analytical solution (e.g. taylor-green)
-    real(kind=rk) :: error(1:6), start_time = 0.0_rk
+    real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation
+    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation, scalar_removal=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -229,6 +230,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
     call read_param_mpi(FILE, 'ACM-new', 'use_HIT_linear_forcing', params_acm%use_HIT_linear_forcing, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
 
 
     ! initial condition
@@ -257,10 +259,11 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
-    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
+!    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
+    call read_param_mpi(FILE, 'VPM', 'thickness', params_acm%thickness, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'C_smooth', params_acm%C_smooth, 1.5_rk )
 
@@ -309,6 +312,7 @@ end subroutine
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_acm%scalar_inicond, params_acm%scalar_inicond )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'source', params_acm%scalar_source_type, params_acm%scalar_source_type )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'scalar_BC_type', params_acm%scalar_BC_type, "neumann" )
 
         if (params_acm%use_sponge) then
             call read_param_mpi( FILE, 'ConvectionDiffusion', 'absorbing_sponge', params_acm%absorbing_sponge, .true. )
@@ -341,10 +345,13 @@ end subroutine
         ! call abort(220819, "the state vector length is not appropriate. number_equation must be DIM+1+N_scalars")
     endif
 
-    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim)-1, kind=rk))
+    ! uniqueGrid modification
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
 
     dx_min = minval( ddx(1:params_acm%dim) )
-    nx_max = maxval( (params_acm%Bs-1) * 2**(params_acm%Jmax) )
+    ! uniqueGrid modification
+    nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
+
     if (params_acm%c_0 > 0.0_rk) then
         dt_min = params_acm%CFL*dx_min/params_acm%c_0
     else
@@ -372,8 +379,10 @@ end subroutine
     endif
 
     ! if used, setup insect. Note fractal tree and active grid are part of the insects: they require the same init module
-    if (params_acm%geometry == "Insect" .or. params_acm%geometry=="fractal_tree" .or. params_acm%geometry=="active_grid" &
-    .or. params_acm%geometry=="cylinder-free".or. params_acm%geometry=="sphere-free") then
+    !
+    ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
+    if (params_acm%geometry == "Insect".or.params_acm%geometry=="fractal_tree".or.params_acm%geometry=="active_grid" &
+    .or. params_acm%geometry=="cylinder-free".or.params_acm%geometry=="sphere-free".or.params_acm%geometry=="plate-free") then
         ! when computing passive scalars, we require derivatives of the mask function, which
         ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
         ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -430,11 +439,8 @@ end subroutine
     ! the dt for this block is returned to the caller:
     real(kind=rk), intent(out) :: dt
     ! temporary array. note this is just one block and hence not important for overall memory consumption
-    real(kind=rk), allocatable, save :: u_mag(:,:,:)
-    real(kind=rk) :: u_eigen, kappa
-    integer :: iscalar, dim
-
-    if (.not.allocated(u_mag)) allocate(u_mag(1:size(u,1), 1:size(u,2), 1:size(u,3)))
+    real(kind=rk) :: u_eigen, kappa, uu, u_mag
+    integer :: iscalar, dim, ix, iy ,iz
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: GET_DT_BLOCK_ACM called but ACM not initialized"
 
@@ -442,14 +448,28 @@ end subroutine
 
     ! compute square of velocity magnitude
     if (params_acm%dim == 2) then
-        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2)
+        u_mag = 0.0_rk
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                uu = u(ix,iy,1,1)*u(ix,iy,1,1)+u(ix,iy,1,2)*u(ix,iy,1,2)
+                u_mag = max( u_mag, uu)
+            enddo
+        enddo
+
     else
-        u_mag = u(:,:,:,1)*u(:,:,:,1) + u(:,:,:,2)*u(:,:,:,2) + u(:,:,:,3)*u(:,:,:,3)
+        u_mag = 0.0_rk
+        do iz=g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    uu = u(ix,iy,iz,1)*u(ix,iy,iz,1)+u(ix,iy,iz,2)*u(ix,iy,iz,2)+u(ix,iy,iz,3)*u(ix,iy,iz,3)
+                    u_mag = max( u_mag, uu)
+                enddo
+            enddo
+        enddo
     endif
 
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
-    u_eigen = sqrt(maxval(u_mag)) + sqrt(params_acm%c_0**2 + maxval(u_mag) )
-
+    u_eigen = sqrt(u_mag) + sqrt(params_acm%c_0**2 + u_mag )
 
     ! ususal CFL condition
     ! if the characteristic velocity is very small, avoid division by zero
@@ -590,7 +610,6 @@ end subroutine
         call init_t_file('forces_1.t', overwrite)
         call init_t_file('forces_2.t', overwrite)
       endif
-      call init_t_file('error_taylor_green.t', overwrite)
       call init_t_file('mask_volume.t', overwrite)
       call init_t_file('u_residual.t', overwrite)
       call init_t_file('kinematics.t', overwrite)

@@ -4,19 +4,19 @@
 subroutine remove_nonperiodic_neighbors(params, tree_ID)
     implicit none
 
-    type (type_params), intent(in)      :: params               !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik) :: k, hvy_id, lgt_id, lgt_id_neighbor, J1, J2, a
-    logical                             :: remove
-    integer(kind=2)                     :: n_domain(1:3)
+    logical          :: remove
+    integer(kind=2)  :: n_domain(1:3)
 
     do k = 1, hvy_n(tree_ID)
         ! the block w're looking at ...
         hvy_id = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! ... and its level
-        J1 = lgt_block(lgt_id, params%max_treelevel + IDX_MESH_LVL)
+        J1 = lgt_block(lgt_id, params%Jmax + IDX_MESH_LVL)
 
         call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:J1), params%domain_size, params%Bs, params%dim, n_domain )
 
@@ -32,7 +32,7 @@ subroutine remove_nonperiodic_neighbors(params, tree_ID)
 
             ! note the hvy_neighbor stores light IDs
             lgt_id_neighbor = hvy_neighbor(hvy_id, a)
-            J2 = lgt_block(lgt_id_neighbor, params%max_treelevel + IDX_MESH_LVL)
+            J2 = lgt_block(lgt_id_neighbor, params%Jmax + IDX_MESH_LVL)
 
             ! Terrible conditionals to determine whether this BC is affected by non-periodic
             ! conditions or not.

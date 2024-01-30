@@ -1,4 +1,4 @@
-subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp)
+subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp, nrhs_slots1)
     implicit none
 
     !> user defined parameter structure
@@ -15,20 +15,21 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: 00, k1, k2 etc)
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp
+    integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp, nrhs_slots1
     ! local shortcuts:
     integer(kind=ik)                                    :: g, Neqn, number_blocks,&
     rank, number_procs,  dim
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: memory_this, memory_total
-    integer             :: status, nrhs_slots, nwork, nx, ny, nz, max_neighbors, mpierr
+    integer             :: status, nwork, nx, ny, nz, max_neighbors, mpierr, nrhs_slots
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
     real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
     character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
+    logical :: automatic_NB_per_rank = .false.
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -39,7 +40,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     rank            = params%rank
     Bs              = params%Bs
     dim             = params%dim
-    g               = params%n_ghosts
+    g               = params%g
     Neqn            = params%n_eqn
     number_procs    = params%number_procs
     memory_total    = 0.0_rk
@@ -77,16 +78,20 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.
     ! Hence, nrhs_slots is number of slots for RHS saving:
-    if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
-        nrhs_slots = size(params%butcher_tableau,1)
-    elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
-        nrhs_slots = 6
-    elseif (params%time_step_method == "Krylov") then
-        nrhs_slots = params%M_krylov +3
-    elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
-        nrhs_slots = 0
+    if (present(nrhs_slots1)) then
+        nrhs_slots = nrhs_slots1
     else
-        call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+        if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
+            nrhs_slots = size(params%butcher_tableau,1)
+        elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
+            nrhs_slots = 6
+        elseif (params%time_step_method == "Krylov") then
+            nrhs_slots = params%M_krylov +3
+        elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
+            nrhs_slots = 0
+        else
+            call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))
+        endif
     endif
 
 
@@ -102,59 +107,78 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     ! wabbit will automatically select the number of blocks per rank to be allocated
     ! to consume this amount of memory
     !---------------------------------------------------------------------------
-    if (params%number_blocks < 1) then
-        ! loop over all arguments until you find the string "--memory" in them (or not)
-        ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
-        do i = 1, command_argument_count()
-            call get_command_argument(i, memstring)
-            ! is memory limitation used?
-            if ( index(memstring,"--memory=")==1 ) then
-                if (params%rank==0) write(*,'("INIT: automatic selection of blocks per rank is active!")')
+    automatic_NB_per_rank = .false.
+    ! loop over all arguments until you find the string "--memory" in them (or not)
+    ! this ensures compatibility with future versions, as the argument may be anywhere in the call.
+    do i = 1, command_argument_count()
+        call get_command_argument(i, memstring)
+        ! is automatic memory management used?
+        if (index(memstring,"--memory=")==1) then
+            automatic_NB_per_rank = .true.
+            ! read memory from command line (in GB)
+            read(memstring(10:len_trim(memstring)-2),* ) maxmem
 
-                ! read memory from command line (in GB)
-                read(memstring(10:len_trim(memstring)-2),* ) maxmem
+            if (params%rank==0) write(*,'("INIT: total memory   : ",f9.4,"GB")') maxmem
 
-                if (params%rank==0) write(*,'("INIT: total memory   : ",f9.4,"GB")') maxmem
+            ! memory per MPIRANK (in GB)
+            maxmem = maxmem / dble(params%number_procs)
+            if (params%rank==0) write(*,'("INIT: memory-per-core: ",f9.4,"GB")') maxmem
 
-                ! memory per MPIRANK (in GB)
-                maxmem = maxmem / dble(params%number_procs)
+        elseif (index(memstring,"--mem-per-core=")==1) then
+            automatic_NB_per_rank = .true.
 
-                if (params%rank==0) write(*,'("INIT: memory-per-rank: ",f9.4,"GB")') maxmem
+            ! read memory from command line (in GB)
+            read(memstring(16:len_trim(memstring)-2),* ) maxmem
 
-                ! first compute mem per block in points
-                mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
-                + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts
-                + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
+            if (params%rank==0) write(*,'("INIT: total memory   : ",f9.4,"GB")') maxmem * dble(params%number_procs)
+            if (params%rank==0) write(*,'("INIT: memory-per-core: ",f9.4,"GB")') maxmem
 
-                ! hvy_mask
-                if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
-                    mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
-                endif
+            exit ! --mem-per-rank has priority, as we exit the loop now. --mem-per-memory=2.0gb --memory=100.0gb ->> 2 Gb/core
+        endif
+    enddo
 
-                ! hvy_tmp
-                if ( present(hvy_tmp) ) then
-                    mem_per_block = mem_per_block + real(nwork) * real(product(Bs(1:dim)+2*g))
-                endif
 
-                ! hvy_work
-                if ( present(hvy_work) ) then
-                    mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
-                endif
+    if ( automatic_NB_per_rank ) then
+        ! This is a hackhack. The parameter N_MAX_COMPONENTS determines how many components a vector
+        ! can have if we sync it. It is required for allocating the buffers. However, the buffers are
+        ! a worst case estimate: we assume that all MPIRANKS have to send and receive ALL of their ghost nodes
+        ! layers. This is a worst case scenario. The grid is not full, and many block-block interfaces are internal
+        ! (on the same MPIRANK) and thus do not have to be stored in the buffer. Since 06/04/2023, I change the estimate
+        ! from N_MAX_COMPONENTS to DIM. -Thomas
+        N_MAX_COMPONENTS = params%dim
 
-                mem_per_block = mem_per_block * 8.0e-9 ! in GB
-                params%number_blocks = nint(maxmem / mem_per_block)
+        ! first compute mem per block in points
+        mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
+        + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts
+        + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
 
-                if (params%rank==0) then
-                    write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
-                    write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
-                endif
+        ! hvy_mask
+        if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
+            mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
+        endif
 
-                if ((params%adapt_tree .or. params%adapt_inicond) .and. (params%number_blocks<2**params%dim)) then
-                    call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
-                    & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
-                endif
-            endif
-        end do
+        ! hvy_tmp
+        if ( present(hvy_tmp) ) then
+            mem_per_block = mem_per_block + real(nwork) * real(product(Bs(1:dim)+2*g))
+        endif
+
+        ! hvy_work
+        if ( present(hvy_work) ) then
+            mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
+        endif
+
+        mem_per_block = mem_per_block * 8.0e-9 ! in GB
+        params%number_blocks = nint(maxmem / mem_per_block)
+
+        if (params%rank==0) then
+            write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+            write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
+        endif
+
+        if ((params%adapt_tree .or. params%adapt_inicond) .and. (params%number_blocks<2**params%dim)) then
+            call abort(1909181740,"[ini_file_to_params.f90]: The number of blocks for the --memory specification is lower than 2^d&
+            & and comp is adaptive: we cannot fetch all 2^d blocks on one CPU for merging. Use more memory or less cores.")
+        endif
     endif
 
 
@@ -176,6 +200,16 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
         "hvy_block", memory_this, shape(hvy_block)
     endif
+
+    !---------------------------------------------------------------------------
+    allocate( hvy_details(Neqn, params%number_blocks) )
+    memory_this = product(real(shape(hvy_details)))*8.0e-9
+    memory_total = memory_total + memory_this
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",2(i9,1x))') &
+        "hvy_details", memory_this, shape(hvy_details)
+    endif
+
 
     !---------------------------------------------------------------------------
     ! work data (Runge-Kutta substeps and old time level)
@@ -235,7 +269,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     !---------------------------------------------------------------------------)
     if (allocated(lgt_block)) deallocate(lgt_block)
-    allocate( lgt_block( number_procs*params%number_blocks, params%max_treelevel+EXTRA_LGT_FIELDS) )
+    allocate( lgt_block( number_procs*params%number_blocks, params%Jmax+EXTRA_LGT_FIELDS) )
     memory_this = product(real(shape(lgt_block)))*4.0e-9
     memory_total = memory_total + memory_this
     if (rank==0) then
@@ -324,7 +358,9 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     endif
 
     if (allocated(hvy_block)) deallocate( hvy_block )
-    if (allocated(hvy_work)) deallocate( hvy_work )
+    if (present(hvy_work)) then
+        if (allocated(hvy_work)) deallocate( hvy_work )
+    endif
     if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )

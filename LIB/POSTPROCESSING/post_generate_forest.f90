@@ -1,5 +1,5 @@
 subroutine post_generate_forest(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -41,16 +41,16 @@ subroutine post_generate_forest(params)
         return
     endif
 
-    call get_cmd_arg( "--Jmax", params%max_treelevel, default=5_ik )
+    call get_cmd_arg( "--Jmax", params%Jmax, default=5_ik )
     call get_cmd_arg( "--Ntrees", tree_N, 20 )
     call get_cmd_arg( "--dim", params%dim, 2 )
 
-    params%number_blocks = tree_N*2**(params%dim*params%max_treelevel)  ! just to get some memory:
+    params%number_blocks = tree_N*2**(params%dim*params%Jmax)  ! just to get some memory:
     params%domain_size = (/ 30, 30 ,30 /)
     params%Bs = Bs
-    params%min_treelevel = 1
+    params%Jmin = 1
     params%n_eqn = 1
-    params%n_ghosts = g
+    params%g = g
     params%forest_size = tree_N+2
     fsize = params%forest_size
     params%order_predictor = "multiresolution_4th"
@@ -58,8 +58,6 @@ subroutine post_generate_forest(params)
     params%time_step_method = 'none'
 
     N_treeGenerate = tree_N ! note tree_N is overwritten elsewhere
-
-    N_MAX_COMPONENTS = params%n_eqn ! used for ghost node sync'ing (buffer allocation)
 
 
     ! we have to allocate grid if this routine is called for the first time
@@ -86,7 +84,7 @@ subroutine post_generate_forest(params)
     end do
 
     do tree_ID = 1, N_treeGenerate
-        call createEquidistantGrid_tree( params, params%max_treelevel, .false., tree_ID )
+        call createEquidistantGrid_tree( params, params%Jmax, .false., tree_ID )
 
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
@@ -157,7 +155,7 @@ subroutine post_generate_forest(params)
 contains
 
     function bump(x) result (res)
-        use module_precision
+        use module_globals
 
         implicit none
         real(kind=rk), intent (in) :: x

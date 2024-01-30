@@ -211,6 +211,7 @@ module module_insects
     integer, dimension(1:4) :: nfft_wings=0
     logical, dimension(1:4) :: wingsetup_done = .false.
     logical, dimension(1:4) :: wings_radius_table_ready = .false.
+    real(kind=rk), dimension(:), allocatable :: theta_i, R_i
     ! wing bounding box (xmin, xmax, ymin, ymax, zmin, zmax)
     real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
     ! wing inertia
@@ -957,9 +958,10 @@ contains
     rot_r_phi   = (/ -phi_dt_r, 0.0d0, 0.0d0  /)
 
     ! in the wing coordinate system
-    Insect%rot_rel_wing_l_w = matmul(M_wing_l,matmul(transpose(M_stroke_l),matmul(transpose(M3_l), &
+    Insect%rot_rel_wing_l_w = matmul(M_wing_l, matmul(transpose(M_stroke_l),matmul(transpose(M3_l), &
     rot_l_phi+matmul(transpose(M2_l),rot_l_theta+matmul(transpose(M1_l), &
     rot_l_alpha)))))
+
     Insect%rot_rel_wing_r_w = matmul(M_wing_r,matmul(transpose(M_stroke_r),matmul(transpose(M3_r), &
     rot_r_phi+matmul(transpose(M2_r),rot_r_theta+matmul(transpose(M1_r), &
     rot_r_alpha)))))

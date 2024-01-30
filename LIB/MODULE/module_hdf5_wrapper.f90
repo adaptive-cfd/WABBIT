@@ -21,13 +21,13 @@ module module_hdf5_wrapper
     use hdf5
     use mpi
     use module_params       ! global parameters
-    use module_precision
+    use module_globals
 
     implicit none
 
     ! Precision of doubles
     character(len=cshort) :: field_precision = "double" !"single"
-    integer(kind=hsize_t), parameter :: max_chunk = 1024
+    integer(kind=hsize_t), parameter :: max_chunk = 128
 
     ! interface for writing attributes. an attribute is an object which is attached
     ! to a dataset, in our case a array saved in the file. we put useful information
@@ -177,11 +177,11 @@ contains
     implicit none
     ! returns dimensionality (datarank) of the array in the file (e.g. 4D array)
     integer, intent(out)             :: datarank ! data dimensionality (2D or 3D)
-    integer(hid_t), intent(in)                :: file_id
-    character(len=*),intent(in)               :: dsetname
-    integer(hid_t)                            :: dset_id       ! dataset identifier
-    integer(hid_t)                            :: filespace     ! dataspace identifier in file
-    integer                                   :: error  ! error flags
+    integer(hid_t), intent(in)       :: file_id
+    character(len=*),intent(in)      :: dsetname
+    integer(hid_t)                   :: dset_id       ! dataset identifier
+    integer(hid_t)                   :: filespace     ! dataspace identifier in file
+    integer                          :: error  ! error flags
 
     ! Open an existing dataset.
     call h5dopen_f(file_id, dsetname, dset_id, error)
@@ -275,7 +275,7 @@ end subroutine get_rank_datafield
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,100041,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -392,7 +392,7 @@ end subroutine get_rank_datafield
 
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) ) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      call MPI_ABORT(WABBIT_COMM,100042,mpicode)
     endif
 
     ! Select hyperslab in the file.
@@ -492,13 +492,6 @@ end subroutine get_rank_datafield
     ! get the dimensions of the field in the file
     call h5sget_simple_extent_dims_f(filespace, dims_file, dims_dummy, error)
 
-    !if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)).or.(dims_global(3)/=dims_file(3)) ) then
-    !    write(*,*) 'file', dims_file
-    !    write(*,*) 'global', dims_global
-    !  write(*,*) "read_hdf5 error: file dimensions do not match"
-    !  call MPI_ABORT(WABBIT_COMM,10004,mpicode)
-    !endif
-
     ! Select hyperslab in the file.
     call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, &
     error, stride, dims_local)
@@ -551,8 +544,6 @@ end subroutine get_rank_datafield
     integer :: error  ! error flags
 
     integer :: i, mpicode,mindim,maxdim
-    ! what follows is for the attribute "time"
-  !  integer, parameter :: arank = 1
 
     ! determine size of memory (i.e. the entire array). note we assume the file
     ! contains the right amount of data, which must be ensured outside of this function
@@ -599,7 +590,9 @@ end subroutine get_rank_datafield
     if ( (dims_global(1)/=dims_file(1)).or.(dims_global(2)/=dims_file(2)) &
     .or.(dims_global(3)/=dims_file(3)) .or.(dims_global(4)/=dims_file(4))) then
       write(*,*) "read_hdf5 error: file dimensions do not match"
-      call MPI_ABORT(WABBIT_COMM,10004,mpicode)
+      write(*,*) "dims_global=", dims_global
+      write(*,*) "dims_file=", dims_file
+      call MPI_ABORT(WABBIT_COMM, 100043, mpicode)
     endif
 
     ! Select hyperslab in the file.

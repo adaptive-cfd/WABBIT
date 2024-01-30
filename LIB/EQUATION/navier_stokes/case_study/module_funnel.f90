@@ -3,7 +3,7 @@
 module module_funnel
 
   use module_navier_stokes_params
-  use module_precision
+  use module_globals
   use module_ns_penalization
   use module_ini_files_parser_mpi, only : read_param_mpi
   use mpi

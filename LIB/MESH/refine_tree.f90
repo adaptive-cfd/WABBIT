@@ -12,20 +12,20 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
-
+subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     use module_indicators
 
     implicit none
 
-    type (type_params), intent(in)         :: params                      !> user defined parameter structure
-    real(kind=rk), intent(inout)           :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
-    character(len=*), intent(in)           :: indicator                   !> how to choose blocks for refinement
-    integer(kind=ik), intent(in)           :: tree_ID
+    type (type_params), intent(in) :: params                      !> user defined parameter structure
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
+    real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
+    character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement
+    integer(kind=ik), intent(in)   :: tree_ID
 
     ! cpu time variables for running time calculation
-    real(kind=rk)                          :: t0, t1, t2, t_misc
-    integer(kind=ik)                       :: k, hvy_n_afterRefinement, lgt_id
+    real(kind=rk)                  :: t0, t1, t2, t_misc
+    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -45,7 +45,8 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
     call toc( "refine_tree (refinementIndicator_tree)", MPI_Wtime()-t1 )
 
 
-    !> (b) check if block has reached maximal level, if so, remove refinement flags
+    !> (b) remove refinement flag for blocks that are on the finest level and thus
+    !! cannot be refined anymore.
     t1 = MPI_Wtime()
     call respectJmaxJmin_tree( params, tree_ID )
     call toc( "refine_tree (respectJmaxJmin_tree)", MPI_Wtime()-t1 )
@@ -73,7 +74,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
         ! so we detect also problems arising from load-imbalancing.
         call hvy2lgt(lgt_id, hvy_active(k, tree_ID), params%rank, params%number_blocks)
 
-        if ( lgt_block(lgt_id, params%max_treelevel+IDX_REFINE_STS) == +1) then
+        if ( lgt_block(lgt_id, params%Jmax+IDX_REFINE_STS) == +1) then
             ! this block will be refined, so it creates 2**D new blocks but is deleted
             hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim - 1)
         else
@@ -93,8 +94,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
 
 
     !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level. Note that those blocks have
-    !! the status +11
+    !! except if they are already on the highest level.
     t1 = MPI_Wtime()
     if ( params%dim == 3 ) then
         call refinementExecute3D_tree( params, hvy_block, tree_ID )
@@ -127,6 +127,8 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID  )
         call toc( "refine_tree (balanceLoad_tree)", MPI_Wtime()-t1 )
     endif
 
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, &
+    ! hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 
     call toc( "refine_tree (lists+neighbors)", t_misc )
     call toc( "refine_tree (TOTAL)", MPI_wtime()-t0 )

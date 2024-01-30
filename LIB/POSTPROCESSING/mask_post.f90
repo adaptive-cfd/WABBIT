@@ -1,5 +1,5 @@
 subroutine mask_post(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -62,7 +62,7 @@ subroutine mask_post(params)
     !> \todo change that for 3d case
     params%number_blocks = 4*lgt_n(tree_ID)/params%number_procs
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_work=hvy_work)
@@ -84,7 +84,7 @@ subroutine mask_post(params)
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        call create_mask_3D_ACM( time, x0, dx, params%Bs, params%n_ghosts, &
+        call create_mask_3D_ACM( time, x0, dx, params%Bs, params%g, &
         hvy_work(:,:,:,1, hvy_id), us )
     end do
 

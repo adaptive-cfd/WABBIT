@@ -14,7 +14,7 @@ program main_post
     integer(kind=ik)                    :: number_procs           ! number of processes
     type (type_params)                  :: params
     character(len=cshort)               :: mode
-    character(len=cshort)               :: filename, key1, key2
+    character(len=clong)                :: filename, key1, key2
     real(kind=rk)                       :: elapsed_time
 
     call MPI_Init(ierr)                                           ! init mpi
@@ -47,6 +47,12 @@ program main_post
     select case(mode)
     case ("--extract-slice")
         call post_extract_slice(params)
+
+    case ("--evaluate-wavelet-thresholding")
+        call post_evaluate_thresholding(params)
+
+    case ("--wavelet-vs-rhs")
+        call waveletVsRHS_timingTest(params)
 
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
@@ -86,8 +92,11 @@ program main_post
     case("--average")
         call post_average_snapshots(params)
 
-    case("--sparse-to-dense")
+    case("--sparse-to-dense", "--refine-everywhere")
         call sparse_to_dense(params)
+
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test")
+        call post_unit_test(params)
 
     case ("--performance-test")
         call performance_test(params)
@@ -101,7 +110,13 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--vorticity", "--divergence", "--vor-abs", "--Q")
+    case("--wavelettest")
+        call wavelet_test(params)
+
+    case("--wavelet-coarsening")
+        call wavelet_test_coarsening(params)
+
+    case("--vorticity", "--divergence", "--vor-abs", "--Q", "--copy")
         call compute_vorticity_post(params)
 
     case("--gradient")
@@ -170,6 +185,8 @@ program main_post
             write(*,*) "--post_rhs"
             write(*,*) "--average"
             write(*,*) "--generate_forest"
+            write(*,*) "--evaluate-wavelet-thresholding"
+            write(*,*) "--refine-everywhere"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

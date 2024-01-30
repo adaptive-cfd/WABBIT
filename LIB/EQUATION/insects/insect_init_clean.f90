@@ -312,7 +312,10 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! when using CT data, code computes the mask function in a shell around fluid-solid interface.
     ! The tickness of the shell is not a critical parameter, but it affects performance. Thicker shell
     ! means more points and thus more comput effort. It is given in multiples of C_smooth, that means
-    ! shell_thickness = C_shell_thickness * C_smooth * dx_min
+    ! shell_thickness = C_shell_thickness * C_smooth * dx_min. dx_min is the spacing on the finest level Jmax.
+    ! Why is the shell thickness dependent on resolution? The cost to generate the mask depends on the number of
+    ! triangles and the number of points in the shell. As the latter is coupled to dx and the former is constant
+    ! this way the mask generation cost is constant when increasing the resolution.
     call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness,5.0d0)
 
     Insect%dx_reference = dx_reference
@@ -414,7 +417,8 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
         ! exclude wings that are hard-coded, otherwise, call initialization routine
         if (Insect%WingShape(wingID)/="pointcloud" .and. Insect%WingShape(wingID)/="mosquito_iams" .and. &
         Insect%WingShape(wingID)/="suzuki" .and. Insect%WingShape(wingID)/="rectangular" .and. &
-        Insect%WingShape(wingID)/="TwoEllipses" .and. (Insect%wing_file_type(wingID)) /= "kleemeier") then
+        Insect%WingShape(wingID)/="TwoEllipses" .and. (Insect%wing_file_type(wingID)) /= "kleemeier" &
+        .and. Insect%WingShape(wingID)/="suzuki_butterfly".and. Insect%WingShape(wingID)/="none") then
 
         ! we have some pre-defined, hard-coded data, but also can read the wing shape
         ! from INI files.

@@ -278,7 +278,7 @@ contains
 
     real(kind=rk) function startup_conditioner(time, time_release, tau)
 
-        use module_precision
+        use module_globals
 
         implicit none
 
@@ -309,7 +309,7 @@ contains
     !> \image html maskfunction.bmp "plot of chi(delta)"
     !> \image latex maskfunction.eps "plot of chi(delta)"
     function smoothstep1(delta,h)
-        use module_precision
+        use module_globals
         implicit none
         real(kind=rk), intent(in)  :: delta,h
         real(kind=rk)              :: smoothstep1,f
@@ -338,7 +338,7 @@ contains
         !> f is 0 if x>t+h \n
         !> f is variable (smooth) in between
         !-------------------------------------------------------------------------------
-        use module_precision
+        use module_globals
 
         implicit none
         real(kind=rk), intent(in)  :: x,t,h

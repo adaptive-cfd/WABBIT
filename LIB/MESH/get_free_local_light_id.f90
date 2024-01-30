@@ -3,7 +3,7 @@
 !> \details Unlike get_free_light_id, this routine returns a free slot on a given proc only.
 ! ********************************************************************************************
 
-subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error )
+subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error, message )
 
     use module_params
 
@@ -15,6 +15,7 @@ subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error )
     !> if there are no more free light ids, the code aborts, unless use set ignore_error=.true
     !> in which case it will return the -1 ligt id
     logical, optional, intent(in)                 :: ignore_error
+    character(len=*), optional, intent(in)        :: message
 
     integer(kind=ik) :: k, first_light_id, last_light_id, i, tree_ID             ! local variables
     logical :: valid, ign_err, active_lists2
@@ -44,7 +45,8 @@ subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error )
         ! error catching: is there no more free blocks on the list?
         if (lgt_free_id == -1) then
             write(*,'("rank=",i5)') params%rank
-            call abort(4458110, "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU")
+            if (present(message)) write(*,*) message
+            call abort(1234567, "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU")
         end if
     endif
 

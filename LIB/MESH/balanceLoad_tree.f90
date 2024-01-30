@@ -14,7 +14,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
 
     integer(kind=ik)  :: rank, proc_dist_id, proc_data_id, ierr, number_procs, &
                          k, N, l, com_i, com_N, heavy_id, sfc_id, neq, &
-                         lgt_free_id, hvy_free_id, hilbertcode(params%max_treelevel)
+                         lgt_free_id, hvy_free_id, hilbertcode(params%Jmax)
     ! block distribution lists
     integer(kind=ik), allocatable, save :: opt_dist_list(:), dist_list(:), friends(:,:), &
                      affinity(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
@@ -91,12 +91,12 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         !-----------------------------------------------------------
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
-                call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), params%max_treelevel )
+                call treecode_to_sfc_id_3D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), params%Jmax )
                 sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
             do k = 1, lgt_n(tree_ID)
-                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), params%max_treelevel )
+                call treecode_to_sfc_id_2D( sfc_id, lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), params%Jmax )
                 sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif
@@ -107,17 +107,17 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
                 ! transfer treecode to hilbertcode
-                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                call treecode_to_hilbertcode_3D( lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), hilbertcode, params%Jmax)
                 ! calculate sfc position from hilbertcode
-                call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%max_treelevel )
+                call treecode_to_sfc_id_3D( sfc_id, hilbertcode, params%Jmax )
                 sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         else
             do k = 1, lgt_n(tree_ID)
                 ! transfer treecode to hilbertcode
-                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k, tree_ID), 1:params%max_treelevel ), hilbertcode, params%max_treelevel)
+                call treecode_to_hilbertcode_2D( lgt_block( lgt_active(k, tree_ID), 1:params%Jmax ), hilbertcode, params%Jmax)
                 ! calculate sfc position from hilbertcode
-                call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%max_treelevel )
+                call treecode_to_sfc_id_2D( sfc_id, hilbertcode, params%Jmax )
                 sfc_sorted_list(k, 1:2) = (/sfc_id, lgt_active(k, tree_ID)/)
             end do
         endif

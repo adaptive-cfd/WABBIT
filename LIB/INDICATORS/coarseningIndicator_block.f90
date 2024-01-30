@@ -10,10 +10,9 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, indicator, &
-    iteration, refinement_status, norm, level, block_mask)
+    iteration, refinement_status, norm, level, detail_precomputed, block_mask)
 
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
@@ -36,25 +35,23 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
     ! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
-
     !> output is the refinement_status
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
+    real(kind=rk), intent(inout)        :: detail_precomputed(:)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
-    real(kind=rk) :: crsn_chance, r, nnorm(1)
+    real(kind=rk) :: crsn_chance, r, mask_max, mask_min
     logical :: thresholding_component(1:size(block_data,4))
-    logical :: tmp_threshold(1:20) ! just take a larger one...lazy tommy
-    real(kind=rk) :: nnorm2(1:20) ! just take a larger one...lazy tommy
 
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     !> This routine sets the -1 coarsening flag on a block. it uses different methods to
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
@@ -85,13 +82,14 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.
-
+#ifdef DEV
         if (.not. allocated(params%threshold_state_vector_component)) then
             call abort(7363823, "params%threshold_state_vector_component not allocated....")
         endif
+#endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level )
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, detail_precomputed )
 
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
@@ -104,22 +102,47 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
     ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
     ! not available, the option is useless but can cause errors.
+    ! NOTE: since the CDF44 wavelet is expensive, we use an alternative method to detect the gradient.
     if (params%threshold_mask .and. present(block_mask)) then
-        ! assuming block_mask holds mask function
-        nnorm2 = 1.0_rk
-        tmp_threshold = .false.
-        tmp_threshold(1) = .true.
+        ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
+        refinement_status_mask = -1_ik ! default we coarsen
+        mask_max = 0.0_rk
+        mask_min = 2.0_rk
 
-        ! even if the global eps is very large, we want the mask to be on the finest
-        ! level. hence, here we set a small value (just for this call) to be sure that the
-        ! mask interface is on Jmax
-        call threshold_block( params, block_mask, tmp_threshold(1:size(block_mask,4)), &
-        refinement_status_mask, nnorm2(1:size(block_mask,4)), level, eps=1.0e-4_rk )
+        if (params%dim == 3) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        if ((block_mask(ix,iy,iz,1) > 1.0e-9_rk).and.(block_mask(ix,iy,iz,1) < 1.0_rk-1.0e-9_rk)) then
+                            ! but if we find intermediate values on the block (i.e. its neither uniformily
+                            ! 0 nor 1), the block contains the fluid/solid interface and is not coarsened.
+                            refinement_status_mask = 0_ik
+                        endif
+                        mask_max = max(mask_max, block_mask(ix,iy,iz,1))
+                        mask_min = min(mask_min, block_mask(ix,iy,iz,1))
+                    enddo
+                enddo
+            enddo
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    if ((block_mask(ix,iy,1,1) > 1.0e-6_rk).and.(block_mask(ix,iy,1,1) < 1.0_rk-1.0e-6_rk)) then
+                        ! but if we find intermediate values on the block (i.e. its neither uniformily
+                        ! 0 nor 1), the block contains the fluid/solid interface and is not coarsened.
+                        refinement_status_mask = 0_ik
+                    endif
+                    mask_max = max(mask_max, block_mask(ix,iy,1,1))
+                    mask_min = min(mask_min, block_mask(ix,iy,1,1))
+                enddo
+            enddo
+        endif
+
+        ! maybe the resolution is so coarse no point on the smoothing layer exists...
+        if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
 
         ! refinement_status_state: -1 refinement_status_mask: -1 ==>  -1
         ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0
         ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
-
         refinement_status = max(refinement_status, refinement_status_mask)
     endif
 

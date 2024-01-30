@@ -13,7 +13,7 @@
 subroutine ensureGradedness_tree( params, tree_ID )
 
     implicit none
-    type (type_params), intent(in)      :: params                 !> user defined parameter structure
+    type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik)                    :: ierr                   ! MPI error variable
     integer(kind=ik)                    :: rank                   ! process rank
@@ -40,7 +40,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
 
 
     N = params%number_blocks
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     rank = params%rank
 
     if ( params%dim == 3 ) then
@@ -53,10 +53,6 @@ subroutine ensureGradedness_tree( params, tree_ID )
         if (.not.allocated(sisters)) allocate( sisters(4) )
     end if
     sisters = -1
-
-    ! NOTE: The status +11 is required for ghost nodes synching, if the maxlevel
-    ! is reached. It means just the same as 0 (stay) in the context of this routine
-
 
     ! we repeat the ensureGradedness_tree procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
@@ -114,7 +110,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                             ! block can not coarsen, if neighbor wants to refine
                             if ( neighbor_status == -1 ) then
                                 ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                            elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
+                            elseif ( neighbor_status == 0 ) then
                                 ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
                             elseif ( neighbor_status == 1 ) then
                                 ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
@@ -129,11 +125,11 @@ subroutine ensureGradedness_tree( params, tree_ID )
                         elseif (mylevel - neighbor_level == 1) then
                             ! neighbor on lower level
                             if ( neighbor_status == -1 ) then
-                                ! neighbor wants to coarsen, as do I, he is one level coarser, -> ok
-                            elseif ( neighbor_status == 0 .or. neighbor_status == 11 ) then
-                                ! neighbor wants to stay, I want to coarsen, he is one level coarser, -> ok
+                                ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok
+                            elseif ( neighbor_status == 0 ) then
+                                ! neighbor wants to stay, I want to coarsen, it is one level coarser, -> ok
                             elseif ( neighbor_status == 1 ) then
-                                ! neighbor wants to refine, I want to coarsen,  he is one level coarser, -> ok
+                                ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
                             end if
                         elseif (neighbor_level - mylevel == 1) then
                             ! neighbor on higher level
@@ -146,7 +142,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                                     grid_changed = .true.
                                 endif
 
-                            elseif ( neighbor_status == 0 .or. neighbor_status == 11) then
+                            elseif ( neighbor_status == 0 ) then
                                 ! neighbor wants to stay and I want to coarsen, but
                                 ! I cannot do that (there would be two levels between us)
                                 ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
@@ -168,7 +164,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                 !-----------------------------------------------------------------------
                 ! this block wants to stay on its level
                 !-----------------------------------------------------------------------
-            elseif (lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == 0 .or. lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == 11 ) then
+            elseif (lgt_block( lgt_id , Jmax + IDX_REFINE_STS ) == 0  ) then
                 ! loop over all neighbors
                 do i = 1, neighbor_num
                     ! neighbor exists ? If not, this is a bad error
@@ -200,6 +196,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
             end if ! refinement status
         end do ! loop over blocks
         call toc( "ensureGradedness_tree (processing part)", MPI_Wtime()-t0 )
+
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
         ! only the blocks it holds, not blocks held by other ranks.
@@ -213,7 +210,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
 
         ! avoid infinite loops
         counter = counter + 1
-        if (counter == 10*params%max_treelevel) call abort(785877, "ERROR: unable to build a graded mesh")
+        if (counter == 10*params%Jmax) call abort(785877, "ERROR: unable to build a graded mesh")
 
     end do ! end do of repeat procedure until grid_changed==.false.
 

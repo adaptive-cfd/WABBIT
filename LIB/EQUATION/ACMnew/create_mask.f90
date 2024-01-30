@@ -221,6 +221,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_cylinder( mask, x0, dx, Bs, g )
         endif
 
+    case ('plate-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_plate_free( mask, x0, dx, Bs, g )
+        endif
+
     case ('cylinder-free')
         if (stage == "time-dependent-part" .or. stage == "all-parts") then
             call draw_free_cylinder( mask, x0, dx, Bs, g )
@@ -284,7 +289,7 @@ end subroutine create_mask_2D_ACM
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -333,11 +338,12 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 end subroutine draw_cylinder
 
 !-------------------------------------------------------------------------------
-
+! The "free cylinder" is a 2D mask function that is coupled with the insect module
+! it is used for debuging and development (hence the coupling)
 subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -358,6 +364,12 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
+    ! The vertical (y) position and velocity is taken from the insect module free-flight
+    ! solver (and the corresponding degree of freedom can be disabled, in which case this
+    ! mask function is an impulsively started cylinder)
+    !
+    ! ini-parameters:
+    ! [FreeFlightSolver]::use_free_flight_solver=1
     params_acm%u_vert = Insect%STATE(5)
     params_acm%z_vert = Insect%STATE(2)
 
@@ -372,7 +384,8 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
     do iy = 1, Bs(2)+2*g
         y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%z_vert
         do ix = 1, Bs(1)+2*g
-            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5*params_acm%domain_size(1)
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_acm%domain_size(1)
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
 
@@ -391,11 +404,74 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
 end subroutine draw_free_cylinder
 
 !-------------------------------------------------------------------------------
+! as above draw_free_cylinder, but draws a thin, rectangular plate with width "length"
+! and thickness "thickness"
+subroutine draw_plate_free(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmpy, tmpx, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    params_acm%u_vert = Insect%STATE(5)
+    params_acm%z_vert = Insect%STATE(2)
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%z_vert
+
+        do ix = 1, Bs(1)+2*g
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_acm%domain_size(1)
+
+            tmpx = smoothstep( abs(x), 0.5_rk*params_acm%length, h)
+            tmpy = smoothstep( abs(y), 0.5_rk*params_acm%thickness, h)
+
+            tmp = tmpy*tmpx
+
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = params_acm%u_vert
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine
+
+!-------------------------------------------------------------------------------
 
 subroutine draw_free_sphere(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -450,7 +526,7 @@ end subroutine draw_free_sphere
 subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -510,7 +586,7 @@ end subroutine draw_fixed_sphere
 subroutine draw_cylinderz(x0, dx, Bs, g, mask )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -557,7 +633,7 @@ end subroutine draw_cylinderz
 subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -625,7 +701,7 @@ end subroutine draw_rotating_cylinder
 subroutine draw_cavity(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -693,7 +769,7 @@ end subroutine draw_cavity
 subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -770,7 +846,7 @@ end subroutine draw_two_cylinders
 subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -899,7 +975,7 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
     !                body
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -1032,7 +1108,7 @@ end subroutine draw_2d_flapping_wings
 
 subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 

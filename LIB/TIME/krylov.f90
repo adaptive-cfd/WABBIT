@@ -7,7 +7,6 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     !> time varible
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
@@ -21,11 +20,12 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     integer :: M_max ! M is M_krylov number of subspace
     real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
     integer :: M_iter
-    integer :: i, j, k, l, iter
+    integer :: i, j, k, l, iter, grhs
     real(kind=rk) :: normv, eps, beta, err_tolerance
     real(kind=rk) :: h_klein, err, t0
 
     M_max = params%M_krylov
+    grhs = params%g_rhs
 
     ! allocate matrices with largest admissible
     if (.not. allocated(H)) then
@@ -43,7 +43,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     endif
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -81,7 +81,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,M_max+2), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs  )
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
         hvy_mask, hvy_tmp, tree_ID )
 
@@ -388,7 +388,6 @@ END subroutine DGPADM
 !     real(kind=rk),dimension(:,:,:,:,:)      :: v
 !     real(kind=rk),dimension(:,:)            :: h
 !     integer                                 :: j
-!     !> user defined parameter structure
 !     type (type_params), intent(in)      :: params
 !     !> light data array
 !     integer(kind=ik), intent(in)        :: lgt_block(:, :)
@@ -482,7 +481,6 @@ end subroutine get_sum_all
 
 subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
@@ -496,15 +494,15 @@ subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     norm = 0.0_rk
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! loop over active blocks
     if (params%dim == 3) then
         ! 3D
         do k = 1, hvy_n(tree_ID)
-            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs(2)+g-1
-            do ix = g+1, Bs(1)+g-1
+            do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
                 norm = norm + sum( hvy_block(ix,iy,iz,:,hvy_active(k,tree_ID))**2 )
             enddo
             enddo
@@ -513,8 +511,8 @@ subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     else
         ! 2D
         do k = 1, hvy_n(tree_ID)
-            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs(1)+g-1
+            do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
                 norm = norm + sum( hvy_block(ix,iy,1,:,hvy_active(k,tree_ID))**2 )
             enddo
             enddo
@@ -528,7 +526,6 @@ end subroutine wabbit_norm
 
 subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block1(:, :, :, :, :)
@@ -543,16 +540,16 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
     result = 0.0_rk
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! loop over active blocks
     if (params%dim == 3) then
         ! 3D
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
-            do iz = g+1, Bs(3)+g-1 ! Note: loops skip redundant points
-            do iy = g+1, Bs(2)+g-1
-            do ix = g+1, Bs(1)+g-1
+            do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
             do ieqn = 1, params%n_eqn
                 result = result + hvy_block1(ix,iy,iz,ieqn,hvy_id) * hvy_block2(ix,iy,iz,ieqn,hvy_id)
             enddo
@@ -564,8 +561,8 @@ subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
         ! 2D
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
-            do iy = g+1, Bs(2)+g-1 ! Note: loops skip redundant points
-            do ix = g+1, Bs(1)+g-1
+            do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
             do ieqn = 1, params%n_eqn
                 result = result + hvy_block1(ix,iy,1,ieqn,hvy_id) * hvy_block2(ix,iy,1,ieqn,hvy_id)
             enddo

@@ -85,7 +85,8 @@ subroutine performance_test(params)
             if ( params%adapt_tree ) then
                 call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
-                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )
+call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+                ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )
             endif
             call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
             Nblocks_rhs = lgt_n(tree_ID_flow)

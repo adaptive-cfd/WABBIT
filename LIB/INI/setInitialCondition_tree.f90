@@ -11,7 +11,6 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     integer(kind=ik), intent(in)         :: tree_ID
     real(kind=rk), intent(inout)         :: time                        !> time loop variables
     integer(kind=ik), intent(inout)      :: iteration
-
     !> if .false. the code initializes on the coarsest grid, if .true. iterations
     !> are performed and the mesh is refined to gurantee the error eps
     logical, intent(in) :: adapt
@@ -25,16 +24,23 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-
     lgt_n_old = 9999999
     iter = 0
     time = 0.0_rk
+    ! default is Jmin, if Jini is not set
+    if (params%Jini<0) params%Jini = params%Jmin
 
     if (params%rank==0) then
         write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
+        write(*,*) "read_from_files: ", params%read_from_files
+        write(*,*) "inicond_refinements: ", params%inicond_refinements
     endif
+
+    ! we need the wavelet here (refinement and coarsening), so if its not yet done
+    ! initialize it here:
+    call setup_wavelet(params)
 
     ! this is a HACK
     if (params%physics_type == 'ACM-new') then
@@ -68,7 +74,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
+                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
             else
                 call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp )
             endif
@@ -96,7 +102,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         if (params%inicond_refinements > 0) then
             do k = 1, params%inicond_refinements
                 ! refine entire mesh.
-                call refine_tree( params, hvy_block,  "everywhere", tree_ID)
+                call refine_tree( params, hvy_block, hvy_tmp,  "everywhere", tree_ID)
 
                 if (params%rank == 0) then
                     write(*,'(" did ",i2," refinement stage (beyond what is required for the &
@@ -113,9 +119,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%rank==0) write(*,*) "Grid is auto-generated!"
 
             !---------------------------------------------------------------------------
-            ! Create the first mesh on the coarsest treelevel
+            ! Create the first grid as equidistant on the coarsest treelevel
             !---------------------------------------------------------------------------
-            call createEquidistantGrid_tree( params, params%min_treelevel, .true., tree_ID )
+            call createEquidistantGrid_tree( params, params%Jini, .true., tree_ID )
 
             !---------------------------------------------------------------------------
             ! on the grid, evaluate the initial condition
@@ -131,7 +137,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                 ! we have to repeat the adapation process until the grid has reached a final
                 ! state. Since we start on the coarsest level, in each iteration we cannot loose
                 ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%max_treelevel-params%min_treelevel))
+                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%Jmax-params%Jmin))
                     lgt_n_old = lgt_n(tree_ID)
 
                     ! push up the entire grid one level.
@@ -139,7 +145,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     !! go up one level where a refinement indicator tells us to do so, but in the current code
                     !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
                     !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID  )
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
 
                     ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                     ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -172,7 +178,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%inicond_refinements > 0) then
                 do k = 1, params%inicond_refinements
                     ! refine entire mesh.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID)
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID)
 
                     ! set initial condition
                     call setInicondBlocks_tree(params, hvy_block, tree_ID)
@@ -225,6 +231,8 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! it is a safety issue. Better simply keep it.
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
+    call MPI_barrier(WABBIT_COMM, k)
+
     ! footer...and done!
     if (params%rank == 0) then
         write(*,'("Resulting grid for initial condition: Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') lgt_n(tree_ID), &
@@ -238,4 +246,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     if (params%physics_type == 'ACM-new') then
         params%threshold_mask = tmp
     endif
+
+    call MPI_barrier(WABBIT_COMM, k)
+
 end subroutine setInitialCondition_tree

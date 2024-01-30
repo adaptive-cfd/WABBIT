@@ -2,7 +2,7 @@
 !-----------------------------------------------------------------------------------------------------
 
 subroutine dense_to_sparse(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
     use module_mpi
@@ -75,25 +75,30 @@ subroutine dense_to_sparse(params)
 
     ! Check parameters for correct inputs:
     if (order == "CDF20") then
-        params%wavelet_transform_type = 'harten-multiresolution'
-        params%order_predictor = "multiresolution_2nd"
-        params%n_ghosts = 2_ik
+        params%g = 2_ik
+        params%wavelet='CDF20'
+
     elseif (order == "CDF40") then
-        params%wavelet_transform_type = 'harten-multiresolution'
-        params%order_predictor = "multiresolution_4th"
-        params%n_ghosts = 4_ik
+        params%g = 3_ik
+        params%wavelet='CDF40'
+
     elseif (order == "CDF44") then
-        params%wavelet_transform_type = 'biorthogonal'
-        params%order_predictor = "multiresolution_4th"
-        params%wavelet='CDF4,4'
-        params%n_ghosts = 6_ik
+        params%wavelet='CDF44'
+        params%g = 7_ik
+
+    elseif (order == "CDF42") then
+        params%wavelet='CDF42'
+        params%g = 5_ik
+
     else
-        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
+        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
     end if
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
     endif
+
+    call setup_wavelet(params)
 
     params%coarsening_indicator = indicator
     params%forest_size = 1
@@ -108,15 +113,15 @@ subroutine dense_to_sparse(params)
     ! check and find common params in all h5-files
     !-------------------------------------------
     call read_attributes(params%input_files(1), lgt_n_tmp, time, iteration, params%domain_size, &
-    params%Bs,params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    params%Bs,params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     do i = 1, params%n_eqn
         file_in = params%input_files(i)
         call check_file_exists(trim(file_in))
         call read_attributes(file_in, lgt_n_tmp, time, iteration, domain, Bs, level, dim)
 
-        params%min_treelevel = 1
-        params%max_treelevel = max(params%max_treelevel, level) ! find the maximal level of all snapshot
+        params%Jmin = 1
+        params%Jmax = max(params%Jmax, level) ! find the maximal level of all snapshot
 
         if (any(params%Bs .ne. Bs)) call abort( 203192, " Block size is not consistent ")
         if (params%dim .ne. dim) call abort(243191,"Dimensions do not agree!")
@@ -170,7 +175,7 @@ subroutine dense_to_sparse(params)
         write(*,'("File contains Nb=",i6," blocks of size Bs=",i4," x ",i4," x ",i4)') lgt_n_tmp, Bs(1),Bs(2),Bs(3)
         write(*,'("Domain size is ",3(g12.4,1x))') domain
         write(*,'("Time=",g12.4," it=",i9)') time, iteration
-        write(*,'("Length of treecodes in file=",i3," in memory=",i3)') level, params%max_treelevel
+        write(*,'("Length of treecodes in file=",i3," in memory=",i3)') level, params%Jmax
         write(*,'("NCPU=",i6)') params%number_procs
         write(*,'("File   Nb=",i6," blocks")') lgt_n_tmp
         write(*,'("Memory Nb=",i6)') params%number_blocks

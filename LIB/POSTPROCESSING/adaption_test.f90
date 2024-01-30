@@ -1,5 +1,5 @@
 subroutine adaption_test(params)
-  use module_precision
+  use module_globals
   use module_params
   use module_mpi
   use module_globals
@@ -74,7 +74,7 @@ subroutine adaption_test(params)
   n_eps = size(eps_str_list)
   params%block_distribution="sfc_hilbert"
   params%time_step_method="none"
-  params%min_treelevel=1
+  params%Jmin=1
   params%physics_type="POD"
   params%eps_normalized=.True. ! normalize the statevector before thresholding
   params%adapt_tree = .True.! .False.!.True.
@@ -84,21 +84,18 @@ subroutine adaption_test(params)
   params%forest_size = 3
 
   ! Check parameters for correct inputs:
-  if (order == "CDF20" .or. order == "CDF2,0") then
-      params%wavelet_transform_type = "harten-multiresolution"
+  if (order == "CDF20") then
       params%order_predictor = "multiresolution_2nd"
-      params%wavelet='CDF2,0'
-      params%n_ghosts = 2_ik
-  elseif (order == "CDF40" .or. order == "CDF4,0") then
-      params%wavelet_transform_type = "harten-multiresolution"
+      params%wavelet='CDF20'
+      params%g = 2_ik
+  elseif (order == "CDF40") then
       params%order_predictor = "multiresolution_4th"
-      params%wavelet='CDF4,0'
-      params%n_ghosts = 4_ik
-  elseif (order == "CDF44" .or. order == "CDF4,4") then
-      params%wavelet_transform_type = 'biorthogonal'
+      params%wavelet='CDF40'
+      params%g = 4_ik
+  elseif (order == "CDF44") then
       params%order_predictor = "multiresolution_4th"
-      params%wavelet='CDF4,4'
-      params%n_ghosts = 6_ik
+      params%wavelet='CDF44'
+      params%g = 6_ik
   else
       call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
   end if
@@ -119,10 +116,10 @@ subroutine adaption_test(params)
   !-----------------------------------------------------------------------------
   do j = 1, n_components
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
-                       params%Bs, params%max_treelevel, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+                       params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
   end do
 
-  number_dense_blocks = 2_ik**(dim*params%max_treelevel)*fsize
+  number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
   allocate(params%threshold_state_vector_component(params%n_eqn))
   params%threshold_state_vector_component(1:params%n_eqn)=.True.
   if (maxmem < 0.0_rk) then
@@ -179,7 +176,7 @@ subroutine adaption_test(params)
     if (rank == 0) then
        write(*,'("Field adapted to eps=",es10.2," rel err=", es10.2," Nblocks=", i6," Nb_adapt/Nb_dense=",f6.1,"% Nb_adapt/Nb_input=",f5.1,"% [Jmin,Jmax]=[",i2,",",i2,"]")') &
               params%eps, error(i), lgt_n_tmp, &
-              100.0*dble(lgt_n_tmp)/dble( (2**params%max_treelevel)**params%dim ), &
+              100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
               100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), Jmin, Jmax
     endif
   end do

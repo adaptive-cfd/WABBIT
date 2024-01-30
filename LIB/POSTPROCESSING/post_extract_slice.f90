@@ -10,7 +10,7 @@
 !           save this interpolated slice
 
 subroutine post_extract_slice(params)
-    use module_precision
+    use module_globals
     use module_params
     use module_mesh
     use module_helpers
@@ -66,11 +66,11 @@ subroutine post_extract_slice(params)
 
     params%dim = dim
     params%Bs = Bs
-    params%max_treelevel = tc_length
+    params%Jmax = tc_length
     params%n_eqn = 1
     ! for interpolation of the slice (in the x-direction) we need at most 2 ghost nodes.
     g = 2
-    params%n_ghosts = g
+    params%g = g
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
@@ -79,8 +79,6 @@ subroutine post_extract_slice(params)
     params%order_predictor = "multiresolution_4th"
     allocate(params%symmetry_vector_component(1:3))
     params%symmetry_vector_component(1:3) = "0"
-    ! hack to save on memory
-    N_MAX_COMPONENTS = 1
 
     allocate(treecode(1:tc_length))
 
@@ -159,7 +157,7 @@ subroutine post_extract_slice(params)
             iy = 1 + nint( x0(2) / (dx(2)*real(Bs(2)-1, kind=rk)) )
             iz = 1 + nint( x0(3) / (dx(3)*real(Bs(3)-1, kind=rk)) )
 
-            level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+            level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
 
             ! note 2D data is (x,y) but our slice is (y,z) hence the oddity (iy,iz,1)
             ! NOTE: in paraview I saw that I had to invert iy,iz to iz,iy although I do not

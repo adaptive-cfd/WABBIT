@@ -22,7 +22,7 @@ git clone git@github.com:adaptive-cfd/WABBIT.git
 2. Compile the code running make.
 
      Note that WABBIT requires:
-  
+
      + [MPI library](https://www.open-mpi.org/)
      + [HDF5 library](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code")
      + [BLAS+LAPACK library](http://ab-initio.mit.edu/wiki/index.php/Template:Installing_BLAS_and_LAPACK)
@@ -32,11 +32,14 @@ git clone git@github.com:adaptive-cfd/WABBIT.git
 make [FC=[mpif90]]
 ```
 
-3. Run the testfiles with
+3. Run the unit tests with
 
 ```
 make test
 ```
+
+NOTE: since 15 Aug 2023, the unit testing framework has evolved. It now stores full HDF5 files in the TESTING directory, which makes it easier to visualize the reference data and current results, should they be different. We now calculate the L2 error of the field, if the grid is identical. This new framework requires the https://github.com/adaptive-cfd/python-tools repository for comparing two WABBIT HDF5 files. 
+
 
 ## HDF5 Library
 
@@ -48,7 +51,7 @@ This is a short example (/working practice) of how to install hdf5 libary (Teste
 
 2. open terminal and follow  
   (mind that *path_2_build_dir* has to be replaced by the path of the directory of your choice.)
-  
+
 ```
 gunzip < hdf5-X.Y.Z.tar.gz | tar xf -
 cd hdf5-X.Y.Z
@@ -91,10 +94,8 @@ make doc
 ```
 ## Publications
 
-* ["Wavelet adaptive proper orthogonal decomposition for large-scale flow data"](https://link.springer.com/article/10.1007/s10444-021-09922-2 "Krah2022"); Krah, Engels, Schneider, Reiss; Advances in Comput. Math. Volume 48, Article number: 10, 2022 
+* ["Wavelet adaptive proper orthogonal decomposition for large-scale flow data"](https://link.springer.com/article/10.1007/s10444-021-09922-2 "Krah2022"); Krah, Engels, Schneider, Reiss; Advances in Comput. Math. Volume 48, Article number: 10, 2022
 
 * ["A wavelet-adaptive method for multiscale simulation of turbulent flows in flying insects"](https://arxiv.org/abs/1912.05371 "Engels2021"); T. Engels, K. Schneider, J. Reiss and M. Farge; Commun. Comput. Phys., 30, 1118-1149, 2021
 
 * ["An Open and Parallel Multiresolution Framework Using Block-Based Adaptive Grids"](https://link.springer.com/chapter/10.1007%2F978-3-319-98177-2_19 "Sroka2018"); Sroka, Engels, Krah, Mutzel, Schneider, Reiss; Active Flow and Combustion Control 2018
-
-

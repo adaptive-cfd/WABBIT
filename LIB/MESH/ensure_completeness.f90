@@ -14,7 +14,7 @@ subroutine ensure_completeness( params, lgt_id, sisters )
     integer(kind=ik)                    :: Jmax                           ! max treelevel
     integer(kind=ik)                    :: k, l, N_sisters, status        ! loop variables
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     N_sisters = size(sisters)
 
     ! if all sisters exists, then the array should not contain values smaller

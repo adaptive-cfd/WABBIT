@@ -25,7 +25,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
     ! in fortran, we work with indices:
     integer :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
     integer, parameter :: y00=1, F0=2
-    integer :: i, k, s, hvy_id
+    integer :: i, k, s, hvy_id, grhs
     real(kind=rk) :: tau
     logical, save :: setup_complete = .false.
     logical, save :: informed = .false.
@@ -34,6 +34,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
         call setup_RKC_coefficients(params)
         setup_complete = .true.
     endif
+    grhs = params%g_rhs
 
 
     ! s is the number of stages
@@ -58,7 +59,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
     if (s<4) call abort(1715929,"runge-kutta-chebychev: s cannot be less than 4")
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs  )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -90,7 +91,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
 
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs  )
         call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
 
         ! main formula

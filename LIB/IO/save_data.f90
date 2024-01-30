@@ -1,10 +1,3 @@
-!> \brief save data main function, call write data routine
-!! input:    - time loop parameter
-!!           - parameter array
-!!           - light data array
-!!           - heavy data array
-! ********************************************************************************************
-
 subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
 
     implicit none
@@ -40,10 +33,20 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
     n_domain = 0
 
+    ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
+    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling createMask_tree if the mask is not stored is supposed
     ! to be small)
     call createMask_tree(params, time, hvy_mask, hvy_tmp)
+
+    ! uniqueGrid modification:
+    ! any saved file must be sync'ed, because we store
+    ! the 1st ghost node for visualization.
+    if (params%penalization) then
+        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+    endif
 
 
     ! preparatory step. The physics modules have to copy everything they want to
@@ -60,7 +63,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
+            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
             params%domain_size, params%Bs, params%dim, n_domain )
         endif
 
@@ -69,9 +72,15 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
         call PREPARE_SAVE_DATA_meta(params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
-        params%n_ghosts, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), n_domain)
+        params%g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), n_domain)
 
     enddo
+
+
+    ! uniqueGrid modification:
+    ! any saved file must be sync'ed, because we store the 1st ghost node for visualization.
+    call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:params%N_fields_saved,:), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+
 
     ! actual saving step. one file per component.
     ! loop over components/qty's:

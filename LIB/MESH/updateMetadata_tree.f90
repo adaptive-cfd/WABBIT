@@ -12,13 +12,14 @@
 subroutine updateMetadata_tree(params, tree_ID)
     implicit none
 
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
-    integer(kind=ik), intent(in)        :: tree_ID
+    type (type_params), intent(in) :: params
+    integer(kind=ik), intent(in)   :: tree_ID
 
-    real(kind=rk)                       :: t0
+    real(kind=rk) :: t0
     t0 = MPI_wtime()
 
     call createActiveSortedLists_tree(params, tree_ID)
+    ! call createActiveSortedLists_tree_old(params, tree_ID)
 
     call updateNeighbors_tree(params, tree_ID)
 

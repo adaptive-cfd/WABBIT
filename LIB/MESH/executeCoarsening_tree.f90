@@ -25,7 +25,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     ! to the last subroutine.)  -Thomas
 
 
-    Jmax = params%max_treelevel
+    Jmax = params%Jmax
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank

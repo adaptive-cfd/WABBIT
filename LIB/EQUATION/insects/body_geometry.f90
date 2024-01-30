@@ -1746,6 +1746,14 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
     ! loop over all triangles
     do i = 1, ntri
+        ! data from the "superSTL" file are in the body system, we figure out first which
+        ! points on the block are affected by the mask generation. As the blocks are
+        ! in the global system (Eulerian grid), we transform points from body->global system.
+        ! Note: normals are (obviously) not translated, so they do not get +Insect%xc_body_g
+        !
+        ! NOTE: xfer from body to global is done for every block (this routine is called block-wise)
+        !       consequently, the matrix multiplication below are carried out more than once -> potential improvement
+        !
         vertex1        = matmul(M_body_inv, xyz_nxnynz(i, 1:3)) + Insect%xc_body_g
         vertex2        = matmul(M_body_inv, xyz_nxnynz(i, 4:6)) + Insect%xc_body_g
         vertex3        = matmul(M_body_inv, xyz_nxnynz(i, 7:9)) + Insect%xc_body_g
@@ -1757,6 +1765,7 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         edge2_normal   = matmul(M_body_inv, xyz_nxnynz(i, 25:27))
         edge3_normal   = matmul(M_body_inv, xyz_nxnynz(i, 28:30))
 
+        ! compute bounding box
         xmin = floor( ( minval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) - safety
         ymin = floor( ( minval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) - safety
         zmin = floor( ( minval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) - safety
@@ -1774,40 +1783,33 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         ymax = min(ymax, size(mask,2)-1)
         zmax = min(zmax, size(mask,3)-1)
 
+        ! we now know which points are possibly affected:
+        ! block(xmin:xmaxn, ymin:ymax, zmin:zmax)
+        ! Note: it is well possible that those are 0:0 if a triangle is not relevant for a block - this
+        ! is actually the case for many triangles.
 
-        vertex1        = xyz_nxnynz(i, 1:3)
-        vertex2        = xyz_nxnynz(i, 4:6)
-        vertex3        = xyz_nxnynz(i, 7:9)
-        face_normal    = xyz_nxnynz(i, 10:12)
-        vertex1_normal = xyz_nxnynz(i, 13:15)
-        vertex2_normal = xyz_nxnynz(i, 16:18)
-        vertex3_normal = xyz_nxnynz(i, 19:21)
-        edge1_normal   = xyz_nxnynz(i, 22:24)
-        edge2_normal   = xyz_nxnynz(i, 25:27)
-        edge3_normal   = xyz_nxnynz(i, 28:30)
 
+        ! computing the signed distance for each point on the block within the bounding box.
+        ! bounding box may be empty.
         do iz = zmin, zmax
-            x_glob(3) = x0(3) + dble(iz)*dx(3) - Insect%xc_body_g(3)
+            x_glob(3) = x0(3) + dble(iz)*dx(3)
             do iy = ymin, ymax
-                x_glob(2) = x0(2) + dble(iy)*dx(2) - Insect%xc_body_g(2)
+                x_glob(2) = x0(2) + dble(iy)*dx(2)
                 do ix = xmin, xmax
-                    x_glob(1) = x0(1) + dble(ix)*dx(1) - Insect%xc_body_g(1)
-
-                    if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
-                    ! x_body is in the body coordinate system
-                    x_body = matmul(M_body, x_glob)
+                    x_glob(1) = x0(1) + dble(ix)*dx(1)
 
                     ! the distance to the current triangle:
-                    tmp = pointTriangleDistance( vertex1, vertex2, vertex3, x_body, face_normal, &
+                    tmp = pointTriangleDistance( vertex1, vertex2, vertex3, x_glob, face_normal, &
                     vertex1_normal, vertex2_normal, vertex3_normal, edge1_normal, edge2_normal, edge3_normal)
 
                     ! if closer (in abs value!) then use this now
-                    if ( abs(tmp) < abs(tmp_block(ix,iy,iz)) ) then !.and. abs(tmp)<=dble(safety)*dx(1) ) then
+                    if ( abs(tmp) < abs(tmp_block(ix,iy,iz)) ) then
                         tmp_block(ix,iy,iz) = tmp
                     endif
                 enddo
             enddo
         enddo
+
     enddo ! loop over triangles
 
     !
@@ -1831,12 +1833,4 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             enddo
         enddo
     enddo
-
-    ! mask = tmp_block
-
-    ! ! store final resut, do not erase existing data in array
-    ! where (mask <= tmp_block)
-    !     mask = tmp_block
-    !     mask_color = color_body
-    ! end where
 end subroutine

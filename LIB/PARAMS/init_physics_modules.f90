@@ -27,7 +27,10 @@ subroutine init_physics_modules( params, filename, N_mask_components)
 
   N_mask_components = 0
 
-  ! call the initialization routines for the physics module that is in use
+  ! call the initialization routines for the physics module that is in use.
+  ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
+  ! automatically depending on the wavelet). Therefore, we pass the number.
   call READ_PARAMETERS_meta( params%physics_type, filename, N_mask_components, params%g )
+  
 
 end subroutine

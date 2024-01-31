@@ -106,7 +106,7 @@ module module_acm
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
-    integer(kind=ik) :: Jmax, N_eqn, n_ghosts = -9999999
+    integer(kind=ik) :: Jmax, n_ghosts = -9999999
     integer(kind=ik), dimension(3) :: Bs = -1
 
     logical :: initialized = .false.
@@ -184,6 +184,9 @@ end subroutine
     integer :: Neqn, i
 
     N_mask_components = 0
+    ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
+    ! automatically depending on the wavelet). Just store the number.
+    params_acm%n_ghosts = g
 
     ! we still need to know about mpirank and mpisize, occasionally
     call MPI_COMM_SIZE (WABBIT_COMM, params_acm%mpisize, mpicode)
@@ -282,10 +285,7 @@ end subroutine
     call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-    call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
-
-    params_acm%n_ghosts = g    
-    params_acm%N_eqn = Neqn
+    
 
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
     if (params_acm%use_passive_scalar) then

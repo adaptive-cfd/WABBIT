@@ -83,6 +83,8 @@ contains
         character(len=*), intent(in) :: physics
         ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
         integer(kind=ik), intent(out) :: N_mask_components
+        ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
+        ! automatically depending on the wavelet). Therefore, we pass the number.
         integer(kind=ik), intent(in) :: g
         character(len=*), intent(in) :: filename
 

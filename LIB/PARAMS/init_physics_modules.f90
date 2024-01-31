@@ -28,6 +28,6 @@ subroutine init_physics_modules( params, filename, N_mask_components)
   N_mask_components = 0
 
   ! call the initialization routines for the physics module that is in use
-  call READ_PARAMETERS_meta( params%physics_type, filename, N_mask_components )
+  call READ_PARAMETERS_meta( params%physics_type, filename, N_mask_components, params%g )
 
 end subroutine

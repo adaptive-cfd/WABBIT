@@ -50,14 +50,15 @@ contains
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_convdiff( filename )
+  subroutine READ_PARAMETERS_convdiff( filename, g )
     implicit none
 
     character(len=*), intent(in) :: filename
+    integer(kind=ik), intent(in) :: g
+
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
     ! inifile structure
     type(inifile) :: FILE
-    integer(kind=ik):: number_ghost_nodes
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
@@ -116,8 +117,8 @@ contains
 
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_convdiff%discretization, "FD_2nd_central")
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes',number_ghost_nodes, 0_ik )
-    if ( params_convdiff%discretization=='FD_4th_central_optimized' .and. number_ghost_nodes<=2  ) then
+
+    if ( params_convdiff%discretization=='FD_4th_central_optimized' .and. g<=2  ) then
       call abort(91020181, "Number of ghost nodes for this scheme is 3!")
     endif
 

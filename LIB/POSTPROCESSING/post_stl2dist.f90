@@ -24,7 +24,7 @@ subroutine post_stl2dist(params)
     real(kind=rk) :: x0(1:3), dx(1:3), x,y,z,tmp
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
-    real(kind=rk), allocatable         :: xyz_nxnynz(:, :)
+    real(kind=rk), allocatable         :: body_superSTL_b(:, :)
     integer :: hvy_id, lgt_id, tree_ID=1
     integer :: c_plus, c_minus, res
     integer :: ix1,iy1,iz1
@@ -130,21 +130,21 @@ subroutine post_stl2dist(params)
 
 
     call count_lines_in_ascii_file_mpi(fname_stl, ntri, 0)
-    allocate( xyz_nxnynz(1:ntri,1:30) )
+    allocate( body_superSTL_b(1:ntri,1:30) )
 
-    call read_array_from_ascii_file_mpi(fname_stl, xyz_nxnynz, 0)
-    xyz_nxnynz(:,1:9) = xyz_nxnynz(:,1:9) / scale
-    xyz_nxnynz(:,1) = xyz_nxnynz(:,1) +  origin(1)
-    xyz_nxnynz(:,4) = xyz_nxnynz(:,4) +  origin(1)
-    xyz_nxnynz(:,7) = xyz_nxnynz(:,7) +  origin(1)
+    call read_array_from_ascii_file_mpi(fname_stl, body_superSTL_b, 0)
+    body_superSTL_b(:,1:9) = body_superSTL_b(:,1:9) / scale
+    body_superSTL_b(:,1) = body_superSTL_b(:,1) +  origin(1)
+    body_superSTL_b(:,4) = body_superSTL_b(:,4) +  origin(1)
+    body_superSTL_b(:,7) = body_superSTL_b(:,7) +  origin(1)
 
-    xyz_nxnynz(:,2) = xyz_nxnynz(:,2) +  origin(2)
-    xyz_nxnynz(:,5) = xyz_nxnynz(:,5) +  origin(2)
-    xyz_nxnynz(:,8) = xyz_nxnynz(:,8) +  origin(2)
+    body_superSTL_b(:,2) = body_superSTL_b(:,2) +  origin(2)
+    body_superSTL_b(:,5) = body_superSTL_b(:,5) +  origin(2)
+    body_superSTL_b(:,8) = body_superSTL_b(:,8) +  origin(2)
 
-    xyz_nxnynz(:,3) = xyz_nxnynz(:,3) +  origin(3)
-    xyz_nxnynz(:,6) = xyz_nxnynz(:,6) +  origin(3)
-    xyz_nxnynz(:,9) = xyz_nxnynz(:,9) +  origin(3)
+    body_superSTL_b(:,3) = body_superSTL_b(:,3) +  origin(3)
+    body_superSTL_b(:,6) = body_superSTL_b(:,6) +  origin(3)
+    body_superSTL_b(:,9) = body_superSTL_b(:,9) +  origin(3)
 
 
     safety = 6 !Bs(1)
@@ -182,24 +182,24 @@ subroutine post_stl2dist(params)
             x0 = x0 - dble(g)*dx
 
             do i = 1, ntri
-                vertex1        = xyz_nxnynz(i, 1:3)
-                vertex2        = xyz_nxnynz(i, 4:6)
-                vertex3        = xyz_nxnynz(i, 7:9)
-                face_normal    = xyz_nxnynz(i, 10:12)
-                vertex1_normal = xyz_nxnynz(i, 13:15)
-                vertex2_normal = xyz_nxnynz(i, 16:18)
-                vertex3_normal = xyz_nxnynz(i, 19:21)
-                edge1_normal   = xyz_nxnynz(i, 22:24)
-                edge2_normal   = xyz_nxnynz(i, 25:27)
-                edge3_normal   = xyz_nxnynz(i, 28:30)
+                vertex1        = body_superSTL_b(i, 1:3)
+                vertex2        = body_superSTL_b(i, 4:6)
+                vertex3        = body_superSTL_b(i, 7:9)
+                face_normal    = body_superSTL_b(i, 10:12)
+                vertex1_normal = body_superSTL_b(i, 13:15)
+                vertex2_normal = body_superSTL_b(i, 16:18)
+                vertex3_normal = body_superSTL_b(i, 19:21)
+                edge1_normal   = body_superSTL_b(i, 22:24)
+                edge2_normal   = body_superSTL_b(i, 25:27)
+                edge3_normal   = body_superSTL_b(i, 28:30)
 
-                xmin = floor( ( minval((/xyz_nxnynz(i,1),xyz_nxnynz(i,4),xyz_nxnynz(i,7)/)) - x0(1) ) / dx(1)) - safety
-                ymin = floor( ( minval((/xyz_nxnynz(i,2),xyz_nxnynz(i,5),xyz_nxnynz(i,8)/)) - x0(2) ) / dx(2)) - safety
-                zmin = floor( ( minval((/xyz_nxnynz(i,3),xyz_nxnynz(i,6),xyz_nxnynz(i,9)/)) - x0(3) ) / dx(3)) - safety
+                xmin = floor( ( minval((/body_superSTL_b(i,1),body_superSTL_b(i,4),body_superSTL_b(i,7)/)) - x0(1) ) / dx(1)) - safety
+                ymin = floor( ( minval((/body_superSTL_b(i,2),body_superSTL_b(i,5),body_superSTL_b(i,8)/)) - x0(2) ) / dx(2)) - safety
+                zmin = floor( ( minval((/body_superSTL_b(i,3),body_superSTL_b(i,6),body_superSTL_b(i,9)/)) - x0(3) ) / dx(3)) - safety
 
-                xmax = ceiling( ( maxval((/xyz_nxnynz(i,1),xyz_nxnynz(i,4),xyz_nxnynz(i,7)/)) - x0(1) ) / dx(1)) + safety
-                ymax = ceiling( ( maxval((/xyz_nxnynz(i,2),xyz_nxnynz(i,5),xyz_nxnynz(i,8)/)) - x0(2) ) / dx(2)) + safety
-                zmax = ceiling( ( maxval((/xyz_nxnynz(i,3),xyz_nxnynz(i,6),xyz_nxnynz(i,9)/)) - x0(3) ) / dx(3)) + safety
+                xmax = ceiling( ( maxval((/body_superSTL_b(i,1),body_superSTL_b(i,4),body_superSTL_b(i,7)/)) - x0(1) ) / dx(1)) + safety
+                ymax = ceiling( ( maxval((/body_superSTL_b(i,2),body_superSTL_b(i,5),body_superSTL_b(i,8)/)) - x0(2) ) / dx(2)) + safety
+                zmax = ceiling( ( maxval((/body_superSTL_b(i,3),body_superSTL_b(i,6),body_superSTL_b(i,9)/)) - x0(3) ) / dx(3)) + safety
 
                 xmin = max(xmin, 1)
                 ymin = max(ymin, 1)

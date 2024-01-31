@@ -363,7 +363,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! initialization for superSTl body
     !---------------------------------------------------------------------------
     if (Insect%BodyType == "superSTL") then
-        if (.not. allocated(xyz_nxnynz)) then
+        if (.not. allocated(body_superSTL_b)) then
             if (root) write(*,'("INSECTS: STL: init start")')
             if (root) write(*,'("INSECTS: STL: file=",A)') Insect%BodySuperSTLfile
 
@@ -371,11 +371,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
             if (root) write(*,'("INSECTS: STL: file length is ntri=", i7 )') ntri
 
-            allocate( xyz_nxnynz(1:ntri,1:30) )
+            allocate( body_superSTL_b(1:ntri,1:30) )
+            allocate( body_superSTL_g(1:ntri,1:30) )
 
             ! No scaling or origin shift is applied: we assume you did that when generating
             ! the superSTL file. The data is thus understood in the body coordinate system.
-            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, xyz_nxnynz, 0)
+            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, body_superSTL_b, 0)
 
             if (root) write(*,'("INSECTS: STL: read from file...done! We are good to go.")')
         endif

@@ -433,9 +433,6 @@ subroutine init_other_params( FILE )
 
     params_ns%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_ns%Bs, params_ns%dim)
 
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_ns%g, 1   )
-
-
   end subroutine init_other_params
 
 

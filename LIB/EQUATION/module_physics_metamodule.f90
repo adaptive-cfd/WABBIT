@@ -78,11 +78,12 @@ contains
     !> \brief main level wrapper routine to read parameters in the physics module. It reads
     !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
     !> the parameter struct for wabbit is not available.
-    subroutine READ_PARAMETERS_meta( physics, filename, N_mask_components )
+    subroutine READ_PARAMETERS_meta( physics, filename, N_mask_components, g )
         implicit none
         character(len=*), intent(in) :: physics
         ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
         integer(kind=ik), intent(out) :: N_mask_components
+        integer(kind=ik), intent(in) :: g
         character(len=*), intent(in) :: filename
 
         ! default is none (for navier-stokes and convection-diffusion)
@@ -90,13 +91,13 @@ contains
 
         select case ( physics )
         case ('ACM-new')
-            call READ_PARAMETERS_ACM( filename, N_mask_components )
+            call READ_PARAMETERS_ACM( filename, N_mask_components, g )
 
         case ('ConvDiff-new')
-            call READ_PARAMETERS_convdiff( filename )
+            call READ_PARAMETERS_convdiff( filename, g )
 
         case ('navier_stokes')
-            call READ_PARAMETERS_NStokes( filename, N_mask_components )
+            call READ_PARAMETERS_NStokes( filename, N_mask_components, g )
 
         case default
             call abort(1212,'unknown physics...say whaaat?')

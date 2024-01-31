@@ -29,7 +29,7 @@ module module_insects
   ! the data that we have often has ghost nodes, i.e. points that overlap and exist
   ! on several CPUS. On those, you normally would not create the mask (which is expensive)
   ! so we skip the first and last "g" points on the arrays used for mask creation
-  integer, private, save :: g
+  integer, save :: g
 
   ! size (global) of domain
   real(kind=rk) :: xl, yl, zl
@@ -73,7 +73,8 @@ module module_insects
   real(kind=rk), allocatable, save :: treedata(:,:)
   real(kind=rk), allocatable, save :: treedata_boundingbox(:,:)
   ! array for superSTL file for the body
-  real(kind=rk), allocatable, save :: xyz_nxnynz(:,:)
+  real(kind=rk), allocatable, save :: body_superSTL_b(:,:)
+  real(kind=rk), allocatable, save :: body_superSTL_g(:,:)
 
 
   !-----------------------------------------------------------------------------
@@ -383,6 +384,7 @@ contains
       type(diptera),intent(inout) :: Insect
 
       logical, save :: first_call = .true.
+      integer(kind=ik) :: i
       integer(kind=2) :: wingID
 
       !-----------------------------------------------------------------------------
@@ -447,6 +449,28 @@ contains
       ! or not (this is not necessary if Update_Insect is called, but helpful to prevent
       ! human errors)
       Insect%time = time
+
+      if (Insect%BodyType == "superSTL") then
+          ! if the body is an stl file, its data (surface triangulation) is in the body coordinate
+          ! system. For the mask generation, we work on the global coordinate system (Eulerian grid)
+          ! and thus we require the data from the superSTL file (coordinates and a bunch of different
+          ! normal vectors) in the global system. 
+          ! The transformation is done here (and not in draw_body_superSTL) because it needs to be
+          ! done only once, and draw_body_superSTL is called for every block. The speed-up, however,
+          ! is of course limited.
+          do i = 1, size(body_superSTL_b, 1)
+              body_superSTL_g(i, 1:3)   = matmul(Insect%M_body_inv, body_superSTL_b(i, 1:3)) + Insect%xc_body_g
+              body_superSTL_g(i, 4:6)   = matmul(Insect%M_body_inv, body_superSTL_b(i, 4:6)) + Insect%xc_body_g
+              body_superSTL_g(i, 7:9)   = matmul(Insect%M_body_inv, body_superSTL_b(i, 7:9)) + Insect%xc_body_g
+              body_superSTL_g(i, 10:12) = matmul(Insect%M_body_inv, body_superSTL_b(i, 10:12))
+              body_superSTL_g(i, 13:15) = matmul(Insect%M_body_inv, body_superSTL_b(i, 13:15))
+              body_superSTL_g(i, 16:18) = matmul(Insect%M_body_inv, body_superSTL_b(i, 16:18))
+              body_superSTL_g(i, 19:21) = matmul(Insect%M_body_inv, body_superSTL_b(i, 19:21))
+              body_superSTL_g(i, 22:24) = matmul(Insect%M_body_inv, body_superSTL_b(i, 22:24))
+              body_superSTL_g(i, 25:27) = matmul(Insect%M_body_inv, body_superSTL_b(i, 25:27))
+              body_superSTL_g(i, 28:30) = matmul(Insect%M_body_inv, body_superSTL_b(i, 28:30))
+          enddo
+      endif
 
   end subroutine Update_Insect
 

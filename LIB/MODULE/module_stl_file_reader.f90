@@ -4,7 +4,6 @@
 module module_stl_file_reader
 
     use module_globals
-    use module_globals
     use mpi
 
     implicit none

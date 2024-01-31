@@ -52,10 +52,11 @@ contains
     !> Main level wrapper routine to read parameters in the physics module. It reads
     !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
     !> the parameter struct for wabbit is not available.
-    subroutine READ_PARAMETERS_NStokes( filename ,N_mask_components)
+    subroutine READ_PARAMETERS_NStokes( filename, N_mask_components, g)
         implicit none
         !> name of inifile
         character(len=*), intent(in) :: filename
+        integer(kind=ik), intent(in) :: g
         integer(kind=ik)             :: N_mask_components
 
         ! inifile structure
@@ -81,6 +82,7 @@ contains
             write(*,*)
         endif
 
+        params_ns%g = g
 
         ! read the file, only process 0 should create output on screen
         call set_lattice_spacing_mpi(1.0d0)

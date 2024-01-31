@@ -166,7 +166,7 @@ end subroutine
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_ACM( filename, N_mask_components )
+  subroutine READ_PARAMETERS_ACM( filename, N_mask_components, g )
     implicit none
 
     character(len=*), intent(in) :: filename
@@ -178,9 +178,10 @@ end subroutine
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx
     integer(kind=ik), intent(out) :: N_mask_components
+    integer(kind=ik), intent(in) :: g
 
     type(inifile) :: FILE
-    integer :: g, Neqn, i
+    integer :: Neqn, i
 
     N_mask_components = 0
 
@@ -259,7 +260,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
-!    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
+    call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
@@ -281,9 +282,9 @@ end subroutine
     call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', g, 0 )
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_acm%n_ghosts, 0 )
     call read_param_mpi(FILE, 'Blocks', 'number_equations', Neqn, 0 )
+
+    params_acm%n_ghosts = g    
     params_acm%N_eqn = Neqn
 
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)

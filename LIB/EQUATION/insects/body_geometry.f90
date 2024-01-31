@@ -1715,7 +1715,7 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     tmp_block = 9.0e6_rk
 
     ! number of triangles to loop over
-    ntri = size(xyz_nxnynz, 1)
+    ntri = size(body_superSTL_b, 1)
 
     ! thickness of the shell around the surface we compute. (the real thickness not half the value)
     shell_thickness = Insect%C_shell_thickness * Insect%C_smooth * Insect%dx_reference
@@ -1740,30 +1740,25 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             write(*,'("STL body generation shell_thickness      =",g12.4)') shell_thickness
             write(*,'("STL body generation shell_thickness_safe =",g12.4)') shell_thickness_safe
             write(*,'("STL body generation safety (upper limit) =",i3)') safety
+            write(*,'("STL body generation                    g =",i3)') g
         endif
     endif
     informed = .true.
 
     ! loop over all triangles
     do i = 1, ntri
-        ! data from the "superSTL" file are in the body system, we figure out first which
-        ! points on the block are affected by the mask generation. As the blocks are
-        ! in the global system (Eulerian grid), we transform points from body->global system.
-        ! Note: normals are (obviously) not translated, so they do not get +Insect%xc_body_g
-        !
-        ! NOTE: xfer from body to global is done for every block (this routine is called block-wise)
-        !       consequently, the matrix multiplication below are carried out more than once -> potential improvement
-        !
-        vertex1        = matmul(M_body_inv, xyz_nxnynz(i, 1:3)) + Insect%xc_body_g
-        vertex2        = matmul(M_body_inv, xyz_nxnynz(i, 4:6)) + Insect%xc_body_g
-        vertex3        = matmul(M_body_inv, xyz_nxnynz(i, 7:9)) + Insect%xc_body_g
-        face_normal    = matmul(M_body_inv, xyz_nxnynz(i, 10:12))
-        vertex1_normal = matmul(M_body_inv, xyz_nxnynz(i, 13:15))
-        vertex2_normal = matmul(M_body_inv, xyz_nxnynz(i, 16:18))
-        vertex3_normal = matmul(M_body_inv, xyz_nxnynz(i, 19:21))
-        edge1_normal   = matmul(M_body_inv, xyz_nxnynz(i, 22:24))
-        edge2_normal   = matmul(M_body_inv, xyz_nxnynz(i, 25:27))
-        edge3_normal   = matmul(M_body_inv, xyz_nxnynz(i, 28:30))
+        ! data from the "superSTL" file are in the body system, but during the update_insect process
+        ! we also computed the data in the global system.
+        vertex1        = body_superSTL_g(i, 1:3)
+        vertex2        = body_superSTL_g(i, 4:6)
+        vertex3        = body_superSTL_g(i, 7:9)
+        face_normal    = body_superSTL_g(i, 10:12)
+        vertex1_normal = body_superSTL_g(i, 13:15)
+        vertex2_normal = body_superSTL_g(i, 16:18)
+        vertex3_normal = body_superSTL_g(i, 19:21)
+        edge1_normal   = body_superSTL_g(i, 22:24)
+        edge2_normal   = body_superSTL_g(i, 25:27)
+        edge3_normal   = body_superSTL_g(i, 28:30)
 
         ! compute bounding box
         xmin = floor( ( minval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) - safety
@@ -1774,20 +1769,24 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         ymax = ceiling( ( maxval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) + safety
         zmax = ceiling( ( maxval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) + safety
 
-        ! note these guys are zero based indexing....
-        xmin = max(xmin, 0)
-        ymin = max(ymin, 0)
-        zmin = max(zmin, 0)
+        ! Do not set the mask in the ghost nodes.
+        ! Note these guys are zero based indexing...
+        xmin = max(xmin, (g+1))
+        ymin = max(ymin, (g+1))
+        zmin = max(zmin, (g+1))
 
-        xmax = min(xmax, size(mask,1)-1)
-        ymax = min(ymax, size(mask,2)-1)
-        zmax = min(zmax, size(mask,3)-1)
+        xmax = min(xmax, size(mask,1)-1-g)
+        ymax = min(ymax, size(mask,2)-1-g)
+        zmax = min(zmax, size(mask,3)-1-g)
 
         ! we now know which points are possibly affected:
-        ! block(xmin:xmaxn, ymin:ymax, zmin:zmax)
-        ! Note: it is well possible that those are 0:0 if a triangle is not relevant for a block - this
-        ! is actually the case for many triangles.
+        ! block(xmin:xmax, ymin:ymax, zmin:zmax)
 
+        ! despite the bounding box loops below, skipping empty loops (ie triangle not on
+        ! block) saves time
+        if (xmax-xmin+1 <= 0) cycle
+        if (ymax-ymin+1 <= 0) cycle
+        if (zmax-zmin+1 <= 0) cycle
 
         ! computing the signed distance for each point on the block within the bounding box.
         ! bounding box may be empty.
@@ -1812,9 +1811,9 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
     enddo ! loop over triangles
 
-    !
+    ! ----------------------------------------------------------------
     ! signed distance to mask function
-    !
+    ! ----------------------------------------------------------------
     do iz = 0, size(mask,3)-1
         do iy = 0, size(mask,2)-1
             do ix = 0, size(mask,1)-1

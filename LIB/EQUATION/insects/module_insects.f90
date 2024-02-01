@@ -259,7 +259,7 @@ module module_insects
     ! parameters that control shape of wings, body, and motion
     !-------------------------------------------------------------
     character(len=clong) :: WingShape(1:4)=["","","",""] ! left, right, 2nd left, 2nd right
-    character(len=clong) :: BodyType="", BodyMotion="", HasDetails=""
+    character(len=clong) :: BodyType="", BodyMotion=""
     character(len=clong) :: FlappingMotion_right="", FlappingMotion_left=""
     character(len=clong) :: FlappingMotion_right2="", FlappingMotion_left2=""
     character(len=clong) :: infile="", LeftWing="", RightWing=""

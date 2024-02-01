@@ -1102,7 +1102,7 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
   real(kind=rk) :: y_tmp, x_tmp, z_tmp
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
 
-  a_body = 0.5d0 * Insect%L_span
+  a_body = 0.5d0
 
   do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
     x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
@@ -1118,7 +1118,7 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
         x_wing = matmul(M_wing,x_body-x_pivot_b)
 
         ! spanwise length:
-        if ((x_wing(2)>=-Insect%safety).and.(x_wing(2)<=Insect%L_span + Insect%safety)) then
+        if ((x_wing(2)>=-Insect%safety).and.(x_wing(2)<=1.0_rk + Insect%safety)) then
           ! thickness: (note left and right wing have a different orientation of the z-axis
           ! but this does not matter since this is the same.
           if (dabs(x_wing(3))<=0.5*Insect%WingThickness + Insect%safety) then
@@ -1138,7 +1138,7 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
               if (x_wing(2)<0.d0) then  ! xs is chordlength coordinate
                 y_tmp = steps(-x_wing(2),0.d0, Insect%smooth)
               else
-                y_tmp = steps( x_wing(2),Insect%L_span, Insect%smooth)
+                y_tmp = steps( x_wing(2),1.0_rk, Insect%smooth)
               endif
 
               !-- smooth height
@@ -1197,7 +1197,7 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
   real(kind=rk) :: y_tmp, x_tmp, z_tmp
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
 
-  a_wing = 0.5d0 * Insect%L_span
+  a_wing = 0.5d0
   Insect%b_top = 0.1474d0
   Insect%b_bot = 0.1474d0
 
@@ -1215,7 +1215,7 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
         x_wing = matmul(M_wing,x_body-x_pivot_b)
 
         ! spanwise length:
-        if ((x_wing(2)>=-Insect%safety).and.(x_wing(2)<=Insect%L_span + Insect%safety)) then
+        if ((x_wing(2)>=-Insect%safety).and.(x_wing(2)<=1.0_rk + Insect%safety)) then
           ! thickness: (note left and right wing have a different orientation of the z-axis
           ! but this does not matter since this is the same.
           if (dabs(x_wing(3))<=0.5*Insect%WingThickness + Insect%safety) then
@@ -1235,7 +1235,7 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               if (x_wing(2)<0.d0) then  ! xs is chordlength coordinate
                 y_tmp = steps(-x_wing(2),0.d0, Insect%smooth)
               else
-                y_tmp = steps( x_wing(2),Insect%L_span, Insect%smooth)
+                y_tmp = steps( x_wing(2),1.0_rk, Insect%smooth)
               endif
 
               !-- smooth height

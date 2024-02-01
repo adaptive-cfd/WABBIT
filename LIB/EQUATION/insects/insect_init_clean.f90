@@ -36,6 +36,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     yl = box_domain(2)
     zl = box_domain(3)
     nu = viscosity
+
     ! header information
     if (root) then
         write(*,*) "---------------------------------------------------------------------------------------"
@@ -102,7 +103,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! Rectangular wing parameters
     call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.d0)
     call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.d0)
-    call read_param_mpi(PARAMS,"Insects","L_span",Insect%L_span, 0.d0)
     ! Kinematics
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_right",Insect%FlappingMotion_right,"none")
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_left",Insect%FlappingMotion_left,"none")
@@ -226,15 +226,9 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     Insect%kine_wing_r2%initialized = .false.
 
     call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
-    call read_param_mpi(PARAMS,"Insects","BodySuperSTLfile",Insect%BodySuperSTLfile,"none.superstl")
-    call read_param_mpi(PARAMS,"Insects","HasDetails",Insect%HasDetails,"all")
     call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
     call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")
     call read_param_mpi(PARAMS,"Insects","RightWing",Insect%RightWing,"yes")
-    call read_param_mpi(PARAMS,"Insects","b_body",Insect%b_body, 0.1d0)
-    call read_param_mpi(PARAMS,"Insects","L_body",Insect%L_body, 1.d0)
-    call read_param_mpi(PARAMS,"Insects","R_head",Insect%R_head, 0.1d0)
-    call read_param_mpi(PARAMS,"Insects","R_eye",Insect%R_eye, 0.d1)
     call read_param_mpi(PARAMS,"Insects","mass",Insect%mass, 1.d0)
     call read_param_mpi(PARAMS,"Insects","gravity",Insect%gravity, 0.d0)
     call read_param_mpi(PARAMS,"Insects","gravity_x",Insect%gravity_x, 0.d0)
@@ -309,6 +303,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! NOTE: 05/2020 Thomas, I changed the default back to local.
     call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
     call read_param_mpi(PARAMS,"Insects","C_smooth",Insect%C_smooth,1.0d0)
+    call read_param_mpi(PARAMS,"Insects","BodySuperSTLfile",Insect%BodySuperSTLfile,"none.superstl")
     ! when using CT data, code computes the mask function in a shell around fluid-solid interface.
     ! The tickness of the shell is not a critical parameter, but it affects performance. Thicker shell
     ! means more points and thus more comput effort. It is given in multiples of C_smooth, that means
@@ -316,21 +311,11 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! Why is the shell thickness dependent on resolution? The cost to generate the mask depends on the number of
     ! triangles and the number of points in the shell. As the latter is coupled to dx and the former is constant
     ! this way the mask generation cost is constant when increasing the resolution.
-    call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness,5.0d0)
+    call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness, 3.0d0)
 
     Insect%dx_reference = dx_reference
     Insect%smooth = Insect%C_smooth*dx_reference
     Insect%safety = 3.5d0*Insect%smooth
-
-    ! position vector of the head
-    call read_param_mpi(PARAMS, "Insects", "x_head", Insect%x_head, (/0.5d0*Insect%L_body,0.d0,0.d0 /) )
-
-    ! eyes
-    defaultvec = Insect%x_head+sin(45.d0*pi/180.d0)*Insect%R_head*0.8d0*(/1.0d0,+1.0d0,1.0d0/)
-    call read_param_mpi(PARAMS,"Insects","x_eye_r",Insect%x_eye_r, defaultvec)
-
-    defaultvec = Insect%x_head+sin(45.d0*pi/180.d0)*Insect%R_head*0.8d0*(/1.0d0,-1.0d0,1.0d0/)
-    call read_param_mpi(PARAMS,"Insects","x_eye_l",Insect%x_eye_l, defaultvec)
 
     ! wing hinges (root points)
     defaultvec=(/0.d0, +Insect%b_body, 0.d0 /)
@@ -348,13 +333,12 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     endif
 
     ! default colors for body and wings
-    Insect%color_body=1
-    Insect%color_l=2
-    Insect%color_r=3
-    if (Insect%second_wing_pair) then
-        Insect%color_l2=4
-        Insect%color_r2=5
-    endif
+    Insect%color_body = 1
+    Insect%color_l    = 2
+    Insect%color_r    = 3
+    Insect%color_l2   = 4
+    Insect%color_r2   = 5
+
 
     ! clean ini file
     call clean_ini_file_mpi(PARAMS)

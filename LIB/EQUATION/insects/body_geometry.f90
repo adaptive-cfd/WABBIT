@@ -298,76 +298,74 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     !-----------------------------------------------------------------------------
     ! Legs, antennae and proboscis
     !-----------------------------------------------------------------------------
-    if ((Insect%HasDetails=="all").or.(Insect%HasDetails=="legs").or.(Insect%HasDetails=="antennae_proboscis")) then
-        ! Parameters of legs, antennae and proboscis
-        xl1 = (/-0.74,-0.63,-0.4,-0.1,0.1/)
-        yl1 = (/0.32,0.32,0.31,0.3,0.12/)
-        zl1 = (/-0.35,-0.37,-0.2,-0.1,-0.16/)
-        rl1 = (/0.015,0.03,0.04,0.03/)*1.3
-        xl2 = (/-0.24,-0.15,0.02,0.17,0.19/)
-        yl2 = (/0.33,0.33,0.32,0.3,0.15/)
-        zl2 = (/-0.29,-0.28,-0.2,-0.15,-0.19/)
-        rl2 = (/0.015,0.03,0.04,0.03/)*1.3
-        xl3 = (/0.28,0.35,0.45,0.4,0.35/)
-        yl3 = (/0.31,0.30,0.28,0.2,0.15/)
-        zl3 = (/-0.3,-0.28,-0.25,-0.18,-0.18/)
-        rl3 = (/0.015,0.02,0.03,0.02/)*1.3
-        xf = (/0.43,0.6/)
-        yf = (/0.0,0.0/)
-        zf = (/-0.28,-0.23/)
-        rf = 0.017*1.3
-        xan = (/0.63,0.8/)
-        yan = (/0.05,0.27/)
-        zan = (/-0.03,0.1/)
-        ran = 0.015*1.3
+    ! Parameters of legs, antennae and proboscis
+    xl1 = (/-0.74,-0.63,-0.4,-0.1,0.1/)
+    yl1 = (/0.32,0.32,0.31,0.3,0.12/)
+    zl1 = (/-0.35,-0.37,-0.2,-0.1,-0.16/)
+    rl1 = (/0.015,0.03,0.04,0.03/)*1.3
+    xl2 = (/-0.24,-0.15,0.02,0.17,0.19/)
+    yl2 = (/0.33,0.33,0.32,0.3,0.15/)
+    zl2 = (/-0.29,-0.28,-0.2,-0.15,-0.19/)
+    rl2 = (/0.015,0.03,0.04,0.03/)*1.3
+    xl3 = (/0.28,0.35,0.45,0.4,0.35/)
+    yl3 = (/0.31,0.30,0.28,0.2,0.15/)
+    zl3 = (/-0.3,-0.28,-0.25,-0.18,-0.18/)
+    rl3 = (/0.015,0.02,0.03,0.02/)*1.3
+    xf = (/0.43,0.6/)
+    yf = (/0.0,0.0/)
+    zf = (/-0.28,-0.23/)
+    rf = 0.017*1.3
+    xan = (/0.63,0.8/)
+    yan = (/0.05,0.27/)
+    zan = (/-0.03,0.1/)
+    ran = 0.015*1.3
 
-        ! ----------------------------------------------------------------------------
-        ! legs (composed of 3 cylinders)
-        ! ----------------------------------------------------------------------------
-        do j = 1,  4
-          ! transform coordinates to global system. they are defined in the body system
-          xa = matmul( transpose(M_body), (/xl1(j)  ,yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl1(j+1),yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
-          ! note input to draw_cylinder_new is in global coordinates
-          call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+    ! ----------------------------------------------------------------------------
+    ! legs (composed of 3 cylinders)
+    ! ----------------------------------------------------------------------------
+    do j = 1,  4
+        ! transform coordinates to global system. they are defined in the body system
+        xa = matmul( transpose(M_body), (/xl1(j)  ,yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl1(j+1),yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+        ! note input to draw_cylinder_new is in global coordinates
+        call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-          xa = matmul( transpose(M_body), (/xl2(j)  ,yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl2(j+1),yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
-          call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+        xa = matmul( transpose(M_body), (/xl2(j)  ,yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl2(j+1),yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-          xa = matmul( transpose(M_body), (/xl3(j)  ,yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl3(j+1),yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
-          call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+        xa = matmul( transpose(M_body), (/xl3(j)  ,yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl3(j+1),yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-          ! right side of body (flip the sign of y)
-          xa = matmul( transpose(M_body), (/xl1(j)  ,-yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl1(j+1),-yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
-          call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+        ! right side of body (flip the sign of y)
+        xa = matmul( transpose(M_body), (/xl1(j)  ,-yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl1(j+1),-yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-          xa = matmul( transpose(M_body), (/xl2(j)  ,-yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl2(j+1),-yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
-          call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+        xa = matmul( transpose(M_body), (/xl2(j)  ,-yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl2(j+1),-yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-          xa = matmul( transpose(M_body), (/xl3(j)  ,-yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
-          xb = matmul( transpose(M_body), (/xl3(j+1),-yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
-          call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
-        enddo
+        xa = matmul( transpose(M_body), (/xl3(j)  ,-yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+        xb = matmul( transpose(M_body), (/xl3(j+1),-yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+        call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
+    enddo
 
-        ! antenna (left)
-        xa = matmul( transpose(M_body), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
-        xb = matmul( transpose(M_body), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
-        call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
+    ! antenna (left)
+    xa = matmul( transpose(M_body), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
+    xb = matmul( transpose(M_body), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
+    call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-        ! antenna (right)
-        xa = matmul( transpose(M_body), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
-        xb = matmul( transpose(M_body), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
-        call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
+    ! antenna (right)
+    xa = matmul( transpose(M_body), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
+    xb = matmul( transpose(M_body), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
+    call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
-        ! proboscis (to drink)
-        xa = matmul( transpose(M_body), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
-        xb = matmul( transpose(M_body), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
-        call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
-    endif
+    ! proboscis (to drink)
+    xa = matmul( transpose(M_body), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
+    xb = matmul( transpose(M_body), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
+    call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
 end subroutine draw_body_bumblebee
 
@@ -618,7 +616,7 @@ subroutine draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
 end subroutine draw_body_paratuposa_simple
 
 !------------------------------------------------------------------------------
-! Body adapted from Maeda & Liu. It assumes Insect%x_head=0.0
+! Body adapted from Maeda & Liu.
 subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
 
@@ -970,7 +968,7 @@ end subroutine
 ! flapping motion in free flight. Therefore, the insect module contains nowadays
 ! also body shapes that are not related to insects. This one is a flat plate of
 ! size
-! Insect%L_span x Insect%L_body x Insect%WingThickness
+! LxBxH
 !-------------------------------------------------------------------------------
 subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     implicit none
@@ -984,11 +982,16 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     real(kind=rk) :: R0,R,a_body, projected_length
     real(kind=rk) :: x_body(1:3), x(1:3), xc(1:3), n_part(1:3)
     integer :: ix,iy,iz,ip, npoints, mpicode, ijk(1:3), box, start,i,j,k
-    real(kind=rk)   :: M_body(1:3,1:3)
+    real(kind=rk) :: M_body(1:3,1:3)
+    real(kind=rk) :: L, B, H
     integer(kind=2) :: color_body
 
     color_body = Insect%color_body
     M_body     = Insect%M_body
+
+    L = 1.0_rk
+    B = 1.0_rk
+    H = 0.05_rk
 
     do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
@@ -1002,14 +1005,15 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
                 x_body = matmul(M_body,x)
 
                 ! bounding box checks
-                if (dabs(x_body(1)) <= Insect%L_span+Insect%safety) then
-                    if (dabs(x_body(2)) <= Insect%L_body+Insect%safety) then
-                        if (dabs(x_body(3)) <= Insect%WingThickness+Insect%safety) then
+                if (dabs(x_body(1)) <= L+Insect%safety) then
+                    if (dabs(x_body(2)) <= B+Insect%safety) then
+                        if (dabs(x_body(3)) <= H+Insect%safety) then
                             ! signed distance:
-                            R = maxval( (/ dabs(x_body(3))-Insect%WingThickness/2.d0,&
-                            dabs(x_body(2))-Insect%L_body/2.d0,&
-                            dabs(x_body(1))-Insect%L_span/2.d0 &
-                            /) )
+                            R = maxval( (/  dabs(x_body(3))-H/2.d0,&
+                                            dabs(x_body(2))-B/2.d0,&
+                                            dabs(x_body(1))-L/2.d0 &
+                                        /) )
+
                             mask(ix,iy,iz) = max(steps(R,0.d0, Insect%smooth),mask(ix,iy,iz))
                             mask_color(ix,iy,iz) = color_body
                         endif
@@ -1691,15 +1695,12 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal
     real(kind=rk), dimension(1:3) :: vertex2_normal, vertex3_normal, face_normal, edge1_normal, edge2_normal, edge3_normal
-    real(kind=rk) :: M_body(1:3,1:3), M_body_inv(1:3,1:3)
     real(kind=rk) :: scale, origin(1:3), tmp, x, y, z
     real(kind=rk) :: x_glob(1:3), x_body(1:3), signed_distance, shell_thickness, shell_thickness_safe
     character(len=clong) :: fname_stl
     logical :: informed = .false.
 
     color_body = Insect%color_body
-    M_body     = Insect%M_body
-    M_body_inv = transpose(Insect%M_body)
     fname_stl  = Insect%BodySuperSTLfile
 
     ! we work on a work block because we add the body to existing masks
@@ -1727,12 +1728,12 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
     safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference ) ! in grid points
 
-    ! The below code may be misleading  because the important number for performance,
+    ! The below information may be misleading  because the important number for performance,
     ! "safety", is not a constant, if Insect%smoothing_thickness=="local"
     ! hence, showing the information may be misleading (although is is not incorrect).
-
     if (.not. informed) then
         if (root) then
+            write(*,'(80("~"))')
             write(*,'("STL body generation dx_min               =",es12.3)') Insect%dx_reference
             write(*,'("STL body generation C_smooth             =",g12.4)') Insect%C_smooth
             write(*,'("STL body generation C_shell_thickness    =",g12.4)') Insect%C_shell_thickness
@@ -1741,9 +1742,16 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             write(*,'("STL body generation shell_thickness_safe =",g12.4)') shell_thickness_safe
             write(*,'("STL body generation safety (upper limit) =",i3)') safety
             write(*,'("STL body generation                    g =",i3)') g
+            write(*,'(80("~"))')
         endif
     endif
     informed = .true.
+
+    ! The cost of this algorithm is
+    ! K*Ntri*Nx*Ny*Nz
+    ! so it is very expensive. This is because the resolution of the STL file and the grid 
+    ! resolution do not match. It is well possible, for detailed STL models, that hundredts of
+    ! triangles are considered for a single point - of course, just one is eventually relevant.
 
     ! loop over all triangles
     do i = 1, ntri
@@ -1771,9 +1779,9 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
         ! Do not set the mask in the ghost nodes.
         ! Note these guys are zero based indexing...
-        xmin = max(xmin, (g+1))
-        ymin = max(ymin, (g+1))
-        zmin = max(zmin, (g+1))
+        xmin = max(xmin, g) ! (g) and not (g+1) because of zero indexing
+        ymin = max(ymin, g)
+        zmin = max(zmin, g)
 
         xmax = min(xmax, size(mask,1)-1-g)
         ymax = min(ymax, size(mask,2)-1-g)

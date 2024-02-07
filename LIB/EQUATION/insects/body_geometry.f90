@@ -1743,6 +1743,10 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
             write(*,'("STL body generation safety (upper limit) =",i3)') safety
             write(*,'("STL body generation                    g =",i3)') g
             write(*,'(80("~"))')
+            write(*,*) nint((maxval(body_superSTL_g(:,1))-minval(body_superSTL_g(:,1)))/Insect%dx_reference)
+            write(*,*) nint((maxval(body_superSTL_g(:,2))-minval(body_superSTL_g(:,2)))/Insect%dx_reference)
+            write(*,*) nint((maxval(body_superSTL_g(:,3))-minval(body_superSTL_g(:,3)))/Insect%dx_reference)
+            write(*,'(80("~"))')
         endif
     endif
     informed = .true.
@@ -1816,9 +1820,9 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
                 enddo
             enddo
         enddo
-
+        
     enddo ! loop over triangles
-
+    
     ! ----------------------------------------------------------------
     ! signed distance to mask function
     ! ----------------------------------------------------------------
@@ -1826,7 +1830,6 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         do iy = 0, size(mask,2)-1
             do ix = 0, size(mask,1)-1
                 signed_distance = tmp_block(ix,iy,iz)
-                ! tmp = smoothstep( signed_distance, 0.0_rk, Insect%smooth )
 
                 ! revised version, 11/2022:
                 ! now we compute a thin layer around the surface which is smoothed both towards the inside and

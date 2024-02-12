@@ -15,7 +15,7 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     logical :: refinement
 
     ! for non lifted wavelets, no coarseExtension is done, hence no need for the additional security zone here
-    if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20")) return
+    if ((params%wavelet=="CDF40").or.(params%wavelet=="CDF20").or.(params%wavelet=="CDF60")) return
 
     !--------------------------------------------------------------------------------------------------------------------
     ! This routine performs two tasks:

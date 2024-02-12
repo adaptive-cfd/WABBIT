@@ -70,35 +70,14 @@ subroutine sparse_to_dense(params)
         call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
 
-    call get_cmd_arg( "--wavelet", order, default="CFD44" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default="CFD44" )
     call get_cmd_arg( "--J_target", level, default=tc_length )
     call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
     call get_cmd_arg( "--time", time_given, default=-1.0_rk)
 
-    ! setup wavelet
-    if (order == "CDF20") then
-        params%g = 2_ik
-        params%wavelet='CDF20'
-    elseif (order == "CDF22") then
-        params%g = 3_ik
-        params%wavelet='CDF22'
-    elseif (order == "CDF40") then
-        params%g = 4_ik
-        params%wavelet='CDF40'
-    elseif (order == "CDF44") then
-        params%wavelet='CDF44'
-        params%g = 7_ik
-    elseif (order == "CDF42") then
-        params%wavelet='CDF42'
-        params%g = 5_ik
-    elseif (order == "CDF62") then
-        params%wavelet='CDF62'
-        params%g = 7_ik
-    else
-        call abort(20030202, "The --wavelet parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
-    end if
-
-    call setup_wavelet(params)
+    ! initialize wavelet transform
+    ! also, set number of ghost nodes params%G to minimal value for this wavelet
+    call setup_wavelet(params, params%g)
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
@@ -127,7 +106,6 @@ subroutine sparse_to_dense(params)
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
 
-        write(*,'(A40,1x,A40)') "params%order_predictor=", params%order_predictor
         write(*,'(A40,1x,A40)') "params%wavelet=", params%wavelet
         write(*,'(A40,1x,i2)') "params%g=", params%g
         write(*,'(A40,1x,A40)') "operator=", operator

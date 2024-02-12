@@ -1549,9 +1549,13 @@ contains
     end subroutine
 
 
-    subroutine setup_wavelet(params)
+    subroutine setup_wavelet(params, g_wavelet)
         implicit none
         type (type_params), intent(inout) :: params
+        ! if called with g_wavelet, we return the number of ghost nodes
+        ! required for the wavelet filters (used in postprocessing routines
+        ! to decide which G is used.)
+        integer(kind=ik), intent(out), optional :: g_wavelet
         integer(kind=ik) :: i
 
         if (allocated(params%GR)) deallocate(params%HD)
@@ -1629,9 +1633,14 @@ contains
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
 
-            if (params%g<7) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=7 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 7
+            else
+                if (params%g<7) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8888881, "The selected wavelet requires at least g=7 ghost nodes.")
+                endif
             endif
 
         case("CDF44")
@@ -1670,9 +1679,14 @@ contains
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
 
-            if (params%g<7) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=7 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 7
+            else
+                if (params%g<7) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8883881, "The selected wavelet requires at least g=7 ghost nodes.")
+                endif
             endif
 
         case ("CDF42")
@@ -1701,9 +1715,14 @@ contains
             params%Nreconl = params%Nwcl+5 ! support of GR -5:3
             params%Nreconr = params%Nwcr+3
 
-            if (params%g<5) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=5 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 5
+            else
+                if (params%g<5) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8888871, "The selected wavelet requires at least g=5 ghost nodes.")
+                endif
             endif
 
         case ("CDF40")
@@ -1725,9 +1744,14 @@ contains
 
             params%order_predictor = "multiresolution_4th"
 
-            if (params%g<4) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=4 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 4
+            else
+                if (params%g<4) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8888811, "The selected wavelet requires at least g=4 ghost nodes.")
+                endif
             endif
 
         case ("CDF20")
@@ -1749,9 +1773,14 @@ contains
 
             params%order_predictor = "multiresolution_2nd"
 
-            if (params%g<2) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=2 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 2
+            else
+                if (params%g<2) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8888883, "The selected wavelet requires at least g=2 ghost nodes.")
+                endif
             endif
 
         case("CDF22")
@@ -1780,9 +1809,14 @@ contains
             params%Nreconl = params%Nwcl+3 ! support of GR -3:1
             params%Nreconr = params%Nwcr+1
 
-            if (params%g<3) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                call abort(88888881, "The selected wavelet requires at least g=3 ghost nodes.")
+            ! minimum number of ghost nodes required for this wavelet
+            if (present(g_wavelet)) then
+                g_wavelet = 3
+            else
+                if (params%g<3) then
+                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
+                    call abort(8888881, "The selected wavelet requires at least g=3 ghost nodes.")
+                endif
             endif
 
         case default

@@ -67,9 +67,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     if (.not.allocated(hvy_details)) then
         allocate(hvy_details(1:size(hvy_block,4), 1:params%number_blocks))
     endif
-    do k = 1, hvy_n(tree_ID)
-        hvy_details(:, hvy_active(k, tree_ID)) = -1.0_rk
-    enddo
+    ! this array is small so we can actually initialize it
+    ! This is not actually necessary, but it does not hurt (12 feb 2024, TE)
+    hvy_details = -1.0_rk
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
@@ -124,7 +124,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
         !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
-
         ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
         ! acts on a single block only.
         ! We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the default, other indicators

@@ -196,6 +196,9 @@ program main_post
         end if
     end select
 
+    ! close and flush all existings *.t files
+    call close_all_t_files()
+
     elapsed_time = MPI_wtime() - elapsed_time
     if (rank==0) then
         write(*,*)

@@ -111,6 +111,9 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
             tag, WABBIT_COMM, requests(ireq), ierr)
 
+            ! transferred blocks did not yet get a detail:
+            hvy_details(:, hvy_id_new) = -1.0_rk
+
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
 
         ! Am I the owner of this block, so will I have to send data?

@@ -69,36 +69,18 @@ subroutine dense_to_sparse(params)
     call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg_dbl( "--eps", params%eps, default=-1.0_rk )
     call get_cmd_arg_str( "--indicator", indicator, default="threshold-state-vector" )
+    ! --order and --wavelet are synonyms, but --wavelet overules (--order is deprecated)
     call get_cmd_arg_str( "--order", order, default="CDF40" )
+    call get_cmd_arg_str( "--wavelet", params%wavelet, default=order )
     call get_cmd_arg_str_vct( "--files", params%input_files )
-
-
-    ! Check parameters for correct inputs:
-    if (order == "CDF20") then
-        params%g = 2_ik
-        params%wavelet='CDF20'
-
-    elseif (order == "CDF40") then
-        params%g = 3_ik
-        params%wavelet='CDF40'
-
-    elseif (order == "CDF44") then
-        params%wavelet='CDF44'
-        params%g = 7_ik
-
-    elseif (order == "CDF42") then
-        params%wavelet='CDF42'
-        params%g = 5_ik
-
-    else
-        call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
-    end if
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
     endif
 
-    call setup_wavelet(params)
+    ! initialize wavelet transform
+    ! also, set number of ghost nodes params%G to minimal value for this wavelet
+    call setup_wavelet(params, params%g)
 
     params%coarsening_indicator = indicator
     params%forest_size = 1
@@ -159,7 +141,7 @@ subroutine dense_to_sparse(params)
             write(*,'(A20,1x,A80)') "Writing to file:", file_out(i)
         end do
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
-        write(*,'(A20,1x,A8)') "Wavelets used:", order
+        write(*,'(A20,1x,A8)') "Wavelets used:", params%wavelet
         write(*,'(A20,1x,es9.3)') "eps:", params%eps
         write(*,'(A20,1x,A80)')"wavelet normalization:", params%eps_norm
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
@@ -197,10 +179,11 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! READ Grid and coarse if possible
     !----------------------------------
-    params%adapt_tree=.true.
-    params%adapt_inicond=.true.
-    params%read_from_files=.true.
-
+    params%adapt_tree = .true.
+    params%adapt_inicond = .true.
+    params%read_from_files = .true.
+    params%force_maxlevel_dealiasing = .false.
+    params%threshold_mask = .false.
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp )
 
     !----------------------------------

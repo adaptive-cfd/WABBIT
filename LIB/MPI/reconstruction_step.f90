@@ -86,7 +86,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
     ! reset all details, not just the ones we'll re-compute
     if (present(hvy_details)) then
-        hvy_details(:, hvyID) = -1.0_rk
+        hvy_details = -1.0_rk
     endif
 
     !---------------------------------------------------------------------------

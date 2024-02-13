@@ -1549,19 +1549,24 @@ contains
     end subroutine
 
 
-    subroutine setup_wavelet(params, g_wavelet)
+    subroutine setup_wavelet(params, g_wavelet, verbose)
         implicit none
         type (type_params), intent(inout) :: params
         ! if called with g_wavelet, we return the number of ghost nodes
         ! required for the wavelet filters (used in postprocessing routines
         ! to decide which G is used.)
         integer(kind=ik), intent(out), optional :: g_wavelet
-        integer(kind=ik) :: i
+        logical, intent(in), optional :: verbose
+        logical :: verbose1
+        integer(kind=ik) :: i, g_min
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
         if (allocated(params%HR)) deallocate(params%HR)
         if (allocated(params%GR)) deallocate(params%GR)
+
+        verbose1 = .true.
+        if (present(verbose)) verbose1 = verbose
 
         ! for non-lifted wavelets: (Donoho wavelets)
         params%Nscl = 0
@@ -1619,29 +1624,21 @@ contains
             enddo
 
             params%order_predictor = "multiresolution_6th"
+            ! minimum number of ghost nodes required for this wavelet
+            g_min = 7
 
             ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
             ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
             ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
             ! scaling function coeffs to be copied:
-            params%Nscl = params%g+5 ! dictated by support of h_tilde (HD) filter for SC
-            params%Nscr = params%g+5
+            params%Nscl = g_min+5 ! dictated by support of h_tilde (HD) filter for SC
+            params%Nscr = g_min+5
             ! wavelet coefficients to be deleted:
             params%Nwcl = params%Nscl+5 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr+7
             ! last reconstructed point is the support of GR filter not seing any WC set to zero anymore
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
-
-            ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 7
-            else
-                if (params%g<7) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8888881, "The selected wavelet requires at least g=7 ghost nodes.")
-                endif
-            endif
 
         case("CDF44")
             ! H TILDE filter
@@ -1665,13 +1662,15 @@ contains
             -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
 
             params%order_predictor = "multiresolution_4th"
+            ! minimum number of ghost nodes required for this wavelet
+            g_min = 7
 
             ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
             ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
             ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
             ! scaling function coeffs to be copied:
-            params%Nscl = params%g+5 ! dictated by support of h_tilde (HD) filter for SC
-            params%Nscr = params%g+5
+            params%Nscl = g_min+5 ! dictated by support of h_tilde (HD) filter for SC
+            params%Nscr = g_min+5
             ! wavelet coefficients to be deleted:
             params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr+5
@@ -1679,17 +1678,7 @@ contains
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
 
-            ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 7
-            else
-                if (params%g<7) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8883881, "The selected wavelet requires at least g=7 ghost nodes.")
-                endif
-            endif
-
-        case ("CDF42")
+        case("CDF42")
             ! H TILDE filter
             allocate( params%HD(-4:4) )
             params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
@@ -1707,25 +1696,17 @@ contains
             params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
 
             params%order_predictor = "multiresolution_4th"
+            ! minimum number of ghost nodes required for this wavelet
+            g_min = 5
 
-            params%Nscl = params%g+3
-            params%Nscr = params%g+3
+            params%Nscl = g_min+3
+            params%Nscr = g_min+3
             params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr+5
             params%Nreconl = params%Nwcl+5 ! support of GR -5:3
             params%Nreconr = params%Nwcr+3
 
-            ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 5
-            else
-                if (params%g<5) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8888871, "The selected wavelet requires at least g=5 ghost nodes.")
-                endif
-            endif
-
-        case ("CDF40")
+        case("CDF40")
             ! H TILDE filter
             allocate( params%HD(0:0) )
             params%HD = (/1.0_rk/)
@@ -1743,18 +1724,11 @@ contains
             params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             params%order_predictor = "multiresolution_4th"
-
             ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 4
-            else
-                if (params%g<4) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8888811, "The selected wavelet requires at least g=4 ghost nodes.")
-                endif
-            endif
+            g_min = 4
+            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
 
-        case ("CDF20")
+        case("CDF20")
             ! H TILDE filter
             allocate( params%HD(0:0) )
             params%HD = (/1.0_rk/)
@@ -1772,21 +1746,14 @@ contains
             params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             params%order_predictor = "multiresolution_2nd"
-
             ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 2
-            else
-                if (params%g<2) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8888883, "The selected wavelet requires at least g=2 ghost nodes.")
-                endif
-            endif
+            g_min = 2
+            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
 
         case("CDF22")
             ! H TILDE filter
             allocate( params%HD(-2:2) )
-            params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/) ! H TILDE
+            params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/)
 
             ! G TILDE filter
             allocate( params%GD(0:2) )
@@ -1801,30 +1768,33 @@ contains
             params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
 
             params%order_predictor = "multiresolution_2nd"
+            ! minimum number of ghost nodes required for this wavelet
+            g_min = 3
 
-            params%Nscl = params%g+1
-            params%Nscr = params%g+1
+            params%Nscl = g_min+1
+            params%Nscr = g_min+1
             params%Nwcl = params%Nscl + 0 ! chosen such that g_tilde (GD) does not see the copied SC
             params%Nwcr = params%Nscr + 2
             params%Nreconl = params%Nwcl+3 ! support of GR -3:1
             params%Nreconr = params%Nwcr+1
-
-            ! minimum number of ghost nodes required for this wavelet
-            if (present(g_wavelet)) then
-                g_wavelet = 3
-            else
-                if (params%g<3) then
-                    write(*,*) trim(adjustl(params%wavelet)), " g=", params%g
-                    call abort(8888881, "The selected wavelet requires at least g=3 ghost nodes.")
-                endif
-            endif
 
         case default
             call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
 
         end select
 
-        if (params%rank==0) then
+        if (present(g_wavelet)) then
+            ! if we return the minimal value of ghosts, we assume that you are going to use it
+            ! instead of ignoring it -> we can omit checking 
+            g_wavelet = g_min
+        else
+            if (params%g < g_min) then
+                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g, " <   g_min=", g_min
+                call abort(8888881, "The selected wavelet requires more ghost nodes.")
+            endif
+        endif
+
+        if (params%rank==0 .and. verbose1) then
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             write(*,*) "                      Wavelet-setup"
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"

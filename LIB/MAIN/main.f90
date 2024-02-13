@@ -110,6 +110,7 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    ! initialize wavelet
     call setup_wavelet(params)
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)

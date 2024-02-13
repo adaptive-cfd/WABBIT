@@ -226,9 +226,9 @@ end subroutine ini_file_to_params
     type(inifile) ,intent(inout)     :: FILE
     !> params structure of WABBIT
     type(type_params),intent(inout)  :: params
-    !> power used for dimensionality (d=2 or d=3)
     integer(kind=ik) :: i, g_default
     real(kind=rk), dimension(:), allocatable  :: tmp
+
     if (params%rank==0) then
       write(*,*)
       write(*,*)
@@ -239,6 +239,8 @@ end subroutine ini_file_to_params
     ! read number_block_nodes
     params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
 
+    ! annoyingly, this is redundant with the definition in setup_wavelet, but as setup_wavelet is part of module_wavelets
+    ! which use module_params it cannot be called here (circular dependency....)
     select case(params%wavelet)
     case ('CDF20')
         g_default = 2
@@ -253,7 +255,6 @@ end subroutine ini_file_to_params
     case default
         g_default = 1
     end select
-
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
     call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )

@@ -66,27 +66,11 @@ subroutine post_evaluate_thresholding(params)
     call get_cmd_arg( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg( "--eps", params%eps, default=-1.0_rk )
     call get_cmd_arg( "--indicator", indicator, default="threshold-state-vector" )
-    call get_cmd_arg( "--wavelet", order, default="CDF40" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default="CDF40" )
 
-    ! setup wavelet
-    if (order == "CDF20") then
-        params%g = 2_ik
-        params%wavelet='CDF20'
-    elseif (order == "CDF22") then
-        params%g = 3_ik
-        params%wavelet='CDF22'
-    elseif (order == "CDF40") then
-        params%g = 4_ik
-        params%wavelet='CDF40'
-    elseif (order == "CDF44") then
-        params%wavelet='CDF44'
-        params%g = 7_ik
-    elseif (order == "CDF42") then
-        params%wavelet='CDF42'
-        params%g = 5_ik
-    else
-        call abort(20030202, "The --wavelet parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
-    end if
+    ! initialize wavelet transform
+    ! also, set number of ghost nodes params%G to minimal value for this wavelet
+    call setup_wavelet(params, params%g)
 
     call setup_wavelet(params)
 

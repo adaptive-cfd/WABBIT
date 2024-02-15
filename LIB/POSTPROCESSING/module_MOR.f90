@@ -1882,24 +1882,10 @@ contains
             !> order of the wavelt
             character(len=cshort), intent(in)    :: order
 
-            ! Check parameters for correct inputs:
-            if (order == "CDF20") then
-                params%order_predictor = "multiresolution_2nd"
-                params%wavelet='CDF20'
-                params%g = 2_ik
-            elseif (order == "CDF40") then
-                params%order_predictor = "multiresolution_4th"
-                params%wavelet='CDF40'
-                params%g = 4_ik
-            elseif (order == "CDF44" ) then
-                params%order_predictor = "multiresolution_4th"
-                params%wavelet='CDF44'
-                params%g = 6_ik
-            else
-                call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
-            end if
-
-
+            ! initialize wavelet transform
+            ! also, set number of ghost nodes params%G to minimal value for this wavelet
+            params%wavelet = order
+            call setup_wavelet(params, params%g)
         end subroutine set_wavelet_params
 
         subroutine adjust_n_ghosts_for_scalarproduct(params)

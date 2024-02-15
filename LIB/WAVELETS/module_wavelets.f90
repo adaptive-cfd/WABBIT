@@ -1599,7 +1599,7 @@ contains
                             0.0_rk, &
                             -3.0_rk*2.0_rk**(-10.0_rk)/)
 
-            ! H filter
+            ! H filter  
             allocate( params%HR(-5:5) )
             params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
 
@@ -1640,6 +1640,34 @@ contains
             params%Nreconl = params%Nwcl+7 ! support of GR -7:5
             params%Nreconr = params%Nwcr+5
 
+        case("CDF60")
+            ! H TILDE filter
+            allocate( params%HD(0:0) )
+            params%HD = (/1.0_rk/)
+
+           ! H filter  
+            allocate( params%HR(-5:5) )
+            params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
+
+            ! G TILDE filter
+            allocate( params%GD(-4:6) )
+            do i = -4, +6
+                if (mod(i,2)==0) then
+                    params%GD(i) = -1.0_rk*params%HR(i-1)
+                else
+                    params%GD(i) = +1.0_rk*params%HR(i-1)
+                endif
+            enddo
+
+            ! G filter
+            allocate( params%GR(-2:0) )
+            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+
+            params%order_predictor = "multiresolution_6th"
+            ! minimum number of ghost nodes required for this wavelet
+            g_min = 6
+            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+            
         case("CDF44")
             ! H TILDE filter
             allocate( params%HD(-6:6) )

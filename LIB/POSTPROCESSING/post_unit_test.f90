@@ -32,34 +32,11 @@ subroutine post_unit_test(params)
     allocate( hvy_n(1), lgt_n(1) )
 
 
-    call get_cmd_arg( "--wavelet", order, default="CFD44" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default="CFD44" )
     call get_cmd_arg( "--dim", params%dim, default=2 )
-
-
-    ! setup wavelet
-    if (order == "CDF20") then
-        params%g = 2_ik
-        params%wavelet='CDF20'
-    elseif (order == "CDF22") then
-        params%g = 3_ik
-        params%wavelet='CDF22'
-    elseif (order == "CDF40") then
-        params%g = 4_ik
-        params%wavelet='CDF40'
-    elseif (order == "CDF44") then
-        params%wavelet='CDF44'
-        params%g = 7_ik
-    elseif (order == "CDF42") then
-        params%wavelet='CDF42'
-        params%g = 5_ik
-    elseif (order == "CDF62") then
-        params%wavelet='CDF62'
-        params%g = 7_ik
-    else
-        call abort(20030202, "The --wavelet parameter is not correctly set [CDF40, CDF20, CDF44, CDF42]")
-    end if
-
-    call setup_wavelet(params)
+    ! initialize wavelet transform
+    ! also, set number of ghost nodes params%G to minimal value for this wavelet
+    call setup_wavelet(params, params%g)
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,

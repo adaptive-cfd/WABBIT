@@ -44,7 +44,7 @@ subroutine adaption_test(params)
           write(*,*) " --list               list of files containing all snapshots"
           write(*,*) " --components         number of components in statevector"
           write(*,*) " --eps-list           eps used"
-          write(*,*) " --order              order of the predictor"
+          write(*,*) " --wavelet            wavelet to be used"
           write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
           write(*,*) " --eps-norm           normalization of wavelets"
           write(*,*) " --save_all           saves adapted snapshots"
@@ -58,7 +58,7 @@ subroutine adaption_test(params)
   !----------------------------------
   call get_cmd_arg( "--save_all", save_all, default=.false.)
   call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
-  call get_cmd_arg_str( "--order", order, default="CDF44" )
+  call get_cmd_arg_str( "--wavelet", params%wavelet, default="CDF44" )
   call get_cmd_arg( "--list", params%input_files )
   call get_cmd_arg( "--eps-list", eps_str_list )
   call get_cmd_arg( "--memory", args, default="2GB")
@@ -82,22 +82,9 @@ subroutine adaption_test(params)
   params%n_eqn = n_components
   params%forest_size = 3
 
-  ! Check parameters for correct inputs:
-  if (order == "CDF20") then
-      params%order_predictor = "multiresolution_2nd"
-      params%wavelet='CDF20'
-      params%g = 2_ik
-  elseif (order == "CDF40") then
-      params%order_predictor = "multiresolution_4th"
-      params%wavelet='CDF40'
-      params%g = 4_ik
-  elseif (order == "CDF44") then
-      params%order_predictor = "multiresolution_4th"
-      params%wavelet='CDF44'
-      params%g = 6_ik
-  else
-      call abort(20030202, "The --order parameter is not correctly set [CDF40, CDF20, CDF44]")
-  end if
+  ! initialize wavelet transform
+  ! also, set number of ghost nodes params%G to minimal value for this wavelet
+  call setup_wavelet(params, params%g)
 
   allocate(error(n_eps))
   allocate(Nb_adapt(n_eps))

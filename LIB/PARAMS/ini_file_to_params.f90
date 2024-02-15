@@ -34,9 +34,9 @@ subroutine ini_file_to_params( params, filename )
     ! (check that here as default for number ghost nodes g depends on it)
     call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
 
-    call ini_domain(params, FILE )
-    call ini_blocks(params,FILE)
-    call ini_time(params,FILE)
+    call ini_domain(params, FILE)
+    call ini_blocks(params, FILE)
+    call ini_time(params, FILE)
 
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
@@ -252,6 +252,8 @@ end subroutine ini_file_to_params
         g_default = 5
     case ('CDF44', 'CDF62')
         g_default = 7
+    case ('CDF60')
+        g_default = 6
     case default
         g_default = 1
     end select

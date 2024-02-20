@@ -1327,18 +1327,18 @@ contains
                 wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             case (11:12)
                 ! +x
-                wc(nx-Nwcr:nx, :, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
             case (13:14)
                 ! +y
-                wc(:, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
             case(5)
-                wc(1:Nwcl, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
             case(6)
                 wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             case(7)
-                wc(nx-Nwcr:nx, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
             case(8)
-                wc(nx-Nwcr:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             end select
         else
             ! 3D
@@ -1347,19 +1347,19 @@ contains
             ! ---faces---
             case (35:38)
                 ! +x
-                wc(nx-Nwcr:nx, :, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
             case (43:46)
                 ! -x
                 wc(1:Nwcl, :, :, 1:nc, 2:d) = 0.0_rk
             case (39:42)
                 ! +y
-                wc(:, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
             case (31:34)
                 ! -y
                 wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             case (27:30)
                 ! +z
-                wc(:, :, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(:, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (47:50)
                 ! -z
                 wc(:, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
@@ -1368,45 +1368,45 @@ contains
             case (26)
                 wc(1:Nwcl, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (23)
-                wc(nx-Nwcr:nx, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (22)
-                wc(1:Nwcl, 1:Nwcl, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (19)
-                wc(nx-Nwcr:nx, 1:Nwcl, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (25)
-                wc(1:Nwcl, ny-Nwcr:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (21)
-                wc(1:Nwcl, ny-Nwcr:ny, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (20)
-                wc(nx-Nwcr:nx, ny-Nwcr:ny, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (24)
-                wc(nx-Nwcr:nx, ny-Nwcr:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
 
             ! ---(partial) edges---
             case (51:52)
-                wc(:, 1:Nwcl, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(:, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (53:54)
-                wc(nx-Nwcr:nx, :, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (55:56)
-                wc(:, ny-Nwcr:ny, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(:, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (57:58)
-                wc(1:Nwcl, :, nz-Nwcr:nz, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
             case (59:60)
                 wc(:, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (61:62)
-                wc(nx-Nwcr:nx, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (63:64)
-                wc(:, ny-Nwcr:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+                wc(:, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (65:66)
                 wc(1:Nwcl, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
             case (67:68)
-                wc(nx-Nwcr:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             case (69:70)
                 wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
             case (71:72)
-                wc(nx-Nwcr:nx, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
             case (73:74)
-                wc(1:Nwcl, ny-Nwcr:ny, :, 1:nc, 2:d) = 0.0_rk
+                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
 
             end select
 
@@ -1461,21 +1461,21 @@ contains
                 wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
             case (11:12)
                 ! +x
-                wc(nx-Nscr:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr:nx, :, :, 1:nc)
+                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
             case (13:14)
                 ! +y
-                wc(:, ny-Nscr:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr:ny, :, 1:nc)
+                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
             case (15:16)
                 ! -y
                 wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
             case(5)
-                wc(1:Nscl, ny-Nscr:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr:ny, :, 1:nc)
+                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
             case(6)
                 wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
             case(7)
-                wc(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc, 1) = u_copy(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc)
+                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
             case(8)
-                wc(nx-Nscr:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr:nx, 1:Nscl, :, 1:nc)
+                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
             end select
         else
             ! 3D
@@ -1484,19 +1484,19 @@ contains
             ! ---faces---
             case (35:38)
                 ! +x
-                wc(nx-Nscr:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr:nx, :, :, 1:nc)
+                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
             case (43:46)
                 ! -x
                 wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
             case (39:42)
                 ! +y
-                wc(:, ny-Nscr:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr:ny, :, 1:nc)
+                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
             case (31:34)
                 ! -y
                 wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
             case (27:30)
                 ! +z
-                wc(:, :, nz-Nscr:nz, 1:nc, 1) = u_copy(:, :, nz-Nscr:nz, 1:nc)
+                wc(:, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, :, nz-Nscr+1:nz, 1:nc)
             case (47:50)
                 ! -z
                 wc(:, :, 1:Nscl, 1:nc, 1) = u_copy(:, :, 1:Nscl, 1:nc)
@@ -1504,44 +1504,44 @@ contains
             case (26)
                 wc(1:Nscl, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, 1:Nscl, 1:nc)
             case (23)
-                wc(nx-Nscr:nx, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr:nx, 1:Nscl, 1:Nscl, 1:nc)
+                wc(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc)
             case (22)
-                wc(1:Nscl, 1:Nscl, nz-Nscr:nz, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, nz-Nscr:nz, 1:nc)
+                wc(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc)
             case (19)
-                wc(nx-Nscr:nx, 1:Nscl, nz-Nscr:nz, 1:nc, 1) = u_copy(nx-Nscr:nx, 1:Nscl, nz-Nscr:nz, 1:nc)
+                wc(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc)
             case (25)
-                wc(1:Nscl, ny-Nscr:ny, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr:ny, 1:Nscl, 1:nc)
+                wc(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc)
             case (21)
-                wc(1:Nscl, ny-Nscr:ny, nz-Nscr:nz, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                wc(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
             case (20)
-                wc(nx-Nscr:nx, ny-Nscr:ny, nz-Nscr:nz, 1:nc, 1) = u_copy(nx-Nscr:nx, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
             case (24)
-                wc(nx-Nscr:nx, ny-Nscr:ny, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr:nx, ny-Nscr:ny, 1:Nscl, 1:nc)
+                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc)
             ! ---(partial) edges---
             case (51:52)
-                wc(:, 1:Nscl, nz-Nscr:nz, 1:nc, 1) = u_copy(:, 1:Nscl, nz-Nscr:nz, 1:nc)
+                wc(:, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, 1:Nscl, nz-Nscr+1:nz, 1:nc)
             case (53:54)
-                wc(nx-Nscr:nx, :, nz-Nscr:nz, 1:nc, 1) = u_copy(nx-Nscr:nx, :, nz-Nscr:nz, 1:nc)
+                wc(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc)
             case (55:56)
-                wc(:, ny-Nscr:ny, nz-Nscr:nz, 1:nc, 1) = u_copy(:, ny-Nscr:ny, nz-Nscr:nz, 1:nc)
+                wc(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
             case (57:58)
-                wc(1:Nscl, :, nz-Nscr:nz, 1:nc, 1) = u_copy(1:Nscl, :, nz-Nscr:nz, 1:nc)
+                wc(1:Nscl, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, :, nz-Nscr+1:nz, 1:nc)
             case (59:60)
                 wc(:, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(:, 1:Nscl, 1:Nscl, 1:nc)
             case (61:62)
-                wc(nx-Nscr:nx, :, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr:nx, :, 1:Nscl, 1:nc)
+                wc(nx-Nscr+1:nx, :, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, 1:Nscl, 1:nc)
             case (63:64)
-                wc(:, ny-Nscr:ny, 1:Nscl, 1:nc, 1) = u_copy(:, ny-Nscr:ny, 1:Nscl, 1:nc)
+                wc(:, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, 1:Nscl, 1:nc)
             case (65:66)
                 wc(1:Nscl, :, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, :, 1:Nscl, 1:nc)
             case (67:68)
-                wc(nx-Nscr:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr:nx, 1:Nscl, :, 1:nc)
+                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
             case (69:70)
                 wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
             case (71:72)
-                wc(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc, 1) = u_copy(nx-Nscr:nx, ny-Nscr:ny, :, 1:nc)
+                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
             case (73:74)
-                wc(1:Nscl, ny-Nscr:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr:ny, :, 1:nc)
+                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
             end select
 
         endif
@@ -1569,6 +1569,7 @@ contains
         if (present(verbose)) verbose1 = verbose
 
         ! for non-lifted wavelets: (Donoho wavelets)
+        ! Not really required.....doesn't hurt.
         params%Nscl = 0
         params%Nscr = 0
         params%Nwcl = 0
@@ -1624,21 +1625,7 @@ contains
             enddo
 
             params%order_predictor = "multiresolution_6th"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 7
-
-            ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
-            ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
-            ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
-            ! scaling function coeffs to be copied:
-            params%Nscl = g_min+5 ! dictated by support of h_tilde (HD) filter for SC
-            params%Nscr = g_min+5
-            ! wavelet coefficients to be deleted:
-            params%Nwcl = params%Nscl+5 ! chosen such that g_tilde (GD) does not see the copied SC
-            params%Nwcr = params%Nscr+7
-            ! last reconstructed point is the support of GR filter not seing any WC set to zero anymore
-            params%Nreconl = params%Nwcl+7 ! support of GR -7:5
-            params%Nreconr = params%Nwcr+5
+            params%isLiftedWavelet = .true.
 
         case("CDF60")
             ! H TILDE filter
@@ -1664,10 +1651,8 @@ contains
             params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             params%order_predictor = "multiresolution_6th"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 6
-            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
-            
+            params%isLiftedWavelet = .false.
+
         case("CDF44")
             ! H TILDE filter
             allocate( params%HD(-6:6) )
@@ -1690,21 +1675,7 @@ contains
             -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
 
             params%order_predictor = "multiresolution_4th"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 7
-
-            ! NOTE: there is a story with even and odd numbers here. Simply, every 2nd
-            ! value of SC/WC is zero anyways (in the reconstruction, see also setRequiredZerosWCSC_block)
-            ! So for example deleting g+5 and g+6 does not make any difference, because the 6th is zero anyways
-            ! scaling function coeffs to be copied:
-            params%Nscl = g_min+5 ! dictated by support of h_tilde (HD) filter for SC
-            params%Nscr = g_min+5
-            ! wavelet coefficients to be deleted:
-            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
-            params%Nwcr = params%Nscr+5
-            ! last reconstructed point is the support of GR filter not seing any WC set to zero anymore
-            params%Nreconl = params%Nwcl+7 ! support of GR -7:5
-            params%Nreconr = params%Nwcr+5
+            params%isLiftedWavelet = .true.
 
         case("CDF42")
             ! H TILDE filter
@@ -1724,15 +1695,7 @@ contains
             params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
 
             params%order_predictor = "multiresolution_4th"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 5
-
-            params%Nscl = g_min+3
-            params%Nscr = g_min+3
-            params%Nwcl = params%Nscl+3 ! chosen such that g_tilde (GD) does not see the copied SC
-            params%Nwcr = params%Nscr+5
-            params%Nreconl = params%Nwcl+5 ! support of GR -5:3
-            params%Nreconr = params%Nwcr+3
+            params%isLiftedWavelet = .true.
 
         case("CDF40")
             ! H TILDE filter
@@ -1752,9 +1715,7 @@ contains
             params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             params%order_predictor = "multiresolution_4th"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 4
-            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+            params%isLiftedWavelet = .false.
 
         case("CDF20")
             ! H TILDE filter
@@ -1774,9 +1735,7 @@ contains
             params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
 
             params%order_predictor = "multiresolution_2nd"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 2
-            ! non-lifted wavelets do not have to set Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+            params%isLiftedWavelet = .false.
 
         case("CDF22")
             ! H TILDE filter
@@ -1796,20 +1755,51 @@ contains
             params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
 
             params%order_predictor = "multiresolution_2nd"
-            ! minimum number of ghost nodes required for this wavelet
-            g_min = 3
-
-            params%Nscl = g_min+1
-            params%Nscr = g_min+1
-            params%Nwcl = params%Nscl + 0 ! chosen such that g_tilde (GD) does not see the copied SC
-            params%Nwcr = params%Nscr + 2
-            params%Nreconl = params%Nwcl+3 ! support of GR -3:1
-            params%Nreconr = params%Nwcr+1
+            params%isLiftedWavelet = .true.
 
         case default
             call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
 
         end select
+
+        ! minimum number of ghost nodes required for this wavelet
+        ! value is determined by largest filter bank
+        g_min = 0
+        g_min = max(g_min, abs(lbound(params%HD, dim=1)))
+        g_min = max(g_min, abs(ubound(params%HD, dim=1)))
+        g_min = max(g_min, abs(lbound(params%GD, dim=1)))
+        g_min = max(g_min, abs(ubound(params%GD, dim=1)))
+        g_min = max(g_min, abs(lbound(params%HR, dim=1)))
+        g_min = max(g_min, abs(ubound(params%HR, dim=1)))
+        g_min = max(g_min, abs(lbound(params%GR, dim=1)))
+        g_min = max(g_min, abs(ubound(params%GR, dim=1)))
+
+        ! compute coarse extension parameters. (see inkscape drawing 1d-ghostnodes-coarseextension-V2.svg)
+        !
+        ! Nscl, Nscr:
+        ! determined with (h_tilde filter) not reaching into ghost nodes.
+        ! Remaining points are copied (orange arrow)
+        !
+        ! Pink zero wc: reconstruction of last ghost node with (g filter)
+        ! must use all zero wc (YOU CAN SKIP THIS!)
+        !
+        ! Red zero WC: wc that is computed from copied SC is zero
+        ! (g_tilde filter)
+        !
+        ! Reconstruction: any modified zero or copy (g filter & h filter)
+        ! as the g filter is wider, it determines the length (but check!)
+        ! -> it is always the g filter because it is wider AND we set more WC
+        ! to zero
+        !
+        if (params%isLiftedWavelet) then
+            params%Nscl    = abs(lbound(params%HD, dim=1)) - 1
+            params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
+            params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
+
+            params%Nscr    = ubound(params%HD, dim=1)
+            params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
+            params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
+        endif
 
         if (present(g_wavelet)) then
             ! if we return the minimal value of ghosts, we assume that you are going to use it
@@ -1836,6 +1826,18 @@ contains
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        endif
+
+        ! the code sets the ghost nodes, not just the modified ones
+        ! i.e. 1:Nscr
+        if (params%isLiftedWavelet) then
+            params%Nscr    = params%Nscr    + g_min
+            params%Nwcr    = params%Nwcr    + g_min
+            params%Nreconr = params%Nreconr + g_min
+
+            params%Nscl    = params%Nscl    + g_min
+            params%Nwcl    = params%Nwcl    + g_min
+            params%Nreconl = params%Nreconl + g_min
         endif
 
     end subroutine

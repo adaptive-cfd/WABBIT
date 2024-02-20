@@ -68,9 +68,13 @@ subroutine post_add_two_masks(params)
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn)=.True.
-    params%order_predictor = "multiresolution_4th"
-    params%wavelet='CDF44'
-    params%g = 6_ik
+
+
+    call get_cmd_arg_str( "--wavelet", params%wavelet, default='CDF40' )
+    ! initialize wavelet transform
+    ! also, set number of ghost nodes params%G to minimal value for this wavelet
+    call setup_wavelet(params, params%g)
+
     params%forest_size = 20
     fsize = params%forest_size
     params%block_distribution = "sfc_hilbert"

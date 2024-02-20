@@ -61,6 +61,7 @@ module module_params
         logical :: threshold_mask = .false.
         logical :: useCoarseExtension = .true.
         logical :: useSecurityZone = .true.
+        logical :: isLiftedWavelet = .false.
 
 
         character(len=cshort) :: wavelet="not-initialized"

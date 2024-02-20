@@ -66,9 +66,6 @@ program main_post
     case ("--prune-tree")
         call post_prune_tree(params)
 
-    case ("--remesh")
-        call post_remesh(params)
-
     case ("--superstl")
         call post_superstl(params)
 

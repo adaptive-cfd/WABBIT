@@ -512,7 +512,7 @@ function compute_tree_L2norm(params, hvy_block, hvy_tmp, tree_ID, verbosity ) &
     logical :: verbose=.false.
     if (present(verbosity)) verbose = verbosity
 
-    L2norm =  scalar_product_two_trees(params, hvy_block, hvy_tmp, tree_ID1=tree_ID, tree_ID2=tree_ID)
+    L2norm = scalar_product_two_trees(params, hvy_block, hvy_tmp, tree_ID1=tree_ID, tree_ID2=tree_ID)
     L2norm = sqrt(L2norm)
     if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
 end function
@@ -1688,7 +1688,7 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
             M  = (/ 0.66666667, 0.16666667 /)
         endif
     else
-        call abort(2875490, "The predictor method is unknown")
+        call abort(28754904, "The predictor method is unknown")
     endif
     !----------------------------------------------
     ! sprod = <X_i, X_j>

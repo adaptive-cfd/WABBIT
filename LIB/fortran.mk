@@ -4,7 +4,7 @@ FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt2hvy.f90 hvy2lgt.f90 lgt2proc.f90 init_random_seed.f90 \
 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 compute_vorticity_post.f90 compute_scalar_field_post.f90 \
 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 \
-post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_remesh.f90 \
+post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 \
 post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
 post_evaluate_thresholding.f90 post_unit_test.f90
 # Object and module directory:
@@ -65,6 +65,7 @@ FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
+FFLAGS += "-O3"
 FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid 
 FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
@@ -97,7 +98,7 @@ endif
 mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
-FFLAGS += -FR -heap-arrays
+FFLAGS += -O3 -FR -heap-arrays
 ##FFLAGS += -xcore-avx2  # use avx2
 # timing flags: attention they might disable all optimization!
 ##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created

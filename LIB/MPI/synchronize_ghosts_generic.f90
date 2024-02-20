@@ -1,6 +1,8 @@
 subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
     syncSameLevelOnly, g_minus, g_plus  )
-
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    
     implicit none
 
     type (type_params), intent(in) :: params

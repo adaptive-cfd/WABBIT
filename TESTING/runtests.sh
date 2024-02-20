@@ -22,7 +22,7 @@ if [ -z "$mpi_command" ]; then
 fi
 
 if [ "${memory}" == "" ]; then
-    export memory="--memory=5.0GB"
+    export memory="--memory=8.0GB"
 fi
 
 if [ "$(which wabbit-compare-hdffiles.py)" == "" ]; then
@@ -76,6 +76,7 @@ tests=( "---post---"
         "TESTING/wavelets/adaptive_CDF40/run.sh"
         "TESTING/wavelets/adaptive_CDF42/run.sh"
         "TESTING/wavelets/adaptive_CDF44/run.sh"
+        "TESTING/wavelets/adaptive_CDF60/run.sh"
         "TESTING/wavelets/adaptive_CDF62/run.sh"
         "---convection---"
         "TESTING/conv/blob_2D_equi_4th/blob-convection-adaptive.sh"
@@ -84,6 +85,8 @@ tests=( "---post---"
         "TESTING/conv/blob_2D_adaptive_CDF40/blob-convection-adaptive.sh"
         "TESTING/conv/blob_2D_adaptive_CDF42/blob-convection-adaptive.sh"
         "TESTING/conv/blob_2D_adaptive_CDF44/blob-convection-adaptive.sh"
+        "TESTING/conv/blob_2D_adaptive_CDF60/blob-convection-adaptive.sh"
+        "TESTING/conv/blob_2D_adaptive_CDF62/blob-convection-adaptive.sh"
         "TESTING/conv/blob_3D_equi_2nd/blob3d.sh"
         "TESTING/conv/blob_3D_equi_4th/blob3d.sh"
         "TESTING/conv/blob_3D_adaptive_CDF40/blob3d-adaptive.sh"

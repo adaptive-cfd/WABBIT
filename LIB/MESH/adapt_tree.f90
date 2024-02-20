@@ -12,7 +12,9 @@
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
 subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_mask, ignore_maxlevel)
-
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    
     implicit none
 
     real(kind=rk), intent(in)           :: time
@@ -204,11 +206,13 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
-    ! final coarse extension step
+    ! final coarse extension step. This is required because after executeCoarsening_tree, the grid is altered,
+    ! and in the very last iteration step, no coarse extension is performed afterwards. This however only affects
+    ! the last level
     t0 = MPI_Wtime()
     if (params%useCoarseExtension) then
         call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false. )
+        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level )
     endif
     call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 

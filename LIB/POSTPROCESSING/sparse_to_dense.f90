@@ -70,7 +70,7 @@ subroutine sparse_to_dense(params)
         call abort(0909191,"You must specify a name for the target! See --sparse-to-dense --help")
     endif
 
-    call get_cmd_arg( "--wavelet", params%wavelet, default="CFD44" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
     call get_cmd_arg( "--J_target", level, default=tc_length )
     call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
     call get_cmd_arg( "--time", time_given, default=-1.0_rk)

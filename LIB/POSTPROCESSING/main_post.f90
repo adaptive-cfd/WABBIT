@@ -48,6 +48,9 @@ program main_post
     case ("--extract-slice")
         call post_extract_slice(params)
 
+    case ("--compression-unit-test")
+        call post_compression_unit_test(params)
+
     case ("--evaluate-wavelet-thresholding")
         call post_evaluate_thresholding(params)
 

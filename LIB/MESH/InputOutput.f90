@@ -299,6 +299,9 @@ end subroutine saveHDF5_tree
 !
 !-------------------------------------------------------------------------------
 subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
 
     character(len=*), intent(in)   :: fnames(1:)      !< list of files to be read (=number of vector components)

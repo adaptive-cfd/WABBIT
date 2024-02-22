@@ -1,6 +1,9 @@
 ! On an existing tree, set the initial condition (via the physics modules) on all blocks
 ! This routine does not modify the tree; it is simply a wrapper to set the data on the blocks
 subroutine setInicondBlocks_tree(params, hvy_block, tree_ID)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
 
     type (type_params), intent(inout)    :: params                              !> user defined parameter structure

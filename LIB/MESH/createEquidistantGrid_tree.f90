@@ -3,11 +3,14 @@
 !! Since the grid changes, the neighbor relations and active-lists are updated as well.
 ! ********************************************************************************************
 
-subroutine createEquidistantGrid_tree( params, Jmin, verbosity, tree_ID )
+subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_ID )
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
 
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
     integer(kind=ik), intent(in)        :: Jmin                           !> what level to initialize?
     logical, intent(in)                 :: verbosity                      !> write output
     integer(kind=ik), intent(in)        :: tree_ID
@@ -143,4 +146,7 @@ subroutine createEquidistantGrid_tree( params, Jmin, verbosity, tree_ID )
     ! active lists, as well as neighbor relations.
     call updateMetadata_tree(params, tree_ID)
 
+    ! the grid we created above is not at all balanced - on the contrary, it fills up CPU1, then CPU2
+    ! correct this by balancing:
+    call balanceLoad_tree(params, hvy_block, tree_ID)
 end subroutine createEquidistantGrid_tree

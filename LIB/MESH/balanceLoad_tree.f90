@@ -1,7 +1,9 @@
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
 subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
-
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    
     implicit none
 
     type (type_params), intent(in)      :: params                     !> user defined parameter structure

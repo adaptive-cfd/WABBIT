@@ -425,6 +425,7 @@ contains
 
 
      case ("many-blobs")
+        u = 0.0_rk
          do iblob = 1, params_convdiff%Nblobs
              do iy = 1, Bs(2)+2*g
                  do ix = 1, Bs(1)+2*g
@@ -464,7 +465,7 @@ contains
                         if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
                       endif
                       ! set actual inicond gauss blob
-                      u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
+                      u(ix,iy,:,i) = 1.0_rk + dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
                   end do
               end do
           else

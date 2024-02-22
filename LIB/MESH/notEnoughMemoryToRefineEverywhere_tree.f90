@@ -2,6 +2,9 @@
 ! check if we still have enough memory left: for very large simulations
 ! we cannot affort to have them fail without the possibility to resume them
 logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
     type (type_params), intent(inout) :: params
     integer(kind=ik), intent(in)      :: tree_ID
@@ -18,7 +21,7 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
     endif
 
     ! this is the available maximum number of active blocks on a single mpirank
-    hvy_n_max = params%number_blocks
+    hvy_n_max = nint(0.95_rk * real(params%number_blocks, kind=rk) )
 
     ! remove blocks already used for mask etc
     hvy_n_max = hvy_n_max - sum(hvy_n(2:size(hvy_n)))

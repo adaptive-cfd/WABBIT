@@ -190,7 +190,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
     ! start with an equidistant grid on coarsest level.
     ! routine also deletes any existing mesh in the tree.
-    call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID_mask )
+    call createEquidistantGrid_tree( params, hvy_mask, params%Jmin, .true., tree_ID_mask )
 
 
     do k = 1, hvy_n(tree_ID_mask)

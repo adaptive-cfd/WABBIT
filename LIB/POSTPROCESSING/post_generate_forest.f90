@@ -84,7 +84,7 @@ subroutine post_generate_forest(params)
     end do
 
     do tree_ID = 1, N_treeGenerate
-        call createEquidistantGrid_tree( params, params%Jmax, .false., tree_ID )
+        call createEquidistantGrid_tree( params, hvy_block, params%Jmax, .false., tree_ID )
 
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)

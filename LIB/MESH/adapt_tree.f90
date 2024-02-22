@@ -57,6 +57,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     Jmax_active = maxActiveLevel_tree(tree_ID)
     level       = Jmax_active ! algorithm starts on maximum *active* level
 
+    if (Jmin<1) call abort(2202243, "Currently, setting Jmin<1 is not possible")
+
     if (present(ignore_maxlevel)) then
         ignore_maxlevel2 = ignore_maxlevel
     else

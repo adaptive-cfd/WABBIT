@@ -146,6 +146,12 @@ subroutine init_ghost_nodes( params )
             endif
         endif
 
+#ifdef DEV
+        if (number_blocks<1) then
+            call abort(2422021, "Ghost setup called but number_blocks undefnd - call init_ghost_nodes AFTER allocate_tree. Maybe you forgot --memory?")
+        endif
+#endif
+
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
         ! max number of active neighbors: 2D = 12, 3D = 56

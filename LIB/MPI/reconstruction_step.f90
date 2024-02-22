@@ -25,7 +25,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
 ! real(kind=rk), allocatable :: WCtmp(:,:,:,:,:,:) ! code used to verify that FWT after manip yields same coeffs
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor
-    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), ii, Nreconl, Nreconr, nnn, p, ierr, g_this, g_spaghetti
+    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), ii, Nreconl, Nreconr, nnn, p, ierr, g_this, g_spaghetti, Nwcl,Nwcr
 !    integer(kind=ik) :: ix,iy,iz,ic,iwc ! code used to verify that FWT after manip yields same coeffs
 
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
@@ -63,7 +63,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
     if ((Bs(1) < Nreconr-g).or.(Bs(2) < Nreconr-g)) then
         ! NOTE: Nreconr > Nreconl always.
-        write(*,*) params%wavelet, "Bs=", Bs, "Bs_min=", Nreconr
+        write(*,*) params%wavelet, "Bs=", Bs, "Bs_min=", Nreconr-g
         call abort(991234, "For the chosen wavelet, block size is too small!")
     endif
 
@@ -154,10 +154,10 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
 
     ! First, we sync the ghost nodes, in order to apply the decomposition filters
-    ! HD and GD to the data. It may be that this is done before calling.
+    ! HD and GD to the data. It may be that this sync'ing is done before calling.
     if (.not. inputDataSynced) then
         t0 = MPI_Wtime()
-        g_this = max(ubound(params%HD,1),ubound(params%GD,1))
+        g_this = max(ubound(params%HD,1), ubound(params%GD,1))! ubound GD is the largest (GD is not symmetric but HD is)
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=g_this, g_plus=g_this)
         call toc( "coarseExtension (sync 1)", MPI_Wtime()-t0 )
     endif
@@ -200,7 +200,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                         endif
                     enddo
                     ! restore original data (this block is not modified)
-                    hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
+!                    hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
+                    ! we can NOT do this now, because the sync step (3rd) otherwise wrongly syncs WC/SC -> done in step 3B
                 endif
             endif
         else
@@ -228,9 +229,24 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     call toc( "coarseExtension 3 (sync 2)", MPI_Wtime()-t0 )
 
 
+    ! 3B) : Those blocks were only transformed to compute their details; however, we needed blocks with coarseExtension
+    ! to sync their WC/SC with those blocks. Therefore, we restore them only now, after the sync step.
+    do k = 1, hvy_n
+        hvyID = hvy_active(k)
+        if (present(hvy_details) .and. present(level)) then
+            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+            level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+            
+            if (.not. toBeManipulated(k) .and. (level_me==level)) then
+                ! restore original data (this block is not modified, but currently transformed to wavelet space)
+                hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
+            endif
+        endif
+    enddo   
 
-    ! routine operates on a single tree (not a forest)
+
     ! 4th. Loop over all blocks and check if they have *coarser* neighbors
+    ! routine operates on a single tree (not a forest)
     t0 = MPI_Wtime()
     do k = 1, hvy_n
         hvyID = hvy_active(k)

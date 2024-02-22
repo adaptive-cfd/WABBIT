@@ -214,7 +214,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     t0 = MPI_Wtime()
     if (params%useCoarseExtension) then
         call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level )
+        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level, hvy_details=hvy_details )
     endif
     call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 

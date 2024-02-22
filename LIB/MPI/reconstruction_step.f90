@@ -20,8 +20,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ! if the input data are sync'ed we do not do it here: otherwise, call
     ! ghost nodes synchronization
     logical, intent(in) :: inputDataSynced
-    real(kind=rk), optional, intent(inout) :: hvy_details(:,:)
-    integer(kind=ik), optional :: level
+    real(kind=rk), intent(inout) :: hvy_details(:,:)
+    integer(kind=ik), intent(in) :: level
 
 ! real(kind=rk), allocatable :: WCtmp(:,:,:,:,:,:) ! code used to verify that FWT after manip yields same coeffs
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor
@@ -67,10 +67,6 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         call abort(991234, "For the chosen wavelet, block size is too small!")
     endif
 
-    if (.not. present(level)) then
-        call abort(66119, "CoarseExtension must proceed level-wise unless Bs >= Nreconr+lbound(GR)")
-    endif
-
     ! it turns out, when the coefficients are spaghetti-ordered,
     ! we can sync one less point and still have enough coefficients.
     select case(params%wavelet)
@@ -98,9 +94,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
 
     ! reset all details, not just the ones we'll re-compute
-    if (present(hvy_details)) then
-        hvy_details = -1.0_rk
-    endif
+    hvy_details = -1.0_rk
 
     !---------------------------------------------------------------------------
     ! create the list of blocks that will be affected by coarseExtension.
@@ -128,22 +122,12 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                 level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
 
-                if (present(level)) then
-                    ! if a level is given, we only work on this level ...
-                    if ((level_neighbor < level_me).and.(level_me==level)) then
-                        toBeManipulated(k) = .true.
-                        ! nnn = nnn + 1
-                        ! its enough if one neighborhood is true
-                        exit
-                    endif
-                    ! ... otherwise, we check all blocks
-                else
-                    if (level_neighbor < level_me) then
-                        toBeManipulated(k) = .true.
-                        ! nnn = nnn + 1
-                        ! its enough if one neighborhood is true
-                        exit
-                    endif
+                ! we proceed level-wise
+                if ((level_neighbor < level_me).and.(level_me==level)) then
+                    toBeManipulated(k) = .true.
+                    ! nnn = nnn + 1
+                    ! its enough if one neighborhood is true
+                    exit
                 endif
             endif
         enddo
@@ -163,7 +147,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     endif
 
 
-    ! 2nd. We compute the decomposition by applying the HD GD filters to the data.
+    ! 2nd. We compute the FWT decomposition by applying the HD GD filters to the data.
     ! Data are decimated and then stored in the block in Spaghetti order (the counterpart
     ! to Mallat ordering). Coefficients SC and WC are computed only inside the block
     ! not in the ghost nodes (that is trivial: we cannot compute the filters in the ghost node
@@ -176,41 +160,15 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
         ! We compute detail coefficients on the fly here, for all blocks
         ! on the level.
-        if (present(hvy_details) .and. present(level)) then
-            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-            level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
 
-            ! FWT required for a block that is either manipulated or thresholded
-            if (toBeManipulated(k) .or. (level_me==level)) then
-                ! hvy_work now is a copy with sync'ed ghost points.
-                hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-                ! data WC/SC now in Spaghetti order
-                call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-
-                ! this block has been FWT'ed only in order to compute its details:
-                if (.not. toBeManipulated(k)) then
-                    ! copy transform data in "inflated mallat ordering":
-                    call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-                    ! extract largest wavelet coeffcienct
-                    do p = 1, nc
-                        if (params%dim==3) then
-                            hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-                        else
-                            hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-                        endif
-                    enddo
-                    ! restore original data (this block is not modified)
-!                    hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
-                    ! we can NOT do this now, because the sync step (3rd) otherwise wrongly syncs WC/SC -> done in step 3B
-                endif
-            endif
-        else
-            if (toBeManipulated(k)) then
-                ! hvy_work now is a copy with sync'ed ghost points.
-                hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-                ! data WC/SC now in Spaghetti order
-                call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
-            endif
+        ! FWT required for a block that is either manipulated or thresholded
+        if (toBeManipulated(k) .or. (level_me==level)) then
+            ! hvy_work now is a copy with sync'ed ghost points.
+            hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
+            ! data WC/SC now in Spaghetti order
+            call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
         endif
     end do
     call toc( "coarseExtension 2 (FWT)", MPI_Wtime()-t0 )
@@ -233,14 +191,24 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     ! to sync their WC/SC with those blocks. Therefore, we restore them only now, after the sync step.
     do k = 1, hvy_n
         hvyID = hvy_active(k)
-        if (present(hvy_details) .and. present(level)) then
-            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-            level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-            
-            if (.not. toBeManipulated(k) .and. (level_me==level)) then
-                ! restore original data (this block is not modified, but currently transformed to wavelet space)
-                hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
-            endif
+
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+        
+        if (.not. toBeManipulated(k) .and. (level_me==level)) then
+            ! this block has been FWT'ed only in order to compute its details:
+            ! copy transform data in "inflated mallat ordering":
+            call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+            ! extract largest wavelet coeffcienct
+            do p = 1, nc
+                if (params%dim==3) then
+                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+                else
+                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+                endif
+            enddo
+            ! restore original data (this block is not modified, but currently transformed to wavelet space)
+            hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
         endif
     enddo   
 
@@ -280,15 +248,13 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
         ! evaluate detail for blocks that were affected by coarseExtension (blocks on
         ! the level J which are not affected by it are computed above)
-        if (present(hvy_details)) then
-            do p = 1, nc
-                if (params%dim==3) then
-                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3), p, 2:8)) )
-                else
-                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-                endif
-            enddo
-        endif
+        do p = 1, nc
+            if (params%dim==3) then
+                hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3), p, 2:8)) )
+            else
+                hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+            endif
+        enddo
 
         ! copy back original data, then fix the coarse extension parts by
         ! copying tmp_reconst (the inverse of the manipulated SC/WC) into the patches

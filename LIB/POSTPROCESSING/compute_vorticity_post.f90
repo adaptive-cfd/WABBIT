@@ -367,9 +367,9 @@ subroutine wavelet_test(params)
     call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
     call saveHDF5_tree("3dtest_774.h5", 774.0_rk, iteration, 1, params, hvy_block, tree_ID )
-
-    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
+! TODO: update this. CE MUST be done level wise. add wrapper to do this.
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
+    ! hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
     call saveHDF5_tree("3dtest_775.h5", 775.0_rk, iteration, 1, params, hvy_block, tree_ID )
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
@@ -379,8 +379,9 @@ subroutine wavelet_test(params)
     enddo
 
     do k = 1, 10
-        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-        hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
+        ! TODO: update this. CE MUST be done level wise. add wrapper to do this.
+        ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
+        ! hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
     enddo
 
     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
@@ -894,7 +895,8 @@ do iter= 1, 1
 
     call saveHDF5_tree("coarsening_332.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
-    call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID),inputDataSynced=.true. )
+    ! TODO: update this. CE MUST be done level wise. add wrapper to do this.
+    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID),inputDataSynced=.true. )
     call saveHDF5_tree("coarsening_333.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 enddo
@@ -986,14 +988,14 @@ do iter= 1, 1
     call updateMetadata_tree(params, tree_ID)
 
     ! do kk = 1, 50
-        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
+        ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
     ! enddo
     call saveHDF5_tree("coarsening_334.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
 call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
 
 call saveHDF5_tree("coarsening_335.h5", time, iteration, 1, params, hvy_block, tree_ID )
-call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
+! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )
 call saveHDF5_tree("coarsening_336.h5", time, iteration, 1, params, hvy_block, tree_ID )
 enddo
 ! end of loop here

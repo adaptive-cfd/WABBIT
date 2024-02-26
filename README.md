@@ -16,7 +16,7 @@ How to get a copy of WABBIT and compiling the code:
 1. Clone from github
 
 ```
-git clone git@github.com:adaptive-cfd/WABBIT.git
+git clone https://github.com/adaptive-cfd/WABBIT.git
 ```
 
 2. Compile the code run make.

@@ -5,9 +5,9 @@ New in 05/2021: please see this video for an introduction to the code's datastru
 
 With WABBIT it is possible to solve partial differential equations (PDE) on block-based adaptive grids. Simulations in 2D and 3D are possible and performed fully parallel on CPU. The set of PDE is encapsulated from the code handling the adaptive grid, and thus existing monobloc solvers can be adapted easily for this solver. WABBIT can handle PDEs of the following type:
 
-<a href="http://www.codecogs.com/eqnedit.php?latex=\partial_t&space;\phi&space;=&space;N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?\partial_t&space;\phi&space;=&space;N(\phi)" title="\partial_t \phi = N(\phi)" /></a>
+$\partial_t \phi = N\left(\phi\right)$
 
-and <a href="http://www.codecogs.com/eqnedit.php?latex=N(\phi)" target="_blank"><img src="http://latex.codecogs.com/gif.latex?N(\phi)" title="N(\phi)" /></a> can be defined. This implementation is handled by the "physics-modules". Note the current version of the code does not handle elliptic PDE, such as the Poisson equation that typically arises in incompressible fluid dynamics. Instead, we use a quasi-hyperbolic approximation in that case, the "artificial compressibility method".
+and $N\left(\phi\right)$ can be defined. This implementation is handled by the "physics-modules". Note the current version of the code does not handle elliptic PDE, such as the Poisson equation that typically arises in incompressible fluid dynamics. Instead, we use a quasi-hyperbolic approximation in that case, the "artificial compressibility method".
 
 
 ## Getting Started

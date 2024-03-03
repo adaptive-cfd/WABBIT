@@ -29,6 +29,7 @@ module module_mesh
 contains
 
 #include "securityZone_tree.f90"
+#include "coarseExtensionUpdate_tree.f90"
 #include "unitTest_ghostSync.f90"
 #include "unitTest_waveletDecomposition.f90"
 #include "unitTest_refineCoarsen.f90"

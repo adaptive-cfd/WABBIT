@@ -1,4 +1,4 @@
-# WABBIT v2.0beta3 (newBiorthogonal)
+# WABBIT v2.0beta4 (newBiorthogonal)
 ## (W)avelet (A)daptive (B)lock-(B)ased solver for (I)nteractions with (T)urbulence
 
 New in 05/2021: please see this video for an introduction to the code's datastructures: https://www.youtube.com/watch?v=qBBIW2-ktgo

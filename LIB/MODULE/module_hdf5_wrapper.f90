@@ -59,15 +59,15 @@ contains
   !-----------------------------------------------------------------------------
   subroutine open_file_hdf5(filename, file_id, ovrwrte)
     implicit none
-    integer(hid_t),intent(out) ::  file_id
+    integer(hid_t), intent(out) ::  file_id
     character(len=*), intent (in) :: filename
     logical, intent(in) :: ovrwrte
 
     integer(hid_t) :: plist_id
-    integer :: error
+    integer  :: error
     integer :: mpirank, mpicode
     logical :: exist
-
+    
     ! Initialize HDF5 library and Fortran interfaces.
     call h5open_f(error)
     ! Setup file access property list with parallel I/O access.
@@ -83,8 +83,8 @@ contains
     !---------------------------------------------------------------------------
     ! check if the file already exists
     call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
-    if (mpirank==0) then
-    inquire ( file=filename, exist=exist )
+    if (mpirank == 0) then
+      inquire ( file=filename, exist=exist )
     endif
     call MPI_BCAST( exist, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
 

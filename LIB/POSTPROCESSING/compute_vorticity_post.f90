@@ -261,7 +261,7 @@ subroutine wavelet_test(params)
     type (type_params), intent(inout)  :: params
     character(len=cshort)              :: fname1, fname_out, fname2
     real(kind=rk)                      :: time, x, y
-    integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g, ix,iy,iz, ic
+    integer(kind=ik)                   :: iteration=-99, lgtID, tc_length, g, ix,iy,iz, ic, k
     integer(kind=ik), dimension(3)     :: Bs
     character(len=2)                   :: order
 
@@ -294,24 +294,22 @@ subroutine wavelet_test(params)
 
     !!!!!!!!!!!!!!!!!!!!!!
     ! yes works in 2D or 3D
-    params%dim = 3
+    params%dim = 2
     !!!!!!!!!!!!!!!!!!!!!
-    params%wavelet = "CDF44"
-    params%g = 7
+    params%wavelet = "CDF46"
     params%Bs = 32
     params%n_eqn = 1
     params%domain_size=1.0_rk
     params%Jmax=3
     params%Jmin=1
     allocate(params%butcher_tableau(1,1))
-
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component(1) = "0"
 
+    call setup_wavelet(params, params%g)
+
     Bs = params%Bs
     g  = params%g
-
-    call setup_wavelet(params)
 
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
@@ -319,6 +317,23 @@ subroutine wavelet_test(params)
     call reset_tree(params, .true., tree_ID)
 
     call createEquidistantGrid_tree( params, hvy_block, 3, .true., tree_ID )
+
+    ! flag for coarsening
+    do k = 1, lgt_n(tree_ID)
+        lgtID = lgt_active(k, tree_ID)
+        ! keep a single block ( which will be 8 blocks due to completeness)
+        coarsen = .not. ( (lgt_block(lgtID,1)==0).and.(lgt_block(lgtID,2)==3).and.(lgt_block(lgtID,3)==3) )
+
+        if (coarsen) then
+            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = -1
+        else
+            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = 0
+        endif
+    end do
+
+    call ensureGradedness_tree( params, tree_ID )
+    call executeCoarsening_tree( params, hvy_block, tree_ID )
+    call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
 
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
@@ -343,59 +358,18 @@ subroutine wavelet_test(params)
         endif
     end do
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-    call saveHDF5_tree("3dtest_773.h5", 773.0_rk, iteration, 1, params, hvy_block, tree_ID )
+    call saveHDF5_tree("data_0001.h5", 1.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
-    ! flag for coarsening
-    do k = 1, lgt_n(tree_ID)
-        lgtID = lgt_active(k, tree_ID)
-        ! keep a single block ( which will be 8 blocks due to completeness)
-        coarsen = .not. ( (lgt_block(lgtID,1)==0).and.(lgt_block(lgtID,2)==0).and.(lgt_block(lgtID,3)==0) )
+    call coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID )
 
-        if (coarsen) then
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = -1
-        else
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = 0
-        endif
-    end do
+    call saveHDF5_tree("data_0002.h5", 2.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
-    call ensureGradedness_tree( params, tree_ID )
-    call executeCoarsening_tree( params, hvy_block, tree_ID )
-
-
-    call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-    call saveHDF5_tree("3dtest_774.h5", 774.0_rk, iteration, 1, params, hvy_block, tree_ID )
-! TODO: update this. CE MUST be done level wise. add wrapper to do this.
-    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
-    call saveHDF5_tree("3dtest_775.h5", 775.0_rk, iteration, 1, params, hvy_block, tree_ID )
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        hvy_tmp(:,:,:,:,hvyID) = hvy_block(:,:,:,:,hvyID)
+    do k = 1, 20
+        call coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID )
     enddo
 
-    do k = 1, 10
-        ! TODO: update this. CE MUST be done level wise. add wrapper to do this.
-        ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, &
-        ! hvy_active(:,tree_ID), hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
-    enddo
-
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
-
-    write(*,*) "After a second coarse extension, the solution (output block-wise) changed:"
-
-    do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        hvy_block(:,:,:,:,hvyID) = abs(hvy_block(:,:,:,:,hvyID) - hvy_tmp(:,:,:,:,hvyID))
-        ! write(*,*) maxval( hvy_block(g+1:Bs(1)+g,g+1:Bs(1)+g,g+1:Bs(1)+g,:,hvyID) )
-        write(*,*) maxval( hvy_block(:,:,:,:,hvyID) )
-    enddo
-
-    call saveHDF5_tree("3dtest_776.h5", 776.0_rk, iteration, 1, params, hvy_block, tree_ID )
+    call saveHDF5_tree("data_0003.h5", 3.0_rk, iteration, 1, params, hvy_block, tree_ID )
 
 
 end subroutine

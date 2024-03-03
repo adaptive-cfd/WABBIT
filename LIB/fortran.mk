@@ -65,7 +65,7 @@ FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
-FFLAGS += "-O3"
+#FFLAGS += -O3
 FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -g -ggdb -pedantic
 FFLAGS += -Wall -Wextra -Wconversion -g3 -fbacktrace -ffpe-trap=zero,invalid 
 FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
@@ -287,7 +287,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	findSisters_tree.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
 	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90 \
-	securityZone_tree.f90
+	securityZone_tree.f90 coarseExtensionUpdate_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

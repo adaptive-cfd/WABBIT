@@ -1,4 +1,4 @@
-subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
+subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
     inputDataSynced, level, hvy_details )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -137,7 +137,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     !---------------------------------------------------------------------------
 
 
-    ! First, we sync the ghost nodes, in order to apply the decomposition filters
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 1st, we sync the ghost nodes, in order to apply the decomposition filters
     ! HD and GD to the data. It may be that this sync'ing is done before calling.
     if (.not. inputDataSynced) then
         t0 = MPI_Wtime()
@@ -147,13 +148,19 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     endif
 
 
-    ! 2nd. We compute the FWT decomposition by applying the HD GD filters to the data.
-    ! Data are decimated and then stored in the block in Spaghetti order (the counterpart
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 2nd. We compute the FWT decomposition by applying the HD GD filters to the data on level "level".
+    ! Data are filtered, decimated and then stored in the block in Spaghetti order (the counterpart
     ! to Mallat ordering). Coefficients SC and WC are computed only inside the block
     ! not in the ghost nodes (that is trivial: we cannot compute the filters in the ghost node
     ! layer). The first point (g+1),(g+1) is a scaling function coefficient, regardless of g
     ! odd or even. Bs must be even. We also make a copy of the sync'ed data n hvy_work - we use this
-    ! to fix up the SC in the coarse extension case.
+    ! to fix up the SC in the coarse extension case. 
+    ! NOTE: we indeed need to tranform more blocks than we'll actually modify with coarseExt. Strictly speaking,
+    ! FWT is required for blocks 
+    ! (1) are affected by coarse Ext
+    ! (2) blocks that are neighbors to blocks from (1)
+    ! because we need to sync their WC. However, this logic is not implemented, and we FWT all blocks on the level.
     t0 = MPI_Wtime()
     do k = 1, hvy_n
         hvyID = hvy_active(k)
@@ -163,10 +170,11 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
 
-        ! FWT required for a block that is either manipulated or thresholded
-        if (toBeManipulated(k) .or. (level_me==level)) then
+        ! FWT required for a block that is on the level
+        if (level_me == level) then
             ! hvy_work now is a copy with sync'ed ghost points.
             hvy_work(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
+
             ! data WC/SC now in Spaghetti order
             call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
         endif
@@ -174,8 +182,8 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     call toc( "coarseExtension 2 (FWT)", MPI_Wtime()-t0 )
 
 
-
-    ! 3rd we sync the decompose coefficients, but only on the same level. This is
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 3rd we sync the WC coefficients, but only on the same level. This is
     ! required as several fine blocks hit a coarse one, and this means we have to sync
     ! those in order to be able to reconstruct with modified WC/SC. Note it does not matter
     ! if all blocks are sync'ed: we'll not reconstruct on the coarse block anyways, and the
@@ -187,8 +195,10 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
     call toc( "coarseExtension 3 (sync 2)", MPI_Wtime()-t0 )
 
 
-    ! 3B) : Those blocks were only transformed to compute their details; however, we needed blocks with coarseExtension
-    ! to sync their WC/SC with those blocks. Therefore, we restore them only now, after the sync step.
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 3B) : Not all blocks will be modified by coarseExtension, but are still FWT'ed.
+    ! We restore those blocks now (by copying back the backup and avoiding the expensive IWT).
+    ! As we already have the FWT here, we might as well compute the largest WC (detail for coarseningIndicator)
     do k = 1, hvy_n
         hvyID = hvy_active(k)
 
@@ -196,9 +206,9 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
         level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
         
         if (.not. toBeManipulated(k) .and. (level_me==level)) then
-            ! this block has been FWT'ed only in order to compute its details:
-            ! copy transform data in "inflated mallat ordering":
+            ! this block has been FWT'ed but is not modified, howver, we can extract its details now
             call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+
             ! extract largest wavelet coeffcienct
             do p = 1, nc
                 if (params%dim==3) then
@@ -207,12 +217,14 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                     hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
                 endif
             enddo
+
             ! restore original data (this block is not modified, but currently transformed to wavelet space)
             hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
         endif
     enddo   
 
 
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! 4th. Loop over all blocks and check if they have *coarser* neighbors
     ! routine operates on a single tree (not a forest)
     t0 = MPI_Wtime()
@@ -222,6 +234,7 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
 
         ! this block just remains the same as before..
         if (.not. toBeManipulated(k)) cycle
+        
         ! ===> the following code is only executed for blocks that are manipulated by CE
 
         ! copy transformed data to "inflated mallat ordering":
@@ -240,6 +253,20 @@ subroutine coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work, h
                     ! manipulation of coeffs
                     call coarseExtensionManipulateWC_block(params, wc, neighborhood)
                     call coarseExtensionManipulateSC_block(params, wc, hvy_work(:,:,:,:,hvyID), neighborhood)
+                elseif (level_neighbor > level_me) then
+                    ! it is actually possible for a block to have both finer and coarser neighbors. If its
+                    ! coarser, (level_neighbor<level_me), then coarseExtension is applied to this block.
+                    ! However for small Bs (or large wavelets, i.e. large Nreconr Nreconl), the coarseExt
+                    ! reconstruction step also takes into account the ghost nodes layer on the adjacent 
+                    ! side. If this adjacent block is then finer (level_neighbor > level_me), those WC
+                    ! should be zero and this is what we assure here.
+                    call coarseExtensionManipulateWC_block(params, wc, neighborhood, params%g, params%g)
+                    ! note if the neighboring blocks are on the same level, the WC are sync'ed between the 
+                    ! blocks, and we must NOT delete them.
+                    
+                    ! What about the SC?
+                    ! See the extensive comment in WaveDecomposition_dim1 on that. 
+                    ! "Magically", the SC are correct.
                 endif
             endif
         enddo

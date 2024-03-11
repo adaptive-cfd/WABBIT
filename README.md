@@ -46,12 +46,12 @@ NOTE: since 15 Aug 2023, the unit testing framework has evolved. It now stores f
 
 Make sure that the mpi library which is also used for WABBIT is installed (for example by loading mpich3).
 
-This is a short example (/working practice) of how to install hdf5 libary (Tested for version hdf5-1.10.1).
+This is a short example (/working practice) of how to install hdf5 libary (Tested for version hdf5-1.14.2, currently does not work with hdf5-1.14.3 stand 11.03.24).
 
-1. download source code from [hdf5](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code")
+1. download 1.14.2 source code from [hdf5 Github](https://github.com/HDFGroup/hdf5) (official newer version can be found here: [hdf5](https://www.hdfgroup.org/downloads/hdf5/source-code/ "HDF5 Source Code"))
 
 2. open terminal and follow  
-  (mind that *path_2_build_dir* has to be replaced by the path of the directory of your choice.)
+  (mind that `path_2_build_dir` has to be replaced by the path of the directory of your choice. A typical choice is `./install`)
 
 ```
 gunzip < hdf5-X.Y.Z.tar.gz | tar xf -
@@ -63,15 +63,17 @@ make install
 make check-install        # verify installation.
 ```
 
-3. export variables:
+3. export variables, replace `path_2_build_dir` by the chosen build dir and `path_2_source_dir` by the source directory of HDF5:
 
 ```
 HDF_ROOT=path_2_build_dir
+HDF_SOURCE=path_2_source_dir
 export HDF_ROOT
+export HDF_SOURCE
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HDF_ROOT}/lib:${HDF_ROOT}/lib64
 export LD_RUN_PATH=$LD_LIBRARY_PATH
 ```
-   Recommendation: Add the lines to export the variables to your bashrc-file. Otherwise, the export has to be done every time you open a new terminal to compile the code.
+Recommendation: Add the lines to export the variables to your bashrc-file or a modules setup. Otherwise, the export has to be done every time you open a new terminal to compile the code.
 
 ### run WABBIT
 

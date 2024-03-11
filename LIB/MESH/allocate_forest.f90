@@ -1,4 +1,7 @@
 subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_hvy_tmp, nrhs_slots1)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
 
     !> user defined parameter structure
@@ -191,6 +194,12 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         write(*,'("INIT: allocate_forest: Allocating a ",i1,"D case.")') params%dim
     endif
 
+    if (params%number_blocks < 1) then
+        call abort(2024022216, "We try to allocate an empty grid; maybe you forgot --memory=XX.XGB in the call !?")
+    endif
+    if ((nwork < 1) .and. (present(hvy_tmp))) then
+        call abort(2024022216, "We try to allocate nwork<1 work arrays...")
+    endif
 
     !---------------------------------------------------------------------------
     allocate( hvy_block( nx, ny, nz, Neqn, params%number_blocks ) )

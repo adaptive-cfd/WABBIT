@@ -57,6 +57,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     Jmax_active = maxActiveLevel_tree(tree_ID)
     level       = Jmax_active ! algorithm starts on maximum *active* level
 
+    if (Jmin<1) call abort(2202243, "Currently, setting Jmin<1 is not possible")
+
     if (present(ignore_maxlevel)) then
         ignore_maxlevel2 = ignore_maxlevel
     else
@@ -120,7 +122,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! thresholding). In this case, the detail (largest wavelet coeff) is passed via hvy_details.
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
-            call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
         endif
         call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
@@ -157,6 +159,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         if (params%useSecurityZone) then
             if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
+                ! Note: we can add the security zone also for non-lifted wavelets (although this 
+                ! does not make much sense, but for development...)
                 call addSecurityZone_tree( time, params, level, tree_ID, hvy_block, hvy_tmp )
             endif
         endif
@@ -190,6 +194,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call updateMetadata_tree(params, tree_ID)
         call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
+        ! After the coarsening step on this level, the some blocks were (possibly) coarsened.
+        ! If that happened (and it is the usual case), suddenly new blocks have coarser neighbors, and
+        ! on those, the coarseExt needs to be done. Note performing the coarseExt twice on a block does not
+        ! alter the data, but is of course not for free. The usual workflow in adapt_tree is that many blocks
+        ! can be coarsened, and thus the 2nd call to coarseExtensionUpdate_level is much cheaper.
+        if (params%useCoarseExtension) then
+            call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level, hvy_details=hvy_details )
+        endif
+
         ! iteration counter (used for random coarsening criterion)
         iteration = iteration + 1
         level = level - 1
@@ -206,15 +220,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", MPI_Wtime()-t0 )
 
-    ! final coarse extension step. This is required because after executeCoarsening_tree, the grid is altered,
-    ! and in the very last iteration step, no coarse extension is performed afterwards. This however only affects
-    ! the last level
-    t0 = MPI_Wtime()
-    if (params%useCoarseExtension) then
-        call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level )
-    endif
-    call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
     call toc( "adapt_tree (TOTAL)", MPI_wtime()-t1)
 end subroutine

@@ -1,6 +1,8 @@
 ! Initial condition.
 ! Can be read from files (params%input_files), or generated in an interative process.
 subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, iteration, hvy_mask, hvy_tmp)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
 
     implicit none
 
@@ -121,7 +123,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             !---------------------------------------------------------------------------
             ! Create the first grid as equidistant on the coarsest treelevel
             !---------------------------------------------------------------------------
-            call createEquidistantGrid_tree( params, params%Jini, .true., tree_ID )
+            call createEquidistantGrid_tree( params, hvy_block, params%Jini, .true., tree_ID )
 
             !---------------------------------------------------------------------------
             ! on the grid, evaluate the initial condition

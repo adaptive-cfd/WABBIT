@@ -121,7 +121,7 @@ subroutine post_stl2dist(params)
     call reset_tree( params, .true., tree_ID)
 
     ! start with an equidistant grid on coarsest level
-    call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID)
+    call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID)
 
     ! reset grid to zeros
     do k = 1, hvy_n(1)

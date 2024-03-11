@@ -65,14 +65,14 @@ subroutine dense_to_sparse(params)
     !----------------------------------
     ! read parameters
     !----------------------------------
-    call get_cmd_arg_bool( "--eps-normalized", params%eps_normalized, default=.true. )
-    call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
-    call get_cmd_arg_dbl( "--eps", params%eps, default=-1.0_rk )
-    call get_cmd_arg_str( "--indicator", indicator, default="threshold-state-vector" )
+    call get_cmd_arg( "--eps-normalized", params%eps_normalized, default=.true. )
+    call get_cmd_arg( "--eps-norm", params%eps_norm, default="L2" )
+    call get_cmd_arg( "--eps", params%eps, default=-1.0_rk )
+    call get_cmd_arg( "--indicator", indicator, default="threshold-state-vector" )
     ! --order and --wavelet are synonyms, but --wavelet overules (--order is deprecated)
-    call get_cmd_arg_str( "--order", order, default="CDF40" )
-    call get_cmd_arg_str( "--wavelet", params%wavelet, default=order )
-    call get_cmd_arg_str_vct( "--files", params%input_files )
+    call get_cmd_arg( "--order", order, default="CDF40" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default=order )
+    call get_cmd_arg( "--files", params%input_files )
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
@@ -84,6 +84,7 @@ subroutine dense_to_sparse(params)
 
     params%coarsening_indicator = indicator
     params%forest_size = 1
+    params%physics_type = "postprocessing"
 
     params%n_eqn = size(params%input_files)
     allocate(params%field_names(params%n_eqn))

@@ -425,6 +425,7 @@ contains
 
 
      case ("many-blobs")
+        u = 0.0_rk
          do iblob = 1, params_convdiff%Nblobs
              do iy = 1, Bs(2)+2*g
                  do ix = 1, Bs(1)+2*g

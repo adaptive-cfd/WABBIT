@@ -41,7 +41,7 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     !----------------------------------------------------------------------------
     ! create an equidistant grid on level J=1 (and not Jmin, because that may well be 0)
     !----------------------------------------------------------------------------
-    call createEquidistantGrid_tree( params, params%Jmin, .true., tree_ID )
+    call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID )
 
     !----------------------------------------------------------------------------
     ! create just some data...

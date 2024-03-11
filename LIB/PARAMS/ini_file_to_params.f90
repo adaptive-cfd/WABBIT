@@ -228,6 +228,7 @@ end subroutine ini_file_to_params
     type(type_params),intent(inout)  :: params
     integer(kind=ik) :: i, g_default
     real(kind=rk), dimension(:), allocatable  :: tmp
+    logical :: lifted_wavelet
 
     if (params%rank==0) then
       write(*,*)
@@ -244,18 +245,27 @@ end subroutine ini_file_to_params
     select case(params%wavelet)
     case ('CDF20')
         g_default = 2
+        lifted_wavelet = .false.
     case ('CDF22')
         g_default = 3
+        lifted_wavelet = .true.
     case ('CDF40')
         g_default = 4
+        lifted_wavelet = .false.
     case ('CDF42')
         g_default = 5
+        lifted_wavelet = .true.
     case ('CDF44', 'CDF62')
         g_default = 7
+        lifted_wavelet = .true.
     case ('CDF60')
         g_default = 6
+        lifted_wavelet = .false.
+    case ('CDF46')
+        g_default = 9
+        lifted_wavelet = .true.
     case default
-        g_default = 1
+        call abort(2320241, "no default specified for this wavelet...")
     end select
 
     call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
@@ -269,8 +279,11 @@ end subroutine ini_file_to_params
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
     call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
     call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
-    call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, .true. )
-    call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, .true. )
+    call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, lifted_wavelet )
+    ! Note: we can add the security zone also for non-lifted wavelets (although this 
+    ! does not make much sense, but for development...)
+    ! Default: false for non-lifted, true for lifted wavelets
+    call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet )
 
 
     if ( params%Jmax < params%Jmin ) then

@@ -171,7 +171,7 @@ subroutine post_dry_run
     do while ( time < params%time_max )
         ! start with an equidistant grid on coarsest level.
         ! routine also deletes any existing mesh in the tree.
-        call createEquidistantGrid_tree( params, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
+        call createEquidistantGrid_tree( params, hvy_mask, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
 
 
         if (params%rank==0) then

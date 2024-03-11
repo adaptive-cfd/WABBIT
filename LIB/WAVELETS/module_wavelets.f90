@@ -1273,7 +1273,7 @@ contains
 
     ! manipulate wavelet coefficients in a neighborhood direction: applied
     ! if we find a coarser neighbor in this direction (coarse extension)
-    subroutine coarseExtensionManipulateWC_block(params, wc, neighborhood)
+    subroutine coarseExtensionManipulateWC_block(params, wc, neighborhood, Nwcl_optional, Nwcr_optional)
         implicit none
 
         type (type_params), intent(in) :: params
@@ -1294,6 +1294,7 @@ contains
         !
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik), intent(in) :: neighborhood
+        integer(kind=ik), intent(in), optional :: Nwcl_optional, Nwcr_optional
 
         integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d
@@ -1312,6 +1313,11 @@ contains
         Nreconr = params%Nreconr
         d       = 2_ik ** params%dim
 
+        ! sometimes we just need to delete the WC in the ghost nodes layer
+        ! in which case we set Nwcl=Nwcr=g
+        if (present(Nwcl_optional)) Nwcl = Nwcl_optional
+        if (present(Nwcr_optional)) Nwcr = Nwcr_optional
+        
         if (params%dim == 2) then
             ! 2D
             select case(neighborhood)
@@ -1627,6 +1633,60 @@ contains
             params%order_predictor = "multiresolution_6th"
             params%isLiftedWavelet = .true.
 
+        case("CDF46")
+            ! H TILDE filter
+            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+            ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
+            allocate( params%HD(-8:8) )
+            params%HD = (/&
+            9.0_rk   *2.0_rk**(-14.0_rk), &
+            0.0_rk                      , &
+            -35.0_rk *2.0_rk**(-12.0_rk), &
+            9.0_rk   *2.0_rk**(-10.0_rk), &
+            189.0_rk *2.0_rk**(-12.0_rk), &
+            -59.0_rk *2.0_rk**(-10.0_rk), &
+            -477.0_rk*2.0_rk**(-12.0_rk), &
+            153.0_rk *2.0_rk**( -9.0_rk), &
+            5379.0_rk*2.0_rk**(-13.0_rk), &
+            153.0_rk *2.0_rk**( -9.0_rk), &
+            -477.0_rk*2.0_rk**(-12.0_rk), &
+            -59.0_rk *2.0_rk**(-10.0_rk), &
+            189.0_rk *2.0_rk**(-12.0_rk), &
+            9.0_rk   *2.0_rk**(-10.0_rk), &
+            -35.0_rk *2.0_rk**(-12.0_rk), &
+            0.0_rk                      , &
+            9.0_rk   *2.0_rk**(-14.0_rk)/)
+
+            ! H filter  
+            allocate( params%HR(-3:3) )
+            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+            ! G TILDE filter
+            allocate( params%GD(-2:4) )
+            do i = -2, 4
+                if (mod(i,2)==0) then
+                    params%GD(i) = -1.0_rk*params%HR(i-1)
+                else
+                    params%GD(i) = +1.0_rk*params%HR(i-1)
+                endif
+            enddo
+            ! allocate( params%GD(-2:4) )
+            ! params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
+
+
+            ! G filter
+            allocate( params%GR(-9:7) )
+            do i = -9, 7
+                if (mod(i,2)==0) then
+                    params%GR(i) = -1.0_rk*params%HD(i+1)
+                else
+                    params%GR(i) = +1.0_rk*params%HD(i+1)
+                endif
+            enddo
+
+            params%order_predictor = "multiresolution_4th"
+            params%isLiftedWavelet = .true.
+
         case("CDF60")
             ! H TILDE filter
             allocate( params%HD(0:0) )
@@ -1655,6 +1715,8 @@ contains
 
         case("CDF44")
             ! H TILDE filter
+            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+            ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
             allocate( params%HD(-6:6) )
             params%HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
             87.0_rk*2.0_rk**(-7.0_rk), &
@@ -1920,7 +1982,7 @@ contains
         type (type_params), intent(in) :: params
         ! Input: data Output: FWT(DATA) in Spagghetti-ordering
         real(kind=rk), dimension(:, :, :, :), intent(inout) :: u_wc
-        real(kind=rk), dimension(:, :, :, :), allocatable, save :: u_wc_copy
+        real(kind=rk), dimension(:, :, :, :), allocatable, save :: u_wc_copy, u_copy
         real(kind=rk), dimension(:), allocatable, save :: buffer1, buffer2
         integer(kind=ik) :: ix, iy, iz, ic, g, Bs(1:3), nx, ny, nz, nc
         nx = size(u_wc, 1)
@@ -1934,6 +1996,11 @@ contains
             if (.not.areArraysSameSize(u_wc_copy, u_wc)) deallocate(u_wc_copy)
         endif
         if (.not. allocated(u_wc_copy)) allocate(u_wc_copy(1:nx,1:ny,1:nz,1:nc))
+        if (allocated(u_copy)) then
+            if (.not.areArraysSameSize(u_copy, u_wc)) deallocate(u_copy)
+        endif
+        if (.not. allocated(u_copy)) allocate(u_copy(1:nx,1:ny,1:nz,1:nc))
+        u_copy = u_wc
         if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
         if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
 
@@ -2035,12 +2102,26 @@ contains
         ! compressed Mallat means the valid coeffs run 1:Bs and NOT 1:Bs+2*g
         u_wc_copy = u_wc
 
+        ! this next step may seem weird. We copy the input data to the new u_wc data, in order to keep those data
+        ! in the ghost nodes layer. Why should we do that? Well admittedly, those coefficients are garbage at this 
+        ! point, because we cannot apply the filters here (that is trivial). Copying the input data to the ghost nodes
+        ! does at first not make any more sense then that. However, when using the coarse extension, the trick is that some
+        ! SC are copied, i.e., they are identical to the function values on the fine block. While this is only relevant at some 
+        ! ghost nodes patches (namely, where we have a finer neighbor) it does not hurt to copy the entire layer either.
+        ! If we want to compute the inverse transform (IWT), well, then we have to sync the ghost nodes anyways (which
+        ! then overwrites this copy action). However, during coarseExtension, specifically the reconstruction step, this copy
+        ! step enables us to use a smaller block size (dictated by the reconstruction size, and not reconstruction size + reconst. filter support)
+        ! because we set WC==0 and indeed the SC are copied here an correct.
+        u_wc = u_copy
+
         if (params%dim==2) then
             ! copy to the back spaghetti-ordered coefficients to the block
+            ! note copying only applied to the valid coefficients, i.e. those interior to the block
             u_wc( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) = u_wc_copy(1:Bs(1)/2, 1:Bs(2)/2, :, :)
             u_wc( (g+2):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, :, :) = u_wc_copy(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
             u_wc( (g+1):(Bs(1)+g):2, (g+2):(Bs(2)+g):2, :, :) = u_wc_copy(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
             u_wc( (g+2):(Bs(1)+g):2, (g+2):(Bs(2)+g):2, :, :) = u_wc_copy(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
+
         else
             ! copy to the back spaghetti-ordered coefficients to the block
             u_wc( (g+1):(Bs(1)+g):2, (g+1):(Bs(2)+g):2, (g+1):(Bs(3)+g):2, :) = u_wc_copy(1:Bs(1)/2, 1:Bs(2)/2, 1:Bs(3)/2, :)

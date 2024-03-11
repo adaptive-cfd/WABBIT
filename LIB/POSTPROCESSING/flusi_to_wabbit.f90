@@ -159,7 +159,7 @@ subroutine flusi_to_wabbit(params)
     call allocate_forest(params, hvy_block)
 
     ! create an equidistant grid (order of light id is important!)
-    call createEquidistantGrid_tree( params, params%Jmax, .true., tree_ID)
+    call createEquidistantGrid_tree( params, hvy_block, params%Jmax, .true., tree_ID)
 
 
 

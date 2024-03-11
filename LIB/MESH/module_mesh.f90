@@ -29,6 +29,7 @@ module module_mesh
 contains
 
 #include "securityZone_tree.f90"
+#include "coarseExtensionUpdate_tree.f90"
 #include "unitTest_ghostSync.f90"
 #include "unitTest_waveletDecomposition.f90"
 #include "unitTest_refineCoarsen.f90"
@@ -73,5 +74,127 @@ contains
 #include "remove_nonperiodic_neighbors.f90"
 #include "forest.f90"
 #include "notEnoughMemoryToRefineEverywhere_tree.f90"
+
+
+! analytical data used for wavelet compression test
+subroutine set_block_testing_data(params, u, x0, dx)
+    use module_globals
+
+    implicit none
+
+    type (type_params), intent(inout)  :: params
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    real(kind=rk), intent(inout) :: u(:,:,:)
+
+    integer(kind=ik) :: ix, iy, iz, Bs(1:3), g
+    real(kind=rk) :: sigma0, x00, y00, z00, ampli, x, y, z
+
+    Bs = params%Bs
+    g  = params%g
+    
+    sigma0 = 0.3_rk / 15.0_rk
+    x00 = params%domain_size(1)/2.0_rk
+    y00 = params%domain_size(2)/2.0_rk
+    z00 = params%domain_size(3)/2.0_rk
+    ampli = 4.0_rk
+    
+    if (params%dim==2) then
+        ! create gauss pulse. 
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                ! compute x,y coordinates from spacing and origin
+                x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                
+                if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                
+                if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                
+                ! set actual inicond gauss blob
+                ! here only for the pressure.
+                u(ix,iy,:) = 1.0_rk + ampli*exp( -( (x)**2 + (y)**2 ) / (2.0*sigma0**2) )
+            end do
+        end do
+    else
+        ! create gauss pulse
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! compute x,y coordinates from spacing and origin
+                    x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                    y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                    z = real(iz-(g+1), kind=rk) * dx(3) + x0(3) - z00
+                    
+                    if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                    if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                    
+                    if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                    if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                    
+                    if (z<-params%domain_size(3)/2.0) z = z + params%domain_size(3)
+                    if (z>params%domain_size(3)/2.0) z = z - params%domain_size(3)
+                    
+                    ! set actual inicond gauss blob
+                    u(ix,iy,iz) = 1.0_rk + ampli*exp( -( (x)**2 + (y)**2 + (z)**2 ) / (2.0*sigma0**2) )
+                end do
+            end do
+        end do
+    end if
+
+
+    sigma0 = 0.4_rk
+    x00 = params%domain_size(1)/4.1_rk
+    y00 = params%domain_size(2)/4.1_rk
+    z00 = params%domain_size(3)/4.1_rk
+    ampli = 2.0_rk
+    
+    if (params%dim==2) then
+        ! create gauss pulse. 
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                ! compute x,y coordinates from spacing and origin
+                x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                
+                if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                
+                if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                
+                ! set actual inicond gauss blob
+                ! here only for the pressure.
+                u(ix,iy,:) = u(ix,iy,:) + ampli*exp( -( (x)**2 + (y)**2 ) / (2.0*sigma0**2) )
+            end do
+        end do
+    else
+        ! create gauss pulse
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! compute x,y coordinates from spacing and origin
+                    x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                    y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                    z = real(iz-(g+1), kind=rk) * dx(3) + x0(3) - z00
+                    
+                    if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                    if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                    
+                    if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                    if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                    
+                    if (z<-params%domain_size(3)/2.0) z = z + params%domain_size(3)
+                    if (z>params%domain_size(3)/2.0) z = z - params%domain_size(3)
+                    
+                    ! set actual inicond gauss blob
+                    u(ix,iy,iz) = u(ix,iy,iz) + ampli*exp( -( (x)**2 + (y)**2 + (z)**2 ) / (2.0*sigma0**2) )
+                end do
+            end do
+        end do
+    end if
+end subroutine
+
 
 end module module_mesh

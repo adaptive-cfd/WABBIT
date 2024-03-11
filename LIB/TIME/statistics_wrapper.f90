@@ -39,6 +39,9 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
     hvy_id = hvy_active(1,tree_ID)
+    call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+    call get_block_spacing_origin( params, lgt_id, x0, dx )
+
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
     hvy_tmp(:,:,:,:,hvy_id), "init_stage", hvy_mask(:,:,:,:, hvy_id))
 

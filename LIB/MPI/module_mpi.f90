@@ -79,7 +79,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_tree!, sync_ghosts_nostages
+    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_level
 
 
 contains
@@ -145,6 +145,12 @@ subroutine init_ghost_nodes( params )
               & number_ghost_nodes or increase number_block_nodes.")
             endif
         endif
+
+#ifdef DEV
+        if (number_blocks<1) then
+            call abort(2422021, "Ghost setup called but number_blocks undefnd - call init_ghost_nodes AFTER allocate_tree. Maybe you forgot --memory?")
+        endif
+#endif
 
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,

@@ -62,8 +62,6 @@ module module_params
         logical :: useCoarseExtension = .true.
         logical :: useSecurityZone = .true.
         logical :: isLiftedWavelet = .false.
-
-
         character(len=cshort) :: wavelet="not-initialized"
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE

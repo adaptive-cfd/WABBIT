@@ -14,9 +14,6 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     hvyID, lgtID, k, level_neighbor, lgtID_neighbor
     logical :: refinement
 
-    ! for non lifted wavelets, no coarseExtension is done, hence no need for the additional security zone here
-    if (.not. params%isLiftedWavelet) return
-
     !--------------------------------------------------------------------------------------------------------------------
     ! This routine performs two tasks:
     !   1) if a block has a significant neighbor on the SAME LEVEL, its (possible) coarsening flag is revoked to 0 (STAY)

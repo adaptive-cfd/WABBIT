@@ -32,7 +32,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     !----------------------------------------------------------------------------
     ! create an equidistant grid on level J=1 (and not Jmin, because that may well be 0)
     !----------------------------------------------------------------------------
-    call createEquidistantGrid_tree( params, 1, .true., tree_ID )
+    call createEquidistantGrid_tree( params, hvy_block, 1, .true., tree_ID )
 
     !----------------------------------------------------------------------------
     ! create just some data...

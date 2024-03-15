@@ -176,186 +176,14 @@ module module_treelib
       array(level-i)=int(element,kind=ik)
       i=i+1
     enddo
-
   end subroutine
   !===============================================================================
 
   !===============================================================================
-  !> \brief wrapper for finding adjacant block in 2D, calls adjacent_NESW
-  subroutine adjacent4( treecode, direction, treecode_neighbor)
-      implicit none
-
-      integer(kind=tsize), intent(in) :: treecode
-      integer(kind=tsize), intent(out) :: treecode_neighbor
-      character(len=3), intent(in) :: direction
-
-      integer(kind=tsize) :: treecode_tmp
-
-      select case(direction)
-        case('__N','__S','__E','__W')
-            call adjacent4_NESW( treecode, direction, treecode_neighbor)
-        case('_NE')
-            call adjacent4_NESW( treecode, '__N', treecode_tmp)
-            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-        case('_NW')
-            call adjacent4_NESW( treecode, '__N', treecode_tmp)
-            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-        case('_SE')
-            call adjacent4_NESW( treecode, '__N', treecode_tmp)
-            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-        case('_SW')
-            call adjacent4_NESW( treecode, '__N', treecode_tmp)
-            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-        case default
-            call abort(118118, "Lord vader, the treelib does not know the direction")
-      end select
-
-  end subroutine adjacent4
-  !===============================================================================
-
-  !===============================================================================
-  !> \brief Obtain neighbour in 2D for given direction with numerical treecode
-    subroutine adjacent4_NESW( treecode, direction, treecode_neighbor)
-      implicit none
-      integer(kind=tsize), intent(in) :: treecode
-      integer(kind=tsize) :: treecode_this, tmp
-      integer(kind=tsize), intent(out) :: treecode_neighbor
-      character(len=3), intent(in) :: direction
-      integer(kind=ik) :: i, j
-      logical :: go
-
-      ! copy treecode, as we modify it, but not return this modified value
-      treecode_this = treecode
-      ! this is the neighbors treecode we're looking for
-      treecode_neighbor = 0
-      go = .true.
-
-      select case(direction)
-        case('__N')
-          !*********************************************************************
-          ! NORTH
-          !*********************************************************************
-          call pop(treecode_this, tmp)
-          treecode_neighbor = modulo( tmp + 2_tsize, 4_tsize)
-          i = 1 ! i=0 is done above
-          do while (i < maxdigits .and. go)
-            ! last element is used to distinguish
-            if (tmp == 2 .or. tmp == 3) then
-              ! neighbor on same quadrant: copy, be happy.
-              do j = i, maxdigits
-                call pop(treecode_this, tmp)
-                treecode_neighbor = treecode_neighbor + tmp * 10**j
-              enddo
-              ! done, so escape loop
-              go = .false.
-            else
-              ! transition to different quadrant.
-              call pop(treecode_this, tmp)
-              treecode_neighbor = treecode_neighbor + (modulo(tmp+2_tsize,4_tsize)) * 10**i
-              i = i + 1
-            endif
-          enddo
-        case('__S')
-          !*********************************************************************
-          ! SOUTH
-          !*********************************************************************
-          call pop(treecode_this, tmp)
-          treecode_neighbor = modulo( tmp + 2_tsize, 4_tsize)
-          i = 1 ! i=0 is done above
-          do while (i < maxdigits .and. go)
-            ! last element is used to distinguish
-            if (tmp == 0 .or. tmp == 1) then
-              ! neighbor on same quadrant: copy, be happy.
-              do j = i, maxdigits
-                call pop(treecode_this, tmp)
-                treecode_neighbor = treecode_neighbor + tmp * 10**j
-              enddo
-              ! done, so escape loop
-              go = .false.
-            else
-              ! transition to different quadrant.
-              call pop(treecode_this, tmp)
-              treecode_neighbor = treecode_neighbor + (modulo(tmp+2_tsize,4_tsize)) * 10**i
-              i = i + 1
-            endif
-          enddo
-        case('__E')
-          !*********************************************************************
-          ! EAST
-          !*********************************************************************
-          call pop(treecode_this, tmp)
-          if (tmp == 0 .or. tmp == 2) then
-            treecode_neighbor = modulo( tmp+1_tsize , 4_tsize)
-          else
-            treecode_neighbor = modulo( tmp-1_tsize , 4_tsize)
-          endif
-
-          i = 1 ! i=0 is done above
-          do while (i < maxdigits .and. go)
-            ! last element is used to distinguish
-            if (tmp == 0 .or. tmp == 2) then
-              ! neighbor on same quadrant: copy, be happy.
-              do j = i, maxdigits
-                call pop(treecode_this, tmp)
-                treecode_neighbor = treecode_neighbor + tmp * 10**j
-              enddo
-              ! done, so escape loop
-              go = .false.
-            else
-              ! transition to different quadrant.
-              call pop(treecode_this, tmp)
-              if ( tmp == 1 .or. tmp == 3) then
-                treecode_neighbor = treecode_neighbor + (modulo(tmp-1_tsize,4_tsize)) * 10**i
-              else
-                treecode_neighbor = treecode_neighbor + (modulo(tmp+1_tsize,4_tsize)) * 10**i
-              endif
-              i = i + 1
-            endif
-          enddo
-        case('__W')
-          !*********************************************************************
-          ! WEST
-          !*********************************************************************
-          call pop(treecode_this, tmp)
-          if (tmp == 0 .or. tmp == 2) then
-            treecode_neighbor = modulo( tmp+1_tsize , 4_tsize)
-          else
-            treecode_neighbor = modulo( tmp-1_tsize , 4_tsize)
-          endif
-
-          i = 1 ! i=0 is done above
-          do while (i < maxdigits .and. go)
-            ! last element is used to distinguish
-            if (tmp == 1 .or. tmp == 3) then
-              ! neighbor on same quadrant: copy, be happy.
-              do j = i, maxdigits
-                call pop(treecode_this, tmp)
-                treecode_neighbor = treecode_neighbor + tmp * 10**j
-              enddo
-              ! done, so escape loop
-              go = .false.
-            else
-              ! transition to different quadrant.
-              call pop(treecode_this, tmp)
-              if ( tmp == 1 .or. tmp == 3) then
-                treecode_neighbor = treecode_neighbor + (modulo(tmp-1_tsize,4_tsize)) * 10**i
-              else
-                treecode_neighbor = treecode_neighbor + (modulo(tmp+1_tsize,4_tsize)) * 10**i
-              endif
-              i = i + 1
-            endif
-          enddo
-        case default
-            call abort(118118, "Lord vader, the treelib does not know the direction")
-      end select
-
-    end subroutine
-  !===============================================================================
-
-  !===============================================================================
-  !> \brief Obtain neighbour in 2D for given direction with numerical treecode
-  !> \details Use math representation and loop over digits
-  subroutine adjacent_JB_NESW( treecode, treecode_neighbor, direction, level, max_treelevel)
+  !> \brief Obtain neighbour for given direction with numerical treecode
+  !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
+  !> \author JB
+  subroutine adjacent_wrapper(treecode, treecode_neighbor, direction, level, max_treelevel)
     implicit none
     !> Level at which to search the neighbour, this is from coarse to fine
     integer(kind=ik), intent(in)        :: level
@@ -366,159 +194,141 @@ module module_treelib
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> Seach direction in str representation
-    character(len=3), intent(in)        :: direction
-    integer(kind=tsize)                 :: treecode_this, tmp, dir_sign, dir_fac
-    integer(kind=ik)                    :: i, j
-    logical                             :: go
+    character(len=*), intent(in)        :: direction
+    character                           :: dir_card
+    integer(kind=tsize)                 :: tc1
+    integer(kind=ik)                    :: i
 
-    ! copy treecode, as we modify it, but not return this modified value
-    treecode_this = treecode
+    tc1 = treecode
+    ! loop over all letters in direction and call the cardinal directions
+    do i = 1, len(direction)
+      select case(direction(i:i))
+        ! this case does nothing, charaters are defined as placeholders
+        ! place at top because it appears very often, probably micro-optimization but well
+        case("_")
+        ! 2D cases are on top to break out earlier, probably micro-optimization but well
+        case("5", "N")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 5, level, max_treelevel)
+        case("3", "S")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 3, level, max_treelevel)
+        case("2", "W")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 2, level, max_treelevel)
+        case("4", "E")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 4, level, max_treelevel)
+        case("1", "T")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 1, level, max_treelevel)
+        case("6", "B")
+          call adjacent_3D_faces(tc1, treecode_neighbor, 6, level, max_treelevel)
+        ! this case signals the second part, as far as I've understood we can break here
+        case("/")
+          exit
+        case default
+          call abort(118118, "Lord vader, the treelib does not know the direction")  
+      end select
+    end do
+  end subroutine
+  !===============================================================================
 
-    ! this is the neighbors treecode we're looking for
-    treecode_neighbor = 0_tsize
+  !===============================================================================
+  !> \author JB
+  !> \brief Obtain neighbour in 3D for given direction with numerical treecode
+  !> \details Use math representation and loop over digits
+  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
+  !  --------------------------------------------------------------------------------------------
+  !> neighbor codes: \n
+  !  ---------------
+  !> for imagination:
+  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
+  !!                   - edge: boundary between two sides - use sides numbers for coding
+  !!                   - corner: between three sides - so use all three sides numbers
+  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
+  !!                     so use this corner code in second part of neighbor code
+  !!
+  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
+  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
+  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
+  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
+  !! corner: '123/___', '134/___', '145/___', '152/___' \n
+  !!         '623/___', '634/___', '645/___', '652/___' \n
+  !! \n
+  !! complete neighbor code array, 74 possible neighbor relations \n
+  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
+  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
+  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
+  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  ! ********************************************************************************************
+  subroutine adjacent_3D_faces( treecode, treecode_neighbor, direction, level, max_treelevel)
+    implicit none
+    !> Level at which to search the neighbour, this is from coarse to fine
+    integer(kind=ik), intent(in)        :: level
+    !> Max treelevel, needed to loop correctly
+    integer(kind=ik), intent(in)        :: max_treelevel
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecoude out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> Seach direction in int representation for main cardinal directions
+    integer(kind=ik), intent(in)        :: direction
+    integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
+    integer(kind=ik)                    :: i
 
-    !> We need direction and level from each direction
+    ! We need direction and level from each direction
     select case(direction)
-      case('__N')
-        dir_sign = -1
-        dir_fac = 2
-      case('__S')
+      ! At first we assign the main cardinal directions
+      case(1)  ! T - top side z+1
         dir_sign = 1
-        dir_fac = 2
-      case('__E')
-        dir_sign = 1
-        dir_fac = 1
-      case('__W')
+        dir_fac = 4
+      case(2)  ! W - front side y-1
         dir_sign = -1
         dir_fac = 1
+      case(3)  ! S - right side x+1
+        dir_sign = 1
+        dir_fac = 2
+      case(4)  ! E - back side y+1
+        dir_sign = 1
+        dir_fac = 1
+      case(5)  ! N - left side x-1
+        dir_sign = -1
+        dir_fac = 2
+      case(6)  ! B - bottom side z-1
+        dir_sign = -1
+        dir_fac = 4
       case default
         call abort(118118, "Lord vader, the treelib does not know the direction")
     end select
 
-    !> scales finer as neighbour search - keep as 0 and pop of numbers
+    ! copy treecode, as we modify it, but not return this modified value
+    tc_reduce = treecode
+
+    ! this is the neighbors treecode we're looking for
+    treecode_neighbor = 0_tsize
+
+    ! scales finer as neighbour search - keep as 0 and pop of numbers
     do i = 1, max_treelevel-level
-      call pop(treecode_this, tmp)
+      call pop(tc_reduce, digit_last)
     end do
     do i = max_treelevel-level+1, maxdigits
       ! pop last digit
-      call pop(treecode_this, tmp)
+      call pop(tc_reduce, digit_last)
       ! add number with change from neighbour or overflow
-      treecode_neighbor = treecode_neighbor + (modulo(tmp + dir_sign*dir_fac, 2*dir_fac) + tmp/(2*dir_fac)*2/dir_fac)* 10**(i-1)
+      treecode_neighbor = treecode_neighbor + (modulo(digit_last + dir_sign*dir_fac, 2*dir_fac) + digit_last/(2*dir_fac)*2*dir_fac)* 10**(i-1)
+      
       ! compute overflow, magic with + 2*dir_fac) / (2*dir_fac) is done to round towards negative infinity for the case when dir_sign < 0
-      dir_sign = (modulo(tmp, 2*dir_fac) + dir_sign*dir_fac + 2*dir_fac) / (2*dir_fac) - 1
+      dir_sign = modulo(digit_last/dir_fac + (2 - dir_sign)/2, 2_tsize)*dir_sign
 
       ! copy directly the rest and exit loop if numbers are not gonna change anymore
       if (dir_sign == 0) then
-        treecode_neighbor = treecode_neighbor + treecode_this* 10**i
+        treecode_neighbor = treecode_neighbor + tc_reduce* 10**i
         exit
       end if
     end do
 
   end subroutine
   !===============================================================================
-
-  ! !===============================================================================
-  ! !> \brief Obtain neighbour in 3D for given direction with numerical treecode
-  ! !> \details Use math representation and loop over digits
-  ! !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
-  ! !  --------------------------------------------------------------------------------------------
-  ! !> neighbor codes: \n
-  ! !  ---------------
-  ! !> for imagination:
-  ! !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-  ! !!                   - edge: boundary between two sides - use sides numbers for coding
-  ! !!                   - corner: between three sides - so use all three sides numbers
-  ! !!                   - block on higher/lower level: block shares face/edge and one unique corner,
-  ! !!                     so use this corner code in second part of neighbor code
-  ! !!
-  ! !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-  ! !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
-  ! !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
-  ! !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-  ! !! corner: '123/___', '134/___', '145/___', '152/___' \n
-  ! !!         '623/___', '634/___', '645/___', '652/___' \n
-  ! !! \n
-  ! !! complete neighbor code array, 74 possible neighbor relations \n
-  ! !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-  ! !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-  ! !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-  ! !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-  ! !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-  ! !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-  ! !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-  ! !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
-  ! ! ********************************************************************************************
-  ! subroutine adjacent_3D_faces( treecode, treecode_neighbor, direction, level, max_treelevel)
-  !   implicit none
-  !   !> Level at which to search the neighbour, this is from coarse to fine
-  !   integer(kind=ik), intent(in)        :: level
-  !   !> Max treelevel, needed to loop correctly
-  !   integer(kind=ik), intent(in)        :: max_treelevel
-  !   !> Numerical treecode in
-  !   integer(kind=tsize), intent(in)     :: treecode
-  !   !> Numerical treecoude out
-  !   integer(kind=tsize), intent(out)    :: treecode_neighbor
-  !   !> Seach direction in str representation
-  !   character(len=3), intent(in)        :: direction
-  !   integer(kind=tsize)                 :: treecode_this, tmp, dir_sign, dir_fac
-  !   integer(kind=ik)                    :: i, j
-  !   logical                             :: go
-
-  !   ! copy treecode, as we modify it, but not return this modified value
-  !   treecode_this = treecode
-
-  !   ! this is the neighbors treecode we're looking for
-  !   treecode_neighbor = 0_tsize
-
-  !   !> We need direction and level from each direction
-  !   select case(direction)
-  !     case('__1')  ! top side
-  !       dir_sign = -1
-  !       dir_fac = 4
-  !     case('__2')  ! front side
-  !       dir_sign = -1
-  !       dir_fac = 2
-  !     case('__3')  ! left side
-  !       dir_sign = -1
-  !       dir_fac = 1
-  !     case('__4')  ! right side
-  !       dir_sign = 1
-  !       dir_fac = 1
-  !     case('__5')  ! back side
-  !       dir_sign = 1
-  !       dir_fac = 2
-  !     case('__6')  ! bottom side
-  !       dir_sign = 1
-  !       dir_fac = 4
-  !     case default
-  !       call abort(118118, "Lord vader, the treelib does not know the direction")
-  !   end select
-
-  !   !> scales finer as neighbour search - keep as 0 and pop of numbers
-  !   do i = 1, max_treelevel-level
-  !     call pop(treecode_this, tmp)
-  !   end do
-  !   do i = max_treelevel-level+1, maxdigits
-  !     ! pop last digit
-  !     call pop(treecode_this, tmp)
-  !     ! add number with change from neighbour or overflow
-  !     treecode_neighbor = treecode_neighbor + (modulo(tmp + dir_sign*dir_fac, 2*dir_fac) + tmp/(2*dir_fac)*2/dir_fac)* 10**(i-1)
-  !     ! compute overflow, magic with + 2*dir_fac) / (2*dir_fac) is done to round towards negative infinity for the case when dir_sign < 0
-  !     dir_sign = (modulo(tmp, 2*dir_fac) + dir_sign*dir_fac + 2*dir_fac) / (2*dir_fac) - 1
-
-  !     ! copy directly the rest and exit loop if numbers are not gonna change anymore
-  !     if (dir_sign == 0) then
-  !       treecode_neighbor = treecode_neighbor + treecode_this* 10**i
-  !       exit
-  !     end if
-  !   end do
-
-  !   !> flip back
-  !   ! treecode_this = treecode_neighbor
-  !   ! treecode_neighbor = flipint(treecode_this)
-
-  ! end subroutine
-  ! !===============================================================================
 
   !===============================================================================
   !> \brief Obtain block position coordinates from numerical treecode
@@ -593,69 +403,6 @@ module module_treelib
 
   end subroutine decoding_n
   !===============================================================================
-
-  !===============================================================================
-  !> \brief Obtain numerical treecode from block position coordinates
-  subroutine encoding4( ix, iy, treecode ) !, Jmax )
-    implicit none
-    integer(kind=ik), intent(in) :: ix, iy!, Jmax
-    integer(kind=tsize), intent(out) :: treecode
-    integer(kind=tsize) :: c, d, cl, dl, tl, j
-    !integer(kind=ik) :: b(Jmax)
-
-    ! following gargantini, we first require the binary representation of ix,iy
-    ! note algorithm ENCODING in her paper requires us to loop down from the highest
-    ! level (the last entry of the binary), so here we FLIP the number.
-    ! NOTE: gargantini uses 0-based indexing, which is a source of errors. we use 1-based
-    c = flipint( toBinary( ix-1 ) )
-    d = flipint( toBinary( iy-1 ) )
-    treecode = 0_tsize
-
-    ! this is the encoding part from gargantinis paper. Note since we reversed the
-    ! binary representations, we loop from 1:end and not from end:-1:1
-    do j = 1, maxdigits
-      ! pop current digit:
-      cl = modulo(c, 10_tsize)
-      dl = modulo(d, 10_tsize)
-      ! remove digit:
-      c = c / 10_tsize
-      d = d / 10_tsize
-      tl = 9_tsize
-
-      ! JB: Is x and y here swapped?
-      if (cl==0_tsize .and. dl==0_tsize) then
-        tl = 0_tsize
-      end if
-
-      if (cl==0_tsize .and. dl==1_tsize) then
-        tl = 1_tsize
-      end if
-
-      if (cl==1_tsize .and. dl==0_tsize) then
-        tl = 2_tsize
-      end if
-
-      if (cl==1_tsize .and. dl==1_tsize) then
-        tl = 3_tsize
-      end if
-
-      ! tl = cl*2_tsize + dl
-
-      treecode = treecode + tl * 10_tsize**(j-1)
-    end do
-
-    ! gargantini gives the example (I,J)=(6,5) which gives K=321. To reproduce it, set (ix,iy)=7,6
-    ! which gives you at this point
-    ! treecode=1230000000000000 this means first index (rightmost, "0") is COARSEST
-    ! now we reverse the direction (flipint) and end up with
-    ! treecode=000000000000321, this means first index (rightmost, "1") is FINEST
-    ! Then, we have K[0] (which is the rightmost entry of the code) = 1 as
-    ! gargantini has. in the decoding prodecure, we flip the treecode again and start from the coarsest
-    ! to finest level
-    treecode = flipint(treecode)
-  end subroutine encoding4
-  !===============================================================================
-
 
   !===============================================================================
   !> \brief Obtain numerical treecode from block position coordinates for 2 or 3 dimensions

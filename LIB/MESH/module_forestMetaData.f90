@@ -1,3 +1,5 @@
+!===============================================================================
+!> This module contains the memory for the forest meta data.
 module module_forestMetaData
 
     use module_globals
@@ -27,29 +29,32 @@ module module_forestMetaData
     ! nor HVY_TMP (a work array)
     ! are included here !!
 
+    !> \brief List of treecodes in array with level, refinement status and tree_id
     integer(kind=ik), allocatable, public    :: lgt_block(:, :)
-
+    !> List of neighbours (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_neighbor(:,:)
-    ! list of active blocks (light data) for each tree
+    !> List of active blocks (light data) for each tree
     integer(kind=ik), allocatable, public    :: lgt_active(:,:)
-    ! number of active blocks (light data) for each tree
+    !> Number of active blocks (light data) for each tree
     integer(kind=ik), allocatable, public    :: lgt_n(:)
 
-    ! list of active blocks (heavy data) for each tree
+    !> List of active blocks (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_active(:,:)
-    ! number of active blocks (heavy data) for each tree
+    !> Number of active blocks (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_n(:)
 
-    ! maximum wavelet coefficient for each component of the state vector.
+    !> Maximum wavelet coefficient for each component of the state vector.
     real(kind=rk), allocatable, public    :: hvy_details(:,:)
 
-    ! The following list contains the numerical treecode and the lightID for the active blocks
-    ! in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,
-    ! a treecode is an array and this is handy. for finding a block however, this is not true,
-    ! here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
+    !> \brief Sorted nlist of numerical treecodes
+    !> \details The following list contains the numerical treecode and the lightID for the active blocks
+    !> in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,
+    !> a treecode is an array and this is handy. for finding a block however, this is not true,
+    !> here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
     integer(kind=tsize), allocatable, public :: lgt_sortednumlist(:,:,:)
 
-    ! number of active trees
+    !> Number of active trees
     integer(kind=ik), public    :: tree_n
 
 end module
+!===============================================================================

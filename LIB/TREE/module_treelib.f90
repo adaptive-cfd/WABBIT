@@ -1,142 +1,148 @@
+!===========================================================================
+!> Module to deal with the tree-structure in quadtree or octree format
+! *****************************************************************************
 module module_treelib
 
   use module_globals
 
-contains
+  contains
 
 #include "get_neighbor_treecode.f90"
 
 
-! for numerical treecodes:
-! subroutine appendDigitTreecode
-! subroutine setTreecodeInactive
-! setLevel
-! getLevel
-! setTreeID
-! getTreeID
-! setRefinementStatus
-! getRefinementStatus
+  ! for numerical treecodes:
+  ! subroutine appendDigitTreecode
+  ! subroutine setTreecodeInactive
+  ! setLevel
+  ! getLevel
+  ! setTreeID
+  ! getTreeID
+  ! setRefinementStatus
+  ! getRefinementStatus
 
 
-!-----------------------------------------------------------------------------
-!> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
-!>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)
-!>   - The surface normal is computed from the treecode
-subroutine get_adjacent_boundary_surface_normal(treecode, domain_size, Bs, dim, n_surface)
-    implicit none
-    integer(kind=ik), intent(in) :: treecode(1:), Bs(1:3), dim
-    real(kind=rk), intent(in) :: domain_size(1:3)
-    ! The normal on the domain indicates (if non-periodic BC are used), if a block
-    ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
-    ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
-    ! is way at the back and its boundary normal points in +x, and in z, its at the bottom (z=0), thus
-    ! its normal points downwards.
-    integer(kind=2), intent(out) :: n_surface(3)
+  !-----------------------------------------------------------------------------
+  !> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
+  !> \details
+  !>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)
+  !>   - The surface normal is computed from the treecode
+  subroutine get_adjacent_boundary_surface_normal(treecode, domain_size, Bs, dim, n_surface)
+      implicit none
+      integer(kind=ik), intent(in) :: treecode(1:), Bs(1:3), dim
+      real(kind=rk), intent(in) :: domain_size(1:3)
+      ! The normal on the domain indicates (if non-periodic BC are used), if a block
+      ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
+      ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
+      ! is way at the back and its boundary normal points in +x, and in z, its at the bottom (z=0), thus
+      ! its normal points downwards.
+      integer(kind=2), intent(out) :: n_surface(3)
 
-    real(kind=rk), dimension(1:3) :: x0, dx
-    real(kind=rk) :: tolerance
+      real(kind=rk), dimension(1:3) :: x0, dx
+      real(kind=rk) :: tolerance
 
-    call get_block_spacing_origin2( treecode, domain_size, Bs, dim, x0, dx )
+      call get_block_spacing_origin2( treecode, domain_size, Bs, dim, x0, dx )
 
-    tolerance = 1.0e-3_rk * minval(dx(1:dim))
+      tolerance = 1.0e-3_rk * minval(dx(1:dim))
 
-    if (abs(x0(1)-0.0_rk) < tolerance ) then !x==0
-        n_surface(1) = -1
-    elseif (abs(x0(1)+dx(1)*real(Bs(1)-1,kind=rk) - domain_size(1)) < tolerance) then !x==L
-        n_surface(1) = +1
-    else
-        n_surface(1) = 0
-    endif
+      if (abs(x0(1)-0.0_rk) < tolerance ) then !x==0
+          n_surface(1) = -1
+      elseif (abs(x0(1)+dx(1)*real(Bs(1)-1,kind=rk) - domain_size(1)) < tolerance) then !x==L
+          n_surface(1) = +1
+      else
+          n_surface(1) = 0
+      endif
 
-    if (abs(x0(2)-0.0_rk) < tolerance ) then !y==0
-        n_surface(2) = -1
-    elseif (abs(x0(2)+dx(2)*real(Bs(2)-1,kind=rk) - domain_size(2)) < tolerance) then !y==L
-        n_surface(2) = +1
-    else
-        n_surface(2) = 0
-    endif
+      if (abs(x0(2)-0.0_rk) < tolerance ) then !y==0
+          n_surface(2) = -1
+      elseif (abs(x0(2)+dx(2)*real(Bs(2)-1,kind=rk) - domain_size(2)) < tolerance) then !y==L
+          n_surface(2) = +1
+      else
+          n_surface(2) = 0
+      endif
 
-    if (dim == 3) then
-        if (abs(x0(3)-0.0_rk) < tolerance ) then !z==0
-            n_surface(3) = -1
-        elseif (abs(x0(3)+dx(3)*real(Bs(3)-1,kind=rk) - domain_size(3)) < tolerance) then !z==L
-            n_surface(3) = +1
-        else
-            n_surface(3) = 0
-        endif
-    else
-        n_surface(3) = 0
-    endif
-end subroutine get_adjacent_boundary_surface_normal
+      if (dim == 3) then
+          if (abs(x0(3)-0.0_rk) < tolerance ) then !z==0
+              n_surface(3) = -1
+          elseif (abs(x0(3)+dx(3)*real(Bs(3)-1,kind=rk) - domain_size(3)) < tolerance) then !z==L
+              n_surface(3) = +1
+          else
+              n_surface(3) = 0
+          endif
+      else
+          n_surface(3) = 0
+      endif
+  end subroutine get_adjacent_boundary_surface_normal
 
 
-!> \author engels
-!> \brief For any block lgt_id this routine computes, from the treecode stored in
-!! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
-!! and origin are 3D vectors, the third component being zero in a 2D case. \n
-subroutine get_block_spacing_origin2( treecode, domain, Bs, dim, x0, dx )
-    implicit none
+  !> \author engels
+  !> \brief Compute block spacing and origin from lgt_block
+  !> \details For any block lgt_id this routine computes, from the treecode stored in
+  !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
+  !! and origin are 3D vectors, the third component being zero in a 2D case. \n
+  subroutine get_block_spacing_origin2( treecode, domain, Bs, dim, x0, dx )
+      implicit none
 
-    integer(kind=ik), intent(in)               :: dim
-    real(kind=rk), dimension(1:3), intent(in)  :: domain
-    integer(kind=ik), dimension(1:3)           :: Bs
-    integer(kind=ik), intent(in)               :: treecode(:)
-    !> output
-    real(kind=rk), dimension(1:3), intent(out) :: x0, dx
+      integer(kind=ik), intent(in)               :: dim
+      real(kind=rk), dimension(1:3), intent(in)  :: domain
+      integer(kind=ik), dimension(1:3)           :: Bs
+      integer(kind=ik), intent(in)               :: treecode(:)
+      !> output
+      real(kind=rk), dimension(1:3), intent(out) :: x0, dx
 
-    integer(kind=ik)                           :: ix, iy, iz, J
+      integer(kind=ik)                           :: ix, iy, iz, J
 
-    ! fetch this blocks level:
-    J = size(treecode)
+      ! fetch this blocks level:
+      J = size(treecode)
 
-    ! compute its coordinates in ijk space
-    call decoding(treecode, ix, iy, iz, J)
+      ! compute its coordinates in ijk space
+      call decoding(treecode, ix, iy, iz, J)
 
-    ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
-    ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
-    dx = 0.0_rk
-    dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim), kind=rk )
-    ! dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim)-1, kind=rk )
+      ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
+      ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
+      dx = 0.0_rk
+      dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim), kind=rk )
+      ! dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim)-1, kind=rk )
 
-    ! note zero based indexing:
-    ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
-    x0 = real( ((/ix,iy,iz/) - 1)*(Bs), kind=rk) * dx
+      ! note zero based indexing:
+      ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
+      x0 = real( ((/ix,iy,iz/) - 1)*(Bs), kind=rk) * dx
 
-end subroutine get_block_spacing_origin2
+  end subroutine get_block_spacing_origin2
 
 
   !===============================================================================
-  !> \brief from a tree id and treecode we make a tree-identifieer, which is
+  !> \brief Make tree-identifier from tree id and treecode
+  !> \details from a tree id and treecode we make a tree-identifieer, which is
   !! an integer made of the tree_ID and the treecode
-  !! Note: tree_ID s start from 1
+  !! \note tree_ID s start from 1
   function treecode2int(treearray, tree_ID)
-    implicit none
-    integer(kind=ik), intent(in) :: treearray(:)
-    integer(kind=ik), optional, intent(in) :: tree_ID
-    integer(kind=tsize) :: N, i, potency
-    integer(kind=tsize) :: treecode2int
-    N = size(treearray,1)
+      implicit none
+      integer(kind=ik), intent(in) :: treearray(:)
+      integer(kind=ik), optional, intent(in) :: tree_ID
+      integer(kind=tsize) :: N, i, potency
+      integer(kind=tsize) :: treecode2int
+      N = size(treearray,1)
 
-    if (present(tree_ID)) then
-        treecode2int = tree_ID
-        potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
-        ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
-    else
-        ! For the rest of wabbit not using tree_IDs we have to make sure that
-        ! the results stay the same
-        potency = -1_tsize
-        treecode2int = 0_tsize
-    endif
+      if (present(tree_ID)) then
+          treecode2int = tree_ID
+          potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
+          ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
+      else
+          ! For the rest of wabbit not using tree_IDs we have to make sure that
+          ! the results stay the same
+          potency = -1_tsize
+          treecode2int = 0_tsize
+      endif
 
-    do i = 1, N
-        if (treearray(i) >= 0) then
-            ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
-            ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-            treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
-        endif
-    enddo
+      do i = 1, N
+          if (treearray(i) >= 0) then
+              ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
+              ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
+              treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
+          endif
+      enddo
 
-end function
+  end function
 
   !===============================================================================
   !> \brief from an integer, return the first (rightmost) digit and remove it from
@@ -149,81 +155,83 @@ end function
     ! remove it from number
     number = number / 10
   end subroutine
-!===============================================================================
+  !===============================================================================
 
-!===============================================================================
-!> \brief convert treecodenumber to treearray
-subroutine treecodenumber2array( number, level, array )
-  implicit none
-  integer(kind=tsize),intent(in):: number
-  integer(kind=ik),intent(in)      :: level
-  integer(kind=ik),intent(inout)   :: array(:)
-  integer(kind=ik)                 :: i
-  integer(kind=tsize)              :: element,tmp
-
-
-  tmp=number
-  array=0
-  i=0
-  do while (tmp .ne. 0 )
-    call pop(tmp,element)
-    array(level-i)=int(element,kind=ik)
-    i=i+1
-  enddo
-
-end subroutine
-!===============================================================================
-
-
-subroutine adjacent4( treecode, direction, treecode_neighbor)
+  !===============================================================================
+  !> \brief convert treecodenumber to treearray
+  subroutine treecodenumber2array( number, level, array )
     implicit none
+    integer(kind=tsize),intent(in):: number
+    integer(kind=ik),intent(in)      :: level
+    integer(kind=ik),intent(inout)   :: array(:)
+    integer(kind=ik)                 :: i
+    integer(kind=tsize)              :: element,tmp
 
-    integer(kind=tsize), intent(in) :: treecode
-    integer(kind=tsize), intent(out) :: treecode_neighbor
-    character(len=3), intent(in) :: direction
 
-    integer(kind=tsize) :: treecode_tmp
+    tmp=number
+    array=0
+    i=0
+    do while (tmp .ne. 0 )
+      call pop(tmp,element)
+      array(level-i)=int(element,kind=ik)
+      i=i+1
+    enddo
 
-    select case(direction)
-      case('__N','__S','__E','__W')
-          call adjacent4_NESW( treecode, direction, treecode_neighbor)
-      case('_NE')
-          call adjacent4_NESW( treecode, '__N', treecode_tmp)
-          call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-      case('_NW')
-          call adjacent4_NESW( treecode, '__N', treecode_tmp)
-          call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-      case('_SE')
-          call adjacent4_NESW( treecode, '__N', treecode_tmp)
-          call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-      case('_SW')
-          call adjacent4_NESW( treecode, '__N', treecode_tmp)
-          call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
-      case default
-          call abort(118118, "Lord vader, the treelib does not know the direction")
-    end select
+  end subroutine
+  !===============================================================================
 
-end subroutine adjacent4
+  !===============================================================================
+  !> \brief wrapper for finding adjacant block in 2D, calls adjacent_NESW
+  subroutine adjacent4( treecode, direction, treecode_neighbor)
+      implicit none
 
-!===============================================================================
+      integer(kind=tsize), intent(in) :: treecode
+      integer(kind=tsize), intent(out) :: treecode_neighbor
+      character(len=3), intent(in) :: direction
 
-  subroutine adjacent4_NESW( treecode, direction, treecode_neighbor)
-    implicit none
-    integer(kind=tsize), intent(in) :: treecode
-    integer(kind=tsize) :: treecode_this, tmp
-    integer(kind=tsize), intent(out) :: treecode_neighbor
-    character(len=3), intent(in) :: direction
-    integer(kind=ik) :: i, j
-    logical :: go
+      integer(kind=tsize) :: treecode_tmp
 
-    ! copy treecode, as we modify it, but not return this modified value
-    treecode_this = treecode
-    ! this is the neighbors treecode we're looking for
-    treecode_neighbor = 0
-    go = .true.
+      select case(direction)
+        case('__N','__S','__E','__W')
+            call adjacent4_NESW( treecode, direction, treecode_neighbor)
+        case('_NE')
+            call adjacent4_NESW( treecode, '__N', treecode_tmp)
+            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
+        case('_NW')
+            call adjacent4_NESW( treecode, '__N', treecode_tmp)
+            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
+        case('_SE')
+            call adjacent4_NESW( treecode, '__N', treecode_tmp)
+            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
+        case('_SW')
+            call adjacent4_NESW( treecode, '__N', treecode_tmp)
+            call adjacent4_NESW( treecode_tmp, '__E', treecode_neighbor)
+        case default
+            call abort(118118, "Lord vader, the treelib does not know the direction")
+      end select
 
-    select case(direction)
-      case('__N')
+  end subroutine adjacent4
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Obtain neighbour in 2D for given direction with numerical treecode
+    subroutine adjacent4_NESW( treecode, direction, treecode_neighbor)
+      implicit none
+      integer(kind=tsize), intent(in) :: treecode
+      integer(kind=tsize) :: treecode_this, tmp
+      integer(kind=tsize), intent(out) :: treecode_neighbor
+      character(len=3), intent(in) :: direction
+      integer(kind=ik) :: i, j
+      logical :: go
+
+      ! copy treecode, as we modify it, but not return this modified value
+      treecode_this = treecode
+      ! this is the neighbors treecode we're looking for
+      treecode_neighbor = 0
+      go = .true.
+
+      select case(direction)
+        case('__N')
           !*********************************************************************
           ! NORTH
           !*********************************************************************
@@ -243,11 +251,10 @@ end subroutine adjacent4
             else
               ! transition to different quadrant.
               call pop(treecode_this, tmp)
-              treecode_neighbor = treecode_neighbor + (modulo(tmp+2,4_tsize)) * 10**i
+              treecode_neighbor = treecode_neighbor + (modulo(tmp+2_tsize,4_tsize)) * 10**i
               i = i + 1
             endif
           enddo
-
         case('__S')
           !*********************************************************************
           ! SOUTH
@@ -338,17 +345,185 @@ end subroutine adjacent4
               i = i + 1
             endif
           enddo
+        case default
+            call abort(118118, "Lord vader, the treelib does not know the direction")
+      end select
+
+    end subroutine
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Obtain neighbour in 2D for given direction with numerical treecode
+  !> \details Use math representation and loop over digits
+  subroutine adjacent_JB_NESW( treecode, treecode_neighbor, direction, level, max_treelevel)
+    implicit none
+    !> Level at which to search the neighbour, this is from coarse to fine
+    integer(kind=ik), intent(in)        :: level
+    !> Max treelevel, needed to loop correctly
+    integer(kind=ik), intent(in)        :: max_treelevel
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecoude out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> Seach direction in str representation
+    character(len=3), intent(in)        :: direction
+    integer(kind=tsize)                 :: treecode_this, tmp, dir_sign, dir_fac
+    integer(kind=ik)                    :: i, j
+    logical                             :: go
+
+    ! copy treecode, as we modify it, but not return this modified value
+    treecode_this = treecode
+
+    ! this is the neighbors treecode we're looking for
+    treecode_neighbor = 0_tsize
+
+    !> We need direction and level from each direction
+    select case(direction)
+      case('__N')
+        dir_sign = -1
+        dir_fac = 2
+      case('__S')
+        dir_sign = 1
+        dir_fac = 2
+      case('__E')
+        dir_sign = 1
+        dir_fac = 1
+      case('__W')
+        dir_sign = -1
+        dir_fac = 1
       case default
-          call abort(118118, "Lord vader, the treelib does not know the direction")
+        call abort(118118, "Lord vader, the treelib does not know the direction")
     end select
 
+    !> scales finer as neighbour search - keep as 0 and pop of numbers
+    do i = 1, max_treelevel-level
+      call pop(treecode_this, tmp)
+    end do
+    do i = max_treelevel-level+1, maxdigits
+      ! pop last digit
+      call pop(treecode_this, tmp)
+      ! add number with change from neighbour or overflow
+      treecode_neighbor = treecode_neighbor + (modulo(tmp + dir_sign*dir_fac, 2*dir_fac) + tmp/(2*dir_fac)*2/dir_fac)* 10**(i-1)
+      ! compute overflow, magic with + 2*dir_fac) / (2*dir_fac) is done to round towards negative infinity for the case when dir_sign < 0
+      dir_sign = (modulo(tmp, 2*dir_fac) + dir_sign*dir_fac + 2*dir_fac) / (2*dir_fac) - 1
+
+      ! copy directly the rest and exit loop if numbers are not gonna change anymore
+      if (dir_sign == 0) then
+        treecode_neighbor = treecode_neighbor + treecode_this* 10**i
+        exit
+      end if
+    end do
+
   end subroutine
+  !===============================================================================
 
+  ! !===============================================================================
+  ! !> \brief Obtain neighbour in 3D for given direction with numerical treecode
+  ! !> \details Use math representation and loop over digits
+  ! !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
+  ! !  --------------------------------------------------------------------------------------------
+  ! !> neighbor codes: \n
+  ! !  ---------------
+  ! !> for imagination:
+  ! !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
+  ! !!                   - edge: boundary between two sides - use sides numbers for coding
+  ! !!                   - corner: between three sides - so use all three sides numbers
+  ! !!                   - block on higher/lower level: block shares face/edge and one unique corner,
+  ! !!                     so use this corner code in second part of neighbor code
+  ! !!
+  ! !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
+  ! !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
+  ! !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
+  ! !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
+  ! !! corner: '123/___', '134/___', '145/___', '152/___' \n
+  ! !!         '623/___', '634/___', '645/___', '652/___' \n
+  ! !! \n
+  ! !! complete neighbor code array, 74 possible neighbor relations \n
+  ! !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
+  ! !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
+  ! !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
+  ! !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+  ! !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+  ! !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+  ! !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+  ! !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  ! ! ********************************************************************************************
+  ! subroutine adjacent_3D_faces( treecode, treecode_neighbor, direction, level, max_treelevel)
+  !   implicit none
+  !   !> Level at which to search the neighbour, this is from coarse to fine
+  !   integer(kind=ik), intent(in)        :: level
+  !   !> Max treelevel, needed to loop correctly
+  !   integer(kind=ik), intent(in)        :: max_treelevel
+  !   !> Numerical treecode in
+  !   integer(kind=tsize), intent(in)     :: treecode
+  !   !> Numerical treecoude out
+  !   integer(kind=tsize), intent(out)    :: treecode_neighbor
+  !   !> Seach direction in str representation
+  !   character(len=3), intent(in)        :: direction
+  !   integer(kind=tsize)                 :: treecode_this, tmp, dir_sign, dir_fac
+  !   integer(kind=ik)                    :: i, j
+  !   logical                             :: go
 
-!===============================================================================
+  !   ! copy treecode, as we modify it, but not return this modified value
+  !   treecode_this = treecode
 
+  !   ! this is the neighbors treecode we're looking for
+  !   treecode_neighbor = 0_tsize
 
-  subroutine decoding4(treecode1, i, j, k)
+  !   !> We need direction and level from each direction
+  !   select case(direction)
+  !     case('__1')  ! top side
+  !       dir_sign = -1
+  !       dir_fac = 4
+  !     case('__2')  ! front side
+  !       dir_sign = -1
+  !       dir_fac = 2
+  !     case('__3')  ! left side
+  !       dir_sign = -1
+  !       dir_fac = 1
+  !     case('__4')  ! right side
+  !       dir_sign = 1
+  !       dir_fac = 1
+  !     case('__5')  ! back side
+  !       dir_sign = 1
+  !       dir_fac = 2
+  !     case('__6')  ! bottom side
+  !       dir_sign = 1
+  !       dir_fac = 4
+  !     case default
+  !       call abort(118118, "Lord vader, the treelib does not know the direction")
+  !   end select
+
+  !   !> scales finer as neighbour search - keep as 0 and pop of numbers
+  !   do i = 1, max_treelevel-level
+  !     call pop(treecode_this, tmp)
+  !   end do
+  !   do i = max_treelevel-level+1, maxdigits
+  !     ! pop last digit
+  !     call pop(treecode_this, tmp)
+  !     ! add number with change from neighbour or overflow
+  !     treecode_neighbor = treecode_neighbor + (modulo(tmp + dir_sign*dir_fac, 2*dir_fac) + tmp/(2*dir_fac)*2/dir_fac)* 10**(i-1)
+  !     ! compute overflow, magic with + 2*dir_fac) / (2*dir_fac) is done to round towards negative infinity for the case when dir_sign < 0
+  !     dir_sign = (modulo(tmp, 2*dir_fac) + dir_sign*dir_fac + 2*dir_fac) / (2*dir_fac) - 1
+
+  !     ! copy directly the rest and exit loop if numbers are not gonna change anymore
+  !     if (dir_sign == 0) then
+  !       treecode_neighbor = treecode_neighbor + treecode_this* 10**i
+  !       exit
+  !     end if
+  !   end do
+
+  !   !> flip back
+  !   ! treecode_this = treecode_neighbor
+  !   ! treecode_neighbor = flipint(treecode_this)
+
+  ! end subroutine
+  ! !===============================================================================
+
+  !===============================================================================
+  !> \brief Obtain block position coordinates from numerical treecode
+  !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
+  subroutine decoding_n(treecode1, i, j, k)
       implicit none
 
       !> block position coordinates
@@ -416,10 +591,11 @@ end subroutine adjacent4
       j = int(iy, kind=ik)
       k = int(iz, kind=ik)
 
-  end subroutine decoding4
+  end subroutine decoding_n
+  !===============================================================================
 
-
-
+  !===============================================================================
+  !> \brief Obtain numerical treecode from block position coordinates
   subroutine encoding4( ix, iy, treecode ) !, Jmax )
     implicit none
     integer(kind=ik), intent(in) :: ix, iy!, Jmax
@@ -446,6 +622,7 @@ end subroutine adjacent4
       d = d / 10_tsize
       tl = 9_tsize
 
+      ! JB: Is x and y here swapped?
       if (cl==0_tsize .and. dl==0_tsize) then
         tl = 0_tsize
       end if
@@ -462,6 +639,8 @@ end subroutine adjacent4
         tl = 3_tsize
       end if
 
+      ! tl = cl*2_tsize + dl
+
       treecode = treecode + tl * 10_tsize**(j-1)
     end do
 
@@ -475,9 +654,48 @@ end subroutine adjacent4
     ! to finest level
     treecode = flipint(treecode)
   end subroutine encoding4
+  !===============================================================================
 
 
-  ! convert given integger decnum to binary representation
+  !===============================================================================
+  !> \brief Obtain numerical treecode from block position coordinates for 2 or 3 dimensions
+  !> \author JB
+  subroutine encoding_n( ix, dim, treecode ) !, Jmax )
+    implicit none
+    integer(kind=ik), intent(in)    :: dim              !> dimension (2 or 3)
+    integer(kind=ik), intent(in)    :: ix(dim)          !> block position coordinates
+    integer(kind=tsize), intent(out) :: treecode
+    integer(kind=tsize) :: c(dim)
+    integer(kind=tsize) :: i_dim
+    !integer(kind=ik) :: b(Jmax)
+
+    ! following gargantini, we first require the binary representation of ix,iy
+    ! note algorithm ENCODING in her paper requires us to loop down from the highest
+    ! level (the last entry of the binary), so here we FLIP the number.
+    ! NOTE: gargantini uses 0-based indexing, which is a source of errors. we use 1-based
+    treecode = 0_tsize
+    do i_dim = 1, dim
+      c(i_dim) = flipint( toBinary( ix(i_dim)-1 ) )
+      ! Assume number contains only 0 and 1 and directly apply values
+      treecode = treecode + c(i_dim) * 2_tsize**(i_dim-1)
+    end do
+
+    ! gargantini gives the example (I,J)=(6,5) which gives K=321. To reproduce it, set (ix,iy)=7,6
+    ! which gives you at this point
+    ! treecode=1230000000000000 this means first index (rightmost, "0") is COARSEST
+    ! now we reverse the direction (flipint) and end up with
+    ! treecode=000000000000321, this means first index (rightmost, "1") is FINEST
+    ! Then, we have K[0] (which is the rightmost entry of the code) = 1 as
+    ! gargantini has. in the decoding prodecure, we flip the treecode again and start from the coarsest
+    ! to finest level
+    treecode = flipint(treecode)
+  end subroutine encoding_n
+  !===============================================================================
+
+
+  !===============================================================================
+  !> \brief Convert given integer decnum to binary representation
+  !> \details Each digit represents a power of 2 and can be either 1 or 0, output is as integer.
   ! textbook code
   INTEGER(kind=tsize) FUNCTION toBinary(decNum)
     IMPLICIT NONE
@@ -501,11 +719,13 @@ end subroutine adjacent4
 
     toBinary = bineq
   END FUNCTION toBinary
+  !===============================================================================
 
-
-  ! flip an integer number, eg given 523 return 325
-  ! or 000021 gives 120000, so we have to use zero-padding!
-  ! The length of returned (zero padded) reverse int is specified by maxdigits
+  !===============================================================================
+  !> \brief Flip an integer number
+  !! \details Flip an integer number, eg given 523 return 325
+  !! or 000021 gives 120000, so we have to use zero-padding! \n
+  !! The length of returned (zero padded) reverse int is specified by maxdigits
   integer(kind=tsize) function flipint(i)
     implicit none
     integer(kind=tsize), intent(in) :: i
@@ -520,16 +740,19 @@ end subroutine adjacent4
     end do
     return
   end function
+  !===============================================================================
 
 
 
-  !> \brief give treecode for adjacent block
-  !! input:             - treecode for block N
-  !!                    - direction for neighbor search
-  !!                    - max treelevel
-  !! output:            - neighbor treecode, for neighbor on same level
+  !> \brief give treecode for adjacent block \n
+  !! \details input:
+  !!   - treecode for block N
+  !!   - direction for neighbor search
+  !!   - max treelevel
+  !!
+  !! output:
+  !!   - neighbor treecode, for neighbor on same level
   ! ********************************************************************************************
-
   recursive subroutine adjacent_block_2D(tcBlock, tcNeighbor, direction, level, max_treelevel)
 
       use module_params   ! global parameters
@@ -651,10 +874,13 @@ end subroutine adjacent4
 
 
   !> \brief give treecode for adjacent block in 3D \n
-  !! input:             - treecode for block N
+  !! \details input:
+  !!                    - treecode for block N
   !!                    - direction for neighbor search
   !!                    - max treelevel
-  !!output:             - neighbor treecode, for neighbor on same level
+  !! output:             
+  !!
+  !!                    - neighbor treecode, for neighbor on same level
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
@@ -682,7 +908,6 @@ end subroutine adjacent4
   !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
-
   recursive subroutine adjacent_block_3D(tcBlock, tcNeighbor, direction, level, max_treelevel)
 
       use module_params     ! global parameters
@@ -984,7 +1209,6 @@ end subroutine adjacent4
   !> \note Subroutine works with both 2D and 3D (quad/octtrees)
   !
   ! ********************************************************************************************
-
   subroutine decoding(treecode, i, j, k, treeN)
       ! global parameters
       use module_params
@@ -1045,37 +1269,35 @@ end subroutine adjacent4
   !! \details
   !> \note Subroutine works with both 2D and 3D (quad/octtrees)
   !! \date 3.08.2018 - created from 2D/3D and simplified for d dimensions
-! ix(1)->   0      1     2     3      4     5     6     7
-! ix(2)  ---------------------------------------------------
-!   0    || 000 | 001 | 010 | 011 || 100  | 101 | 110 | 111||
-!        ---------------------------------------------------
-!   1    || 002 | 003 | 012 | 013 || 102  | 103 | 112 | 113||
-!        ---------------------------------------------------
-!   2    || 020 | 021 | 030 | 031 || 120  | 121 | 130 | 131||
-!        ---------------------------------------------------
-!   3    || 022 | 023 | 032 | 033 || 122  | 123 | 132 | 133||
-!        :::::::::::::::::::::::::::::::::::::::::::::::::::
-!   4    || 200 | 201 | 210 | 211 || 300  | 301 | 310 | 311||
-!        ---------------------------------------------------
-!   5    || 202 | 203 | 212 | 213 || 302  | 303 | 312 | 313||
-!       ----------------------------------------------------
-!   6    || 220 | 221 | 230 | 231 || 320  | 321 | 330 | 331||
-!       ----------------------------------------------------
-!   7    || 222 | 223 | 232 | 233 || 322  | 323 | 332 | 333||
-!       ----------------------------------------------------
-! Coordinate Transformation:
-! 1. transformation of the cartesian coordinates from dezimal(basis 10) to binary (basis 2)
-!       ix      = 2^{N-1} c_{N-1} + ... +  2^2 c_2 + 2^1 c_1 + 2^0 c_0 =(c_{N-1},...,c_2,c_1,c_0)_2
-!       example:
-!       ix      =(5,6)_10                 =((101),(110))_2
-! 2. coordinate transformation from cartesian to treecode
-!       ix -> treecode
-!       example for d=2
-!       ((101),(011))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
-!       compare to the quaternary codes in the quadrants above
-!
-
-
+  ! ix(1)->   0      1     2     3      4     5     6     7
+  ! ix(2)  ---------------------------------------------------
+  !   0    || 000 | 001 | 010 | 011 || 100  | 101 | 110 | 111||
+  !        ---------------------------------------------------
+  !   1    || 002 | 003 | 012 | 013 || 102  | 103 | 112 | 113||
+  !        ---------------------------------------------------
+  !   2    || 020 | 021 | 030 | 031 || 120  | 121 | 130 | 131||
+  !        ---------------------------------------------------
+  !   3    || 022 | 023 | 032 | 033 || 122  | 123 | 132 | 133||
+  !        :::::::::::::::::::::::::::::::::::::::::::::::::::
+  !   4    || 200 | 201 | 210 | 211 || 300  | 301 | 310 | 311||
+  !        ---------------------------------------------------
+  !   5    || 202 | 203 | 212 | 213 || 302  | 303 | 312 | 313||
+  !       ----------------------------------------------------
+  !   6    || 220 | 221 | 230 | 231 || 320  | 321 | 330 | 331||
+  !       ----------------------------------------------------
+  !   7    || 222 | 223 | 232 | 233 || 322  | 323 | 332 | 333||
+  !       ----------------------------------------------------
+  ! Coordinate Transformation:
+  ! 1. transformation of the cartesian coordinates from dezimal(basis 10) to binary (basis 2)
+  !       ix      = 2^{N-1} c_{N-1} + ... +  2^2 c_2 + 2^1 c_1 + 2^0 c_0 =(c_{N-1},...,c_2,c_1,c_0)_2
+  !       example:
+  !       ix      =(5,6)_10                 =((101),(110))_2
+  ! 2. coordinate transformation from cartesian to treecode
+  !       ix -> treecode
+  !       example for d=2
+  !       ((101),(011))_2 -> 2^0 (101)_2 + 2^1 (110)_2=(3 2 1)
+  !       compare to the quaternary codes in the quadrants above
+  !
   subroutine encoding(treearray, ix, dim , block_num, treeN)
       ! global parameters
       use module_params
@@ -1115,7 +1337,10 @@ end subroutine adjacent4
 
   end subroutine encoding
 
-
+  !===============================================================================
+  !> \brief Encoding from block position (cartesian coordinates) to treecode with different input
+  !
+  ! JB: Redundant and only used once in post_extract_slice
   subroutine encoding_revised(treecode, ix, dim, level)
       ! global parameters
       use module_params
@@ -1147,10 +1372,10 @@ end subroutine adjacent4
 
       deallocate( ix_binary )
   end subroutine encoding_revised
-
+  !===============================================================================
 
   !> \brief convert a integer i to binary b \n
-  !! binary return as vector with length N
+  !> \details binary return as vector with length N
   subroutine int_to_binary(i, N, b)
 
       use module_params       ! global parameters

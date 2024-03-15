@@ -32,6 +32,7 @@ module module_timing
 
 contains
 
+    !> Resets all timings to 0
     subroutine reset_all_timings()
         implicit none
         if (allocated(comp_time)) comp_time = 0.0_dp

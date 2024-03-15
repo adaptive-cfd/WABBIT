@@ -44,15 +44,17 @@ mpirun -n 1 ./wabbit [your_filename.ini] --mem-per-core=2.0GB
 where the --memory options allows you to control how much memory is globally allocated, i.e., on all CPUs. Note that WABBIT does not free memory during runtime. This is because the code is intented to run on clusters/supercomputers, where the available memory is reserved for the execution of the code alone. This is quite typical for supercomputing.
 
 ## Additional Information
-If you are new to WABBIT it is recommended to read the [information for newcomers](https://github.com/adaptive-cfd/WABBIT/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+the+newcomers%22 "newcomer issues")!
+In case you have problems with the preparation to use WABBIT, have a look if you can find anything in the  [wiki](../../ "additional information for WABBIT")
 
-In case you have problems with the preparation to use WABBIT, have a look at the informations given in the  [wiki](https://github.com/adaptive-cfd/WABBIT/wiki "additional information for WABBIT on fedora/ubuntu")
-
-For further Information see the documentation. Therefore it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed.
-
+More information can also be found in the documentation build with [`doxygen`](https://www.doxygen.nl/). Therefore it is necessary to have [Doxygen](http://www.stack.nl/~dimitri/doxygen/ "Doxygen") installed. Create the documentation with
+``` shell
+doxygen doc/doc_configuration
 ```
-make doc
+and display `doc/output/html/index.html` with your browser. You can also locally display all files with
+``` shell
+python3 -m http.server --directory doc/output/html
 ```
+and then open in a browser `localhost:8000`
 
 ## Publications
 

@@ -143,10 +143,11 @@ module module_treelib
       enddo
 
   end function
+  !===============================================================================
 
   !===============================================================================
   !> \brief from an integer, return the first (rightmost) digit and remove it from
-  !! the number
+  !! number
   elemental subroutine pop( number, element )
     implicit none
     integer(kind=tsize), intent(inout) :: number, element
@@ -158,15 +159,14 @@ module module_treelib
   !===============================================================================
 
   !===============================================================================
-  !> \brief convert treecodenumber to treearray
-  subroutine treecodenumber2array( number, level, array )
+  !> \brief convert numerical decimal treecodenumber to treearray
+  subroutine tcd2array( number, level, array )
     implicit none
     integer(kind=tsize),intent(in):: number
     integer(kind=ik),intent(in)      :: level
     integer(kind=ik),intent(inout)   :: array(:)
     integer(kind=ik)                 :: i
     integer(kind=tsize)              :: element,tmp
-
 
     tmp=number
     array=0
@@ -180,10 +180,217 @@ module module_treelib
   !===============================================================================
 
   !===============================================================================
+  !> \brief convert numerical binary treecodenumber to treearray
+  !> \author JB
+  subroutine tcb2array( treecode, level, array, dim)
+    implicit none
+    !> Treecode in binary numerical representation
+    integer(kind=tsize),intent(in)   :: treecode
+    !> Depth to be iterated over
+    integer(kind=ik),intent(in)      :: level
+    !> Treearray
+    integer(kind=ik),intent(inout)   :: array(:)
+    !> Dimension, 2 or 3, defaults to 3
+    integer(kind=ik), optional       :: dim
+    integer(kind=ik)                 :: i, n_dim
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+    n_dim = dim
+
+    array=0
+    do i = 0,level-1
+        array(level-i) = int(ibits(treecode, i*n_dim, n_dim), ik)
+    end do
+  end subroutine
+  !===============================================================================
+
+  !===============================================================================
   !> \brief Obtain neighbour for given direction with numerical treecode
   !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
   !> \author JB
-  subroutine adjacent_wrapper(treecode, treecode_neighbor, direction, level, max_treelevel)
+  subroutine adjacent_wrapper_b(treecode, treecode_neighbor, direction, level, dim)
+    implicit none
+    !> Level at which to search the neighbour, this is from coarse (0) to fine (maxlevel).
+    !> Set negative values in order to reverse direction fine (-1) to coarse (-maxlevel+1)
+    integer(kind=ik), intent(in)        :: level
+    !> Dimension 2 or 3, needed to get correct max level, defaults to 3
+    integer(kind=ik), optional          :: dim
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecoude out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> Seach direction in str representation
+    character(len=*), intent(in)        :: direction
+    integer(kind=tsize)                 :: tc1
+    integer(kind=ik)                    :: i, n_dim
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+
+    treecode_neighbor = treecode
+    ! loop over all letters in direction and call the cardinal directions
+    do i = 1, len(direction)
+      tc1 = treecode_neighbor
+      select case(direction(i:i))
+        ! this case does nothing, charaters are defined as placeholders
+        ! place at top because it appears very often, probably micro-optimization but well
+        case("_")
+        ! 2D cases are on top to break out earlier, probably micro-optimization but well
+        case("5", "N")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 5, level, n_dim)
+        case("3", "S")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 3, level, n_dim)
+        case("2", "W")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 2, level, n_dim)
+        case("4", "E")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 4, level, n_dim)
+        case("1", "T")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 1, level, n_dim)
+        case("6", "B")
+          call adjacent_3D_faces_b(tc1, treecode_neighbor, 6, level, n_dim)
+        ! this case signals the second part, as far as I've understood we can break here
+        case("/")
+          exit
+        case default
+          call abort(118118, "Lord vader, the treelib does not know the direction")  
+      end select
+    end do
+  end subroutine
+  !===============================================================================
+
+  !===============================================================================
+  !> \author JB
+  !> \brief Obtain neighbour in 3D for given direction with numerical binary treecode
+  !> \details Use math representation and loop over digits
+  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
+  !  --------------------------------------------------------------------------------------------
+  !> neighbor codes: \n
+  !  ---------------
+  !> for imagination:
+  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
+  !!                   - edge: boundary between two sides - use sides numbers for coding
+  !!                   - corner: between three sides - so use all three sides numbers
+  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
+  !!                     so use this corner code in second part of neighbor code
+  !!
+  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
+  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
+  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
+  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
+  !! corner: '123/___', '134/___', '145/___', '152/___' \n
+  !!         '623/___', '634/___', '645/___', '652/___' \n
+  !! \n
+  !! complete neighbor code array, 74 possible neighbor relations \n
+  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
+  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
+  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
+  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
+  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
+  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
+  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
+  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  ! ********************************************************************************************
+  subroutine adjacent_3D_faces_b( treecode, treecode_neighbor, direction, level, dim)
+    implicit none
+    !> Level at which to search the neighbour, this is from coarse (0) to fine (maxlevel).
+    !> Set negative values in order to reverse direction fine (-1) to coarse (-maxlevel+1)
+    integer(kind=ik), intent(in)        :: level
+    !> Dimension 2 or 3, needed to get correct max level, defaults to 3
+    integer(kind=ik), optional          :: dim
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecoude out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> Seach direction in int representation for main cardinal directions
+    integer(kind=ik), intent(in)        :: direction
+    integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
+    integer(kind=ik)                    :: i, n_dim, max_treelevel, level_set
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+    n_dim = dim
+
+    ! this is the maximum index possible for binary grids (the last one on the finest grid)
+    max_treelevel = int((bit_size(treecode) -1) / n_dim, 4)
+
+    ! handle cases when level input is revers from fine to coarse and translate
+    if (level < 0) then
+        level_set = max_treelevel + level + 1
+    else
+        level_set = level
+    end if
+
+    ! We need direction and level from each direction
+    select case(direction)
+      ! At first we assign the main cardinal directions
+      case(1)  ! T - top side z+1
+        dir_sign = 1
+        dir_fac = 4
+      case(2)  ! W - front side y-1
+        dir_sign = -1
+        dir_fac = 1
+      case(3)  ! S - right side x+1
+        dir_sign = 1
+        dir_fac = 2
+      case(4)  ! E - back side y+1
+        dir_sign = 1
+        dir_fac = 1
+      case(5)  ! N - left side x-1
+        dir_sign = -1
+        dir_fac = 2
+      case(6)  ! B - bottom side z-1
+        dir_sign = -1
+        dir_fac = 4
+      case default
+        call abort(118118, "Lord vader, the treelib does not know the direction")
+    end select
+
+    ! copy treecode, as we modify it, but not return this modified value
+    tc_reduce = treecode
+
+    ! this is the neighbors treecode we're looking for
+    treecode_neighbor = 0_tsize
+
+    ! scales finer as neighbour search - keep as 0 and pop of numbers
+    do i = max_treelevel-level_set+1, max_treelevel
+      ! extract binary-duplet YX or triplet ZYX
+      digit_last = ibits(treecode, (i-1)*n_dim, n_dim)
+
+      ! add number with change from neighbour or overflow
+      treecode_neighbor = treecode_neighbor + ishft(modulo(digit_last + dir_sign*dir_fac, 2*dir_fac) + digit_last/(2*dir_fac)*2*dir_fac, n_dim*(i-1))
+
+      ! compute overflow
+      dir_sign = ibits(digit_last/dir_fac + (2 - dir_sign)/2, 0, 1)*dir_sign
+
+      ! copy directly the rest and exit loop if numbers are not gonna change anymore
+      ! shift back and forth in order to set lower values to zero
+      if (dir_sign == 0) then
+        treecode_neighbor = treecode_neighbor + ishft(ishft(treecode, -n_dim*i), n_dim*i)
+        exit
+      end if
+    end do
+
+  end subroutine
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Obtain neighbour for given direction with numerical treecode
+  !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
+  !> \author JB
+  subroutine adjacent_wrapper_n(treecode, treecode_neighbor, direction, level, max_treelevel)
     implicit none
     !> Level at which to search the neighbour, this is from coarse to fine
     integer(kind=ik), intent(in)        :: level
@@ -208,17 +415,17 @@ module module_treelib
         case("_")
         ! 2D cases are on top to break out earlier, probably micro-optimization but well
         case("5", "N")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 5, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 5, level, max_treelevel)
         case("3", "S")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 3, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 3, level, max_treelevel)
         case("2", "W")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 2, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 2, level, max_treelevel)
         case("4", "E")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 4, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 4, level, max_treelevel)
         case("1", "T")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 1, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 1, level, max_treelevel)
         case("6", "B")
-          call adjacent_3D_faces(tc1, treecode_neighbor, 6, level, max_treelevel)
+          call adjacent_3D_faces_n(tc1, treecode_neighbor, 6, level, max_treelevel)
         ! this case signals the second part, as far as I've understood we can break here
         case("/")
           exit
@@ -261,7 +468,7 @@ module module_treelib
   !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
-  subroutine adjacent_3D_faces( treecode, treecode_neighbor, direction, level, max_treelevel)
+  subroutine adjacent_3D_faces_n( treecode, treecode_neighbor, direction, level, max_treelevel)
     implicit none
     !> Level at which to search the neighbour, this is from coarse to fine
     integer(kind=ik), intent(in)        :: level
@@ -439,6 +646,132 @@ module module_treelib
   end subroutine encoding_n
   !===============================================================================
 
+  !===============================================================================
+  !> \brief Obtain block position coordinates from numerical bitwise treecode
+  !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
+  subroutine decoding_b(ix, treecode, dim)
+    implicit none
+
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional    :: dim              
+    !> block position coordinates
+    ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
+    integer(kind=ik), intent(out)    :: ix(3)
+    !> treecode
+    integer(kind=tsize), intent(in) :: treecode
+    integer(kind=tsize) :: n_dim, i_dim, i_nx, max_tclevel
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+
+    ! this is the maximum index possible for binary grids (the last one on the finest grid)
+    max_tclevel = (bit_size(treecode) -1) / n_dim
+
+    ! NOTE: one-based indexing
+    do i_dim = 1,n_dim
+      ix(i_dim) = 1
+    end do
+
+    ! extract corresponding bit from bit-duplet YX or -triplet ZYX of level i_nx, then multiply by 2**(i_nx-1)
+    ! convert from int8 to int4 is not necessary but gets rid of conversion warning
+    do i_nx = 0, max_tclevel-1
+      do i_dim = 1,n_dim
+        ix(i_dim) = ix(i_dim) + int(ishft(ibits(treecode, (i_nx)*n_dim+(i_dim-1), 1), i_nx), 4)
+      end do
+    end do
+
+  end subroutine decoding_b
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Obtain numerical binary treecode from block position coordinates for 2 or 3 dimensions
+  !> \author JB
+  subroutine encoding_b( ix, treecode, dim) !, Jmax )
+    implicit none
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional    :: dim              
+    !> block position coordinates
+    ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
+    integer(kind=ik), intent(in)    :: ix(3)
+    !> treecode
+    integer(kind=tsize), intent(out) :: treecode
+    integer(kind=tsize) :: n_dim, i_dim, i_nx, temp, max_tclevel
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+
+    ! this is the maximum index possible for binary grids (the last one on the finest grid)
+    max_tclevel = (bit_size(treecode) -1) / n_dim
+
+    treecode = 0_tsize
+
+    ! loop over all levels in treecode
+    do i_nx = 0, max_tclevel-1
+        ! extract value as bit from each direction and add correspondend position in level-triplet or -duplet to treecode
+        ! subtract 1 as it is one-based indexing
+        do i_dim = 1, n_dim
+            treecode = treecode + ishft(ibits(ix(i_dim)-1, i_nx,1), (i_nx)*n_dim + (i_dim - 1))
+        end do
+    end do
+  end subroutine encoding_b
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Convert numerical binary treecode to str for readability where each digit is from 0-7
+  !> \details Str representation is needed as max length of 21 exceeds maximum digits a decimal representation can have
+  !> \author JB
+  subroutine tc_to_str( treecode, tc_str, dim, level) !, Jmax )
+    implicit none
+    !> Treecode in binary numerical representation
+    integer(kind=tsize), intent(out) :: treecode
+    !> String where each digit is 0-7
+    character(len=*), intent(out)   :: tc_str
+    !> Dimension (2 or 3) - defaults to 3
+    integer(kind=ik), optional    :: dim
+    !> Level, cut trailing zeros - defaults to 63 / dim
+    integer(kind=ik), optional    :: level
+    
+    character(len=:), allocatable :: temp_str ! allocatable as variable length
+    integer(kind=tsize) :: i_dim, i_nx, temp, n_level, n_dim
+
+    ! Set default for dimension
+    if (present(dim)) then
+        n_dim = dim
+    else
+        n_dim = 3
+    end if
+
+    ! Set default for level, max is 63 / dim
+    if (present(level)) then
+        n_level = level
+    else
+        n_dim = 63 / n_dim
+    end if
+    ! Dynamically allocate temp_str based on n_level and init
+    allocate(character(len=n_level) :: temp_str)
+    temp_str = ""
+
+    do i_nx = 0, n_level-1
+        ! extract bit-triplet ZYX on current level
+        temp = ibits(treecode, 3*i_nx, 3)
+
+        ! convert to str and add at correct position
+        temp_str = achar(temp + ichar('0')) // temp_str
+    end do
+
+    tc_str = temp_str
+    ! allocated needs to be deallocated
+    deallocate(temp_str)
+  end subroutine tc_to_str
+  !===============================================================================
 
   !===============================================================================
   !> \brief Convert given integer decnum to binary representation

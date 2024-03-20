@@ -112,9 +112,9 @@ module module_treelib
 
   !===============================================================================
   !> \brief Make tree-identifier from tree id and treecode
-  !> \details from a tree id and treecode we make a tree-identifieer, which is
-  !! an integer made of the tree_ID and the treecode
-  !! \note tree_ID s start from 1
+  !> \details from a tree id and treearray we make a tree-identifieer, which is
+  !! an integer made of the tree_ID and the treecode and level
+  !! \note As 0 is defined as not used, tree_ID s start from 1
   function treecode2int(treearray, tree_ID)
       implicit none
       integer(kind=ik), intent(in) :: treearray(:)
@@ -141,6 +141,134 @@ module module_treelib
               treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
           endif
       enddo
+
+  end function
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Make unique treecode-identifier from numerical decimal treecode, level and tree_id
+  !> \details Level is required, as mothers share the same treecode with sister-0.
+  !! This is circumvented by increasing every set level by one and keeping unset
+  !! ones as 0. If level is not provided it is assumed to be of full level
+  !! \note As 0 is defined as all levels unset, tree_ID s start from 1
+  !! Example with tree_id 7 for tree_ids 1-99, treecode 10322000 and level 6: 07-21433100
+  function tcd2id(treecode, tree_ID, level, max_level)
+    implicit none
+    !> Treecode in numerical decimal representation
+    integer(kind=tsize), intent(in) :: treecode
+    !> Tree ID, defaults to 0
+    integer(kind=ik), optional, intent(in) :: tree_ID
+    !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
+    integer(kind=ik), optional, intent(in) :: max_level
+    !> Level at which the block is situated, defaults to max_level.
+    !> If not set grids with overlapping blocks of different levels are not unique anymore
+    integer(kind=ik), optional, intent(in) :: level
+    integer(kind=ik) :: i_level, n_level, max_tclevel
+    integer(kind=tsize) :: tcd2id
+
+    ! Set default for max level
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
+
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = max_tclevel
+    end if
+
+    ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
+    tcd2id = treecode
+
+    ! encode tree_id at start of array
+    if (present(tree_ID)) then
+      ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be:
+      ! if tree_ID > 10**(int(log10(2**bitsize(treecode)), kind=ik) - max_tclevel)
+      !   write(*,'("Error - tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0)') tre_ID, max_tclevel
+      ! end if
+
+      tcd2id = tcd2id +  int(tree_ID, kind=tsize) * 10_tsize**(max_tclevel)
+    endif
+
+    ! ensure unique level description, as 2130 with level 4 is equal to 213(0) with level 3 as in treecode it is right-zero-padded
+    ! add 1 for every level which is set from left to right, which results in 3241 which is different from 324(0)
+    do i_level = 1, n_level
+      tcd2id = tcd2id + 10_tsize ** (max_tclevel - i_level)
+    enddo
+
+  end function
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Make unique treecode-identifier from numerical binary treecode, level and tree_id
+  !> \details Level is required, as mothers share the same treecode with sister-0.
+  !! 5 extra bits are used to encode all available levels (31 max for dim=2), other free bits on left end are used to encode tree_id
+  !> A 2D-example with tree_id=5 for tree_ids up to 15, level=3 and treecode = 3100 = 11-01-00-00:
+  !> 0101-00011-11010000
+  function tcb2id(treecode, dim, tree_ID, level, max_level)
+    implicit none
+    !> Treecode in numerical decimal representation
+    integer(kind=tsize), intent(in) :: treecode
+    !> Tree ID, optional and elsewise set as 0
+    integer(kind=ik), optional, intent(in) :: tree_ID
+    !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
+    integer(kind=ik), optional, intent(in) :: max_level
+    !> Level at which the block is situated, defaults to max_level.
+    !> If not set grids with overlapping blocks of different levels are not unique anymore
+    integer(kind=ik), optional, intent(in) :: level
+    !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
+    integer(kind=ik), optional, intent(in) :: dim
+    integer(kind=ik) :: i_level, n_level, max_tclevel, n_dim
+    integer(kind=tsize) :: tcb2id
+
+    ! Set default for dimension
+    if (present(dim)) then
+      n_dim = dim
+    else
+      n_dim = 3
+    end if
+
+    ! Set default for max level
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
+
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = 0
+    end if
+
+    ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
+    tcb2id = treecode
+
+    ! encode tree_id at start of array
+    if (present(tree_ID)) then
+      ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be the following
+      ! ! the -5 comes from the levels we want to encode
+      ! if tree_ID > 2**(bitsize(treecode) - n_dim*max_tclevel - 5)
+      !   write(*,'("Error - Tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0, " in dimension ", i0)') tree_ID, max_tclevel, dim
+      ! end if
+
+      tcb2id = tcb2id + ishft(int(tree_ID, kind=tsize), n_dim*max_tclevel + 5)
+    endif
+
+    ! encode level in 5 bits left of treecode, if not set it is kept as zero
+    tcb2id = tcb2id + ishft(int(n_level, kind=tsize), n_dim*max_tclevel)
 
   end function
   !===============================================================================
@@ -540,73 +668,71 @@ module module_treelib
   !===============================================================================
   !> \brief Obtain block position coordinates from numerical treecode
   !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
-  subroutine decoding_n(treecode1, i, j, k)
-      implicit none
+  subroutine decoding_n(ix, treecode, dim, level, max_level)
+    implicit none
 
-      !> block position coordinates
-      integer(kind=ik), intent(out)    :: i, j, k
-      !> treecode
-      integer(kind=tsize), intent(in) :: treecode1
-      integer(kind=tsize) :: nx, step, l, treeL, treecode, ix, iy, iz
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional, intent(in)    :: dim              
+    !> block position coordinates
+    ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
+    integer(kind=ik), intent(out)    :: ix(3)
+    !> Treecode
+    integer(kind=tsize), intent(in) :: treecode
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
 
-      ! copy+flip treecode (we modify it but to do give caller the modification back)
-      ! gargantini gives the example (I,J)=(6,5) which gives K=321. To reproduce it, set (ix,iy)=7,6
-      ! which gives you at this point
-      ! treecode=1230000000000000 this means first index (rightmost, "0") is COARSEST
-      ! now we reverse the direction (flipint) and end up with
-      ! treecode=000000000000321, this means first index (rightmost, "1") is FINEST
-      ! Then, we have K[0] (which is the rightmost entry of the code) = 1 as
-      ! gargantini has. in the decoding prodecure, we flip the treecode again and start from the coarsest
-      ! to finest level
-      treecode = flipint( treecode1 )
+    integer(kind=tsize) :: tc_digit, tc_temp
+    integer(kind=ik) :: i_dim, n_dim, max_tclevel, i_level, n_level
 
-      ! this is the maximum index possible (the last one on the finest grid)
-      nx = 2**maxdigits
+    ! Set default for dimension
+    if (present(dim)) then
+      n_dim = dim
+    else
+      n_dim = 3
+    end if
 
-      ! NOTE: one-based indexing
-      ix = 1
-      iy = 1
-      iz = 1
+    ! Set default for dimension
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
 
-      ! stepping for j=1 level (not j=0, where only one block exists) is nx/2, since
-      ! there are two blocks in each direction. For subsequent level, the displacement
-      ! get smaller by factors of 2
-      step = nx / 2
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = max_tclevel
+    end if
 
-      ! first entry treecode(1) is indeed level one (and not the root, which would be 0 and is excluded)
-      do l = 1, maxdigits
-          treeL = mod(treecode,10_tsize)
-          treecode = treecode / 10
-          select case (treeL)
-            case (0)
-              ! nothing ( origin of does not change, as finer block origin indeed coincides
-              ! with her mothers one )
-            case (1)
-              iy = iy + step
-            case (2)
-              ix = ix + step
-            case (3)
-              iy = iy + step
-              ix = ix + step
-            case (4)
-              iz = iz + step
-            case (5)
-              iz = iz + step
-              iy = iy + step
-            case (6)
-              iz = iz + step
-              ix = ix + step
-            case (7)
-              iz = iz + step
-              iy = iy + step
-              ix = ix + step
-          end select
-          step = step / 2
+    tc_temp = treecode
+
+    ! this is the maximum index possible for binary grids (the last one on the finest grid)
+    max_tclevel = maxdigits
+    ! max_tclevel = min(bit_size(ix(i_dim)) - leadz(treecode)/n_dim, maxdigits)  ! only loop over all digits which are set in treecode
+
+    ! NOTE: one-based indexing
+    do i_dim = 1,n_dim
+      ix(i_dim) = 1
+    end do
+
+    ! skip first digits
+    do i_level = 0, max_tclevel - n_level - 1
+      call pop(tc_temp, tc_digit)
+    end do
+    ! extract corresponding bit from bit-duplet YX or -triplet ZYX of level i_nx, then multiply by 10**(i_nx-1)
+    do i_level = 0, n_level-1
+      call pop(tc_temp, tc_digit)
+      do i_dim = 1,n_dim
+        ix(i_dim) = ix(i_dim) + int(ibits(tc_digit, i_dim-1, 1) * 2**i_level, kind=ik)
       end do
-
-      i = int(ix, kind=ik)
-      j = int(iy, kind=ik)
-      k = int(iz, kind=ik)
+    end do
 
   end subroutine decoding_n
   !===============================================================================
@@ -614,62 +740,102 @@ module module_treelib
   !===============================================================================
   !> \brief Obtain numerical treecode from block position coordinates for 2 or 3 dimensions
   !> \author JB
-  subroutine encoding_n( ix, dim, treecode ) !, Jmax )
+  subroutine encoding_n( ix, treecode, dim, level, max_level )
     implicit none
-    integer(kind=ik), intent(in)    :: dim              !> dimension (2 or 3)
-    integer(kind=ik), intent(in)    :: ix(dim)          !> block position coordinates
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional, intent(in)    :: dim
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
+    !> block position coordinates
+    ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
+    integer(kind=ik), intent(in)    :: ix(3)
+    !> treecode
     integer(kind=tsize), intent(out) :: treecode
-    integer(kind=tsize) :: c(dim)
-    integer(kind=tsize) :: i_dim
+    integer(kind=ik) :: i_dim, n_dim, i_level, n_level, max_tclevel
     !integer(kind=ik) :: b(Jmax)
 
-    ! following gargantini, we first require the binary representation of ix,iy
-    ! note algorithm ENCODING in her paper requires us to loop down from the highest
-    ! level (the last entry of the binary), so here we FLIP the number.
-    ! NOTE: gargantini uses 0-based indexing, which is a source of errors. we use 1-based
+    ! Set default for dimension
+    if (present(dim)) then
+      n_dim = dim
+    else
+      n_dim = 3
+    end if
+
+    ! Set default for dimension
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
+
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = max_tclevel
+    end if
+
+    ! NOTE: gargantini uses 0-based indexing, which is a source of errors. we use 1-based (-1)
     treecode = 0_tsize
-    do i_dim = 1, dim
-      c(i_dim) = flipint( toBinary( ix(i_dim)-1 ) )
-      ! Assume number contains only 0 and 1 and directly apply values
-      treecode = treecode + c(i_dim) * 2_tsize**(i_dim-1)
+    do i_dim = 1, n_dim
+      ! loop over all bits in ix which are set
+      do i_level = 0, bit_size(ix(i_dim))-leadz(ix(i_dim))
+        treecode = treecode + ibits(ix(i_dim)-1, i_level, 1) * 2_tsize**(i_dim-1) * 10_tsize**(i_level + (max_tclevel - n_level))
+      end do
     end do
 
-    ! gargantini gives the example (I,J)=(6,5) which gives K=321. To reproduce it, set (ix,iy)=7,6
-    ! which gives you at this point
-    ! treecode=1230000000000000 this means first index (rightmost, "0") is COARSEST
-    ! now we reverse the direction (flipint) and end up with
-    ! treecode=000000000000321, this means first index (rightmost, "1") is FINEST
-    ! Then, we have K[0] (which is the rightmost entry of the code) = 1 as
-    ! gargantini has. in the decoding prodecure, we flip the treecode again and start from the coarsest
-    ! to finest level
-    treecode = flipint(treecode)
   end subroutine encoding_n
   !===============================================================================
 
   !===============================================================================
   !> \brief Obtain block position coordinates from numerical bitwise treecode
   !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
-  subroutine decoding_b(ix, treecode, dim)
+  subroutine decoding_b(ix, treecode, dim, level, max_level)
     implicit none
 
     !> dimension (2 or 3), defaults to 3
-    integer(kind=ik), optional    :: dim              
+    integer(kind=ik), optional, intent(in)    :: dim              
     !> block position coordinates
     ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
     integer(kind=ik), intent(out)    :: ix(3)
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
     !> treecode
     integer(kind=tsize), intent(in) :: treecode
-    integer(kind=tsize) :: n_dim, i_dim, i_nx, max_tclevel
+    integer(kind=tsize) :: n_dim, i_dim, i_level, max_tclevel, n_level
 
     ! Set default for dimension
     if (present(dim)) then
-        n_dim = dim
+      n_dim = dim
     else
-        n_dim = 3
+      n_dim = 3
     end if
 
-    ! this is the maximum index possible for binary grids (the last one on the finest grid)
-    max_tclevel = (bit_size(treecode) -1) / n_dim
+    ! Set default for dimension
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
+
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = max_tclevel
+    end if
 
     ! NOTE: one-based indexing
     do i_dim = 1,n_dim
@@ -678,9 +844,9 @@ module module_treelib
 
     ! extract corresponding bit from bit-duplet YX or -triplet ZYX of level i_nx, then multiply by 2**(i_nx-1)
     ! convert from int8 to int4 is not necessary but gets rid of conversion warning
-    do i_nx = 0, max_tclevel-1
+    do i_level = 0, n_level-1
       do i_dim = 1,n_dim
-        ix(i_dim) = ix(i_dim) + int(ishft(ibits(treecode, (i_nx)*n_dim+(i_dim-1), 1), i_nx), 4)
+        ix(i_dim) = ix(i_dim) + int(ishft(ibits(treecode, (i_level + max_tclevel - n_level)*n_dim+(i_dim-1), 1), i_level), kind=ik)
       end do
     end do
 
@@ -690,16 +856,20 @@ module module_treelib
   !===============================================================================
   !> \brief Obtain numerical binary treecode from block position coordinates for 2 or 3 dimensions
   !> \author JB
-  subroutine encoding_b( ix, treecode, dim) !, Jmax )
+  subroutine encoding_b( ix, treecode, dim, level, max_level) !, Jmax )
     implicit none
     !> dimension (2 or 3), defaults to 3
     integer(kind=ik), optional    :: dim              
     !> block position coordinates
     ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
     integer(kind=ik), intent(in)    :: ix(3)
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
     !> treecode
     integer(kind=tsize), intent(out) :: treecode
-    integer(kind=tsize) :: n_dim, i_dim, i_nx, temp, max_tclevel
+    integer(kind=tsize) :: n_dim, i_dim, i_level, max_tclevel, n_level
 
     ! Set default for dimension
     if (present(dim)) then
@@ -708,25 +878,40 @@ module module_treelib
         n_dim = 3
     end if
 
-    ! this is the maximum index possible for binary grids (the last one on the finest grid)
-    max_tclevel = (bit_size(treecode) -1) / n_dim
+    ! Set default for dimension
+    if (present(max_level)) then
+      max_tclevel = max_level
+    else
+      max_tclevel = maxdigits
+    end if
+
+    ! Set default for level and handle negative cases
+    if (present(level)) then
+      if (level < 0) then
+        n_level = max_tclevel + level + 1
+      else
+        n_level = level
+      end if
+    else
+      n_level = max_tclevel
+    end if
 
     treecode = 0_tsize
 
-    ! loop over all levels in treecode
-    do i_nx = 0, max_tclevel-1
-        ! extract value as bit from each direction and add correspondend position in level-triplet or -duplet to treecode
-        ! subtract 1 as it is one-based indexing
-        do i_dim = 1, n_dim
-            treecode = treecode + ishft(ibits(ix(i_dim)-1, i_nx,1), (i_nx)*n_dim + (i_dim - 1))
-        end do
+    ! extract value as bit from each direction and add correspondend position in level-triplet or -duplet to treecode
+    ! subtract 1 as it is one-based indexing
+    ! loop over all bits set in index
+    do i_dim = 1, n_dim
+      do i_level = 0,  bit_size(ix(i_dim)) - leadz(ix(i_dim)) -1
+        treecode = treecode + ishft(ibits(ix(i_dim)-1, i_level,1), (i_level + (max_tclevel - n_level))*n_dim + (i_dim - 1))
+      end do
     end do
   end subroutine encoding_b
   !===============================================================================
 
   !===============================================================================
   !> \brief Convert numerical binary treecode to str for readability where each digit is from 0-7
-  !> \details Str representation is needed as max length of 21 exceeds maximum digits a decimal representation can have
+  !> \details Str representation is needed as max length of 31/21 exceeds maximum digits a decimal representation can have
   !> \author JB
   subroutine tc_to_str( treecode, tc_str, dim, level) !, Jmax )
     implicit none

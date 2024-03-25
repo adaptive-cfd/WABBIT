@@ -143,7 +143,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
             WABBIT_COMM, ierr)
         enddo
 
-        ! ...and their block level and refinement status
+        ! ...and their block level, refinement status, tree_id
         do k = params%Jmax + IDX_MESH_LVL, params%Jmax + EXTRA_LGT_FIELDS
             call MPI_allgatherv( lgt_block(lgt_start, k), lgt_num, MPI_INTEGER4, &
             my_lgt_block_recv_buffer(1, k), proc_lgt_num, proc_lgt_start, MPI_INTEGER4, &

@@ -39,22 +39,25 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     integer(kind=ik)                    :: neighborDirCode_sameLevel
     integer(kind=ik)                    :: neighborDirCode_coarserLevel, tcFinerAppendDigit(4)
     integer(kind=ik)                    :: neighborDirCode_finerLevel(4)
-    integer(kind=ik)                    :: level
-    integer(kind=ik)                    :: tcBlock(Jmax), tcNeighbor(Jmax), tcVirtual(Jmax)
+    integer(kind=ik)                    :: k, lgtID_neighbor, level, tc_last, tree_ID
+    integer(kind=tsize)                 :: tcb_Block, tcb_Neighbor, tcb_Virtual
     logical                             :: exists
-    integer(kind=ik)                    :: lgtID_neighbor, tree_ID
-    integer(kind=ik)                    :: k
     ! variable to show if there is a valid edge neighbor
     logical                             :: lvl_down_neighbor
     logical :: thereMustBeANeighbor
 
-    tcBlock    = lgt_block( lgtID_block, 1:Jmax )
     level      = lgt_block( lgtID_block, Jmax + IDX_MESH_LVL )
     tree_ID    = lgt_block( lgtID_block, Jmax + IDX_TREE_ID )
     neighborDirCode_sameLevel     = -1
     neighborDirCode_coarserLevel  = -1
     neighborDirCode_finerLevel    = -1
     tcFinerAppendDigit            = -1
+
+    ! we have to init tcBlock before we set it elsewise fortran doesnt like it
+    tcb_Block    = 0_tsize
+    call array2tcb(tcb_Block, lgt_block( lgtID_block, 1:Jmax ), dim=params%dim, level=level, max_level=Jmax)
+    ! last digit is used very often so we only extract it once
+    tc_last = tc_get_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
 
     ! not all blocks can have coarse neighbors.
     ! Consider:
@@ -87,13 +90,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 4) then
+            if ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 30
-            elseif ( tcBlock(level) == 5) then
+            elseif ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 29
-            elseif ( tcBlock(level) == 6) then
+            elseif ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 27
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 28
             end if
             lvl_down_neighbor = .true.
@@ -108,13 +111,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 34
-            elseif ( tcBlock(level) == 2) then
+            elseif ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 32
-            elseif ( tcBlock(level) == 4) then
+            elseif ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 33
-            elseif ( tcBlock(level) == 6) then
+            elseif ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 31
             end if
             lvl_down_neighbor = .true.
@@ -129,13 +132,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 2) then
+            if ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 36
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 38
-            elseif ( tcBlock(level) == 6) then
+            elseif ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 35
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 37
             end if
             lvl_down_neighbor = .true.
@@ -150,13 +153,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 1) then
+            if ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 42
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 40
-            elseif ( tcBlock(level) == 5) then
+            elseif ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 41
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 39
             end if
             lvl_down_neighbor = .true.
@@ -171,13 +174,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 46
-            elseif ( tcBlock(level) == 1) then
+            elseif ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 44
-            elseif ( tcBlock(level) == 4) then
+            elseif ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 45
-            elseif ( tcBlock(level) == 5) then
+            elseif ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 43
             end if
             lvl_down_neighbor = .true.
@@ -192,13 +195,13 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
             ! If the neighbor is coarser, then we have only one possible block, but
             ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 50
-            elseif ( tcBlock(level) == 1) then
+            elseif ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 49
-            elseif ( tcBlock(level) == 2) then
+            elseif ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 47
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 48
             end if
             lvl_down_neighbor = .true.
@@ -211,12 +214,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 7
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 4) then
+            if ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 52
-            elseif ( tcBlock(level) == 6) then
+            elseif ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 51
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 4) .or. (tcBlock( level ) == 6) )
+            lvl_down_neighbor = ( (tc_last == 4) .or. (tc_last == 6) )
 
             tcFinerAppendDigit(1:2)         = (/ 4, 6 /)
             neighborDirCode_finerLevel(1:2) = (/ 52, 51 /)
@@ -225,12 +228,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 8
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 6) then
+            if ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 53
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 54
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 6) .or. (tcBlock( level ) == 7) )
+            lvl_down_neighbor = ( (tc_last == 6) .or. (tc_last == 7) )
 
             tcFinerAppendDigit(1:2)         = (/ 6, 7 /)
             neighborDirCode_finerLevel(1:2) = (/ 53, 54 /)
@@ -239,12 +242,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 9
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 5) then
+            if ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 56
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 55
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 5) .or. (tcBlock( level ) == 7) )
+            lvl_down_neighbor = ( (tc_last == 5) .or. (tc_last == 7) )
 
             tcFinerAppendDigit(1:2)         = (/ 5, 7 /)
             neighborDirCode_finerLevel(1:2) = (/ 56, 55 /)
@@ -253,12 +256,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 10
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 4) then
+            if ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 58
-            elseif ( tcBlock(level) == 5) then
+            elseif ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 57
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 4) .or. (tcBlock( level ) == 5) )
+            lvl_down_neighbor = ( (tc_last == 4) .or. (tc_last == 5) )
 
             tcFinerAppendDigit(1:2)         = (/ 4, 5 /)
             neighborDirCode_finerLevel(1:2) = (/ 58, 57 /)
@@ -267,12 +270,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 11
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 60
-            elseif ( tcBlock(level) == 2) then
+            elseif ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 59
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 0) .or. (tcBlock( level ) == 2) )
+            lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 2) )
 
             tcFinerAppendDigit(1:2)         = (/ 0, 2 /)
             neighborDirCode_finerLevel(1:2) = (/ 60, 59 /)
@@ -281,12 +284,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 12
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 2) then
+            if ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 61
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 62
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 2) .or. (tcBlock( level ) == 3) )
+            lvl_down_neighbor = ( (tc_last == 2) .or. (tc_last == 3) )
 
             tcFinerAppendDigit(1:2)         = (/ 2, 3 /)
             neighborDirCode_finerLevel(1:2) = (/ 61, 62 /)
@@ -295,12 +298,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 13
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 1) then
+            if ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 64
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 63
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 1) .or. (tcBlock( level ) == 3) )
+            lvl_down_neighbor = ( (tc_last == 1) .or. (tc_last == 3) )
 
             tcFinerAppendDigit(1:2)         = (/ 1, 3 /)
             neighborDirCode_finerLevel(1:2) = (/ 64, 63 /)
@@ -309,12 +312,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 14
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 66
-            elseif ( tcBlock(level) == 1) then
+            elseif ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 65
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 0) .or. (tcBlock( level ) == 1) )
+            lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 1) )
 
             tcFinerAppendDigit(1:2)         = (/ 0, 1 /)
             neighborDirCode_finerLevel(1:2) = (/ 66, 65 /)
@@ -323,12 +326,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 15
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 2) then
+            if ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 68
-            elseif ( tcBlock(level) == 6) then
+            elseif ( tc_last == 6) then
                 neighborDirCode_coarserLevel = 67
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 2) .or. (tcBlock( level ) == 6) )
+            lvl_down_neighbor = ( (tc_last == 2) .or. (tc_last == 6) )
 
             tcFinerAppendDigit(1:2)         = (/ 2, 6 /)
             neighborDirCode_finerLevel(1:2) = (/ 68, 67 /)
@@ -337,12 +340,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 16
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 70
-            elseif ( tcBlock(level) == 4) then
+            elseif ( tc_last == 4) then
                 neighborDirCode_coarserLevel = 69
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 0) .or. (tcBlock( level ) == 4) )
+            lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 4) )
 
             tcFinerAppendDigit(1:2)         = (/ 0, 4 /)
             neighborDirCode_finerLevel(1:2) = (/ 70, 69 /)
@@ -351,12 +354,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 17
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 3) then
+            if ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 72
-            elseif ( tcBlock(level) == 7) then
+            elseif ( tc_last == 7) then
                 neighborDirCode_coarserLevel = 71
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 3) .or. (tcBlock( level ) == 7) )
+            lvl_down_neighbor = ( (tc_last == 3) .or. (tc_last == 7) )
 
             tcFinerAppendDigit(1:2)         = (/ 3, 7 /)
             neighborDirCode_finerLevel(1:2) = (/ 72, 71 /)
@@ -365,12 +368,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_sameLevel    = 18
 
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 1) then
+            if ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 74
-            elseif ( tcBlock(level) == 5) then
+            elseif ( tc_last == 5) then
                 neighborDirCode_coarserLevel = 73
             end if
-            lvl_down_neighbor = ( (tcBlock( level ) == 1) .or. (tcBlock( level ) == 5) )
+            lvl_down_neighbor = ( (tc_last == 1) .or. (tc_last == 5) )
 
             tcFinerAppendDigit(1:2)         = (/ 1, 5 /)
             neighborDirCode_finerLevel(1:2) = (/ 74, 73 /)
@@ -380,56 +383,56 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_coarserLevel   = 19
             neighborDirCode_finerLevel(1)  = 19
             tcFinerAppendDigit(1) = 6
-            lvl_down_neighbor = ( tcBlock( level ) == 6 )
+            lvl_down_neighbor = ( tc_last == 6 )
 
         case('134/___')
             neighborDirCode_sameLevel      = 20
             neighborDirCode_coarserLevel   = 20
             neighborDirCode_finerLevel(1)  = 20
             tcFinerAppendDigit(1) = 7
-            lvl_down_neighbor = ( tcBlock( level ) == 7 )
+            lvl_down_neighbor = ( tc_last == 7 )
 
         case('145/___')
             neighborDirCode_sameLevel      = 21
             neighborDirCode_coarserLevel   = 21
             neighborDirCode_finerLevel(1)  = 21
             tcFinerAppendDigit(1) = 5
-            lvl_down_neighbor = ( tcBlock( level ) == 5 )
+            lvl_down_neighbor = ( tc_last == 5 )
 
         case('152/___')
             neighborDirCode_sameLevel      = 22
             neighborDirCode_coarserLevel   = 22
             neighborDirCode_finerLevel(1)  = 22
             tcFinerAppendDigit(1) = 4
-            lvl_down_neighbor = ( tcBlock( level ) == 4 )
+            lvl_down_neighbor = ( tc_last == 4 )
 
         case('623/___')
             neighborDirCode_sameLevel      = 23
             neighborDirCode_coarserLevel   = 23
             neighborDirCode_finerLevel(1)  = 23
             tcFinerAppendDigit(1) = 2
-            lvl_down_neighbor = ( tcBlock( level ) == 2 )
+            lvl_down_neighbor = ( tc_last == 2 )
 
         case('634/___')
             neighborDirCode_sameLevel      = 24
             neighborDirCode_coarserLevel   = 24
             neighborDirCode_finerLevel(1)  = 24
             tcFinerAppendDigit(1) = 3
-            lvl_down_neighbor = ( tcBlock( level ) == 3 )
+            lvl_down_neighbor = ( tc_last == 3 )
 
         case('645/___')
             neighborDirCode_sameLevel      = 25
             neighborDirCode_coarserLevel   = 25
             neighborDirCode_finerLevel(1)  = 25
             tcFinerAppendDigit(1) = 1
-            lvl_down_neighbor = ( tcBlock( level ) == 1 )
+            lvl_down_neighbor = ( tc_last == 1 )
 
         case('652/___')
             neighborDirCode_sameLevel      = 26
             neighborDirCode_coarserLevel   = 26
             neighborDirCode_finerLevel(1)  = 26
             tcFinerAppendDigit(1) = 0
-            lvl_down_neighbor = ( tcBlock( level ) == 0 )
+            lvl_down_neighbor = ( tc_last == 0 )
 
 
         ! +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
@@ -441,7 +444,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_finerLevel(1) = 5
             tcFinerAppendDigit(1) = 1
             ! only sister block 1, 2 can have valid NE neighbor at one level down
-            if ( (tcBlock( level ) == 1) .or. (tcBlock( level ) == 2) ) then
+            if ( (tc_last == 1) .or. (tc_last == 2) ) then
                 lvl_down_neighbor = .true.
             end if
 
@@ -451,7 +454,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_finerLevel(1) = 6
             tcFinerAppendDigit(1) = 0
             ! only sister block 0, 3 can have valid NW neighbor at one level down
-            if ( (tcBlock( level ) == 0) .or. (tcBlock( level ) == 3) ) then
+            if ( (tc_last == 0) .or. (tc_last == 3) ) then
                 lvl_down_neighbor = .true.
             end if
 
@@ -461,7 +464,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_finerLevel(1) = 7
             tcFinerAppendDigit(1) = 3
             ! only sister block 0, 3 can have valid SE neighbor at one level down
-            if ( (tcBlock( level ) == 0) .or. (tcBlock( level ) == 3) ) then
+            if ( (tc_last == 0) .or. (tc_last == 3) ) then
                 lvl_down_neighbor = .true.
             end if
 
@@ -471,7 +474,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             neighborDirCode_finerLevel(1) = 8
             tcFinerAppendDigit(1) = 2
             ! only sister block 1, 2 can have valid NE neighbor at one level down
-            if ( (tcBlock( level ) == 1) .or. (tcBlock( level ) == 2) ) then
+            if ( (tc_last == 1) .or. (tc_last == 2) ) then
                 lvl_down_neighbor = .true.
             end if
 
@@ -483,9 +486,9 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             tcFinerAppendDigit(1:2)         = (/ 0, 1 /)
             neighborDirCode_finerLevel(1:2) = (/ 10,  9 /)
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 10
-            elseif ( tcBlock(level) == 1) then
+            elseif ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 9
             end if
 
@@ -497,9 +500,9 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             tcFinerAppendDigit(1:2)         = (/ 1, 3 /)
             neighborDirCode_finerLevel(1:2) = (/ 13, 14 /)
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 1) then
+            if ( tc_last == 1) then
                 neighborDirCode_coarserLevel = 13
-            elseif ( tcBlock(level) == 3) then
+            elseif ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 14
             end if
 
@@ -511,9 +514,9 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             tcFinerAppendDigit(1:2)         = (/ 2, 3 /)
             neighborDirCode_finerLevel(1:2) = (/ 12, 11 /)
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 3) then
+            if ( tc_last == 3) then
                 neighborDirCode_coarserLevel = 11
-            elseif ( tcBlock(level) == 2) then
+            elseif ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 12
             end if
 
@@ -525,9 +528,9 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             tcFinerAppendDigit(1:2)         = (/ 0, 2 /)
             neighborDirCode_finerLevel(1:2) = (/ 15, 16 /)
             ! neighbor code for coarser neighbors
-            if ( tcBlock(level) == 0) then
+            if ( tc_last == 0) then
                 neighborDirCode_coarserLevel = 15
-            elseif ( tcBlock(level) == 2) then
+            elseif ( tc_last == 2) then
                 neighborDirCode_coarserLevel = 16
             end if
 
@@ -541,9 +544,11 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     ! 1) Check if we find a neighbor on the SAME LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! calculate treecode for neighbor on same level
-    call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
+    ! call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
+    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=Jmax)
+
     ! check if (hypothetical) neighbor exists and if so find its lgtID
-    call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
+    call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
 
     if (exists) then
         ! we found the neighbor on the same level.
@@ -556,11 +561,14 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (lvl_down_neighbor) then
         ! We did not find the neighbor on the same level, and now check on the coarser level.
-        ! Depending on my own treecode, I know what neighbor I am looking for, and I just set
-        ! the last index to -1 = I go one level down (coarser)
-        tcNeighbor( level ) = -1
+        ! Just clear all levels before the lower one
+        tcb_Neighbor = tc_clear_until_level_b(tcb_Neighbor, dim=params%dim, level=level-1, max_level=Jmax)
         ! check if (hypothetical) neighbor exists and if so find its lgtID
-        call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
+        call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level-1, tree_id=tree_ID, max_level=params%Jmax)
+
+        ! call tcb2array(tcb_Neighbor, tc_test, dim=params%dim, level=level, max_level=Jmax)
+        ! ! write(*, '("neighbour ", a, " orig=", b64.64, " neig=", b64.64)') dir, tcb_Block, tcb_Neighbor
+        ! write(*, '("Coarse neighbour dir=", a, " ta=", 13(i0), " tcb=", 13(i0))') dir, tcNeighbor, tc_test
 
         if ( exists ) then
             ! neighbor is one level down (coarser)
@@ -579,13 +587,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
         do k = 1, 4
             if (tcFinerAppendDigit(k) /= -1) then
                 ! first neighbor virtual treecode, one level up
-                tcVirtual = tcBlock
-                tcVirtual( level+1 ) = tcFinerAppendDigit(k)
+                tcb_Virtual = tc_set_level_b(tcb_Block, tcFinerAppendDigit(k), level=level+1, max_level=Jmax, dim=params%dim)
 
                 ! calculate treecode for neighbor on same level (virtual level)
-                call adjacent(tcVirtual, tcNeighbor, dir, level+1, Jmax, params%dim)
+                call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=Jmax, dim=params%dim)
                 ! check if (hypothetical) neighbor exists and if so find its lgtID
-                call doesBlockExist_tree(tcNeighbor, exists, lgtID_neighbor, tree_ID)
+                call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
 
                 if (exists) then
                     hvy_neighbor( hvyID_block, neighborDirCode_finerLevel(k) ) = lgtID_neighbor
@@ -595,29 +602,11 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
                 ! because symmetry conditions are used.
                 if (thereMustBeANeighbor) then
                     if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
-                        write(*,*) dir, tcBlock, lvl_down_neighbor, level, ":", tcFinerAppendDigit
+                        write(*,*) dir, lgt_block( lgtID_block, 1:Jmax ), lvl_down_neighbor, level, ":", tcFinerAppendDigit
                         error = .true.
                     endif
                 endif
             endif
         end do
     endif
-end subroutine
-
-! wrapper for adjacent_block_2D // adjacent_block_3D
-subroutine adjacent(tcBlock, tcNeighbor, dir, level, Jmax, dim)
-    use module_params
-    implicit none
-    integer(kind=ik), intent(in)        :: Jmax
-    integer(kind=ik), intent(in)        :: level, dim
-    integer(kind=ik), intent(in)        :: tcBlock(Jmax)   !> block treecode
-    character(len=*), intent(in)        :: dir             !> direction for neighbor search
-    integer(kind=ik), intent(out)       :: tcNeighbor(Jmax)!> neighbor treecode
-
-    if (dim == 3) then
-        call adjacent_block_3D(tcBlock, tcNeighbor, dir, level, Jmax)
-    else
-        call adjacent_block_2D(tcBlock, tcNeighbor, dir, level, Jmax)
-    endif
-
 end subroutine

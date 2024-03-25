@@ -233,6 +233,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     rank = params%rank
     N = params%number_blocks
 
+    ! init
+    treecode1 = 0_tsize; treecode2 = 0_tsize
+
     ! NOTES:
     !   We assume that the pruned tree is on JMAX (rhs level) and we assume that
     !   the full one is finer, never coarser.
@@ -255,9 +258,10 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
         lgt_id1 = lgt_active(k, tree_ID_pruned)
         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+        call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), dim=params%dim, level=level1, max_level=params%dim)
 
         ! do we find the treecode of the pruned tree-block in the full grid?
-        call doesBlockExist_tree( lgt_block(lgt_id1, 1:level1), exists, lgt_id2, tree_ID_full)
+        call doesBlockExist_tree(treecode1, exists, lgt_id2, dim=params%dim, level=level1, tree_id=tree_ID_full, max_level=params%Jmax)
 
         if (exists) then
             ! we found the pruned trees block in the full tree : we happily copy
@@ -295,8 +299,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
         hvy_id1  = hvy_active(k, tree_ID_pruned)
         call hvy2lgt(lgt_id1, hvy_id1, params%rank, params%number_blocks)
         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+        call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), dim=params%dim, level=level1, max_level=params%dim)
 
-        call doesBlockExist_tree(lgt_block(lgt_id1, 1:level1), exists, lgt_id2, tree_ID_full)
+        call doesBlockExist_tree(treecode1, exists, lgt_id2, dim=params%dim, level=level1, tree_id=tree_ID_full, max_level=params%Jmax)
 
         ! we found the pruned trees block in the full tree : we happily copy
         ! its heavy data

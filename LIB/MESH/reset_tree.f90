@@ -66,6 +66,10 @@ subroutine reset_forest(params)
     ! set refinement to 0
     lgt_block(:, max_treelevel+IDX_REFINE_STS) = 0
 
+    ! set TC to -1
+    lgt_block(:, max_treelevel+IDX_TC_1) = -1
+    lgt_block(:, max_treelevel+IDX_TC_2) = -1
+
     ! reset sorted list of numerical treecodes
     do i = 1,size(lgt_active,2)
             lgt_sortednumlist(:,:,i) = -1

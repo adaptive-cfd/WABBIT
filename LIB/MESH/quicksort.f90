@@ -3,13 +3,14 @@ recursive subroutine quicksort(a, first, last, sortdim)
 
     implicit none
 
-    integer(kind=tsize), intent(inout) ::  a(:,:)
+    integer(kind=ik), intent(inout)    :: a(:,:)
     integer(kind=ik), intent(in)       :: sortdim
-    integer(kind=tsize), dimension(2)  :: x, t
+    integer(kind=ik), dimension(4)     :: x, t
     integer(kind=ik)                   :: first, last
     integer(kind=ik)                   :: i, j
 
-    x = a( (first+last) / 2 , sortdim)
+    ! x = a( (first+last) / 2 , sortdim)
+    x = a( (first+last) / 2 , :)
     i = first
     j = last
 
@@ -21,10 +22,12 @@ recursive subroutine quicksort(a, first, last, sortdim)
 
     ! otherwise do recursive quicksort
     do
-        do while (a(i,sortdim) < x(sortdim))
+        ! do while (a(i,sortdim) < x(sortdim))
+        do while (tc_id_lower(a(i,2:4), x(2:4)))
             i=i+1
         end do
-        do while (x(sortdim) < a(j,sortdim))
+        ! do while (x(sortdim) < a(j,sortdim))
+        do while (tc_id_lower(x(2:4), a(j,2:4)))
             j=j-1
         end do
         if (i >= j) exit
@@ -38,24 +41,25 @@ recursive subroutine quicksort(a, first, last, sortdim)
 end subroutine quicksort
 
 subroutine interchange_sort(a, left_end, right_end, sortdim)
-   use module_params
-   implicit none
-   integer(kind=tsize), intent(inout) ::  a(:,:)
-   integer(kind=ik) :: left_end, right_end
-   integer(kind=ik), intent(in) :: sortdim
+    use module_params
+    implicit none
+    integer(kind=ik), intent(inout) ::  a(:,:)
+    integer(kind=ik) :: left_end, right_end
+    integer(kind=ik), intent(in) :: sortdim
 
-   integer(kind=ik) :: i, j
-   integer(kind=tsize), dimension(2) :: temp
+    integer(kind=ik) :: i, j
+    integer(kind=ik), dimension(4) :: temp
 
-   do i = left_end, right_end - 1
-      do j = i+1, right_end
-         if (a(i,sortdim) > a(j,sortdim)) then
+    do i = left_end, right_end - 1
+        do j = i+1, right_end
+        ! if (a(j,sortdim) < a(i,sortdim)) then
+        if (tc_id_lower(a(j,2:4), a(i,2:4))) then
             temp = a(i,:)
             a(i,:) = a(j,:)
             a(j,:) = temp
-         end if
-      end do
-   end do
+            end if
+        end do
+    end do
 
  end subroutine interchange_sort
 

@@ -30,6 +30,7 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
     integer(kind=ik)                    :: n_level, n_tree_ID, n_dim, max_tclevel
     integer(kind=ik)                    :: k, i1, i2, imid            ! loop variables
     integer(kind=tsize)                 :: num_treecode               ! unique tc-id
+    integer(kind=ik)                    :: id_a_now(3)                ! array for comparisons
 
     ! Set default for Tree_ID
     n_tree_ID = 1; if (present(tree_ID)) n_tree_ID = tree_ID
@@ -51,7 +52,19 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
 
     !> 1st: given the array treecode, compute the numerical value of the treecode we're
     !! looking for. note these values are stored for easier finding in lgt_sortednumlist
-    num_treecode = tcb2id(tcBlock, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
+    ! num_treecode = tcb2id(tcBlock, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
+    ! id_a_now = (/ num_treecode, tcBlock, int(n_level, kind=tsize), int(n_tree_ID, kind=tsize)/)
+
+    ! construct array of what we want to compare
+    ! tree_ID and level are combined into one number for performance purposes
+    ! as max_level is 31 for 2D, we shift tree_ID by 100
+    ! this might be confusing but can be entangled easily
+    id_a_now = (/-1, -1, n_level + n_tree_ID * 100/)
+    call set_tc(id_a_now, tcBlock)
+
+    ! ! construct array of what we want to compare
+    ! id_a_now = (/-1, -1, n_level, n_tree_ID/)
+    ! call set_tc(id_a_now, tcBlock)
 
     !> 2nd: binary search. start with the entire interval, then choose either right or left half
     i1 = 1
@@ -61,24 +74,30 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
     do while ( abs(i2-i1) >= 2 )
         ! cut interval in two parts
         imid = (i1+i2) / 2
-        if (lgt_sortednumlist(imid,2,n_tree_ID) < num_treecode) then
+        ! if (lgt_sortednumlist(imid,2,n_tree_ID) < num_treecode) then
+        if (tc_id_lower(lgt_sortednumlist(imid,2:4,n_tree_ID), id_a_now)) then
             i1 = imid
         else
             i2 = imid
         end if
     end do
 
-    if ( num_treecode == lgt_sortednumlist(i1,2,n_tree_ID) .and. lgt_sortednumlist(i1,1,n_tree_ID) > 0) then
+    ! if ( num_treecode == lgt_sortednumlist(i1,2,n_tree_ID) .and. lgt_sortednumlist(i1,1,n_tree_ID) > 0) then
+    if ( all(lgt_sortednumlist(i1,2:4,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(i1,1,n_tree_ID) > 0) then
         ! found the block we're looking for
         exists = .true.
         lgtID = int( lgt_sortednumlist(i1,1,n_tree_ID), kind=ik)
         return
     end if
 
-    if ( num_treecode == lgt_sortednumlist(i2,2,n_tree_ID) .and. lgt_sortednumlist(i2,1,n_tree_ID) > 0) then
+    ! if ( num_treecode == lgt_sortednumlist(i2,2,n_tree_ID) .and. lgt_sortednumlist(i2,1,n_tree_ID) > 0) then
+    if ( all(lgt_sortednumlist(i2,2:4,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(i2,1,n_tree_ID) > 0) then
         ! found the block we're looking for
         exists = .true.
         lgtID = int( lgt_sortednumlist(i2,1,n_tree_ID), kind=ik)
         return
     end if
+
+    ! write(*, '("treecode - id=", i0)') lgtID
+
 end subroutine doesBlockExist_tree

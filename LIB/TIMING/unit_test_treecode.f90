@@ -56,19 +56,23 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     ! !> start coordinates random between 20 and 100
     ! call random_number(rand)
     ! ixy(:) = 20 + floor(rand(:) * 80)
+    ! ixy(:) = (/ 1536, 4069, 6738/)
 
-    ! call encoding_b( ixy, tc_b, dim=3, level=8, max_level=params%Jmax)
-    ! call tc_to_str(tc_b, tc_str, dim=3, level=8, max_level=params%Jmax)
+    ! call encoding_b( ixy, tc_b, dim=3, level=-1, max_level=params%Jmax)
+    ! call encoding_n( ixy, newtreecode, dim=3, level=-1, max_level=params%Jmax)
+    ! call tc_to_str(tc_b, tc_str, dim=3, level=-1, max_level=params%Jmax)
     ! write(*,'("UNIT TEST: treecode num bin - orig=", 3(i0, 1x), " TC=", b64.64, " TC dec=", a)') ixy, tc_b, tc_str
-
-    ! call set_tc(oxy(1:2), tc_b)
-    ! write(*,'("UNIT TEST: treecode num bin - orig=", 3(i0, 1x), " TC=", b64.64, " 2_TC=", b32.32, "-", b32.32)') ixy, tc_b, oxy(1), oxy(2)
+    ! write(*,'("UNIT TEST: treecode num dec - orig=", 3(i0, 1x), " TC dec=", i0)') ixy, newtreecode
 
     ! level = 4
-    ! call adjacent_wrapper_b(tc_b, tc_b_n, "__N", dim=3, level=3, max_level=params%Jmax)
-    ! call decoding_b(oxy, tc_b_n, dim=3, level=8, max_level=params%Jmax)
+    ! call adjacent_wrapper_b(tc_b, tc_b_n, "__E", dim=3, level=-1, max_level=params%Jmax)
+    ! call decoding_b(oxy, tc_b_n, dim=3, level=-1, max_level=params%Jmax)
     ! call tc_to_str(tc_b_n, tc_str, dim=3, level=-1, max_level=params%Jmax)
     ! write(*,'("UNIT TEST: treecode num bin - orig=", 3(i0, 1x), " N TC=", b64.64, " TC dec=", a, 3(1x, i0))') ixy, tc_b_n, tc_str, oxy
+
+    ! call adjacent_wrapper_n(newtreecode, neighbor, "__E", level=-1, max_level=params%Jmax)
+    ! call decoding_n(oxy, neighbor, dim=3, level=-1, max_level=params%Jmax)
+    ! write(*,'("UNIT TEST: treecode num dec - orig=", 3(i0, 1x), " TC dec=", i0, 3(1x, i0))') ixy, neighbor, oxy
 
     ! call abort(123980)
 
@@ -78,7 +82,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     do k = 1, kcheck
       !> start coordinates random between 20 and 100
       call random_number(rand)
-      ixy(:) = 20 + floor(rand(:) * 80)
+      ixy(:) = 1 + floor(rand(:) * 2**params%Jmax)
 
       call encoding_b( ixy, tc_b, 3)
       call decoding_b( oxy, tc_b, 3)
@@ -109,7 +113,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     do k = 1, kcheck
       !> start coordinates random between 20 and 100
       call random_number(rand)
-      ixy(:) = 20 + floor(rand(:) * 80)
+      ixy(:) = 1 + floor(rand(:) * 2**params%Jmax)
 
       call encoding_b( ixy, tc_b, 2)
       call encoding_n( ixy, newtreecode, 2)
@@ -120,7 +124,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       do j= 1,4
         call adjacent_wrapper_n( newtreecode, neighbor, dir_2d(j), params%Jmax, params%Jmax)
         call decoding_n(oxy, neighbor, 2)
-        if ( (oxy(2) /= (ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)))) .or. (oxy(1) /= (ixy(1) + (j-1)/2 * (-1 + 2*modulo((j-1), 2))))) then
+        if ( (oxy(2) /= modulo(ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(1) /= modulo(ixy(1) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax))) then
           write(*,'("UNIT TEST FAILED: treecode num dec ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_2d(j), ixy, oxy
           if (abort_on_fail) call abort(123980)
         endif
@@ -132,7 +137,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         call adjacent_wrapper_b( tc_b, tc_b_n, dir_2d(j), -1, 2)
         call decoding_b(oxy, tc_b_n, 2)
 
-        if ( (oxy(2) /= (ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)))) .or. (oxy(1) /= (ixy(1) + (j-1)/2 * (-1 + 2*modulo((j-1), 2))))) then
+        if ( (oxy(2) /= modulo(ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(1) /= modulo(ixy(1) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax))) then
           write(*,'("UNIT TEST FAILED: treecode num bin ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_2d(j), ixy, oxy
           if (abort_on_fail) call abort(123980)
         endif
@@ -143,7 +149,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       do j= 1,4
         call adjacent_block_2D( treecode, n, dir_2d(j), params%Jmax, params%Jmax)
         call decoding(n, ix,iy,iz, treeN)
-        if ( ix /= ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)) .or. iy /= ixy(1) + (j-1)/2 * (-1 + 2*modulo((j-1), 2))) then
+        if ( ix /= modulo(ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax) &
+        .or. iy /= modulo(ixy(1) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) then
           write(*,*) "UNIT TEST FAILED: treecode num old ", dir_2d(j), " - orig sx=", ixy(2), "sy=", ixy(1), "neighbour ix=", ix, "iy=", iy
           if (abort_on_fail) call abort(123980)
         endif
@@ -156,7 +163,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     do k = 1, kcheck
       !> start coordinates random between 20 and 100
       call random_number(rand)
-      ixy(:) = 20 + floor(rand(:) * 80)
+      ixy(:) = 1 + floor(rand(:) * 2**params%Jmax)
 
       call encoding_b( ixy, tc_b, 3)
       call encoding_n( ixy, newtreecode, 3)
@@ -168,9 +175,9 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         call adjacent_wrapper_n( newtreecode, neighbor, dir_3d(j), params%Jmax, params%Jmax)
         call decoding_n(oxy, neighbor, 3)
 
-        if ( (oxy(2) /= (ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (oxy(1) /= (ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (oxy(3) /= (ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2))))) then
+        if ( (oxy(2) /= modulo(ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(1) /= modulo(ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(3) /= modulo(ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax))) then
           write(*,'("UNIT TEST FAILED: treecode num dec 3D ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, oxy
           if (abort_on_fail) call abort(123980)
         endif
@@ -182,9 +189,9 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         call adjacent_wrapper_b( tc_b, tc_b_n, dir_3d(j), -1, 3)
         call decoding_b(oxy, tc_b_n, 3)
 
-        if ( (oxy(2) /= (ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (oxy(1) /= (ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (oxy(3) /= (ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2))))) then
+        if ( (oxy(2) /= modulo(ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(1) /= modulo(ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (oxy(3) /= modulo(ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax))) then
           write(*,'("UNIT TEST FAILED: treecode num bin 3D ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, oxy
           if (abort_on_fail) call abort(123980)
       endif
@@ -196,10 +203,10 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         call adjacent_block_3D( treecode, n, dir_3d(j), params%Jmax, params%Jmax)
         call decoding(n, ix,iy,iz, treeN)
 
-        if ( (ix /= (ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (iy /= (ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)))) &
-        .or. (iz /= (ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2))))) then
-          write(*,'("UNIT TEST FAILED: treecode num old 3D ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, ix, iy, iz
+        if ( (ix /= modulo(ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (iy /= modulo(ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax)) &
+        .or. (iz /= modulo(ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)), 2**params%Jmax))) then
+          write(*,'("UNIT TEST FAILED: treecode num old 3D ", a, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, iy, ix, iz
           if (abort_on_fail) call abort(123980)
         endif
       end do
@@ -211,10 +218,15 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     if (params%rank == 0) then
       write(*,*) "UNIT TEST: treecode - ===num bin=== measuring time"
     end if
-    !> reset number to set equal conditions
-    ixy(1) = 79
-    ixy(2) = 42
-    ixy(3) = 27
+    ! reset number to set equal conditions
+    if (params%Jmax >= 8) then
+      ixy(1) = 79
+      ixy(2) = 42
+      ixy(3) = 27
+    else
+      call random_number(rand)
+      ixy(:) = 1 + floor(rand(:) * 2**params%Jmax)
+    endif
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

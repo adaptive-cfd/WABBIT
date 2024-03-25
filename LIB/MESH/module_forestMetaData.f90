@@ -51,7 +51,7 @@ module module_forestMetaData
     !> in a sorted fashion. this is very important for finding blocks. usually, in the rest of the code,
     !> a treecode is an array and this is handy. for finding a block however, this is not true,
     !> here, having a single, unique number is a lot faster. these numbers are called numerical treecodes.
-    integer(kind=tsize), allocatable, public :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), allocatable, public :: lgt_sortednumlist(:,:,:)
 
     !> Number of active trees
     integer(kind=ik), public    :: tree_n

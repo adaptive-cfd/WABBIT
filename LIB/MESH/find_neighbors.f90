@@ -602,7 +602,10 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
                 ! because symmetry conditions are used.
                 if (thereMustBeANeighbor) then
                     if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
-                        write(*,*) dir, lgt_block( lgtID_block, 1:Jmax ), lvl_down_neighbor, level, ":", tcFinerAppendDigit
+                        ! construct print format dynamically after Jmax
+                        write(*, '("Dir ", a, ", lvl_down=", l1, " lvl=", i0, ":", 4(1x, i0), " TC:", 20(1x, i0))') &
+                            dir, lvl_down_neighbor, level+1, tcFinerAppendDigit, lgt_block( lgtID_block, 1:Jmax )
+                        ! write(*,*) dir, lgt_block( lgtID_block, 1:Jmax ), lvl_down_neighbor, level, ":", tcFinerAppendDigit
                         error = .true.
                     endif
                 endif

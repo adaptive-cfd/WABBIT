@@ -290,7 +290,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     !---------------------------------------------------------------------------
     if (allocated(lgt_sortednumlist)) deallocate(lgt_sortednumlist)
-    allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
+    allocate( lgt_sortednumlist( size(lgt_block,1), 4, params%forest_size) )
     memory_this = product(real(shape(lgt_sortednumlist)))*4.0e-9
     memory_total = memory_total + memory_this
     if (rank==0) then

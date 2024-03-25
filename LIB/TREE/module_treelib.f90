@@ -396,6 +396,63 @@ end subroutine get_block_spacing_origin_b
   !===============================================================================
 
   !===============================================================================
+  !> \brief Define a "<"-operator for two blocks based on their tree_id, level and tc
+  !> \details In order to sort the array we want to uniquely arrange them to find
+  !! blocks quickly. This function defines the "<"-operator based on following input:
+  !!  - tree_ID
+  !!  - level
+  !!  - treecode in binary or numerical encoding
+  function tc_id_lower( array1, array2)
+    implicit none
+    !> Array1 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    integer(kind=ik),intent(in)   :: array1(:)
+    !> Array2 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    integer(kind=ik),intent(in)   :: array2(:)
+    !> Output
+    logical                       :: tc_id_lower
+
+    ! check if tree_id or level are larger, they are combined in one number
+    ! check if treecode is larger if tree_id and level are similar
+    if (array1(3) > array2(3) .or. &
+      (array1(3) == array2(3) .and. get_tc(array1(1:2)) >= get_tc(array2(1:2)))) then
+      tc_id_lower = .false.
+    else
+      tc_id_lower = .true.
+    endif
+  end function
+  !===============================================================================
+
+  !===============================================================================
+  !> \brief Define a "<"-operator for two blocks based on their tree_id, level and tc
+  !> \details In order to sort the array we want to uniquely arrange them to find
+  !! blocks quickly. This function defines the "<"-operator based on following input:
+  !!  - tree_ID
+  !!  - level
+  !!  - treecode in binary or numerical encoding
+  function tc_id_lower2( array1, array2)
+    implicit none
+    !> Array1 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    integer(kind=ik),intent(in)   :: array1(:)
+    !> Array2 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    integer(kind=ik),intent(in)   :: array2(:)
+    !> Output
+    logical                       :: tc_id_lower2
+
+    ! check if tree_id or level are larger, they are combined in one number
+    ! check if treecode is larger if tree_id and level are similar
+    if (array1(4) > array2(4) .or. &
+      (array1(4) == array2(4) .and. array1(3) > array2(3)) .or. &
+      (array1(4) == array2(4) .and. array1(3) == array2(3) &
+      ! .and. array1(2) >= array2(2))) then
+      .and. get_tc(array1(1:2)) >= get_tc(array2(1:2)))) then
+        tc_id_lower2 = .false.
+    else
+      tc_id_lower2 = .true.
+    endif
+  end function
+  !===============================================================================
+
+  !===============================================================================
   !> \brief Extract from lgt_block from the specific ID the treecode
   !> \details As treecode needs two normal integers in size, this is used to decode
   function get_tc( tc_2)
@@ -463,7 +520,7 @@ end subroutine get_block_spacing_origin_b
     ! extract digit
     element = mod( number, 10_tsize)
     ! remove it from number
-    number = number / 10
+    number = number / 10_tsize
   end subroutine
   !===============================================================================
 
@@ -787,9 +844,10 @@ end subroutine get_block_spacing_origin_b
     n_level = max_tclevel; if (present(level)) n_level = level
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
-    tc1 = treecode
+    treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
     do i = 1, len(direction)
+      tc1 = treecode_neighbor
       select case(direction(i:i))
         ! this case does nothing, charaters are defined as placeholders
         ! place at top because it appears very often, probably micro-optimization but well
@@ -908,14 +966,14 @@ end subroutine get_block_spacing_origin_b
       ! pop last digit
       call pop(tc_reduce, digit_last)
       ! add number with change from neighbour or overflow
-      treecode_neighbor = treecode_neighbor + (modulo(digit_last + dir_sign*dir_fac, 2*dir_fac) + digit_last/(2*dir_fac)*2*dir_fac)* 10**(i-1)
+      treecode_neighbor = treecode_neighbor + (modulo(digit_last + dir_sign*dir_fac, 2*dir_fac) + digit_last/(2*dir_fac)*2*dir_fac)* 10_tsize**(i-1)
       
-      ! compute overflow, magic with + 2*dir_fac) / (2*dir_fac) is done to round towards negative infinity for the case when dir_sign < 0
+      ! compute overflow as -1 or 1
       dir_sign = modulo(digit_last/dir_fac + (2 - dir_sign)/2, 2_tsize)*dir_sign
 
       ! copy directly the rest and exit loop if numbers are not gonna change anymore
       if (dir_sign == 0) then
-        treecode_neighbor = treecode_neighbor + tc_reduce* 10**i
+        treecode_neighbor = treecode_neighbor + tc_reduce* 10_tsize**i
         exit
       end if
     end do
@@ -952,10 +1010,6 @@ end subroutine get_block_spacing_origin_b
 
     tc_temp = treecode
 
-    ! this is the maximum index possible for binary grids (the last one on the finest grid)
-    max_tclevel = maxdigits
-    ! max_tclevel = min(bit_size(ix(i_dim)) - leadz(treecode)/n_dim, maxdigits)  ! only loop over all digits which are set in treecode
-
     ! NOTE: one-based indexing
     do i_dim = 1,n_dim
       ix(i_dim) = 1
@@ -969,7 +1023,7 @@ end subroutine get_block_spacing_origin_b
     do i_level = 0, n_level-1
       call pop(tc_temp, tc_digit)
       do i_dim = 1,n_dim
-        ix(i_dim) = ix(i_dim) + int(ibits(tc_digit, i_dim-1, 1) * 2**i_level, kind=ik)
+        ix(i_dim) = ix(i_dim) + int(ibits(tc_digit, i_dim-1, 1) * 2_tsize**i_level, kind=ik)
       end do
     end do
 

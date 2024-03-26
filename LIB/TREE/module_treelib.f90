@@ -9,71 +9,6 @@ module module_treelib
 
 #include "get_neighbor_treecode.f90"
 
-
-  ! for numerical treecodes:
-  ! subroutine appendDigitTreecode
-  ! subroutine setTreecodeInactive
-  ! setLevel
-  ! getLevel
-  ! setTreeID
-  ! getTreeID
-  ! setRefinementStatus
-  ! getRefinementStatus
-
-
-  !-----------------------------------------------------------------------------
-  !> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n
-  !> \details
-  !>   - The surface normal is 0 if the block is not adjacent to the global domain boundary (even if the BC is periodic!!)
-  !>   - The surface normal is computed from the treecode
-  subroutine get_adjacent_boundary_surface_normal(treecode, domain_size, Bs, dim, n_surface)
-      implicit none
-      integer(kind=ik), intent(in) :: treecode(1:), Bs(1:3), dim
-      real(kind=rk), intent(in) :: domain_size(1:3)
-      ! The normal on the domain indicates (if non-periodic BC are used), if a block
-      ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
-      ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
-      ! is way at the back and its boundary normal points in +x, and in z, its at the bottom (z=0), thus
-      ! its normal points downwards.
-      integer(kind=2), intent(out) :: n_surface(3)
-
-      real(kind=rk), dimension(1:3) :: x0, dx
-      real(kind=rk) :: tolerance
-
-      call get_block_spacing_origin2( treecode, domain_size, Bs, dim, x0, dx )
-
-      tolerance = 1.0e-3_rk * minval(dx(1:dim))
-
-      if (abs(x0(1)-0.0_rk) < tolerance ) then !x==0
-          n_surface(1) = -1
-      elseif (abs(x0(1)+dx(1)*real(Bs(1)-1,kind=rk) - domain_size(1)) < tolerance) then !x==L
-          n_surface(1) = +1
-      else
-          n_surface(1) = 0
-      endif
-
-      if (abs(x0(2)-0.0_rk) < tolerance ) then !y==0
-          n_surface(2) = -1
-      elseif (abs(x0(2)+dx(2)*real(Bs(2)-1,kind=rk) - domain_size(2)) < tolerance) then !y==L
-          n_surface(2) = +1
-      else
-          n_surface(2) = 0
-      endif
-
-      if (dim == 3) then
-          if (abs(x0(3)-0.0_rk) < tolerance ) then !z==0
-              n_surface(3) = -1
-          elseif (abs(x0(3)+dx(3)*real(Bs(3)-1,kind=rk) - domain_size(3)) < tolerance) then !z==L
-              n_surface(3) = +1
-          else
-              n_surface(3) = 0
-          endif
-      else
-          n_surface(3) = 0
-      endif
-  end subroutine get_adjacent_boundary_surface_normal
-
-
   !> \author engels
   !> \brief Compute block spacing and origin from lgt_block
   !> \details For any block lgt_id this routine computes, from the treearray stored in
@@ -402,22 +337,24 @@ end subroutine get_block_spacing_origin_b
   !!  - tree_ID
   !!  - level
   !!  - treecode in binary or numerical encoding
-  function tc_id_lower( array1, array2)
+  function tc_id_lower( array1, array2, check_meta)
     implicit none
-    !> Array1 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    !> Array1 of size 2-3 to be compared: (tc1, tc2, (level+100*tree_id))
     integer(kind=ik),intent(in)   :: array1(:)
-    !> Array2 of size 4 to be compared: (tc1, tc2, level, tree_id)
+    !> Array2 of size 2-3 to be compared: (tc1, tc2, (level+100*tree_id))
     integer(kind=ik),intent(in)   :: array2(:)
+    !> Is tree_id and level included and should be checked?
+    logical check_meta
     !> Output
     logical                       :: tc_id_lower
 
     ! check if tree_id or level are larger, they are combined in one number
     ! check if treecode is larger if tree_id and level are similar
-    if (array1(3) > array2(3) .or. &
-      (array1(3) == array2(3) .and. get_tc(array1(1:2)) >= get_tc(array2(1:2)))) then
-      tc_id_lower = .false.
+    if (check_meta) then
+      tc_id_lower = (array1(3) < array2(3) .or. &
+      (array1(3) == array2(3) .and. get_tc(array1(1:2)) < get_tc(array2(1:2))))
     else
-      tc_id_lower = .true.
+      tc_id_lower = (get_tc(array1(1:2)) < get_tc(array2(1:2)))
     endif
   end function
   !===============================================================================
@@ -459,7 +396,7 @@ end subroutine get_block_spacing_origin_b
     implicit none
     !> Array of two elements where we get / decoded ID
     integer(kind=ik),intent(in)   :: tc_2(:)
-    !> Output
+    !> Output, Treecode to be encoded
     integer(kind=tsize)           :: get_tc
 
     ! first number is shifted by amount of bits in second int
@@ -668,10 +605,11 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in str representation
-    character(len=*), intent(in)        :: direction
+    !> Seach direction in int representation
+    integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
     integer(kind=ik)                    :: i, n_dim, n_level, max_tclevel
+    integer(kind=tsize)                    :: dir_temp, dir_now
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -681,31 +619,11 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    do i = 1, len(direction)
+    dir_temp = direction
+    do while (dir_temp /= 0)
       tc1 = treecode_neighbor
-      select case(direction(i:i))
-        ! this case does nothing, charaters are defined as placeholders
-        ! place at top because it appears very often, probably micro-optimization but well
-        case("_")
-        ! 2D cases are on top to break out earlier, probably micro-optimization but well
-        case("5", "N")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 5, level=n_level, dim=n_dim, max_level=max_tclevel)
-        case("3", "S")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 3, level=n_level, dim=n_dim, max_level=max_tclevel)
-        case("2", "W")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 2, level=n_level, dim=n_dim, max_level=max_tclevel)
-        case("4", "E")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 4, level=n_level, dim=n_dim, max_level=max_tclevel)
-        case("1", "T")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 1, level=n_level, dim=n_dim, max_level=max_tclevel)
-        case("6", "B")
-          call adjacent_3D_faces_b(tc1, treecode_neighbor, 6, level=n_level, dim=n_dim, max_level=max_tclevel)
-        ! this case signals the second part, as far as I've understood we can break here
-        case("/")
-          exit
-        case default
-          call abort(118118, "Lord vader, the treelib does not know the direction")  
-      end select
+      call pop(dir_temp, dir_now)
+      call adjacent_3D_faces_b(tc1, treecode_neighbor, dir_now, level=n_level, dim=n_dim, max_level=max_tclevel)
     end do
   end subroutine
   !===============================================================================
@@ -756,7 +674,7 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> Seach direction in int representation for main cardinal directions
-    integer(kind=ik), intent(in)        :: direction
+    integer(kind=tsize), intent(in)        :: direction
     integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
     integer(kind=ik)                    :: i, n_dim, max_tclevel, n_level
 
@@ -833,11 +751,11 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in str representation
-    character(len=*), intent(in)        :: direction
-    character                           :: dir_card
+    !> Seach direction in int representation
+    integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
     integer(kind=ik)                    :: i, n_level, max_tclevel
+    integer(kind=tsize)                    :: dir_temp, dir_now
 
     ! Set defaults for dimension, level and max_level
     max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
@@ -846,31 +764,11 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    do i = 1, len(direction)
+    dir_temp = direction
+    do while (dir_temp /= 0)
       tc1 = treecode_neighbor
-      select case(direction(i:i))
-        ! this case does nothing, charaters are defined as placeholders
-        ! place at top because it appears very often, probably micro-optimization but well
-        case("_")
-        ! 2D cases are on top to break out earlier, probably micro-optimization but well
-        case("5", "N")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 5, n_level, max_tclevel)
-        case("3", "S")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 3, n_level, max_tclevel)
-        case("2", "W")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 2, n_level, max_tclevel)
-        case("4", "E")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 4, n_level, max_tclevel)
-        case("1", "T")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 1, n_level, max_tclevel)
-        case("6", "B")
-          call adjacent_3D_faces_n(tc1, treecode_neighbor, 6, n_level, max_tclevel)
-        ! this case signals the second part, as far as I've understood we can break here
-        case("/")
-          exit
-        case default
-          call abort(118118, "Lord vader, the treelib does not know the direction")  
-      end select
+      call pop(dir_temp, dir_now)
+      call adjacent_3D_faces_n(tc1, treecode_neighbor, dir_now, level=n_level, max_level=max_tclevel)
     end do
   end subroutine
   !===============================================================================
@@ -918,7 +816,7 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> Seach direction in int representation for main cardinal directions
-    integer(kind=ik), intent(in)        :: direction
+    integer(kind=tsize), intent(in)        :: direction
     integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
     integer(kind=ik)                    :: i, n_level, max_tclevel
 
@@ -1027,6 +925,9 @@ end subroutine get_block_spacing_origin_b
       end do
     end do
 
+    ! IY is encoded in first entry and IX in second so we need to swap them
+    i_level = ix(1); ix(1) = ix(2); ix(2) = i_level
+
   end subroutine decoding_n
   !===============================================================================
 
@@ -1046,7 +947,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=ik), intent(in)    :: ix(3)
     !> treecode
     integer(kind=tsize), intent(out) :: treecode
-    integer(kind=ik) :: i_dim, n_dim, i_level, n_level, max_tclevel
+    integer(kind=ik) :: i_dim, n_dim, i_level, n_level, max_tclevel, ix_p(3)
     !integer(kind=ik) :: b(Jmax)
 
     ! Set defaults for dimension, level and max_level
@@ -1055,12 +956,16 @@ end subroutine get_block_spacing_origin_b
     n_level = max_tclevel; if (present(level)) n_level = level
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
+    ! IY is encoded in first entry and IX in second so we need to swap them
+    ix_p(1:n_dim) = ix(1:n_dim)
+    i_level = ix_p(1); ix_p(1) = ix_p(2); ix_p(2) = i_level
+
     ! NOTE: gargantini uses 0-based indexing, which is a source of errors. we use 1-based (-1)
     treecode = 0_tsize
     do i_dim = 1, n_dim
       ! loop over all bits in ix which are set
-      do i_level = 0, bit_size(ix(i_dim))-leadz(ix(i_dim))
-        treecode = treecode + ibits(ix(i_dim)-1, i_level, 1) * 2_tsize**(i_dim-1) * 10_tsize**(i_level + (max_tclevel - n_level))
+      do i_level = 0, bit_size(ix_p(i_dim))-leadz(ix_p(i_dim))
+        treecode = treecode + ibits(ix_p(i_dim)-1, i_level, 1) * 2_tsize**(i_dim-1) * 10_tsize**(i_level + (max_tclevel - n_level))
       end do
     end do
 
@@ -1084,7 +989,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=ik), optional, intent(in)    :: max_level
     !> treecode
     integer(kind=tsize), intent(in) :: treecode
-    integer(kind=tsize) :: n_dim, i_dim, i_level, max_tclevel, n_level
+    integer(kind=ik) :: n_dim, i_dim, i_level, max_tclevel, n_level
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -1105,6 +1010,9 @@ end subroutine get_block_spacing_origin_b
       end do
     end do
 
+    ! IY is encoded in first entry and IX in second so we need to swap them
+    i_level = ix(1); ix(1) = ix(2); ix(2) = i_level
+
   end subroutine decoding_b
   !===============================================================================
 
@@ -1124,7 +1032,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=ik), optional, intent(in)    :: max_level
     !> treecode
     integer(kind=tsize), intent(out) :: treecode
-    integer(kind=tsize) :: n_dim, i_dim, i_level, max_tclevel, n_level
+    integer(kind=ik) :: n_dim, i_dim, i_level, max_tclevel, n_level, ix_p(3)
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -1133,13 +1041,16 @@ end subroutine get_block_spacing_origin_b
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
     treecode = 0_tsize
+    ! IY is encoded in first entry and IX in second so we need to swap them
+    ix_p(1:n_dim) = ix(1:n_dim)
+    i_level = ix_p(1); ix_p(1) = ix_p(2); ix_p(2) = i_level
 
     ! extract value as bit from each direction and add correspondend position in level-triplet or -duplet to treecode
     ! subtract 1 as it is one-based indexing
     ! loop over all bits set in index
     do i_dim = 1, n_dim
-      do i_level = 0,  bit_size(ix(i_dim)) - leadz(ix(i_dim)) -1
-        treecode = treecode + ishft(int(ibits(ix(i_dim)-1, i_level,1), kind=tsize), (i_level + (max_tclevel - n_level))*n_dim + (i_dim - 1))
+      do i_level = 0,  bit_size(ix_p(i_dim)) - leadz(ix_p(i_dim)) -1
+        treecode = treecode + ishft(int(ibits(ix_p(i_dim)-1, i_level,1), kind=tsize), (i_level + (max_tclevel - n_level))*n_dim + (i_dim - 1))
       end do
     end do
   end subroutine encoding_b
@@ -1175,7 +1086,7 @@ end subroutine get_block_spacing_origin_b
     allocate(character(len=n_level) :: temp_str)
     temp_str = ""
 
-    do i_nx = max_tclevel-n_level, max_tclevel
+    do i_nx = max_tclevel-n_level, max_tclevel-1
         ! extract bit-triplet ZYX on current level
         temp = ibits(treecode, 3*i_nx, 3)
 
@@ -1254,8 +1165,6 @@ end subroutine get_block_spacing_origin_b
   !!   - neighbor treecode, for neighbor on same level
   ! ********************************************************************************************
   recursive subroutine adjacent_block_2D(tcBlock, tcNeighbor, direction, level, max_treelevel)
-
-      use module_params   ! global parameters
 
       implicit none
       integer(kind=ik), intent(in)        :: max_treelevel
@@ -1409,8 +1318,6 @@ end subroutine get_block_spacing_origin_b
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
   recursive subroutine adjacent_block_3D(tcBlock, tcNeighbor, direction, level, max_treelevel)
-
-      use module_params     ! global parameters
 
       implicit none
       integer(kind=ik), intent(in)        :: max_treelevel
@@ -1710,8 +1617,6 @@ end subroutine get_block_spacing_origin_b
   !
   ! ********************************************************************************************
   subroutine decoding(treecode, i, j, k, treeN)
-      ! global parameters
-      use module_params
 
       implicit none
 
@@ -1799,9 +1704,6 @@ end subroutine get_block_spacing_origin_b
   !       compare to the quaternary codes in the quadrants above
   !
   subroutine encoding(treearray, ix, dim , block_num, treeN)
-      ! global parameters
-      use module_params
-
       implicit none
       integer(kind=ik), intent(in)    :: dim              !> dimension (2 or 3)
       integer(kind=ik), intent(in)    :: ix(dim)          !> block position coordinates
@@ -1842,9 +1744,6 @@ end subroutine get_block_spacing_origin_b
   !
   ! JB: Redundant and only used once in post_extract_slice
   subroutine encoding_revised(treecode, ix, dim, level)
-      ! global parameters
-      use module_params
-
       implicit none
       integer(kind=ik), intent(in)    :: dim            !> dimension (2 or 3)
       integer(kind=ik), intent(in)    :: ix(dim)        !> block position coordinates
@@ -1877,9 +1776,6 @@ end subroutine get_block_spacing_origin_b
   !> \brief convert a integer i to binary b \n
   !> \details binary return as vector with length N
   subroutine int_to_binary(i, N, b)
-
-      use module_params       ! global parameters
-
       implicit none
       integer(kind=ik), intent(in)    :: i            !> integer to convert into binary
       integer(kind=ik), intent(in)    :: N            !> length of binary output vector

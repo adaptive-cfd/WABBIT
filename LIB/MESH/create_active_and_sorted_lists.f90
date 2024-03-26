@@ -212,9 +212,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
                 ! my_lgt_send_buffer(hvy_n(tree_ID), 2) = treecode_ID
 
                 ! second and third index stores the numerical treecode
-                call array2tcb(treecode_ID, lgt_block(k, 1:params%Jmax), &
-                    dim=params%dim, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
-                call set_tc(my_lgt_send_buffer(hvy_n(tree_ID), 2:3), treecode_ID)
+                my_lgt_send_buffer(hvy_n(tree_ID), 2:3) = lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)
 
                 ! tree_ID and level are combined into one number for performance purposes
                 ! as max_level is 31 for 2D, we shift tree_ID by 100
@@ -263,7 +261,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     ! =======================================================
     ! sort list
     if (lgt_n(tree_ID) > 1) then
-        call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 2)
+        call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 4)
     end if
     t(5) = MPI_wtime()
     call toc("createActiveSortedLists_tree (reset lgt_n)", t(1)-t0)
@@ -647,12 +645,7 @@ subroutine createActiveSortedLists_forest(params)
             ! first index stores the light id of the block
             lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode
-            call array2tcb(treecode_int, lgt_block(k, 1:params%Jmax), &
-            dim=params%dim, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
-            ! cannot be transcribed easily so we need intermediate array
-            tc_ik(:) = -1
-            call set_tc(tc_ik(1:2), treecode_int)
-            lgt_sortednumlist(lgt_n(tree_ID), 2:3, tree_ID) = tc_ik(1:2)
+            lgt_sortednumlist(lgt_n(tree_ID), 2:3, tree_ID) = lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)
 
             ! tree_ID and level are combined into one number for performance purposes
             ! as max_level is 31 for 2D, we shift tree_ID by 100
@@ -671,7 +664,7 @@ subroutine createActiveSortedLists_forest(params)
     ! sort list of every single tree
     do tree_ID = 1, tree_n
         if (lgt_n(tree_ID) > 1) then
-            call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 2)
+            call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 4)
         end if
     end do
 

@@ -21,6 +21,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     integer(kind=ik)                    :: data_rank(8)
     integer(kind=ik)                    :: heavy_ids(8), tree_ID          ! list of block ids, proc ranks
 
+    integer(kind=tsize)                 :: treecode
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
     integer(kind=ik), dimension(3)      ::  icoars1, icoars2, icoarsm, Bs, ifine1, ifine2
 
@@ -35,10 +36,10 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     Bs = params%Bs
     g  = params%g
     Jmax = params%Jmax
-    ! level of merged block
+    ! details of merged block
     level = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_MESH_LVL )
     tree_ID = lgt_block( lgt_blocks_to_merge(1), Jmax + IDX_TREE_ID )
-
+    treecode = get_tc(lgt_block( lgt_blocks_to_merge(1), Jmax+IDX_TC_1 : Jmax+IDX_TC_2 ))
 
     ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
     do i = 1, N_merge
@@ -56,6 +57,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         call abort("You try to merge blocks on different ranks, but you must call gather_ranks before.")
     endif
 
+    ! CHANGE_LGT_BLOCK
     do i = 1, size(lgt_blocks_to_merge)
         if (lgt_block(lgt_blocks_to_merge(i),level) /= i-1) then
             call abort(647483," You try to merge blocks which do not belong together")
@@ -97,10 +99,13 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     call get_free_local_light_id(params, data_rank(1), lgt_merge_id, message="merge_blocks")
     ! create light data entry for the new block
     lgt_block( lgt_merge_id, : ) = -1
+    ! CHANGE_LGT_BLOCK
     lgt_block( lgt_merge_id, 1:level-1 ) = lgt_block( lgt_blocks_to_merge(1), 1:level-1 )
     lgt_block( lgt_merge_id, Jmax+ IDX_MESH_LVL ) = level-1
     lgt_block( lgt_merge_id, Jmax+ idx_refine_sts ) = 0
     lgt_block( lgt_merge_id, Jmax+ IDX_TREE_ID ) = tree_ID
+    call set_tc(lgt_block( lgt_merge_id, params%Jmax+IDX_TC_1:params%Jmax+IDX_TC_2), tc_clear_until_level_b(treecode, &
+        dim=params%dim, level=level-1, max_level=params%Jmax))
 
     !-------------------------------------------------------------------------------
     ! b) heavy data merging (individual operation)
@@ -192,6 +197,9 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
 
     ! merging is complete now, remove the original blocks from light data:
     do i = 1, N_merge
+        ! CHANGE_LGT_BLOCK
         lgt_block( lgt_blocks_to_merge(i), : ) = -1
+        lgt_block( lgt_blocks_to_merge(i), params%Jmax + IDX_TC_1 ) = -1
+        lgt_block( lgt_blocks_to_merge(i), params%Jmax + IDX_TC_2 ) = -1
     enddo
 end subroutine merge_blocks

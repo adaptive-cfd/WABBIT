@@ -1,4 +1,7 @@
 subroutine prune_tree( params, hvy_block, tree_ID)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)    :: params   !< params structure
@@ -258,6 +261,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
         lgt_id1 = lgt_active(k, tree_ID_pruned)
         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+        ! CHANGE_LGT_BLOCK
         call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), dim=params%dim, level=level1, max_level=params%dim)
 
         ! do we find the treecode of the pruned tree-block in the full grid?
@@ -299,6 +303,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
         hvy_id1  = hvy_active(k, tree_ID_pruned)
         call hvy2lgt(lgt_id1, hvy_id1, params%rank, params%number_blocks)
         level1  = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
+        ! CHANGE_LGT_BLOCK
         call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), dim=params%dim, level=level1, max_level=params%dim)
 
         call doesBlockExist_tree(treecode1, exists, lgt_id2, dim=params%dim, level=level1, tree_id=tree_ID_full, max_level=params%Jmax)
@@ -348,6 +353,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             ! not a coarsening) => look for sister blocks on higher levels (refined)
 
             ! find all sister blocks and add 1 to them. no xfer required.
+            ! CHANGE_LGT_BLOCK - also maybe use findSisters_tree here?
             treecode1 = treecode2int( lgt_block(lgt_id1, 1:level1) )
 
             do i = 1, lgt_n(tree_ID_full)
@@ -592,8 +598,21 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
                 ! The treecodes can only be compared if they have the same size
                 ! (i.e. treecode length).
                 level_min = min(level_ref,level)
-                treecode_ref = treecode2int( lgt_block_ref(lgt_id_ref, 1:level_min) )
-                treecode     = treecode2int( lgt_block(lgt_id, 1:level_min) )
+                ! CHANGE_LGT_BLOCK
+                ! treecode_ref = get_tc(lgt_block_ref(lgt_id_ref, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                ! treecode     = get_tc(lgt_block(lgt_id, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                ! treecode_ref = tc_clear_until_level_b(treecode_ref, params%dim, level_min, Jmax)
+                ! treecode     = tc_clear_until_level_b(treecode, params%dim, level_min, Jmax)
+
+                treecode_ref = 0_tsize; treecode = 0_tsize
+                call array2tcb(treecode_ref, lgt_block(lgt_id_ref, 1:level_min), &
+                    dim=params%dim, level=level_min, max_level=Jmax)
+                call array2tcb(treecode, lgt_block(lgt_id, 1:level_min), &
+                    dim=params%dim, level=level_min, max_level=Jmax)
+
+                ! treecode_ref = treecode2int( lgt_block_ref(lgt_id_ref, 1:level_min) )
+                ! treecode     = treecode2int( lgt_block(lgt_id, 1:level_min) )
+
                 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                 ! Comparison of the trees:
                 ! - Compare the treecodes up to the smallest level both blocks share (level_min)
@@ -738,8 +757,20 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
                 ! levels.
                 level_min = min(level1, level2)
 
-                treecode1 = treecode2int( lgt_block(lgt_id1, 1:level_min) )
-                treecode2 = treecode2int( lgt_block(lgt_id2, 1:level_min) )
+                ! CHANGE_LGT_BLOCK
+                ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                ! treecode1 = tc_clear_until_level_b(treecode1, params%dim, level_min, Jmax)
+                ! treecode2 = tc_clear_until_level_b(treecode2, params%dim, level_min, Jmax)
+
+                treecode1 = 0_tsize; treecode2 = 0_tsize
+                call array2tcb(treecode1, lgt_block(lgt_id1, 1:level_min), &
+                    dim=params%dim, level=level_min, max_level=Jmax)
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level_min), &
+                    dim=params%dim, level=level_min, max_level=Jmax)
+
+                ! treecode1 = treecode2int( lgt_block(lgt_id1, 1:level_min) )
+                ! treecode2 = treecode2int( lgt_block(lgt_id2, 1:level_min) )
 
                 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                 ! Comparison of the trees:
@@ -819,6 +850,7 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
 end subroutine
 
 !##############################################################
+!> \brief Refines all active blocks lower than lvl 12??
 subroutine refine_tree2(params, hvy_block, hvy_tmp, tree_ID)
 
     implicit none
@@ -991,13 +1023,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             hvy_id1 = hvy_active(k1,tree_ID1)
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1052,13 +1094,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             hvy_id1 = hvy_active(k1,tree_ID1)
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1105,13 +1157,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             ! we want to add everything to tree1
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1157,13 +1219,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             ! we want to add everything to tree1
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2, tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1184,13 +1256,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             hvy_id1 = hvy_active(k1,tree_ID1)
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1245,13 +1327,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             hvy_id1 = hvy_active(k1,tree_ID1)
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1307,13 +1399,23 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             ! we want to add everything to tree1
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
                 if (treecode1 .ne. treecode2 ) then
                     cycle
                 else
@@ -1358,14 +1460,24 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
             hvy_id1 = hvy_active(k1,tree_ID1)
             call hvy2lgt(lgt_id1, hvy_id1, rank, N )
             level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level1, max_level=Jmax)
+            ! treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
 
             do k2 = 1, hvy_n(tree_ID2)
                 hvy_id2 = hvy_active(k2,tree_ID2)
                 call hvy2lgt(lgt_id2, hvy_id2, rank, N )
 
                 level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-                treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+                ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+                treecode2 = 0_tsize
+                call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                    dim=params%dim, level=level2, max_level=Jmax)
+                ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
 
                 if (treecode1 .ne. treecode2 ) then
                     cycle
@@ -1728,13 +1840,22 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
         call hvy2lgt(lgt_id1, hvy_id1, rank, N )
 
         level1   = lgt_block(lgt_id1, Jmax + IDX_MESH_LVL)
-        treecode1= treecode2int( lgt_block(lgt_id1, 1 : level1))
-
+        ! CHANGE_LGT_BLOCK
+        ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+        treecode1 = 0_tsize
+        call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+            dim=params%dim, level=level1, max_level=Jmax)
+        ! treecode1= treecode2int(lgt_block(lgt_id1, 1 : level1))
         loop_tree2: do k2 = 1, hvy_n(tree_ID2) !loop over all treecodes in 2.tree to find the same block
             hvy_id2 = hvy_active(k2,tree_ID2)
             call hvy2lgt(lgt_id2, hvy_id2, rank, N )
             level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
-            treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
+            ! CHANGE_LGT_BLOCK
+                ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            treecode2 = 0_tsize
+            call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                dim=params%dim, level=level2, max_level=Jmax)
+            ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
             if (treecode1 .ne. treecode2 ) then
                 cycle
             else
@@ -1988,8 +2109,20 @@ subroutine same_block_distribution(params, hvy_block, tree_ID1, tree_ID2)
             lgt_id2  = lgt_active(k2, tree_ID2)
             level2   = lgt_block(lgt_id2, Jmax + IDX_MESH_LVL)
             level_min= min(level1,level2)
-            treecode1= treecode2int( lgt_block(lgt_id1, 1 : level_min))
-            treecode2= treecode2int(lgt_block(lgt_id2, 1 : level_min))
+            ! CHANGE_LGT_BLOCK
+            ! treecode1 = get_tc(lgt_block(lgt_id1, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            ! treecode1 = tc_clear_until_level_b(treecode1, params%dim, level_min, Jmax)
+            treecode1 = 0_tsize
+            call array2tcb(treecode1, lgt_block(lgt_id1, 1:level1), &
+                dim=params%dim, level=level_min, max_level=Jmax)
+            ! treecode1= treecode2int(lgt_block(lgt_id1, 1 : level1))
+            ! CHANGE_LGT_BLOCK
+            ! treecode2 = get_tc(lgt_block(lgt_id2, Jmax+IDX_TC_1 : Jmax+IDX_TC_2))
+            ! treecode2 = tc_clear_until_level_b(treecode2, params%dim, level_min, Jmax)
+            treecode2 = 0_tsize
+            call array2tcb(treecode2, lgt_block(lgt_id2, 1:level2), &
+                dim=params%dim, level=level_min, max_level=Jmax)
+            ! treecode2= treecode2int(lgt_block(lgt_id2, 1 : level2))
             if (treecode1 == treecode2 )then
                 ! check treestructure
                 if (level1 .ne. level2) then

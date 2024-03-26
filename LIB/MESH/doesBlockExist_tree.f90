@@ -2,9 +2,6 @@
 ! ********************************************************************************************
 subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tree_ID)
 
-    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
-    use module_params
-
     implicit none
 
     !-----------------------------------------------------------------
@@ -75,7 +72,7 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
         ! cut interval in two parts
         imid = (i1+i2) / 2
         ! if (lgt_sortednumlist(imid,2,n_tree_ID) < num_treecode) then
-        if (tc_id_lower(lgt_sortednumlist(imid,2:4,n_tree_ID), id_a_now)) then
+        if (tc_id_lower(lgt_sortednumlist(imid,2:4,n_tree_ID), id_a_now, .true.)) then
             i1 = imid
         else
             i2 = imid

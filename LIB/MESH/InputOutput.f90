@@ -185,6 +185,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 endif
 
                 ! copy treecode (we'll save it to file as well)
+                ! CHANGE_LGT_BLOCK
                 block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
             else
                 ! 2D
@@ -207,6 +208,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
                 ! copy treecode (we'll save it to file as well)
+                ! CHANGE_LGT_BLOCK
                 block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
             endif
 
@@ -325,6 +327,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n, version(1), datarank, Bs_file(1:3)=0
     integer(hsize_t) :: dims_treecode(2)
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
+    integer(kind=tsize) :: treecode
     integer(hid_t)        :: file_id
     integer(kind=hsize_t) :: size_field(1:4)
     logical :: verbose = .true.
@@ -542,7 +545,10 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         call get_free_local_light_id( params, rank, free_lgt_id)
 
         call lgt2hvy( free_hvy_id, free_lgt_id, rank, N )
+        ! init
+        lgt_block(free_lgt_id, :) = -1
         ! copy treecode
+        ! CHANGE_LGT_BLOCK
         lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
         lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
@@ -550,6 +556,11 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         lgt_block(free_lgt_id, params%Jmax+IDX_REFINE_STS) = 0
         ! set number of the tree
         lgt_block(free_lgt_id, params%Jmax+IDX_TREE_ID) = tree_id
+        ! set treecode
+        treecode = -1_tsize
+        call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &
+            level=lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+        call set_tc(lgt_block( free_lgt_id, params%Jmax+IDX_TC_1:params%Jmax+IDX_TC_2), treecode)
         ! copy actual data (form buffer to actual data array)
         do dF = 1, N_files
             if (params%dim == 3) then

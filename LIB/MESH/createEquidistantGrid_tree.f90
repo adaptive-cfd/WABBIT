@@ -115,7 +115,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
                             ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
 
                             lgt_block( lgt_id, : ) = -1
-                            ! LGT_BLOCK_ARRAY_TO_BE_DELETED
+                            ! CHANGE_LGT_BLOCK
                             call tcb2array(tc_b, lgt_block( lgt_id, 1:Jmin ), dim=params%dim, level=Jmin, max_level=params%Jmax)
                             lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ) = Jmin
                             lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS ) = 0

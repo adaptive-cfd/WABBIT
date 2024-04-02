@@ -341,7 +341,8 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     hvy_n = 0
     ! setting -1 is required to avoid "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU"
     ! because it looks for a -1 block.
-    lgt_block(:,1) = -1
+    ! Init all blocks as inactive
+    lgt_block(:,:) = -1
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks

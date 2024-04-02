@@ -195,7 +195,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
         call hvy2lgt( k, hvy_id, rank, N )
 
         if (lgt_block(k, TREE_ID_IDX) == tree_ID) then
-            if (lgt_block(k, 1) /= -1) then ! block is active
+            if (get_tc(lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)) >= 0) then ! block is active
                 ! ---------------------------
                 ! update hvy active
                 ! ---------------------------
@@ -607,7 +607,7 @@ subroutine createActiveSortedLists_forest(params)
     ! =======================================================
     do k = 1, size(lgt_block, 1)
         ! block is active
-        if ( lgt_block(k, 1) /= -1 ) then
+        if ( get_tc(lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)) >= 0 ) then
 
             ! which tree id has the current block k?
             tree_ID = lgt_block(k, TREE_ID_IDX)

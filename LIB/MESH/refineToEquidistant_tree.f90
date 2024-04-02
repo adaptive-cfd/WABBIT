@@ -36,7 +36,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
         do k = 1, lgt_n(tree_ID)
             lgt_id = lgt_active(k, tree_ID)
 
-            level_this = treecode_size(lgt_block(lgt_id,:), params%Jmax)
+            level_this = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
 
             if (level_this > level) then
                 lgt_block(lgt_id, params%Jmax + IDX_REFINE_STS) = -1
@@ -70,7 +70,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            level_this = treecode_size(lgt_block(lgt_id,:), params%Jmax)
+            level_this = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
 
             if ((level_this < level).and.(hvy_n(tree_ID)+newBlocks < params%number_blocks)) then
                 lgt_block(lgt_id, params%Jmax + IDX_REFINE_STS) = 1

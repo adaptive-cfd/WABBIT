@@ -24,7 +24,6 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk), allocatable, save    :: new_data(:,:,:), data_predict_fine(:,:)  ! data fields for interpolation
     integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
-    integer(kind=ik)                    :: treearray(params%Jmax)
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level
 
@@ -58,8 +57,6 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
         if ( (lgt_block( lgt_id, params%Jmax + idx_refine_sts) == +1) ) then
 
             ! extract treecode and mesh level
-            ! CHANGE_LGT_BLOCK
-            treearray = lgt_block( lgt_id, 1:params%Jmax )
             treecode = get_tc(lgt_block( lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2 ))
             level    = lgt_block( lgt_id, params%Jmax + IDX_MESH_LVL )
 
@@ -90,18 +87,14 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
                     call hvy2lgt( lgt_free_id, free_heavy_id, rank, N )
                 endif
 
+                treecode = tc_set_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
+
                 ! init array - needed to change values if never adressed
                 lgt_block( lgt_free_id, : ) = -1
 
                 ! write new light data
-                ! CHANGE_LGT_BLOCK
-                ! old treecode array
-                lgt_block( lgt_free_id, 1:params%Jmax ) = treearray
-                ! new treecode array one level up - "0" block
-                lgt_block( lgt_free_id, level+1 ) = k_daughter
                 ! new treecode
-                call set_tc(lgt_block( lgt_free_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2 ), &
-                    tc_set_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax))
+                call set_tc(lgt_block( lgt_free_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2 ), treecode)
                 ! new level + 1
                 lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
                 ! new blocks have refinement_status==0 (STAY)

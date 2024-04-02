@@ -26,7 +26,7 @@ subroutine keyvalues(fname, params)
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk)                           :: time
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
+    integer(kind=ik), allocatable           :: tree(:), tree_temp(:), sum_tree(:), blocks_per_rank(:)
     integer(kind=ik)                        :: sum_curve(2)
     character(len=12)                       :: curves(2)
     real(kind=rk)                           :: x,y,z
@@ -91,6 +91,7 @@ subroutine keyvalues(fname, params)
     call updateMetadata_tree(params, tree_ID)
 
     allocate(tree(1:params%Jmax))
+    allocate(tree_temp(1:params%Jmax))
     allocate(sum_tree(1:params%Jmax))
     allocate(blocks_per_rank(1:params%number_procs))
 
@@ -109,8 +110,14 @@ subroutine keyvalues(fname, params)
             hvy_id = hvy_active(k, tree_ID)
 
             call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-
-            tree = tree + (sum(blocks_per_rank(1:rank))+k)*lgt_block(lgt_id,1:params%Jmax)
+            
+            ! Julius: CHANGE_LGT_BLOCK
+            ! Probably this can be changed to a implementation without arrays but then I have to take
+            ! a further look at it to stay consistent with old results
+            tree_temp(:) = -1_ik
+            call tcb2array( get_tc(lgt_block(lgt_id,params%Jmax + IDX_TC_1 : params%Jmax + IDX_TC_2)), &
+                tree_temp, params%dim, lgt_block(lgt_id,params%Jmax + IDX_MESH_LVL), params%Jmax)
+            tree = tree + (sum(blocks_per_rank(1:rank))+k)*tree_temp(1:params%Jmax)
         end do
 
         call MPI_REDUCE(tree,sum_tree, params%Jmax, MPI_INTEGER, &

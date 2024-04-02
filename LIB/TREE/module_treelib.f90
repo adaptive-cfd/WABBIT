@@ -400,7 +400,10 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize)           :: get_tc
 
     ! first number is shifted by amount of bits in second int
-    get_tc = ishft(int(tc_2(1), kind=tsize), bit_size(tc_2(1))) + int(tc_2(2), kind=tsize)
+    ! We have to left-and-right shift the second int as when left-most bit is set to 1
+    ! it is treated as negative number and left-extended with 1s, with the shift we clear that
+    get_tc = ishft(int(tc_2(1), kind=tsize), bit_size(tc_2(2))) &
+           + ishft(ishft(int(tc_2(2), kind=tsize), bit_size(tc_2(2))), -bit_size(tc_2(2)))
   end function
   !===============================================================================
 
@@ -545,7 +548,8 @@ end subroutine get_block_spacing_origin_b
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
     tmp=treecode
-    array=0
+    ! init as -1 or unset
+    array=-1
     ! skip some elements
     do i_level = n_level, max_tclevel-1
       call pop(tmp,element)
@@ -582,7 +586,8 @@ end subroutine get_block_spacing_origin_b
     n_level = max_tclevel; if (present(level)) n_level = level
     if (n_level < 0) n_level = max_tclevel + n_level + 1
     
-    array=0
+    ! init as -1 or unset
+    array=-1
     do i_level = 0,n_level-1
         array(n_level-i_level) = int(ibits(treecode, (i_level + max_tclevel - n_level)*n_dim, n_dim), ik)
     end do

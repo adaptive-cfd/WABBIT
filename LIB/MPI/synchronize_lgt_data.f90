@@ -78,7 +78,7 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     ! fetch last used light id, that is the value of lgt_end in the above ascii art
     ! this will be the interval which we have to communicate via MPI
     do lgt_id = lgt_end, lgt_start, -1
-        if (lgt_block(lgt_id,1) /= -1) exit
+        if (get_tc(lgt_block(lgt_ID, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)) >= 0) exit
     enddo
     lgt_end = lgt_id
     lgt_num = lgt_end - lgt_start + 1
@@ -166,6 +166,9 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     if (.not. refinement_status_only) then
         ! reset only first column
         lgt_block(:,1) = -1
+        ! reset TC
+        lgt_block(:,params%Jmax+IDX_TC_1) = -1
+        lgt_block(:,params%Jmax+IDX_TC_2) = -1
     endif
 
     ! unpack synchronized buffer into the light data array.

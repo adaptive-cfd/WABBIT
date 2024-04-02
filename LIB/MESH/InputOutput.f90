@@ -185,8 +185,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 endif
 
                 ! copy treecode (we'll save it to file as well)
-                ! CHANGE_LGT_BLOCK
-                block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
+                block_treecode(:,l) = -1
+                call tcb2array(get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), &
+                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ), max_level=params%Jmax)
             else
                 ! 2D
                 if (save_ghosts) then
@@ -208,8 +209,10 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
                 ! copy treecode (we'll save it to file as well)
-                ! CHANGE_LGT_BLOCK
-                block_treecode(:,l) = lgt_block( lgt_id, 1:params%Jmax )
+                block_treecode(:,l) = -1
+                call tcb2array(get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), &
+                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ), max_level=params%Jmax)
+
             endif
 
 
@@ -357,7 +360,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! the size of the array is Bs x Bs x Bs x Nb
     call get_size_datafield(datarank, file_id, "blocks", size_field(1:datarank))
     ! copy first 3 entries to Bs
-    Bs_file(1:datarank-1) = size_field(1:datarank-1)
+    Bs_file(1:datarank-1) = int(size_field(1:datarank-1), kind=ik)
     ! Files created using newGhostNodes branch (after 08 04 2020) contain a version number
     call read_attribute( file_id, "blocks", "version", version)
     ! read time stamp (if desired)
@@ -548,8 +551,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         ! init
         lgt_block(free_lgt_id, :) = -1
         ! copy treecode
-        ! CHANGE_LGT_BLOCK
-        lgt_block(free_lgt_id, 1:dims_treecode(1)) = block_treecode(1:dims_treecode(1), k)
         ! set mesh level
         lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status

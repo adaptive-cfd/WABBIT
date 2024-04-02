@@ -353,48 +353,48 @@ contains
         ! !   end if
 
     end subroutine init_bridge
-
     !===========================================================================
 
-    !> \brief function returns the lgt_id to the corresponding treecode
-    integer(kind=tsize) function treecode2lgt_id(maxtreelevel,treecode)
-
-        ! input:
-        implicit none
-        integer(kind=ik), intent(in)    :: treecode(:)      !< treecode
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        integer         , allocatable           :: meshlevel(:)        ! mesh level of the blocks
-        integer                                 :: nblock,i,j,k    ! Number of blocks
-        integer                                 :: maxtreelevel, tree_ID=1
-
-
-        nblock= size(lgt_block,1)
-        allocate(meshlevel(lgt_n(tree_ID)))
-
-        meshlevel(:) = lgt_block(lgt_active(1:lgt_n(tree_ID), tree_ID), maxtreelevel+1)
-
-        do k=1,lgt_n(tree_ID) !loop over blocks k
-            ! only loop over active blocks
-            j = lgt_active(k, tree_ID)
-            i = 1
-            do while(lgt_block(j,i)==treecode(maxtreelevel-i) .and. i<=meshlevel(k))
-                i=i+1
-            enddo
-
-            if ((i-1)==meshlevel(k)) then
-                treecode2lgt_id=j
-                ! write(*,*) 'light_id=',treecode2lgt_id
-
-                !return
-            endif
-
-        enddo
-
-    end function
 
 
 
+    ! !===========================================================================
+    ! !> \brief function returns the lgt_id to the corresponding treecode
+    ! integer(kind=tsize) function treecode2lgt_id(maxtreelevel,treecode)
 
+    !     ! input:
+    !     implicit none
+    !     integer(kind=ik), intent(in)    :: treecode(:)      !< treecode
+    !     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !     integer         , allocatable           :: meshlevel(:)        ! mesh level of the blocks
+    !     integer                                 :: nblock,i,j,k    ! Number of blocks
+    !     integer                                 :: maxtreelevel, tree_ID=1
+
+
+    !     nblock= size(lgt_block,1)
+    !     allocate(meshlevel(lgt_n(tree_ID)))
+
+    !     meshlevel(:) = lgt_block(lgt_active(1:lgt_n(tree_ID), tree_ID), maxtreelevel+1)
+
+    !     do k=1,lgt_n(tree_ID) !loop over blocks k
+    !         ! only loop over active blocks
+    !         j = lgt_active(k, tree_ID)
+    !         i = 1
+    !         do while(lgt_block(j,i)==treecode(maxtreelevel-i) .and. i<=meshlevel(k))
+    !             i=i+1
+    !         enddo
+
+    !         if ((i-1)==meshlevel(k)) then
+    !             treecode2lgt_id=j
+    !             ! write(*,*) 'light_id=',treecode2lgt_id
+
+    !             !return
+    !         endif
+
+    !     enddo
+
+    ! end function
+    ! !===========================================================================
 
 
 

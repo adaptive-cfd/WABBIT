@@ -54,8 +54,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     tcFinerAppendDigit            = -1
 
     ! we have to init tcBlock before we set it elsewise fortran doesnt like it
-    tcb_Block    = 0_tsize
-    call array2tcb(tcb_Block, lgt_block( lgtID_block, 1:Jmax ), dim=params%dim, level=level, max_level=Jmax)
+    tcb_Block    = get_tc(lgt_block(lgtID_block, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
     ! last digit is used very often so we only extract it once
     tc_last = tc_get_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
 
@@ -613,9 +612,8 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
                 if (thereMustBeANeighbor) then
                     if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
                         ! construct print format dynamically after Jmax
-                        write(*, '("Dir ", i0, ", lvl_down=", l1, " lvl=", i0, ":", 4(1x, i0), " TC:", 20(1x, i0))') &
-                            dir, lvl_down_neighbor, level+1, tcFinerAppendDigit, lgt_block( lgtID_block, 1:Jmax )
-                        ! write(*,*) dir, lgt_block( lgtID_block, 1:Jmax ), lvl_down_neighbor, level, ":", tcFinerAppendDigit
+                        write(*, '("Dir ", i0, ", lvl_down=", l1, " lvl=", i0, ":", 4(1x, i0), " TC: ", b64.64)') &
+                            dir, lvl_down_neighbor, level+1, tcFinerAppendDigit, tcb_Block
                         error = .true.
                     endif
                 endif

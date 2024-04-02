@@ -51,8 +51,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
         lgtID = lgt_active(k, tree_ID)
 
-        ! CHANGE_LGT_BLOCK
-        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -1) then
+        if ( get_tc(lgt_block(lgtID, Jmax+IDX_TC_1 : Jmax+IDX_TC_2)) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -1) then
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
             call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
@@ -98,8 +97,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
         ! ensureGradedness_tree removes the -1 flag and sets -7 (temporarily assigned above) flag if not all sister blocks share it
         lgtID = lgt_active(k, tree_ID)
-        ! CHANGE_LGT_BLOCK
-        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -7) then
+        if ( get_tc(lgt_block(lgtID, Jmax+IDX_TC_1 : Jmax+IDX_TC_2)) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -7) then
             ! merge the four blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.

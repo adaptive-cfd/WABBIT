@@ -462,19 +462,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
   ! write(*,'("treecode num bin", 3(1x, i0), 2(1x, b64.64))') ixy, tc_b, tcb2id(tc_b, dim=3, tree_ID=23, level=level, max_level=params%Jmax)
   ! write(*,'("treecode num dec", 5(1x, i0))') ixy, newtreecode, tcd2id(newtreecode, tree_ID=23, level=level, max_level=params%Jmax)
-
-
-  ! ! some code here to test severity with many trees
-  ! do k = 4,98
-  !   if (params%rank == 0) then
-  !     write(*,'("UNIT TEST: treecode sorted create random tree ", i0)') k
-  !   end if
-  !   call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .false., 4, k )
-  !   tree_n = k
-  ! end do
-  ! call createActiveSortedLists_forest(params)
-  ! call summarize_profiling( WABBIT_COMM )
-  ! call abort(123980)
+  
 
   if (params%rank == 0) then
     WRITE(*,'("UNIT TEST: Finished all treecode tests")')

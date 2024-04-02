@@ -194,7 +194,9 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
         call hvy2lgt( k, hvy_id, rank, N )
 
         if (lgt_block(k, IDX_TREE_ID) == tree_ID) then
-            if (get_tc(lgt_block(k, IDX_TC_1 : IDX_TC_2)) >= 0) then ! block is active
+            ! check if block is active: TC > 0
+            ! performance: don't construct tc and check only first int
+            if (lgt_block(k, IDX_TC_1 ) >= 0) then
                 ! ---------------------------
                 ! update hvy active
                 ! ---------------------------
@@ -599,8 +601,9 @@ subroutine createActiveSortedLists_forest(params)
     ! loop over all light data
     ! =======================================================
     do k = 1, size(lgt_block, 1)
-        ! block is active
-        if ( get_tc(lgt_block(k, IDX_TC_1 : IDX_TC_2)) >= 0 ) then
+        ! check if block is active: TC > 0
+        ! performance: don't construct tc and check only first int
+        if (lgt_block(k, IDX_TC_1 ) >= 0) then
 
             ! which tree id has the current block k?
             tree_ID = lgt_block(k, IDX_TREE_ID)

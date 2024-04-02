@@ -17,7 +17,7 @@ subroutine reset_tree(params, verbosity, tree_ID )
     endif
 
     do k = 1, size(lgt_block,1)
-        if (lgt_block(k,params%Jmax+IDX_TREE_ID) == tree_ID) then
+        if (lgt_block(k,IDX_TREE_ID) == tree_ID) then
             ! this block is a part of this tree -> delete it
             lgt_block(k,:) = -1
         endif
@@ -60,15 +60,15 @@ subroutine reset_forest(params)
     ! all blocks are inactive, reset treecode
     lgt_block(:,:) = -1
     ! reset tree_ID
-    lgt_block(:, max_treelevel+IDX_TREE_ID) = -1
+    lgt_block(:, IDX_TREE_ID) = -1
     ! all blocks are inactive, reset mesh level
-    lgt_block(:, max_treelevel+IDX_MESH_LVL) = -1
+    lgt_block(:, IDX_MESH_LVL) = -1
     ! set refinement to 0
-    lgt_block(:, max_treelevel+IDX_REFINE_STS) = 0
+    lgt_block(:, IDX_REFINE_STS) = 0
 
     ! set TC to -1
-    lgt_block(:, max_treelevel+IDX_TC_1) = -1
-    lgt_block(:, max_treelevel+IDX_TC_2) = -1
+    lgt_block(:, IDX_TC_1) = -1
+    lgt_block(:, IDX_TC_2) = -1
 
     ! reset sorted list of numerical treecodes
     do i = 1,size(lgt_active,2)

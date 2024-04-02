@@ -95,14 +95,14 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
                 sfc_sorted_list(k, :) = -1
-                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
                 call set_tc(sfc_sorted_list(k, 2:3), treecode)
             end do
         else
             do k = 1, lgt_n(tree_ID)
                 sfc_sorted_list(k, :) = -1
-                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
                 call set_tc(sfc_sorted_list(k, 2:3), treecode)
             end do
@@ -116,9 +116,9 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
                 sfc_sorted_list(k, :) = -1
 
                 ! transfer treecode to hilbertcode
-                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 call treecode_to_hilbertcode_3D( treecode, hilbertcode2, &
-                    dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+                    dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), IDX_MESH_LVL), max_level=params%Jmax)
                     
                 sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
                 call set_tc(sfc_sorted_list(k, 2:3), hilbertcode2)
@@ -128,9 +128,9 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
                 sfc_sorted_list(k, :) = -1
 
                 ! transfer treecode to hilbertcode
-                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+                treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 call treecode_to_hilbertcode_2D( treecode, hilbertcode2, &
-                    dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+                    dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), IDX_MESH_LVL), max_level=params%Jmax)
 
                 sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
                 call set_tc(sfc_sorted_list(k, 2:3), hilbertcode2)

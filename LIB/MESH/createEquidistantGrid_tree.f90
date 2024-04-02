@@ -114,10 +114,10 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
 
                             ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
                             lgt_block( lgt_id, : ) = -1
-                            call set_tc(lgt_block( lgt_id, params%Jmax+IDX_TC_1:params%Jmax+IDX_TC_2), tc_b)
-                            lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ) = Jmin
-                            lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS ) = 0
-                            lgt_block( lgt_id, params%Jmax+IDX_TREE_ID ) = tree_ID
+                            call set_tc(lgt_block( lgt_id, IDX_TC_1:IDX_TC_2), tc_b)
+                            lgt_block( lgt_id, IDX_MESH_LVL ) = Jmin
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                            lgt_block( lgt_id, IDX_TREE_ID ) = tree_ID
                         end if
                         ! as this block is now given to one cpu, we can leave the loop over
                         ! cpus and take care of the next one.

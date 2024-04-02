@@ -52,11 +52,11 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
         call hvy2lgt( lgt_id, hvy_active(k, tree_ID), rank, N )
 
         ! block wants to refine
-        if ( (lgt_block( lgt_id, params%Jmax + idx_refine_sts) == +1) ) then
+        if ( (lgt_block( lgt_id, idx_refine_sts) == +1) ) then
 
             ! treecode and mesh level
-            treecode = get_tc(lgt_block( lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2 ))
-            level    = lgt_block( lgt_id, params%Jmax + IDX_MESH_LVL )
+            treecode = get_tc(lgt_block( lgt_id,IDX_TC_1 : IDX_TC_2 ))
+            level    = lgt_block( lgt_id, IDX_MESH_LVL )
 
             ! ------------------------------------------------------------------------------------------------------
             ! first: interpolate block data
@@ -91,13 +91,13 @@ subroutine refinementExecute3D_tree( params, hvy_block, tree_ID )
 
                 ! write new light data
                 ! new treecode
-                call set_tc(lgt_block( lgt_free_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2 ), treecode)
+                call set_tc(lgt_block( lgt_free_id, IDX_TC_1 : IDX_TC_2 ), treecode)
                 ! new level + 1
-                lgt_block( lgt_free_id, params%Jmax + IDX_MESH_LVL ) = level+1
+                lgt_block( lgt_free_id, IDX_MESH_LVL ) = level+1
                 ! new blocks have refinement_status==0 (STAY)
-                lgt_block( lgt_free_id, params%Jmax + idx_refine_sts ) = 0
+                lgt_block( lgt_free_id, idx_refine_sts ) = 0
                 ! the tree_ID is the same as the one of the mother block
-                lgt_block( lgt_free_id, params%Jmax + IDX_TREE_ID ) = tree_ID
+                lgt_block( lgt_free_id, IDX_TREE_ID ) = tree_ID
                 ! as this block is upsampled, it has zero details (no need to compute them usinng FWT,
                 ! even if coarseExtension modifies the block, it would just reset some WC coeffs to zero...)
                 hvy_details(:, free_heavy_id) = 0.0_rk

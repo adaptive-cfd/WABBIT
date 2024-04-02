@@ -13,8 +13,8 @@ subroutine get_block_spacing_origin( params, lgt_id, x0, dx )
   integer(kind=tsize)                        :: treecode
   integer(kind=ik)                           :: J
 
-  call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), params%domain_size, &
-    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+  call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
 end subroutine get_block_spacing_origin
 
@@ -40,8 +40,8 @@ subroutine get_adjacent_boundary_surface_normal(params, lgt_id, n_surface)
   real(kind=rk) :: tolerance
   integer(kind=ik) :: i_dim
 
-  call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), params%domain_size, &
-    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+  call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
   tolerance = 1.0e-3_rk * minval(dx(1:params%dim))
 

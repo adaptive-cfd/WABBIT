@@ -74,7 +74,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
         ! so we detect also problems arising from load-imbalancing.
         call hvy2lgt(lgt_id, hvy_active(k, tree_ID), params%rank, params%number_blocks)
 
-        if ( lgt_block(lgt_id, params%Jmax+IDX_REFINE_STS) == +1) then
+        if ( lgt_block(lgt_id, IDX_REFINE_STS) == +1) then
             ! this block will be refined, so it creates 2**D new blocks but is deleted
             hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim - 1)
         else

@@ -32,8 +32,8 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, tree_ID)
 #endif
 
     ! who am i?
-    my_level = lgt_block( lgt_my_id, params%Jmax + IDX_MESH_LVL )
-    tcb_me = get_tc(lgt_block(lgt_my_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+    my_level = lgt_block( lgt_my_id, IDX_MESH_LVL )
+    tcb_me = get_tc(lgt_block(lgt_my_id, IDX_TC_1 : IDX_TC_2))
 
     lgt_sisters_id = -1
 

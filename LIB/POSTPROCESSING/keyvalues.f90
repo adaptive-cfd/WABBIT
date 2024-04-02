@@ -115,8 +115,8 @@ subroutine keyvalues(fname, params)
             ! Probably this can be changed to a implementation without arrays but then I have to take
             ! a further look at it to stay consistent with old results
             tree_temp(:) = -1_ik
-            call tcb2array( get_tc(lgt_block(lgt_id,params%Jmax + IDX_TC_1 : params%Jmax + IDX_TC_2)), &
-                tree_temp, params%dim, lgt_block(lgt_id,params%Jmax + IDX_MESH_LVL), params%Jmax)
+            call tcb2array( get_tc(lgt_block(lgt_id,IDX_TC_1 : IDX_TC_2)), &
+                tree_temp, params%dim, lgt_block(lgt_id,IDX_MESH_LVL), params%Jmax)
             tree = tree + (sum(blocks_per_rank(1:rank))+k)*tree_temp(1:params%Jmax)
         end do
 

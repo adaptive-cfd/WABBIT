@@ -194,8 +194,8 @@ end subroutine predict_data
 !             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
 !                 ! neighbor light data id
 !                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-!                 level_me       = lgt_block( lgtID,          params%Jmax + IDX_MESH_LVL )
-!                 level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+!                 level_me       = lgt_block( lgtID,          IDX_MESH_LVL )
+!                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 !
 !                 ! this routine corrects for mistakes made on the coarser block when it interpolates
 !                 ! the values for its finer neighbor, on the finer one. Hence, it is active if the

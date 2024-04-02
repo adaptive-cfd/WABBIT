@@ -325,14 +325,14 @@ subroutine wavelet_test(params)
         ! keep a single block ( which will be 8 blocks due to completeness)
         ! block has ID 033 = 0*1 + 3*2^n_dim + 3*(2^n_dim)^2
         treecode_check = 3*2**params%dim + 3* 2**(2*params%dim)
-        treecode = get_tc(lgt_block(lgtID, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+        treecode = get_tc(lgt_block(lgtID, IDX_TC_1 : IDX_TC_2))
         coarsen = .not. (treecode == treecode_check)
         ! coarsen = .not. ( (lgt_block(lgtID,1)==0).and.(lgt_block(lgtID,2)==3).and.(lgt_block(lgtID,3)==3) )
 
         if (coarsen) then
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = -1
+            lgt_block( lgtID, IDX_REFINE_STS ) = -1
         else
-            lgt_block( lgtID, params%Jmax+ IDX_REFINE_STS ) = 0
+            lgt_block( lgtID, IDX_REFINE_STS ) = 0
         endif
     end do
 
@@ -391,14 +391,14 @@ end subroutine
 !         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 !
 !         ! on blocks that are to be coarsened ...
-!         if (lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) == -1) then
+!         if (lgt_block( lgtID, IDX_REFINE_STS ) == -1) then
 !             ! block will coarsen - delete all WC on this block
 !             wc(:,:,:,:,2:8) = 0.0_rk
 !         endif
 !
 !         ! ... as well as blocks the have neighbors which will be coarsened
 !         ! (proper "coarse extension")
-!         if (lgt_block( lgtID, Jmax+IDX_REFINE_STS ) == 0) then
+!         if (lgt_block( lgtID, IDX_REFINE_STS ) == 0) then
 !
 !             do neighborhood = 1, 8
 !                 ! neighbor exists ?
@@ -406,7 +406,7 @@ end subroutine
 !                     ! neighbor light data id
 !                     lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
 !                     ! this neighbor will coarsen
-!                     if (lgt_block(lgtID_neighbor, Jmax+IDX_REFINE_STS)==-1) then
+!                     if (lgt_block(lgtID_neighbor, IDX_REFINE_STS)==-1) then
 !         ! call coarseExtensionManipulateWC_block(params, wc, neighborhood)
 ! !! here, unusual neighbors 1-8 are used, and we consequently cannot use the above routine
 !                         ! select case(neighborhood)
@@ -760,7 +760,7 @@ do iter= 1, 1
         !             0331 =       3* 2**n_dim + 3* (2**n_dim)**2 + 1* (2**n_dim)**3
         !             2121 = 2*1 + 1* 2**n_dim + 2* (2**n_dim)**2 + 1* (2**n_dim)**3
         coarsen = .true.
-        treecode = get_tc(lgt_block(lgtID, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+        treecode = get_tc(lgt_block(lgtID, IDX_TC_1 : IDX_TC_2))
         treecode1 = 3                                           + 1* 2**(3*params%dim)
         treecode2 =     3* 2**params%dim + 3* 2**(2*params%dim) + 1* 2**(3*params%dim)
         treecode3 = 2 + 1* 2**params%dim + 2* 2**(2*params%dim) + 1* 2**(3*params%dim)
@@ -770,9 +770,9 @@ do iter= 1, 1
         coarsen = (.not. ((treecode == treecode1) .or. (treecode == treecode2) .or. (treecode == treecode3)) )
 
         if (coarsen) then
-            lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) = -1
+            lgt_block( lgtID, IDX_REFINE_STS ) = -1
         else
-            lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) = 0
+            lgt_block( lgtID, IDX_REFINE_STS ) = 0
         endif
     end do
 
@@ -796,7 +796,7 @@ do iter= 1, 1
         call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
 
         ! on blocks that are to be coarsened ...
-        if (lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) == -1) then
+        if (lgt_block( lgtID, IDX_REFINE_STS ) == -1) then
             ! block will coarsen - delete all WC on this block
             hvy_block( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :, hvyID) = 0.0_rk
             hvy_block( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :, hvyID) = 0.0_rk
@@ -805,7 +805,7 @@ do iter= 1, 1
 
         ! ... as well as blocks the have neighbors which will be coarsened
         ! (proper "coarse extension")
-        if (lgt_block( lgtID, Jmax+IDX_REFINE_STS ) == 0) then
+        if (lgt_block( lgtID, IDX_REFINE_STS ) == 0) then
             ! unpack/inflated Mallat ordering
             call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
@@ -815,7 +815,7 @@ do iter= 1, 1
                     ! neighbor light data id
                     lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
                     ! this neighbor will coarsen
-                    if (lgt_block(lgtID_neighbor, Jmax+IDX_REFINE_STS)==-1) then
+                    if (lgt_block(lgtID_neighbor, IDX_REFINE_STS)==-1) then
                         select case(neighborhood)
                         case(1)
                             wc(1:params%Nwcl, :, :, 1:nc, 2) = 0.0_rk
@@ -916,7 +916,7 @@ do iter= 1, 1
         !             0331 =       3* 2**n_dim + 3* (2**n_dim)**2 + 1* (2**n_dim)**3
         !             2121 = 2*1 + 1* 2**n_dim + 2* (2**n_dim)**2 + 1* (2**n_dim)**3
         coarsen = .true.
-        treecode = get_tc(lgt_block(lgtID, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+        treecode = get_tc(lgt_block(lgtID, IDX_TC_1 : IDX_TC_2))
         treecode1 = 3                                           + 1* 2**(3*params%dim)
         treecode2 =     3* 2**params%dim + 3* 2**(2*params%dim) + 1* 2**(3*params%dim)
         treecode3 = 2 + 1* 2**params%dim + 2* 2**(2*params%dim) + 1* 2**(3*params%dim)
@@ -926,9 +926,9 @@ do iter= 1, 1
         coarsen = (.not. ((treecode == treecode1) .or. (treecode == treecode2) .or. (treecode == treecode3)) )
 
         if (coarsen) then
-            lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) = -1
+            lgt_block( lgtID, IDX_REFINE_STS ) = -1
         else
-            lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) = 0
+            lgt_block( lgtID, IDX_REFINE_STS ) = 0
         endif
     end do
 
@@ -950,7 +950,7 @@ do iter= 1, 1
         call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
 
         ! on blocks that are to be coarsened ...
-        if (lgt_block( lgtID, Jmax+ IDX_REFINE_STS ) == -1) then
+        if (lgt_block( lgtID, IDX_REFINE_STS ) == -1) then
             ! block will coarsen - delete all WC on this block
             hvy_block( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :, hvyID) = 0.0_rk
             hvy_block( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :, hvyID) = 0.0_rk

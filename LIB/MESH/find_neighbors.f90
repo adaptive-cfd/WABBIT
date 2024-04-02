@@ -46,15 +46,15 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     logical                             :: lvl_down_neighbor
     logical :: thereMustBeANeighbor
 
-    level      = lgt_block( lgtID_block, Jmax + IDX_MESH_LVL )
-    tree_ID    = lgt_block( lgtID_block, Jmax + IDX_TREE_ID )
+    level      = lgt_block( lgtID_block, IDX_MESH_LVL )
+    tree_ID    = lgt_block( lgtID_block, IDX_TREE_ID )
     neighborDirCode_sameLevel     = -1
     neighborDirCode_coarserLevel  = -1
     neighborDirCode_finerLevel    = -1
     tcFinerAppendDigit            = -1
 
     ! we have to init tcBlock before we set it elsewise fortran doesnt like it
-    tcb_Block    = get_tc(lgt_block(lgtID_block, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2))
+    tcb_Block    = get_tc(lgt_block(lgtID_block, IDX_TC_1 : IDX_TC_2))
     ! last digit is used very often so we only extract it once
     tc_last = tc_get_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
 

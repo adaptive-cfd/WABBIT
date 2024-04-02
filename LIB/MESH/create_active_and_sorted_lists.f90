@@ -36,7 +36,7 @@
 !     mpisize = params%number_procs
 !     rank = params%rank
 !     N    = params%number_blocks
-!     TREE_ID_IDX = params%Jmax + IDX_TREE_ID
+!     TREE_ID_IDX = IDX_TREE_ID
 
 !     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
 !     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -106,7 +106,7 @@
 !         lgt_sortednumlist(k, 1, tree_ID) = lgt_id
 !         lgt_sortednumlist(k, 2, tree_ID) = treecode2int(lgt_block(lgt_id, 1:params%Jmax), tree_ID )
 !         ! lgt_sortednumlist(k, 2, tree_ID) = treearray2bid(lgt_block(lgt_id, 1:params%Jmax), &
-!         !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+!         !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 !     end do
 
 !     t(4) = MPI_wtime()
@@ -139,7 +139,7 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     !-----------------------------------------------------------------
 
     integer(kind=ik)                    :: k, N, hvy_id, block_rank, ierr,lgt_n_sum, lgt_id
-    integer(kind=ik)                    :: rank, TREE_ID_IDX, N_blocks_tot, mpisize
+    integer(kind=ik)                    :: rank, N_blocks_tot, mpisize
     integer(kind=tsize)                 :: treecode_ID
     real(kind=rk) :: t0,t(5)
 
@@ -158,7 +158,6 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     mpisize = params%number_procs
     rank = params%rank
     N    = params%number_blocks
-    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -194,8 +193,8 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     do hvy_id = 1, N
         call hvy2lgt( k, hvy_id, rank, N )
 
-        if (lgt_block(k, TREE_ID_IDX) == tree_ID) then
-            if (get_tc(lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)) >= 0) then ! block is active
+        if (lgt_block(k, IDX_TREE_ID) == tree_ID) then
+            if (get_tc(lgt_block(k, IDX_TC_1 : IDX_TC_2)) >= 0) then ! block is active
                 ! ---------------------------
                 ! update hvy active
                 ! ---------------------------
@@ -206,22 +205,17 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
                 ! first index stores the light id of the block
                 my_lgt_send_buffer(hvy_n(tree_ID), 1) = k
 
-                ! ! Old version with encoded unique ID
-                ! treecode_ID = treearray2bid(lgt_block(k, 1:params%Jmax), &
-                !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
-                ! my_lgt_send_buffer(hvy_n(tree_ID), 2) = treecode_ID
-
                 ! second and third index stores the numerical treecode
-                my_lgt_send_buffer(hvy_n(tree_ID), 2:3) = lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)
+                my_lgt_send_buffer(hvy_n(tree_ID), 2:3) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
 
                 ! tree_ID and level are combined into one number for performance purposes
                 ! as max_level is 31 for 2D, we shift tree_ID by 100
                 ! this might be confusing but can be entangled easily
                 ! fourth index stores the level and tree_id
-                my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, params%Jmax+IDX_MESH_LVL) + tree_ID * 100
+                my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
 
                 ! ! fourth index stores the level
-                ! my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, params%Jmax+IDX_MESH_LVL)
+                ! my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL)
                 ! ! fifth index stores the tree_id
                 ! my_lgt_send_buffer(hvy_n(tree_ID), 5) = tree_ID
             end if
@@ -318,7 +312,7 @@ end subroutine createActiveSortedLists_tree
 
 !     rank = params%rank
 !     N    = params%number_blocks
-!     TREE_ID_IDX = params%Jmax + IDX_TREE_ID
+!     TREE_ID_IDX = IDX_TREE_ID
 
 !     ! =======================================================
 !     ! loop over all light data
@@ -354,7 +348,7 @@ end subroutine createActiveSortedLists_tree
 !             ! + the tree index
 !             lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
 !             ! lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treearray2bid(lgt_block(k, 1:params%Jmax), &
-!             !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+!             !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, IDX_MESH_LVL), max_level=params%Jmax)
 !         end if
 !     end do
 !     t(3) = MPI_wtime()
@@ -414,7 +408,7 @@ end subroutine createActiveSortedLists_tree
 !     rank = params%rank
 !     N    = params%number_blocks
 !     fsize = params%forest_size
-!     TREE_ID_IDX = params%Jmax + IDX_TREE_ID
+!     TREE_ID_IDX = IDX_TREE_ID
 
 !     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
 !     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
@@ -480,7 +474,7 @@ end subroutine createActiveSortedLists_tree
 !             ! sorted list
 !             treecode_int = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
 !             ! treecode_int = treearray2bid(lgt_block(k, 1:params%Jmax), &
-!             !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+!             !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, IDX_MESH_LVL), max_level=params%Jmax)
             
 !             ! first index stores the light id of the block
 !             my_lgt_send_buffer(lgt_n(tree_ID), 1, tree_ID) = k
@@ -558,7 +552,7 @@ subroutine createActiveSortedLists_forest(params)
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, heavy_id, block_rank, fsize
-    integer(kind=ik) :: rank, tree_ID, TREE_ID_IDX, lgt_n_sum, hvy_n_sum
+    integer(kind=ik) :: rank, tree_ID, lgt_n_sum, hvy_n_sum
     integer(kind=tsize) :: treecode_int
     integer(kind=ik) :: tc_ik(2)
     real(kind=rk) :: t0
@@ -575,7 +569,6 @@ subroutine createActiveSortedLists_forest(params)
     rank  = params%rank
     N     = params%number_blocks
     fsize = params%forest_size
-    TREE_ID_IDX = params%Jmax + IDX_TREE_ID
 
     ! =======================================================
     ! Reset active lists of all trees
@@ -607,10 +600,10 @@ subroutine createActiveSortedLists_forest(params)
     ! =======================================================
     do k = 1, size(lgt_block, 1)
         ! block is active
-        if ( get_tc(lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)) >= 0 ) then
+        if ( get_tc(lgt_block(k, IDX_TC_1 : IDX_TC_2)) >= 0 ) then
 
             ! which tree id has the current block k?
-            tree_ID = lgt_block(k, TREE_ID_IDX)
+            tree_ID = lgt_block(k, IDX_TREE_ID)
             ! find the highest tree number. this is should be the same as
             ! the number of active trees: tree_n
             tree_n = max(tree_ID, tree_n)
@@ -635,26 +628,20 @@ subroutine createActiveSortedLists_forest(params)
             end if
 
             ! sorted list
-            ! treecode_int = treecode2int(lgt_block(k, 1:params%Jmax), tree_ID )
-
-            ! ! Old version with encoded unique ID
-            ! treecode_int = treearray2bid(lgt_block(k, 1:params%Jmax), &
-            ! dim=params%dim, tree_ID=tree_ID, level=lgt_block(k, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
-            ! lgt_sortednumlist(lgt_n(tree_ID), 2, tree_ID) = treecode_int
 
             ! first index stores the light id of the block
             lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
             ! second index stores the numerical treecode
-            lgt_sortednumlist(lgt_n(tree_ID), 2:3, tree_ID) = lgt_block(k, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)
+            lgt_sortednumlist(lgt_n(tree_ID), 2:3, tree_ID) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
 
             ! tree_ID and level are combined into one number for performance purposes
             ! as max_level is 31 for 2D, we shift tree_ID by 100
             ! this might be confusing but can be entangled easily
             ! fourth index stores the level and tree_id
-            lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, params%Jmax+IDX_MESH_LVL) + tree_ID * 100
+            lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
 
             ! ! fourth index stores the level
-            ! lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, params%Jmax+IDX_MESH_LVL)
+            ! lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, IDX_MESH_LVL)
             ! ! fifth index stores the tree_ID
             ! lgt_sortednumlist(lgt_n(tree_ID), 5, tree_ID) = tree_ID 
         end if

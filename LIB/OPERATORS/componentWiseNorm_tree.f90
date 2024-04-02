@@ -23,8 +23,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), params%domain_size, &
-                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
                 do p = 1, n_eqn
                     norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, p, hvy_id )**2 )
@@ -35,8 +35,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), params%domain_size, &
-                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
+                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
                 do p = 1, n_eqn
                     norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, hvy_id )**2 )

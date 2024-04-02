@@ -170,7 +170,7 @@ subroutine operator_reconstruction(params)
         call hvy2lgt(lgt_id, hvy_active(iblock, tree_ID), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
+        level = lgt_block(lgt_id, IDX_MESH_LVL)
 
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g

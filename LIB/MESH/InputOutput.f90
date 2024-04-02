@@ -186,8 +186,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
                 ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l) = -1
-                call tcb2array(get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), &
-                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ), max_level=params%Jmax)
+                call tcb2array(get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), &
+                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, IDX_MESH_LVL ), max_level=params%Jmax)
             else
                 ! 2D
                 if (save_ghosts) then
@@ -210,13 +210,13 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 endif
                 ! copy treecode (we'll save it to file as well)
                 block_treecode(:,l) = -1
-                call tcb2array(get_tc(lgt_block(lgt_id, params%Jmax+IDX_TC_1 : params%Jmax+IDX_TC_2)), &
-                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ), max_level=params%Jmax)
+                call tcb2array(get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), &
+                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, IDX_MESH_LVL ), max_level=params%Jmax)
 
             endif
 
 
-            refinement_status(l) = lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS )
+            refinement_status(l) = lgt_block( lgt_id, IDX_REFINE_STS )
             lgt_ids(l) = lgt_id
 
             ! next block
@@ -552,16 +552,16 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         lgt_block(free_lgt_id, :) = -1
         ! copy treecode
         ! set mesh level
-        lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+        lgt_block(free_lgt_id, IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
         ! set refinement status
-        lgt_block(free_lgt_id, params%Jmax+IDX_REFINE_STS) = 0
+        lgt_block(free_lgt_id, IDX_REFINE_STS) = 0
         ! set number of the tree
-        lgt_block(free_lgt_id, params%Jmax+IDX_TREE_ID) = tree_id
+        lgt_block(free_lgt_id, IDX_TREE_ID) = tree_id
         ! set treecode
         treecode = -1_tsize
         call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &
-            level=lgt_block(free_lgt_id, params%Jmax+IDX_MESH_LVL), max_level=params%Jmax)
-        call set_tc(lgt_block( free_lgt_id, params%Jmax+IDX_TC_1:params%Jmax+IDX_TC_2), treecode)
+            level=lgt_block(free_lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+        call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
         ! copy actual data (form buffer to actual data array)
         do dF = 1, N_files
             if (params%dim == 3) then

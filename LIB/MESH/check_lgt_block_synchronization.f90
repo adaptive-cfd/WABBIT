@@ -54,7 +54,6 @@ end subroutine check_lgt_block_synchronization
 
 
 
-! J: Useful for debugging?
 subroutine write_lgt_data(params, file)
     implicit none
     type (type_params), intent(in)      :: params

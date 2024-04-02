@@ -17,7 +17,9 @@ function minActiveLevel_tree( tree_ID, use_active_list )
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-    max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
+    ! max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
+    ! this is not adapted to params%Jmax but it only matters when all blocks are inactive
+    max_treelevel = maxdigits
     Jmin = max_treelevel
 
     if (present(use_active_list)) then
@@ -31,16 +33,16 @@ function minActiveLevel_tree( tree_ID, use_active_list )
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n(tree_ID)
-            Jmin = min(Jmin, lgt_block( lgt_active(k, tree_ID), max_treelevel + IDX_MESH_LVL))
+            Jmin = min(Jmin, lgt_block( lgt_active(k, tree_ID), IDX_MESH_LVL))
         end do
 
     else
         ! call without active lists
         do k = 1, size(lgt_block, 1)
-            if (lgt_block( k, max_treelevel+IDX_TREE_ID) == tree_ID) then
-                if (lgt_block( k, max_treelevel + IDX_MESH_LVL)>=0) then
+            if (lgt_block( k, IDX_TREE_ID) == tree_ID) then
+                if (lgt_block( k, IDX_MESH_LVL)>=0) then
                     ! skip blocks marked with -1 (they are inactive)
-                    Jmin = min(Jmin, lgt_block( k, max_treelevel+IDX_MESH_LVL))
+                    Jmin = min(Jmin, lgt_block( k, IDX_MESH_LVL))
                 endif
             endif
         end do
@@ -59,10 +61,9 @@ function maxActiveLevel_tree( tree_ID, use_active_list )
     logical, intent(in), optional          :: use_active_list
 
     integer(kind=ik)                    :: maxActiveLevel_tree           ! return value
-    integer(kind=ik)                    :: k, Jmax, max_treelevel     ! loop variables
+    integer(kind=ik)                    :: k, Jmax                       ! loop variables
     logical :: use_active_list2
 
-    max_treelevel = size( lgt_block, 2) - EXTRA_LGT_FIELDS
     Jmax = 0
 
     if (present(use_active_list)) then
@@ -75,14 +76,14 @@ function maxActiveLevel_tree( tree_ID, use_active_list )
         ! call with active lists (to be preferred, much faster)
         ! loop over all active blocks
         do k = 1, lgt_n(tree_ID)
-            Jmax = max(Jmax, lgt_block( lgt_active(k, tree_ID), max_treelevel+IDX_MESH_LVL))
+            Jmax = max(Jmax, lgt_block( lgt_active(k, tree_ID), IDX_MESH_LVL))
         end do
 
     else
         ! call without active lists
         do k = 1, size(lgt_block, 1)
-            if (lgt_block( k, max_treelevel+IDX_TREE_ID) == tree_ID) then
-                Jmax = max(Jmax, lgt_block( k, max_treelevel+IDX_MESH_LVL))
+            if (lgt_block( k, IDX_TREE_ID) == tree_ID) then
+                Jmax = max(Jmax, lgt_block( k, IDX_MESH_LVL))
             endif
         end do
     end if

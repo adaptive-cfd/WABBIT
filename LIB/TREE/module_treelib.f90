@@ -987,7 +987,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=ik), optional, intent(in)    :: dim              
     !> block position coordinates
     ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
-    integer(kind=ik), intent(out)    :: ix(3)
+    integer(kind=ik), intent(out)    :: ix(:)
     !> Level at which to encode, can be negative to set from max_level, defaults to max_level
     integer(kind=ik), optional, intent(in)    :: level
     !> Max level possible, should be set after params%Jmax
@@ -1030,7 +1030,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=ik), optional    :: dim              
     !> block position coordinates
     ! set to fixed size of 3, so ensure that for dim=2 the third will not be accessed or we get oob
-    integer(kind=ik), intent(in)    :: ix(3)
+    integer(kind=ik), intent(in)    :: ix(:)
     !> Level at which to encode, can be negative to set from max_level, defaults to max_level
     integer(kind=ik), optional, intent(in)    :: level
     !> Max level possible, should be set after params%Jmax

@@ -119,8 +119,8 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 ! we proceed level-wise
                 if ((level_neighbor < level_me).and.(level_me==level)) then
@@ -168,7 +168,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
         ! We compute detail coefficients on the fly here, for all blocks
         ! on the level.
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-        level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
 
         ! FWT required for a block that is on the level
         if (level_me == level) then
@@ -203,7 +203,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
         hvyID = hvy_active(k)
 
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-        level_me = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
         
         if (.not. toBeManipulated(k) .and. (level_me==level)) then
             ! this block has been FWT'ed but is not modified, howver, we can extract its details now
@@ -246,8 +246,8 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 if (level_neighbor < level_me) then
                     ! manipulation of coeffs
@@ -299,8 +299,8 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                level_me       = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-                level_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
+                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 if (level_neighbor < level_me) then
                     ! coarse extension case (neighbor is coarser)

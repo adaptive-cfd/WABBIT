@@ -108,7 +108,7 @@ subroutine compute_vorticity_post(params)
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
         params%g = 7_ik
-        params%wavelet="CDF62"
+        params%wavelet="CDF60"
 
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central) and 2 (FD_2nd_central)")

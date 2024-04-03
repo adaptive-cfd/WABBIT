@@ -34,13 +34,13 @@ subroutine read_field_flusi(fname, hvy_block, params, Bs_f, tree_ID)
       allocate( blockbuffer(Bs_f(1)+1,Bs_f(2)+1,Bs_f(3)+1))
       lbounds3D = (/0, 0, 0/)
       ubounds3D = (/Bs_f(1), Bs_f(2), Bs_f(3)/)-1
-      call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
+      call read_dset_mpi_hdf5(file_id, get_dsetname(fname), lbounds3D, ubounds3D, &
           blockbuffer(1:Bs_f(1),1:Bs_f(2), 1:Bs_f(3)))
   else
       allocate( blockbuffer(1,Bs_f(1)+1,Bs_f(2)+1))
       lbounds2D = (/0, 0, 0/)
       ubounds2D = (/1, Bs_f(1), Bs_f(2)/)-1
-      call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
+      call read_dset_mpi_hdf5(file_id, get_dsetname(fname), lbounds2D, ubounds2D, &
           blockbuffer(1,1:Bs_f(1),1:Bs_f(2)))
   end if
 
@@ -114,7 +114,7 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, tree_ID)
   endif
 
   allocate( data_flusi(0:nxyz(1)-1,0:nxyz(2)-1,0:nxyz(3)-1) )
-  call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), (/0,0,0/), (/nxyz(1)-1,nxyz(2)-1,nxyz(3)-1/), data_flusi)
+  call read_dset_mpi_hdf5(file_id, get_dsetname(fname), (/0,0,0/), (/nxyz(1)-1,nxyz(2)-1,nxyz(3)-1/), data_flusi)
 
   ! would be fairly easy but I have no time.
   if (nxyz(1) /= 0) call abort(13738213, "Only 2D right now")
@@ -137,7 +137,7 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, tree_ID)
       ! !
       ! !     num_Bs = ubounds-lbounds+1
       ! !
-      ! !     call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
+      ! !     call read_dset_mpi_hdf5(file_id, get_dsetname(fname), lbounds, ubounds, &
       ! !     hvy_block(g+1:g+num_Bs(1), g+1:g+num_Bs(2), g+1:g+num_Bs(3), 1, hvy_active(k,tree_ID)))
       ! ! else
       !     lbounds = (/ 0, start_x        , start_y         /)
@@ -150,7 +150,7 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, tree_ID)
       !     write(*,*) "ubound", ubounds
       !     write(*,*) "numbs", num_bs
       !
-      !     call read_dset_mpi_hdf5_3D(file_id, get_dsetname(fname), lbounds, ubounds, &
+      !     call read_dset_mpi_hdf5(file_id, get_dsetname(fname), lbounds, ubounds, &
       !     blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1))
 
           ! hvy_block(g+1:g+num_Bs(1),g+1:g+num_Bs(2), 1, 1, hvy_active(k,tree_ID)) = blockbuffer(0:num_Bs(1)-1,0:num_Bs(2)-1,1)

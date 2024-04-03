@@ -20,6 +20,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     real(kind=rk), allocatable          :: coords_origin(:,:), coords_spacing(:,:)
     ! treecode array
     integer(kind=ik), allocatable       :: block_treecode(:,:)
+    integer(kind=tsize), allocatable    :: block_treecode_num(:)
     integer(hid_t)                      :: file_id
     ! offset variables
     integer(kind=ik), dimension(1:4)    :: ubounds3D, lbounds3D
@@ -35,7 +36,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
-    integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:)
+    integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:), level(:)
     logical :: no_sync2
     integer(kind=ik) :: Jmin_active, Jmax_active
 
@@ -86,8 +87,10 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     allocate(procs(1:hvy_n(tree_ID)))
     allocate(lgt_ids(1:hvy_n(tree_ID)))
     allocate(refinement_status(1:hvy_n(tree_ID)))
+    allocate(level(1:hvy_n(tree_ID)))
     procs = rank
     allocate(block_treecode(1:params%Jmax, 1:hvy_n(tree_ID)))
+    allocate(block_treecode_num(1:hvy_n(tree_ID)))
 
     coords_origin = 7.0e6_rk
 
@@ -183,11 +186,6 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
                     coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
                 endif
-
-                ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = -1
-                call tcb2array(get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), &
-                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, IDX_MESH_LVL ), max_level=params%Jmax)
             else
                 ! 2D
                 if (save_ghosts) then
@@ -208,14 +206,17 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
-                ! copy treecode (we'll save it to file as well)
-                block_treecode(:,l) = -1
-                call tcb2array(get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), &
-                    block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, IDX_MESH_LVL ), max_level=params%Jmax)
-
             endif
 
+            ! copy treecode (we'll save it to file as well)
+                ! treecode array here is kept for downwards compatibility
+            block_treecode(:,l) = -1
+            call tcb2array(get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), &
+                block_treecode(:,l), dim=params%dim, level=lgt_block( lgt_id, IDX_MESH_LVL ), max_level=params%Jmax)
+            ! copy numerical treecode
+            block_treecode_num(l) = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
 
+            level(l) = lgt_block( lgt_id, IDX_MESH_LVL )
             refinement_status(l) = lgt_block( lgt_id, IDX_REFINE_STS )
             lgt_ids(l) = lgt_id
 
@@ -231,37 +232,41 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     ! write heavy block data to disk
     if ( params%dim == 3 ) then
         ! 3D data case
-        call write_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
+        call write_dset_mpi_hdf5(file_id, "blocks", lbounds3D, ubounds3D, myblockbuffer)
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2), params%domain_size(3)/))
-        call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
-        call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
-        call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
-        call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
-        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%Jmax-1,ubounds3D(4)/), block_treecode)
-        call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds3D(4)/), (/ubounds3D(4)/), procs)
-        call write_int_dset_mpi_hdf5_1D(file_id, "refinement_status", (/lbounds3D(4)/), (/ubounds3D(4)/), refinement_status)
-        call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds3D(4)/), (/ubounds3D(4)/), lgt_ids)
+        call write_dset_mpi_hdf5(file_id, "coords_origin", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_origin)
+        call write_dset_mpi_hdf5(file_id, "coords_spacing", (/0,lbounds3D(4)/), (/2,ubounds3D(4)/), coords_spacing)
+        call write_dset_mpi_hdf5(file_id, "block_treecode", (/0,lbounds3D(4)/), (/params%Jmax-1,ubounds3D(4)/), block_treecode)
+        call write_dset_mpi_hdf5(file_id, "block_treecode_num", (/lbounds3D(4)/), (/ubounds3D(4)/), block_treecode_num)
+        call write_dset_mpi_hdf5(file_id, "procs", (/lbounds3D(4)/), (/ubounds3D(4)/), procs)
+        call write_dset_mpi_hdf5(file_id, "refinement_status", (/lbounds3D(4)/), (/ubounds3D(4)/), refinement_status)
+        call write_dset_mpi_hdf5(file_id, "level", (/lbounds3D(4)/), (/ubounds3D(4)/), level)
+        call write_dset_mpi_hdf5(file_id, "lgt_ids", (/lbounds3D(4)/), (/ubounds3D(4)/), lgt_ids)
     else
         ! 2D data case
-        call write_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
+        call write_dset_mpi_hdf5(file_id, "blocks", lbounds2D, ubounds2D, myblockbuffer(:,:,1,:))
         call write_attribute(file_id, "blocks", "domain-size", (/params%domain_size(1), params%domain_size(2)/))
-        call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
-        call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
-        call write_dset_mpi_hdf5_2D(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
-        call write_dset_mpi_hdf5_2D(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
-        call write_dset_mpi_hdf5_2D(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%Jmax-1,ubounds2D(3)/), block_treecode)
-        call write_int_dset_mpi_hdf5_1D(file_id, "procs", (/lbounds2D(3)/), (/ubounds2D(3)/), procs)
-        call write_int_dset_mpi_hdf5_1D(file_id, "refinement_status", (/lbounds2D(3)/), (/ubounds2D(3)/), refinement_status)
-        call write_int_dset_mpi_hdf5_1D(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
+        call write_dset_mpi_hdf5(file_id, "coords_origin", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_origin(1:2,:))
+        call write_dset_mpi_hdf5(file_id, "coords_spacing", (/0,lbounds2D(3)/), (/1,ubounds2D(3)/), coords_spacing(1:2,:))
+        call write_dset_mpi_hdf5(file_id, "block_treecode", (/0,lbounds2D(3)/), (/params%Jmax-1,ubounds2D(3)/), block_treecode)
+        call write_dset_mpi_hdf5(file_id, "block_treecode_num", (/lbounds2D(3)/), (/ubounds2D(3)/), block_treecode_num)
+        call write_dset_mpi_hdf5(file_id, "procs", (/lbounds2D(3)/), (/ubounds2D(3)/), procs)
+        call write_dset_mpi_hdf5(file_id, "refinement_status", (/lbounds2D(3)/), (/ubounds2D(3)/), refinement_status)
+        call write_dset_mpi_hdf5(file_id, "level", (/lbounds2D(3)/), (/ubounds2D(3)/), level)
+        call write_dset_mpi_hdf5(file_id, "lgt_ids", (/lbounds2D(3)/), (/ubounds2D(3)/), lgt_ids)
     endif
 
 
     ! add additional annotations
+    call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
+    call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
     call write_attribute(file_id, "blocks", "version", (/20231602/)) ! this is used to distinguish wabbit file formats
     call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))
+    call write_attribute(file_id, "block_treecode_num", "max_level", (/params%Jmax/))
+    call write_attribute(file_id, "block_treecode_num", "dim", (/params%dim/))
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
@@ -328,8 +333,16 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n, version(1), datarank, Bs_file(1:3)=0
+
+    logical          :: read_treecode_num
+    ! old reading
     integer(hsize_t) :: dims_treecode(2)
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
+    ! new reading
+    integer(kind=ik)                               :: tc_max_level, tc_dim
+    integer(kind=tsize), dimension(:), allocatable :: block_treecode_num
+    integer(kind=ik), dimension(:), allocatable    :: level
+
     integer(kind=tsize) :: treecode
     integer(hid_t)        :: file_id
     integer(kind=hsize_t) :: size_field(1:4)
@@ -454,32 +467,82 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     !-----------------------------------------------------------------------------
     ! Step 1: read light data (treecodes)
     !-----------------------------------------------------------------------------
+
     ! open the file
     call check_file_exists(fnames(1))
     call open_file_hdf5(fnames(1), file_id, .false.)
 
-    ! check what Jmax was saved in file (check length of treecode in file)
-    call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
+    ! With changement of treecode to numerical representation we load this and the levels
+    ! However, in order to be backwards compatible if not present we load from the old block_treecode
+    ! WARNING: This possibly can lead to non-consistent information when only one of the two is altered
+    ! manually outside of WABBIT
+    read_treecode_num = dset_exists(file_id, "block_treecode_num")
+    if (read_treecode_num) then
 
-    ! compare treecode lengths
-    if (dims_treecode(1) > params%Jmax) then
-        ! treecode in input file is greater than the new one, abort and output on screen
-        ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-        ! but active level=4). On the other hand, that appears to be rare.
-        call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-    end if
+        ! check what Jmax and dim was saved in file
+        call read_attribute(file_id, "block_treecode_num", "max_level", tc_max_level, 100)
+        call read_attribute(file_id, "block_treecode_num", "dim", tc_dim, 0)
 
-    allocate( block_treecode(1:dims_treecode(1), 1:my_hvy_n) )
-    block_treecode = -1
+        ! compare treecode lengths
+        if (tc_max_level > params%Jmax) then
+            ! treecode in input file is greater than the new one, abort and output on screen
+            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
+            ! but active level=4). On the other hand, that appears to be rare.
+            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
+        end if
 
-    ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
-    ! array we want to hold, so that all CPU can read from the same file simultaneously
-    ! (note zero-based offset):
-    lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
-    ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + my_hvy_n - 1/)
+        ! compare treecode dim
+        if (tc_dim /= params%dim) then
+            ! treecode in input file is saved with different dimension, as this changes
+            ! the interpretation we have to abort
+            ! ToDo: implement conversion
+            call abort(73947887, "ERROR: Treecode in file was saved with different dimension.")
+        end if
 
-    ! actual reading of treecodes (= the description of the tree)
-    call read_dset_mpi_hdf5_2D(file_id, "block_treecode", lbounds, ubounds, block_treecode)
+        allocate( block_treecode(1:1, 1:1) )
+        allocate( block_treecode_num(1:my_hvy_n) )
+        allocate( level(1:my_hvy_n) )
+        block_treecode_num = -1
+        level = -1
+
+        ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
+        ! array we want to hold, so that all CPU can read from the same file simultaneously
+        ! (note zero-based offset):
+        lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
+        ubounds = (/tc_max_level, lbounds(2) + my_hvy_n - 1/)
+
+        ! actual reading of treecodes (= the description of the tree)
+        call read_dset_mpi_hdf5(file_id, "block_treecode_num", lbounds(2:2), ubounds(2:2), block_treecode_num)
+        call read_dset_mpi_hdf5(file_id, "level", lbounds(2:2), ubounds(2:2), level)
+
+    else
+
+        ! check what Jmax was saved in file (check length of treecode in file)
+        call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
+
+        ! compare treecode lengths
+        if (dims_treecode(1) > params%Jmax) then
+            ! treecode in input file is greater than the new one, abort and output on screen
+            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
+            ! but active level=4). On the other hand, that appears to be rare.
+            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
+        end if
+
+        allocate( block_treecode(1:dims_treecode(1), 1:my_hvy_n) )
+        allocate( block_treecode_num(1:1) )
+        allocate( level(1:1) )
+        block_treecode = -1
+
+        ! tell the hdf5 wrapper what part of the global [ n_active x max_treelevel + IDX_REFINE_STS]
+        ! array we want to hold, so that all CPU can read from the same file simultaneously
+        ! (note zero-based offset):
+        lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
+        ubounds = (/int(dims_treecode(1),4)-1, lbounds(2) + my_hvy_n - 1/)
+
+        ! actual reading of treecodes (= the description of the tree)
+        call read_dset_mpi_hdf5(file_id, "block_treecode", lbounds, ubounds, block_treecode)
+
+    endif
 
     ! close file and HDF5 library
     call close_file_hdf5(file_id)
@@ -507,7 +570,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
                 write(*,'("READING: Reading datafield ",i2," from file ",A)') dF, trim(adjustl(fnames(dF)))
             end if
 
-            call read_dset_mpi_hdf5_4D(file_id, "blocks", lbounds3D, ubounds3D, &
+            call read_dset_mpi_hdf5(file_id, "blocks", lbounds3D, ubounds3D, &
             hvy_buffer(:, :, :, dF, 1:my_hvy_n))
 
             ! close file and HDF5 library
@@ -532,7 +595,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
                 write(*,'("READING: Reading datafield ",i2," from file ",A)') dF, trim(adjustl(fnames(dF)))
             end if
 
-            call read_dset_mpi_hdf5_3D(file_id, "blocks", lbounds2D, ubounds2D, &
+            call read_dset_mpi_hdf5(file_id, "blocks", lbounds2D, ubounds2D, &
             hvy_buffer(:, :, 1, dF, 1:my_hvy_n))
 
             ! close file and HDF5 library
@@ -548,20 +611,34 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         call get_free_local_light_id( params, rank, free_lgt_id)
 
         call lgt2hvy( free_hvy_id, free_lgt_id, rank, N )
+
+        ! Light data
         ! init
         lgt_block(free_lgt_id, :) = -1
-        ! copy treecode
-        ! set mesh level
-        lgt_block(free_lgt_id, IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+
+        ! new numerical treecode version:
+        if (read_treecode_num) then
+            ! set mesh level
+            lgt_block(free_lgt_id, IDX_MESH_LVL) = level(k)
+            ! set treecode
+            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), block_treecode_num(k))
+
+        else  ! old numerical treecode version:
+            ! set mesh level
+            lgt_block(free_lgt_id, IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+            ! set treecode
+            treecode = -1_tsize
+            call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &
+                level=lgt_block(free_lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
+        endif
+
         ! set refinement status
         lgt_block(free_lgt_id, IDX_REFINE_STS) = 0
         ! set number of the tree
         lgt_block(free_lgt_id, IDX_TREE_ID) = tree_id
-        ! set treecode
-        treecode = -1_tsize
-        call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &
-            level=lgt_block(free_lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
-        call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
+
+        ! Heavy data
         ! copy actual data (form buffer to actual data array)
         do dF = 1, N_files
             if (params%dim == 3) then
@@ -578,6 +655,8 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     deallocate(hvy_buffer)
     deallocate(block_treecode)
+    deallocate(block_treecode_num)
+    deallocate(level)
 
     ! synchronize light data. This is necessary as all CPUs above created their blocks locally.
     ! As they all pass the same do loops, the counter array blocks_per_rank_list does not have to

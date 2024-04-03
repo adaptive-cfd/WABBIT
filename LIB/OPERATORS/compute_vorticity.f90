@@ -1,6 +1,9 @@
 !> \brief compute vorticity for time step t (for saving it on disk)
 ! ********************************************************************************************
 subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
     implicit none
 
     real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
@@ -260,6 +263,8 @@ end subroutine compute_vorticity
 
 
 subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
     implicit none
 
     real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
@@ -276,6 +281,10 @@ subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
     real(kind=rk), parameter :: a(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+    ! 6th order FD scheme
+    real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
+    real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+
 
     vor_abs = 0.0_rk
 
@@ -318,28 +327,55 @@ subroutine compute_vorticity_abs(u, v, w, dx, Bs, g, discretization, vor_abs)
                 end do
             end do
 
+        case("FD_6th_central")
+            do ix = g+1, Bs(1)+g
+                do iy = g+1, Bs(2)+g
+                    do iz = g+1, Bs(3)+g
+                        ! Note: a(0) does NOT appear (it is zero...)
+                        u_dy = (a_FD6(-3)*u(ix,iy-3,iz) + a_FD6(-2)*u(ix,iy-2,iz) + a_FD6(-1)*u(ix,iy-1,iz) + a_FD6(+1)*u(ix,iy+1,iz) &
+                              + a_FD6(+2)*u(ix,iy+2,iz) + a_FD6(+3)*u(ix,iy+3,iz))*dy_inv
+
+                        u_dz = (a_FD6(-3)*u(ix,iy,iz-3) + a_FD6(-2)*u(ix,iy,iz-2) + a_FD6(-1)*u(ix,iy,iz-1) + a_FD6(+1)*u(ix,iy,iz+1) &
+                              + a_FD6(+2)*u(ix,iy,iz+2) + a_FD6(+3)*u(ix,iy,iz+3))*dz_inv
+
+                        v_dx = (a_FD6(-3)*v(ix-3,iy,iz) + a_FD6(-2)*v(ix-2,iy,iz) + a_FD6(-1)*v(ix-1,iy,iz) + a_FD6(+1)*v(ix+1,iy,iz) &
+                              + a_FD6(+2)*v(ix+2,iy,iz) + a_FD6(+3)*v(ix+3,iy,iz))*dx_inv
+
+                        v_dz = (a_FD6(-3)*v(ix,iy,iz-3) + a_FD6(-2)*v(ix,iy,iz-2) + a_FD6(-1)*v(ix,iy,iz-1) + a_FD6(+1)*v(ix,iy,iz+1) &
+                              + a_FD6(+2)*v(ix,iy,iz+2) + a_FD6(+3)*v(ix,iy,iz+3))*dz_inv
+
+                        w_dx = (a_FD6(-3)*w(ix-3,iy,iz) + a_FD6(-2)*w(ix-2,iy,iz) + a_FD6(-1)*w(ix-1,iy,iz) + a_FD6(+1)*w(ix+1,iy,iz) &
+                              + a_FD6(+2)*w(ix+2,iy,iz) + a_FD6(+3)*w(ix+3,iy,iz))*dx_inv
+
+                        w_dy = (a_FD6(-3)*w(ix,iy-3,iz) + a_FD6(-2)*w(ix,iy-2,iz) + a_FD6(-1)*w(ix,iy-1,iz) + a_FD6(+1)*w(ix,iy+1,iz) &
+                              + a_FD6(+2)*w(ix,iy+2,iz) + a_FD6(+3)*w(ix,iy+3,iz))*dy_inv
+                        vor_abs(ix,iy,iz) = sqrt( (w_dy - v_dz)**2 + (u_dz - w_dx)**2 + (v_dx - u_dy)**2)
+                    end do
+                end do
+            end do
+
         case("FD_4th_central_optimized")
             do ix = g+1, Bs(1)+g
                 do iy = g+1, Bs(2)+g
                     do iz = g+1, Bs(3)+g
                         ! Note: a(0) does NOT appear (it is zero...)
                         u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + a(-1)*u(ix,iy-1,iz) + a(+1)*u(ix,iy+1,iz) &
-                        + a(+2)*u(ix,iy+2,iz) + a(+3)*u(ix,iy+3,iz))*dy_inv
+                              + a(+2)*u(ix,iy+2,iz) + a(+3)*u(ix,iy+3,iz))*dy_inv
 
                         u_dz = (a(-3)*u(ix,iy,iz-3) + a(-2)*u(ix,iy,iz-2) + a(-1)*u(ix,iy,iz-1) + a(+1)*u(ix,iy,iz+1) &
-                        + a(+2)*u(ix,iy,iz+2) + a(+3)*u(ix,iy,iz+3))*dz_inv
+                              + a(+2)*u(ix,iy,iz+2) + a(+3)*u(ix,iy,iz+3))*dz_inv
 
                         v_dx = (a(-3)*v(ix-3,iy,iz) + a(-2)*v(ix-2,iy,iz) + a(-1)*v(ix-1,iy,iz) + a(+1)*v(ix+1,iy,iz) &
-                        + a(+2)*v(ix+2,iy,iz) + a(+3)*v(ix+3,iy,iz))*dx_inv
+                              + a(+2)*v(ix+2,iy,iz) + a(+3)*v(ix+3,iy,iz))*dx_inv
 
                         v_dz = (a(-3)*v(ix,iy,iz-3) + a(-2)*v(ix,iy,iz-2) + a(-1)*v(ix,iy,iz-1) + a(+1)*v(ix,iy,iz+1) &
-                        + a(+2)*v(ix,iy,iz+2) + a(+3)*v(ix,iy,iz+3))*dz_inv
+                              + a(+2)*v(ix,iy,iz+2) + a(+3)*v(ix,iy,iz+3))*dz_inv
 
                         w_dx = (a(-3)*w(ix-3,iy,iz) + a(-2)*w(ix-2,iy,iz) + a(-1)*w(ix-1,iy,iz) + a(+1)*w(ix+1,iy,iz) &
-                        + a(+2)*w(ix+2,iy,iz) + a(+3)*w(ix+3,iy,iz))*dx_inv
+                              + a(+2)*w(ix+2,iy,iz) + a(+3)*w(ix+3,iy,iz))*dx_inv
 
                         w_dy = (a(-3)*w(ix,iy-3,iz) + a(-2)*w(ix,iy-2,iz) + a(-1)*w(ix,iy-1,iz) + a(+1)*w(ix,iy+1,iz) &
-                        + a(+2)*w(ix,iy+2,iz) + a(+3)*w(ix,iy+3,iz))*dy_inv
+                              + a(+2)*w(ix,iy+2,iz) + a(+3)*w(ix,iy+3,iz))*dy_inv
 
                         vor_abs(ix,iy,iz) = sqrt( (w_dy - v_dz)**2 + (u_dz - w_dx)**2 + (v_dx - u_dy)**2)
                     end do

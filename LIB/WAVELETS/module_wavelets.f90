@@ -1564,7 +1564,7 @@ contains
         integer(kind=ik), intent(out), optional :: g_wavelet
         logical, intent(in), optional :: verbose
         logical :: verbose1
-        integer(kind=ik) :: i, g_min
+        integer(kind=ik) :: i, g_min, a 
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
@@ -1888,6 +1888,51 @@ contains
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+            ! ! this code has been used to plot the wavelets in PYTHON.
+            ! a = maxval( (/&
+            ! abs(lbound(params%HD, dim=1)), &
+            ! abs(lbound(params%GD, dim=1)), &
+            ! abs(lbound(params%HR, dim=1)), &
+            ! abs(lbound(params%GR, dim=1)), &
+            ! abs(ubound(params%HD, dim=1)), &
+            ! abs(ubound(params%GD, dim=1)), &
+            ! abs(ubound(params%HR, dim=1)), &
+            ! abs(ubound(params%GR, dim=1)) &
+            ! /))
+
+            ! write(*,*) "HD"
+            ! do i = -a, +a
+            !     if ((i < lbound(params%HD, dim=1) ).or.(i > ubound(params%HD, dim=1) )) then
+            !         write(*,'(es15.8,", ")') 0.0_rk
+            !     else
+            !         write(*,'(es15.8,", ")') params%HD(i)
+            !     endif
+            ! enddo
+            ! write(*,*) "GD"
+            ! do i = -a, +a
+            !     if ((i < lbound(params%GD, dim=1) ).or.(i > ubound(params%GD, dim=1) )) then
+            !         write(*,'(es15.8,", ")') 0.0_rk
+            !     else
+            !         write(*,'(es15.8,", ")') params%GD(i)
+            !     endif
+            ! enddo
+            ! write(*,*) "HR"
+            ! do i = -a, +a
+            !     if ((i < lbound(params%HR, dim=1) ).or.(i > ubound(params%HR, dim=1) )) then
+            !         write(*,'(es15.8,", ")') 0.0_rk
+            !     else
+            !         write(*,'(es15.8,", ")') params%HR(i)
+            !     endif
+            ! enddo
+            ! write(*,*) "GR"
+            ! do i = -a, +a
+            !     if ((i < lbound(params%GR, dim=1) ).or.(i > ubound(params%GR, dim=1) )) then
+            !         write(*,'(es15.8,", ")') 0.0_rk
+            !     else
+            !         write(*,'(es15.8,", ")') params%GR(i)
+            !     endif
+            ! enddo
         endif
 
         ! the code sets the ghost nodes, not just the modified ones

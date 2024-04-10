@@ -408,8 +408,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
                 send_treecode = senders(ineighbor, ileveldiff, 2, :)
                 recv_treecode = recvers(ineighbor, ileveldiff, 2, :)
 
-                call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**J, kind=rk), Bs, params%dim, x0_send, dx_send )
-                call get_block_spacing_origin2( recv_treecode(1:J-ileveldiff), real(Bs*2**J, kind=rk), Bs, params%dim, x0_recv, dx_recv )
+                call get_block_spacing_origin_array( send_treecode(1:J), real(Bs*2**J, kind=rk), Bs, params%dim, x0_send, dx_send )
+                call get_block_spacing_origin_array( recv_treecode(1:J-ileveldiff), real(Bs*2**J, kind=rk), Bs, params%dim, x0_recv, dx_recv )
 
                 write(16,*) ineighbor, ileveldiff, x0_send, dx_send, x0_recv, dx_recv
             enddo
@@ -423,8 +423,8 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     send_treecode = senders(dir, leveldiff, params%dim, :)
     recv_treecode = recvers(dir, leveldiff, params%dim, :)
 
-    call get_block_spacing_origin2( send_treecode(1:J), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_send, dx_send )
-    call get_block_spacing_origin2( recv_treecode(1:J-leveldiff), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_recv, dx_recv )
+    call get_block_spacing_origin_array( send_treecode(1:J), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_send, dx_send )
+    call get_block_spacing_origin_array( recv_treecode(1:J-leveldiff), real(Bs*2**(J), kind=rk), Bs, params%dim, x0_recv, dx_recv )
 
     do i = 1, params%dim
         ! shift to zero at the origin (which is g+1, actually)

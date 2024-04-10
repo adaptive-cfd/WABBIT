@@ -373,7 +373,6 @@ contains
       memspace, plist_id, H5T_NATIVE_INTEGER, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_INTEGER, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -420,7 +419,6 @@ contains
       memspace, plist_id, H5T_NATIVE_INTEGER, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_INTEGER, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -467,7 +465,6 @@ contains
       memspace, plist_id, H5T_NATIVE_INTEGER, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_INTEGER, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -514,7 +511,6 @@ contains
       memspace, plist_id, H5T_NATIVE_INTEGER, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_INTEGER, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -561,7 +557,6 @@ contains
       memspace, plist_id, H5T_STD_I64LE, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_STD_I64LE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -608,7 +603,6 @@ contains
       memspace, plist_id, H5T_NATIVE_DOUBLE, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -655,7 +649,6 @@ contains
       memspace, plist_id, H5T_NATIVE_DOUBLE, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -702,7 +695,6 @@ contains
       memspace, plist_id, H5T_NATIVE_DOUBLE, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -749,7 +741,6 @@ contains
       memspace, plist_id, H5T_NATIVE_DOUBLE, dims_global, dims_local, "r")
 
     ! Everything is prepared - we can read!
-    ! Q: Why dims_local here?
     call h5dread_f( dset_id, H5T_NATIVE_DOUBLE, field, dims_local, error, &
     mem_space_id = memspace, file_space_id = filespace, xfer_prp = plist_id )
 
@@ -798,7 +789,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -846,7 +837,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -894,7 +885,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -942,7 +933,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -990,7 +981,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_STD_I64LE, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_STD_I64LE, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -1038,7 +1029,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -1086,7 +1077,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -1134,7 +1125,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)
@@ -1182,7 +1173,7 @@ contains
     ! actual writing of heavy data
     !-----------------------------------------------------------------------------
     ! Write the dataset collectively, double precision in memory
-    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_global, &
+    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, field, dims_local, &
     error, file_space_id = filespace, mem_space_id = memspace,xfer_prp = plist_id)
 
     ! Make sure to close everythig properly (every create or open)

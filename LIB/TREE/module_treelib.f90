@@ -14,7 +14,7 @@ module module_treelib
   !> \details For any block lgt_id this routine computes, from the treearray stored in
   !! lgt_block( lgt_id, : ), the block's origin and grid spacing. Note spacing
   !! and origin are 3D vectors, the third component being zero in a 2D case. \n
-  subroutine get_block_spacing_origin2( treecode, domain, Bs, dim, x0, dx )
+  subroutine get_block_spacing_origin_array( treecode, domain, Bs, dim, x0, dx )
       implicit none
 
       integer(kind=ik), intent(in)               :: dim
@@ -42,7 +42,7 @@ module module_treelib
       ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
       x0 = real( ((/ix,iy,iz/) - 1)*(Bs), kind=rk) * dx
 
-  end subroutine get_block_spacing_origin2
+  end subroutine get_block_spacing_origin_array
 
   !===============================================================================
   !> \author JB
@@ -85,7 +85,7 @@ module module_treelib
 
     ! compute its coordinates in ijk space
     if (n_input_dec) then
-      call decoding_n(ixyz, treecode, dim=n_dim, level=n_level, max_level=max_tclevel)
+      call decoding_d(ixyz, treecode, dim=n_dim, level=n_level, max_level=max_tclevel)
     else
       call decoding_b(ixyz, treecode, dim=n_dim, level=n_level, max_level=max_tclevel)
     end if
@@ -103,176 +103,176 @@ module module_treelib
 end subroutine get_block_spacing_origin_b
 
 
-  !===============================================================================
-  !> \brief Make tree-identifier from tree id and treecode
-  !> \details from a tree id and treearray we make a tree-identifieer, which is
-  !! an integer made of the tree_ID and the treecode and level
-  !! \note As 0 is defined as not used, tree_ID s start from 1
-  function treecode2int(treearray, tree_ID)
-      implicit none
-      integer(kind=ik), intent(in) :: treearray(:)
-      integer(kind=ik), optional, intent(in) :: tree_ID
-      integer(kind=tsize) :: N, i, potency
-      integer(kind=tsize) :: treecode2int
-      N = size(treearray,1)
+  ! !===============================================================================
+  ! !> \brief Make tree-identifier from tree id and treecode
+  ! !> \details from a tree id and treearray we make a tree-identifieer, which is
+  ! !! an integer made of the tree_ID and the treecode and level
+  ! !! \note As 0 is defined as not used, tree_ID s start from 1
+  ! function treecode2int(treearray, tree_ID)
+  !     implicit none
+  !     integer(kind=ik), intent(in) :: treearray(:)
+  !     integer(kind=ik), optional, intent(in) :: tree_ID
+  !     integer(kind=tsize) :: N, i, potency
+  !     integer(kind=tsize) :: treecode2int
+  !     N = size(treearray,1)
 
-      if (present(tree_ID)) then
-          treecode2int = tree_ID
-          potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
-          ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
-      else
-          ! For the rest of wabbit not using tree_IDs we have to make sure that
-          ! the results stay the same
-          potency = -1_tsize
-          treecode2int = 0_tsize
-      endif
+  !     if (present(tree_ID)) then
+  !         treecode2int = tree_ID
+  !         potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
+  !         ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
+  !     else
+  !         ! For the rest of wabbit not using tree_IDs we have to make sure that
+  !         ! the results stay the same
+  !         potency = -1_tsize
+  !         treecode2int = 0_tsize
+  !     endif
 
-      do i = 1, N
-          if (treearray(i) >= 0) then
-              ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
-              ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-              treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
-          endif
-      enddo
+  !     do i = 1, N
+  !         if (treearray(i) >= 0) then
+  !             ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
+  !             ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
+  !             treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
+  !         endif
+  !     enddo
 
-  end function
-  !===============================================================================
+  ! end function
+  ! !===============================================================================
 
-  !===============================================================================
-  !> \brief Make unique ID from tree id and treearray - this uses binary TC
-  !> \details Wrapper which converts first to numerical binary treecode and then creates ID
-  function treearray2bid(treearray, tree_ID, dim, level, max_level)
-    implicit none
-    !> Treearray
-    integer(kind=ik), intent(in) :: treearray(:)
-    !> Tree ID, defaults to 0
-    integer(kind=ik), optional, intent(in) :: tree_ID
-    !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
-    integer(kind=ik), optional, intent(in) :: dim
-    !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-    integer(kind=ik), optional, intent(in) :: max_level
-    !> Level at which the block is situated, defaults to max_level.
-    !> If not set grids with overlapping blocks of different levels are not unique anymore
-    integer(kind=ik), optional, intent(in) :: level
-    integer(kind=tsize) :: treearray2bid, tcb_temp
+  ! !===============================================================================
+  ! !> \brief Make unique ID from tree id and treearray - this uses binary TC
+  ! !> \details Wrapper which converts first to numerical binary treecode and then creates ID
+  ! function treearray2bid(treearray, tree_ID, dim, level, max_level)
+  !   implicit none
+  !   !> Treearray
+  !   integer(kind=ik), intent(in) :: treearray(:)
+  !   !> Tree ID, defaults to 0
+  !   integer(kind=ik), optional, intent(in) :: tree_ID
+  !   !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
+  !   integer(kind=ik), optional, intent(in) :: dim
+  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
+  !   integer(kind=ik), optional, intent(in) :: max_level
+  !   !> Level at which the block is situated, defaults to max_level.
+  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
+  !   integer(kind=ik), optional, intent(in) :: level
+  !   integer(kind=tsize) :: treearray2bid, tcb_temp
 
-    integer(kind=ik)      :: n_dim, n_level, max_tclevel, n_tree_ID
+  !   integer(kind=ik)      :: n_dim, n_level, max_tclevel, n_tree_ID
 
-    ! Set defaults
-    n_tree_ID = 1; if (present(tree_ID)) n_tree_ID = tree_ID
-    n_dim = 3; if (present(dim)) n_dim = dim
-    max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-    n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
-    if (n_level < 0) n_level = max_tclevel + n_level + 1
+  !   ! Set defaults
+  !   n_tree_ID = 1; if (present(tree_ID)) n_tree_ID = tree_ID
+  !   n_dim = 3; if (present(dim)) n_dim = dim
+  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
+  !   n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
+  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
     
-    call array2tcb(tcb_temp, treearray, dim=n_dim, level=n_level, max_level=max_tclevel)
-    treearray2bid = tcb2id(tcb_temp, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
+  !   call array2tcb(tcb_temp, treearray, dim=n_dim, level=n_level, max_level=max_tclevel)
+  !   treearray2bid = tcb2id(tcb_temp, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
 
-  end function
-  !===============================================================================
+  ! end function
+  ! !===============================================================================
 
 
-  !===============================================================================
-  !> \brief Make unique treecode-identifier from numerical decimal treecode, level and tree_id
-  !> \details Level is required, as mothers share the same treecode with sister-0.
-  !! This is circumvented by increasing every set level by one and keeping unset
-  !! ones as 0. If level is not provided it is assumed to be of full level
-  !! \note As 0 is defined as all levels unset, tree_ID s start from 1
-  !! Example with tree_id 7 for tree_ids 1-99, treecode 10322000 and level 6: 07-21433100
-  function tcd2id(treecode, tree_ID, level, max_level)
-    implicit none
-    !> Treecode in numerical decimal representation
-    integer(kind=tsize), intent(in) :: treecode
-    !> Tree ID, defaults to 0
-    integer(kind=ik), optional, intent(in) :: tree_ID
-    !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-    integer(kind=ik), optional, intent(in) :: max_level
-    !> Level at which the block is situated, defaults to max_level.
-    !> If not set grids with overlapping blocks of different levels are not unique anymore
-    integer(kind=ik), optional, intent(in) :: level
-    integer(kind=ik) :: i_level, n_level, max_tclevel
-    integer(kind=tsize) :: tcd2id
+  ! !===============================================================================
+  ! !> \brief Make unique treecode-identifier from numerical decimal treecode, level and tree_id
+  ! !> \details Level is required, as mothers share the same treecode with sister-0.
+  ! !! This is circumvented by increasing every set level by one and keeping unset
+  ! !! ones as 0. If level is not provided it is assumed to be of full level
+  ! !! \note As 0 is defined as all levels unset, tree_ID s start from 1
+  ! !! Example with tree_id 7 for tree_ids 1-99, treecode 10322000 and level 6: 07-21433100
+  ! function tcd2id(treecode, tree_ID, level, max_level)
+  !   implicit none
+  !   !> Treecode in numerical decimal representation
+  !   integer(kind=tsize), intent(in) :: treecode
+  !   !> Tree ID, defaults to 0
+  !   integer(kind=ik), optional, intent(in) :: tree_ID
+  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
+  !   integer(kind=ik), optional, intent(in) :: max_level
+  !   !> Level at which the block is situated, defaults to max_level.
+  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
+  !   integer(kind=ik), optional, intent(in) :: level
+  !   integer(kind=ik) :: i_level, n_level, max_tclevel
+  !   integer(kind=tsize) :: tcd2id
 
-    ! Set defaults for dimension, level and max_level
-    max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-    n_level = max_tclevel; if (present(level)) n_level = level
-    if (n_level < 0) n_level = max_tclevel + n_level + 1
+  !   ! Set defaults for dimension, level and max_level
+  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
+  !   n_level = max_tclevel; if (present(level)) n_level = level
+  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
 
-    ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
-    tcd2id = treecode
+  !   ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
+  !   tcd2id = treecode
 
-    ! encode tree_id at start of array
-    if (present(tree_ID)) then
-      ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be:
-      ! if tree_ID > 10**(int(log10(2**bitsize(treecode)), kind=ik) - max_tclevel)
-      !   write(*,'("Error - tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0)') tre_ID, max_tclevel
-      ! end if
+  !   ! encode tree_id at start of array
+  !   if (present(tree_ID)) then
+  !     ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be:
+  !     ! if tree_ID > 10**(int(log10(2**bitsize(treecode)), kind=ik) - max_tclevel)
+  !     !   write(*,'("Error - tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0)') tre_ID, max_tclevel
+  !     ! end if
 
-      ! tree_ID start with 0
-      tcd2id = tcd2id +  int(tree_ID-1, kind=tsize) * 10_tsize**(max_tclevel)
-    endif
+  !     ! tree_ID start with 0
+  !     tcd2id = tcd2id +  int(tree_ID-1, kind=tsize) * 10_tsize**(max_tclevel)
+  !   endif
 
-    ! ensure unique level description, as 2130 with level 4 is equal to 213(0) with level 3 as in treecode it is right-zero-padded
-    ! add 1 for every level which is set from left to right, which results in 3241 which is different from 324(0)
-    do i_level = 1, n_level
-      tcd2id = tcd2id + 10_tsize ** (max_tclevel - i_level)
-    enddo
+  !   ! ensure unique level description, as 2130 with level 4 is equal to 213(0) with level 3 as in treecode it is right-zero-padded
+  !   ! add 1 for every level which is set from left to right, which results in 3241 which is different from 324(0)
+  !   do i_level = 1, n_level
+  !     tcd2id = tcd2id + 10_tsize ** (max_tclevel - i_level)
+  !   enddo
 
-  end function
-  !===============================================================================
+  ! end function
+  ! !===============================================================================
 
-  !===============================================================================
-  !> \brief Make unique treecode-identifier from numerical binary treecode, level and tree_id
-  !> \details Level is required, as mothers share the same treecode with sister-0.
-  !! 5 extra bits are used to encode all available levels (31 max for dim=2), other free bits on left end are used to encode tree_id
-  !> A 2D-example with tree_id=5 for tree_ids up to 15, level=3 and treecode = 3100 = 11-01-00-00:
-  !> 0101-00011-11010000
-  function tcb2id(treecode, dim, tree_ID, level, max_level)
-    implicit none
-    !> Treecode in numerical decimal representation
-    integer(kind=tsize), intent(in) :: treecode
-    !> Tree ID, optional and elsewise set as 0
-    integer(kind=ik), optional, intent(in) :: tree_ID
-    !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-    integer(kind=ik), optional, intent(in) :: max_level
-    !> Level at which the block is situated, defaults to max_level.
-    !> If not set grids with overlapping blocks of different levels are not unique anymore
-    integer(kind=ik), optional, intent(in) :: level
-    !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
-    integer(kind=ik), optional, intent(in) :: dim
-    integer(kind=ik) :: i_level, n_level, max_tclevel, n_dim
-    integer(kind=tsize) :: tcb2id
+  ! !===============================================================================
+  ! !> \brief Make unique treecode-identifier from numerical binary treecode, level and tree_id
+  ! !> \details Level is required, as mothers share the same treecode with sister-0.
+  ! !! 5 extra bits are used to encode all available levels (31 max for dim=2), other free bits on left end are used to encode tree_id
+  ! !> A 2D-example with tree_id=5 for tree_ids up to 15, level=3 and treecode = 3100 = 11-01-00-00:
+  ! !> 0101-00011-11010000
+  ! function tcb2id(treecode, dim, tree_ID, level, max_level)
+  !   implicit none
+  !   !> Treecode in numerical decimal representation
+  !   integer(kind=tsize), intent(in) :: treecode
+  !   !> Tree ID, optional and elsewise set as 0
+  !   integer(kind=ik), optional, intent(in) :: tree_ID
+  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
+  !   integer(kind=ik), optional, intent(in) :: max_level
+  !   !> Level at which the block is situated, defaults to max_level.
+  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
+  !   integer(kind=ik), optional, intent(in) :: level
+  !   !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
+  !   integer(kind=ik), optional, intent(in) :: dim
+  !   integer(kind=ik) :: i_level, n_level, max_tclevel, n_dim
+  !   integer(kind=tsize) :: tcb2id
 
-    ! Set defaults for dimension, level and max_level
-    n_dim = 3; if (present(dim)) n_dim = dim
-    max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-    n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
-    if (n_level < 0) n_level = max_tclevel + n_level + 1
+  !   ! Set defaults for dimension, level and max_level
+  !   n_dim = 3; if (present(dim)) n_dim = dim
+  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
+  !   n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
+  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
 
-    ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
-    tcb2id = treecode
+  !   ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
+  !   tcb2id = treecode
 
-    ! encode tree_id at start of array
-    if (present(tree_ID)) then
-      ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be the following
-      ! ! the -5 comes from the levels we want to encode
-      ! if tree_ID-1 > 2**(bitsize(treecode) - n_dim*max_tclevel - 5)
-      !   write(*,'("Error - Tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0, " in dimension ", i0)') tree_ID, max_tclevel, dim
-      ! end if
+  !   ! encode tree_id at start of array
+  !   if (present(tree_ID)) then
+  !     ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be the following
+  !     ! ! the -5 comes from the levels we want to encode
+  !     ! if tree_ID-1 > 2**(bitsize(treecode) - n_dim*max_tclevel - 5)
+  !     !   write(*,'("Error - Tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0, " in dimension ", i0)') tree_ID, max_tclevel, dim
+  !     ! end if
 
-      ! tree_ID start with 0
-      tcb2id = tcb2id + ishft(int(tree_ID-1, kind=tsize), n_dim*max_tclevel + 5)
-    endif
+  !     ! tree_ID start with 0
+  !     tcb2id = tcb2id + ishft(int(tree_ID-1, kind=tsize), n_dim*max_tclevel + 5)
+  !   endif
 
-    ! encode level in 5 bits left of treecode, if not set it is kept as zero
-    tcb2id = tcb2id + ishft(int(n_level, kind=tsize), n_dim*max_tclevel)
+  !   ! encode level in 5 bits left of treecode, if not set it is kept as zero
+  !   tcb2id = tcb2id + ishft(int(n_level, kind=tsize), n_dim*max_tclevel)
 
-  end function
-  !===============================================================================
+  ! end function
+  ! !===============================================================================
 
   !===============================================================================
   !> \brief get digit at specific index and return digit
-  function tc_get_level_b( treecode, dim, level, max_level)
+  function tc_get_digit_at_level_b( treecode, dim, level, max_level)
     implicit none
     !> Treecode in decimal numerical representation
     integer(kind=tsize),intent(in)   :: treecode
@@ -285,7 +285,7 @@ end subroutine get_block_spacing_origin_b
 
     integer(kind=ik)                 :: i_level, n_level, max_tclevel, n_dim
 
-    integer(kind=ik)              :: tc_get_level_b
+    integer(kind=ik)              :: tc_get_digit_at_level_b
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -294,13 +294,13 @@ end subroutine get_block_spacing_origin_b
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
     ! now output specific level
-    tc_get_level_b = int(ibits(treecode, (max_tclevel - n_level)*n_dim, n_dim), kind=ik)
+    tc_get_digit_at_level_b = int(ibits(treecode, (max_tclevel - n_level)*n_dim, n_dim), kind=ik)
   end function
   !===============================================================================
 
   !===============================================================================
   !> \brief set number at specific index and return new altered treecode
-  function tc_set_level_b( treecode, digit, dim, level, max_level)
+  function tc_set_digit_at_level_b( treecode, digit, dim, level, max_level)
     implicit none
     !> Treecode in decimal numerical representation
     integer(kind=tsize),intent(in)   :: treecode
@@ -315,7 +315,7 @@ end subroutine get_block_spacing_origin_b
 
     integer(kind=ik)                 :: i_level, n_level, max_tclevel, n_dim
 
-    integer(kind=tsize)              :: tc_set_level_b
+    integer(kind=tsize)              :: tc_set_digit_at_level_b
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -324,9 +324,9 @@ end subroutine get_block_spacing_origin_b
     if (n_level < 0) n_level = max_tclevel + n_level + 1
 
     ! subtract specific level
-    tc_set_level_b = treecode - ishft(ibits(treecode, (max_tclevel - n_level)*n_dim, n_dim), (max_tclevel - n_level)*n_dim)
+    tc_set_digit_at_level_b = treecode - ishft(ibits(treecode, (max_tclevel - n_level)*n_dim, n_dim), (max_tclevel - n_level)*n_dim)
     ! now set specific level
-    tc_set_level_b = tc_set_level_b + ishft(int(digit, kind=tsize), (max_tclevel - n_level)*n_dim)
+    tc_set_digit_at_level_b = tc_set_digit_at_level_b + ishft(int(digit, kind=tsize), (max_tclevel - n_level)*n_dim)
   end function
   !===============================================================================
 
@@ -344,7 +344,7 @@ end subroutine get_block_spacing_origin_b
     !> Array2 of size 2-3 to be compared: (tc1, tc2, (level+100*tree_id))
     integer(kind=ik),intent(in)   :: array2(:)
     !> Is tree_id and level included and should be checked?
-    logical check_meta
+    logical                       :: check_meta
     !> Output
     logical                       :: tc_id_lower
 
@@ -359,35 +359,35 @@ end subroutine get_block_spacing_origin_b
   end function
   !===============================================================================
 
-  !===============================================================================
-  !> \brief Define a "<"-operator for two blocks based on their tree_id, level and tc
-  !> \details In order to sort the array we want to uniquely arrange them to find
-  !! blocks quickly. This function defines the "<"-operator based on following input:
-  !!  - tree_ID
-  !!  - level
-  !!  - treecode in binary or numerical encoding
-  function tc_id_lower2( array1, array2)
-    implicit none
-    !> Array1 of size 4 to be compared: (tc1, tc2, level, tree_id)
-    integer(kind=ik),intent(in)   :: array1(:)
-    !> Array2 of size 4 to be compared: (tc1, tc2, level, tree_id)
-    integer(kind=ik),intent(in)   :: array2(:)
-    !> Output
-    logical                       :: tc_id_lower2
+  ! !===============================================================================
+  ! !> \brief Define a "<"-operator for two blocks based on their tree_id, level and tc
+  ! !> \details In order to sort the array we want to uniquely arrange them to find
+  ! !! blocks quickly. This function defines the "<"-operator based on following input:
+  ! !!  - tree_ID
+  ! !!  - level
+  ! !!  - treecode in binary or numerical encoding
+  ! function tc_id_lower2( array1, array2)
+  !   implicit none
+  !   !> Array1 of size 4 to be compared: (tc1, tc2, level, tree_id)
+  !   integer(kind=ik),intent(in)   :: array1(:)
+  !   !> Array2 of size 4 to be compared: (tc1, tc2, level, tree_id)
+  !   integer(kind=ik),intent(in)   :: array2(:)
+  !   !> Output
+  !   logical                       :: tc_id_lower2
 
-    ! check if tree_id or level are larger, they are combined in one number
-    ! check if treecode is larger if tree_id and level are similar
-    if (array1(4) > array2(4) .or. &
-      (array1(4) == array2(4) .and. array1(3) > array2(3)) .or. &
-      (array1(4) == array2(4) .and. array1(3) == array2(3) &
-      ! .and. array1(2) >= array2(2))) then
-      .and. get_tc(array1(1:2)) >= get_tc(array2(1:2)))) then
-        tc_id_lower2 = .false.
-    else
-      tc_id_lower2 = .true.
-    endif
-  end function
-  !===============================================================================
+  !   ! check if tree_id or level are larger, they are combined in one number
+  !   ! check if treecode is larger if tree_id and level are similar
+  !   if (array1(4) > array2(4) .or. &
+  !     (array1(4) == array2(4) .and. array1(3) > array2(3)) .or. &
+  !     (array1(4) == array2(4) .and. array1(3) == array2(3) &
+  !     ! .and. array1(2) >= array2(2))) then
+  !     .and. get_tc(array1(1:2)) >= get_tc(array2(1:2)))) then
+  !       tc_id_lower2 = .false.
+  !   else
+  !     tc_id_lower2 = .true.
+  !   endif
+  ! end function
+  ! !===============================================================================
 
   !===============================================================================
   !> \brief Extract from lgt_block from the specific ID the treecode
@@ -595,7 +595,7 @@ end subroutine get_block_spacing_origin_b
   !===============================================================================
 
   !===============================================================================
-  !> \brief Obtain neighbour for given direction with numerical treecode
+  !> \brief Obtain neighbour for given direction with numerical binary treecode
   !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
   !> \author JB
   subroutine adjacent_wrapper_b(treecode, treecode_neighbor, direction, level, dim, max_level)
@@ -610,7 +610,8 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in int representation
+    !> direction for neighbor search - number where each digit represents a cardinal direction
+    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
     integer(kind=ik)                    :: i, n_dim, n_level, max_tclevel
@@ -628,7 +629,7 @@ end subroutine get_block_spacing_origin_b
     do while (dir_temp /= 0)
       tc1 = treecode_neighbor
       call pop(dir_temp, dir_now)
-      call adjacent_3D_faces_b(tc1, treecode_neighbor, dir_now, level=n_level, dim=n_dim, max_level=max_tclevel)
+      call adjacent_faces_b(tc1, treecode_neighbor, dir_now, level=n_level, dim=n_dim, max_level=max_tclevel)
     end do
   end subroutine
   !===============================================================================
@@ -665,7 +666,7 @@ end subroutine get_block_spacing_origin_b
   !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
-  subroutine adjacent_3D_faces_b( treecode, treecode_neighbor, direction, level, dim, max_level)
+  subroutine adjacent_faces_b( treecode, treecode_neighbor, direction, level, dim, max_level)
     implicit none
 
     !> dimension (2 or 3), defaults to 3
@@ -678,7 +679,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in int representation for main cardinal directions
+    !> direction for neighbor search - number with one digit representing a cardinal direction
     integer(kind=tsize), intent(in)        :: direction
     integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
     integer(kind=ik)                    :: i, n_dim, max_tclevel, n_level
@@ -743,10 +744,10 @@ end subroutine get_block_spacing_origin_b
   !===============================================================================
 
   !===============================================================================
-  !> \brief Obtain neighbour for given direction with numerical treecode
+  !> \brief Obtain neighbour for given direction with numerical decimal treecode
   !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
   !> \author JB
-  subroutine adjacent_wrapper_n(treecode, treecode_neighbor, direction, level, max_level)
+  subroutine adjacent_wrapper_d(treecode, treecode_neighbor, direction, level, max_level)
     implicit none
     !> Level at which to search the neighbour, this is from coarse to fine
     integer(kind=ik), optional, intent(in)        :: level
@@ -756,7 +757,8 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in int representation
+    !> direction for neighbor search - number where each digit represents a cardinal direction
+    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
     integer(kind=ik)                    :: i, n_level, max_tclevel
@@ -773,14 +775,14 @@ end subroutine get_block_spacing_origin_b
     do while (dir_temp /= 0)
       tc1 = treecode_neighbor
       call pop(dir_temp, dir_now)
-      call adjacent_3D_faces_n(tc1, treecode_neighbor, dir_now, level=n_level, max_level=max_tclevel)
+      call adjacent_faces_d(tc1, treecode_neighbor, dir_now, level=n_level, max_level=max_tclevel)
     end do
   end subroutine
   !===============================================================================
 
   !===============================================================================
   !> \author JB
-  !> \brief Obtain neighbour in 3D for given direction with numerical treecode
+  !> \brief Obtain neighbour in 3D for given direction with numerical decimal treecode
   !> \details Use math representation and loop over digits
   !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
   !  --------------------------------------------------------------------------------------------
@@ -810,7 +812,7 @@ end subroutine get_block_spacing_origin_b
   !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
   !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
   ! ********************************************************************************************
-  subroutine adjacent_3D_faces_n( treecode, treecode_neighbor, direction, level, max_level)
+  subroutine adjacent_faces_d( treecode, treecode_neighbor, direction, level, max_level)
     implicit none
     !> Level at which to search the neighbour, this is from coarse to fine
     integer(kind=ik), optional, intent(in)        :: level
@@ -820,7 +822,7 @@ end subroutine get_block_spacing_origin_b
     integer(kind=tsize), intent(in)     :: treecode
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
-    !> Seach direction in int representation for main cardinal directions
+    !> direction for neighbor search - number with one digit representing a cardinal direction
     integer(kind=tsize), intent(in)        :: direction
     integer(kind=tsize)                 :: tc_reduce, digit_last, dir_sign, dir_fac
     integer(kind=ik)                    :: i, n_level, max_tclevel
@@ -885,9 +887,9 @@ end subroutine get_block_spacing_origin_b
   !===============================================================================
 
   !===============================================================================
-  !> \brief Obtain block position coordinates from numerical treecode
+  !> \brief Obtain block position coordinates from numerical decimal treecode
   !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
-  subroutine decoding_n(ix, treecode, dim, level, max_level)
+  subroutine decoding_d(ix, treecode, dim, level, max_level)
     implicit none
 
     !> dimension (2 or 3), defaults to 3
@@ -933,13 +935,13 @@ end subroutine get_block_spacing_origin_b
     ! IY is encoded in first entry and IX in second so we need to swap them
     i_level = ix(1); ix(1) = ix(2); ix(2) = i_level
 
-  end subroutine decoding_n
+  end subroutine decoding_d
   !===============================================================================
 
   !===============================================================================
-  !> \brief Obtain numerical treecode from block position coordinates for 2 or 3 dimensions
+  !> \brief Obtain numerical decimal treecode from block position coordinates for 2 or 3 dimensions
   !> \author JB
-  subroutine encoding_n( ix, treecode, dim, level, max_level )
+  subroutine encoding_d( ix, treecode, dim, level, max_level )
     implicit none
     !> dimension (2 or 3), defaults to 3
     integer(kind=ik), optional, intent(in)    :: dim
@@ -974,11 +976,11 @@ end subroutine get_block_spacing_origin_b
       end do
     end do
 
-  end subroutine encoding_n
+  end subroutine encoding_d
   !===============================================================================
 
   !===============================================================================
-  !> \brief Obtain block position coordinates from numerical bitwise treecode
+  !> \brief Obtain block position coordinates from numerical binary treecode
   !> \details Works for 2D and 3D. Considers each digit and adds their level-shift to each coordinate
   subroutine decoding_b(ix, treecode, dim, level, max_level)
     implicit none

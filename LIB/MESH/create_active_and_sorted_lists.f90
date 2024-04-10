@@ -161,9 +161,11 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
-    !if (.not.allocated(my_lgt_recv_buffer)) allocate( my_lgt_recv_buffer( size(lgt_active),1) ) ! 5 components: lgt_sortednumlist(:,1:5)
+    
+    ! 4 components: lgt_sortednumlist(:,1:4)
+    ! ID, TC1, TC2, Tree_ID * 100 + Level
     if (.not.allocated(my_lgt_send_buffer)) then
-        allocate( my_lgt_send_buffer( N,4) ) ! 5 components: lgt_sortednumlist(:,1:5)
+        allocate( my_lgt_send_buffer( N,4) )
         my_lgt_send_buffer=-1
     endif
 

@@ -39,13 +39,13 @@ subroutine findSisters_tree(params, lgt_my_id, lgt_sisters_id, tree_ID)
 
 
     do i = 1, N_sisters
-        if ( i-1 == tc_get_level_b(tcb_me, dim=params%dim, level=my_level, max_level=params%Jmax) ) then
+        if ( i-1 == tc_get_digit_at_level_b(tcb_me, dim=params%dim, level=my_level, max_level=params%Jmax) ) then
             ! this is the block itself, no need to look for it
             lgt_sisters_id(i) = lgt_my_id
 
         else
             ! sister, who are you?
-            tcb_sister = tc_set_level_b(tcb_me, i-1, dim=params%dim, level=my_level, max_level=params%Jmax)
+            tcb_sister = tc_set_digit_at_level_b(tcb_me, i-1, dim=params%dim, level=my_level, max_level=params%Jmax)
 
             ! sister, are you there?
             call doesBlockExist_tree(tcb_sister, exists, lgt_sisters_id(i), dim=params%dim, level=my_level, tree_id=tree_ID, max_level=params%Jmax)

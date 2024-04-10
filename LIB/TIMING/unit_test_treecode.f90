@@ -47,10 +47,10 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
   ! define primary sides to be investigated for 3d
   dir_3d(6) = "__1/___"  ! top z+1
-  dir_3d(3) = "__2/___"  ! left x-1
-  dir_3d(2) = "__3/___"  ! back y+1
-  dir_3d(4) = "__4/___"  ! right x+1
-  dir_3d(1) = "__5/___"  ! front y-1
+  dir_3d(3) = "__2/___"  ! front y-1
+  dir_3d(2) = "__3/___"  ! right x+1
+  dir_3d(4) = "__4/___"  ! back y+1
+  dir_3d(1) = "__5/___"  ! left x-1
   dir_3d(5) = "__6/___"  ! bottom z-1
   dir_3d_int(6) = 1  ! top z+1
   dir_3d_int(3) = 2  ! front y-1
@@ -131,14 +131,14 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       ixy(:) = 2 + floor(rand(:) * (2**params%Jmax-2))  ! ignore edge cases
 
       call encoding_b( ixy, tc_b, 2)
-      call encoding_n( ixy, newtreecode, 2)
+      call encoding_d( ixy, newtreecode, 2)
       call encoding(treecode, ixy, 2, 4**treeN, treeN)
 
       ! tests for JB version - decimal
       ! loop over all directions - in if condition we set the correct neighbouring index change
       do j= 1,4
-        call adjacent_wrapper_n( newtreecode, neighbor, dir_2d_int(j), params%Jmax, params%Jmax)
-        call decoding_n(oxy, neighbor, 2)
+        call adjacent_wrapper_d( newtreecode, neighbor, dir_2d_int(j), params%Jmax, params%Jmax)
+        call decoding_d(oxy, neighbor, 2)
         if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2))) &
         .or. (oxy(2) /= ixy(2) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)))) then
           write(*,'("UNIT TEST FAILED: treecode num bin ", i0, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d(j), ixy(1:2), oxy(1:2)
@@ -181,14 +181,14 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       ixy(:) = 2 + floor(rand(:) * (2**params%Jmax-2))  ! ignore edge cases
 
       call encoding_b( ixy, tc_b, 3)
-      call encoding_n( ixy, newtreecode, 3)
+      call encoding_d( ixy, newtreecode, 3)
       call encoding_revised(treecode, ixy, 3, params%Jmax)
 
       ! tests for JB version - decimal
       ! loop over all directions - in if condition we set the correct neighbouring index change
       do j= 1,6
-        call adjacent_wrapper_n( newtreecode, neighbor, dir_3d_int(j), params%Jmax, params%Jmax)
-        call decoding_n(oxy, neighbor, 3)
+        call adjacent_wrapper_d( newtreecode, neighbor, dir_3d_int(j), params%Jmax, params%Jmax)
+        call decoding_d(oxy, neighbor, 3)
 
         if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
         .or. (oxy(2) /= ixy(2) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
@@ -310,8 +310,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
     t = MPI_wtime()
     do k = 1, kk
-      call encoding_n(ixy, newtreecode, 2)
-      call decoding_n(oxy, newtreecode, 2)
+      call encoding_d(ixy, newtreecode, 2)
+      call decoding_d(oxy, newtreecode, 2)
     enddo
     if (params%rank == 0) then
       write(*,'("2D dec enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
@@ -319,10 +319,10 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
     t = MPI_wtime()
     do k = 1, kk
-      call adjacent_wrapper_n(newtreecode, neighbor, dir_2d_int(1), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(neighbor, newtreecode, dir_2d_int(2), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(newtreecode, neighbor, dir_2d_int(3), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(neighbor, newtreecode, dir_2d_int(4), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(newtreecode, neighbor, dir_2d_int(1), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(neighbor, newtreecode, dir_2d_int(2), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(newtreecode, neighbor, dir_2d_int(3), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(neighbor, newtreecode, dir_2d_int(4), params%Jmax, params%Jmax)
 
       ! loop of 1000 simulates searching loop for neighbour
       ! do iz = 1, 1000
@@ -337,8 +337,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
     t = MPI_wtime()
     do k = 1, kk
-      call encoding_n(ixy, newtreecode, 3)
-      call decoding_n(oxy, newtreecode, 3)
+      call encoding_d(ixy, newtreecode, 3)
+      call decoding_d(oxy, newtreecode, 3)
     enddo
     if (params%rank == 0) then
       write(*,'("3D dec enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
@@ -346,12 +346,12 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
     t = MPI_wtime()
     do k = 1, kk
-      call adjacent_wrapper_n(newtreecode, neighbor, dir_3d_int(1), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(neighbor, newtreecode, dir_3d_int(2), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(newtreecode, neighbor, dir_3d_int(3), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(neighbor, newtreecode, dir_3d_int(4), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(newtreecode, neighbor, dir_3d_int(5), params%Jmax, params%Jmax)
-      call adjacent_wrapper_n(neighbor, newtreecode, dir_3d_int(6), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(newtreecode, neighbor, dir_3d_int(1), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(neighbor, newtreecode, dir_3d_int(2), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(newtreecode, neighbor, dir_3d_int(3), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(neighbor, newtreecode, dir_3d_int(4), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(newtreecode, neighbor, dir_3d_int(5), params%Jmax, params%Jmax)
+      call adjacent_wrapper_d(neighbor, newtreecode, dir_3d_int(6), params%Jmax, params%Jmax)
 
       ! loop of 1000 simulates searching loop for neighbour
       ! do iz = 1, 1000

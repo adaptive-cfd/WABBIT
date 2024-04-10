@@ -29,11 +29,13 @@
 subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_domain)
 
     implicit none
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    type (type_params), intent(in)      :: params                   !< user defined parameter structure
     integer(kind=ik), intent(in)        :: hvyID_block
     integer(kind=ik), intent(in)        :: lgtID_block
     integer(kind=ik), intent(in)        :: Jmax
-    integer(kind=ik), intent(in)        :: dir                      !> direction for neighbor search
+    !> direction for neighbor search - number where each digit represents a cardinal direction
+    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    integer(kind=ik), intent(in)        :: dir                      
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)
     integer(kind=ik)                    :: neighborDirCode_sameLevel
@@ -56,7 +58,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     ! we have to init tcBlock before we set it elsewise fortran doesnt like it
     tcb_Block    = get_tc(lgt_block(lgtID_block, IDX_TC_1 : IDX_TC_2))
     ! last digit is used very often so we only extract it once
-    tc_last = tc_get_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
+    tc_last = tc_get_digit_at_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
 
     ! not all blocks can have coarse neighbors.
     ! Consider:
@@ -82,6 +84,8 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
 
 
     ! set auxiliary variables
+    !> direction for neighbor search - number where each digit represents a cardinal direction
+    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
     select case(dir)
         case(1)  ! '__1/___'
             neighborDirCode_sameLevel    = 1
@@ -596,7 +600,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
         do k = 1, 4
             if (tcFinerAppendDigit(k) /= -1) then
                 ! first neighbor virtual treecode, one level up
-                tcb_Virtual = tc_set_level_b(tcb_Block, tcFinerAppendDigit(k), level=level+1, max_level=Jmax, dim=params%dim)
+                tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(k), level=level+1, max_level=Jmax, dim=params%dim)
 
                 ! calculate treecode for neighbor on same level (virtual level)
                 call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=Jmax, dim=params%dim)

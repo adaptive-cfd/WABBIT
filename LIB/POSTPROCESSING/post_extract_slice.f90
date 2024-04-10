@@ -151,7 +151,7 @@ subroutine post_extract_slice(params)
             +lagrange_polynomial(x_query_normalized, xi, 3)*hvy_block( ix+1, :, :, 1, hvy_id) &
             +lagrange_polynomial(x_query_normalized, xi, 4)*hvy_block( ix+2, :, :, 1, hvy_id)
 
-            ! this is just the inverse of what get_block_spacing_origin2 computes
+            ! this is just the inverse of what get_block_spacing_origin_array computes
             ! we use it to create the 2D treecode
             iy = 1 + nint( x0(2) / (dx(2)*real(Bs(2)-1, kind=rk)) )
             iz = 1 + nint( x0(3) / (dx(3)*real(Bs(3)-1, kind=rk)) )

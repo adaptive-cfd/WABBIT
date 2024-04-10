@@ -59,12 +59,12 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
 
     do i = 1, size(lgt_blocks_to_merge)
         treecode = get_tc(lgt_blocks_to_merge(i), IDX_TC_1 : IDX_TC_2)
-        if (tc_get_level_b( treecode, params%dim, level, params%Jmax) /= i-1) then
+        if (tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /= i-1) then
             call abort(647483," You try to merge blocks which do not belong together")
         endif
         do i1 = 1, level-1
-            if (tc_get_level_b( treecode, params%dim, level, params%Jmax) /=
-                tc_get_level_b( get_tc(lgt_blocks_to_merge(1), IDX_TC_1 : IDX_TC_2), params%dim, level, params%Jmax)) then
+            if (tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /=
+                tc_get_digit_at_level_b( get_tc(lgt_blocks_to_merge(1), IDX_TC_1 : IDX_TC_2), params%dim, level, params%Jmax)) then
                 call abort(647483," You try to merge blocks which do not belong together")
             endif
         enddo

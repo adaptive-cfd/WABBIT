@@ -46,7 +46,7 @@ subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, dim, level, max_lev
     ! loop over treecode
     do k = 1, n_level
 
-        tree_i = tc_get_level_b(treecode, dim=n_dim, level=k, max_level=max_tclevel)
+        tree_i = tc_get_digit_at_level_b(treecode, dim=n_dim, level=k, max_level=max_tclevel)
 
         ! set hilbert pattern, in first step: always start with first pattern
         if ( k > 1 ) then
@@ -56,7 +56,7 @@ subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, dim, level, max_lev
         ! position in new pattern
         call pattern_pos_3D( hilbert_pattern, tree_i, hilbert_i )
 
-        hilbertcode = tc_set_level_b(hilbertcode, hilbert_i, dim=n_dim, level=k, max_level=max_tclevel)
+        hilbertcode = tc_set_digit_at_level_b(hilbertcode, hilbert_i, dim=n_dim, level=k, max_level=max_tclevel)
 
         ! save previous pattern and treecode
         prev_hilbert_pattern    = hilbert_pattern

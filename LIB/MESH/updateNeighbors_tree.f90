@@ -40,6 +40,8 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
 
+            !> direction for neighbor search - number where each digit represents a cardinal direction
+            !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
             ! faces
             call find_neighbor(params, hvyID, lgtID, Jmax, 1, error, n_domain)
             call find_neighbor(params, hvyID, lgtID, Jmax, 2, error, n_domain)
@@ -96,6 +98,8 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
 
+            !> direction for neighbor search - number where each digit represents a cardinal direction
+            !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
             call find_neighbor( params, hvyID, lgtID, Jmax, 5, error, n_domain)  ! '__N'
             call find_neighbor( params, hvyID, lgtID, Jmax, 4, error, n_domain)  ! '__E'
             call find_neighbor( params, hvyID, lgtID, Jmax, 3, error, n_domain)  ! '__S'

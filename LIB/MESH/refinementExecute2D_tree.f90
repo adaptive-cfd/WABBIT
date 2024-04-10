@@ -87,7 +87,7 @@ subroutine refinementExecute2D_tree( params, hvy_block, tree_ID )
                     call hvy2lgt( lgt_free_id, free_heavy_id, rank, N )
                 endif
 
-                treecode = tc_set_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
+                treecode = tc_set_digit_at_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
 
                 ! init array - needed to change values if never adressed
                 lgt_block( lgt_free_id, : ) = -1

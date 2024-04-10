@@ -29,8 +29,9 @@ subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error, 
 
     ! loop over the range of light IDs belonging to proc "mpirank"
     do k = first_light_id, last_light_id
-        ! check: if the block is not active, then we found a free block to return
-        if ( get_tc(lgt_block(k, IDX_TC_1 : IDX_TC_2)) < 0 ) then
+        ! check if block is active: TC > 0
+        ! performance: don't construct tc and check only first int
+        if ( lgt_block(k, IDX_TC_1) < 0 ) then
             lgt_free_id = k
             exit
         end if

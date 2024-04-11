@@ -47,11 +47,6 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
     exists = .false.
     lgtID = -1
 
-    !> 1st: given the array treecode, compute the numerical value of the treecode we're
-    !! looking for. note these values are stored for easier finding in lgt_sortednumlist
-    ! num_treecode = tcb2id(tcBlock, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
-    ! id_a_now = (/ num_treecode, tcBlock, int(n_level, kind=tsize), int(n_tree_ID, kind=tsize)/)
-
     ! construct array of what we want to compare
     ! tree_ID and level are combined into one number for performance purposes
     ! as max_level is 31 for 2D, we shift tree_ID by 100
@@ -71,27 +66,24 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
     do while ( abs(i2-i1) >= 2 )
         ! cut interval in two parts
         imid = (i1+i2) / 2
-        ! if (lgt_sortednumlist(imid,2,n_tree_ID) < num_treecode) then
-        if (tc_id_lower(lgt_sortednumlist(imid,2:4,n_tree_ID), id_a_now, .true.)) then
+        if (tc_id_lower(lgt_sortednumlist(2:4, imid,n_tree_ID), id_a_now, .true.)) then
             i1 = imid
         else
             i2 = imid
         end if
     end do
 
-    ! if ( num_treecode == lgt_sortednumlist(i1,2,n_tree_ID) .and. lgt_sortednumlist(i1,1,n_tree_ID) > 0) then
-    if ( all(lgt_sortednumlist(i1,2:4,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(i1,1,n_tree_ID) > 0) then
+    if ( all(lgt_sortednumlist(2:4, i1,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(1, i1,n_tree_ID) > 0) then
         ! found the block we're looking for
         exists = .true.
-        lgtID = int( lgt_sortednumlist(i1,1,n_tree_ID), kind=ik)
+        lgtID = int( lgt_sortednumlist(1,i1,n_tree_ID), kind=ik)
         return
     end if
 
-    ! if ( num_treecode == lgt_sortednumlist(i2,2,n_tree_ID) .and. lgt_sortednumlist(i2,1,n_tree_ID) > 0) then
-    if ( all(lgt_sortednumlist(i2,2:4,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(i2,1,n_tree_ID) > 0) then
+    if ( all(lgt_sortednumlist(2:4, i2,n_tree_ID) == id_a_now) .and. lgt_sortednumlist(1, i2,n_tree_ID) > 0) then
         ! found the block we're looking for
         exists = .true.
-        lgtID = int( lgt_sortednumlist(i2,1,n_tree_ID), kind=ik)
+        lgtID = int( lgt_sortednumlist(1,i2,n_tree_ID), kind=ik)
         return
     end if
 

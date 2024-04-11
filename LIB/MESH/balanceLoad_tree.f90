@@ -53,11 +53,11 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
     if (.not.allocated(dist_list)) allocate( dist_list(1:number_procs))
     ! allocate sfc com list, maximal number of communications is when every proc wants to send all of his blocks
     ! NOTE: it is not necessary or wise to reset this array (it is large!)
-    if (.not.allocated(sfc_com_list)) allocate( sfc_com_list( number_procs*params%number_blocks, 3 ) )
+    if (.not.allocated(sfc_com_list)) allocate( sfc_com_list( 3, number_procs*params%number_blocks ) )
 
     ! allocate space filling curve list, number of elements is the number of active blocks
     ! and for each block, we store the space-filling-curve-index and the lgt ID
-    if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( size(lgt_block,1), 3) )
+    if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( 3, size(lgt_block,1)) )
 
     ! number of blocks
     N = params%number_blocks
@@ -94,17 +94,17 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         !-----------------------------------------------------------
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
-                sfc_sorted_list(k, :) = -1
+                sfc_sorted_list(:, k) = -1
                 treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
-                sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
-                call set_tc(sfc_sorted_list(k, 2:3), treecode)
+                sfc_sorted_list(1, k) = lgt_active(k, tree_ID)
+                call set_tc(sfc_sorted_list(2:3, k), treecode)
             end do
         else
             do k = 1, lgt_n(tree_ID)
-                sfc_sorted_list(k, :) = -1
+                sfc_sorted_list(:, k) = -1
                 treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
-                sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
-                call set_tc(sfc_sorted_list(k, 2:3), treecode)
+                sfc_sorted_list(1, k) = lgt_active(k, tree_ID)
+                call set_tc(sfc_sorted_list(2:3, k), treecode)
             end do
         endif
     case("sfc_hilbert")
@@ -113,27 +113,27 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         !-----------------------------------------------------------
         if (params%dim == 3) then
             do k = 1, lgt_n(tree_ID)
-                sfc_sorted_list(k, :) = -1
+                sfc_sorted_list(:, k) = -1
 
                 ! transfer treecode to hilbertcode
                 treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 call treecode_to_hilbertcode_3D( treecode, hilbertcode2, &
                     dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), IDX_MESH_LVL), max_level=params%Jmax)
                     
-                sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
-                call set_tc(sfc_sorted_list(k, 2:3), hilbertcode2)
+                sfc_sorted_list(1, k) = lgt_active(k, tree_ID)
+                call set_tc(sfc_sorted_list(2:3, k), hilbertcode2)
             end do
         else
             do k = 1, lgt_n(tree_ID)
-                sfc_sorted_list(k, :) = -1
+                sfc_sorted_list(:, k) = -1
 
                 ! transfer treecode to hilbertcode
                 treecode = get_tc(lgt_block(lgt_active(k, tree_ID), IDX_TC_1 : IDX_TC_2))
                 call treecode_to_hilbertcode_2D( treecode, hilbertcode2, &
                     dim=params%dim, level=lgt_block(lgt_active(k, tree_ID), IDX_MESH_LVL), max_level=params%Jmax)
 
-                sfc_sorted_list(k, 1) = lgt_active(k, tree_ID)
-                call set_tc(sfc_sorted_list(k, 2:3), hilbertcode2)
+                sfc_sorted_list(1, k) = lgt_active(k, tree_ID)
+                call set_tc(sfc_sorted_list(2:3, k), hilbertcode2)
             end do
         endif
 
@@ -181,7 +181,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
         end do
 
         ! find out on which mpirank lies the block that we're looking at
-        call lgt2proc( proc_data_id, sfc_sorted_list(k,1), params%number_blocks )
+        call lgt2proc( proc_data_id, sfc_sorted_list(1, k), params%number_blocks )
 
         ! does this block lie on the right mpirank, i.e., the current part of the
         ! SFC? if so, nothing needs to be done. otherwise, the following if is active
@@ -196,9 +196,9 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
             !    2     receiver mpirank
             !    3     block light data id
             com_i = com_i + 1
-            sfc_com_list(com_i, 1) = proc_data_id           ! sender mpirank
-            sfc_com_list(com_i, 2) = proc_dist_id           ! receiver mpirank
-            sfc_com_list(com_i, 3) = sfc_sorted_list(k,1)   ! light id of block
+            sfc_com_list(1, com_i) = proc_data_id           ! sender mpirank
+            sfc_com_list(2, com_i) = proc_dist_id           ! receiver mpirank
+            sfc_com_list(3, com_i) = sfc_sorted_list(1,k)   ! light id of block
         end if
 
         ! The opt_dist_list defines how many blocks this rank should have, and
@@ -215,7 +215,8 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
     !---------------------------------------------------------------------------------
     ! 3rd: actual communication (send/recv)
     !---------------------------------------------------------------------------------
-    call block_xfer( params, sfc_com_list, com_i, hvy_block, msg="balanceLoad_tree" )
+    call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree" )
+
     call toc( "balanceLoad_tree (comm)", MPI_wtime()-t1 )
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.

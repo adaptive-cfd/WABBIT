@@ -93,7 +93,7 @@ end subroutine
 !     !   We assume that the pruned tree is on JMAX (rhs level) and we assume that
 !     !   the full one is not finer, only coarser.
 !
-!     if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
+!     if (.not.allocated(comm_list)) allocate( comm_list( 3, params%number_procs*N) )
 !
 !     call createActiveSortedLists_forest( params, lgt_block, lgt_active, lgt_n, &
 !     hvy_active, hvy_n, lgt_sortednumlist, tree_n)
@@ -127,9 +127,9 @@ end subroutine
 !
 !             if (rank_full /= rank_pruned) then
 !                 n_comm = n_comm + 1
-!                 comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
-!                 comm_list(n_comm, 2) = rank_full   ! receiver mpirank
-!                 comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
+!                 comm_list(1, n_comm) = rank_pruned   ! sender mpirank
+!                 comm_list(2, n_comm) = rank_full   ! receiver mpirank
+!                 comm_list(3, n_comm) = lgt_id1 ! block lgt_id to send
 !                 write(*,*) "found on different rank", n_comm, rank_pruned, rank_full
 !             endif
 !         else
@@ -243,7 +243,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     !   We assume that the pruned tree is on JMAX (rhs level) and we assume that
     !   the full one is finer, never coarser.
 
-    if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
+    if (.not.allocated(comm_list)) allocate( comm_list( 3, params%number_procs*N ) )
 
     call createActiveSortedLists_forest(params)
 
@@ -276,9 +276,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
             if (rank_full /= rank_pruned) then
                 n_comm = n_comm + 1
-                comm_list(n_comm, 1) = rank_pruned   ! sender mpirank
-                comm_list(n_comm, 2) = rank_full   ! receiver mpirank
-                comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
+                comm_list(1, n_comm) = rank_pruned   ! sender mpirank
+                comm_list(2, n_comm) = rank_full   ! receiver mpirank
+                comm_list(3, n_comm) = lgt_id1 ! block lgt_id to send
             endif
         endif
     enddo
@@ -1975,7 +1975,7 @@ subroutine same_block_distribution(params, hvy_block, tree_ID1, tree_ID2)
     N = params%number_blocks
     fsize = params%forest_size
     Jmax = params%Jmax
-    if (.not.allocated(comm_list)) allocate( comm_list( params%number_procs*N, 3 ) )
+    if (.not.allocated(comm_list)) allocate( comm_list( 3, params%number_procs*N) )
 
     !! Loop over all treecodes of both trees and check if they are identical.
     !! If the treecodes are the same but the blocks are not on the same rank,
@@ -2011,9 +2011,9 @@ subroutine same_block_distribution(params, hvy_block, tree_ID1, tree_ID2)
                 if (rank1 .ne. rank2) then
                     n_comm = n_comm + 1
                     !                write(*,*) "===============> not identical", n_comm
-                    comm_list(n_comm, 1) = rank1   ! sender mpirank
-                    comm_list(n_comm, 2) = rank2   ! receiver mpirank
-                    comm_list(n_comm, 3) = lgt_id1 ! block lgt_id to send
+                    comm_list(1, n_comm) = rank1   ! sender mpirank
+                    comm_list(2, n_comm) = rank2   ! receiver mpirank
+                    comm_list(3, n_comm) = lgt_id1 ! block lgt_id to send
                 end if
             end if
         end do ! loop over tree2

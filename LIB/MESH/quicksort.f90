@@ -19,8 +19,7 @@ recursive subroutine quicksort(a, first, last, sortsize)
     integer(kind=ik)                   :: first, last
     integer(kind=ik)                   :: i, j
 
-    ! x = a( (first+last) / 2 , sortdim)
-    x = a( (first+last) / 2 , :)
+    x = a( :, (first+last) / 2 )
     i = first
     j = last
 
@@ -33,15 +32,15 @@ recursive subroutine quicksort(a, first, last, sortsize)
     ! otherwise do recursive quicksort
     do
         ! do while (a(i,sortdim) < x(sortdim))
-        do while (tc_id_lower(a(i,2:sortsize), x(2:sortsize), sortsize>=4))
+        do while (tc_id_lower(a(2:sortsize, i), x(2:sortsize), sortsize>=4))
             i=i+1
         end do
         ! do while (x(sortdim) < a(j,sortdim))
-        do while (tc_id_lower(x(2:sortsize), a(j,2:sortsize), sortsize>=4))
+        do while (tc_id_lower(x(2:sortsize), a(2:sortsize, j), sortsize>=4))
             j=j-1
         end do
         if (i >= j) exit
-        t = a(i,:);  a(i,:) = a(j,:);  a(j,:) = t
+        t = a(:,i);  a(:,i) = a(:,j);  a(:,j) = t
         i=i+1
         j=j-1
     end do
@@ -72,11 +71,11 @@ subroutine interchange_sort(a, left_end, right_end, sortsize)
 
     do i = left_end, right_end - 1
         do j = i+1, right_end
-        ! if (a(j,sortdim) < a(i,sortdim)) then
-        if (tc_id_lower(a(j,2:sortsize), a(i,2:sortsize), sortsize>=4)) then
-            temp = a(i,:)
-            a(i,:) = a(j,:)
-            a(j,:) = temp
+        ! if (a(sortdim, j) < a(sortdim, i)) then
+        if (tc_id_lower(a(2:sortsize, j), a(2:sortsize, i), sortsize>=4)) then
+            temp = a(:,i)
+            a(:,i) = a(:,j)
+            a(:,j) = temp
             end if
         end do
     end do

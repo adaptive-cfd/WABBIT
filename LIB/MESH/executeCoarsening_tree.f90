@@ -29,7 +29,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
-    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),3))
+    if (.not. allocated(xfer_list)) allocate(xfer_list(3, size(lgt_block,1)))
 
     ! transfer counter
     n_xfer = 0
@@ -70,9 +70,9 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
                 if (mpirank_owners(j) /= data_rank) then
                     ! MPI xfer required. Add the xfer to the list
                     n_xfer = n_xfer + 1
-                    xfer_list(n_xfer, 1) = mpirank_owners(j)  ! send from this rank ..
-                    xfer_list(n_xfer, 2) = data_rank          ! ... to this rank
-                    xfer_list(n_xfer, 3) = light_ids(j)       ! transfer this block
+                    xfer_list(1, n_xfer) = mpirank_owners(j)  ! send from this rank ..
+                    xfer_list(2, n_xfer) = data_rank          ! ... to this rank
+                    xfer_list(3, n_xfer) = light_ids(j)       ! transfer this block
                 endif
 
                 ! don't forget: mark all 4/8 sisters as treated here, in order not to trigger this

@@ -162,10 +162,10 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
     
-    ! 4 components: lgt_sortednumlist(:,1:4)
+    ! 4 components: lgt_sortednumlist(1:4, :)
     ! ID, TC1, TC2, Tree_ID * 100 + Level
     if (.not.allocated(my_lgt_send_buffer)) then
-        allocate( my_lgt_send_buffer( N,4) )
+        allocate( my_lgt_send_buffer( 4,N) )
         my_lgt_send_buffer=-1
     endif
 
@@ -181,8 +181,8 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
     ! reset the active lists
     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
     hvy_active(1:hvy_n(tree_ID), tree_ID) = -1
-    lgt_sortednumlist(1:lgt_n(tree_ID),:, tree_ID) = -1
-    my_lgt_send_buffer(1:hvy_n(tree_ID),:) = -1
+    lgt_sortednumlist(:, 1:lgt_n(tree_ID), tree_ID) = -1
+    my_lgt_send_buffer(:, 1:hvy_n(tree_ID)) = -1
 
     ! reset active block numbers
     lgt_n(tree_ID) = 0
@@ -207,16 +207,16 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
                 hvy_n(tree_ID) = hvy_n(tree_ID) + 1
                 ! sorted list
                 ! first index stores the light id of the block
-                my_lgt_send_buffer(hvy_n(tree_ID), 1) = k
+                my_lgt_send_buffer(1, hvy_n(tree_ID)) = k
 
                 ! second and third index stores the numerical treecode
-                my_lgt_send_buffer(hvy_n(tree_ID), 2:3) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
+                my_lgt_send_buffer(2:3, hvy_n(tree_ID)) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
 
                 ! tree_ID and level are combined into one number for performance purposes
                 ! as max_level is 31 for 2D, we shift tree_ID by 100
                 ! this might be confusing but can be entangled easily
                 ! fourth index stores the level and tree_id
-                my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
+                my_lgt_send_buffer(4, hvy_n(tree_ID)) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
 
                 ! ! fourth index stores the level
                 ! my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL)
@@ -241,16 +241,14 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
         proc_lgt_start(k) = sum(proc_lgt_n(1:k-1))! + 1
     enddo
 
+
     call MPI_allgatherv( rank*N + hvy_active(1:hvy_n(tree_ID), tree_ID), hvy_n(tree_ID), MPI_INTEGER4, &
     lgt_active( 1:lgt_n(tree_ID), tree_ID), proc_lgt_n, proc_lgt_start, MPI_INTEGER4, &
     WABBIT_COMM, ierr)
-    ! JB: this can possibly be combined into one call but I don't know how
-    ! possible the dimension tree_id in sortednumlist is hindering here to transfer as one block as it acts as a stride?
-    do k=1,4
-        call MPI_allgatherv( my_lgt_send_buffer(1:hvy_n(tree_ID), k), hvy_n(tree_ID), MPI_INTEGER4, &
-        lgt_sortednumlist(1:lgt_n(tree_ID), k, tree_ID), proc_lgt_n, proc_lgt_start, MPI_INTEGER4, &
-        WABBIT_COMM, ierr)
-    end do
+
+    call MPI_allgatherv( my_lgt_send_buffer(1:4, 1:hvy_n(tree_ID)), 4*hvy_n(tree_ID), MPI_INTEGER4, &
+    lgt_sortednumlist(1:4, 1:lgt_n(tree_ID), tree_ID), 4*proc_lgt_n, 4*proc_lgt_start, MPI_INTEGER4, &
+    WABBIT_COMM, ierr)
 
     t(3) = MPI_wtime()
 
@@ -590,7 +588,7 @@ subroutine createActiveSortedLists_forest(params)
         ! reset the active lists
         lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
         hvy_active(1:hvy_n(tree_ID), tree_ID) = -1
-        lgt_sortednumlist(1:lgt_n(tree_ID), :, tree_ID) = -1
+        lgt_sortednumlist(:, 1:lgt_n(tree_ID), tree_ID) = -1
     end do
 
 
@@ -635,15 +633,15 @@ subroutine createActiveSortedLists_forest(params)
             ! sorted list
 
             ! first index stores the light id of the block
-            lgt_sortednumlist(lgt_n(tree_ID), 1, tree_ID) = k
+            lgt_sortednumlist(1, lgt_n(tree_ID), tree_ID) = k
             ! second index stores the numerical treecode
-            lgt_sortednumlist(lgt_n(tree_ID), 2:3, tree_ID) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
+            lgt_sortednumlist(2:3, lgt_n(tree_ID), tree_ID) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
 
             ! tree_ID and level are combined into one number for performance purposes
             ! as max_level is 31 for 2D, we shift tree_ID by 100
             ! this might be confusing but can be entangled easily
             ! fourth index stores the level and tree_id
-            lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
+            lgt_sortednumlist(4, lgt_n(tree_ID), tree_ID) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
 
             ! ! fourth index stores the level
             ! lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, IDX_MESH_LVL)

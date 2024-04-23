@@ -48,7 +48,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
 
         ! reset refinement status to "stay"
         do k = 1, lgt_n(tree_ID)
-           lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS) = 0
+           lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = 0
         enddo
 
         ! each CPU decides for its blocks if they're refined or not
@@ -58,7 +58,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
 
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level = lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL)
+            level = lgt_block( lgt_id, IDX_MESH_LVL)
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
             nnorm = 1.0_rk
@@ -74,7 +74,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
             if ( abs(a - b)>1.0e-7_rk ) then
-                lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
         enddo
 
@@ -90,7 +90,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
 
         ! reset refinement status to "stay"
         do k = 1, lgt_n(tree_ID)
-           lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS) = 0
+           lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = 0
         enddo
 
         ! each CPU decides for its blocks if they're refined or not
@@ -103,11 +103,11 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) then
-                    lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
+                    lgt_block(lgt_id, IDX_REFINE_STS) = +1
                 endif
 
                 ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6, hvy_id) > 0.0_rk)) then
-                !     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
+                !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
                 ! endif
             enddo
         else
@@ -119,10 +119,10 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
                 if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) then
-                    lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
+                    lgt_block(lgt_id, IDX_REFINE_STS) = +1
                 endif
                 ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6, hvy_id) > 0.0_rk)) then
-                !     lgt_block(lgt_id, Jmax + IDX_REFINE_STS) = +1
+                !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
                 ! endif
             enddo
         endif
@@ -138,7 +138,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         ! to refine the entire mesh at the beginning of a time step, if error
         ! control is desired.
         do k = 1, lgt_n(tree_ID)
-            lgt_block( lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS ) = +1
+            lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = +1
         end do
 
     case ("random")
@@ -165,7 +165,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         ref_chance = 1.0_rk - current_grid_density / max_grid_density
 
         ! unset all refinement flags
-        lgt_block( :, Jmax+IDX_REFINE_STS ) = 0
+        lgt_block( :, IDX_REFINE_STS ) = 0
 
         ! only root sets the flag, then we sync. It is messy if all procs set a
         ! random value which is not sync'ed
@@ -174,15 +174,15 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
             do k = 1, lgt_n(tree_ID)
                 call random_number(r)
                 ! set refinement status to refine
-                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS)==0) then
+                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS)==0) then
                     tags = tags + 1
-                    lgt_block( lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS ) = 1
+                    lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = 1
                 end if
             end do
         endif
 
         ! sync light data, as only root sets random refinement
-        call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
+        call MPI_BCAST( lgt_block(:, IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
 
     case default
         call abort("ERROR: refine_tree: the refinement indicator is unkown")

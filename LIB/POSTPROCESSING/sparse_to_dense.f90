@@ -169,7 +169,7 @@ subroutine sparse_to_dense(params)
     !     if (params%rank==0) then
     !         hvyID = hvy_active(1, tree_ID)
     !         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-    !         lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1 ! refine
+    !         lgt_block( lgtID, IDX_REFINE_STS ) = +1 ! refine
     !     endif
     !
     !     call synchronize_lgt_data( params,  refinement_status_only=.true. )

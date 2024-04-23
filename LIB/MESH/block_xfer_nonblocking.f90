@@ -68,13 +68,13 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
         if (xfer_started(k)) cycle
 
         ! we will transfer this block:
-        lgt_id = xfer_list(k,3)
+        lgt_id = xfer_list(3, k)
 
         ! from its current owner: "mpirank_sender"
-        mpirank_sender = xfer_list(k,1)
+        mpirank_sender = xfer_list(1, k)
 
         ! to its new owner:
-        mpirank_recver = xfer_list(k,2)
+        mpirank_recver = xfer_list(2, k)
 
         ! its new light id will be "lgt_id_new"
         call get_free_local_light_id( params, mpirank_recver, lgt_id_new, ignore_error=.true. )
@@ -159,7 +159,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     do i = 1, N_xfers
         ! delete block. it has been moved previously, and now we delete the original
         if (xfer_started(i) .and. .not. source_block_deleted(i)) then
-            lgt_block( xfer_list(i,3), : ) = -1
+            lgt_block( xfer_list(3, i), : ) = -1
             ! pay attention here: you must not delete the block twice. after the first delete, it is
             ! free and can be used for a newly xferd block: then it is no longer free and must not be
             ! deleted again

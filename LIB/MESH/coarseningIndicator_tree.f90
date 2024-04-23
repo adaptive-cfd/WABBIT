@@ -50,7 +50,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! reset refinement status to "stay" on all active blocks
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
-        lgt_block( lgtID, Jmax + IDX_REFINE_STS ) = 0
+        lgt_block( lgtID, IDX_REFINE_STS ) = 0
     enddo
 
     ! construct mask function, if it is used as secondary criterion. This criterion
@@ -164,7 +164,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         if (iteration==0) then
             do k = 1, lgt_n(tree_ID)
                 ! flag for coarsening
-                lgt_block(lgt_active(k, tree_ID), Jmax + IDX_REFINE_STS) = -1
+                lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = -1
             enddo
         endif
 
@@ -188,13 +188,13 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                     call random_number(r)
                     ! set refinement status to coarsen based on random numbers.
                     if ( r <= crsn_chance ) then
-                        lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
+                        lgt_block(lgtID, IDX_REFINE_STS) = -1
                         tags = tags + 1
                     endif
                 enddo
             endif
             ! sync light data, as only root sets random refinement
-            call MPI_BCAST( lgt_block(:, Jmax + IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
+            call MPI_BCAST( lgt_block(:, IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
         endif
 
     case default
@@ -206,7 +206,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         do k = 1, hvy_n(tree_ID)
             hvyID = hvy_active(k, tree_ID)
             call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-            level = lgt_block( lgtID, Jmax+IDX_MESH_LVL)
+            level = lgt_block( lgtID, IDX_MESH_LVL)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
@@ -222,17 +222,17 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! Note this behavior can be bypassed using the ignore_maxlevel switch.
             if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) then
                 ! coarsen (no need to evaluate the possibly expensive coarseningIndicator_block)
-                lgt_block(lgtID, Jmax + IDX_REFINE_STS) = -1
+                lgt_block(lgtID, IDX_REFINE_STS) = -1
             else
                 ! evaluate the criterion on this block.
                 if (params%threshold_mask .and. present(hvy_mask)) then
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID), hvy_mask(:,:,:,:,hvyID))
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_details(:,hvyID), hvy_mask(:,:,:,:,hvyID))
                 else
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, Jmax + IDX_REFINE_STS), norm, level, hvy_details(:,hvyID))
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_details(:,hvyID))
                 endif
             endif
         enddo

@@ -199,10 +199,12 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! on those, the coarseExt needs to be done. Note performing the coarseExt twice on a block does not
         ! alter the data, but is of course not for free. The usual workflow in adapt_tree is that many blocks
         ! can be coarsened, and thus the 2nd call to coarseExtensionUpdate_level is much cheaper.
+        t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
             call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level, hvy_details=hvy_details )
         endif
+        call toc( "adapt_tree (coarse_extension2)", MPI_Wtime()-t0 )
 
         ! iteration counter (used for random coarsening criterion)
         iteration = iteration + 1

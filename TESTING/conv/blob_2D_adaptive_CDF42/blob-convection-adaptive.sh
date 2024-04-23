@@ -43,7 +43,7 @@ echo ""
 echo ""
 echo ""
 
-# loop over all HDF5 files and generate keyvalues using wabbit
+# loop over all HDF5 files and generate keyvalues using wabbit-python-tools
 for p in ${prefixes[@]}
 do
     for t in ${times[@]}

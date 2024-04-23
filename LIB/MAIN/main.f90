@@ -130,7 +130,7 @@ program main
     ! Unit tests
     !---------------------------------------------------------------------------
     if (params%test_treecode) then
-       call unit_test_treecode( params )
+       call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true. )
     end if
 
     ! perform a convergence test on ghost node sync'ing

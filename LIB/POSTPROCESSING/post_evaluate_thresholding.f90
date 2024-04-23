@@ -140,7 +140,7 @@ subroutine post_evaluate_thresholding(params)
         do k = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k, tree_ID)
             call lgt2hvy(hvyID, lgtID, params%rank, params%number_blocks)
-            write(*,'(i6,1x,i2,1x,i2,4x,es12.4)') lgtID,  lgt_block( lgtID, params%Jmax + IDX_MESH_LVL), lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ), hvy_details(1,hvyID)
+            write(*,'(i6,1x,i2,1x,i2,4x,es12.4)') lgtID,  lgt_block( lgtID, IDX_MESH_LVL), lgt_block( lgtID, IDX_REFINE_STS ), hvy_details(1,hvyID)
         enddo
     endif
 

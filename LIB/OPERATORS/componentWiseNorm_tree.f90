@@ -7,7 +7,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
     character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
     real(kind=rk), intent(inout)        :: norm(:)                              !> the computed norm for each component of the vector
     real(kind=rk)                       :: x0(1:3), dx(1:3)
-    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g, p, mpierr, lgt_id, D, J
+    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g, p, mpierr, lgt_id, D
 
     ! note: if norm and hvy_block components are of different size, we use the smaller one.
     n_eqn = min( size(norm, 1), size(hvy_block,4) )
@@ -23,8 +23,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                J = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
-                call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
+                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
                 do p = 1, n_eqn
                     norm(p) = norm(p) + dx(1)*dx(2)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, p, hvy_id )**2 )
@@ -35,8 +35,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                J = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
-                call get_block_spacing_origin2( lgt_block(lgt_id, 1:J), params%domain_size, Bs, D, x0, dx )
+                call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                    params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
                 do p = 1, n_eqn
                     norm(p) = norm(p) + dx(1)*dx(2)*dx(3)*sum( hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, hvy_id )**2 )

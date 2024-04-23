@@ -30,8 +30,8 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
         hvyID = hvy_active(k, tree_ID)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
-        level_me          = lgt_block( lgtID, params%Jmax + IDX_MESH_LVL )
-        refinement_status = lgt_block( lgtID, params%Jmax + IDX_REFINE_STS )
+        level_me          = lgt_block( lgtID, IDX_MESH_LVL )
+        refinement_status = lgt_block( lgtID, IDX_REFINE_STS )
 
         ! first task
         ! is the block on the level we look at?
@@ -42,14 +42,14 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
                     lgtID_neighbor             = hvy_neighbor( hvyID, neighborhood )
-                    level_neighbor             = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
-                    refinement_status_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_REFINE_STS )
+                    level_neighbor             = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+                    refinement_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
                     ! this block is significant
                     if ((refinement_status_neighbor == 0).and.(level_neighbor == level_this)) then
                         ! revoke coarsening status. note we must use a temp status or otherwise all blocks
                         ! will revoke their coarsening
-                        lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = TMP_STATUS
+                        lgt_block( lgtID, IDX_REFINE_STS ) = TMP_STATUS
                     endif
                 endif
             enddo
@@ -62,13 +62,13 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
                     lgtID_neighbor             = hvy_neighbor( hvyID, neighborhood )
-                    level_neighbor             = lgt_block( lgtID_neighbor, params%Jmax + IDX_MESH_LVL )
-                    refinement_status_neighbor = lgt_block( lgtID_neighbor, params%Jmax + IDX_REFINE_STS )
+                    level_neighbor             = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+                    refinement_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
                     ! the finer neighboring block is significant:
                     if ((refinement_status_neighbor == 0).and.(level_neighbor == level_this)) then
                         ! this block shall be refined. it may entail other blocks to be refined as well
-                        lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = +1
+                        lgt_block( lgtID, IDX_REFINE_STS ) = +1
                         ! write(*,*) "It happened: a new block emerges"
                     endif
                 endif
@@ -80,8 +80,8 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k, tree_ID)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
-        if (lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) == TMP_STATUS) then
-            lgt_block( lgtID, params%Jmax + IDX_REFINE_STS ) = 0
+        if (lgt_block( lgtID, IDX_REFINE_STS ) == TMP_STATUS) then
+            lgt_block( lgtID, IDX_REFINE_STS ) = 0
         endif
     enddo
 
@@ -91,7 +91,7 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     ! the following code is only required if new blocks have to be created (which is rare or even never occurs, it seems...)
     refinement = .false.
     do k = 1, lgt_n(tree_ID)
-        if (lgt_block( lgt_active(k, tree_ID), params%Jmax + IDX_REFINE_STS ) == +1) then
+        if (lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) == +1) then
             refinement = .true.
         endif
     enddo

@@ -160,7 +160,7 @@ subroutine sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, 
                     ! neighbor heavy id
                     call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
                     ! define level difference: sender - receiver, so +1 means sender on higher level
-                    level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+                    level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
 
                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
                     ! leveldiff =  0 : sender is same level as recver
@@ -321,7 +321,7 @@ end subroutine sync_ghosts
 !                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
 !                     ! leveldiff =  0 : sender is same level as recver
 !                     ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-!                     level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+!                     level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
 !
 !                     if ( myrank == recver_rank ) then
 !                         ! internal relation (no communication) has its own buffer (to avoid senseless copying
@@ -816,7 +816,7 @@ subroutine get_my_sendrecv_amount_with_ranks(params, lgt_block, hvy_neighbor, hv
                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
                 ! leveldiff =  0 : sender is same level as recver
                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-                level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+                level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
 
 
                 if (recver_rank /= myrank .or. count_internal) then
@@ -954,7 +954,7 @@ end subroutine get_my_sendrecv_amount_with_ranks
 !                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
 !                 ! leveldiff =  0 : sender is same level as recver
 !                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-!                 level_diff = lgt_block( sender_lgtID, params%Jmax + IDX_MESH_LVL ) - lgt_block( recver_lgtID, params%Jmax + IDX_MESH_LVL )
+!                 level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
 !
 !
 !                 if (recver_rank /= myrank .or. count_internal) then

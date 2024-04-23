@@ -63,8 +63,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%Jmax+IDX_MESH_LVL)), &
-            params%domain_size, params%Bs, params%dim, n_domain )
+            call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
         endif
 
         ! call preparatory routines. this routine saves the variables to be stored

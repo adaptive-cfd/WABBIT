@@ -280,7 +280,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     !---------------------------------------------------------------------------)
     if (allocated(lgt_block)) deallocate(lgt_block)
-    allocate( lgt_block( number_procs*params%number_blocks, params%Jmax+EXTRA_LGT_FIELDS) )
+    allocate( lgt_block( number_procs*params%number_blocks, EXTRA_LGT_FIELDS) )
     memory_this = product(real(shape(lgt_block)))*4.0e-9
     memory_total = memory_total + memory_this
     if (rank==0) then
@@ -290,7 +290,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     !---------------------------------------------------------------------------
     if (allocated(lgt_sortednumlist)) deallocate(lgt_sortednumlist)
-    allocate( lgt_sortednumlist( size(lgt_block,1), 2, params%forest_size) )
+    allocate( lgt_sortednumlist( 4, size(lgt_block,1), params%forest_size) )
     memory_this = product(real(shape(lgt_sortednumlist)))*4.0e-9
     memory_total = memory_total + memory_this
     if (rank==0) then
@@ -341,7 +341,8 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     hvy_n = 0
     ! setting -1 is required to avoid "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU"
     ! because it looks for a -1 block.
-    lgt_block(:,1) = -1
+    ! Init all blocks as inactive
+    lgt_block(:,:) = -1
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks

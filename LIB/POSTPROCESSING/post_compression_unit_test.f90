@@ -120,7 +120,7 @@ subroutine post_compression_unit_test(params)
         close(14)
 
         open(14, file="header.txt", status='replace')
-        write (14,'("Bs=",i3," Jmax=",i2," dim=",i1," eps-norm=",A," eps-normalized=",L)') Bs(1), params%Jmax, params%dim, &
+        write (14,'("Bs=",i3," Jmax=",i2," dim=",i1," eps-norm=",A," eps-normalized=",L1)') Bs(1), params%Jmax, params%dim, &
         adjustl(trim(params%eps_norm)), params%eps_normalized
         close(14)
     endif

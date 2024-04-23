@@ -153,8 +153,8 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       !------------------------------------------------------------------------------------
       ! If type is _FOURIER_, we read a0, ai, bi:
       ! The Fourier series evaluation in WABBIT/FLUSI is :
-      ! Q = a0_Q / 2 + ( a1_Q*sin(1*2*pi*t) + b1_Q*cos(1*2*pi*t) )
-      !              + ( a2_Q*sin(2*2*pi*t) + b2_Q*cos(2*2*pi*t) )
+      ! Q = a0_Q / 2 + ( a1_Q*cos(1*2*pi*t) + b1_Q*sin(1*2*pi*t) )
+      !              + ( a2_Q*cos(2*2*pi*t) + b2_Q*sin(2*2*pi*t) )
       !              + ....
       ! Note the unfortunate division of a0 by 2, which is an historic artifact.
       !------------------------------------------------------------------------------------

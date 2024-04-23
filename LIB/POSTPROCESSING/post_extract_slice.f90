@@ -36,6 +36,7 @@ subroutine post_extract_slice(params)
     real(kind=rk), allocatable              :: hvy_block_2Dslice(:, :, :, :, :)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:), treecode(:)
+    integer(kind=tsize)                     :: tc_b
     integer(kind=ik), allocatable           :: lgt_block_2Dslice(:,:)
     integer(kind=ik), allocatable           :: lgt_active_2Dslice(:,:), hvy_active_2Dslice(:,:)
 
@@ -80,8 +81,6 @@ subroutine post_extract_slice(params)
     allocate(params%symmetry_vector_component(1:3))
     params%symmetry_vector_component(1:3) = "0"
 
-    allocate(treecode(1:tc_length))
-
     call allocate_forest(params, hvy_block)
 
     ! read data
@@ -106,7 +105,7 @@ subroutine post_extract_slice(params)
     write(*,*) "out of the total ", lgt_n(tree_ID)," blocks, ", Nblocks, " are concerned by slicing"
 
     allocate( hvy_block_2Dslice(1:Bs(2)+2*g, 1:Bs(3)+2*g, 1, 1, 1:Nblocks) )
-    allocate( lgt_block_2Dslice(1:Nblocks, 1:tc_length+EXTRA_LGT_FIELDS))
+    allocate( lgt_block_2Dslice(1:Nblocks, 1:EXTRA_LGT_FIELDS))
     allocate( lgt_active_2Dslice(1:Nblocks, 1), hvy_active_2Dslice(1:Nblocks, 1))
 
     hvy_block_2Dslice = 0.0_rk
@@ -152,24 +151,26 @@ subroutine post_extract_slice(params)
             +lagrange_polynomial(x_query_normalized, xi, 3)*hvy_block( ix+1, :, :, 1, hvy_id) &
             +lagrange_polynomial(x_query_normalized, xi, 4)*hvy_block( ix+2, :, :, 1, hvy_id)
 
-            ! this is just the inverse of what get_block_spacing_origin2 computes
+            ! this is just the inverse of what get_block_spacing_origin_array computes
             ! we use it to create the 2D treecode
             iy = 1 + nint( x0(2) / (dx(2)*real(Bs(2)-1, kind=rk)) )
             iz = 1 + nint( x0(3) / (dx(3)*real(Bs(3)-1, kind=rk)) )
 
-            level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
+            level = lgt_block(lgt_id, IDX_MESH_LVL)
 
             ! note 2D data is (x,y) but our slice is (y,z) hence the oddity (iy,iz,1)
             ! NOTE: in paraview I saw that I had to invert iy,iz to iz,iy although I do not
             ! copletely understand why.
-            call encoding_revised(treecode, (/iz,iy/), 2, level)
+            ! call encoding_revised(treecode, (/iz,iy/), 2, level)
+            call encoding_b((/iz,iy/), tc_b, dim=2, level=level, max_level=tc_length)
 
             ! copy computed treecode and som other information to lgt_block for the 2D slice
-            lgt_block_2Dslice(i, 1:level) = treecode(1:level)
-            lgt_block_2Dslice(i, tc_length+IDX_MESH_LVL)   = level
-            lgt_block_2Dslice(i, tc_length+IDX_TREE_ID)    = 1
-            lgt_block_2Dslice(i, tc_length+IDX_REFINE_STS) = 0
-
+            lgt_block_2Dslice(i, :)   = -1
+            ! lgt_block_2Dslice(i, 1:level) = treecode(1:level)
+            lgt_block_2Dslice(i, IDX_MESH_LVL)   = level
+            lgt_block_2Dslice(i, IDX_TREE_ID)    = 1
+            lgt_block_2Dslice(i, IDX_REFINE_STS) = 0
+            call set_tc(lgt_block_2Dslice( i, IDX_TC_1:IDX_TC_2), tc_b)
             i = i + 1
         endif
     end do

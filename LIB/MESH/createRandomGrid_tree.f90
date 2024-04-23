@@ -20,12 +20,12 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     ! to the last subroutine.)  -Thomas
 
     ! set all blocks to free (since if we call inicond twice, all blocks are used in the second call)
-    call reset_tree( params, .true., tree_ID=tree_ID )
+    call reset_tree( params, verbosity, tree_ID=tree_ID )
 
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call createEquidistantGrid_tree( params, hvy_block, min(2, params%Jmin), .true., tree_ID=tree_ID )
+    call createEquidistantGrid_tree( params, hvy_block, min(2, params%Jmin), verbosity, tree_ID=tree_ID )
 
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, iterations

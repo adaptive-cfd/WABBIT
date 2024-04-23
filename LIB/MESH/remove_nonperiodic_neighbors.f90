@@ -16,9 +16,9 @@ subroutine remove_nonperiodic_neighbors(params, tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! ... and its level
-        J1 = lgt_block(lgt_id, params%Jmax + IDX_MESH_LVL)
+        J1 = lgt_block(lgt_id, IDX_MESH_LVL)
 
-        call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:J1), params%domain_size, params%Bs, params%dim, n_domain )
+        call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
 
         ! is this an interior block ? (note: this is completely equivalent to checking if a neighborhood crosses the periodic domain,
         ! because only in this case, n_domain has nonzero value)
@@ -32,7 +32,7 @@ subroutine remove_nonperiodic_neighbors(params, tree_ID)
 
             ! note the hvy_neighbor stores light IDs
             lgt_id_neighbor = hvy_neighbor(hvy_id, a)
-            J2 = lgt_block(lgt_id_neighbor, params%Jmax + IDX_MESH_LVL)
+            J2 = lgt_block(lgt_id_neighbor, IDX_MESH_LVL)
 
             ! Terrible conditionals to determine whether this BC is affected by non-periodic
             ! conditions or not.

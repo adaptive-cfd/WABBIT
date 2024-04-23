@@ -14,14 +14,14 @@ subroutine respectJmaxJmin_tree( params, tree_ID)
 
         lgt_id = lgt_active(k, tree_ID)
 
-        if ((lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) == +1_ik).and.(lgt_block( lgt_id, Jmax + IDX_MESH_LVL ) >= Jmax)) then
+        if ((lgt_block( lgt_id, IDX_REFINE_STS ) == +1_ik).and.(lgt_block( lgt_id, IDX_MESH_LVL ) >= Jmax)) then
             ! can not refine (set flag to 0 = stay)
-            lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0_ik
+            lgt_block( lgt_id, IDX_REFINE_STS ) = 0_ik
         end if
 
-        if ((lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) == -1_ik).and.(lgt_block( lgt_id, Jmax + IDX_MESH_LVL ) <= Jmin)) then
+        if ((lgt_block( lgt_id, IDX_REFINE_STS ) == -1_ik).and.(lgt_block( lgt_id, IDX_MESH_LVL ) <= Jmin)) then
             ! can not coarsen
-            lgt_block( lgt_id, Jmax + IDX_REFINE_STS ) = 0_ik
+            lgt_block( lgt_id, IDX_REFINE_STS ) = 0_ik
         end if
 
     end do

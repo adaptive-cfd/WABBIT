@@ -15,7 +15,9 @@ module module_globals
     integer, parameter, public  :: IDX_MESH_LVL        = 1 ! current mesh level of the block
     integer, parameter, public  :: IDX_REFINE_STS      = 2 ! refinement status
     integer, parameter, public  :: IDX_TREE_ID         = 3 ! number of the tree in the forest
-    integer, parameter, public  :: EXTRA_LGT_FIELDS    = 3 ! number of data fields additionaly to treecode
+    integer, parameter, public  :: IDX_TC_1            = 4 ! first part of TC number
+    integer, parameter, public  :: IDX_TC_2            = IDX_TC_1+1 ! second part of TC number
+    integer, parameter, public  :: EXTRA_LGT_FIELDS    = 5 ! number of data fields additionaly to treecode
     integer, parameter, public  :: tree_ID_flow = 1, tree_ID_mask = 2, tree_ID_mask_coarser = 3
     ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
     ! universality dictates that we can also use a different number of components, for example

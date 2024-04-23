@@ -177,7 +177,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
     do iblock = 1, hvy_n(tree_ID_u)
         call hvy2lgt(lgt_id, hvy_active(iblock,tree_ID_u), params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
-        level = lgt_block(lgt_id, params%Jmax+IDX_MESH_LVL)
+        level = lgt_block(lgt_id, IDX_MESH_LVL)
 
         do ix = g+1, Bs(1)+g
             do iy = g+1, Bs(2)+g

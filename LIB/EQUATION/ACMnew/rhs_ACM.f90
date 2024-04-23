@@ -1442,7 +1442,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
     real(kind=rk) :: phi_dx, phi_dy, phi_dz, phi_dxdx, phi_dydy, phi_dzdz
     ! we have quite some of these work arrays in the code, but they are very small,
-    ! only one block. They're ngeligible in front of the lgt_block array.
+    ! only one block. They're negligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: source(:,:,:)
 
     if (.not. allocated(source)) allocate(source(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
@@ -1785,7 +1785,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
 
     ! we have quite some of these work arrays in the code, but they are very small,
-    ! only one block. They're ngeligible in front of the lgt_block array.
+    ! only one block. They're negligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: source(:,:,:)
 
     if (.not. allocated(source)) allocate(source(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))

@@ -22,7 +22,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     ! on my section, which is the first and last light id?
     integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, heavy_id
     integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
-    integer(kind=ik),allocatable        :: treecode(:)
+    integer(kind=tsize)                 :: tc_b
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -58,7 +58,6 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
         write(*,'("EQUI: Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
         write(*,'("EQUI: On this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
         write(*,'("EQUI: tree_ID=",i2)') tree_ID
-
     endif
 
     !-----------------------------------------------------------------------------
@@ -86,7 +85,6 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     !-----------------------------------------------------------------------------
     ! Generate and distribute the blocks
     !-----------------------------------------------------------------------------
-    allocate( treecode( params%Jmax ) )
     ! loop over blocks in x,y,z directions (in the 2d case, 3rd loop degenerates)
     ! NOTE: This ordering is necessary for POSTPROCESSING flusi to wabbit!
     do ix = nx, 1, -1
@@ -103,8 +101,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
                         ! create the new block on that cpu.
                         if (params%rank == icpu) then
                             ! for this new block, compute the treecode
-
-                            call encoding(treecode, (/ix,iy,iz/), d, num_blocks, Jmin)
+                            call encoding_b((/ix,iy,iz/), tc_b, dim=params%dim, level=Jmin, max_level=params%Jmax)
 
                             ! on my section of the global light data list, which is the first and last light id I hold?
                             call hvy2lgt( lgt_id_first, 1, params%rank, params%number_blocks )
@@ -116,12 +113,11 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
                             call lgt2hvy( heavy_id, lgt_id, icpu, params%number_blocks )
 
                             ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
-
                             lgt_block( lgt_id, : ) = -1
-                            lgt_block( lgt_id, 1:Jmin ) = treecode(1:Jmin)
-                            lgt_block( lgt_id, params%Jmax+IDX_MESH_LVL ) = Jmin
-                            lgt_block( lgt_id, params%Jmax+IDX_REFINE_STS ) = 0
-                            lgt_block( lgt_id, params%Jmax+IDX_TREE_ID ) = tree_ID
+                            call set_tc(lgt_block( lgt_id, IDX_TC_1:IDX_TC_2), tc_b)
+                            lgt_block( lgt_id, IDX_MESH_LVL ) = Jmin
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                            lgt_block( lgt_id, IDX_TREE_ID ) = tree_ID
                         end if
                         ! as this block is now given to one cpu, we can leave the loop over
                         ! cpus and take care of the next one.

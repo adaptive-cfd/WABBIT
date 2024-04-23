@@ -29,7 +29,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
-    if (.not. allocated(xfer_list)) allocate(xfer_list(size(lgt_block,1),3))
+    if (.not. allocated(xfer_list)) allocate(xfer_list(3, size(lgt_block,1)))
 
     ! transfer counter
     n_xfer = 0
@@ -51,7 +51,9 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
         lgtID = lgt_active(k, tree_ID)
 
-        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -1) then
+        ! check if block is active: TC > 0 and block wants to be refined
+        ! performance: don't construct tc and check only first int
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
             call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
@@ -68,14 +70,14 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
                 if (mpirank_owners(j) /= data_rank) then
                     ! MPI xfer required. Add the xfer to the list
                     n_xfer = n_xfer + 1
-                    xfer_list(n_xfer, 1) = mpirank_owners(j)  ! send from this rank ..
-                    xfer_list(n_xfer, 2) = data_rank          ! ... to this rank
-                    xfer_list(n_xfer, 3) = light_ids(j)       ! transfer this block
+                    xfer_list(1, n_xfer) = mpirank_owners(j)  ! send from this rank ..
+                    xfer_list(2, n_xfer) = data_rank          ! ... to this rank
+                    xfer_list(3, n_xfer) = light_ids(j)       ! transfer this block
                 endif
 
                 ! don't forget: mark all 4/8 sisters as treated here, in order not to trigger this
                 ! loop again: we use the temporary status -7
-                lgt_block(light_ids(j), Jmax+IDX_REFINE_STS) = -7
+                lgt_block(light_ids(j), IDX_REFINE_STS) = -7
             enddo
         endif
     enddo
@@ -97,7 +99,9 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
         ! ensureGradedness_tree removes the -1 flag and sets -7 (temporarily assigned above) flag if not all sister blocks share it
         lgtID = lgt_active(k, tree_ID)
-        if ( lgt_block(lgtID, 1) >= 0 .and. lgt_block(lgtID, Jmax+IDX_REFINE_STS) == -7) then
+        ! check if block is active: TC > 0 and block wants to be refined
+        ! performance: don't construct tc and check only first int
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -7) then
             ! merge the four blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.

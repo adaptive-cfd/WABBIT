@@ -38,40 +38,41 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call hvy2lgt( lgtID, hvyID, params%rank, N )
 
-            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%Jmax+IDX_MESH_LVL)), &
-            params%domain_size, params%Bs, params%dim, n_domain )
+            call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
 
+            !> direction for neighbor search - number where each digit represents a cardinal direction
+            !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
             ! faces
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__1/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__2/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__3/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__4/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__5/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '__6/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 1, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 2, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 3, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 4, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 5, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 6, error, n_domain)
 
             ! edges
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_12/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_13/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_14/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_15/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_62/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_63/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_64/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_65/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_23/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_25/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_43/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '_45/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 12, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 13, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 14, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 15, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 62, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 63, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 64, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 65, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 23, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 25, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 43, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 45, error, n_domain)
 
             ! corners
-            call find_neighbor(params, hvyID, lgtID, Jmax, '123/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '134/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '145/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '152/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '623/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '634/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '645/___', error, n_domain)
-            call find_neighbor(params, hvyID, lgtID, Jmax, '652/___', error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 123, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 134, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 145, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 152, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 623, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 634, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 645, error, n_domain)
+            call find_neighbor(params, hvyID, lgtID, Jmax, 652, error, n_domain)
         end do
 
     else
@@ -95,18 +96,19 @@ subroutine updateNeighbors_tree(params, tree_ID)
 
             call hvy2lgt( lgtID, hvyID, params%rank, N )
 
-            call get_adjacent_boundary_surface_normal( lgt_block(lgtID, 1:lgt_block(lgtID,params%Jmax+IDX_MESH_LVL)), &
-            params%domain_size, params%Bs, params%dim, n_domain )
+            call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
 
-            call find_neighbor( params, hvyID, lgtID, Jmax, '__N', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '__E', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '__S', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '__W', error, n_domain)
+            !> direction for neighbor search - number where each digit represents a cardinal direction
+            !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+            call find_neighbor( params, hvyID, lgtID, Jmax, 5, error, n_domain)  ! '__N'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 4, error, n_domain)  ! '__E'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 3, error, n_domain)  ! '__S'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 2, error, n_domain)  ! '__W'
 
-            call find_neighbor( params, hvyID, lgtID, Jmax, '_NE', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '_NW', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '_SE', error, n_domain)
-            call find_neighbor( params, hvyID, lgtID, Jmax, '_SW', error, n_domain)
+            call find_neighbor( params, hvyID, lgtID, Jmax, 45, error, n_domain)  ! '_NE'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 25, error, n_domain)  ! '_NW'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 43, error, n_domain)  ! '_SE'
+            call find_neighbor( params, hvyID, lgtID, Jmax, 23, error, n_domain)  ! '_SW'
         end do
 
     end if

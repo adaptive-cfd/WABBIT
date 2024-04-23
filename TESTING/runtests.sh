@@ -47,7 +47,7 @@ fi
 
 
 # list all tests here. For readability, we include header lines like ---acm---
-# they structure teh output on the screen. Note the three dashes mark those headers
+# they structure the output on the screen. Note the three dashes mark those headers
 tests=( "---post---"
         # "TESTING/wabbit_post/pod/pod_test.sh"
         "---wavelets---"

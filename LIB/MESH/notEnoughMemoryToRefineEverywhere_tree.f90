@@ -38,7 +38,7 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
             hvyID = hvy_active(k, tree_ID)
             call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
-            if (lgt_block( lgtID, params%Jmax + IDX_MESH_LVL ) < params%Jmax) then
+            if (lgt_block( lgtID, IDX_MESH_LVL ) < params%Jmax) then
                 ! this block can be refined (and will be) (it is refined to it has 8 children
                 ! but disappears, so 7 new blocks)
                 hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim) - 1

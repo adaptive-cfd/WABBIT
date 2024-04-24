@@ -10,6 +10,8 @@
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
 subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
+    use module_treelib
+    use module_globals
     implicit none
 
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
@@ -39,7 +41,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     ! details of merged block
     level = lgt_block( lgt_blocks_to_merge(1), IDX_MESH_LVL )
     tree_ID = lgt_block( lgt_blocks_to_merge(1), IDX_TREE_ID )
-    treecode = get_tc(lgt_block( lgt_blocks_to_merge(1), IDX_TC_1 : IDX_TC_2 ))
+    treecode = get_tc(lgt_block( lgt_blocks_to_merge(1), IDX_TC_1:IDX_TC_2 ))
 
     ! Check which CPU holds the blocks. The CPU will also hold the merged, new block
     do i = 1, N_merge
@@ -57,18 +59,19 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         call abort("You try to merge blocks on different ranks, but you must call gather_ranks before.")
     endif
 
-    do i = 1, size(lgt_blocks_to_merge)
-        treecode = get_tc(lgt_blocks_to_merge(i), IDX_TC_1 : IDX_TC_2)
-        if (tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /= i-1) then
-            call abort(647483," You try to merge blocks which do not belong together")
-        endif
-        do i1 = 1, level-1
-            if (tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /=
-                tc_get_digit_at_level_b( get_tc(lgt_blocks_to_merge(1), IDX_TC_1 : IDX_TC_2), params%dim, level, params%Jmax)) then
-                call abort(647483," You try to merge blocks which do not belong together")
-            endif
-        enddo
-    enddo
+    ! do i = 1, size(lgt_blocks_to_merge)
+    !     treecode = get_tc( lgt_block(lgt_blocks_to_merge(i), IDX_TC_1:IDX_TC_2))
+    !     if (tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /= i-1) then
+    !         call abort(647483," You try to merge blocks which do not belong together")
+    !     endif
+    !     do i1 = 1, level-1
+    !         if ( tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax) /= &
+    !              tc_get_digit_at_level_b( get_tc( lgt_block(lgt_blocks_to_merge(1), IDX_TC_1:IDX_TC_2)), params%dim, level, params%Jmax)&
+    !            ) then
+    !             call abort(647483," You try to merge blocks which do not belong together")
+    !         endif
+    !     enddo
+    ! enddo
 #endif
 !-------------------------------------------------------------------------------
 

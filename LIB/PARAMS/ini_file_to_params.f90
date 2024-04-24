@@ -285,6 +285,9 @@ end subroutine ini_file_to_params
     ! Default: false for non-lifted, true for lifted wavelets
     call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet )
 
+    if (params%g_rhs > params%g) then
+        call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
+    endif
 
     if ( params%Jmax < params%Jmin ) then
         call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")

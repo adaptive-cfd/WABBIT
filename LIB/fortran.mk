@@ -37,6 +37,9 @@ ifndef $(FC)
 FC = mpif90
 endif
 
+ifndef $(HDF_SOURCE)
+HDF_SOURCE = $(HDF_ROOT)
+endif
 
 #Place of Sparse BLAS objects
 SB_LIB = #-L../../sblas/SOFTWARE -lSparseBLAS_GNU

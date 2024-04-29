@@ -32,6 +32,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
     logical :: consider_hvy_tmp
+    real(kind=rk) :: t0  !< timing for debugging
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -57,10 +58,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except in the "dealiasing step", because all blocks on Jmax are coarsened)
     if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random") then
+        t0 = MPI_Wtime()
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
         call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+        call toc( "coarseningIndicator (createMask_tree)", MPI_Wtime()-t0 )
     endif
 
 
@@ -83,6 +86,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! sync its ghost nodes in order to apply the detail operator to the entire
     !! derived field (incl gost nodes).
     if (consider_hvy_tmp) then
+        t0 = MPI_Wtime()
         ! case with derived quantities.
         ! loop over my active hvy data:
         do k = 1, hvy_n(tree_ID)
@@ -105,6 +109,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
         if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
         call abort(2801191,"your thresholding does not work with threshold-mask.")
+
+        call toc( "coarseningIndicator (prepare thresholdfield)", MPI_Wtime()-t0 )
     endif
 
 
@@ -123,6 +129,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
+        t0 = MPI_Wtime()
         if ( .not. consider_hvy_tmp ) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
             call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
@@ -147,6 +154,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
+
+        call toc( "coarseningIndicator (norm)", MPI_Wtime()-t0 )
     endif
 
     !---------------------------------------------------------------------------
@@ -198,6 +207,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         endif
 
     case default
+        t0 = MPI_Wtime()
         ! Default is wavelet thresholding...
         
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
@@ -236,6 +246,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 endif
             endif
         enddo
+        call toc( "coarseningIndicator (coarseIndicator_block)", MPI_Wtime()-t0 )
     end select
 
     !> after modifying all refinement flags, we need to synchronize light data

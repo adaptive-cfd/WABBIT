@@ -295,6 +295,10 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
         ! reconstruction part. We manipulated the data and reconstructed them on the entire block with modified coeffs.
         ! Now, we copy those reconstructed data back to the original block - this is
         ! the actual coarseExtension.
+        ! JB: In theory we synched the SC and WC of the same level so we could overwrite the whole domain
+        !     however, as with blocks with both finer and coarser neighbours the finer neighbours do not synch WC and SC
+        !     the WR reconstructs false values at the border there
+        !     For CVS this problem should solve itself as every block can find same-level neighbours for all directions
         do neighborhood = 1, size(hvy_neighbor,2)
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id

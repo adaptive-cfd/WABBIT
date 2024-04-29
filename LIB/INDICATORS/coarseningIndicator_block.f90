@@ -47,7 +47,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, mask_max, mask_min
     logical :: thresholding_component(1:size(block_data,4))
-
+    real(kind=rk) :: t0  !< timing for debugging
 
     Jmax = params%Jmax
     Bs = params%Bs
@@ -79,6 +79,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         endif
 
     case ("threshold-state-vector", "primary-variables")
+        t0 = MPI_Wtime()
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.
@@ -91,6 +92,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         thresholding_component = params%threshold_state_vector_component
         call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, detail_precomputed )
 
+        call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
@@ -104,6 +106,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! not available, the option is useless but can cause errors.
     ! NOTE: since the CDF44 wavelet is expensive, we use an alternative method to detect the gradient.
     if (params%threshold_mask .and. present(block_mask)) then
+        t0 = MPI_Wtime()
         ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
         refinement_status_mask = -1_ik ! default we coarsen
         mask_max = 0.0_rk
@@ -144,6 +147,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0
         ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
         refinement_status = max(refinement_status, refinement_status_mask)
+
+        call toc( "coarseningIndicator_block (mask_comp)", MPI_Wtime()-t0 )
     endif
 
 end subroutine coarseningIndicator_block

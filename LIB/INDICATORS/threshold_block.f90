@@ -24,7 +24,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     real(kind=rk)                       :: detail( size(u,4) )
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
-    real(kind=rk)                       :: t0, eps2
+    real(kind=rk)                       :: eps2
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -43,7 +43,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
-    t0     = MPI_Wtime()
     nx     = size(u, 1)
     ny     = size(u, 2)
     nz     = size(u, 3)
@@ -181,7 +180,4 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     else
         refinement_status = 0
     end if
-
-    ! timings
-    call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
 end subroutine threshold_block

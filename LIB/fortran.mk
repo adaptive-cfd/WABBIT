@@ -37,7 +37,7 @@ ifndef $(FC)
 FC = mpif90
 endif
 
-ifndef $(HDF_SOURCE)
+ifndef HDF_SOURCE
 HDF_SOURCE = $(HDF_ROOT)
 endif
 

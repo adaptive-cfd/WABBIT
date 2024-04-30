@@ -36,11 +36,22 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
 
         select case(params%filter_type)
         case('explicit_3pt')
+            ! This filter comes from
+            ! A general class of commutative filters for LES in complex geometries
+            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
+            ! 
+            ! Table I, case 1
+
             stencil_size = 3
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/ 1.0_rk/4.0_rk, -1.0_rk/2.0_rk, 1.0_rk/4.0_rk /)
 
         case('explicit_5pt')
+            ! This filter comes from
+            ! A general class of commutative filters for LES in complex geometries
+            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
+            ! 
+            ! Table I, case 5
             stencil_size = 5
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/ -1.0_rk/ 16.0_rk, &
@@ -50,6 +61,7 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             -1.0_rk/ 16.0_rk/)
 
         case('explicit_7pt')
+            ! same as above case 10
             stencil_size = 7
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/  1.0_rk/ 64.0_rk, &
@@ -61,6 +73,7 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             1.0_rk/ 64.0_rk/)
 
         case('explicit_9pt')
+            ! not included in Vasilyev 1998
             stencil_size = 9
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/ -1.0_rk/256.0_rk, &
@@ -74,6 +87,7 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             -1.0_rk/256.0_rk/)
 
         case('explicit_11pt')
+            ! not included in Vasilyev 1998
             stencil_size = 11
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/  1.0_rk/1024.0_rk, &

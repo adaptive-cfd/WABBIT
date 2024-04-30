@@ -2,6 +2,7 @@
 ! WRAPPER Motion protocol wrapper
 !-------------------------------------------------------------------------------
 subroutine FlappingMotionWrap ( time, Insect, wingID )
+  use module_insects_integration_flusi_wabbit
   implicit none
 
   real(kind=rk),intent(in) :: time
@@ -138,31 +139,44 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
 
       ! inform about your interpretation
       select case (kine%infile_type)
-      case ("Fourier","fourier","FOURIER")
+      case ("Fourier", "fourier", "FOURIER")
         if (root) write(*,*) "The input file is interpreted as FOURIER coefficients"
-      case ("Hermite","hermite","HERMITE")
+
+      case ("Hermite", "hermite", "HERMITE")
         if (root) write(*,*) "The input file is interpreted as HERMITE coefficients"
+
       case default
         call abort(77771, "kinematics file does not appear to be valid, set type=fourier or type=hermite")
+
       end select
 
-      ! how many coefficients will be read
+      !------------------------------------------------------------------------------------
+      ! If type is _FOURIER_, we read a0, ai, bi:
+      ! The Fourier series evaluation in WABBIT/FLUSI is :
+      ! Q = a0_Q / 2 + ( a1_Q*cos(1*2*pi*t) + b1_Q*sin(1*2*pi*t) )
+      !              + ( a2_Q*cos(2*2*pi*t) + b2_Q*sin(2*2*pi*t) )
+      !              + ....
+      ! Note the unfortunate division of a0 by 2, which is an historic artifact.
+      !------------------------------------------------------------------------------------
+      ! If the type is _HERMITE_, we read function values (ai) and derivatives (bi), 
+      ! assuming implicitly an equidistant time vector [0, 1), thus excluding t=1.0
+      !------------------------------------------------------------------------------------
+      
       call read_param_mpi(kinefile,"kinematics","nfft_phi",kine%nfft_phi,0)
-      call read_param_mpi(kinefile,"kinematics","nfft_alpha",kine%nfft_alpha,0)
-      call read_param_mpi(kinefile,"kinematics","nfft_theta",kine%nfft_theta,0)
-
-      ! read coefficients
       call read_param_mpi(kinefile,"kinematics","a0_phi",kine%a0_phi,0.d0)
-      call read_param_mpi(kinefile,"kinematics","a0_alpha",kine%a0_alpha,0.d0)
-      call read_param_mpi(kinefile,"kinematics","a0_theta",kine%a0_theta,0.d0)
-
       call read_param_mpi(kinefile,"kinematics","ai_phi",kine%ai_phi(1:kine%nfft_phi))
       call read_param_mpi(kinefile,"kinematics","bi_phi",kine%bi_phi(1:kine%nfft_phi))
+      
+      call read_param_mpi(kinefile,"kinematics","nfft_alpha",kine%nfft_alpha,0)
+      call read_param_mpi(kinefile,"kinematics","a0_alpha",kine%a0_alpha,0.d0)
       call read_param_mpi(kinefile,"kinematics","ai_alpha",kine%ai_alpha(1:kine%nfft_alpha))
-
       call read_param_mpi(kinefile,"kinematics","bi_alpha",kine%bi_alpha(1:kine%nfft_alpha))
+      
+      call read_param_mpi(kinefile,"kinematics","nfft_theta",kine%nfft_theta,0)
+      call read_param_mpi(kinefile,"kinematics","a0_theta",kine%a0_theta,0.d0)
       call read_param_mpi(kinefile,"kinematics","ai_theta",kine%ai_theta(1:kine%nfft_theta))
       call read_param_mpi(kinefile,"kinematics","bi_theta",kine%bi_theta(1:kine%nfft_theta))
+
       kine%initialized = .true.
       call clean_ini_file_mpi( kinefile )
 
@@ -195,7 +209,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     ! make sure the output is in the right units (it HAS to be radiants!)
     !---------------------------------------------------------------------------
     select case (kine%infile_units)
-    case ("degree","DEGREE","Degree")
+    case ("degree","DEGREE","Degree","DEG","deg")
       ! the rest of the code gets radiants, so convert here
       phi    = deg2rad(phi)
       alpha  = deg2rad(alpha)
@@ -203,7 +217,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       phi_dt = deg2rad(phi_dt)
       alpha_dt = deg2rad(alpha_dt)
       theta_dt = deg2rad(theta_dt)
-    case ("radian","RADIAN","Radian","radiant","RADIANT","Radiant")
+    case ("radian","RADIAN","Radian","radiant","RADIANT","Radiant","rad","RAD")
       ! if the file is already in radiants, do nothing and be happy!
     case default
       call abort(1718,"kinematics file does not appear to be valid, set units=degree or units=radiant")

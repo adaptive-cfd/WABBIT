@@ -11,6 +11,7 @@ program main
     use module_time_step        ! time step module
     use module_unit_test        ! unit test module
     use module_bridge_interface ! bridge implementation of wabbit
+    use module_t_files
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
     ! it exists to disentangle module_forest and module_IO
     use module_saving
@@ -398,9 +399,12 @@ program main
         ! one also wants to be able to resume it. the usual "kill" on clusters will terminate
         ! wabbit immediately and not write a backup. Hence, it is possible to terminate
         ! wabbit by writing "save_stop" to "runtime_control"
+        ! To reduce IO, do this after 15 iterations in 2D but in every time step in 3D (timeSteps are longer in 3D)
+        if ((modulo(iteration,15)==0 .and. params%dim==2).or.(params%dim==3)) then
         if ( runtime_control_stop() ) then
             if (rank==0) write(*,*) "WE RECVED THE STOP COMMAND: WRITE BACKUP; THEN BYEBYE"
             keep_running = .false.
+        endif
         endif
     end do
 

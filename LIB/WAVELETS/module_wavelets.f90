@@ -1591,6 +1591,8 @@ contains
         select case(params%wavelet)
         case("CDF62")
             ! H TILDE filter
+            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+            ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
             allocate( params%HD(-6:6) )
             params%HD = (/ -3.0_rk*2.0_rk**(-10.0_rk), &
                             0.0_rk, &
@@ -1889,50 +1891,57 @@ contains
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
             write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-            ! ! this code has been used to plot the wavelets in PYTHON.
-            ! a = maxval( (/&
-            ! abs(lbound(params%HD, dim=1)), &
-            ! abs(lbound(params%GD, dim=1)), &
-            ! abs(lbound(params%HR, dim=1)), &
-            ! abs(lbound(params%GR, dim=1)), &
-            ! abs(ubound(params%HD, dim=1)), &
-            ! abs(ubound(params%GD, dim=1)), &
-            ! abs(ubound(params%HR, dim=1)), &
-            ! abs(ubound(params%GR, dim=1)) &
-            ! /))
+            ! this code has been used to plot our wavelets in PYTHON.
+            a = maxval( (/&
+            abs(lbound(params%HD, dim=1)), &
+            abs(lbound(params%GD, dim=1)), &
+            abs(lbound(params%HR, dim=1)), &
+            abs(lbound(params%GR, dim=1)), &
+            abs(ubound(params%HD, dim=1)), &
+            abs(ubound(params%GD, dim=1)), &
+            abs(ubound(params%HR, dim=1)), &
+            abs(ubound(params%GR, dim=1)) &
+            /) )
 
-            ! write(*,*) "HD"
-            ! do i = -a, +a
-            !     if ((i < lbound(params%HD, dim=1) ).or.(i > ubound(params%HD, dim=1) )) then
-            !         write(*,'(es15.8,", ")') 0.0_rk
-            !     else
-            !         write(*,'(es15.8,", ")') params%HD(i)
-            !     endif
-            ! enddo
-            ! write(*,*) "GD"
-            ! do i = -a, +a
-            !     if ((i < lbound(params%GD, dim=1) ).or.(i > ubound(params%GD, dim=1) )) then
-            !         write(*,'(es15.8,", ")') 0.0_rk
-            !     else
-            !         write(*,'(es15.8,", ")') params%GD(i)
-            !     endif
-            ! enddo
-            ! write(*,*) "HR"
-            ! do i = -a, +a
-            !     if ((i < lbound(params%HR, dim=1) ).or.(i > ubound(params%HR, dim=1) )) then
-            !         write(*,'(es15.8,", ")') 0.0_rk
-            !     else
-            !         write(*,'(es15.8,", ")') params%HR(i)
-            !     endif
-            ! enddo
-            ! write(*,*) "GR"
-            ! do i = -a, +a
-            !     if ((i < lbound(params%GR, dim=1) ).or.(i > ubound(params%GR, dim=1) )) then
-            !         write(*,'(es15.8,", ")') 0.0_rk
-            !     else
-            !         write(*,'(es15.8,", ")') params%GR(i)
-            !     endif
-            ! enddo
+            write(*,'(A)', advance='no') "HD=["
+            do i = -a, +a
+                if ((i < lbound(params%HD, dim=1) ).or.(i > ubound(params%HD, dim=1) )) then
+                    write(*,'(es15.8,", ")', advance='no') 0.0_rk
+                else
+                    write(*,'(es15.8,", ")', advance='no') params%HD(i)
+                endif
+            enddo
+            write(*,'(A)') "]"
+
+            write(*,'(A)', advance='no') "GD=["
+            do i = -a, +a
+                if ((i < lbound(params%GD, dim=1) ).or.(i > ubound(params%GD, dim=1) )) then
+                    write(*,'(es15.8,", ")', advance='no') 0.0_rk
+                else
+                    write(*,'(es15.8,", ")', advance='no') params%GD(i)
+                endif
+            enddo
+            write(*,'(A)') "]"
+
+            write(*,'(A)', advance='no') "HR=["
+            do i = -a, +a
+                if ((i < lbound(params%HR, dim=1) ).or.(i > ubound(params%HR, dim=1) )) then
+                    write(*,'(es15.8,", ")', advance='no') 0.0_rk
+                else
+                    write(*,'(es15.8,", ")', advance='no') params%HR(i)
+                endif
+            enddo
+            write(*,'(A)') "]"
+
+            write(*,'(A)', advance='no') "GR=["
+            do i = -a, +a
+                if ((i < lbound(params%GR, dim=1) ).or.(i > ubound(params%GR, dim=1) )) then
+                    write(*,'(es15.8,", ")', advance='no') 0.0_rk
+                else
+                    write(*,'(es15.8,", ")', advance='no') params%GR(i)
+                endif
+            enddo
+            write(*,'(A)') "]"
         endif
 
         ! the code sets the ghost nodes, not just the modified ones

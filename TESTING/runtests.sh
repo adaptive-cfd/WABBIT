@@ -34,7 +34,7 @@ if [ "$(which wabbit-compare-hdffiles.py)" == "" ]; then
     echo "https://github.com/adaptive-cfd/python-tools repository for comparing two WABBIT HDF5 files. "
     echo ""
     echo " You do not seem to have the command ${fail_color}wabbit-compare-hdffiles.py${end_color} available! Either you do not have"
-    echo " the repository, or its directory is not in you \$PYTHONPATH"
+    echo " the repository, or its directory is not in your \$PATH"
     echo ""
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "${fail_color}Cannot run unit tests !!${end_color}"

@@ -37,6 +37,9 @@ ifndef $(FC)
 FC = mpif90
 endif
 
+ifndef $(HDF_SOURCE)
+HDF_SOURCE = $(HDF_ROOT)
+endif
 
 #Place of Sparse BLAS objects
 SB_LIB = #-L../../sblas/SOFTWARE -lSparseBLAS_GNU
@@ -187,7 +190,7 @@ $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o
+	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o

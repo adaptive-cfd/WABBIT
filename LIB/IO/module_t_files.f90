@@ -4,7 +4,7 @@ module module_t_files
     implicit none
 
     ! precision statement
-    integer, parameter :: flush_frequency = 5
+    integer, save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
     integer, parameter :: max_parallel_files = 50
     integer, parameter :: max_columns = 160
     integer, save :: mpirank = 7
@@ -16,6 +16,15 @@ module module_t_files
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
+
+    ! Why do we have this module ?
+    !
+    ! On the supercomputers, we are allowed to do very little IO, and that in particular
+    ! extends to even very small operations, like dumping a log file to disk. This is only a few
+    ! bytes, but opening and closing the file stresses the machine. Therefore, this module is a buffer
+    ! for the very simple fortran write statement: We just collect some time steps (flush_frequency)
+    ! before dumping this data to disk.
+
 
 
     PUBLIC :: init_t_file, append_t_file, close_t_file, close_all_t_files, disable_all_t_files_output

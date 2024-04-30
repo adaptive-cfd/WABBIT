@@ -150,6 +150,14 @@ contains
     ! and bi (derivative values) at the locations x. Note that x is assumed periodic;
     ! do not include x=1.0.
     ! a valid example is x=(0:N-1)/N
+    !
+    ! This function is used to describe the kinematics of insects, in cases where the fourier
+    ! series does not converge well, or simply if you like it better. We therefore assume 
+    ! implicitly that the coefficients ai (function values) and bi (derivatives) are samples
+    ! equidistanly between 0 and 1 (excluding 1), as described above. Therefore, no time 
+    ! vector for the samples is passed. If you request the data at say t=4.2334, then we return
+    ! the same as t=0.2334. An alternative to this method is the "kineloader", which handles
+    ! also non-periodic kinematics (however, it is less well tested).
     !-------------------------------------------------------------------------------
     subroutine hermite_eval(time, u, u_dt, ai, bi)
         implicit none
@@ -163,7 +171,7 @@ contains
         n = size(ai)
 
         time_periodized = time
-        do while (time_periodized > 1.0_rk )
+        do while (time_periodized >= 1.0_rk )
             time_periodized = time_periodized - 1.0_rk
         enddo
 

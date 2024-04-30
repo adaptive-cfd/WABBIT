@@ -471,7 +471,8 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
             ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
             ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
             ! up or down sampled.
-            call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, gminus, gplus )
+            call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, &
+                 gminus, gplus, output_to_file )
             ijkGhosts(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend
             ijkGhosts(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer
 
@@ -497,6 +498,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
         enddo
     enddo
 
+#ifdef DEV
     ! this output can be plotted using the python script
     if ((params%rank==0) .and. output_to_file) then
         open(16,file='ghost_bounds.dat',status='replace')
@@ -519,6 +521,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
         enddo
         close(16)
     endif
+#endif
 end subroutine
 
 end module module_MPI

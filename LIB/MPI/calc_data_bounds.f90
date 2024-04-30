@@ -6,7 +6,7 @@
 ! Now you can be clever: synchronizing ghosts means copying points with THE SAME COORDINATES. Makes sense, doesnt't it?
 ! So all you would have to do is compute the sender bounds (from the given, manually set recver bounds)
 
-subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, gminus, gplus )
+subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir, leveldiff, gminus, gplus, output_to_file )
     implicit none
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in) :: ijkrecv(2,3)
@@ -14,6 +14,7 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
     integer(kind=ik), intent(out) :: ijksend(2,3)
     ! leveldiff = 1 ! -1: interpolation, +1: coarsening
     integer(kind=ik), intent(in) :: dir, leveldiff, gminus, gplus
+    logical, intent(in) :: output_to_file
 
     integer(kind=ik), parameter :: Jmax = 6
     integer(kind=ik) :: send_treecode(1:Jmax)
@@ -401,21 +402,25 @@ subroutine compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, dir
 
     ! this file contains a list of all neighboring relations
     ! used for development in 2D only.
-    if ((dir == 1) .and. (params%rank == 0)) then
-        open(16, file='neighbor_blocks2D.dat', status='replace')
-        do ineighbor = 1, 16
-            do ileveldiff = -1, 1
-                send_treecode = senders(ineighbor, ileveldiff, 2, :)
-                recv_treecode = recvers(ineighbor, ileveldiff, 2, :)
+#ifdef DEV
+    if (output_to_file) then
+        if ((dir == 1) .and. (params%rank == 0)) then
+            open(16, file='neighbor_blocks2D.dat', status='replace')
+            do ineighbor = 1, 16
+                do ileveldiff = -1, 1
+                    send_treecode = senders(ineighbor, ileveldiff, 2, :)
+                    recv_treecode = recvers(ineighbor, ileveldiff, 2, :)
 
-                call get_block_spacing_origin_array( send_treecode(1:J), real(Bs*2**J, kind=rk), Bs, params%dim, x0_send, dx_send )
-                call get_block_spacing_origin_array( recv_treecode(1:J-ileveldiff), real(Bs*2**J, kind=rk), Bs, params%dim, x0_recv, dx_recv )
+                    call get_block_spacing_origin_array( send_treecode(1:J), real(Bs*2**J, kind=rk), Bs, params%dim, x0_send, dx_send )
+                    call get_block_spacing_origin_array( recv_treecode(1:J-ileveldiff), real(Bs*2**J, kind=rk), Bs, params%dim, x0_recv, dx_recv )
 
-                write(16,*) ineighbor, ileveldiff, x0_send, dx_send, x0_recv, dx_recv
+                    write(16,*) ineighbor, ileveldiff, x0_send, dx_send, x0_recv, dx_recv
+                enddo
             enddo
-        enddo
-        close(16)
+            close(16)
+        endif
     endif
+#endif
 
     !***************************************************************************
     ! Compute sender bounds from recver bounds

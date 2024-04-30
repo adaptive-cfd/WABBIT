@@ -19,18 +19,26 @@ module module_MPI
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
+    integer(kind=ik), PARAMETER   :: S_META_FULL = 6  ! how many metadata entries we collect in the logik-loop
+#ifdef DEV
+    integer(kind=ik), PARAMETER   :: S_META_SEND = 5  ! how many metadata entries will be send, plus rank
+#else
+    integer(kind=ik), PARAMETER   :: S_META_SEND = 4  ! how many metadata entries will be send
+#endif
     integer(kind=ik), allocatable :: iMetaData_sendBuffer(:), iMetaData_recvBuffer(:)
-    integer(kind=ik), allocatable :: MetaData_recvCounter(:), MetaData_sendCounter(:)
+    integer(kind=ik), allocatable :: MetaData_sendCounter(:)
+    integer(kind=ik), allocatable :: MetaData_recvCounter(:)
     integer(kind=ik), allocatable :: Data_recvCounter(:), Data_sendCounter(:)
-    integer(kind=ik), allocatable :: real_pos(:), internalNeighborSyncs(:)
+    integer(kind=ik), allocatable :: internalNeighborSyncs(:)
     real(kind=rk), allocatable    :: rData_sendBuffer(:), rData_recvBuffer(:)
-    integer(kind=ik) :: internalNeighbor_pos
+    integer(kind=ik)              :: internalNeighbor_pos
     !
     integer(kind=ik), allocatable :: send_request(:)
     integer(kind=ik), allocatable :: recv_request(:)
 
-    ! an array to count how many messages we send to the other mpiranks.
+    ! arrays to iterate over messages we send to the other mpiranks.
     integer(kind=ik), allocatable :: int_pos(:)
+    integer(kind=ik), allocatable :: real_pos(:)
 
     ! internally, we flatten the ghost nodes layers to a line. this is stored in
     ! this buffer (NOTE max size is (blocksize)*(ghost nodes size + 1)*(number of datafields))
@@ -205,8 +213,8 @@ subroutine init_ghost_nodes( params )
         allocate( internalNeighborSyncs(1:buffer_N_int), stat=status(1) )
         allocate( iMetaData_sendBuffer(1:buffer_N_int), stat=status(1) )
         allocate( iMetaData_recvBuffer(1:buffer_N_int), stat=status(2) )
-        allocate( rData_sendBuffer(1:buffer_N), stat=status(3) )
-        allocate( rData_recvBuffer(1:buffer_N), stat=status(4) )
+        allocate( rData_sendBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(3) )
+        allocate( rData_recvBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(4) )
 
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
@@ -236,11 +244,11 @@ subroutine init_ghost_nodes( params )
             product(real(shape(iMetaData_recvBuffer)))*4e-9
         endif
 
+        ! thanks to the mix of Fortran and MPI this is quite a nightmare with 0- or 1-based arrays
         allocate( send_request(1:2*Ncpu) )
         allocate( recv_request(1:2*Ncpu) )
-        allocate( int_pos(1:Ncpu) )
-        allocate( real_pos(1:Ncpu) )
         allocate( line_buffer( 1:Neqn*product(Bs(1:params%dim)+2*g) ) )
+        allocate( int_pos(0:Ncpu-1), real_pos(0:Ncpu-1))
         allocate( Data_recvCounter(0:Ncpu-1), Data_sendCounter(0:Ncpu-1) )
         allocate( MetaData_recvCounter(0:Ncpu-1), MetaData_sendCounter(0:Ncpu-1) )
 

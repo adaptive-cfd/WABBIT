@@ -148,7 +148,7 @@ subroutine ini_file_to_params( params, filename )
    ! samples. In 2D, the code generally runs fast and does many time steps, hence
    ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
    if (params%dim == 2) then
-    flush_frequency = 500
+    flush_frequency = 50
  else
     flush_frequency = 10
  endif

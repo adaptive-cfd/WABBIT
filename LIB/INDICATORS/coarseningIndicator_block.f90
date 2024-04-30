@@ -107,7 +107,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! not available, the option is useless but can cause errors.
     ! NOTE: since the CDF44 wavelet is expensive, we use an alternative method to detect the gradient.
     if (params%threshold_mask .and. present(block_mask)) then
-        t0 = MPI_Wtime()
+        ! t0 = MPI_Wtime()
         ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
         refinement_status_mask = -1_ik ! default we coarsen
         mask_max = 0.0_rk
@@ -149,7 +149,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
         refinement_status = max(refinement_status, refinement_status_mask)
 
-        call toc( "coarseningIndicator_block (mask_comp)", MPI_Wtime()-t0 )
+        ! timing for debugging - block based so should not be deployed for productive versions
+        ! call toc( "coarseningIndicator_block (mask_comp)", MPI_Wtime()-t0 )
     endif
 
 end subroutine coarseningIndicator_block

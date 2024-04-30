@@ -79,7 +79,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         endif
 
     case ("threshold-state-vector", "primary-variables")
-        t0 = MPI_Wtime()
+        ! t0 = MPI_Wtime()
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.
@@ -92,7 +92,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         thresholding_component = params%threshold_state_vector_component
         call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, detail_precomputed )
 
-        call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )
+        ! timing for debugging - block based so should not be deployed for productive versions
+        ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 

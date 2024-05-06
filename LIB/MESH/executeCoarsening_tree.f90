@@ -16,7 +16,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     integer(kind=ik)                    :: light_ids(1:8), mpirank_owners(1:8)
     integer(kind=ik), allocatable, save :: xfer_list(:,:)
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID
+    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, procID, hvyID
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -50,13 +50,21 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
         ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
         lgtID = lgt_active(k, tree_ID)
+        call lgt2proc(procID, lgtID, params%number_blocks)
+        call lgt2hvy(hvyID, lgtID, procID, params%number_blocks)
+        
 
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
         if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
             ! find all sisters (including the block in question, so four or eight blocks)
             ! their light IDs are in "light_ids" and ordered by their last treecode-digit
-            call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
+            ! if this block resides on this block we can get its sisters from hvy_family
+            if (procID == params%rank) then
+                light_ids(1:N) = hvy_family(hvyID, 2:1+2**params%dim)
+            else
+                call find_sisters( params, lgtID, light_ids(1:N))
+            endif
 
             ! figure out on which rank the sisters lie, xfer them if necessary
             do j = 1, N
@@ -102,10 +110,10 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
         if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -7) then
-            ! merge the four blocks into one new block. Merging is done in two steps,
+            ! merge the 4/8 blocks into one new block. Merging is done in two steps,
             ! first for light data (which all CPUS do redundantly, so light data is kept synched)
             ! Then only the responsible rank will perform the heavy data merging.
-            call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
+            call find_sisters( params, lgtID, light_ids(1:N))
             ! note the newly merged block has status 0
             call merge_blocks( params, hvy_block, light_ids(1:N) )
         endif

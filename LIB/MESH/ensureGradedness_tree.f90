@@ -22,10 +22,6 @@ subroutine ensureGradedness_tree( params, tree_ID )
     counter, hvy_id, neighbor_status, Jmax, proc_id, lgt_id
     logical                             :: grid_changed, test2    ! status of grid changing
 
-    ! it turned out that in some situations ensure_completeness is very expensive, mostly because
-    ! of the findSisters_tree routine. We therefore at least do this procedure only once and not
-    ! in each iteration of the algorithm.
-    integer(kind=ik), allocatable, save  :: sisters(:)
 
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
@@ -46,13 +42,10 @@ subroutine ensureGradedness_tree( params, tree_ID )
     if ( params%dim == 3 ) then
         ! 3D:
         neighbor_num = 74
-        if (.not.allocated(sisters)) allocate( sisters(8) )
     else
         ! 2D:
         neighbor_num = 16
-        if (.not.allocated(sisters)) allocate( sisters(4) )
     end if
-    sisters = -1
 
     ! we repeat the ensureGradedness_tree procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
@@ -83,10 +76,8 @@ subroutine ensureGradedness_tree( params, tree_ID )
             ! -1  -1    -1  -1
             ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
             if ( lgt_block( lgt_id , IDX_REFINE_STS ) == -1) then
-                ! find the sisters of this block
-                call findSisters_tree(params, lgt_id, sisters, tree_ID)
                 ! check if all sisters share the -1 status, remove it if they don't
-                call ensure_completeness( params, lgt_id, sisters )
+                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim) )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time

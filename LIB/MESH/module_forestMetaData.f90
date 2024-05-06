@@ -33,6 +33,8 @@ module module_forestMetaData
     integer(kind=ik), allocatable, public    :: lgt_block(:, :)
     !> List of neighbours (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_neighbor(:,:)
+    !> List of family (heavy data) for each tree
+    integer(kind=ik), allocatable, public    :: hvy_family(:,:)
     !> List of active blocks (light data) for each tree
     integer(kind=ik), allocatable, public    :: lgt_active(:,:)
     !> Number of active blocks (light data) for each tree

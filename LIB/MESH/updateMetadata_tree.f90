@@ -22,6 +22,7 @@ subroutine updateMetadata_tree(params, tree_ID)
     ! call createActiveSortedLists_tree_old(params, tree_ID)
 
     call updateNeighbors_tree(params, tree_ID)
+    call updateFamily_tree(params, tree_ID)
 
     call toc( "updateMetadata_tree (lists+neighbors)", MPI_wtime()-t0 )
 end subroutine

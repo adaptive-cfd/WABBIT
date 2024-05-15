@@ -115,73 +115,92 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
-        ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
-        ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
-        ! If the coarseExtension is used, it also computes the FWT of all blocks on the current level -
-        ! this reduces load imbalancing. We need to compute the FWT anyways in coarseningIndicator_tree (for
-        ! thresholding). In this case, the detail (largest wavelet coeff) is passed via hvy_details.
-        t0 = MPI_Wtime()
-        if (params%useCoarseExtension) then
-            call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-            hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
-        endif
-        call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
+        ! Speed optimization: Don't WD Jmax if we delete all blocks there anyways!
+        ! If block is on JMax, we skip first CE and indicatoring and simply flag all blocks as to be coarsened if force_maxlevel_dealising is set
+        ! This saves a lot of time as usually we have many blocks on highest level
+        ! CE only affects WC and therefore just same level or upwards so skipping is valid, second CE works on 0 blocks so we can just leave it
+        ! if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel2 .and. level == params%Jmax) then
+        if (.false.) then
+                ! set all refinement statuses on this block to refine
+            do k = 1, hvy_n(tree_ID)
+                hvy_ID = hvy_active(k, tree_ID)
+                call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
 
-        !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
-        ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
-        ! acts on a single block only.
-        ! We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the default, other indicators
-        ! are used mostly for testing.
-        ! The routine first sets all blocks (regardless of level) to 0 (STAY).
-        ! In the wavelet case, we check the blocks for their largest detail (=wavelet coeff). If the coarseExtension is used,
-        ! the FWT of all blocks (on this level) is performed there (even for blocks that are not modified) - this reduces load
-        ! imbalancing. If coarseExtension is not used, the actual FWT of blocks (on this level) is performed in coarseningIndicator_tree.
-        ! The routine assigns -1 (COARSEN) to a block, if it matches the criterion. This status may however be revoked below.
-        t0 = MPI_Wtime()
-        if (present(hvy_mask)) then
-            ! if present, the mask can also be used for thresholding (and not only the state vector). However,
-            ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
-        else
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2)
-        endif
-        call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
+                lgt_block( lgt_ID, IDX_REFINE_STS ) = -1
+            end do
+            ! synch status so that every processor knows which blocks are deleted
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
+        else ! normal procedure
 
-        ! After coarseningIndicator_tree, the situation is:
-        ! coarseningIndicator_tree works on LEVEL.
-        ! blocks that are significant on that level now have status 0, others (on this level) have -1
-        ! Any blocks on other levels have status 0.
-
-        ! here, we should refine the coarse frontier blocks
-
-        ! afterwards, the newly created blocks should have status 0 (check that!!)
-        ! can we call refinement if the refinement_status incudes "-1" ? ===> to be checked.
-
-        if (params%useSecurityZone) then
-            if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
-                ! Note: we can add the security zone also for non-lifted wavelets (although this 
-                ! does not make much sense, but for development...)
-                call addSecurityZone_tree( time, params, level, tree_ID, hvy_block, hvy_tmp )
+            ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
+            ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
+            ! If the coarseExtension is used, it also computes the FWT of all blocks on the current level -
+            ! this reduces load imbalancing. We need to compute the FWT anyways in coarseningIndicator_tree (for
+            ! thresholding). In this case, the detail (largest wavelet coeff) is passed via hvy_details.
+            t0 = MPI_Wtime()
+            if (params%useCoarseExtension) then
+                call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+                hvy_n(tree_ID), lgt_n(tree_ID), hvy_details=hvy_details, inputDataSynced=.true., level=level )
             endif
-        endif
+            call toc( "adapt_tree (coarse_extension)", MPI_Wtime()-t0 )
 
-        ! In addSecurityZone_tree, some blocks on level J have revoked their -1 status to 0, some
-        ! new blocks may have been created and they have the status 0 as well.
-        ! Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it
-        ! is not possible to 'accidentally' delete the newly created blocks later on.
+            !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
+            ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
+            ! acts on a single block only.
+            ! We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the default, other indicators
+            ! are used mostly for testing.
+            ! The routine first sets all blocks (regardless of level) to 0 (STAY).
+            ! In the wavelet case, we check the blocks for their largest detail (=wavelet coeff). If the coarseExtension is used,
+            ! the FWT of all blocks (on this level) is performed there (even for blocks that are not modified) - this reduces load
+            ! imbalancing. If coarseExtension is not used, the actual FWT of blocks (on this level) is performed in coarseningIndicator_tree.
+            ! The routine assigns -1 (COARSEN) to a block, if it matches the criterion. This status may however be revoked below.
+            t0 = MPI_Wtime()
+            if (present(hvy_mask)) then
+                ! if present, the mask can also be used for thresholding (and not only the state vector). However,
+                ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
+                call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
+            else
+                call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2)
+            endif
+            call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
+
+            ! After coarseningIndicator_tree, the situation is:
+            ! coarseningIndicator_tree works on LEVEL.
+            ! blocks that are significant on that level now have status 0, others (on this level) have -1
+            ! Any blocks on other levels have status 0.
+
+            ! here, we should refine the coarse frontier blocks
+
+            ! afterwards, the newly created blocks should have status 0 (check that!!)
+            ! can we call refinement if the refinement_status incudes "-1" ? ===> to be checked.
+
+            if (params%useSecurityZone) then
+                if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
+                    ! Note: we can add the security zone also for non-lifted wavelets (although this 
+                    ! does not make much sense, but for development...)
+                    call addSecurityZone_tree( time, params, level, tree_ID, hvy_block, hvy_tmp )
+                endif
+            endif
+
+            ! In addSecurityZone_tree, some blocks on level J have revoked their -1 status to 0, some
+            ! new blocks may have been created and they have the status 0 as well.
+            ! Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it
+            ! is not possible to 'accidentally' delete the newly created blocks later on.
 
 
-        ! check if block has reached maximal level, if so, remove refinement flags
-        t0 = MPI_Wtime()
-        if (ignore_maxlevel2 .eqv. .false.) then
-            call respectJmaxJmin_tree( params, tree_ID )
-        endif
-        call toc( "adapt_tree (respectJmaxJmin_tree)", MPI_Wtime()-t0 )
+            ! check if block has reached maximal level, if so, remove refinement flags
+            t0 = MPI_Wtime()
+            if (ignore_maxlevel2 .eqv. .false.) then
+                call respectJmaxJmin_tree( params, tree_ID )
+            endif
+            call toc( "adapt_tree (respectJmaxJmin_tree)", MPI_Wtime()-t0 )
 
-        ! unmark blocks that cannot be coarsened due to gradedness and completeness
-        t0 = MPI_Wtime()
-        call ensureGradedness_tree( params, tree_ID )
-        call toc( "adapt_tree (ensureGradedness_tree)", MPI_Wtime()-t0 )
+            ! unmark blocks that cannot be coarsened due to gradedness and completeness
+            t0 = MPI_Wtime()
+            call ensureGradedness_tree( params, tree_ID )
+            call toc( "adapt_tree (ensureGradedness_tree)", MPI_Wtime()-t0 )
+
+        endif ! endif for loop to skip on JMax with force_maxlevel_dealiasing
 
         ! adapt the mesh, i.e. actually merge blocks
         ! this applies the wavelet low-pass filter as well (h*h) before decimation

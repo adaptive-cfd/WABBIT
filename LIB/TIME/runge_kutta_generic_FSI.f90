@@ -53,7 +53,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     rk_coeffs = params%butcher_tableau
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs)
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs)
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -125,7 +125,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         ! RK substep
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes for new input
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs)
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID), g_minus=grhs, g_plus=grhs)
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)

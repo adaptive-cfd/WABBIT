@@ -153,7 +153,7 @@ subroutine sparse_to_dense(params)
     ! balance the load
     call balanceLoad_tree(params, hvy_block, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (operator=="sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)

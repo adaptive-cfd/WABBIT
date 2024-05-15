@@ -74,7 +74,7 @@ subroutine mask_post(params)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call updateMetadata_tree(params, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (.not. allocated(us)) allocate(us(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3))
 

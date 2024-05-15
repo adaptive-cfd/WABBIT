@@ -105,7 +105,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         enddo
 
         ! note here we sync hvy_tmp (=derived qty) and not hvy_block
-        call sync_ghosts( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts_all( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
         if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
         call abort(2801191,"your thresholding does not work with threshold-mask.")

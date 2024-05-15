@@ -112,7 +112,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! note it can NOT be merged into coarseExtensionUpdate_tree because this is empty for CDFX0 wavelets
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
+        call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), &
+            level, g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
 
         ! Speed optimization: Don't WD Jmax if we delete all blocks there anyways!
@@ -343,7 +344,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! note it can NOT be merged into coarseExtensionUpdate_tree because this is empty for CDFX0 wavelets
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_WD_pre)", MPI_Wtime()-t0 )
 
         ! Wavelet decomposition
@@ -370,7 +371,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! Synch SC to mother blocks, create this block if not present
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), g_minus=g_this, g_plus=g_this)
         call toc( "adapt_tree (sync_SC2Mother)", MPI_Wtime()-t0 )
     end do
 

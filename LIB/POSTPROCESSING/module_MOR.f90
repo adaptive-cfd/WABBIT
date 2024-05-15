@@ -1520,7 +1520,7 @@ contains
             if ( params%adapt_tree) then
                 call adapt_tree( 0.0_rk, params, hvy_block, dest_tree_ID, params%coarsening_indicator, hvy_tmp )
             else
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
+                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
             endif
 
             t_elapse = MPI_WTIME() - t_elapse

@@ -155,7 +155,7 @@ subroutine compute_vorticity_post(params)
         call readHDF5vct_tree( (/file_ux, file_uy/), params, hvy_block, tree_ID)
     end if
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
 
     ! calculate vorticity from velocities
     do k = 1, hvy_n(tree_ID)
@@ -746,7 +746,7 @@ subroutine wavelet_test_coarsening(params)
 do iter= 1, 1
 
     ! compute FWT
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
@@ -861,7 +861,7 @@ do iter= 1, 1
 
 
     ! wc are modified - we have to sync
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
 
     do k = 1, hvy_n(tree_ID)
@@ -870,7 +870,7 @@ do iter= 1, 1
     end do
 
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     ! call executeCoarsening_tree( params, hvy_block, tree_ID, .true. )
     call abort(150623, "we removed the ignore_prefilter, check if that is okay still")
@@ -900,7 +900,7 @@ call readHDF5vct_tree( (/"coarsening_331.h5"/), params, hvy_block, tree_ID)
 do iter= 1, 1
 
     ! compute FWT
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
@@ -960,7 +960,7 @@ do iter= 1, 1
 
 
     ! wc are modified - we have to sync
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
 
     do k = 1, hvy_n(tree_ID)
@@ -969,7 +969,7 @@ do iter= 1, 1
     end do
 
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     call executeCoarsening_tree( params, hvy_block, tree_ID )
     call abort(150623, "we removed the ignore_prefilter, check if that is okay still")

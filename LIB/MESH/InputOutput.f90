@@ -45,7 +45,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     ! uniqueGrid modification
     if (.not. no_sync2) then
         ! because when saving pruned trees, sync is not possible...
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, &
         hvy_active(:,tree_ID), hvy_n(tree_ID) )
     endif
     Jmin_active = minActiveLevel_tree(tree_ID)
@@ -660,10 +660,10 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     if (present(synchronize_ghosts)) then
         if (synchronize_ghosts) then
-            call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+            call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
         endif
     else
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
     endif
 
     ! it is useful to print out the information on active levels in the file
@@ -950,6 +950,6 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
     call createActiveSortedLists_forest(params)
     call updateNeighbors_tree(params, tree_ID)
 
-    call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
 end subroutine read_field2tree

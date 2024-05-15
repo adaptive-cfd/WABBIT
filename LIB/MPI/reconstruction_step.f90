@@ -143,7 +143,8 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     if (.not. inputDataSynced) then
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1), ubound(params%GD,1))! ubound GD is the largest (GD is not symmetric but HD is)
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=g_this, g_plus=g_this)
+        call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+            level, g_minus=g_this, g_plus=g_this)
         call toc( "coarseExtension (sync 1)", MPI_Wtime()-t0 )
     endif
 
@@ -189,8 +190,8 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     ! if all blocks are sync'ed: we'll not reconstruct on the coarse block anyways, and the
     ! ghost nodes on the fine bloc (WC/SC) are overwritten in the coarse-extension assumption anyways.
     t0 = MPI_Wtime()
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
-    hvy_active, hvy_n, syncSameLevelOnly=.true., g_minus=g_spaghetti, g_plus=g_spaghetti )
+    call sync_level_only( params, lgt_block, hvy_block, hvy_neighbor, &
+    hvy_active, hvy_n, level, g_minus=g_spaghetti, g_plus=g_spaghetti)
     ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
     call toc( "coarseExtension 3 (sync 2)", MPI_Wtime()-t0 )
 
@@ -412,7 +413,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     ! step altered the signal.
     t0 = MPI_Wtime()
     g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=g_this, g_plus=g_this)
+    call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus=g_this, g_plus=g_this)
     call toc( "coarseExtension 5 (sync 3)", MPI_Wtime()-t0 )
 
 

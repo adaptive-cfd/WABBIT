@@ -83,7 +83,7 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
+    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_only, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
     PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_level
 
 

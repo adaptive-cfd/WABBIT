@@ -25,15 +25,16 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     inkscape:zoom="1"
-     inkscape:cx="10560.5"
-     inkscape:cy="496.49999"
+     inkscape:zoom="2"
+     inkscape:cx="20002.5"
+     inkscape:cy="962.75"
      inkscape:window-width="1920"
      inkscape:window-height="1131"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer1"><inkscape:page
+     inkscape:current-layer="layer1-1"
+     showgrid="false"><inkscape:page
        x="0"
        y="0"
        width="210"
@@ -9476,46 +9477,46 @@
        transform="translate(1260.5148,-4.6843396)"><tspan
          x="152.83203"
          y="158.20407"
-         id="tspan39">There is two locations where this change will appear:
+         id="tspan16">There is two locations where this change will appear:
 </tspan><tspan
          x="152.83203"
          y="162.17282"
-         id="tspan40">
+         id="tspan17">
 </tspan><tspan
          x="152.83203"
          y="166.14157"
-         id="tspan41">* when setting up neighbors, we must remove the neighbor code from </tspan><tspan
+         id="tspan18">* when setting up neighbors, we must remove the neighbor code from </tspan><tspan
          x="152.83203"
          y="170.11032"
-         id="tspan42">non-existing neighbors. this causes the ghost node sync'ing routine to </tspan><tspan
+         id="tspan83">non-existing neighbors. this causes the ghost node sync'ing routine to </tspan><tspan
          x="152.83203"
          y="174.07907"
-         id="tspan43">skip these borders
+         id="tspan84">skip these borders
 </tspan><tspan
          x="152.83203"
          y="178.04782"
-         id="tspan44">the point is the redundant nodes right on the domain border: they must </tspan><tspan
+         id="tspan85">the point is the redundant nodes right on the domain border: they must </tspan><tspan
          x="152.83203"
          y="182.01657"
-         id="tspan45">not be synch'ed !
+         id="tspan86">not be synch'ed !
 </tspan><tspan
          x="152.83203"
          y="185.98532"
-         id="tspan46">
+         id="tspan87">
 </tspan><tspan
          x="152.83203"
          y="189.95407"
-         id="tspan47">* filling the ghost node layer itself, i.e., the local copy action (no MPI </tspan><tspan
+         id="tspan88">* filling the ghost node layer itself, i.e., the local copy action (no MPI </tspan><tspan
          x="152.83203"
          y="193.92282"
-         id="tspan48">here!) Attention: interferes with INTERPOLATION because those </tspan><tspan
+         id="tspan89">here!) Attention: interferes with INTERPOLATION because those </tspan><tspan
          x="152.83203"
          y="197.89157"
-         id="tspan49">patches extend to the ghost nodes layer
+         id="tspan90">patches extend to the ghost nodes layer
 </tspan><tspan
          x="152.83203"
          y="201.86032"
-         id="tspan50">
+         id="tspan91">
 </tspan></text><image
        width="33.585857"
        height="25.156975"
@@ -10603,83 +10604,83 @@
        transform="translate(1626.8247,24.186275)"><tspan
          x="131.04411"
          y="98.740448"
-         id="tspan51">Note: errors occur only 
+         id="tspan92">Note: errors occur only 
 </tspan><tspan
          x="131.04411"
          y="103.15016"
-         id="tspan52">at fine/coarse interfaces
+         id="tspan93">at fine/coarse interfaces
 </tspan><tspan
          x="131.04411"
          y="107.55987"
-         id="tspan53">
+         id="tspan94">
 </tspan><tspan
          x="131.04411"
          y="111.96959"
-         id="tspan54">If g=6, then those errors 
+         id="tspan95">If g=6, then those errors 
 </tspan><tspan
          x="131.04411"
          y="116.3793"
-         id="tspan55">disappear at block interfaces
+         id="tspan96">disappear at block interfaces
 </tspan><tspan
          x="131.04411"
          y="120.78901"
-         id="tspan56">on same level:
+         id="tspan97">on same level:
 </tspan><tspan
          x="131.04411"
          y="125.19873"
-         id="tspan57">
+         id="tspan98">
 </tspan><tspan
          x="131.04411"
          y="129.60844"
-         id="tspan58">Notes:
+         id="tspan99">Notes:
 </tspan><tspan
          x="131.04411"
          y="134.01815"
-         id="tspan59">(i) this means that ghost
+         id="tspan100">(i) this means that ghost
 </tspan><tspan
          x="131.04411"
          y="138.42787"
-         id="tspan60">node sync'ing is required in the
+         id="tspan101">node sync'ing is required in the
 </tspan><tspan
          x="131.04411"
          y="142.83758"
-         id="tspan61">process, but only on level J and 
+         id="tspan106">process, but only on level J and 
 </tspan><tspan
          x="131.04411"
          y="147.2473"
-         id="tspan62">only for &quot;same&quot; neighbors
+         id="tspan107">only for &quot;same&quot; neighbors
 </tspan><tspan
          x="131.04411"
          y="151.65701"
-         id="tspan63">
+         id="tspan108">
 </tspan><tspan
          x="131.04411"
          y="156.06672"
-         id="tspan64">(ii) it requires an interface to detect &quot;same </tspan><tspan
+         id="tspan109">(ii) it requires an interface to detect &quot;same </tspan><tspan
          x="131.04411"
          y="160.47644"
-         id="tspan65">level neighbors&quot;.
+         id="tspan110">level neighbors&quot;.
 </tspan><tspan
          x="131.04411"
          y="164.88615"
-         id="tspan66">
+         id="tspan111">
 </tspan><tspan
          x="131.04411"
          y="169.29586"
-         id="tspan67">(iii) transform proceeds level-wise from fine </tspan><tspan
+         id="tspan112">(iii) transform proceeds level-wise from fine </tspan><tspan
          x="131.04411"
          y="173.70558"
-         id="tspan68">to coarse. drôlement, the always means </tspan><tspan
+         id="tspan113">to coarse. drôlement, the always means </tspan><tspan
          x="131.04411"
          y="178.11529"
-         id="tspan69">neighbors either same/coarser, but never </tspan><tspan
+         id="tspan114">neighbors either same/coarser, but never </tspan><tspan
          x="131.04411"
          y="182.52501"
-         id="tspan70">finer.
+         id="tspan115">finer.
 </tspan><tspan
          x="131.04411"
          y="186.93472"
-         id="tspan71">
+         id="tspan116">
 </tspan></text><text
        xml:space="preserve"
        style="font-size:3.52777px;line-height:1.25;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.264583"
@@ -35003,44 +35004,44 @@
        style="font-size:10.6667px;line-height:1.25;font-family:Arial;-inkscape-font-specification:Arial;white-space:pre;shape-inside:url(#rect249363-0-1);display:inline"><tspan
          x="3283.1016"
          y="135.278"
-         id="tspan72">Step 1: gather SC on coarse grid.. Fine block computes some (which are possible w/o ghost nodes) </tspan><tspan
+         id="tspan117">Step 1: gather SC on coarse grid.. Fine block computes some (which are possible w/o ghost nodes) </tspan><tspan
          x="3283.1016"
          y="148.61137"
-         id="tspan73">and copies some. Send to coarse block
+         id="tspan118">and copies some. Send to coarse block
 </tspan><tspan
          x="3283.1016"
          y="161.94475"
-         id="tspan74">- ghost nodes on coarse block are done
+         id="tspan119">- ghost nodes on coarse block are done
 </tspan><tspan
          x="3283.1016"
          y="175.27812"
-         id="tspan75">
+         id="tspan120">
 </tspan><tspan
          x="3283.1016"
          y="188.6115"
-         id="tspan76">Step 2: Coarse block interpolates fine block ghost nodes. This is possible because any WC needed for </tspan><tspan
+         id="tspan121">Step 2: Coarse block interpolates fine block ghost nodes. This is possible because any WC needed for </tspan><tspan
          x="3283.1016"
          y="201.94487"
-         id="tspan77">this are assumed zero. Now fine ghost nodes are filled
+         id="tspan122">this are assumed zero. Now fine ghost nodes are filled
 </tspan><tspan
          x="3283.1016"
          y="215.27824"
-         id="tspan78">
+         id="tspan123">
 </tspan><tspan
          x="3283.1016"
          y="228.61162"
-         id="tspan79">Step 3: substitution step. Fine block has coarse SC and WC available. Compute first M points that are </tspan><tspan
+         id="tspan124">Step 3: substitution step. Fine block has coarse SC and WC available. Compute first M points that are </tspan><tspan
          x="3283.1016"
          y="241.94499"
-         id="tspan80">affected by altered WC and SC
+         id="tspan125">affected by altered WC and SC
 </tspan><tspan
          x="3283.1016"
          y="255.27837"
-         id="tspan81">
+         id="tspan126">
 </tspan><tspan
          x="3283.1016"
          y="268.61174"
-         id="tspan82">Gillis &amp; Rees likewise include this substitution in the ghost node sync</tspan></text><text
+         id="tspan127">Gillis &amp; Rees likewise include this substitution in the ghost node sync</tspan></text><text
        xml:space="preserve"
        style="font-size:4.69081px;line-height:1.25;font-family:Arial;-inkscape-font-specification:Arial;fill:#ff00ff;stroke-width:0.351811"
        x="-2720.6907"
@@ -41834,4 +41835,54 @@
          id="tspan372-5"
          style="font-size:12.9616px;stroke-width:0.173593"
          x="-1716.3945"
-         y="284.20544">J+1</tspan></text></g></svg>
+         y="284.20544">J+1</tspan></text><g
+       id="g197"
+       transform="matrix(1.3286674,0,0,1.3286674,-2604.1301,37.046017)"
+       style="stroke:#00ffff"><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.129092px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="m 776.06211,150.55242 -2.2802,31.55391"
+         id="path11"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.129092px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="m 779.93783,150.55242 -6.15594,31.55389"
+         id="path12"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.129092px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="M 773.78189,182.10631 772.1864,150.55242"
+         id="path14"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.129092px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="m 773.95078,150.28269 -0.16886,31.82364"
+         id="path16"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.127;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+         d="m 768.31068,150.55242 5.5606,31.81457"
+         id="path18"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.127;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:0.381, 0.381;stroke-dashoffset:0;stroke-opacity:1"
+         d="m 770.19511,150.55242 3.58681,31.55391"
+         id="path23"
+         sodipodi:nodetypes="cc" /><path
+         style="fill:none;stroke:#00ffff;stroke-width:0.127;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:0.381, 0.381;stroke-dashoffset:0;stroke-opacity:1"
+         d="m 777.94654,150.55242 -4.18087,31.55394"
+         id="path25"
+         sodipodi:nodetypes="cc" /><g
+         id="g196"
+         transform="translate(602.20574,6.1767907)"
+         style="stroke:#00ffff"><rect
+           style="fill:#ffffff;fill-opacity:0.875642;stroke:#00ffff;stroke-width:0.302866;stroke-dasharray:none"
+           id="rect25"
+           width="7.8061523"
+           height="2.9042521"
+           x="166.83548"
+           y="166.35709" /><text
+           xml:space="preserve"
+           style="font-size:1.72122px;line-height:1.25;font-family:Arial;-inkscape-font-specification:Arial;fill:#0000ff;stroke:#00ffff;stroke-width:0.129092"
+           x="168.06073"
+           y="168.02484"
+           id="text27"><tspan
+             sodipodi:role="line"
+             id="tspan27"
+             style="fill:#0000ff;stroke:#00ffff;stroke-width:0.129092"
+             x="168.06073"
+             y="168.02484">h[-3:+3]</tspan></text></g></g></g></svg>

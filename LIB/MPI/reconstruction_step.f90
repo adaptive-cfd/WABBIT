@@ -445,3 +445,94 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     !
     ! deallocate(WCtmp)
 end subroutine
+
+
+
+subroutine coarseExtensionJmax( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
+    inputDataSynced )
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+
+    type (type_params), intent(in)      :: params
+    !> light data array
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
+    real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :)
+    !> heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
+    !> list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_active(:)
+    !> number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n, lgt_n
+    ! if the input data are sync'ed we do not do it here: otherwise, call
+    ! ghost nodes synchronization
+    logical, intent(in) :: inputDataSynced
+
+    integer(kind=ik) :: k, neighborhood, hvyID, lgtID, lgtID_neighbor, level_me, level_neighbor
+    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), g_this
+
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+
+    t0 = MPI_Wtime()
+    nx = size(hvy_block, 1)
+    ny = size(hvy_block, 2)
+    nz = size(hvy_block, 3)
+    nc = size(hvy_block, 4)
+    g  = params%g
+    Bs = params%bs
+
+    if (allocated(wc)) then
+        if (.not. areArraysSameSize(hvy_block(:,:,:,:,1), wc(:,:,:,:,1)) ) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:1) ) ! note here we use only SC so last index 1:1 not 1:8
+
+
+    ! 1st, we sync the ghost nodes, in order to apply the decomposition HD filter (the others we will not use here)
+    ! It may be that this sync'ing is done before calling.
+    if (.not. inputDataSynced) then
+        ! we will apply the h_tilde (HD) low-pass filder
+        g_this = ubound(params%HD,1)! attention assumes symmetric HD filter (but that's always the case for CDF wavelets)
+        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=g_this, g_plus=g_this)
+    endif
+
+
+    ! 2nd. We apply the HD filter to the blocks on Jmax (and not the other filters)
+    ! correct for coarseExtension stuff (i.e., points where applying the filter is not correct because it's near
+    ! a fine/coarse interface)
+    do k = 1, hvy_n
+        hvyID = hvy_active(k)
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+
+        ! apply the filter to all blocks on Jmax....
+        if (lgt_block( lgtID, IDX_MESH_LVL ) == params%jmax) then
+            call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvyID), wc(:,:,:,:,1), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
+            
+            !... and correct those affected by coarseExtension
+            do neighborhood = 1, size(hvy_neighbor, 2)
+                ! neighbor exists ?
+                if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                    ! neighbor light data id
+                    lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                    level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                    level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+                    
+                    ! coarser neighbor?
+                    if (level_neighbor < level_me) then
+                        ! manipulation of coeffs
+                        call coarseExtensionManipulateSC_block(params, wc, hvy_block(:,:,:,:,hvyID), neighborhood)
+                    endif
+                endif
+            enddo           
+            
+            ! wc is not low-pass filtered and corrected block data. it can be copied to the original block.
+            ! Note: we did not ensure every 2nd point is zero here, because we will not do IWT. The decimation
+            ! afterwards will just kick out those (supposedly zero) points, regardless of their content.
+            hvy_block(:,:,:,:,hvyID) = wc(:,:,:,:,1)
+        endif
+    enddo
+
+    ! ghost nodes outdated after this routine
+end subroutine

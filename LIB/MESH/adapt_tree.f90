@@ -81,22 +81,46 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call updateMetadata_tree(params, tree_ID)
     call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
 
-! Q: can we save time of the IWT of all blocks, maybe copy SC to their positions? are they already there? I think so YES
-! Q: can we save time if a block is coarsened and we do nt have to perform coarseExtension? -
-! maybe yes but the main time in coarseExt is spent on FWT/IWT maniuplation is not that critical
-! ___ no we cant -> if coarseExt is not performed, no valid WC are available: we CANNOT KNOW before if we coarsen a block
-!
-! We can actually say that the coarseExt is part of a global FWT transform. --> we CANNOT see below.
-!
-! Note: it is wrong to think that coarsened blocks have then again zero WC
-! on the contrary. They have only zero WC if they are interpolated after removal of WC
-!
-! THIS CANNOT WORK EASILY. It ignores the pyramidal nature of wavelets. Best seen in a block that has both
-! coarse and fine neighbors. This was the reason we do not merge coarseExtension with FWT.
-!
-! Performance: the code performs level wise, but coarseExt and GhostSync are always performed for all blocks!
-!
 
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! Special case of Jmax (does _not_ apply if Jmax_active /= Jmax)
+    !
+    ! On Jmax and if params%force_maxlevel_dealiasing is set (which is the usual case for elevated Re flow, 
+    ! exceptions only at very large levels of viscosity), the implication is that all these blocks will be coarsened,
+    ! regardless of the WC or any other criterion. We do not have to compute the FWT in this case, nor do we
+    ! have to perform the coarseExtension completely (i.e., the reconstruction part with IWT) on those blocks.
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if ((Jmax_active == params%Jmax).and.(params%force_maxlevel_dealiasing)) then
+        ! flag all blocks on Jmax for coarsening
+        do k = 1, lgt_n(tree_ID)
+            lgt_id = lgt_active(k, tree_ID)
+            if (lgt_block( lgt_id, IDX_MESH_LVL ) == params%jmax) then
+                lgt_block( lgt_id, IDX_REFINE_STS ) = -1
+            endif
+        enddo
+
+        ! next, just apply HD to the Jmax blocks, correct the coarse extension step if they have coarser neighbors
+        ! (copy previous SC), then merge the blocks without applying an additional filter (just decimation)
+        if ((params%isLiftedWavelet).and.(params%useCoarseExtension)) then
+            call coarseExtensionJmax( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            hvy_n(tree_ID), lgt_n(tree_ID), inputDataSynced=.false. )
+        endif
+
+        ! adapt the mesh, i.e. actually merge blocks on jmax to jmax-1
+        ! this does __not__ apply the wavelet low-pass filter as well (h*h) before decimation
+        call executeCoarsening_tree( params, hvy_block, tree_ID, ignore_prefilter=.true. )
+
+        ! update grid lists: active list, neighbor relations, etc
+        call updateMetadata_tree(params, tree_ID)
+
+        ! following adaptation loop now starts on Jmax-1
+        level = level - 1
+    endif
+
+
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! level-wise adaptation loop
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! we iterate from the highest current level to the lowest current level and then iterate further
     ! until the number of blocks is constant (note: as only coarsening
     ! is done here, no new blocks arise that could compromise the number of blocks -

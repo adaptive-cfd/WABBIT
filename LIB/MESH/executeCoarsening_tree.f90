@@ -1,7 +1,10 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID, ignore_prefilter )
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+        
     implicit none
 
     !> user defined parameter structure
@@ -9,6 +12,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in), optional       :: ignore_prefilter
 
     ! loop variables
     integer(kind=ik)                    :: k, Jmax, N, j
@@ -17,6 +21,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     integer(kind=ik), allocatable, save :: xfer_list(:,:)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID
+    logical :: ignore_prefilter2
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -34,6 +39,8 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     ! transfer counter
     n_xfer = 0
 
+    ignore_prefilter2 = .false.
+    if (present(ignore_prefilter)) ignore_prefilter2 = ignore_prefilter
 
     !---------------------------------------------------------------------------
     ! first, prepare for xfer (gather information: which blocks are sent where)
@@ -107,7 +114,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
             ! Then only the responsible rank will perform the heavy data merging.
             call findSisters_tree( params, lgtID, light_ids(1:N), tree_ID )
             ! note the newly merged block has status 0
-            call merge_blocks( params, hvy_block, light_ids(1:N) )
+            call merge_blocks( params, hvy_block, light_ids(1:N), ignore_prefilter2 )
         endif
     enddo
 end subroutine executeCoarsening_tree

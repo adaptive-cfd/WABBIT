@@ -51,12 +51,13 @@ module module_MPI
     ! it is filled (once) in init_ghost_nodes
     integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
-    ! We frequently need to know the indices of a ghost nodes chunk. Thus we save them
+    ! We frequently need to know the indices of a patch for ghost nodes or parts of interor. Thus we save them
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [sender/receiver/up-downsampled])
-    integer(kind=ik), dimension(1:2, 1:3, 1:74, -1:1, 1:3) :: ijkGhosts
+    ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation], [level-diff], [sender/receiver/up-downsampled])
+    ! The third index is 1:74 for ghost relations, 0 for whole block, -1:-8 for SC decimation
+    integer(kind=ik), dimension(1:2, 1:3, -8:74, -1:1, 1:3) :: ijkPatches
 
     ! it is useful to keep a named constant for the dimensionality here (we use
     ! it to access e.g. two/three D arrays in inverse_neighbor)
@@ -84,7 +85,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_only, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
-    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_level
+    PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_level, coarse_extension_modify, coarse_extension_retransform, xfer_block_data, prepare_update_family_metadata
 
 
 contains
@@ -96,6 +97,7 @@ contains
 #include "calc_data_bounds.f90"
 #include "restrict_predict_data.f90"
 #include "reconstruction_step.f90"
+#include "xfer_block_data.f90"
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,
 !! which we use to rapidly identify a ghost nodes layer
@@ -245,7 +247,7 @@ subroutine init_ghost_nodes( params )
         ! once in a module-global array (which is faster than computing it every time with tons
         ! of IF-THEN clauses).
         ! This arrays indices are:
-        ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+        ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
         call ghosts_setup_patches(params, gminus=params%g, gplus=params%g, output_to_file=.true.)
 
         ! set up table with inverse neighbor relations
@@ -394,9 +396,9 @@ subroutine ghosts_ensure_correct_buffer_size(params, hvy_block)
     nc = size(hvy_block,4)
 
     ! now we know how large the patches are we'd like to store in the RESPRE buffer
-    i = maxval( ijkGhosts(2,1,:,:,RESPRE) )*2
-    j = maxval( ijkGhosts(2,2,:,:,RESPRE) )*2
-    k = maxval( ijkGhosts(2,3,:,:,RESPRE) )*2
+    i = maxval( ijkPatches(2,1,:,:,RESPRE) )*2
+    j = maxval( ijkPatches(2,2,:,:,RESPRE) )*2
+    k = maxval( ijkPatches(2,3,:,:,RESPRE) )*2
 
     allocate( res_pre_data( i, j, k, nc) )
 
@@ -433,31 +435,36 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     integer(kind=ik), intent(in) :: gminus, gplus
     logical, intent(in) :: output_to_file
 
-    integer(kind=ik) :: N_neighbors, level_diff, neighborhood, i, j, k
+    integer(kind=ik) :: N_neighbors, N_family, level_diff, neighborhood, family, i, j, k
     integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
     integer(kind=ik) :: ijksend(2,3)
 
     ! full reset of all patch definitions. Note we set 1 not 0
-    ijkGhosts = 1
+    ijkPatches = 1
 
     N_neighbors = 74
-    if (params%dim==2) N_neighbors=16
+    N_family = 8
+    if (params%dim==2) then
+        N_neighbors=16
+        N_family=4
+    endif
 
+    ! set all neighbour relations
     do neighborhood = 1, N_neighbors
         do level_diff = -1, 1
             !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
             ! The receiver bounds are hard-coded with a huge amount of tedious indices.
             call set_recv_bounds( params, ijkrecv, neighborhood, level_diff, gminus, gplus)
-            ijkGhosts(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv
 
             ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
             ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
             ! up or down sampled.
             call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, &
                  gminus, gplus, output_to_file )
-            ijkGhosts(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend
-            ijkGhosts(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer
 
             ! apply a shift (if we sync only a subset of the layer)
             !
@@ -476,10 +483,31 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
             ! g: ghost u: interior s: synced
             ! here, params%g=3 and g=1
 
-            ijkGhosts(1:2,1:dim, neighborhood, level_diff,RECVER) = ijkGhosts(1:2,1:dim, neighborhood, level_diff,RECVER) + (params%g-gminus)
-            ijkGhosts(1:2,1:dim, neighborhood, level_diff,SENDER) = ijkGhosts(1:2,1:dim, neighborhood, level_diff,SENDER) + (params%g-gminus)
+            ijkPatches(1:2,1:dim, neighborhood, level_diff,RECVER) = ijkPatches(1:2,1:dim, neighborhood, level_diff,RECVER) + (params%g-gminus)
+            ijkPatches(1:2,1:dim, neighborhood, level_diff,SENDER) = ijkPatches(1:2,1:dim, neighborhood, level_diff,SENDER) + (params%g-gminus)
         enddo
     enddo
+
+    ! set full block relation
+    ! The receiver bounds are hard-coded with a huge amount of tedious indices, they are identical to senders
+    call set_recv_bounds( params, ijkrecv, 0, 0, gminus, gplus)
+    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkrecv
+    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkrecv
+
+    ! set mother/daughter relations
+    ! sender / receiver relations between the level differences are inverted
+    do family = -1, -N_family, -1
+        ! Fine sender or receiver: affects sc in mallat-ordering, connected to relation -1
+        call set_recv_bounds( params, ijkrecv, family, -1, gminus, gplus)
+        ijkPatches(1:2,1:3, 0,  1, SENDER) = ijkrecv
+        ijkPatches(1:2,1:3, 0, -1, RECVER) = ijkrecv
+
+        ! Coarse sender or receiver: affects specific part of block
+        call set_recv_bounds( params, ijkrecv, family, 1, gminus, gplus)
+        ijkPatches(1:2,1:3, 0, -1, SENDER) = ijkrecv
+        ijkPatches(1:2,1:3, 0,  1, RECVER) = ijkrecv
+    enddo
+
 
 #ifdef DEV
     ! this output can be plotted using the python script
@@ -496,7 +524,27 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
                 do i = 1, 2
                     do j = 1, 3
                         do k = 1, 3
-                            write(16,'(i3)') ijkGhosts(i, j, neighborhood, level_diff, k)
+                            write(16,'(i3)') ijkPatches(i, j, neighborhood, level_diff, k)
+                        enddo
+                    enddo
+                enddo
+            enddo
+        enddo
+        close(16)
+
+        open(16,file='family_bounds.dat',status='replace')
+        write(16,'(i3)') params%Bs(1)
+        write(16,'(i3)') params%Bs(2)
+        write(16,'(i3)') params%Bs(3)
+        write(16,'(i3)') params%g
+        write(16,'(i3)') S
+        write(16,'(i3)') A
+        do family = -1, -N_family, -1
+            do level_diff = -1, 1
+                do i = 1, 2
+                    do j = 1, 3
+                        do k = 1, 3
+                            write(16,'(i3)') ijkPatches(i, j, family, level_diff, k)
                         enddo
                     enddo
                 enddo

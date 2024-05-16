@@ -15,7 +15,6 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)                    :: hvy_id
-    integer(kind=ik) :: s(1:4)
 
     ! some neighborhoods are intrinsically on the same level (level_diff=0)
     ! and thus it makes no sense to call the up/downsampling routine for those
@@ -204,18 +203,18 @@ end subroutine predict_data
 !
 !                     level_diff = level_neighbor - level_me
 !
-!                     ! ijkGhosts([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [sender/receiver/up-downsampled])
+!                     ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood], [level-diff], [sender/receiver/up-downsampled])
 !                     ! leveldiff = J_sender - J_recver
 !                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
 !                     ! leveldiff =  0 : sender is same level as recver
 !                     ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
 ! ! because the ghost nodes module loops over sender, and here we want the receiver, we need to take the inverse neighborhood
-!                     x1patch = ijkGhosts(1, 1, inverse_neighbor(neighborhood,dim), -1, 2)
-!                     y1patch = ijkGhosts(1, 2, inverse_neighbor(neighborhood,dim), -1, 2)
-!                     z1patch = ijkGhosts(1, 3, inverse_neighbor(neighborhood,dim), -1, 2)
-!                     x2patch = ijkGhosts(2, 1, inverse_neighbor(neighborhood,dim), -1, 2)
-!                     y2patch = ijkGhosts(2, 2, inverse_neighbor(neighborhood,dim), -1, 2)
-!                     z2patch = ijkGhosts(2, 3, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     x1patch = ijkPatches(1, 1, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     y1patch = ijkPatches(1, 2, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     z1patch = ijkPatches(1, 3, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     x2patch = ijkPatches(2, 1, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     y2patch = ijkPatches(2, 2, inverse_neighbor(neighborhood,dim), -1, 2)
+!                     z2patch = ijkPatches(2, 3, inverse_neighbor(neighborhood,dim), -1, 2)
 !
 ! ! hvy_block( x1patch:x2patch, y1patch:y2patch, z1patch:z2patch ,:, hvyID) = 0.0_rk
 ! ! endif

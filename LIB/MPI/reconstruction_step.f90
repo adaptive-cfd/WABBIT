@@ -290,7 +290,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
         hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
 
         ! reconstruct from the manipulated coefficients
-        call mallat2spaghetti_block(params, wc, tmp_reconst)
+        call inflatedMallat2spaghetti_block(params, wc, tmp_reconst)
         call waveletReconstruction_block(params, tmp_reconst)
 
         ! reconstruction part. We manipulated the data and reconstructed them on the entire block with modified coeffs.
@@ -449,4 +449,292 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     ! enddo
     !
     ! deallocate(WCtmp)
+end subroutine
+
+
+
+subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, isMallat)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+
+    type (type_params), intent(in)      :: params
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)             !< light data array
+    real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)      !< heavy work data array - block data.
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)           !< heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
+    integer(kind=ik), intent(in)        :: level                       !< current level
+    logical, optional, intent(in)       :: isMallat                    !< is hvy_data already in mallat form or spaghetti form
+
+    integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID
+    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
+    logical                             :: toBeManipulated, is_Mallat
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+
+    nx = size(hvy_data, 1)
+    ny = size(hvy_data, 2)
+    nz = size(hvy_data, 3)
+    nc = size(hvy_data, 4)
+
+    is_mallat = .false.
+    if (present(isMallat)) is_Mallat = isMallat
+
+    if (allocated(wc)) then
+        if (size(wc, 4) < nc) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
+
+    do k = 1, hvy_n
+        hvyID = hvy_active(k)
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        ! check if this block is to be modified
+        do neighborhood = 1, size(hvy_neighbor, 2)
+            ! neighbor exists ?
+            if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                ! neighbor light data id
+                lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
+                ! we proceed level-wise
+                if ((level_neighbor < level_me).and.(level_me==level)) then
+                    toBeManipulated = .true.
+                    ! nnn = nnn + 1
+                    ! its enough if one neighborhood is true
+                    exit
+                endif
+            endif
+        enddo
+
+        if (toBeManipulated) then
+            ! transform to inflated mallat
+            if (is_Mallat) then
+                call Mallat2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
+            else
+                call spaghetti2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
+            endif
+
+            ! loop over all relevant neighbors
+            do neighborhood = 1, size(hvy_neighbor, 2)
+                ! neighbor exists ?
+                if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                    ! neighbor light data id
+                    lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                    level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                    level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
+                    if (level_neighbor < level_me) then
+                        ! manipulation of coeffs
+                        call coarseExtensionManipulateWC_block(params, wc, neighborhood)
+                        call coarseExtensionManipulateSC_block(params, wc, hvy_tmp(:,:,:,:,hvyID), neighborhood)
+                    elseif (level_neighbor > level_me) then
+                        ! it is actually possible for a block to have both finer and coarser neighbors. If its
+                        ! coarser, (level_neighbor<level_me), then coarseExtension is applied to this block.
+                        ! However for small Bs (or large wavelets, i.e. large Nreconr Nreconl), the coarseExt
+                        ! reconstruction step also takes into account the ghost nodes layer on the adjacent 
+                        ! side. If this adjacent block is then finer (level_neighbor > level_me), those WC
+                        ! should be zero and this is what we assure here, as they have not been correctly computed
+                        call coarseExtensionManipulateWC_block(params, wc, neighborhood, params%g, params%g)
+                        ! note if the neighboring blocks are on the same level, the WC are sync'ed between the 
+                        ! blocks, and we must NOT delete them.
+                        
+                        ! What about the SC?
+                        ! See the extensive comment in WaveDecomposition_dim1 on that. 
+                        ! "Magically", the SC are correct.
+                    endif
+                endif
+            enddo
+
+            ! transform wc from inflated mallat to normal mallat to store
+            call inflatedMallat2Mallat_block(params, wc, hvy_data(:,:,:,:,hvyID))
+        else  ! block is not modified, transform block to mallat
+            if (.not. is_Mallat) then
+                call spaghetti2Mallat_block(params, hvy_data(:,:,:,:,hvyID), wc(:,:,:,:,1))
+                hvy_data(:,:,:,:,hvyID) = wc(:,:,:,:,1)
+            endif
+        endif
+    enddo
+end subroutine
+
+
+
+subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+
+    type (type_params), intent(in)      :: params
+    integer(kind=ik), intent(inout)     :: lgt_block(:, :)             !< light data array
+    real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)      !< heavy work data array - block data.
+    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)           !< heavy data array - neighbor data
+    integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
+    integer(kind=ik), intent(in)        :: level                       !< current level
+
+    integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID, Nreconl, Nreconr
+    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
+    logical                             :: toBeManipulated
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
+
+    nx = size(hvy_data, 1)
+    ny = size(hvy_data, 2)
+    nz = size(hvy_data, 3)
+    nc = size(hvy_data, 4)
+
+    Nreconl = params%Nreconl
+    Nreconr = params%Nreconr 
+
+    if (allocated(tmp_reconst)) then
+        if (size(tmp_reconst, 4) < nc) deallocate(tmp_reconst)
+    endif
+    if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
+
+    do k = 1, hvy_n
+        hvyID = hvy_active(k)
+        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        ! check if this block is to be modified
+        do neighborhood = 1, size(hvy_neighbor, 2)
+            ! neighbor exists ?
+            if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                ! neighbor light data id
+                lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
+                ! we proceed level-wise
+                if ((level_neighbor < level_me).and.(level_me==level)) then
+                    toBeManipulated = .true.
+                    ! nnn = nnn + 1
+                    ! its enough if one neighborhood is true
+                    exit
+                endif
+            endif
+        enddo
+
+        if (toBeManipulated) then
+
+            ! reconstruct from the manipulated coefficients
+            call Mallat2spaghetti_block(params, hvy_data(:, :, :, 1:nc, hvyID), tmp_reconst)
+            call waveletReconstruction_block(params, tmp_reconst)
+
+            hvy_data(:,:,:,:,hvyID) = hvy_tmp(:,:,:,:,hvyID)
+
+            ! reconstruction part. We manipulated the data and reconstructed them on the entire block with modified coeffs.
+            ! Now, we copy those reconstructed data back to the original block - this is
+            ! the actual coarseExtension.
+            ! JB: In theory we synched the SC and WC of the same level so we could overwrite the whole domain
+            !     however, as with blocks with both finer and coarser neighbours the finer neighbours do not synch WC and SC
+            !     the WR reconstructs false values at the border there
+            !     For CVS this problem should solve itself as every block can find same-level neighbours for all directions
+            do neighborhood = 1, size(hvy_neighbor,2)
+                if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
+                    ! neighbor light data id
+                    lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
+                    level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+                    level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
+                    if (level_neighbor < level_me) then
+                        ! coarse extension case (neighbor is coarser)
+                        if (params%dim == 2) then
+                            select case (neighborhood)
+                            case (9:10)
+                                ! -x
+                                hvy_data(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
+                            case (11:12)
+                                ! +x
+                                hvy_data(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx,:,:,1:nc)
+                            case (13:14)
+                                ! +y
+                                hvy_data(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny,:,1:nc)
+                            case (15:16)
+                                ! -y
+                                hvy_data(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
+                            case (5)
+                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny,:,1:nc)
+                            case (6)
+                                hvy_data(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
+                            case (7)
+                                ! top right corner
+                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny,:,1:nc)
+                            case (8)
+                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl,:,1:nc)
+                            end select
+                        else
+                            select case(neighborhood)
+                            ! ---faces---
+                            case (35:38)
+                                ! +x
+                                hvy_data(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, :, 1:nc)
+                            case (43:46)
+                                ! -x
+                                hvy_data(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, :, 1:nc)
+                            case (39:42)
+                                ! +y
+                                hvy_data(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, :, 1:nc)
+                            case (31:34)
+                                ! -y
+                                hvy_data(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, :, 1:nc)
+                            case (27:30)
+                                ! +z
+                                hvy_data(:, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, :, nz-Nreconr+1:nz, 1:nc)
+                            case (47:50)
+                                ! -z
+                                hvy_data(:, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, :, 1:Nreconl, 1:nc)
+                            ! --- corners ---
+                            case (26)
+                                hvy_data(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc)
+                            case (23)
+                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc)
+                            case (22)
+                                hvy_data(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
+                            case (19)
+                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
+                            case (25)
+                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
+                            case (21)
+                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
+                            case (20)
+                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
+                            case (24)
+                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
+                            ! ---(partial) edges---
+                            case (51:52)
+                                hvy_data(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
+                            case (53:54)
+                                hvy_data(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc)
+                            case (55:56)
+                                hvy_data(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
+                            case (57:58)
+                                hvy_data(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc)
+                            case (59:60)
+                                hvy_data(:, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, 1:Nreconl, 1:nc)
+                            case (61:62)
+                                hvy_data(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc)
+                            case (63:64)
+                                hvy_data(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
+                            case (65:66)
+                                hvy_data(1:Nreconl, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, 1:Nreconl, 1:nc)
+                            case (67:68)
+                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc)
+                            case (69:70)
+                                hvy_data(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, :, 1:nc)
+                            case (71:72)
+                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc)
+                            case (73:74)
+                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc)
+                            end select
+                        endif
+                    endif
+                endif
+            enddo
+
+        else  ! block is not modified, rewrite old values
+                hvy_data(:,:,:,:,hvyID) = hvy_tmp(:,:,:,:,hvyID)
+        endif
+    enddo
 end subroutine

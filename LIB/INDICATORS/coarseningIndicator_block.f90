@@ -9,8 +9,10 @@
 !! -1 block wants to coarsen \n
 ! ********************************************************************************************
 
-subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, indicator, &
-    iteration, refinement_status, norm, level, detail_precomputed, block_mask)
+subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
+    refinement_status, norm, level, block_mask)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
 
     implicit none
     type (type_params), intent(in)      :: params
@@ -25,13 +27,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     real(kind=rk), intent(inout), optional :: block_mask(:, :, :, :)
     !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
-    !> block spacing and origin
-    real(kind=rk), intent(in)           :: dx(1:3), x0(1:3)
     !> how to choose blocks for refinement
     character(len=*), intent(in)        :: indicator
-    !> coarsening iteration index. coarsening is done until the grid has reached
-    !! the steady state; therefore, this routine is called several times for
-    integer(kind=ik), intent(in)        :: iteration
     ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
     ! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
@@ -39,7 +36,6 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
-    real(kind=rk), intent(inout)        :: detail_precomputed(:)
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz
@@ -90,7 +86,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, detail_precomputed )
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level)
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )

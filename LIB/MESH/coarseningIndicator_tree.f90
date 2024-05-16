@@ -223,11 +223,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! this should prevent filtering artifacts at block-block interfaces.
             if (level /= level_this) cycle
 
-            ! some indicators may depend on the grid, hence
-            ! we pass the spacing and origin of the block (as we have to compute vorticity
-            ! here, this can actually be omitted.)
-            call get_block_spacing_origin( params, lgtID, x0, dx )
-
             ! force blocks on maximum refinement level to coarsen, if parameter is set.
             ! Note this behavior can be bypassed using the ignore_maxlevel switch.
             if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) then
@@ -237,12 +232,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 ! evaluate the criterion on this block.
                 if (params%threshold_mask .and. present(hvy_mask)) then
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
-                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_details(:,hvyID), hvy_mask(:,:,:,:,hvyID))
+                    hvy_tmp(:,:,:,:,hvyID), indicator, &
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
                 else
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
-                    hvy_tmp(:,:,:,:,hvyID), dx, x0, indicator, iteration, &
-                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_details(:,hvyID))
+                    hvy_tmp(:,:,:,:,hvyID), indicator, &
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level)
                 endif
             endif
         enddo

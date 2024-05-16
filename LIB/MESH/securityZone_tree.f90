@@ -98,18 +98,22 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
 
     ! create new blocks, if necessary.
     ! Note: we bypass "refine_tree" because the refinementIndicator_tree removes coarsening flags
+    ! This is incredibly tricky, I need to think about some potential issues with this
     if (refinement) then
-        ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
-        call ensureGradedness_tree( params, tree_ID )
+        write(*, '("This case is currently not checked. If you encounter this I am sorry, apparently Julius did not think it through yet!")')
+        call abort(197)
 
-        ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-        if (params%dim == 3) then
-            call refinementExecute3D_tree( params, hvy_block, tree_ID )
-        else
-            call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-        endif
+        ! ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
+        ! call ensureGradedness_tree( params, tree_ID )
 
-        ! grid has changed...
-        call updateMetadata_tree(params, tree_ID)
+        ! ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
+        ! if (params%dim == 3) then
+        !     call refinementExecute3D_tree( params, hvy_block, tree_ID )
+        ! else
+        !     call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
+        ! endif
+
+        ! ! grid has changed...
+        ! call updateMetadata_tree(params, tree_ID)
     endif
 end subroutine

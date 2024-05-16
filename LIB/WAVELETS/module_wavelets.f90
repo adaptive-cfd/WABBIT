@@ -1423,7 +1423,7 @@ contains
     ! Inflated Mallat ordering is a HACK. I was just easier to code.
     ! That does not mean its wrong, it isn't. But is uses extra memory (although
     ! that is negligible) and does unnecessary copy actions.
-    subroutine Mallat2inflatedMallat(params, wc, u)
+    subroutine Mallat2inflatedMallat_block(params, wc, u)
         implicit none
         type (type_params), intent(in) :: params
         ! The WC and u array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
@@ -1515,7 +1515,7 @@ contains
     ! Inflated Mallat ordering is a HACK. I was just easier to code.
     ! That does not mean its wrong, it isn't. But is uses extra memory (although
     ! that is negligible) and does unnecessary copy actions.
-    subroutine inflatedMallat2Mallat(params, u, wc)
+    subroutine inflatedMallat2Mallat_block(params, u, wc)
         implicit none
         type (type_params), intent(in) :: params
         ! The WC and u array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)

@@ -85,7 +85,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-        call mallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
+        call inflatedMallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
     end do
     deallocate(wc)
 

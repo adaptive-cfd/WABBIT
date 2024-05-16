@@ -104,12 +104,12 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik) sLevel
     logical :: SM2M = .false., SM2C = .false., SC2M = .false., SM2F = .false., SF2M = .false.
 
-    integer(kind=ik)   :: myrank, mpisize, ii0, ii1, Bs(1:3), buffer_offset
+    integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
     integer(kind=ik)   :: recver_rank, recver_hvyID, patch_size
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
 
-    integer(kind=ik) :: ijk(2,3), isend, irecv, s(1:4), count_send_total
+    integer(kind=ik) :: ijk(2,3), isend, irecv, count_send_total
     integer(kind=ik) :: bounds_type, istage, inverse, gminus, gplus
     real(kind=rk) :: t0, t1
 
@@ -155,7 +155,7 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     ! once in a module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkGhosts([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+    ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
     ! As g can be varied (as long as it does not exceed the maximum value params%g), it is set up
     ! each time we sync (at negligibble cost)
     call ghosts_setup_patches(params, gminus=gminus, gplus=gplus, output_to_file=.false.)
@@ -166,14 +166,6 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
 ! Diagonal neighbors (not required for the RHS)
 ! 2D: 5,6,7,8
 ! 3D: 7-18, 19-26, 51-74
-!
-! New Idea (09 Apr 2023)
-!
-! During adapt_mesh, which is the most performance-hungry part of the algorithm with biorthogonal wavelets
-! we should sync certain levels only. This we need also for the complete wavelet transform and denoising/CVS.
-! Synching a level should mean we syn (J,J-1). We start from Jmax. This means: sync all neighborhoods that
-! involve level J, also on blocks of level J-1. It does not mean a block on (J-1) is completely synced, just those
-! neighborhoods.
 !
 ! 2nd IDEA: stage-free ghost nodes.
 ! ==> did not work yet
@@ -206,61 +198,11 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
         call toc( "sync ghosts (prepare metadata)", MPI_wtime()-t1 )
 
         !***************************************************************************
-        ! (ii) prepare data for sending
+        ! (ii) sending handled by xfer_block_data
         !***************************************************************************
         t1 = MPI_wtime()
-        do k = 0, mpisize-1
-            ! write in total size of entries at beginning of each part and pre-shift real_pos
-            buffer_offset = sum(meta_send_counter(0:k-1))*S_META_SEND + sum(data_send_counter(0:k-1)) + k + 1
-            rData_sendBuffer(buffer_offset) = meta_send_counter(k)
-            real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
-
-            ! ! test send/receive sizes
-            ! write(*, '("Rank ", i0, " to ", i0, " Send ", 4(i0, 1x), "Receive ", 4(i0, 1x), "Patches ", 4(i0, 1x))') myrank, k, data_send_counter, data_recv_counter, meta_send_counter
-        end do
-
-        do k = 0, count_send_total-1  ! we do MPI so lets stick to 0-based for a moment
-            recver_rank = meta_send_all(S_META_FULL*k + 3)
-            ! internal relation needs to prepare nothing and will be handled later
-            if ( myrank /= recver_rank ) then
-                ! unpack from metadata array what we need
-                sender_hvyID = meta_send_all(S_META_FULL*k + 1)
-                recver_hvyID = meta_send_all(S_META_FULL*k + 2)
-                neighborhood = meta_send_all(S_META_FULL*k + 4)
-                level_diff = meta_send_all(S_META_FULL*k + 5)
-                patch_size = meta_send_all(S_META_FULL*k + 6)
-
-                ! external relation (MPI communication)
-                call send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, recver_hvyID, neighborhood, level_diff, patch_size)
-            end if
-        end do ! loop over all patches (all heavy_n where neighborhood exists and ghost synching is applied)
-
-        call toc( "sync ghosts (prepare data)", MPI_wtime()-t1 )
-        !***************************************************************************
-        ! (iii) transfer part (send/recv)
-        !***************************************************************************
-        t1 = MPI_wtime()
-        call start_xfer_mpi( params, isend, irecv )
-        call toc( "sync ghosts (start_xfer_mpi)", MPI_wtime()-t1 )
-
-        !***************************************************************************
-        ! (iv) Unpack received data in the ghost node layers
-        !***************************************************************************
-        ! process-internal ghost points (direct copy)
-        t1 = MPI_wtime()
-        call unpack_ghostlayers_internal( params, hvy_block, count_send_total )
-        call toc( "sync ghosts (unpack internal)", MPI_wtime()-t1 )
-
-        ! before unpacking the data we received from other ranks, we wait for the transfer
-        ! to be completed
-        t1 = MPI_wtime()
-        call finalize_xfer_mpi(params, isend, irecv)
-        call toc( "sync ghosts (finalize_xfer_mpi)", MPI_wtime()-t1 )
-
-        ! process-external ghost points (copy from buffer)
-        t1 = MPI_wtime()
-        call unpack_ghostlayers_external( params, hvy_block )
-        call toc( "sync ghosts (unpack external)", MPI_wtime()-t1 )
+        call xfer_block_data(params, hvy_block, count_send_total)
+        call toc( "sync ghosts (xfer_block_data)", MPI_wtime()-t1 )
 
     end do ! loop over stages 1,2
 
@@ -417,356 +359,6 @@ end subroutine sync_ghosts_generic
 
 
 
-subroutine send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, &
-    recver_hvyID, neighborhood, level_diff, patch_size)
-    implicit none
-
-    type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: recver_rank ! zero-based
-    integer(kind=ik), intent(in)   :: sender_hvyID, recver_hvyID
-    integer(kind=ik), intent(in)   :: neighborhood
-    integer(kind=ik), intent(in)   :: level_diff
-    integer(kind=ik), intent(in)   :: patch_size
-    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)
-
-    ! Following are global data used but defined in module_mpi:
-    ! res_pre_data, rDara_sendBuffer
-
-    ! merged information of level diff and an indicator that we have a historic finer sender
-    integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
-    integer(kind=ik)   :: patch_ijk(2,3), size_buff(4), nc
-
-    nc = size(hvy_block,4)
-    if (size(res_pre_data,4) < nc) then
-        size_buff(1) = size( res_pre_data, 1 )
-        size_buff(2) = size( res_pre_data, 2 )
-        size_buff(3) = size( res_pre_data, 3 )
-        size_buff(4) = size( hvy_block, 4 )
-        deallocate( res_pre_data )
-        allocate( res_pre_data(size_buff(1), size_buff(2), size_buff(3), size_buff(4)) )
-    endif
-
-    ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-    ! They depend on the neighbor-relation, level difference and the bounds type.
-    ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-    if ( level_diff == 0 ) then
-        ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
-        ! we will send to our neighbor mpirank
-        patch_ijk = ijkGhosts(:,:, neighborhood, level_diff, SENDER)
-
-        call GhostLayer2Line( params, line_buffer, buffer_size, &
-        hvy_block( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
-
-    else
-        ! up/downsample data first, then flatten to 1D buffer
-        patch_ijk = ijkGhosts(:,:, neighborhood, level_diff, SENDER)
-
-        call restrict_predict_data( params, res_pre_data, patch_ijk, neighborhood, level_diff, hvy_block, sender_hvyID )
-
-        patch_ijk = ijkGhosts(:,:, neighborhood, level_diff, RESPRE)
-
-        call GhostLayer2Line( params, line_buffer, buffer_size, &
-        res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
-    end if
-
-    ! now append data, first lets find the positions in the array, +1 to skip count number
-    buffer_offset = sum(meta_send_counter(0:recver_rank-1))*S_META_SEND + sum(data_send_counter(0:recver_rank-1)) + recver_rank + 1
-    data_offset = buffer_offset + real_pos(recver_rank)
-
-    if (buffer_size /= patch_size) then
-        write(*, '("ERROR: I am confused because real buffer_size is not equivalent to theoretical one:", i0, " - ", i0)') buffer_size, patch_size
-        call abort(666)
-    endif
-
-    ! set metadata, encoded in float, as ints up to 2^53 can be exactly represented with doubles this is not a problem
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 1) = recver_hvyID
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 2) = neighborhood
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 3) = level_diff
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 4) = buffer_size
-#ifdef DEV
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 5) = recver_rank  ! receiver rank only for DEV
-#endif
-
-    ! set data
-    if (buffer_size>0) then
-        rData_sendBuffer( data_offset:data_offset+buffer_size-1 ) = line_buffer(1:buffer_size)
-    endif
-
-    ! shift positions
-    real_pos(recver_rank) = real_pos(recver_rank) + buffer_size
-    int_pos(recver_rank) = int_pos(recver_rank) + 1
-
-end subroutine send_prepare_external
-
-
-subroutine unpack_ghostlayers_external( params, hvy_block )
-    implicit none
-
-    type (type_params), intent(in)      :: params
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-
-    integer(kind=ik) :: sender_rank, myrank ! zero-based
-    integer(kind=ik) :: recver_hvyID, neighborhood
-    integer(kind=ik) :: level_diff, bounds_type, buffer_position, buffer_size, rank_destination
-    integer(kind=ik) :: ijk1(2,3), nc, k_patches, buffer_offset, offset_data, n_patches
-
-    myrank = params%rank
-    nc = size(hvy_block,4)
-
-    do sender_rank = 0, params%number_procs-1 ! zero-based
-        ! skip my own rank, skip ranks that did not send me anything
-        if (sender_rank /= myrank .and. data_recv_counter(sender_rank) /= 0) then
-            ! first get overall offset of data
-            buffer_offset = sum(meta_recv_counter(0:sender_rank-1))*S_META_SEND + sum(data_recv_counter(0:sender_rank-1)) + sender_rank + 1
-            n_patches = int(rData_recvBuffer(buffer_offset))
-
-            ! point to first data
-            offset_data = buffer_offset + n_patches*S_META_SEND + 1
-
-            do k_patches = 0, n_patches-1
-                ! extract metadata
-                recver_hvyID     = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+1))
-                neighborhood     = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+2))
-                level_diff       = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+3))
-                buffer_size      = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+4))
-#ifdef DEV
-                rank_destination = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+5))
-                if (rank_destination /= myrank) then
-                    write(*,'("rank= ", i0, " dest= ", i0, " patch= ", i0, " recver_rank= ", i0)') myrank, rank_destination, k_patches, sender_rank
-                    call abort(7373872, "EXT this data seems to be not mine!")
-                endif
-#endif
- 
-                ! copy data to line buffer. we now need to extract this to the ghost nodes layer (2D/3D)
-                line_buffer(1:buffer_size) = rData_recvBuffer( offset_data : offset_data+buffer_size-1 )
-
-
-                ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                ! They depend on the neighbor-relation, level difference and the bounds type.
-                ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                call Line2GhostLayer( params, line_buffer, ijkGhosts(:,:, neighborhood, level_diff, RECVER), hvy_block, recver_hvyID )
-
-                ! increase buffer position marker
-                offset_data = offset_data + buffer_size
-            end do
-        end if
-    end do
-
-end subroutine unpack_ghostlayers_external
-
-
-
-subroutine unpack_ghostlayers_internal( params, hvy_block, count_send_total )
-    implicit none
-
-    type (type_params), intent(in)      :: params
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: count_send_total  !< total amount of patches for do loop
-
-    integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, neighborhood
-    integer(kind=ik) :: sender_hvyID, level_diff
-    integer(kind=ik) :: send_ijk(2,3), recv_ijk(2,3), nc, myrank
-
-    nc = size(hvy_block,4)
-    myrank  = params%rank
-
-    do k_patch = 0, count_send_total-1
-        ! check if this ghost point patch is addressed from me to me
-        recver_rank = meta_send_all(S_META_FULL*k_patch + 3)
-        if (recver_rank == myrank) then
-            ! unpack required info:  sender_hvyID, recver_hvyID, neighborhood, level_diff
-            sender_hvyID = meta_send_all(S_META_FULL*k_patch + 1)
-            recver_hvyID = meta_send_all(S_META_FULL*k_patch + 2)
-            neighborhood = meta_send_all(S_META_FULL*k_patch + 4)
-            level_diff = meta_send_all(S_META_FULL*k_patch + 5)
-
-            if ( level_diff == 0 ) then
-                ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
-                ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                ! They depend on the neighbor-relation and level difference
-                ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                send_ijk = ijkGhosts(:,:, neighborhood, level_diff, RECVER)
-                recv_ijk = ijkGhosts(:,:, neighborhood, level_diff, SENDER)
-    
-                hvy_block( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                hvy_block( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
-            else
-                ! interpolation or restriction before inserting
-                call restrict_predict_data( params, res_pre_data, ijkGhosts(1:2,1:3, neighborhood, level_diff, SENDER), &
-                neighborhood, level_diff, hvy_block, sender_hvyID )
-    
-                ! copy interpolated / restricted data to ghost nodes layer
-                ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkGhosts array (see module_MPI).
-                ! They depend on the neighbor-relation, level difference and the bounds type.
-                ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-    
-                send_ijk = ijkGhosts(:, :, neighborhood, level_diff, RECVER)
-                recv_ijk = ijkGhosts(:, :, neighborhood, level_diff, RESPRE)
-    
-                hvy_block( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                res_pre_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc)
-            end if
-        endif
-    end do
-
-end subroutine unpack_ghostlayers_internal
-
-
-subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
-    implicit none
-
-    type (type_params), intent(in)   :: params
-    !> data buffer
-    real(kind=rk), intent(inout)     :: line_buffer(:)
-    ! buffer size
-    integer(kind=ik), intent(out)    :: buffer_counter
-    !> heavy block data, all data fields
-    real(kind=rk), intent(inout)     :: hvy_data(:, :, :, :)
-
-    ! loop variable
-    integer(kind=ik) :: i, j, k, dF
-    ! reset buffer size
-    buffer_counter = 0
-
-    ! loop over all components
-    do dF = 1, size(hvy_data,4)
-        do k = 1, size(hvy_data, 3) ! third dimension, note: for 2D cases k is always 1
-            do j = 1, size(hvy_data, 2)
-                do i = 1, size(hvy_data, 1)
-                    ! increase buffer size
-                    buffer_counter = buffer_counter + 1
-                    ! write data buffer
-                    line_buffer(buffer_counter)   = hvy_data( i, j, k, dF )
-                end do
-            end do
-        end do
-    end do
-
-end subroutine GhostLayer2Line
-
-!############################################################################################################
-
-subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_block, hvy_id )
-    implicit none
-
-    type (type_params), intent(in)  :: params
-    !> data buffer
-    real(kind=rk), intent(inout)    :: line_buffer(:)
-    !> data_bounds
-    integer(kind=ik), intent(inout) :: data_bounds(2,3)
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
-    !> hvy id
-    integer(kind=ik), intent(in)    :: hvy_id
-
-    ! loop variable
-    integer(kind=ik) :: i, j, k, dF, buffer_i
-
-    buffer_i = 1
-    ! loop over all components
-    do dF = 1, size(hvy_block,4)
-        do k = data_bounds(1,3), data_bounds(2,3) ! third dimension, note: for 2D cases k is always 1
-            do j = data_bounds(1,2), data_bounds(2,2)
-                do i = data_bounds(1,1), data_bounds(2,1)
-                    ! write data buffer
-                    hvy_block( i, j, k, dF, hvy_id ) = line_buffer( buffer_i )
-                    buffer_i = buffer_i + 1
-                end do
-            end do
-        end do
-    end do
-
-end subroutine Line2GhostLayer
-
-
-!############################################################################################################
-
-subroutine start_xfer_mpi( params, isend, irecv)
-
-    implicit none
-
-    type (type_params), intent(in)  :: params
-    integer(kind=ik), intent(out)   :: isend, irecv
-
-    ! Following are global data used but defined in module_mpi:
-    ! integer(kind=ik), intent(inout) :: iMetaData_sendBuffer(:)
-    ! integer(kind=ik), intent(inout) :: iMetaData_recvBuffer(:)
-    ! real(kind=rk), intent(inout)    :: rData_sendBuffer(:)
-    ! real(kind=rk), intent(inout)    :: rData_recvBuffer(:)
-
-    integer(kind=ik) :: length_realBuffer, mpirank_partner
-    integer(kind=ik) :: length_intBuffer, rank, ierr, tag
-    integer(kind=ik) :: buffer_start
-
-    rank = params%rank
-    isend = 0
-    irecv = 0
-
-    ! these two arrays are module-global.
-    recv_request = MPI_REQUEST_NULL
-    send_request = MPI_REQUEST_NULL
-
-    ! Note: internal ghost nodes do not pass by the buffer, they only require the integer
-    ! buffer above. Therefore, no data (a message of zero length) will be sent to myself
-    do mpirank_partner = 0, params%number_procs-1 ! zero based
-
-        if (data_send_counter(mpirank_partner) > 0) then
-            ! increase communication counter
-            isend = isend + 1
-
-            ! the amount of data is pre-computed in prepare_metadata
-            ! hence we do know how much data we will send:
-            ! 1 - amount of patches to send (metadata of metadata)
-            ! metadata*num_of_integers
-            ! actual data
-            length_realBuffer = data_send_counter(mpirank_partner) + meta_send_counter(mpirank_partner)*S_META_SEND + 1
-            buffer_start = sum(meta_send_counter(0:mpirank_partner-1))*S_META_SEND + sum(data_send_counter(0:mpirank_partner-1)) + mpirank_partner + 1
-
-            ! send data
-            tag = rank
-            call MPI_Isend( rData_sendBuffer(buffer_start:buffer_start+length_realBuffer-1), length_realBuffer, MPI_REAL8, &
-            mpirank_partner, tag, WABBIT_COMM, send_request(isend), ierr)
-
-        end if
-
-        if (data_recv_counter(mpirank_partner) > 0) then
-            ! increase communication counter
-            irecv = irecv + 1
-
-            ! the amount of data is pre-computed in prepare_metadata
-            ! hence we do know how much data we will receive:
-            ! 1 - amount of patches to receive (metadata of metadata)
-            ! metadata*num_of_integers
-            ! actual data
-            length_realBuffer = data_recv_counter(mpirank_partner) + meta_recv_counter(mpirank_partner)*S_META_SEND + 1
-            buffer_start = sum(meta_recv_counter(0:mpirank_partner-1))*S_META_SEND + sum(data_recv_counter(0:mpirank_partner-1)) + mpirank_partner + 1
-
-            ! receive data
-            tag = mpirank_partner
-            call MPI_Irecv( rData_recvBuffer(buffer_start:buffer_start+length_realBuffer-1), length_realBuffer, MPI_REAL8, &
-            mpirank_partner, MPI_ANY_TAG, WABBIT_COMM, recv_request(irecv), ierr)
-        end if
-    end do
-end subroutine start_xfer_mpi
-
-
-subroutine finalize_xfer_mpi(params, isend, irecv)
-    implicit none
-    type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in) :: isend, irecv
-    integer(kind=ik) :: ierr
-
-    ! synchronize non-blocking communications
-    if (isend>0) then
-        call MPI_Waitall( isend, send_request(1:isend), MPI_STATUSES_IGNORE, ierr)
-    end if
-    if (irecv>0) then
-        call MPI_Waitall( irecv, recv_request(1:irecv), MPI_STATUSES_IGNORE, ierr)
-    end if
-end subroutine
-
-
-
 ! This subroutine prepares who sends to whom. This includes:
 !    - logic of different synchronization situations
 !    - saving of all metadata
@@ -800,7 +392,7 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
-    !    internalNeighborsSyncs (possibly needs renaming after this function)
+    !    meta_send_all (possibly needs renaming after this function)
 
     integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
@@ -826,6 +418,7 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
         ! calculate light id
         sender_hvyID = hvy_active(k_block)
         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
+        level = lgt_block( sender_lgtID, IDX_MESH_LVL )
 
         ! loop over all neighbors
         do neighborhood = 1, size(hvy_neighbor, 2)
@@ -850,7 +443,6 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
                 ! leveldiff =  0 : sender is same level as recver
                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-                level = lgt_block( sender_lgtID, IDX_MESH_LVL )
                 level_diff = level - lgt_block( recver_lgtID, IDX_MESH_LVL )
 
                 ! Send logic, following cases exist currently, all linked as .or.:
@@ -864,7 +456,7 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
                 .or. (istage==1 .and. level_diff== 0 .and. (sLevel==-1 .or. (level==sLevel .and. sM2M)))) then
                     ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
                     ! receiver before sending with interpolation or downsampling.
-                    ijk = ijkGhosts(:, :, neighborhood, level_diff, RECVER)
+                    ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
 
                     if (myrank /= recver_rank) then
                         data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -900,7 +492,7 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
                     .or. (istage==1 .and. level_diff== 0 .and. (sLevel==-1 .or. (level==sLevel .and. sM2M)))) then
                         inverse = inverse_neighbor(neighborhood, dim)
 
-                        ijk = ijkGhosts(:, :, inverse, -1*level_diff, RECVER)
+                        ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -1006,7 +598,7 @@ end subroutine prepare_ghost_synch_metadata
 !                     ! why is this RECVER and not sender? Well, complicated. The amount of data on the sender patch
 !                     ! is not the same as in the receiver patch, because we interpolate or downsample. We effectively
 !                     ! transfer only the data the recver wants - not the extra data.
-!                     ijk = ijkGhosts(:, :, neighborhood, level_diff, RECVER)
+!                     ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
 !
 !                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
 !                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
@@ -1015,7 +607,7 @@ end subroutine prepare_ghost_synch_metadata
 !                     ! This is NOT the same number as before
 !                     inverse = inverse_neighbor(neighborhood, dim)
 !
-!                     ijk = ijkGhosts(:, :, inverse, -1*level_diff, RECVER)
+!                     ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
 !
 !                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
 !                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)

@@ -579,14 +579,18 @@ logical function patch_crosses_periodic_BC(x0, dx, ijk, dim)
 end function
 
 
-subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminus, gplus)
+! set recv bounds for different neighborhood or patch relations
+subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, gplus)
     implicit none
 
     type (type_params), intent(in)                  :: params
     !> data_bounds
     integer(kind=ik), intent(inout)                 :: data_bounds(2,3)
-    !> neighborhood relation, id from dirs
-    integer(kind=ik), intent(in)                    :: neighborhood
+    !> neighborhood or family relation, id from dirs
+    !! -8:-1 is mother/daughter relation
+    !! 0 is full block relation, level
+    !! 1:74 is neighborhood relation
+    integer(kind=ik), intent(in)                    :: relation
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: level_diff, gminus, gplus
 
@@ -600,8 +604,8 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
     data_bounds(:,:) = 1
 
     if ( params%dim == 3 ) then
-        !---3D------3D------3D------3D------3D------3D------3D------3D---
-        select case(neighborhood)
+        !---3D------Neighborhood
+        select case(relation)
             ! '__1/___'
         case(1)
             if (level_diff /= 0) return
@@ -785,7 +789,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
         case(19,20,21,22)
             data_bounds(1,3) = 1
             data_bounds(2,3) = g
-            select case(neighborhood)
+            select case(relation)
             case(19) ! '123/___'
                 data_bounds(1,1) = 1
                 data_bounds(2,1) = g
@@ -815,7 +819,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
         case(23,24,25,26)
             data_bounds(1,3) = Bs(3)+g+1
             data_bounds(2,3) = Bs(3)+g+gplus
-            select case(neighborhood)
+            select case(relation)
             case(23) ! '623/___'
                 data_bounds(1,1) = 1
                 data_bounds(2,1) = g
@@ -846,7 +850,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
             if ( level_diff == -1 ) then
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(27) ! '__1/123'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -875,7 +879,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
             elseif ( level_diff == 1 ) then
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(27) ! '__1/123'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -908,7 +912,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
                 ! first, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(31) ! '__2/123'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -939,7 +943,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
                 ! first, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(31) ! '__2/123'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -973,7 +977,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,1) = 1
                 data_bounds(2,1) = g
                 ! second, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(35) ! '__3/123'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = Bs(2)+g+gplus
@@ -1004,7 +1008,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,1) = 1
                 data_bounds(2,1) = g
                 ! second, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(35) ! '__3/123'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2))/2
@@ -1038,7 +1042,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
                 ! first, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(40) ! '__4/634'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1069,7 +1073,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
                 ! first, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(40) ! '__4/634'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1103,7 +1107,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,1) = Bs(1)+g+1
                 data_bounds(2,1) = Bs(1)+g+gplus
                 ! second, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(45) ! '__5/152'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = Bs(2)+g+gplus
@@ -1134,7 +1138,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(1,1) = Bs(1)+g+1
                 data_bounds(2,1) = Bs(1)+g+gplus
                 ! second, third dimension
-                select case(neighborhood)
+                select case(relation)
                 case(45) ! '__5/152'
                     data_bounds(1,2) = g+1
                     data_bounds(2,2) = g+(Bs(2))/2
@@ -1167,7 +1171,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
             if ( level_diff == -1 ) then
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(47) ! '__6/623'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1197,7 +1201,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
             elseif ( level_diff == 1 ) then
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(47) ! '__6/623'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1232,7 +1236,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = Bs(2)+g+gplus
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(51) ! '_12/123'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1247,7 +1251,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = Bs(2)+g+gplus
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(51) ! '_12/123'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1265,7 +1269,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(54) ! '_13/134'
                     data_bounds(1,2) = 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1280,7 +1284,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(54) ! '_13/134'
                     data_bounds(1,2) = g+(Bs(2))/2 + 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1298,7 +1302,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = g
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(55) ! '_14/134'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1314,7 +1318,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = g
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(55) ! '_14/134'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1333,7 +1337,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(57) ! '_15/145'
                     data_bounds(1,2) = 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1349,7 +1353,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,3) = 1
                 data_bounds(2,3) = g
-                select case(neighborhood)
+                select case(relation)
                 case(57) ! '_15/145'
                     data_bounds(1,2) = g+(Bs(2))/2 + 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1368,7 +1372,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = Bs(2)+g+gplus
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(59) ! '_62/623'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1383,7 +1387,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = Bs(2)+g+gplus
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(59) ! '_62/623'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1401,7 +1405,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(62) ! '_63/634'
                     data_bounds(1,2) = 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1416,7 +1420,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(62) ! '_63/634'
                     data_bounds(1,2) = g+(Bs(2))/2 + 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1434,7 +1438,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = g
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(63) ! '_64/634'
                     data_bounds(1,1) = 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1450,7 +1454,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = g
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(63) ! '_64/634'
                     data_bounds(1,1) = g+(Bs(1))/2 + 1
                     data_bounds(2,1) = Bs(1)+g
@@ -1469,7 +1473,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(65) ! '_65/645'
                     data_bounds(1,2) = 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1485,7 +1489,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,3) = Bs(3)+g+1
                 data_bounds(2,3) = Bs(3)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(65) ! '_65/645'
                     data_bounds(1,2) = g+(Bs(2))/2 + 1
                     data_bounds(2,2) = Bs(2)+g
@@ -1504,7 +1508,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(67) ! '_23/123'
                     data_bounds(1,3) = 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1519,7 +1523,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(67) ! '_23/123'
                     data_bounds(1,3) = g+(Bs(3))/2 + 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1537,7 +1541,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(69) ! '_25/152'
                     data_bounds(1,3) = 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1552,7 +1556,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,2) = Bs(2)+g+1
                 data_bounds(2,2) = Bs(2)+g+gplus
-                select case(neighborhood)
+                select case(relation)
                 case(69) ! '_25/152'
                     data_bounds(1,3) = g+(Bs(3))/2 + 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1570,7 +1574,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
-                select case(neighborhood)
+                select case(relation)
                 case(71) ! '_43/134'
                     data_bounds(1,3) = 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1585,7 +1589,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = g
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
-                select case(neighborhood)
+                select case(relation)
                 case(71) ! '_43/134'
                     data_bounds(1,3) = g+(Bs(3))/2 + 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1603,7 +1607,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
-                select case(neighborhood)
+                select case(relation)
                 case(73) ! '_45/145'
                     data_bounds(1,3) = 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1618,7 +1622,7 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,1) = Bs(1)+g+gplus
                 data_bounds(1,2) = 1
                 data_bounds(2,2) = g
-                select case(neighborhood)
+                select case(relation)
                 case(73) ! '_45/145'
                     data_bounds(1,3) = g+(Bs(3))/2 + 1
                     data_bounds(2,3) = Bs(3)+g
@@ -1630,10 +1634,55 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
 
             end if
 
+        !---3D------Full block relation
+        case(0)
+            if (level_diff /= 0) return
+            data_bounds(1,1) = g+1
+            data_bounds(2,1) = Bs(1)+g
+            data_bounds(1,2) = g+1
+            data_bounds(2,2) = Bs(2)+g
+            data_bounds(1,3) = g+1
+            data_bounds(2,3) = Bs(2)+g
+        !---3D------family relation, assume values on finer side are already WD in mallat-ordering
+        case(-1, -2, -3, -4, -5, -6, -7, -8)
+            if (level_diff == 0) then
+                return
+            ! only transfer SC if this is the finer block
+            elseif (level_diff == -1) then
+                data_bounds(1,1) = g+1
+                data_bounds(2,1) = g+Bs(1)/2
+                data_bounds(1,2) = g+1
+                data_bounds(2,2) = g+Bs(2)/2
+                data_bounds(1,3) = g+1
+                data_bounds(2,3) = g+Bs(2)/2
+            else
+                if (modulo(-relation, 2) == 0) then
+                    data_bounds(1,1) = g+1
+                    data_bounds(2,1) = g+Bs(1)/2
+                else
+                    data_bounds(1,1) = g+1+Bs(1)/2
+                    data_bounds(2,1) = g+Bs(1)
+                endif
+                if (modulo(-relation/2, 2) == 0) then
+                    data_bounds(1,2) = g+1
+                    data_bounds(2,2) = g+Bs(2)/2
+                else
+                    data_bounds(1,2) = g+1+Bs(2)/2
+                    data_bounds(2,2) = g+Bs(2)
+                endif
+                if (modulo(-relation/4, 2) == 0) then
+                    data_bounds(1,3) = g+1
+                    data_bounds(2,3) = g+Bs(2)/2
+                else
+                    data_bounds(1,3) = g+1+Bs(3)/2
+                    data_bounds(2,3) = g+Bs(3)
+                endif
+            endif
+
         end select
     else
-        !---2D------2D------2D------2D------2D------2D------2D------2D---
-        select case(neighborhood)
+        !---2D------Neighborhood
+        select case(relation)
             ! '__N'
         case(1)
             if (level_diff /= 0) return
@@ -1821,6 +1870,41 @@ subroutine set_recv_bounds( params, data_bounds, neighborhood, level_diff, gminu
                 data_bounds(2,2) = Bs(2)+g+gplus
 
             end if
+
+        !---2D------Full block relation
+        case(0)
+            if (level_diff /= 0) return
+            data_bounds(1,1) = g+1
+            data_bounds(2,1) = Bs(1)+g
+            data_bounds(1,2) = g+1
+            data_bounds(2,2) = Bs(2)+g
+
+        !---2D------family relation, assume values on finer side are already WD in mallat-ordering
+        case(-1, -2, -3, -4)
+            if (level_diff == 0) then
+                return
+            ! only transfer SC if this is the finer block
+            elseif (level_diff == -1) then
+                data_bounds(1,1) = g+1
+                data_bounds(2,1) = g+Bs(1)/2
+                data_bounds(1,2) = g+1
+                data_bounds(2,2) = g+Bs(2)/2
+            else
+                if (modulo(-relation, 2) == 0) then
+                    data_bounds(1,1) = g+1
+                    data_bounds(2,1) = g+Bs(1)/2
+                else
+                    data_bounds(1,1) = g+1+Bs(1)/2
+                    data_bounds(2,1) = g+Bs(1)
+                endif
+                if (modulo(-relation/2, 2) == 0) then
+                    data_bounds(1,2) = g+1
+                    data_bounds(2,2) = g+Bs(2)/2
+                else
+                    data_bounds(1,2) = g+1+Bs(2)/2
+                    data_bounds(2,2) = g+Bs(2)
+                endif
+            endif
 
         end select
     end if

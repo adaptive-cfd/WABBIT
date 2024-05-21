@@ -476,7 +476,6 @@ subroutine coarseExtensionJmax( params, lgt_block, hvy_block, hvy_work, hvy_neig
 
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
-    t0 = MPI_Wtime()
     nx = size(hvy_block, 1)
     ny = size(hvy_block, 2)
     nz = size(hvy_block, 3)

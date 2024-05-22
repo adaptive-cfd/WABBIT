@@ -1,5 +1,5 @@
 subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, hvy_neighbor, hvy_active, hvy_n, lgt_n, &
-    inputDataSynced, level, hvy_details )
+    inputDataSynced, level)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -20,7 +20,6 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     ! if the input data are sync'ed we do not do it here: otherwise, call
     ! ghost nodes synchronization
     logical, intent(in) :: inputDataSynced
-    real(kind=rk), intent(inout) :: hvy_details(:,:)
     integer(kind=ik), intent(in) :: level
 
 ! real(kind=rk), allocatable :: WCtmp(:,:,:,:,:,:) ! code used to verify that FWT after manip yields same coeffs
@@ -92,9 +91,6 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     endif
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
-
-    ! reset all details, not just the ones we'll re-compute
-    hvy_details = -1.0_rk
 
     !---------------------------------------------------------------------------
     ! create the list of blocks that will be affected by coarseExtension.
@@ -210,14 +206,14 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             ! this block has been FWT'ed but is not modified, howver, we can extract its details now
             call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
 
-            ! extract largest wavelet coeffcienct
-            do p = 1, nc
-                if (params%dim==3) then
-                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-                else
-                    hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-                endif
-            enddo
+            ! ! extract largest wavelet coeffcienct
+            ! do p = 1, nc
+            !     if (params%dim==3) then
+            !         hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+            !     else
+            !         hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+            !     endif
+            ! enddo
 
             ! restore original data (this block is not modified, but currently transformed to wavelet space)
             hvy_block(:,:,:,1:nc,hvyID) = hvy_work(:,:,:,1:nc,hvyID)
@@ -274,15 +270,15 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
 
         ! WCtmp(:,:,:,:,1:8,hvyID) = wc ! code used to verify that FWT after manip yields same coeffs
 
-        ! evaluate detail for blocks that were affected by coarseExtension (blocks on
-        ! the level J which are not affected by it are computed above)
-        do p = 1, nc
-            if (params%dim==3) then
-                hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-            else
-                hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-            endif
-        enddo
+        ! ! evaluate detail for blocks that were affected by coarseExtension (blocks on
+        ! ! the level J which are not affected by it are computed above)
+        ! do p = 1, nc
+        !     if (params%dim==3) then
+        !         hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+        !     else
+        !         hvy_details(p, hvyID) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+        !     endif
+        ! enddo
 
         ! copy back original data, then fix the coarse extension parts by
         ! copying tmp_reconst (the inverse of the manipulated SC/WC) into the patches
@@ -453,7 +449,7 @@ end subroutine
 
 
 
-subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, isMallat)
+subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -467,20 +463,16 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
     integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
     integer(kind=ik), intent(in)        :: level                       !< current level
-    logical, optional, intent(in)       :: isMallat                    !< is hvy_data already in mallat form or spaghetti form
 
     integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
-    logical                             :: toBeManipulated, is_Mallat
+    logical                             :: toBeManipulated
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
     nz = size(hvy_data, 3)
     nc = size(hvy_data, 4)
-
-    is_mallat = .false.
-    if (present(isMallat)) is_Mallat = isMallat
 
     if (allocated(wc)) then
         if (size(wc, 4) < nc) deallocate(wc)
@@ -490,13 +482,13 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        level_me       = lgt_block( lgtID, IDX_MESH_LVL )
         ! check if this block is to be modified
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 ! we proceed level-wise
@@ -511,11 +503,11 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
 
         if (toBeManipulated) then
             ! transform to inflated mallat
-            if (is_Mallat) then
-                call Mallat2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
-            else
-                call spaghetti2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
-            endif
+            call spaghetti2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
+
+            ! if (level == 4) then
+            !     write(*, '(i0, " max before ", es8.1)') lgtID, maxval( abs(wc(params%g+1:params%Bs(1)+params%g, params%g+1:params%Bs(2)+params%g, :, 1, 2:4)) )
+            ! endif
 
             ! loop over all relevant neighbors
             do neighborhood = 1, size(hvy_neighbor, 2)
@@ -523,8 +515,8 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
                     lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                    level_me       = lgt_block( lgtID, IDX_MESH_LVL )
                     level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
 
                     if (level_neighbor < level_me) then
                         ! manipulation of coeffs
@@ -548,13 +540,12 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
                 endif
             enddo
 
-            ! transform wc from inflated mallat to normal mallat to store
-            call inflatedMallat2Mallat_block(params, wc, hvy_data(:,:,:,:,hvyID))
-        else  ! block is not modified, transform block to mallat
-            if (.not. is_Mallat) then
-                call spaghetti2Mallat_block(params, hvy_data(:,:,:,:,hvyID), wc(:,:,:,:,1))
-                hvy_data(:,:,:,:,hvyID) = wc(:,:,:,:,1)
-            endif
+            ! if (level == 4) then
+            !     write(*, '(i0, " max after ", es8.1)') lgtID, maxval( abs(wc(params%g+1:params%Bs(1)+params%g, params%g+1:params%Bs(2)+params%g, :, 1, 2:4)) )
+            ! endif
+
+            ! transform wc from inflated mallat back to spaghetti
+            call inflatedMallat2spaghetti_block(params, wc, hvy_data(:,:,:,:,hvyID))
         endif
     enddo
 end subroutine
@@ -597,18 +588,20 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
     do k = 1, hvy_n
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+
         ! check if this block is to be modified
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
             if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                 ! neighbor light data id
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                level_me       = lgt_block( lgtID, IDX_MESH_LVL )
                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 ! we proceed level-wise
                 if ((level_neighbor < level_me).and.(level_me==level)) then
                     toBeManipulated = .true.
+
                     ! nnn = nnn + 1
                     ! its enough if one neighborhood is true
                     exit
@@ -617,12 +610,12 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
         enddo
 
         if (toBeManipulated) then
-
+        
             ! reconstruct from the manipulated coefficients
-            call Mallat2spaghetti_block(params, hvy_data(:, :, :, 1:nc, hvyID), tmp_reconst)
+            tmp_reconst = hvy_data(:,:,:,1:nc,hvyID)
             call waveletReconstruction_block(params, tmp_reconst)
 
-            hvy_data(:,:,:,:,hvyID) = hvy_tmp(:,:,:,:,hvyID)
+            hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
 
             ! reconstruction part. We manipulated the data and reconstructed them on the entire block with modified coeffs.
             ! Now, we copy those reconstructed data back to the original block - this is
@@ -635,7 +628,6 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
                     lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
-                    level_me       = lgt_block( lgtID, IDX_MESH_LVL )
                     level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                     if (level_neighbor < level_me) then
@@ -733,8 +725,13 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
                 endif
             enddo
 
-        else  ! block is not modified, rewrite old values
-                hvy_data(:,:,:,:,hvyID) = hvy_tmp(:,:,:,:,hvyID)
+        else  ! block is not modified, rewrite old values if it was transformed
+            if (level_me == level) then
+                hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
+            endif
         endif
+
+        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10h for - JB
+        toBeManipulated = .false.
     enddo
 end subroutine

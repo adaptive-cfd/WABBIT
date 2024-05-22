@@ -1,5 +1,5 @@
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, hvy_mask)
+    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, hvy_mask)
 
     use module_indicators
 
@@ -9,10 +9,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     integer(kind=ik), intent(in)        :: level_this                     !> current level to look at (in the case of biorthogonal wavelets, not in "harten-multiresolution")
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !> heavy work data array - block data.
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    !> mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    !! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    !! block level) so the physics modules have to provide an interface to create the mask at a tree
+    !! level. All parts of the mask shall be included: chi, boundary values, sponges.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
     character(len=*), intent(in)        :: indicator                      !> how to choose blocks for refinement
@@ -20,10 +20,12 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
+    
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
 
     ! for the mask generation (time-independent mask) we require the mask on the highest
     ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
-    logical, intent(in) :: ignore_maxlevel
+    logical, intent(in)                 :: ignore_maxlevel
 
     ! local variables
     integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level
@@ -31,7 +33,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    logical :: consider_hvy_tmp
+    logical :: consider_hvy_tmp, inputIsWD
     real(kind=rk) :: t0  !< timing for debugging
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -43,6 +45,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
     consider_hvy_tmp = .false.
+    inputIsWD = input_is_WD
     Jmax = params%Jmax
     neq = params%n_eqn
     Bs = params%Bs
@@ -86,31 +89,34 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! sync its ghost nodes in order to apply the detail operator to the entire
     !! derived field (incl gost nodes).
     if (consider_hvy_tmp) then
-        t0 = MPI_Wtime()
-        ! case with derived quantities.
-        ! loop over my active hvy data:
-        do k = 1, hvy_n(tree_ID)
-            hvyID = hvy_active(k, tree_ID)
+        call abort(197,"This case currently does not work as Julius needs to sort out the temporary arrays")
+        inputIsWD = .false.
 
-            ! get lgt id of block
-            call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        ! t0 = MPI_Wtime()
+        ! ! case with derived quantities.
+        ! ! loop over my active hvy data:
+        ! do k = 1, hvy_n(tree_ID)
+        !     hvyID = hvy_active(k, tree_ID)
 
-            ! some indicators may depend on the grid (e.g. the vorticity), hence
-            ! we pass the spacing and origin of the block
-            call get_block_spacing_origin( params, lgtID, x0, dx )
+        !     ! get lgt id of block
+        !     call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
 
-            ! actual computation of thresholding quantity (vorticity etc)
-            call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvyID), &
-            g, x0, dx, hvy_tmp(:,:,:,:,hvyID), hvy_mask(:,:,:,:,hvyID), N_thresholding_components )
-        enddo
+        !     ! some indicators may depend on the grid (e.g. the vorticity), hence
+        !     ! we pass the spacing and origin of the block
+        !     call get_block_spacing_origin( params, lgtID, x0, dx )
 
-        ! note here we sync hvy_tmp (=derived qty) and not hvy_block
-        call sync_ghosts_all( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        !     ! actual computation of thresholding quantity (vorticity etc)
+        !     call PREPARE_THRESHOLDFIELD_meta( params%physics_type, time, hvy_block(:,:,:,:,hvyID), &
+        !     g, x0, dx, hvy_tmp(:,:,:,:,hvyID), hvy_mask(:,:,:,:,hvyID), N_thresholding_components )
+        ! enddo
 
-        if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
-        call abort(2801191,"your thresholding does not work with threshold-mask.")
+        ! ! note here we sync hvy_tmp (=derived qty) and not hvy_block
+        ! call sync_ghosts_all( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
-        call toc( "coarseningIndicator (prepare thresholdfield)", MPI_Wtime()-t0 )
+        ! if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
+        ! call abort(2801191,"your thresholding does not work with threshold-mask.")
+
+        ! call toc( "coarseningIndicator (prepare thresholdfield)", MPI_Wtime()-t0 )
     endif
 
 
@@ -233,11 +239,11 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 if (params%threshold_mask .and. present(hvy_mask)) then
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), indicator, &
-                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvyID))
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, inputIsWD, hvy_mask(:,:,:,:,hvyID))
                 else
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), indicator, &
-                    lgt_block(lgtID, IDX_REFINE_STS), norm, level)
+                    lgt_block(lgtID, IDX_REFINE_STS), norm, level, inputIsWD)
                 endif
             endif
         enddo

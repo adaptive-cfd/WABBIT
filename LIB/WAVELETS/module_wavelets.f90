@@ -1182,7 +1182,7 @@ contains
     ! Inflated Mallat ordering is a HACK. I was just easier to code.
     ! That does not mean its wrong, it isn't. But is uses extra memory (although
     ! that is negligible) and does unnecessary copy actions.
-    subroutine inflatedMallat2spaghetti_block(params, wc, u)
+    subroutine inflatedMallat2spaghetti_block(params, wc, u, sc_only)
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
@@ -1202,7 +1202,14 @@ contains
         ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         !
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        !> Option to only convert SC
+        logical, optional, intent(in)  :: sc_only
+
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_s, i_e
+        logical sc_only_set
+
+        sc_only_set = .false.
+        if (present(sc_only)) sc_only_set = sc_only
 
         nx = size(u, 1)
         ny = size(u, 2)
@@ -1220,44 +1227,70 @@ contains
         ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
         ! in the sense that Nx*Ny data gives 4/8 * Nx*Ny decomposition.
 
-        ! copy from inflated Mallat to Spaghetti ordering
-        if (modulo(g, 2) == 0) then
-            ! even g
-            if (params%dim == 2) then
-                u(1:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
-                u(2:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
-                u(1:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
-                u(2:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
-            else
-                u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 1)
-                u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 2)
-                u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 3)
-                u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 4)
+        ! compute index shift for odd g, ignoring outmost elements
+        i_s = 1 + modulo(g, 2)  ! 1 for even, 2 for odd
+        i_e = 0 + modulo(g, 2)  ! 0 for even, 1 for odd
 
-                u(1:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 5)
-                u(2:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 6)
-                u(1:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 7)
-                u(2:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 8)
+        ! copy from inflated Mallat to Mallat ordering
+        if (params%dim == 2) then
+            u(       i_s:nx-i_e:2,   i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 1)
+            if (.not. sc_only_set) then
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 2)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 3)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 4)
             endif
         else
-            ! odd g
-            if (params%dim == 2) then
-                u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
-                u(3:nx:2  , 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
-                u(2:nx-1:2, 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
-                u(3:nx:2  , 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
-            else
-                u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1)
-                u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2)
-                u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3)
-                u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4)
+            u(       i_s:nx-i_e:2,   i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 1)
+            if (.not. sc_only_set) then
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 2)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 3)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 4)
 
-                u(2:nx-1:2, 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5)
-                u(3:nx:2  , 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6)
-                u(2:nx-1:2, 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7)
-                u(3:nx:2  , 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8)
+                u(   i_s:nx-i_e:2,   i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 5)
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 6)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 7)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 8)
             endif
         endif
+
+        ! ! copy from inflated Mallat to Spaghetti ordering
+        ! if (modulo(g, 2) == 0) then
+        !     ! even g
+        !     if (params%dim == 2) then
+        !         u(1:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
+        !         u(2:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
+        !         u(1:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
+        !         u(2:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
+        !     else
+        !         u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 1)
+        !         u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 2)
+        !         u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 3)
+        !         u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 4)
+
+        !         u(1:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 5)
+        !         u(2:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 6)
+        !         u(1:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 7)
+        !         u(2:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 8)
+        !     endif
+        ! else
+        !     ! odd g
+        !     if (params%dim == 2) then
+        !         u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
+        !         u(3:nx:2  , 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
+        !         u(2:nx-1:2, 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
+        !         u(3:nx:2  , 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
+        !     else
+        !         u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1)
+        !         u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2)
+        !         u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3)
+        !         u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4)
+
+        !         u(2:nx-1:2, 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5)
+        !         u(3:nx:2  , 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6)
+        !         u(2:nx-1:2, 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7)
+        !         u(3:nx:2  , 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8)
+        !     endif
+        ! endif
 
     end subroutine
 
@@ -1463,7 +1496,7 @@ contains
         Bs = params%bs
 
 #ifdef DEV
-        if (.not.areArraysSameSize(u, wc(:,:,:,:,1))) then
+        if (.not.areArraysSameSize(wc, u(:,:,:,:,1))) then
             call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
         endif
 #endif
@@ -1515,7 +1548,7 @@ contains
     ! Inflated Mallat ordering is a HACK. I was just easier to code.
     ! That does not mean its wrong, it isn't. But is uses extra memory (although
     ! that is negligible) and does unnecessary copy actions.
-    subroutine inflatedMallat2Mallat_block(params, u, wc)
+    subroutine inflatedMallat2Mallat_block(params, u, wc, sc_only)
         implicit none
         type (type_params), intent(in) :: params
         ! The WC and u array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
@@ -1544,8 +1577,14 @@ contains
         ! u(:,:,:,:,7)          GHG     wcyz wavelet coeffs
         ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
+        !> Option to only convert SC
+        logical, optional, intent(in)  :: sc_only
 
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_s, i_e
+        logical sc_only_set
+
+        sc_only_set = .false.
+        if (present(sc_only)) sc_only_set = sc_only
 
         nx = size(u, 1)
         ny = size(u, 2)
@@ -1555,49 +1594,36 @@ contains
         Bs = params%bs
 
 #ifdef DEV
-        if (.not.areArraysSameSize(u, wc(:,:,:,:,1))) then
+        if (.not.areArraysSameSize(wc, u(:,:,:,:,1))) then
             call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
         endif
 #endif
 
         wc = 0.0_rk
 
+        ! compute index shift for odd g, ignoring outmost elements
+        i_s = 1 + modulo(g, 2)  ! 1 for even, 2 for odd
+        i_e = 0 + modulo(g, 2)  ! 0 for even, 1 for odd
+
         ! copy from inflated Mallat to Mallat ordering
-        if (modulo(g, 2) == 0) then
-            ! even g
-            if (params%dim == 2) then
-                wc(      1:nx/2,      1:ny/2, :, :) = u( 1:nx:2, 1:ny:2, :, :, 1)
-                wc(      1:nx/2, ny/2+1:ny  , :, :) = u( 1:nx:2, 1:ny:2, :, :, 2)
-                wc( nx/2+1:nx  ,      1:ny/2, :, :) = u( 1:nx:2, 1:ny:2, :, :, 3)
-                wc( nx/2+1:nx  , ny/2+1:ny  , :, :) = u( 1:nx:2, 1:ny:2, :, :, 4)
-            else
-                wc(      1:nx/2,      1:ny/2,      1:nz/2, :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 1)
-                wc(      1:nx/2, ny/2+1:ny  ,      1:nz/2, :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 2)
-                wc( nx/2+1:nx  ,      1:ny/2,      1:nz/2, :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 3)
-                wc( nx/2+1:nx  , ny/2+1:ny  ,      1:nz/2, :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 4)
-        
-                wc(      1:nx/2,      1:ny/2, nz/2+1:nz  , :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 5)
-                wc(      1:nx/2, ny/2+1:ny  , nz/2+1:nz  , :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 6)
-                wc( nx/2+1:nx  ,      1:ny/2, nz/2+1:nz  , :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 7)
-                wc( nx/2+1:nx  , ny/2+1:ny  , nz/2+1:nz  , :) = u( 1:nx:2, 1:ny:2, 1:nz:2, :, 8)
+        if (params%dim == 2) then
+            wc(        i_s:nx/2  ,    i_s:ny/2  , :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 1)
+            if (.not. sc_only_set) then
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e, :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 2)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  , :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 3)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e, :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 4)
             endif
         else
-            ! odd g
-            if (params%dim == 2) then
-                wc(      2:nx/2,      2:ny/2, :, :) = u( 2:nx-1:2, 2:ny-1:2, :, :, 1)
-                wc(      2:nx/2, ny/2+1:ny-1, :, :) = u( 2:nx-1:2, 2:ny-1:2, :, :, 2)
-                wc( nx/2+1:nx-1,      2:ny/2, :, :) = u( 2:nx-1:2, 2:ny-1:2, :, :, 3)
-                wc( nx/2+1:nx-1, ny/2+1:ny-1, :, :) = u( 2:nx-1:2, 2:ny-1:2, :, :, 4)
-            else
-                wc(      2:nx/2,      2:ny/2,      2:nz/2, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1)
-                wc(      2:nx/2, ny/2+1:ny-1,      2:nz/2, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2)
-                wc( nx/2+1:nx-1,      2:ny/2,      2:nz/2, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3)
-                wc( nx/2+1:nx-1, ny/2+1:ny-1,      2:nz/2, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4)
+            wc(        i_s:nx/2  ,    i_s:ny/2  ,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 1)
+            if (.not. sc_only_set) then
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 2)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  ,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 3)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 4)
         
-                wc(      2:nx/2,      2:ny/2, nz/2+1:nz-1, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5)
-                wc(      2:nx/2, ny/2+1:ny-1, nz/2+1:nz-1, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6)
-                wc( nx/2+1:nx-1,      2:ny/2, nz/2+1:nz-1, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7)
-                wc( nx/2+1:nx-1, ny/2+1:ny-1, nz/2+1:nz-1, :) = u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8)
+                wc(    i_s:nx/2  ,    i_s:ny/2  , nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 5)
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e, nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 6)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  , nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 7)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e, nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 8)
             endif
         endif
     end subroutine

@@ -639,8 +639,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
                 hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
             endif
         end do
-        ! newly read blocks do not have their details evaluated in any case.
-        hvy_details(:, free_hvy_id ) = -99.9_rk
     end do
 
     deallocate(hvy_buffer)

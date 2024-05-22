@@ -1647,30 +1647,32 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
         case(-1, -2, -3, -4, -5, -6, -7, -8)
             if (level_diff == 0) then
                 return
-            ! only transfer SC if this is the finer block
-            elseif (level_diff == -1) then
-                data_bounds(1,1) = g+1
-                data_bounds(2,1) = g+Bs(1)/2
-                data_bounds(1,2) = g+1
-                data_bounds(2,2) = g+Bs(2)/2
-                data_bounds(1,3) = g+1
-                data_bounds(2,3) = g+Bs(2)/2
+            ! only transfer SC if this is the finer block, from Mallat ordering
+            ! take into account that this depends on if g is even or odd
+            elseif (level_diff == +1) then
+                data_bounds(1,1) = ceiling(g/2.0)+1
+                data_bounds(2,1) = ceiling(g/2.0)+Bs(1)/2
+                data_bounds(1,2) = ceiling(g/2.0)+1
+                data_bounds(2,2) = ceiling(g/2.0)+Bs(2)/2
+                data_bounds(1,3) = ceiling(g/2.0)+1
+                data_bounds(2,3) = ceiling(g/2.0)+Bs(2)/2
+            ! Transfer directly into domain wich is not decomposed so we only select the part
             else
-                if (modulo(-relation, 2) == 0) then
-                    data_bounds(1,1) = g+1
-                    data_bounds(2,1) = g+Bs(1)/2
-                else
-                    data_bounds(1,1) = g+1+Bs(1)/2
-                    data_bounds(2,1) = g+Bs(1)
-                endif
-                if (modulo(-relation/2, 2) == 0) then
+                if (modulo(-relation-1, 2) == 0) then
                     data_bounds(1,2) = g+1
-                    data_bounds(2,2) = g+Bs(2)/2
+                    data_bounds(2,2) = g+Bs(1)/2
                 else
-                    data_bounds(1,2) = g+1+Bs(2)/2
-                    data_bounds(2,2) = g+Bs(2)
+                    data_bounds(1,2) = g+1+Bs(1)/2
+                    data_bounds(2,2) = g+Bs(1)
                 endif
-                if (modulo(-relation/4, 2) == 0) then
+                if (modulo((-relation-1)/2, 2) == 0) then
+                    data_bounds(1,1) = g+1
+                    data_bounds(2,1) = g+Bs(2)/2
+                else
+                    data_bounds(1,1) = g+1+Bs(2)/2
+                    data_bounds(2,1) = g+Bs(2)
+                endif
+                if (modulo((-relation-1)/4, 2) == 0) then
                     data_bounds(1,3) = g+1
                     data_bounds(2,3) = g+Bs(2)/2
                 else
@@ -1883,26 +1885,28 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
         case(-1, -2, -3, -4)
             if (level_diff == 0) then
                 return
-            ! only transfer SC if this is the finer block
-            elseif (level_diff == -1) then
-                data_bounds(1,1) = g+1
-                data_bounds(2,1) = g+Bs(1)/2
-                data_bounds(1,2) = g+1
-                data_bounds(2,2) = g+Bs(2)/2
+            ! only transfer SC if this is the finer block, from Mallat ordering
+            ! take into account that this depends on if g is even or odd
+            elseif (level_diff == +1) then
+                data_bounds(1,1) = ceiling(g/2.0)+1
+                data_bounds(2,1) = ceiling(g/2.0)+Bs(1)/2
+                data_bounds(1,2) = ceiling(g/2.0)+1
+                data_bounds(2,2) = ceiling(g/2.0)+Bs(2)/2
+            ! Transfer directly into domain wich is not decomposed so we only select the part
             else
-                if (modulo(-relation, 2) == 0) then
-                    data_bounds(1,1) = g+1
-                    data_bounds(2,1) = g+Bs(1)/2
-                else
-                    data_bounds(1,1) = g+1+Bs(1)/2
-                    data_bounds(2,1) = g+Bs(1)
-                endif
-                if (modulo(-relation/2, 2) == 0) then
+                if (modulo(-relation-1, 2) == 0) then
                     data_bounds(1,2) = g+1
-                    data_bounds(2,2) = g+Bs(2)/2
+                    data_bounds(2,2) = g+Bs(1)/2
                 else
-                    data_bounds(1,2) = g+1+Bs(2)/2
-                    data_bounds(2,2) = g+Bs(2)
+                    data_bounds(1,2) = g+1+Bs(1)/2
+                    data_bounds(2,2) = g+Bs(1)
+                endif
+                if (modulo((-relation-1)/2, 2) == 0) then
+                    data_bounds(1,1) = g+1
+                    data_bounds(2,1) = g+Bs(2)/2
+                else
+                    data_bounds(1,1) = g+1+Bs(2)/2
+                    data_bounds(2,1) = g+Bs(2)
                 endif
             endif
 

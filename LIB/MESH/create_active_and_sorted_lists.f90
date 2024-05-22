@@ -203,8 +203,8 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
                 ! update hvy active
                 ! ---------------------------
                 ! save heavy id, only if proc responsable for block
-                hvy_active( hvy_n(tree_ID) + 1, tree_ID ) = hvy_id
                 hvy_n(tree_ID) = hvy_n(tree_ID) + 1
+                hvy_active( hvy_n(tree_ID), tree_ID ) = hvy_id
                 ! sorted list
                 ! first index stores the light id of the block
                 my_lgt_send_buffer(1, hvy_n(tree_ID)) = k

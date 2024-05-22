@@ -128,6 +128,8 @@ end subroutine executeCoarsening_tree
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening with values currently in WD form \n
 !! Merge tagged blocks into new, coarser blocks
+!> Since mother blocks temporarily coexist with daughter blocks,
+!! the block usage is temporarily increased
 ! ********************************************************************************************
 subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
@@ -137,19 +139,19 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> heavy data array - block data
+    !> heavy data array - block data in spaghetti WD form
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
-    integer(kind=ik)                    :: k, Jmax, N, j
+    integer(kind=ik)                    :: k, Jmax, N, j, rank
     ! list of block ids, proc ranks
-    integer(kind=ik)                    :: light_ids(1:8), mpirank_owners(1:8)
+    integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
-    integer(kind=ik), allocatable, save :: xfer_list(:)
     ! rank of proc to keep the coarsened data
     integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, procID, hvyID, level, lgt_merge_id, hvy_merge_id
-    integer(kind=ik)                    :: nx, ny, nz, nc, rank
+    integer(kind=ik)                    :: nx, ny, nz, nc
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -167,7 +169,10 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
     ! at worst every block is on a different rank
-    if (.not. allocated(xfer_list)) allocate(xfer_list(6*size(lgt_block,1)))
+    if (allocated(wc)) then
+        if (size(wc, 4) < nc) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc) )
 
     ! transfer counter
     n_xfer = 0
@@ -180,74 +185,102 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
         ! Check if the block will be coarsened.
         !
         ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
-        ! the active list. NOTE HERE: due to previous iterations, some light data id are already
-        ! marked for xfer, (and thus given the -7 status) but they are still in active block list
-        ! so: check again if this block is REALLY active (the active list is updated later)
+        ! the active list. NOTE HERE: due to previous iterations
         !
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
         ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
         hvyID = hvy_active(k, tree_ID)
         call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-        
 
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
         if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
-            ! get all sisters from hvy_family
-            light_ids(1:N) = hvy_family(hvyID, 2:1+2**params%dim)
+            ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+            hvy_block(:,:,:,:,hvyID) = wc
 
-            ! figure out on which rank the sisters lie
-            do j = 1, N
-                call lgt2proc( mpirank_owners(j), light_ids(j), params%number_blocks )
-            enddo
-
-            ! The merging will be done on the mpirank which holds the most of the sister blocks
-            data_rank = most_common_element( mpirank_owners(1:N) )
-
-            ! construct new mother block and create light data entry for the new block if that is my part
-            if (data_rank == rank .and. hvy_family(hvyID, 1) == -1) then
-                call get_free_local_light_id(params, data_rank, lgt_merge_id, message="merge_blocks")
-                lgt_block( lgt_merge_id, : ) = -1
-                treecode = get_tc(lgt_block( light_ids(1), IDX_TC_1:IDX_TC_2 ))
-                level = lgt_block( light_ids(1), IDX_MESH_LVL )
-                call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
-                    dim=params%dim, level=level-1, max_level=params%Jmax))
-                lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level-1
-                lgt_block( lgt_merge_id, IDX_REFINE_STS ) = 0
-                lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
-
-                ! update sisters on my rank that they have found their mother and can be skipped
+            ! If this block already has a mother, we do not have to create it once again
+            if (hvy_family(hvyID, 1) == -1) then
+                ! Get all sisters
+                lgt_daughters(1:N) = hvy_family(hvyID, 2:1+2**params%dim)
+    
+                ! figure out on which rank the sisters lie
                 do j = 1, N
-                    if (mpirank_owners(j) == rank) then
-                        call lgt2hvy(hvyID, lgtID, rank, params%number_blocks)
-                        hvy_family(hvyID, 1) = lgt_merge_id
-                    endif
+                    call lgt2proc( rank_daughters(j), lgt_daughters(j), params%number_blocks )
                 enddo
+    
+                ! The merging will be done on the mpirank which holds the most of the sister blocks
+                data_rank = most_common_element( rank_daughters(1:N) )
+    
+                ! construct new mother block if on my rank and create light data entry for the new block
+                if (data_rank == rank) then
+                    call get_free_local_light_id(params, data_rank, lgt_merge_id, message="merge_blocks")
+                    lgt_block( lgt_merge_id, : ) = -1
+                    treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+                    level = lgt_block( lgt_daughters(1), IDX_MESH_LVL )
+                    call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
+                        dim=params%dim, level=level-1, max_level=params%Jmax))
+                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level-1
+                    lgt_block( lgt_merge_id, IDX_REFINE_STS ) = 0
+                    lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
+
+                    ! update sisters on my rank that they have found their mother and can be skipped
+                    do j = 1, N
+                        if (rank_daughters(j) == rank) then
+                            call lgt2hvy(hvyID, lgt_daughters(j), rank, params%number_blocks)
+                            hvy_family(hvyID, 1) = lgt_merge_id
+                        endif
+                    enddo
+
+                    ! write(*, '("Rank ", i0, " created a new block: ", i0, " with TC ", b64.64)') rank, lgt_merge_id, tc_clear_until_level_b(treecode, &
+                    ! dim=params%dim, level=level-1, max_level=params%Jmax)
+                endif
             endif
         endif
     enddo
 
-    ! lgt_block and the active lists are outdated, so lets resynch
+    ! the active lists are outdated, so lets resynch
     call synchronize_lgt_data( params, refinement_status_only=.false.)
     call updateMetadata_tree(params, tree_ID)
+
+    ! if (rank == 1) then
+    !     write(*, '("Rank ", i0, " with blocks ", i0)') rank, hvy_n(tree_ID)
+    !     ! print family
+    !     do k = 1, hvy_n(tree_ID)
+    !         hvyID = hvy_active(k, tree_ID)
+    !         call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+    !         write(*, '("1R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
+    !             rank, k, lgtID, lgt_block(lgtID, IDX_MESH_LVL), lgt_block(lgtID, IDX_REFINE_STS), hvy_family(hvyID, :), lgt_block(lgtID, IDX_TC_2)
+    !     enddo
+    ! endif
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter
     call prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_active(:, tree_ID), hvy_n(tree_ID), n_xfer, size(hvy_block, 4), &
         s_M2C=.true.)
-    call xfer_block_data(params, hvy_block, n_xfer)
+    call xfer_block_data(params, hvy_block, n_xfer, verbose_check=.true.)
 
     ! now the mother refinement flags have to be reset and daughter blocks to be deleted
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
         ! delete daughter blocks
-        if ( lgt_block(lgtID, IDX_REFINE_STS) == -7) then
+        if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
             lgt_block(lgtID, :) = -1
             lgt_block(lgtID, IDX_REFINE_STS) = 0
         endif
-        ! change refinement flag of mother block
-        if ( lgt_block(lgtID, IDX_REFINE_STS) == -8) then
-            lgt_block(lgtID, IDX_REFINE_STS) = 0
-        endif
     enddo
+
+    ! ! now the mother refinement flags have to be reset and daughter blocks to be deleted
+    ! do k = 1, hvy_n(tree_ID)
+    !     hvyID = hvy_active(k, tree_ID)
+    !     call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+
+    !     ! delete daughter blocks
+    !     if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+    !         lgt_block(lgtID, :) = -1
+    !         lgt_block(lgtID, IDX_REFINE_STS) = 0
+    !     endif
+    ! enddo
+    ! call synchronize_lgt_data( params, refinement_status_only=.false.)
+
 end subroutine executeCoarsening_WD

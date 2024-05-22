@@ -100,20 +100,23 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     ! Note: we bypass "refine_tree" because the refinementIndicator_tree removes coarsening flags
     ! This is incredibly tricky, I need to think about some potential issues with this
     if (refinement) then
-        write(*, '("This case is currently not checked. If you encounter this I am sorry, apparently Julius did not think it through yet!")')
-        call abort(197)
+#ifdef DEV
+        write(*, '("It happened! A new block emerges on rank ", i0)') params%rank
+#endif
+
+        call abort(197, "I don't believe in wonders so this case is abolished")
 
         ! ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
         ! call ensureGradedness_tree( params, tree_ID )
 
         ! ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-        ! if (params%dim == 3) then
-        !     call refinementExecute3D_tree( params, hvy_block, tree_ID )
-        ! else
-        !     call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-        ! endif
+        ! call refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level_this )
 
         ! ! grid has changed...
         ! call updateMetadata_tree(params, tree_ID)
+
+        ! ! When blocks on lower levels are created these outdate the neighbours there. If by chance this routine here
+        ! ! will be called again and new blocks are created on lower levels, we need synched ghost patches
+        ! call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )        
     endif
 end subroutine

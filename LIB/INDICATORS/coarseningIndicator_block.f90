@@ -10,7 +10,7 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
-    refinement_status, norm, level, block_mask)
+    refinement_status, norm, level, input_is_WD, block_mask)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -36,6 +36,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
+    logical, intent(inout)              :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz
@@ -86,7 +87,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level)
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD)
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )

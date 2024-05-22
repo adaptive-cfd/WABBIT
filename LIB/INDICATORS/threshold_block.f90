@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, eps )
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, eps)
     implicit none
 
     !> user defined parameter structure
@@ -11,20 +11,20 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
-    ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
-    ! we pass the level to this routine
+    !> If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+    !! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
-    !
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
     real(kind=rk), intent(inout)        :: norm( size(u,4) )
-    ! if different from the default eps (params%eps), you can pass a different value here. This is optional
-    ! and used for example when thresholding the mask function.
+    !> if different from the default eps (params%eps), you can pass a different value here. This is optional
+    !! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
 
     integer(kind=ik)                    :: dF, i, j, l, p
     real(kind=rk)                       :: detail( size(u,4) )
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
-    real(kind=rk)                       :: eps2
+    real(kind=rk)                       :: eps_use
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -41,6 +41,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
     nx     = size(u, 1)
     ny     = size(u, 2)
@@ -52,10 +53,14 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     Jmax   = params%Jmax
     detail = -1.0_rk
 
+    if (allocated(u_wc)) then
+        if (size(u_wc, 4) > nc) deallocate(u_wc)
+    endif
     if (allocated(wc)) then
-        if (.not. areArraysSameSize(u, wc(:,:,:,:,1)) ) deallocate(wc)
+        if (size(wc, 4) > nc) deallocate(wc)
     endif
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
+    if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
 
 
 #ifdef DEV
@@ -64,7 +69,14 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
 #endif
 
-    call Mallat2inflatedMallat_block(params, u, wc)
+    if (.not. input_is_WD) then
+        u_wc = u
+        call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
+        call Spaghetti2inflatedMallat_block(params, u_wc, wc)
+    else
+        call Spaghetti2inflatedMallat_block(params, u, wc)
+    endif
+
 
     if (params%dim == 2) then
         do p = 1, nc
@@ -120,25 +132,26 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !
 
     ! default thresholding level is the one in the parameter struct
-    eps2 = params%eps
+    eps_use = params%eps
     ! but if we pass another one, use that.
-    if (present(eps)) eps2 = eps
+    if (present(eps)) eps_use = eps
 
+    ! write(*, '("Detail ", es8.1, " eps ", es8.1)') detail(1), eps_use
 
     select case(params%eps_norm)
     case ("Linfty")
         ! do nothing, our wavelets are normalized in L_infty norm by default, hence
         ! a simple threshold controls this norm
-        eps2 = eps2
+        eps_use = eps_use
 
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        eps2 = eps2 * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
+        eps_use = eps_use * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity
-        eps2 = eps2 * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )
+        eps_use = eps_use * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )
 
     case default
         call abort(20022811, "ERROR:threshold_block.f90:Unknown wavelet normalization!")
@@ -148,10 +161,18 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1
     ! note gradedness and completeness may prevent it from actually going through with that
-    if ( maxval(detail) < eps2) then
+    if ( maxval(detail) < eps_use) then
         ! coarsen block, -1
         refinement_status = -1
     else
         refinement_status = 0
+
+        ! if (level == 4 .and. params%rank == 0) then
+        !     call Spaghetti2Mallat_block(params, u, u_wc)
+        !     write(*, '("Detail ", es8.1, " eps ", es8.1)') detail(1), eps_use
+        !     do ny = 1,26
+        !         write(*, '(26(es8.1, 1x))') u_wc(1:26, ny, 1, 1)
+        !     enddo
+        ! endif
     end if
 end subroutine threshold_block

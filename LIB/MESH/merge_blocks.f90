@@ -121,9 +121,6 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         ! get heavy id of merge block
         call lgt2hvy( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
 
-        ! detail is not computed (yet)
-        hvy_details(:, hvy_merge_id) = -1.0_rk
-
         ! indices of subblocks on new, merged, coarser block
         do i = 1, params%dim
             icoars1(i) = g+1

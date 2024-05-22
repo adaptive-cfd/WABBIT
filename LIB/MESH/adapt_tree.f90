@@ -40,7 +40,13 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     integer(kind=ik)                    :: ierr, k1, hvy_id
     logical                             :: ignore_maxlevel2, iterate, toBeManipulated
     ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
-    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, level_me, Jmin, lgt_n_old, g_this
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, level_me, Jmin, lgt_n_old, g_this, g_spaghetti
+    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: tmp_wd  ! used for data juggling
+
+
+    ! testing
+    integer(kind=ik)                    :: ix, iy
+
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -59,21 +65,18 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     if (Jmin<1) call abort(2202243, "Currently, setting Jmin<1 is not possible")
 
-    if (present(ignore_maxlevel)) then
-        ignore_maxlevel2 = ignore_maxlevel
-    else
-        ignore_maxlevel2 = .false.
-    endif
+    ignore_maxlevel2 = .false.
+    if (present(ignore_maxlevel)) ignore_maxlevel2 = ignore_maxlevel
 
-    if (allocated(hvy_details)) then
-        if (size(hvy_details,1) /= size(hvy_block,4)) deallocate(hvy_details)
+    if (allocated(tmp_wd)) then
+        if (size(tmp_wd, 4) < size(hvy_block, 4)) deallocate(tmp_wd)
     endif
-    if (.not.allocated(hvy_details)) then
-        allocate(hvy_details(1:size(hvy_block,4), 1:params%number_blocks))
-    endif
-    ! this array is small so we can actually initialize it
-    ! This is not actually necessary, but it does not hurt (12 feb 2024, TE)
-    hvy_details = -1.0_rk
+    if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:size(hvy_block, 4), 1) )
+
+    ! it turns out, when the coefficients are spaghetti-ordered,
+    ! we can sync only even numbers of points and save one for odd numbered
+    g_spaghetti = params%g/2*2
+
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
@@ -97,6 +100,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 ! Performance: the code performs level wise, but coarseExt and GhostSync are always performed for all blocks!
 !
 
+    ! synching is required for add_security_zone when blocks from lower levels are refined
+    ! ToDo: Check if synch happens already before
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+
     ! we iterate from the highest current level to the lowest current level and then iterate further
     ! until the number of blocks is constant (note: as only coarsening
     ! is done here, no new blocks arise that could compromise the number of blocks -
@@ -113,7 +120,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
         call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), &
             level, g_minus=g_this, g_plus=g_this)
-        call toc( "adapt_tree (sync_ghosts)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (sync 1)", MPI_Wtime()-t0 )
 
 
         ! Wavelet-transform all blocks on this level
@@ -131,11 +138,18 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! hvy_tmp now is a copy with sync'ed ghost points.
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
     
-                ! data WC/SC now in Spaghetti order
-                call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))
+                ! Compute wavelet decomposition
+                ! For Jmax if dealiasing, just compute H filter
+                ! Data SC/WC now in Spaghetti order
+                if (level == params%Jmax .and. params%force_maxlevel_dealiasing) then
+                    call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvy_ID), tmp_wd(:,:,:,:,1), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
+                    call inflatedMallat2spaghetti_block(params, tmp_wd, hvy_block(:,:,:,:,hvy_ID))
+                else
+                    call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))
+                endif
             endif
         end do
-        call toc( "adat_tree (FWT)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (FWT)", MPI_Wtime()-t0 )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! 4th. Loop over all blocks and check if they have *coarser* neighbors
@@ -171,11 +185,21 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2, hvy_mask)
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, &
+                ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true., hvy_mask=hvy_mask)
         else
-            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, ignore_maxlevel2)
+            call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, &
+                ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
         endif
         call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
+
+        ! do k1 = 1, hvy_n(tree_ID)
+        !     hvy_id = hvy_active(k1, tree_ID)
+        !     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 4) then
+        !         write(*, '("R: ", i0, ", B: ", i0, ", Ref: ", i0)') params%rank, lgt_id, lgt_block(lgt_id, IDX_REFINE_STS)
+        !     endif
+        ! enddo
 
         ! After coarseningIndicator_tree, the situation is:
         ! coarseningIndicator_tree works on LEVEL.
@@ -219,10 +243,36 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call executeCoarsening_WD( params, hvy_block, tree_ID )
         call toc( "adapt_tree (executeCoarsening_WD)", MPI_Wtime()-t0 )
 
+        ! if (params%rank == 1) then
+        !     write(*, '("After executeCoarsening ", i0)') level
+        !     call lgt2hvy(hvy_id, 32154, params%rank, params%number_blocks)
+        !     do iy = 4,23
+        !         write(*, '(20(es8.1, 1x))') hvy_block(4:23, iy, 1, 1, hvy_id)
+        !     enddo
+        ! endif
+
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
         call updateMetadata_tree(params, tree_ID)
-        call toc( "adapt_tree (update neighbors)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (update metadata)", MPI_Wtime()-t0 )
+
+        ! if (params%rank == 1) then
+        !     write(*, '("Rank ", i0, " with blocks ", i0)') params%rank, hvy_n(tree_ID)
+        !     ! print family
+        !     do k1 = 1, hvy_n(tree_ID)
+        !         hvy_ID = hvy_active(k1, tree_ID)
+        !         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        !         write(*, '("3R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
+        !             params%rank, k1, lgt_ID, lgt_block(lgt_ID, IDX_MESH_LVL), lgt_block(lgt_ID, IDX_REFINE_STS), hvy_family(hvy_ID, :), lgt_block(lgt_ID, IDX_TC_2)
+        !     enddo
+        ! endif
+
+        ! synch SC from new coarser neighbours, needed before coarse_extension_modify as we need to wipe the WC there
+        t0 = MPI_Wtime()
+        call sync_level_from_coarse( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:, tree_ID), hvy_n(tree_ID), level, g_minus=g_spaghetti, g_plus=g_spaghetti)
+        ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
+        call toc( "adapt_tree (sync 2)", MPI_Wtime()-t0 )
 
         ! After the coarsening step on this level, the some blocks were (possibly) coarsened.
         ! If that happened (and it is the usual case), suddenly new blocks have coarser neighbors, and
@@ -235,6 +285,15 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             hvy_n(tree_ID), lgt_n(tree_ID), level)
         endif
         call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
+
+
+        ! synch SC and WC on this level before retransforming
+        t0 = MPI_Wtime()
+        call sync_level_only( params, lgt_block, hvy_block, hvy_neighbor, &
+        hvy_active(:, tree_ID), hvy_n(tree_ID), level, g_minus=g_spaghetti, g_plus=g_spaghetti)
+        ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
+        call toc( "adapt_tree (sync 3)", MPI_Wtime()-t0 )
+
 
         ! Wavelet-retransform all blocks on this level
         t0 = MPI_Wtime()
@@ -252,7 +311,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 endif
             end do
         endif
-        call toc( "adat_tree (FWT)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (RWT)", MPI_Wtime()-t0 )
 
         ! iteration counter (used for random coarsening criterion)
         iteration = iteration + 1
@@ -340,16 +399,6 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     else
         ignore_maxlevel2 = .false.
     endif
-
-    if (allocated(hvy_details)) then
-        if (size(hvy_details,1) /= size(hvy_block,4)) deallocate(hvy_details)
-    endif
-    if (.not.allocated(hvy_details)) then
-        allocate(hvy_details(1:size(hvy_block,4), 1:params%number_blocks))
-    endif
-    ! this array is small so we can actually initialize it
-    ! This is not actually necessary, but it does not hurt (12 feb 2024, TE)
-    hvy_details = -1.0_rk
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.

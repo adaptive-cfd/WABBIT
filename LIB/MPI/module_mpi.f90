@@ -84,7 +84,7 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_only, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
+    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_only, sync_level_from_coarse, blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes
     PUBLIC :: init_ghost_nodes, coarseExtensionUpdate_level, coarse_extension_modify, coarse_extension_retransform, xfer_block_data, prepare_update_family_metadata
 
 
@@ -435,7 +435,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     integer(kind=ik), intent(in) :: gminus, gplus
     logical, intent(in) :: output_to_file
 
-    integer(kind=ik) :: N_neighbors, N_family, level_diff, neighborhood, family, i, j, k
+    integer(kind=ik) :: N_neighbors, level_diff, neighborhood, i, j, k
     integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
     integer(kind=ik) :: ijksend(2,3)
@@ -444,10 +444,8 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     ijkPatches = 1
 
     N_neighbors = 74
-    N_family = 8
     if (params%dim==2) then
         N_neighbors=16
-        N_family=4
     endif
 
     ! set all neighbour relations
@@ -488,26 +486,6 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
         enddo
     enddo
 
-    ! set full block relation
-    ! The receiver bounds are hard-coded with a huge amount of tedious indices, they are identical to senders
-    call set_recv_bounds( params, ijkrecv, 0, 0, gminus, gplus)
-    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkrecv
-    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkrecv
-
-    ! set mother/daughter relations
-    ! sender / receiver relations between the level differences are inverted
-    do family = -1, -N_family, -1
-        ! Fine sender or receiver: affects sc in mallat-ordering, connected to relation -1
-        call set_recv_bounds( params, ijkrecv, family, -1, gminus, gplus)
-        ijkPatches(1:2,1:3, 0,  1, SENDER) = ijkrecv
-        ijkPatches(1:2,1:3, 0, -1, RECVER) = ijkrecv
-
-        ! Coarse sender or receiver: affects specific part of block
-        call set_recv_bounds( params, ijkrecv, family, 1, gminus, gplus)
-        ijkPatches(1:2,1:3, 0, -1, SENDER) = ijkrecv
-        ijkPatches(1:2,1:3, 0,  1, RECVER) = ijkrecv
-    enddo
-
 
 #ifdef DEV
     ! this output can be plotted using the python script
@@ -531,7 +509,57 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
             enddo
         enddo
         close(16)
+    endif
+#endif
+end subroutine
 
+
+
+! setup the family patches (i.e. the indices of the sender/receiver parts
+! for any neighborhood relation), this depends on the filter being used
+subroutine family_setup_patches(params, output_to_file)
+    implicit none
+    type (type_params), intent(in) :: params
+    logical, intent(in) :: output_to_file
+
+    integer(kind=ik) :: N_family, level_diff, family, i, j, k, g
+    integer(kind=ik) :: ijkrecv(2,3)
+    integer(kind=ik) :: ijkbuffer(2,3)
+    integer(kind=ik) :: ijksend(2,3)
+
+    ! full reset of all patch definitions. Note we set 1 not 0
+    ijkPatches = 1
+
+    N_family = 8
+    if (params%dim==2) then
+        N_family=4
+    endif
+    g = params%g
+
+    ! set full block relation
+    ! The receiver bounds are hard-coded with a huge amount of tedious indices, they are identical to senders
+    call set_recv_bounds( params, ijkrecv, 0, 0, g, g)
+    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkrecv
+    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkrecv
+
+    ! set mother/daughter relations
+    ! sender / receiver relations between the level differences are inverted
+    do family = -1, -N_family, -1
+        ! Fine sender or receiver: affects sc in mallat-ordering, connected to relation -1
+        ! This takes different border into account
+        call set_recv_bounds( params, ijkrecv, family, -1, g, g)
+        ijkPatches(1:2,1:3, family,  1, SENDER) = ijkrecv
+        ijkPatches(1:2,1:3, family, -1, RECVER) = ijkrecv
+
+        ! Coarse sender or receiver: affects specific part of block
+        call set_recv_bounds( params, ijkrecv, family, 1, g, g)
+        ijkPatches(1:2,1:3, family, -1, SENDER) = ijkrecv
+        ijkPatches(1:2,1:3, family,  1, RECVER) = ijkrecv
+    enddo
+
+#ifdef DEV
+    ! this output can be plotted using the python script
+    if ((params%rank==0) .and. output_to_file) then
         open(16,file='family_bounds.dat',status='replace')
         write(16,'(i3)') params%Bs(1)
         write(16,'(i3)') params%Bs(2)
@@ -553,6 +581,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
         close(16)
     endif
 #endif
+
 end subroutine
 
 end module module_MPI

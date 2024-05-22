@@ -24,6 +24,33 @@ subroutine sync_level_only(params, lgt_block, hvy_block, hvy_neighbor, hvy_activ
 
 end subroutine sync_level_only
 
+!> Wrapper to synch level from coarser neighbours
+!! Used after coarse extension to update SC
+subroutine sync_level_from_coarse(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus, g_plus)
+    implicit none
+
+    type (type_params), intent(in) :: params
+    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
+    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
+    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in) :: level                           !< what level to synch from and to
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
+
+    integer(kind=ik) :: gminus, gplus
+    gminus = params%g
+    gplus = params%g
+    ! if we sync a different number of ghost nodes
+    if (present(g_minus)) gminus = g_minus
+    if (present(g_plus))   gplus = g_plus
+
+    ! set level to -1 to enable synching between all
+    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
+        g_minus=gminus, g_plus=gplus, s_level=level, s_C2M=.true.)
+
+end subroutine sync_level_from_coarse
+
 !> Wrapper to synch all ghost-point patches from and between the same level, used for level-wise algorithms
 subroutine sync_level_with_all_neighbours(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus, g_plus)
     implicit none

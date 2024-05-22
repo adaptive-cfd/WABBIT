@@ -7,7 +7,7 @@
 !!    2. Data is send / received via buffers, buffer is assumed to fit all data!
 !!    3. Data is send / received directly (for whole blocks)
 !> Before this step, all metadata and datasizes have to be prepared in send_counter and recv_counter
-subroutine xfer_block_data(params, hvy_data, count_send_total)
+subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -16,6 +16,8 @@ subroutine xfer_block_data(params, hvy_data, count_send_total)
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: count_send_total             !< total amount of data to send from this rank
+
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
@@ -42,10 +44,11 @@ subroutine xfer_block_data(params, hvy_data, count_send_total)
         buffer_offset = sum(meta_send_counter(0:k-1))*S_META_SEND + sum(data_send_counter(0:k-1)) + k + 1
         rData_sendBuffer(buffer_offset) = meta_send_counter(k)
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
-
-        ! ! test send/receive sizes
-        ! write(*, '("Rank ", i0, " to ", i0, " Send ", 4(i0, 1x), "Receive ", 4(i0, 1x), "Patches ", 4(i0, 1x))') myrank, k, data_send_counter, data_recv_counter, meta_send_counter
     end do
+    ! ! test send/receive sizes
+    ! if (present(verbose_check)) then
+    !     write(*, '("Rank ", i0, " Send ", 4(i0, 1x), "Receive ", 4(i0, 1x), "Send patches ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, count_send_total
+    ! endif
 
     do k = 0, count_send_total-1  ! we do MPI so lets stick to 0-based for a moment
         recver_rank = meta_send_all(S_META_FULL*k + 3)
@@ -207,11 +210,13 @@ subroutine unpack_ghostlayers_external( params, hvy_data )
                 relation         = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+2))
                 level_diff       = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+3))
                 buffer_size      = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+4))
+
+                ! write(*, '("Rank ", i0," Recv external ", 4(i0, 1x))') params%rank, recver_hvyID, relation, level_diff, buffer_size
 #ifdef DEV
                 rank_destination = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+5))
                 if (rank_destination /= myrank) then
                     write(*,'("rank= ", i0, " dest= ", i0, " patch= ", i0, " recver_rank= ", i0)') myrank, rank_destination, k_patches, sender_rank
-                    call abort(7373872, "EXT this data seems to be not mine!")
+                    call abort(7373872, "ERROR: this data seems to be not mine!")
                 endif
 #endif
  
@@ -241,7 +246,7 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: count_send_total  !< total amount of patches for do loop
 
-    integer(kind=ik) :: k_patch, recver_rank, recver_hvyID
+    integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID
     integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
     integer(kind=ik) :: sender_hvyID, level_diff
     integer(kind=ik) :: send_ijk(2,3), recv_ijk(2,3), nc, myrank
@@ -259,6 +264,13 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
             relation     = meta_send_all(S_META_FULL*k_patch + 4)
             level_diff   = meta_send_all(S_META_FULL*k_patch + 5)
 
+            call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
+            call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
+
+            ! if (relation < 1) then
+            !     write(*, '("SID, RID, Rel, lvl-diff ", 4(i0, 1x))') sender_lgtID, recver_lgtID, relation, level_diff
+            ! endif
+
             if ( level_diff == 0  .or. relation < 1 ) then
                 ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
@@ -266,6 +278,9 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
                 send_ijk = ijkPatches(:,:, relation, level_diff, RECVER)
                 recv_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+
+                ! write(*, '("Recv ", 4(i0, 1x), " Send ", 4(i0, 1x))') send_ijk(1:2, 1:2), recv_ijk(1:2, 1:2)
+                ! write(*, '("Send data ", 25(f5.2, 1x))') hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
     
                 hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
                 hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
@@ -484,6 +499,19 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
 
     integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, myrank, mylastdigit, N, family, recver_rank
     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
+    integer(kind=tsize) :: tc
+
+    !-----------------------------------------------------------------------
+    ! set up constant arrays
+    !-----------------------------------------------------------------------
+    ! We frequently need to know the indices of a ghost nodes patch. Thus we save them
+    ! once in a module-global array (which is faster than computing it every time with tons
+    ! of IF-THEN clauses).
+    ! This arrays indices are:
+    ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+    ! As g can be varied (as long as it does not exceed the maximum value params%g), it is set up
+    ! each time we sync (at negligibble cost)
+    call family_setup_patches(params, output_to_file=.false.)
 
     sLevel = -1
     if (present(s_Level)) sLevel = s_Level
@@ -506,7 +534,13 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
         sender_hvyID = hvy_active(k_block)
         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
         level = lgt_block( sender_lgtID, IDX_MESH_LVL )
-        mylastdigit = tc_get_digit_at_level_b(get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2)), dim=params%dim, level=level, max_level=params%Jmax)
+        tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))
+        mylastdigit = tc_get_digit_at_level_b(tc, dim=params%dim, level=level, max_level=params%Jmax)
+
+        ! if (myrank == 1) then
+        !     write(*, '("0R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
+        !     myrank, k_block, sender_lgtID, lgt_block(sender_lgtID, IDX_MESH_LVL), lgt_block(sender_lgtID, IDX_REFINE_STS), hvy_family(sender_hvyID, :), lgt_block(sender_lgtID, IDX_TC_2)
+        ! endif
 
         ! check if mother exists
         if (hvy_family(sender_hvyID, 1) /= -1) then
@@ -527,6 +561,10 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 ! receiver before sending with interpolation or downsampling.
                 ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
 
+                ! if (myrank == 1) then
+                !     write(*, '("Send to mother 6xijk, sendID, recvID, lastDigit ", 9(i0, 1x), " tc", b32.32)') ijkPatches(:, :, -1 - mylastdigit, +1, SENDER), sender_lgtID, recver_lgtID, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
+                ! endif
+
                 if (myrank /= recver_rank) then
                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -535,6 +573,8 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
                     meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+
+                    ! write(*, '("Send to mother Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
 
                 ! now lets save all metadata in one array without caring for rank sorting for now
@@ -542,7 +582,7 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 meta_send_all(S_META_FULL*count_send + 2) = recver_hvyID
                 meta_send_all(S_META_FULL*count_send + 3) = recver_rank
                 meta_send_all(S_META_FULL*count_send + 4) = -1 - mylastdigit
-                meta_send_all(S_META_FULL*count_send + 5) = level_diff
+                meta_send_all(S_META_FULL*count_send + 5) = -1  ! inverse as adjusted to receiver
                 meta_send_all(S_META_FULL*count_send + 6) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                 
                 count_send = count_send + 1
@@ -557,6 +597,8 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 if  ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
                     ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
 
+                    ! write(*, '("Recv from mother ", 6(i0, 1x))') ijk
+
                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
@@ -564,6 +606,8 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
                     meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+
+                    ! write(*, '("Recv from mother Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
             endif
         endif
@@ -587,7 +631,9 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
 
                     ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
                     ! receiver before sending with interpolation or downsampling.
-                    ijk = ijkPatches(:, :, -family, +1, RECVER)
+                    ijk = ijkPatches(:, :, -family, -1, RECVER)
+
+                    ! write(*, '("Send to children ", 6(i0, 1x))') ijk
 
                     if (myrank /= recver_rank) then
                         data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -597,6 +643,8 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
                         meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+
+                        ! write(*, '("Send to children Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
@@ -604,7 +652,7 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                     meta_send_all(S_META_FULL*count_send + 2) = recver_hvyID
                     meta_send_all(S_META_FULL*count_send + 3) = recver_rank
                     meta_send_all(S_META_FULL*count_send + 4) = -family
-                    meta_send_all(S_META_FULL*count_send + 5) = level_diff
+                    meta_send_all(S_META_FULL*count_send + 5) = 1  ! inverse as adjusted to receiver
                     meta_send_all(S_META_FULL*count_send + 6) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
                     count_send = count_send + 1
@@ -617,7 +665,9 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 ! This is NOT the same number as before
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
                     if  ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
-                        ijk = ijkPatches(:, :, -family, +1, RECVER)
+                        ijk = ijkPatches(:, :, -family, -1, RECVER)
+
+                        ! write(*, '("Recv from children ", 6(i0, 1x))') ijk
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -626,6 +676,8 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
                         meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+
+                        ! write(*, '("Recv from children Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif
                 endif
             end do ! loop over all possible daughters
@@ -640,7 +692,7 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
     ! JB: This can only trigger if we change g during the run?, and why increase by 125%? What if that is not enough?
     if (sum(data_recv_counter) + sum(meta_recv_counter)*S_META_SEND + params%number_procs > size(rData_recvBuffer, 1)) then
         ! out-of-memory case: the preallocated buffer is not large enough.
-        write(*,'("rank=",i4," OOM for ghost nodes and increases its receive buffer size to 125%")') myrank
+        write(*,'("rank=",i4," OOM for patches and increases its receive buffer size to 125%")') myrank
         new_size = size(rData_recvBuffer,1)*125/100
         deallocate(rData_recvBuffer)
         allocate( rData_recvBuffer(1:new_size), stat=status )
@@ -649,7 +701,7 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
 
     if (sum(data_send_counter) + sum(meta_send_counter)*S_META_SEND + params%number_procs > size(rData_sendBuffer, 1)) then
         ! out-of-memory case: the preallocated buffer is not large enough.
-        write(*,'("rank=",i4," OOM for ghost nodes and increases its send buffer size to 125%")') myrank
+        write(*,'("rank=",i4," OOM for patches and increases its send buffer size to 125%")') myrank
         new_size = size(rData_sendBuffer,1)*125/100
         deallocate(rData_sendBuffer)
         allocate( rData_sendBuffer(1:new_size), stat=status )

@@ -113,14 +113,17 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         ! this call turned out useful for biorthogonal wavelets - the coarse extension deteriorates
         ! the loadbalancing substantially, thus the best balancing possible is advised
+        t0 = MPI_Wtime()
         call balanceLoad_tree( params, hvy_block, tree_ID )
+        call toc( "adapt_tree (balanceLoad_tree lvl)", MPI_Wtime()-t0 )
+
 
         ! synchronize ghost nodes - required to apply wavelet filters
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
         call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), &
             level, g_minus=g_this, g_plus=g_this)
-        call toc( "adapt_tree (sync 1)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (sync lvl && all)", MPI_Wtime()-t0 )
 
 
         ! Wavelet-transform all blocks on this level
@@ -143,7 +146,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! Data SC/WC now in Spaghetti order
                 if (level == params%Jmax .and. params%force_maxlevel_dealiasing) then
                     call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvy_ID), tmp_wd(:,:,:,:,1), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
-                    call inflatedMallat2spaghetti_block(params, tmp_wd, hvy_block(:,:,:,:,hvy_ID))
+                    call inflatedMallat2spaghetti_block(params, tmp_wd, hvy_block(:,:,:,:,hvy_ID), sc_only=.true.)
                 else
                     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))
                 endif
@@ -151,9 +154,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         end do
         call toc( "adapt_tree (FWT)", MPI_Wtime()-t0 )
 
+
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ! 4th. Loop over all blocks and check if they have *coarser* neighbors
-        ! this is the first coarse extension
+        ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
+        ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
+        ! This is the first coarse extension before removing blocks
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
@@ -192,14 +197,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
         endif
         call toc( "adapt_tree (coarseningIndicator_tree)", MPI_Wtime()-t0 )
-
-        ! do k1 = 1, hvy_n(tree_ID)
-        !     hvy_id = hvy_active(k1, tree_ID)
-        !     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 4) then
-        !         write(*, '("R: ", i0, ", B: ", i0, ", Ref: ", i0)') params%rank, lgt_id, lgt_block(lgt_id, IDX_REFINE_STS)
-        !     endif
-        ! enddo
 
         ! After coarseningIndicator_tree, the situation is:
         ! coarseningIndicator_tree works on LEVEL.
@@ -243,42 +240,15 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call executeCoarsening_WD( params, hvy_block, tree_ID )
         call toc( "adapt_tree (executeCoarsening_WD)", MPI_Wtime()-t0 )
 
-        ! if (params%rank == 1) then
-        !     write(*, '("After executeCoarsening ", i0)') level
-        !     call lgt2hvy(hvy_id, 32154, params%rank, params%number_blocks)
-        !     do iy = 4,23
-        !         write(*, '(20(es8.1, 1x))') hvy_block(4:23, iy, 1, 1, hvy_id)
-        !     enddo
-        ! endif
-
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
         call updateMetadata_tree(params, tree_ID)
         call toc( "adapt_tree (update metadata)", MPI_Wtime()-t0 )
 
-        ! if (params%rank == 1) then
-        !     write(*, '("Rank ", i0, " with blocks ", i0)') params%rank, hvy_n(tree_ID)
-        !     ! print family
-        !     do k1 = 1, hvy_n(tree_ID)
-        !         hvy_ID = hvy_active(k1, tree_ID)
-        !         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !         write(*, '("3R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
-        !             params%rank, k1, lgt_ID, lgt_block(lgt_ID, IDX_MESH_LVL), lgt_block(lgt_ID, IDX_REFINE_STS), hvy_family(hvy_ID, :), lgt_block(lgt_ID, IDX_TC_2)
-        !     enddo
-        ! endif
-
-        ! synch SC from new coarser neighbours, needed before coarse_extension_modify as we need to wipe the WC there
-        t0 = MPI_Wtime()
-        call sync_level_from_coarse( params, lgt_block, hvy_block, hvy_neighbor, &
-        hvy_active(:, tree_ID), hvy_n(tree_ID), level, g_minus=g_spaghetti, g_plus=g_spaghetti)
-        ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
-        call toc( "adapt_tree (sync 2)", MPI_Wtime()-t0 )
 
         ! After the coarsening step on this level, the some blocks were (possibly) coarsened.
         ! If that happened (and it is the usual case), suddenly new blocks have coarser neighbors, and
-        ! on those, the coarseExt needs to be done. Note performing the coarseExt twice on a block does not
-        ! alter the data, but is of course not for free. The usual workflow in adapt_tree is that many blocks
-        ! can be coarsened, and thus the 2nd call to coarseExtensionUpdate_level is much cheaper.
+        ! on those, the coarseExt needs to be done.
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
@@ -287,12 +257,22 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
 
 
-        ! synch SC and WC on this level before retransforming
+        ! synch SC and WC from new coarser neighbours and same-level neighbors
         t0 = MPI_Wtime()
-        call sync_level_only( params, lgt_block, hvy_block, hvy_neighbor, &
+        call sync_level_from_MC( params, lgt_block, hvy_block, hvy_neighbor, &
         hvy_active(:, tree_ID), hvy_n(tree_ID), level, g_minus=g_spaghetti, g_plus=g_spaghetti)
         ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
-        call toc( "adapt_tree (sync 3)", MPI_Wtime()-t0 )
+        call toc( "adapt_tree (sync lvl <- MC)", MPI_Wtime()-t0 )
+
+
+        ! After synching with coarser neighbors, we do CE again to overwrite false boundary values
+        ! This uses the fact that values refined on the grid points with wc=0 are the copied sc values
+        t0 = MPI_Wtime()
+        if (params%useCoarseExtension) then
+            call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            hvy_n(tree_ID), lgt_n(tree_ID), level, sc_skip_ghosts=.true.)
+        endif
+        call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
 
 
         ! Wavelet-retransform all blocks on this level
@@ -312,6 +292,14 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             end do
         endif
         call toc( "adapt_tree (RWT)", MPI_Wtime()-t0 )
+
+
+        ! synchronize ghost nodes - final synch to update the neighbours the new values
+        t0 = MPI_Wtime()
+        g_this = max(ubound(params%HD,1),ubound(params%GD,1))
+        call sync_level_to_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID), &
+            level, g_minus=g_this, g_plus=g_this)
+        call toc( "adapt_tree (sync lvl -> all)", MPI_Wtime()-t0 )
 
         ! iteration counter (used for random coarsening criterion)
         iteration = iteration + 1

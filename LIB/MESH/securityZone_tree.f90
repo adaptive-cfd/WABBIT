@@ -102,21 +102,20 @@ subroutine addSecurityZone_tree( time, params, level_this, tree_ID, hvy_block, h
     if (refinement) then
 #ifdef DEV
         write(*, '("It happened! A new block emerges on rank ", i0)') params%rank
+        write(*, '("If this occurs during the run you should check definetly what is going on as this case is rare and behaviour is not yet completely thought through.")')
 #endif
 
-        call abort(197, "I don't believe in wonders so this case is abolished")
+        ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
+        call ensureGradedness_tree( params, tree_ID )
 
-        ! ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
-        ! call ensureGradedness_tree( params, tree_ID )
+        ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
+        call refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level_this )
 
-        ! ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-        ! call refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level_this )
+        ! grid has changed...
+        call updateMetadata_tree(params, tree_ID)
 
-        ! ! grid has changed...
-        ! call updateMetadata_tree(params, tree_ID)
-
-        ! ! When blocks on lower levels are created these outdate the neighbours there. If by chance this routine here
-        ! ! will be called again and new blocks are created on lower levels, we need synched ghost patches
-        ! call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )        
+        ! When blocks on lower levels are created these outdate the neighbours there. If by chance this routine here
+        ! will be called again and new blocks are created on lower levels, we need synched ghost patches
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )        
     endif
 end subroutine

@@ -449,7 +449,7 @@ end subroutine
 
 
 
-subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
+subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, sc_skip_ghosts)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -463,16 +463,20 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
     integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
     integer(kind=ik), intent(in)        :: level                       !< current level
+    logical, optional, intent(in)       :: sc_skip_ghosts              !< for second CE modify we can skip ghosts points
 
     integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
-    logical                             :: toBeManipulated
+    logical                             :: toBeManipulated, scSkipGhosts
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
     nz = size(hvy_data, 3)
     nc = size(hvy_data, 4)
+
+    scSkipGhosts = .false.
+    if (present(sc_skip_ghosts)) scSkipGhosts = sc_skip_ghosts
 
     if (allocated(wc)) then
         if (size(wc, 4) < nc) deallocate(wc)
@@ -505,10 +509,6 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
             ! transform to inflated mallat
             call spaghetti2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
 
-            ! if (level == 4) then
-            !     write(*, '(i0, " max before ", es8.1)') lgtID, maxval( abs(wc(params%g+1:params%Bs(1)+params%g, params%g+1:params%Bs(2)+params%g, :, 1, 2:4)) )
-            ! endif
-
             ! loop over all relevant neighbors
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists ?
@@ -521,7 +521,7 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
                     if (level_neighbor < level_me) then
                         ! manipulation of coeffs
                         call coarseExtensionManipulateWC_block(params, wc, neighborhood)
-                        call coarseExtensionManipulateSC_block(params, wc, hvy_tmp(:,:,:,:,hvyID), neighborhood)
+                        call coarseExtensionManipulateSC_block(params, wc, hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
                     elseif (level_neighbor > level_me) then
                         ! it is actually possible for a block to have both finer and coarser neighbors. If its
                         ! coarser, (level_neighbor<level_me), then coarseExtension is applied to this block.
@@ -539,10 +539,6 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
                     endif
                 endif
             enddo
-
-            ! if (level == 4) then
-            !     write(*, '(i0, " max after ", es8.1)') lgtID, maxval( abs(wc(params%g+1:params%Bs(1)+params%g, params%g+1:params%Bs(2)+params%g, :, 1, 2:4)) )
-            ! endif
 
             ! transform wc from inflated mallat back to spaghetti
             call inflatedMallat2spaghetti_block(params, wc, hvy_data(:,:,:,:,hvyID))

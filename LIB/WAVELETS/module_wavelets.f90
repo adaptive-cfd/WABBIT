@@ -1780,7 +1780,7 @@ contains
 
 
 
-    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood)
+    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood, skip_ghosts)
         implicit none
 
         type (type_params), intent(in) :: params
@@ -1801,10 +1801,11 @@ contains
         ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         !
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik), intent(in) :: neighborhood
+        integer(kind=ik), intent(in)   :: neighborhood   !> Which neighborhood to apply manipulation
+        logical, optional, intent(in)  :: skip_ghosts    !> Flag to skip ghost points if they have been synched
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
-        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr
+        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, N_s, N_e
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1816,97 +1817,96 @@ contains
         Nscr    = params%Nscr
         Nreconl = params%Nreconl
         Nreconr = params%Nreconr
+        ! Normally we also reset boundary values. However if they have been synched to the field we want to let them as they are
+        N_s = 1
+        N_e = 0
+        if (present(skip_ghosts)) then
+            if (skip_ghosts) then
+                N_s = 1 + g
+                N_e = 0 + g
+            endif
+        endif
 
 
         if (params%dim == 2) then
             ! 2D
             select case(neighborhood)
-            case (9:10)
-                ! -x
-                wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
-            case (11:12)
-                ! +x
-                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
-            case (13:14)
-                ! +y
-                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
-            case (15:16)
-                ! -y
-                wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
-            case(5)
-                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
-            case(6)
-                wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
-            case(7)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
-            case(8)
-                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
+            case (9:10)  ! -x
+                wc(N_s:Nscl, 1:ny-N_e, :, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, :, 1:nc)
+            case (11:12) ! +x
+                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, :, 1:nc)
+            case (13:14) ! +y
+                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc)
+            case (15:16) ! -y
+                wc(1:nx-N_e, N_s:Nscl, :, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, :, 1:nc)
+            case(5) ! -x+y
+                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, :, 1:nc)
+            case(6) ! -x-y
+                wc(N_s:Nscl, N_s:Nscl, :, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, :, 1:nc)
+            case(7) ! +x+y
+                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc)
+            case(8) ! +x-y
+                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, :, 1:nc)
             end select
         else
             ! 3D
             ! The finer neighbors are modified
             select case(neighborhood)
             ! ---faces---
-            case (35:38)
-                ! +x
-                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
-            case (43:46)
-                ! -x
-                wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
-            case (39:42)
-                ! +y
-                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
-            case (31:34)
-                ! -y
-                wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
-            case (27:30)
-                ! +z
-                wc(:, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, :, nz-Nscr+1:nz, 1:nc)
-            case (47:50)
-                ! -z
-                wc(:, :, 1:Nscl, 1:nc, 1) = u_copy(:, :, 1:Nscl, 1:nc)
+            case (35:38) ! +x
+                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, 1:nz-N_e, 1:nc)
+            case (43:46) ! -x
+                wc(N_s:Nscl, 1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, 1:nz-N_e, 1:nc)
+            case (39:42) ! +y
+                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
+            case (31:34) ! -y
+                wc(1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc)
+            case (27:30) ! +z
+                wc(1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (47:50) ! -z
+                wc(1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc)
             ! --- corners ---
-            case (26)
-                wc(1:Nscl, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, 1:Nscl, 1:nc)
-            case (23)
-                wc(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc)
-            case (22)
-                wc(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (19)
-                wc(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (25)
-                wc(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc)
-            case (21)
-                wc(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (20)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (24)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc)
+            case (26) ! -x-y-z
+                wc(N_s:Nscl, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, N_s:Nscl, 1:nc)
+            case (23) ! +x-y-z
+                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc)
+            case (22) ! -x-y+z
+                wc(N_s:Nscl, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
+            case (19) ! +x-y+z
+                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
+            case (25) ! -x+y-z
+                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
+            case (21) ! -x+y+z
+                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (20) ! +x+y+z
+                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (24) ! +x+y-z
+                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
             ! ---(partial) edges---
-            case (51:52)
-                wc(:, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (53:54)
-                wc(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc)
-            case (55:56)
-                wc(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (57:58)
-                wc(1:Nscl, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, :, nz-Nscr+1:nz, 1:nc)
-            case (59:60)
-                wc(:, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(:, 1:Nscl, 1:Nscl, 1:nc)
-            case (61:62)
-                wc(nx-Nscr+1:nx, :, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, 1:Nscl, 1:nc)
-            case (63:64)
-                wc(:, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, 1:Nscl, 1:nc)
-            case (65:66)
-                wc(1:Nscl, :, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, :, 1:Nscl, 1:nc)
-            case (67:68)
-                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
-            case (69:70)
-                wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
-            case (71:72)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
-            case (73:74)
-                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
+            case (51:52) !   -y+z
+                wc(1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
+            case (53:54) ! +x  +z
+                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (55:56) !   +y+z
+                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (57:58) ! -x  +z
+                wc(N_s:Nscl, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
+            case (59:60) !   -y-z
+                wc(1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc)
+            case (61:62) ! +x  -z
+                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc)
+            case (63:64) !   +y-z
+                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
+            case (65:66) ! -x  -z
+                wc(N_s:Nscl, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, N_s:Nscl, 1:nc)
+            case (67:68) ! +x-y
+                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc)
+            case (69:70) ! -x-y
+                wc(N_s:Nscl, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, 1:nz-N_e, 1:nc)
+            case (71:72) ! +x+y
+                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
+            case (73:74) ! -x+y
+                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
             end select
 
         endif

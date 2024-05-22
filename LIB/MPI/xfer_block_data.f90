@@ -47,7 +47,7 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
     end do
     ! ! test send/receive sizes
     ! if (present(verbose_check)) then
-    !     write(*, '("Rank ", i0, " Send ", 4(i0, 1x), "Receive ", 4(i0, 1x), "Send patches ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, count_send_total
+    !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
     do k = 0, count_send_total-1  ! we do MPI so lets stick to 0-based for a moment
@@ -62,7 +62,7 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
             patch_size = meta_send_all(S_META_FULL*k + 6)
 
             ! external relation (MPI communication)
-            call send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, recver_hvyID, neighborhood, level_diff, patch_size)
+            call send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, recver_hvyID, neighborhood, level_diff, patch_size, verbose_check)
         end if
     end do ! loop over all patches (all heavy_n where neighborhood exists and ghost synching is applied)
     call toc( "xfer_block_data (prepare data)", MPI_wtime()-t0 )
@@ -71,7 +71,7 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
     ! (ii) transfer part (send/recv)
     !***************************************************************************
     t0 = MPI_wtime()
-    call start_xfer_mpi( params, isend, irecv )
+    call start_xfer_mpi( params, isend, irecv, verbose_check)
     call toc( "xfer_block_data (start_xfer_mpi)", MPI_wtime()-t0 )
 
     !***************************************************************************
@@ -79,25 +79,29 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
     !***************************************************************************
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
-    call unpack_ghostlayers_internal( params, hvy_data, count_send_total )
+    call unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check)
     call toc( "xfer_block_data (unpack internal)", MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
     ! to be completed
     t0 = MPI_wtime()
-    call finalize_xfer_mpi(params, isend, irecv)
+    call finalize_xfer_mpi(params, isend, irecv, verbose_check)
     call toc( "xfer_block_data (finalize_xfer_mpi)", MPI_wtime()-t0 )
 
     ! process-external ghost points (copy from buffer)
     t0 = MPI_wtime()
-    call unpack_ghostlayers_external( params, hvy_data )
+    call unpack_ghostlayers_external( params, hvy_data, verbose_check )
     call toc( "xfer_block_data (unpack external)", MPI_wtime()-t0 )
 
 end subroutine xfer_block_data
 
 
+
+!> \brief Prepare data to be sent with MPI \n
+!! This already applies res_pre so that the recver only has to sort in the data correctly. \n
+!! Fills the send buffer
 subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
-    recver_hvyID, relation, level_diff, patch_size)
+    recver_hvyID, relation, level_diff, patch_size, verbose_check)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -107,6 +111,7 @@ subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
     integer(kind=ik), intent(in)   :: level_diff
     integer(kind=ik), intent(in)   :: patch_size
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
     ! res_pre_data, rDara_sendBuffer
@@ -133,7 +138,7 @@ subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
         ! we will send to our neighbor mpirank
         patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
 
-        call GhostLayer2Line( params, line_buffer, buffer_size, &
+        call Patch2Line( params, line_buffer, buffer_size, &
         hvy_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
 
     else
@@ -144,7 +149,7 @@ subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
 
         patch_ijk = ijkPatches(:,:, relation, level_diff, RESPRE)
 
-        call GhostLayer2Line( params, line_buffer, buffer_size, &
+        call Patch2Line( params, line_buffer, buffer_size, &
         res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
     end if
 
@@ -179,11 +184,15 @@ end subroutine send_prepare_external
 
 
 
-subroutine unpack_ghostlayers_external( params, hvy_data )
+!> Unpack patches which were send via MPI. \n
+!! Patch by patch it reads the metadata and then assigns the data to the correct position
+subroutine unpack_ghostlayers_external( params, hvy_data, verbose_check )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)
+
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     integer(kind=ik) :: sender_rank, myrank ! zero-based
     integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
@@ -215,7 +224,8 @@ subroutine unpack_ghostlayers_external( params, hvy_data )
 #ifdef DEV
                 rank_destination = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+5))
                 if (rank_destination /= myrank) then
-                    write(*,'("rank= ", i0, " dest= ", i0, " patch= ", i0, " recver_rank= ", i0)') myrank, rank_destination, k_patches, sender_rank
+                    write(*,'("rank= ", i0, " dest_id= ", i0, " rel= ", i0, " lvl_diff=", i0, " buff_size=", i0, " send_rank=", i0, " patch_i=", i0)') &
+                        myrank, recver_hvyID, relation, level_diff, buffer_size, rank_destination, sender_rank, k_patches
                     call abort(7373872, "ERROR: this data seems to be not mine!")
                 endif
 #endif
@@ -227,7 +237,7 @@ subroutine unpack_ghostlayers_external( params, hvy_data )
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
                 ! They depend on the neighbor-relation, level difference and the bounds type.
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                call Line2GhostLayer( params, line_buffer, ijkPatches(:,:, relation, level_diff, RECVER), hvy_data, recver_hvyID )
+                call Line2Patch( params, line_buffer, ijkPatches(:,:, relation, level_diff, RECVER), hvy_data, recver_hvyID )
 
                 ! increase buffer position marker
                 offset_data = offset_data + buffer_size
@@ -239,12 +249,15 @@ end subroutine unpack_ghostlayers_external
 
 
 
-subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
+!> \brief Unpack all internal patches which do not have to be sent
+!! This simply copies from hvy_data, applies res_pre and then copies it back into the correct position
+subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: count_send_total  !< total amount of patches for do loop
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID
     integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
@@ -267,10 +280,6 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
             call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
 
-            ! if (relation < 1) then
-            !     write(*, '("SID, RID, Rel, lvl-diff ", 4(i0, 1x))') sender_lgtID, recver_lgtID, relation, level_diff
-            ! endif
-
             if ( level_diff == 0  .or. relation < 1 ) then
                 ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
@@ -279,9 +288,6 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
                 send_ijk = ijkPatches(:,:, relation, level_diff, RECVER)
                 recv_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
 
-                ! write(*, '("Recv ", 4(i0, 1x), " Send ", 4(i0, 1x))') send_ijk(1:2, 1:2), recv_ijk(1:2, 1:2)
-                ! write(*, '("Send data ", 25(f5.2, 1x))') hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
-    
                 hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
                 hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
             else
@@ -305,9 +311,11 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total )
 
 end subroutine unpack_ghostlayers_internal
 
-!############################################################################################################
 
-subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
+
+!############################################################################################################
+!> \brief Convert 2D or 3D patch from indices to 1D to insert it into one-dimensional buffer
+subroutine Patch2Line( params, line_buffer, buffer_counter, hvy_data )
     implicit none
 
     type (type_params), intent(in)   :: params
@@ -337,11 +345,12 @@ subroutine GhostLayer2Line( params, line_buffer, buffer_counter, hvy_data )
         end do
     end do
 
-end subroutine GhostLayer2Line
+end subroutine Patch2Line
 
 
 
-subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_data, hvy_id )
+!> \brief Convert 1D line from one-dimensional buffer back to 2D or 3D patch from indices
+subroutine Line2Patch( params, line_buffer, data_bounds, hvy_data, hvy_id )
     implicit none
 
     type (type_params), intent(in)  :: params
@@ -371,16 +380,19 @@ subroutine Line2GhostLayer( params, line_buffer, data_bounds, hvy_data, hvy_id )
         end do
     end do
 
-end subroutine Line2GhostLayer
+end subroutine Line2Patch
+
+
 
 !############################################################################################################
-
-subroutine start_xfer_mpi( params, isend, irecv)
+!> \brief Start all communications - this is non-blocking meaning we need to know how much is send and received
+subroutine start_xfer_mpi( params, isend, irecv, verbose_check)
 
     implicit none
 
     type (type_params), intent(in)  :: params
     integer(kind=ik), intent(out)   :: isend, irecv
+    logical, optional, intent(in)   :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
     ! integer(kind=ik), intent(inout) :: iMetaData_sendBuffer(:)
@@ -445,11 +457,13 @@ end subroutine start_xfer_mpi
 
 
 
-subroutine finalize_xfer_mpi(params, isend, irecv)
+!> Just a small wrapper for waitall.
+subroutine finalize_xfer_mpi(params, isend, irecv, verbose_check)
     implicit none
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in) :: isend, irecv
     integer(kind=ik) :: ierr
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! synchronize non-blocking communications
     if (isend>0) then
@@ -528,6 +542,10 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
     meta_send_counter(:) = 0
     meta_recv_counter(:) = 0
 
+    ! I searched for this for 5 hours I think, it was hidden in synchronize_ghost_generic
+    int_pos(:) = 0
+    real_pos(:) = 0
+
     count_send = 0
     do k_block = 1, hvy_n
         ! calculate light id
@@ -536,11 +554,6 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
         level = lgt_block( sender_lgtID, IDX_MESH_LVL )
         tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))
         mylastdigit = tc_get_digit_at_level_b(tc, dim=params%dim, level=level, max_level=params%Jmax)
-
-        ! if (myrank == 1) then
-        !     write(*, '("0R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
-        !     myrank, k_block, sender_lgtID, lgt_block(sender_lgtID, IDX_MESH_LVL), lgt_block(sender_lgtID, IDX_REFINE_STS), hvy_family(sender_hvyID, :), lgt_block(sender_lgtID, IDX_TC_2)
-        ! endif
 
         ! check if mother exists
         if (hvy_family(sender_hvyID, 1) /= -1) then
@@ -560,10 +573,6 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
                 ! receiver before sending with interpolation or downsampling.
                 ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
-
-                ! if (myrank == 1) then
-                !     write(*, '("Send to mother 6xijk, sendID, recvID, lastDigit ", 9(i0, 1x), " tc", b32.32)') ijkPatches(:, :, -1 - mylastdigit, +1, SENDER), sender_lgtID, recver_lgtID, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
-                ! endif
 
                 if (myrank /= recver_rank) then
                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -596,8 +605,6 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
             if (myrank /= recver_rank) then  ! only receive from foreign ranks
                 if  ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
                     ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
-
-                    ! write(*, '("Recv from mother ", 6(i0, 1x))') ijk
 
                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -633,8 +640,6 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                     ! receiver before sending with interpolation or downsampling.
                     ijk = ijkPatches(:, :, -family, -1, RECVER)
 
-                    ! write(*, '("Send to children ", 6(i0, 1x))') ijk
-
                     if (myrank /= recver_rank) then
                         data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -666,8 +671,6 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
                     if  ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
                         ijk = ijkPatches(:, :, -family, -1, RECVER)
-
-                        ! write(*, '("Recv from children ", 6(i0, 1x))') ijk
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents

@@ -161,7 +161,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! This is the first coarse extension before removing blocks
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
-            call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            call coarse_extension_modify_level(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID), lgt_n(tree_ID), level)
         endif
         call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
@@ -237,8 +237,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! adapt the mesh, i.e. actually merge blocks
         ! this applies the wavelet low-pass filter as well (h*h) before decimation
         t0 = MPI_Wtime()
-        call executeCoarsening_WD( params, hvy_block, tree_ID )
-        call toc( "adapt_tree (executeCoarsening_WD)", MPI_Wtime()-t0 )
+        call executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
+        call toc( "adapt_tree (executeCoarsening_level)", MPI_Wtime()-t0 )
 
         ! update grid lists: active list, neighbor relations, etc
         t0 = MPI_Wtime()
@@ -251,7 +251,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! on those, the coarseExt needs to be done.
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
-            call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            call coarse_extension_modify_level(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID), lgt_n(tree_ID), level)
         endif
         call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
@@ -269,7 +269,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! This uses the fact that values refined on the grid points with wc=0 are the copied sc values
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
-            call coarse_extension_modify(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            call coarse_extension_modify_level(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID), lgt_n(tree_ID), level, sc_skip_ghosts=.true.)
         endif
         call toc( "adapt_tree (coarse_extension_modify)", MPI_Wtime()-t0 )
@@ -278,7 +278,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! Wavelet-retransform all blocks on this level
         t0 = MPI_Wtime()
         if (params%useCoarseExtension) then
-            call coarse_extension_retransform(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
+            call coarse_extension_retransform_level(params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
             hvy_n(tree_ID), lgt_n(tree_ID), level)
         else  ! just set back all values to the original ones
             do k = 1, hvy_n(tree_ID)

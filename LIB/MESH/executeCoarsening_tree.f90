@@ -126,22 +126,21 @@ end subroutine executeCoarsening_tree
 
 
 ! ********************************************************************************************
-!> \brief Apply mesh coarsening with values currently in WD form \n
+!> \brief Apply mesh coarsening with values currently in WD form for one level. \n
 !! Merge tagged blocks into new, coarser blocks
 !> Since mother blocks temporarily coexist with daughter blocks,
 !! the block usage is temporarily increased
 ! ********************************************************************************************
-subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
+subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
     implicit none
 
-    !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> heavy data array - block data in spaghetti WD form
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: tree_ID
+    type (type_params), intent(in)      :: params                       !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
+    integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
+    integer(kind=ik), intent(in)        :: level                        !< level to be coarsened
 
     ! loop variables
     integer(kind=ik)                    :: k, Jmax, N, j, rank
@@ -149,7 +148,7 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, procID, hvyID, level, lgt_merge_id, hvy_merge_id
+    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, procID, hvyID, level_me, lgt_merge_id, hvy_merge_id
     integer(kind=ik)                    :: nx, ny, nz, nc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
 
@@ -191,10 +190,11 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
         ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
         hvyID = hvy_active(k, tree_ID)
         call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
 
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
-        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1 .and. level==level_me) then
             ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
             call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
             hvy_block(:,:,:,:,hvyID) = wc
@@ -214,13 +214,12 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     
                 ! construct new mother block if on my rank and create light data entry for the new block
                 if (data_rank == rank) then
-                    call get_free_local_light_id(params, data_rank, lgt_merge_id, message="merge_blocks")
+                    call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
                     lgt_block( lgt_merge_id, : ) = -1
                     treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
-                    level = lgt_block( lgt_daughters(1), IDX_MESH_LVL )
                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
-                        dim=params%dim, level=level-1, max_level=params%Jmax))
-                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level-1
+                        dim=params%dim, level=level_me-1, max_level=params%Jmax))
+                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_me-1
                     lgt_block( lgt_merge_id, IDX_REFINE_STS ) = 0
                     lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
 
@@ -263,8 +262,9 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     ! now the mother refinement flags have to be reset and daughter blocks to be deleted
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
         ! delete daughter blocks
-        if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+        if ( lgt_block(lgtID, IDX_REFINE_STS) == -1 .and. level==level_me) then
             lgt_block(lgtID, :) = -1
             lgt_block(lgtID, IDX_REFINE_STS) = 0
         endif
@@ -283,4 +283,4 @@ subroutine executeCoarsening_WD( params, hvy_block, tree_ID )
     ! enddo
     ! call synchronize_lgt_data( params, refinement_status_only=.false.)
 
-end subroutine executeCoarsening_WD
+end subroutine executeCoarsening_WD_level

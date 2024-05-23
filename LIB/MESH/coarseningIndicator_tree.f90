@@ -5,17 +5,17 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     implicit none
     real(kind=rk), intent(in)           :: time
-    type (type_params), intent(in)      :: params                         !> user defined parameter structure
-    integer(kind=ik), intent(in)        :: level_this                     !> current level to look at (in the case of biorthogonal wavelets, not in "harten-multiresolution")
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !> heavy work data array - block data.
+    type (type_params), intent(in)      :: params                         !< user defined parameter structure
+    integer(kind=ik), intent(in)        :: level_this                     !< current level to look at (in the case of biorthogonal wavelets, not in "harten-multiresolution")
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !< heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)         !< heavy work data array - block data.
     !> mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
     !! mask functions separately. This makes the mask routines tree-level routines (and no longer
     !! block level) so the physics modules have to provide an interface to create the mask at a tree
     !! level. All parts of the mask shall be included: chi, boundary values, sponges.
     real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
-    character(len=*), intent(in)        :: indicator                      !> how to choose blocks for refinement
+    character(len=*), intent(in)        :: indicator                      !< how to choose blocks for refinement
     !> coarsening iteration index. coarsening is done until the grid has reached
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
@@ -52,10 +52,13 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     g = params%g
 
     ! reset refinement status to "stay" on all active blocks
-    do k = 1, lgt_n(tree_ID)
-        lgtID = lgt_active(k, tree_ID)
-        lgt_block( lgtID, IDX_REFINE_STS ) = 0
-    enddo
+    ! this is skipped if indicator/="everywhere" .and. indicator/="random" are used, for further iterations
+    if (.not. (iteration > 0 .and. (indicator=="everywhere" .or. indicator/="random"))) then
+        do k = 1, lgt_n(tree_ID)
+            lgtID = lgt_active(k, tree_ID)
+            lgt_block( lgtID, IDX_REFINE_STS ) = 0
+        enddo
+    endif
 
     ! construct mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)

@@ -125,7 +125,8 @@ subroutine sparse_to_dense(params)
     elseif (operator=="refine-everywhere") then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="coarsen-everywhere") then
-        params%number_blocks = lgt_n(tree_ID) / params%number_procs + 7_ik
+        ! *5/4 as executeCoarsening needs more blocks
+        params%number_blocks = ((lgt_n(tree_ID) / params%number_procs + 7_ik) * 5) / 4
     endif
 
     if (params%rank==0) then
@@ -142,6 +143,8 @@ subroutine sparse_to_dense(params)
 
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
+
+    write(*, '("Number of blocks: ", i0)') params%number_blocks
 
     ! read input data
     call readHDF5vct_tree( (/file_in/), params, hvy_block, tree_ID)
@@ -197,7 +200,7 @@ subroutine sparse_to_dense(params)
     if (params%rank==0 ) then
         write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
         trim(adjustl(file_in)), level, trim(adjustl(file_out))
-        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now if --sparse-to-dense is used)")') &
+        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now if no operator or --operator=sparse-to-dense is used)")') &
         minActiveLevel_tree( tree_ID ),&
         maxActiveLevel_tree( tree_ID )
     end if

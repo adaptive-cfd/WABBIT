@@ -77,7 +77,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
         mpirank_recver = xfer_list(2, k)
 
         ! its new light id will be "lgt_id_new"
-        call get_free_local_light_id( params, mpirank_recver, lgt_id_new, ignore_error=.true. )
+        call get_free_local_light_id( params, mpirank_recver, lgt_id_new, ignore_error=.true., message="block_xfer" )
 
         ! the idea is now if we do not have enough memory (ie no free block on target rank) we can
         ! wait until the current requests are finnished. Then we retry the loop.

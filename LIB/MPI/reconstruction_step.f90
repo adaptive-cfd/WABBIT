@@ -449,7 +449,7 @@ end subroutine
 
 
 
-subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, sc_skip_ghosts)
+subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, sc_skip_ghosts)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -543,12 +543,15 @@ subroutine coarse_extension_modify(params, lgt_block, hvy_data, hvy_tmp, hvy_nei
             ! transform wc from inflated mallat back to spaghetti
             call inflatedMallat2spaghetti_block(params, wc, hvy_data(:,:,:,:,hvyID))
         endif
+
+        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
+        toBeManipulated = .false.
     enddo
 end subroutine
 
 
 
-subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
+subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -567,6 +570,8 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
     logical                             :: toBeManipulated
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
+
+    integer(kind=ik) :: iy
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
@@ -610,6 +615,13 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
             ! reconstruct from the manipulated coefficients
             tmp_reconst = hvy_data(:,:,:,1:nc,hvyID)
             call waveletReconstruction_block(params, tmp_reconst)
+
+            ! if (lgt_block(lgtID, IDX_TC_2) == 4032 .and. lgt_block(lgtID, IDX_MESH_LVL)==5) then
+            !     write(*, '("113 lvl ", i0)') level
+            !     do iy = 1, 19
+            !         write(*, '(19(es8.1))') tmp_reconst(1:19, iy, 1, 1)
+            !     enddo
+            ! endif
 
             hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
 
@@ -721,13 +733,20 @@ subroutine coarse_extension_retransform(params, lgt_block, hvy_data, hvy_tmp, hv
                 endif
             enddo
 
+            ! if (lgt_block(lgtID, IDX_TC_2) == 4032 .and. lgt_block(lgtID, IDX_MESH_LVL)==5) then
+            !     write(*, '("113 data lvl ", i0)') level
+            !     do iy = 1, 19
+            !         write(*, '(19(es8.1))') hvy_data(1:19, iy, 1, 1, hvyID)
+            !     enddo
+            ! endif
+
         else  ! block is not modified, rewrite old values if it was transformed
             if (level_me == level) then
                 hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
             endif
         endif
 
-        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10h for - JB
+        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
         toBeManipulated = .false.
     enddo
 end subroutine

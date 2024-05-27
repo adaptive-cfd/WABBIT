@@ -85,8 +85,8 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_level_from_MC
-    PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes
-    PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_level, coarse_extension_retransform_level, xfer_block_data, prepare_update_family_metadata
+    PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block
+    PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_level, coarse_extension_reconstruct_level, xfer_block_data, prepare_update_family_metadata
 
 
 contains

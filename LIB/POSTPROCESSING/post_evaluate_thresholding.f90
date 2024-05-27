@@ -129,7 +129,7 @@ subroutine post_evaluate_thresholding(params)
 
     do level = Jmax_active, Jmin_active, -1
         write(*,*) level
-        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, iteration, ignore_maxlevel=.true., input_is_WD=.false.)
+        call coarseningIndicator_level( time, params, level, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, iteration, ignore_maxlevel=.true., input_is_WD=.false.)
     enddo
 
 

@@ -10,7 +10,7 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
-    refinement_status, norm, level, input_is_WD, block_mask)
+    refinement_status, norm, level, input_is_WD, block_mask, indices)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -36,10 +36,12 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
-    logical, intent(inout)              :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
+    !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
+    integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz, idx(2,3)
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, mask_max, mask_min
@@ -49,6 +51,21 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     Jmax = params%Jmax
     Bs = params%Bs
     g = params%g
+
+    ! set the indices we want to treshold
+    idx(:, :) = 1
+    if (present(indices)) then
+        idx(:, :) = indices(:, :)
+    else  ! full interior block
+        idx(1, 1) = g+1
+        idx(2, 1) = Bs(1)+g
+        idx(1, 2) = g+1
+        idx(2, 2) = Bs(2)+g
+        if (params%dim == 3) then
+            idx(1, 3) = g+1
+            idx(2, 3) = Bs(3)+g
+        endif
+    endif
 
     !> This routine sets the -1 coarsening flag on a block. it uses different methods to
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
@@ -87,7 +104,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD)
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )

@@ -322,7 +322,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
                      u_dx4, v_dx4, u_dy4, v_dy4
     ! loop variables
-    integer(kind=rk) :: ix, iy, idir
+    integer(kind=ik) :: ix, iy, idir
     ! coefficients for Tam&Webb (4th order 1st derivative)
     real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for a standard centered 4th order 1st derivative
@@ -767,7 +767,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi
     !> loop variables
-    integer(kind=rk) :: ix, iy, iz
+    integer(kind=ik) :: ix, iy, iz
 
     real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for a standard centered 4th order 1st derivative
@@ -1424,7 +1424,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     !> time
     real(kind=rk), intent(in)               :: time
 
-    integer(kind=rk) :: ix, iy, iz, iscalar, j
+    integer(kind=ik) :: ix, iy, iz, iscalar, j
 
     ! coefficients for Tam&Webb (4th order 1st derivative)
     real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
@@ -1768,7 +1768,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     !> time
     real(kind=rk), intent(in)               :: time
 
-    integer(kind=rk) :: ix, iy, iscalar, j
+    integer(kind=ik) :: ix, iy, iscalar, j
 
     real(kind=rk) :: kappa, x, y, masksource, nu, R
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv

@@ -1655,8 +1655,8 @@ contains
         integer(kind=ik), intent(in) :: neighborhood
         integer(kind=ik), intent(in), optional :: Nwcl_optional, Nwcr_optional
 
-        integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d
+        integer(kind=ik) :: Nwcl, Nwcr
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3)
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1664,118 +1664,19 @@ contains
         nc = size(wc, 4)
         g = params%g
         Bs = params%bs
-        Nscl    = params%Nscl
-        Nscr    = params%Nscr
         Nwcl    = params%Nwcl
         Nwcr    = params%Nwcr
-        Nreconl = params%Nreconl
-        Nreconr = params%Nreconr
         d       = 2_ik ** params%dim
 
         ! sometimes we just need to delete the WC in the ghost nodes layer
         ! in which case we set Nwcl=Nwcr=g
         if (present(Nwcl_optional)) Nwcl = Nwcl_optional
         if (present(Nwcr_optional)) Nwcr = Nwcr_optional
-        
-        if (params%dim == 2) then
-            ! 2D
-            select case(neighborhood)
-            case (9:10)
-                ! FIXME to be modified for any other than CDF44
-                ! NOTE: even though we set Nwcl=12 points to zero, this does not mean we
-                ! kill 12 WC. They are on the extended grid, so effectively only 12/2
-                ! are killed, many of which are in the ghost nodes layer
-                ! -x
-                wc(1:Nwcl, :, :, 1:nc, 2:d) = 0.0_rk
-            case (15:16)
-                ! -y
-                wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (11:12)
-                ! +x
-                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
-            case (13:14)
-                ! +y
-                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(5)
-                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(6)
-                wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case(7)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(8)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            end select
-        else
-            ! 3D
-            ! The finer neighbors are modified
-            select case(neighborhood)
-            ! ---faces---
-            case (35:38)
-                ! +x
-                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
-            case (43:46)
-                ! -x
-                wc(1:Nwcl, :, :, 1:nc, 2:d) = 0.0_rk
-            case (39:42)
-                ! +y
-                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case (31:34)
-                ! -y
-                wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (27:30)
-                ! +z
-                wc(:, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (47:50)
-                ! -z
-                wc(:, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
 
-            ! --- corners ---
-            case (26)
-                wc(1:Nwcl, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (23)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (22)
-                wc(1:Nwcl, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (19)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (25)
-                wc(1:Nwcl, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (21)
-                wc(1:Nwcl, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (20)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (24)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+        idx(:, :) = 1
+        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/))
 
-            ! ---(partial) edges---
-            case (51:52)
-                wc(:, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (53:54)
-                wc(nx-Nwcr+1:nx, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (55:56)
-                wc(:, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (57:58)
-                wc(1:Nwcl, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (59:60)
-                wc(:, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (61:62)
-                wc(nx-Nwcr+1:nx, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (63:64)
-                wc(:, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (65:66)
-                wc(1:Nwcl, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (67:68)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (69:70)
-                wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (71:72)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case (73:74)
-                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-
-            end select
-
-        endif
+        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = 0.0_rk
     end subroutine
 
 
@@ -1805,7 +1706,7 @@ contains
         logical, optional, intent(in)  :: skip_ghosts    !> Flag to skip ghost points if they have been synched
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
-        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, N_s, N_e
+        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1817,101 +1718,98 @@ contains
         Nscr    = params%Nscr
         Nreconl = params%Nreconl
         Nreconr = params%Nreconr
-        ! Normally we also reset boundary values. However if they have been synched to the field we want to let them as they are
-        N_s = 1
-        N_e = 0
+
+        idx(:, :) = 1
+        ! Normally we also reset boundary values. However if they have been synched to the field we want to leave them as they are
         if (present(skip_ghosts)) then
-            if (skip_ghosts) then
-                N_s = 1 + g
-                N_e = 0 + g
-            endif
-        endif
-
-
-        if (params%dim == 2) then
-            ! 2D
-            select case(neighborhood)
-            case (9:10)  ! -x
-                wc(N_s:Nscl, 1:ny-N_e, :, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, :, 1:nc)
-            case (11:12) ! +x
-                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, :, 1:nc)
-            case (13:14) ! +y
-                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc)
-            case (15:16) ! -y
-                wc(1:nx-N_e, N_s:Nscl, :, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, :, 1:nc)
-            case(5) ! -x+y
-                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, :, 1:nc)
-            case(6) ! -x-y
-                wc(N_s:Nscl, N_s:Nscl, :, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, :, 1:nc)
-            case(7) ! +x+y
-                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, :, 1:nc)
-            case(8) ! +x-y
-                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, :, 1:nc)
-            end select
+            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/), &
+                X_s=(/g, g, g/), X_e=(/g, g, g/))
         else
-            ! 3D
-            ! The finer neighbors are modified
-            select case(neighborhood)
-            ! ---faces---
-            case (35:38) ! +x
-                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, 1:nz-N_e, 1:nc)
-            case (43:46) ! -x
-                wc(N_s:Nscl, 1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, 1:nz-N_e, 1:nc)
-            case (39:42) ! +y
-                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
-            case (31:34) ! -y
-                wc(1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc)
-            case (27:30) ! +z
-                wc(1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (47:50) ! -z
-                wc(1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc)
-            ! --- corners ---
-            case (26) ! -x-y-z
-                wc(N_s:Nscl, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, N_s:Nscl, 1:nc)
-            case (23) ! +x-y-z
-                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc)
-            case (22) ! -x-y+z
-                wc(N_s:Nscl, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
-            case (19) ! +x-y+z
-                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
-            case (25) ! -x+y-z
-                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
-            case (21) ! -x+y+z
-                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (20) ! +x+y+z
-                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (24) ! +x+y-z
-                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
-            ! ---(partial) edges---
-            case (51:52) !   -y+z
-                wc(1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, nz-Nscr+1:nz-N_e, 1:nc)
-            case (53:54) ! +x  +z
-                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (55:56) !   +y+z
-                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (57:58) ! -x  +z
-                wc(N_s:Nscl, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, nz-Nscr+1:nz-N_e, 1:nc)
-            case (59:60) !   -y-z
-                wc(1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, N_s:Nscl, N_s:Nscl, 1:nc)
-            case (61:62) ! +x  -z
-                wc(nx-Nscr+1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, 1:ny-N_e, N_s:Nscl, 1:nc)
-            case (63:64) !   +y-z
-                wc(1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(1:nx-N_e, ny-Nscr+1:ny-N_e, N_s:Nscl, 1:nc)
-            case (65:66) ! -x  -z
-                wc(N_s:Nscl, 1:ny-N_e, N_s:Nscl, 1:nc, 1) = u_copy(N_s:Nscl, 1:ny-N_e, N_s:Nscl, 1:nc)
-            case (67:68) ! +x-y
-                wc(nx-Nscr+1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, N_s:Nscl, 1:nz-N_e, 1:nc)
-            case (69:70) ! -x-y
-                wc(N_s:Nscl, N_s:Nscl, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, N_s:Nscl, 1:nz-N_e, 1:nc)
-            case (71:72) ! +x+y
-                wc(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(nx-Nscr+1:nx-N_e, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
-            case (73:74) ! -x+y
-                wc(N_s:Nscl, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc, 1) = u_copy(N_s:Nscl, ny-Nscr+1:ny-N_e, 1:nz-N_e, 1:nc)
-            end select
-
+            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/))
         endif
+
+        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 1) = &
+            u_copy(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
 
     end subroutine
+
+
+
+    !> \brief From a neighbourhood, compute the indices of the boundary patch until specific points N_s (left end) or N_e (right end)
+    !> We have the option to exclude some points on the left or right end, usefull to skip ghost points for example
+    !> This function is used for coarseExtensionManipulation to get the range of influence of the boundary patches
+    !> This works only for leveldiff = 0,1 (coarse and same-level neighbors)
+    !  ToDo: adapt for finer neighbours with leveldiff = -1
+    subroutine get_indices_of_modify_patch(params, neighborhood, idx, N_xyz, N_s, N_e, X_s, X_e)
+        implicit none
+
+        type (type_params), intent(in)           :: params              !> Good ol' params
+        integer(kind=ik), intent(in)             :: neighborhood        !> Which neighborhood to apply manipulation
+        integer(kind=ik), intent(out)            :: idx(1:2, 1:3)   !> Output of indices, first entry is l/r and second is dim
+        integer(kind=ik), intent(in)             :: N_xyz(1:3)          !> Size of blocks including ghost points, should be size(block, i_dim)
+        integer(kind=ik), intent(in)             :: N_s(1:)             !> Number of points to modify at start, vec with entry for each dimension
+        integer(kind=ik), intent(in)             :: N_e(1:)             !> Number of points to modify at end, vec with entry for each dimension
+        integer(kind=ik), intent(in), optional   :: X_s(1:)             !> Number of points to skip at start, vec with entry for each dimension
+        integer(kind=ik), intent(in), optional   :: X_e(1:)             !> Number of points to skip at end, vec with entry for each dimension
+
+        integer(kind=ik) :: dim, i_dim
+        ! Indexes where to start or finish, short name because elsewise this list gets looong
+        integer(kind=ik) :: I_s(1:3), I_e(1:3)
+
+        dim = params%dim
+
+        ! Pre-init indices by setting the full domain that we look at, X_s = 0, X_e = g = 1
+        ! g g g g g           s s s s -
+        ! g i i i g           s s s s -
+        ! g i i i g           s s s s -
+        ! g i i i g           s s s s -
+        ! g g g g g           - - - - -
+        do i_dim = 1, dim
+            if (present(X_s)) then
+                idx(1, i_dim) = 1 + X_s(i_dim)
+            else
+                idx(1, i_dim) = 1
+            endif
+            if (present(X_e)) then
+                idx(2, i_dim) = N_xyz(i_dim) - X_e(i_dim)
+            else
+                idx(2, i_dim) = N_xyz(i_dim)
+            endif
+        enddo
+
+        ! now lets get to the select beast, this limits / restricts the patch for the specific neighborhood
+        ! example from above with N_s = N_e = 2 and selecting neighborhood 9 or -x edge for 2D
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! - - - - -           - - - - -
+        if (params%dim == 2) then
+            ! 2D, first surpress indices for third dimension
+            ! index blocks are: lvl_same faces, lvl_diff faces, edges
+            idx(1:2, 3) = 1
+            if (any((/3,   11,12,    7,8/) == neighborhood)) idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
+            if (any((/1,   9,10,     5,6/) == neighborhood)) idx(2, 1) = N_s(1)  ! -x
+            if (any((/2,   13,14,    5,7/) == neighborhood)) idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
+            if (any((/4,   15,16,    6,8/) == neighborhood)) idx(2, 2) = N_s(2)  ! -y
+        else
+            ! 3D
+            ! index blocks are: lvl_same faces, lvl_same edges, lvl_diff faces, corners, lvl_diff edges
+            if (any((/3,   8,12,15,17,    35,36,37,38,   19,20,23,24,   53,54,61,62,67,68,71,72/) == neighborhood)) &
+                idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
+            if (any((/5,   10,14,16,18,   43,44,45,46,   21,22,25,26,   57,58,65,66,69,70,73,74/) == neighborhood)) &
+                idx(2, 1) = N_s(1)  ! -x
+            if (any((/4,   9,13,17,18,    39,40,41,42,   20,21,24,25,   55,56,63,64,71,72,73,74/) == neighborhood)) &
+                idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
+            if (any((/2,   7,11,15,16,    31,32,33,34,   19,22,23,26,   51,52,59,60,67,68,69,70/) == neighborhood)) &
+                idx(2, 2) = N_s(2)  ! -y
+            if (any((/1,   7,8,9,10,      27,28,29,30,   19,20,21,22,   51,52,53,54,55,56,57,58/) == neighborhood)) &
+                idx(1, 3) = N_xyz(3) - N_e(3) + 1  ! +z
+            if (any((/6,   11,12,13,14,   47,48,49,50,   23,24,25,26,   59,60,61,62,63,64,65,66/) == neighborhood)) &
+                idx(2, 3) = N_s(3)  ! -z
+        endif
+    end subroutine get_indices_of_modify_patch
+
 
 
     subroutine setup_wavelet(params, g_wavelet, verbose)

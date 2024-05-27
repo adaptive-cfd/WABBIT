@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, eps)
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps)
     implicit none
 
     !> user defined parameter structure
@@ -19,8 +19,10 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !> if different from the default eps (params%eps), you can pass a different value here. This is optional
     !! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
+    !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
+    integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
 
-    integer(kind=ik)                    :: dF, i, j, l, p
+    integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3)
     real(kind=rk)                       :: detail( size(u,4) )
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
@@ -62,6 +64,21 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
 
+    ! set the indices we want to treshold
+    idx(:, :) = 1
+    if (present(indices)) then
+        idx(:, :) = indices(:, :)
+    else  ! full interior block
+        idx(1, 1) = g+1
+        idx(2, 1) = Bs(1)+g
+        idx(1, 2) = g+1
+        idx(2, 2) = Bs(2)+g
+        if (dim == 3) then
+            idx(1, 3) = g+1
+            idx(2, 3) = Bs(3)+g
+        endif
+    endif
+
 
 #ifdef DEV
     if (.not. allocated(params%GD)) call abort(1213149, "The cat is angry: Wavelet-setup not yet called?")
@@ -82,13 +99,13 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         do p = 1, nc
             ! if all details are smaller than C_eps, we can coarsen.
             ! check interior WC only
-            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
+            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:4)) )
         enddo
     else
         do p = 1, nc
             ! if all details are smaller than C_eps, we can coarsen.
             ! check interior WC only
-            detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
+            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:8)) )
         enddo
     endif
 

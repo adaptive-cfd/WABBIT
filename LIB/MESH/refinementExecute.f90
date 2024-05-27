@@ -117,12 +117,12 @@ end subroutine refineBlock
 
 
 
-!> \brief Refine block directly to mallat decomposition
+!> \brief Refine block directly to spaghetti decomposition
 !!    SC is copied to correct quadrant / octant
 !!    WC is set to 0
 !> All daughter blocks are created and at last mother is set as inactive
 !  Module MPI could be used in order to do the copying more easily, as we have the indices there in ijkPatches
-subroutine refineBlock2MallatWD(params, hvy_block, hvyID, tree_ID)
+subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
@@ -136,6 +136,13 @@ subroutine refineBlock2MallatWD(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level, lgtID
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_wd  ! used for data juggling
+
+    if (allocated(tmp_wd)) then
+        if (size(tmp_wd, 4) < size(hvy_block, 4)) deallocate(tmp_wd)
+    endif
+    if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:size(hvy_block, 4)) )
+
 
     dim = params%dim
     N = params%number_blocks
@@ -178,35 +185,38 @@ subroutine refineBlock2MallatWD(params, hvy_block, hvyID, tree_ID)
         ! k=0 -> X_l, Y_l; k=1 -> X_l, Y_r; k=2 -> X_r, Y_l; k=3 -> X_r, Y_r;
         do dF = 1, size(hvy_block,4)
             ! Init values as 0 to set all WC to 0
-            hvy_block(:, :, :, df, free_heavy_id) = 0.0_rk
+            tmp_wd(:, :, :, df) = 0.0_rk
 
             ! compute bounds from which quadrant / octant to copy
             data_bounds = -1
-            data_bounds(1, 1) = g+1       + Bs(1)/2 * modulo(dF/2, 2)
-            data_bounds(2, 1) = g+Bs(1)/2 + Bs(1)/2 * modulo(dF/2, 2)
-            data_bounds(1, 2) = g+1       + Bs(2)/2 * modulo(dF  , 2)
-            data_bounds(2, 2) = g+Bs(2)/2 + Bs(2)/2 * modulo(dF  , 2)
-            data_bounds(1, 3) = g+1       + Bs(3)/2 * modulo(dF/4, 2)
-            data_bounds(2, 3) = g+Bs(3)/2 + Bs(3)/2 * modulo(dF/4, 2)
+            data_bounds(1, 1) = g+1       + Bs(1)/2 * modulo(k_daughter/2, 2)
+            data_bounds(2, 1) = g+Bs(1)/2 + Bs(1)/2 * modulo(k_daughter/2, 2)
+            data_bounds(1, 2) = g+1       + Bs(2)/2 * modulo(k_daughter  , 2)
+            data_bounds(2, 2) = g+Bs(2)/2 + Bs(2)/2 * modulo(k_daughter  , 2)
+            data_bounds(1, 3) = g+1       + Bs(3)/2 * modulo(k_daughter/4, 2)
+            data_bounds(2, 3) = g+Bs(3)/2 + Bs(3)/2 * modulo(k_daughter/4, 2)
 
             ! now copy values from this quadrant / octant to SC area in Mallat format
             if (dim == 2) then
-                hvy_block(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, 1, df, free_heavy_id) = &
+                tmp_wd(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, 1, df) = &
                     hvy_block(data_bounds(1, 1):data_bounds(2, 1), data_bounds(1, 2):data_bounds(2, 2), 1, df, hvyID)
             else
-                hvy_block(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, &
-                    ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(3)/2, df, free_heavy_id) = &
+                tmp_wd(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, &
+                    ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(3)/2, df) = &
                     hvy_block(data_bounds(1, 1):data_bounds(2, 1), data_bounds(1, 2):data_bounds(2, 2), &
                     data_bounds(1, 3):data_bounds(2, 3), df, hvyID)
             endif
+
         end do
+        ! transform to spaghetti form as this is what we usually work with
+        call Mallat2Spaghetti_block(params, tmp_wd, hvy_block(:, :, :, :, free_heavy_id))
     end do
 
     ! delete mother
     lgt_block(lgtID, :) = -1
     lgt_block(lgtID, IDX_REFINE_STS) = 0
 
-end subroutine refineBlock2MallatWD
+end subroutine refineBlock2SpaghettiWD
 
 
 
@@ -463,7 +473,9 @@ end subroutine refinementExecute3D_tree
 !! level and create four(2D) or eight(3D) new blocks, each carrying a part of the interpolated data,
 !! or copy them to Mallat decomposed blocks if they are on the input level
 !! As all CPU first work individually, the light data array is synced afterwards.
-!> This function is used when parts of the blocks are already composed in adapt_tree
+!> This function is used when parts of the blocks are already waveled decomposed in adapt_tree,
+!! so for block on the given level it refines directly to mallat wavelet decomposition (and then spaghetti),
+!! for other blocks it does normal refinement
 !
 !> \note The interpolation (or prediction) operator here is applied to a block INCLUDING
 !! any ghost nodes. You must sync first. This does not apply to blocks which will be in MallatWD though
@@ -471,7 +483,7 @@ end subroutine refinementExecute3D_tree
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays \n
 ! ********************************************************************************************
-subroutine refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level )
+subroutine refinementExecute_lvl2SpaghettiWD( params, hvy_block, tree_ID, level )
 
     implicit none
 
@@ -506,7 +518,7 @@ subroutine refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level )
             
             ! Daughters created as Mallat WDed blocks
             if (level_me == level) then
-                call refineBlock2MallatWD(params, hvy_block, hvyID, tree_ID)
+                call refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
             ! Daughters refined normally
             else
                 call refineBlock(params, hvy_block, hvyID, tree_ID)
@@ -518,4 +530,4 @@ subroutine refinementExecute_lvl2MallatWD( params, hvy_block, tree_ID, level )
     ! synchronize light data
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
-end subroutine refinementExecute_lvl2MallatWD
+end subroutine refinementExecute_lvl2SpaghettiWD

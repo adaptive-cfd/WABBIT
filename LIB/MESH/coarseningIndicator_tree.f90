@@ -1,4 +1,7 @@
-subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
+!> \brief Decides for all blocks if they can stay or want to coarsen.
+!> This method goes a bit against the naming convention, as for default wavelet cases it acts
+!! level wise but for specific indicators (everywhere or random) it acts on the whole tree.
+subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_tmp, &
     tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, hvy_mask)
 
     use module_indicators
@@ -52,8 +55,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     g = params%g
 
     ! reset refinement status to "stay" on all active blocks
-    ! this is skipped if indicator/="everywhere" .and. indicator/="random" are used, for further iterations
-    if (.not. (iteration > 0 .and. (indicator=="everywhere" .or. indicator/="random"))) then
+    ! this is skipped if indicator=="everywhere" .and. indicator=="random" are used
+    ! why? Because we want to coarsen blocks level by level, but the indicator is only set in the first iteration
+    ! elsewise we would just coarsen all blocks to Jmin and not every or random leaf-block one time
+    if (.not. (iteration > 0 .and. (indicator=="everywhere" .or. indicator=="random"))) then
         do k = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k, tree_ID)
             lgt_block( lgtID, IDX_REFINE_STS ) = 0
@@ -251,6 +256,16 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             endif
         enddo
         call toc( "coarseningIndicator (coarseIndicator_block)", MPI_Wtime()-t0 )
+
+        ! if we want to add a security zone, we check for everz significant block if a neighbor wants to coarsen
+        ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
+        ! in that case we set the neighbouring block to be important as well (with a temporary flag)
+        if (params%useSecurityZone) then
+            t0 = MPI_Wtime()
+            call addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
+            call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0 )
+        endif
+
     end select
 
     !> after modifying all refinement flags, we need to synchronize light data

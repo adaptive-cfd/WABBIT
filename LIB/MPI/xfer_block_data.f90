@@ -619,12 +619,17 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
             endif
         endif
 
-        ! check if daughter exists
-        if (hvy_family(sender_hvyID, 2+2**params%dim) /= -1) then
+        ! check if any daughter exists
+        ! in order to save blocks we directly set one of the daughters to the mother, so we should check all daughter ids
+        if (any(hvy_family(sender_hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
             ! loop over all daughters
             do family = 1, 2**params%dim
                 ! daughters light data id
                 recver_lgtID = hvy_family(sender_hvyID, 1+2**params%dim+family)
+
+                ! if it doesn't exist, cycle, this can be the case when a daughter has been directly assigned to the mother
+                if (recver_lgtID == -1) cycle
+
                 ! calculate dauther rank
                 call lgt2proc( recver_rank, recver_lgtID, N )
                 ! daughter heavy id
@@ -711,3 +716,45 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
     endif
 end subroutine prepare_update_family_metadata
+
+
+
+!> \brief In-place move from Mallat wavelet decomposition the SC patch to a position and wipe the rest
+!> When copying patches in coarsening from wavelet decomposed values into mother patches
+!! we might want to do this in-place in order to create less blocks. This is exactly what
+!! this function does
+!  Why is this function in MPI? In order to access ijkPatches as this already has all indices available
+subroutine move_mallat_patch_block(params, hvy_block, hvy_ID, digit)
+
+    implicit none
+
+    type (type_params), intent(in)      :: params                       !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data
+    integer(kind=ik), intent(in)        :: hvy_ID                       !< ID of the block to be concerned
+    integer(kind=ik), intent(in)        :: digit                        !< to which position should the patch go
+
+    integer(kind=ik)                    :: nc, ijk_s(2,3), ijk_r(2,3)
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_wd  ! used for data juggling
+
+    nc = size(hvy_block, 4)
+    if (allocated(tmp_wd)) then
+        if (size(tmp_wd, 4) < nc) deallocate(tmp_wd)
+    endif
+    if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:nc) )
+
+    ! setup correct patches and get indices
+    call family_setup_patches(params, output_to_file=.false.)
+    ! recver and sender swap is deceiving, but I checked and thats how it goes
+    ijk_r = ijkPatches(:, :, -1 - digit, +1, SENDER)
+    ijk_s = ijkPatches(:, :, -1 - digit, +1, RECVER)
+
+    write(*, '("Self-shift ", i0, " : Send ", 6(i0, 1x), " Recv ", 6(i0, 1x))') hvy_ID, ijk_s, ijk_r
+
+    ! init tmp values
+    tmp_wd(:, :, :, :) = 0.0_rk
+    ! move patch
+    tmp_wd(ijk_r(1,1):ijk_r(2,1), ijk_r(1,2):ijk_r(2,2), ijk_r(1,3):ijk_r(2,3), 1:nc) = &
+        hvy_block(ijk_s(1,1):ijk_s(2,1), ijk_s(1,2):ijk_s(2,2), ijk_s(1,3):ijk_s(2,3), 1:nc, hvy_ID)
+    hvy_block(:,:,:,1:nc, hvy_ID) = tmp_wd(:,:,:,1:nc)
+
+end subroutine move_mallat_patch_block

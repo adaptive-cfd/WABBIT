@@ -148,9 +148,11 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, procID, hvyID, level_me, lgt_merge_id, hvy_merge_id
+    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, hvyID, level_me, lgt_merge_id, digit_merge
     integer(kind=ik)                    :: nx, ny, nz, nc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
+
+    integer(kind=ik)  :: iy
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -214,9 +216,23 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
     
                 ! construct new mother block if on my rank and create light data entry for the new block
                 if (data_rank == rank) then
+                    ! get lgtID as first daughter block on correct rank and move values in-place
+                    ! lgt_merge_id = -1
+                    ! do j = 1, N
+                    !     if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
+                    !         lgt_merge_id = lgt_daughters(j)
+                    !         call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
+                    !         ! we need to compute the last digit to in-place move the patch correctly
+                    !         treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
+                    !         digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax)
+                    !         call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
+                    !     endif
+                    ! enddo
                     call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
-                    lgt_block( lgt_merge_id, : ) = -1
                     treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+
+                    ! change meta_data of mother block
+                    lgt_block( lgt_merge_id, : ) = -1
                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
                         dim=params%dim, level=level_me-1, max_level=params%Jmax))
                     lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_me-1
@@ -225,7 +241,7 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
 
                     ! update sisters on my rank that they have found their mother and can be skipped
                     do j = 1, N
-                        if (rank_daughters(j) == rank) then
+                        if (rank_daughters(j) == rank .and. lgt_daughters(j) /= lgt_merge_id) then
                             call lgt2hvy(hvyID, lgt_daughters(j), rank, params%number_blocks)
                             hvy_family(hvyID, 1) = lgt_merge_id
                         endif
@@ -240,18 +256,9 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
 
     ! the active lists are outdated, so lets resynch
     call synchronize_lgt_data( params, refinement_status_only=.false.)
-    call updateMetadata_tree(params, tree_ID)
-
-    ! if (rank == 1) then
-    !     write(*, '("Rank ", i0, " with blocks ", i0)') rank, hvy_n(tree_ID)
-    !     ! print family
-    !     do k = 1, hvy_n(tree_ID)
-    !         hvyID = hvy_active(k, tree_ID)
-    !         call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-    !         write(*, '("1R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
-    !             rank, k, lgtID, lgt_block(lgtID, IDX_MESH_LVL), lgt_block(lgtID, IDX_REFINE_STS), hvy_family(hvyID, :), lgt_block(lgtID, IDX_TC_2)
-    !     enddo
-    ! endif
+    ! update metadata but ignore neighbors - this is important as we temporarily have a non-unique grid
+    ! where mothers and daughters coexist
+    call updateMetadata_tree(params, tree_ID, update_neighbors=.false.)
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter

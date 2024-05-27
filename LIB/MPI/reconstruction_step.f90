@@ -24,7 +24,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
 
 ! real(kind=rk), allocatable :: WCtmp(:,:,:,:,:,:) ! code used to verify that FWT after manip yields same coeffs
     integer(kind=ik) :: N, k, neighborhood, level_diff, hvyID, lgtID, hvyID_neighbor, lgtID_neighbor, level_me, level_neighbor
-    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), ii, Nreconl, Nreconr, nnn, p, ierr, g_this, g_spaghetti, Nwcl,Nwcr
+    integer(kind=ik) :: nx,ny,nz,nc, g, Bs(1:3), ii, Nreconl, Nreconr, nnn, p, ierr, g_this, g_spaghetti, Nwcl,Nwcr, idx(2,3)
 !    integer(kind=ik) :: ix,iy,iz,ic,iwc ! code used to verify that FWT after manip yields same coeffs
 
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
@@ -305,95 +305,11 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
 
                 if (level_neighbor < level_me) then
                     ! coarse extension case (neighbor is coarser)
-                    if (params%dim == 2) then
-                        select case (neighborhood)
-                        case (9:10)
-                            ! -x
-                            hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
-                        case (11:12)
-                            ! +x
-                            hvy_block(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx,:,:,1:nc)
-                        case (13:14)
-                            ! +y
-                            hvy_block(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny,:,1:nc)
-                        case (15:16)
-                            ! -y
-                            hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
-                        case (5)
-                            hvy_block(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny,:,1:nc)
-                        case (6)
-                            hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
-                        case (7)
-                            ! top right corner
-                            hvy_block(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny,:,1:nc)
-                        case (8)
-                            hvy_block(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl,:,1:nc)
-                        end select
-                    else
-                        select case(neighborhood)
-                        ! ---faces---
-                        case (35:38)
-                            ! +x
-                            hvy_block(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, :, 1:nc)
-                        case (43:46)
-                            ! -x
-                            hvy_block(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, :, 1:nc)
-                        case (39:42)
-                            ! +y
-                            hvy_block(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, :, 1:nc)
-                        case (31:34)
-                            ! -y
-                            hvy_block(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, :, 1:nc)
-                        case (27:30)
-                            ! +z
-                            hvy_block(:, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, :, nz-Nreconr+1:nz, 1:nc)
-                        case (47:50)
-                            ! -z
-                            hvy_block(:, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, :, 1:Nreconl, 1:nc)
-                        ! --- corners ---
-                        case (26)
-                            hvy_block(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc)
-                        case (23)
-                            hvy_block(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc)
-                        case (22)
-                            hvy_block(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                        case (19)
-                            hvy_block(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                        case (25)
-                            hvy_block(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                        case (21)
-                            hvy_block(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                        case (20)
-                            hvy_block(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                        case (24)
-                            hvy_block(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                        ! ---(partial) edges---
-                        case (51:52)
-                            hvy_block(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                        case (53:54)
-                            hvy_block(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc)
-                        case (55:56)
-                            hvy_block(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                        case (57:58)
-                            hvy_block(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc)
-                        case (59:60)
-                            hvy_block(:, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, 1:Nreconl, 1:nc)
-                        case (61:62)
-                            hvy_block(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc)
-                        case (63:64)
-                            hvy_block(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                        case (65:66)
-                            hvy_block(1:Nreconl, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, 1:Nreconl, 1:nc)
-                        case (67:68)
-                            hvy_block(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc)
-                        case (69:70)
-                            hvy_block(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, :, 1:nc)
-                        case (71:72)
-                            hvy_block(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc)
-                        case (73:74)
-                            hvy_block(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc)
-                        end select
-                    endif
+                    idx(:, :) = 1
+                    call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/))
+
+                    hvy_block(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, hvyID) = &
+                        tmp_reconst(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
                 endif
             endif
         enddo
@@ -449,6 +365,8 @@ end subroutine
 
 
 
+!> \brief Modify the SC and WC of a wavelet decomposed blocks at fine/coarse interfaces
+!> This routine assumes that the input is already wavelet decomposed in spaghetti form
 subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, sc_skip_ghosts)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -457,7 +375,7 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
 
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(inout)     :: lgt_block(:, :)             !< light data array
-    real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array
+    real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array, WDed in Spaghetti form
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)      !< heavy work data array - block data.
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)           !< heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
@@ -484,6 +402,9 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
 
     do k = 1, hvy_n
+        ! Set toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
+        toBeManipulated = .false.
+
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         level_me       = lgt_block( lgtID, IDX_MESH_LVL )
@@ -543,15 +464,12 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
             ! transform wc from inflated mallat back to spaghetti
             call inflatedMallat2spaghetti_block(params, wc, hvy_data(:,:,:,:,hvyID))
         endif
-
-        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
-        toBeManipulated = .false.
     enddo
 end subroutine
 
 
 
-subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
+subroutine coarse_extension_reconstruct_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -567,7 +485,7 @@ subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_t
     integer(kind=ik), intent(in)        :: level                       !< current level
 
     integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID, Nreconl, Nreconr
-    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
+    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor, idx(2,3)
     logical                             :: toBeManipulated
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
 
@@ -587,6 +505,9 @@ subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_t
     if (.not. allocated(tmp_reconst)) allocate(tmp_reconst(1:nx, 1:ny, 1:nz, 1:nc) )
 
     do k = 1, hvy_n
+        ! Set toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
+        toBeManipulated = .false.
+
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         level_me       = lgt_block( lgtID, IDX_MESH_LVL )
@@ -640,95 +561,11 @@ subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_t
 
                     if (level_neighbor < level_me) then
                         ! coarse extension case (neighbor is coarser)
-                        if (params%dim == 2) then
-                            select case (neighborhood)
-                            case (9:10)
-                                ! -x
-                                hvy_data(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl,:,:,1:nc)
-                            case (11:12)
-                                ! +x
-                                hvy_data(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx,:,:,1:nc)
-                            case (13:14)
-                                ! +y
-                                hvy_data(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny,:,1:nc)
-                            case (15:16)
-                                ! -y
-                                hvy_data(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl,:,1:nc)
-                            case (5)
-                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny,:,1:nc)
-                            case (6)
-                                hvy_data(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl,:,1:nc)
-                            case (7)
-                                ! top right corner
-                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny,:,1:nc)
-                            case (8)
-                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl,:,1:nc)
-                            end select
-                        else
-                            select case(neighborhood)
-                            ! ---faces---
-                            case (35:38)
-                                ! +x
-                                hvy_data(nx-Nreconr+1:nx, :, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, :, 1:nc)
-                            case (43:46)
-                                ! -x
-                                hvy_data(1:Nreconl, :, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, :, 1:nc)
-                            case (39:42)
-                                ! +y
-                                hvy_data(:, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, :, 1:nc)
-                            case (31:34)
-                                ! -y
-                                hvy_data(:, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, :, 1:nc)
-                            case (27:30)
-                                ! +z
-                                hvy_data(:, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, :, nz-Nreconr+1:nz, 1:nc)
-                            case (47:50)
-                                ! -z
-                                hvy_data(:, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, :, 1:Nreconl, 1:nc)
-                            ! --- corners ---
-                            case (26)
-                                hvy_data(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, 1:Nreconl, 1:nc)
-                            case (23)
-                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, 1:Nreconl, 1:nc)
-                            case (22)
-                                hvy_data(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                            case (19)
-                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                            case (25)
-                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                            case (21)
-                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                            case (20)
-                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                            case (24)
-                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                            ! ---(partial) edges---
-                            case (51:52)
-                                hvy_data(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, nz-Nreconr+1:nz, 1:nc)
-                            case (53:54)
-                                hvy_data(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, nz-Nreconr+1:nz, 1:nc)
-                            case (55:56)
-                                hvy_data(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, nz-Nreconr+1:nz, 1:nc)
-                            case (57:58)
-                                hvy_data(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, nz-Nreconr+1:nz, 1:nc)
-                            case (59:60)
-                                hvy_data(:, 1:Nreconl, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, 1:Nreconl, 1:Nreconl, 1:nc)
-                            case (61:62)
-                                hvy_data(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, :, 1:Nreconl, 1:nc)
-                            case (63:64)
-                                hvy_data(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(:, ny-Nreconr+1:ny, 1:Nreconl, 1:nc)
-                            case (65:66)
-                                hvy_data(1:Nreconl, :, 1:Nreconl, 1:nc, hvyID) = tmp_reconst(1:Nreconl, :, 1:Nreconl, 1:nc)
-                            case (67:68)
-                                hvy_data(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, 1:Nreconl, :, 1:nc)
-                            case (69:70)
-                                hvy_data(1:Nreconl, 1:Nreconl, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, 1:Nreconl, :, 1:nc)
-                            case (71:72)
-                                hvy_data(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(nx-Nreconr+1:nx, ny-Nreconr+1:ny, :, 1:nc)
-                            case (73:74)
-                                hvy_data(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc, hvyID) = tmp_reconst(1:Nreconl, ny-Nreconr+1:ny, :, 1:nc)
-                            end select
-                        endif
+                        idx(:, :) = 1
+                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/))
+
+                        hvy_data(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, hvyID) = &
+                            tmp_reconst(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
                     endif
                 endif
             enddo
@@ -745,8 +582,5 @@ subroutine coarse_extension_retransform_level(params, lgt_block, hvy_data, hvy_t
                 hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
             endif
         endif
-
-        ! Reset toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
-        toBeManipulated = .false.
     enddo
 end subroutine

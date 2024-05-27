@@ -74,22 +74,6 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
 
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
-    ! do k = 1,hvy_n(tree_ID)
-    !     hvyID = hvy_active(k, tree_ID)
-    !     call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
-
-    !     if (lgt_block(lgtID, IDX_TC_2) == 0 .and. lgt_block(lgtID, IDX_MESH_LVL) == 1) then
-    !         write(*, '("Block 1 start")')
-    !         do iy = 4, 13
-    !             write(*, '(10(es8.1), ".", 10(es8.1))') hvy_block(4:23, iy, 1, 1, 1)
-    !         enddo
-    !         write(*, '()')
-    !         do iy = 14, 23
-    !             write(*, '(10(es8.1), ".", 10(es8.1))') hvy_block(4:23, iy, 1, 1, 1)
-    !         enddo
-    !     endif
-    ! enddo
-
     ! refine
     call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
 
@@ -98,22 +82,6 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
 
     ! coarsening (back to the original level)
     call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "everywhere", hvy_tmp)
-
-    ! do k = 1,hvy_n(tree_ID)
-    !     hvyID = hvy_active(k, tree_ID)
-    !     call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
-
-    !     if (lgt_block(lgtID, IDX_TC_2) == 0 .and. lgt_block(lgtID, IDX_MESH_LVL) == 1) then
-    !         write(*, '("Block 1 end")')
-    !         do iy = 4, 13
-    !             write(*, '(10(es8.1), ".", 10(es8.1))') hvy_block(4:23, iy, 1, 1, 1)
-    !         enddo
-    !         write(*, '()')
-    !         do iy = 14, 23
-    !             write(*, '(10(es8.1), ".", 10(es8.1))') hvy_block(4:23, iy, 1, 1, 1)
-    !         enddo
-    !     endif
-    ! enddo
 
     ! we compare norms - this is not the most elegant way, but it'll do the trick for now.
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)

@@ -125,8 +125,7 @@ subroutine sparse_to_dense(params)
     elseif (operator=="refine-everywhere") then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="coarsen-everywhere") then
-        ! *5/4 as executeCoarsening needs more blocks
-        params%number_blocks = ((lgt_n(tree_ID) / params%number_procs + 7_ik) * 5) / 4
+        params%number_blocks = (lgt_n(tree_ID) / params%number_procs + 7_ik)
     endif
 
     if (params%rank==0) then

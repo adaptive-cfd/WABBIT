@@ -742,13 +742,9 @@ subroutine move_mallat_patch_block(params, hvy_block, hvy_ID, digit)
     endif
     if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:nc) )
 
-    ! setup correct patches and get indices
-    call family_setup_patches(params, output_to_file=.false.)
     ! recver and sender swap is deceiving, but I checked and thats how it goes
     ijk_r = ijkPatches(:, :, -1 - digit, +1, SENDER)
     ijk_s = ijkPatches(:, :, -1 - digit, +1, RECVER)
-
-    write(*, '("Self-shift ", i0, " : Send ", 6(i0, 1x), " Recv ", 6(i0, 1x))') hvy_ID, ijk_s, ijk_r
 
     ! init tmp values
     tmp_wd(:, :, :, :) = 0.0_rk

@@ -178,6 +178,27 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
     ! transfer counter
     n_xfer = 0
 
+    !---------------------------------------------------------------------------
+    ! transfer all blocks that want to coarsen to Mallat format
+    ! this is necessary so that move_mallat_patch_block can move the correct data
+    ! elsewise we would need different logic to create the mother block out of one of the daughters
+    !---------------------------------------------------------------------------
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1 .and. level==level_me) then
+            ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+            hvy_block(:,:,:,:,hvyID) = wc
+        endif
+    enddo
+
+    ! setup correct patches and get indices, used for move_mallat_patch_block
+    ! this is in theory only needed when we change g but if this is every done I want to avoid nasty bug finding
+    call family_setup_patches(params, output_to_file=.false.)
+
 
     !---------------------------------------------------------------------------
     ! create new empty blocks on rank with most daughters if it does not exist
@@ -197,10 +218,6 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
         if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1 .and. level==level_me) then
-            ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
-            call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-            hvy_block(:,:,:,:,hvyID) = wc
-
             ! If this block already has a mother, we do not have to create it once again
             if (hvy_family(hvyID, 1) == -1) then
                 ! Get all sisters
@@ -217,19 +234,19 @@ subroutine executeCoarsening_WD_level( params, hvy_block, tree_ID, level )
                 ! construct new mother block if on my rank and create light data entry for the new block
                 if (data_rank == rank) then
                     ! get lgtID as first daughter block on correct rank and move values in-place
-                    ! lgt_merge_id = -1
-                    ! do j = 1, N
-                    !     if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
-                    !         lgt_merge_id = lgt_daughters(j)
-                    !         call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
-                    !         ! we need to compute the last digit to in-place move the patch correctly
-                    !         treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
-                    !         digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax)
-                    !         call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
-                    !     endif
-                    ! enddo
-                    call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
-                    treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+                    lgt_merge_id = -1
+                    do j = 1, N
+                        if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
+                            lgt_merge_id = lgt_daughters(j)
+                            call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
+                            ! we need to compute the last digit to in-place move the patch correctly
+                            treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
+                            digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level, params%Jmax)
+                            call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
+                        endif
+                    enddo
+                    ! call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
+                    ! treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
 
                     ! change meta_data of mother block
                     lgt_block( lgt_merge_id, : ) = -1

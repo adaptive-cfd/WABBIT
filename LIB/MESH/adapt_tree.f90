@@ -181,18 +181,18 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! blocks that are significant on that level now have status 0, others (on this level) have -1
         ! Any blocks on other levels have status 0.
 
-        ! ! Coarse Extension sets WC to zero inside a block regardless of if it is kept or not
-        ! ! This can mean that we delete WC which are important, filtering out parts of the flow
-        ! ! In order to prevent this, neighbouring blocks are kept if it would delete necessary WC
-        ! if (params%useSecurityZone) then
-        !     if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
-        !         ! Note: we can add the security zone also for non-lifted wavelets (although this 
-        !         ! does not make much sense, but for development...)
-        !         t0 = MPI_Wtime()
-        !         call addSecurityZone_level( time, params, level, tree_ID, hvy_block, hvy_tmp )
-        !         call toc( "adapt_tree (addSecurityZone_level)", MPI_Wtime()-t0 )
-        !     endif
-        ! endif
+        ! Coarse Extension sets WC to zero inside a block regardless of if it is kept or not
+        ! This can mean that we delete WC which are important, filtering out parts of the flow
+        ! In order to prevent this, neighbouring blocks are kept if it would delete necessary WC
+        if (params%useSecurityZone) then
+            if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
+                ! Note: we can add the security zone also for non-lifted wavelets (although this 
+                ! does not make much sense, but for development...)
+                t0 = MPI_Wtime()
+                call addSecurityZone_level( time, params, level, tree_ID, hvy_block, hvy_tmp )
+                call toc( "adapt_tree (addSecurityZone_level)", MPI_Wtime()-t0 )
+            endif
+        endif
         ! In addSecurityZone_tree, some blocks on level J have revoked their -1 status to 0, some
         ! new blocks may have been created and they have the status 0 as well.
         ! Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it

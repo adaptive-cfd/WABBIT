@@ -257,14 +257,14 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
         enddo
         call toc( "coarseningIndicator (coarseIndicator_block)", MPI_Wtime()-t0 )
 
-        ! if we want to add a security zone, we check for everz significant block if a neighbor wants to coarsen
-        ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
-        ! in that case we set the neighbouring block to be important as well (with a temporary flag)
-        if (params%useSecurityZone) then
-            t0 = MPI_Wtime()
-            call addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
-            call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0 )
-        endif
+        ! ! if we want to add a security zone, we check for everz significant block if a neighbor wants to coarsen
+        ! ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
+        ! ! in that case we set the neighbouring block to be important as well (with a temporary flag)
+        ! if (params%useSecurityZone) then
+        !     t0 = MPI_Wtime()
+        !     call addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
+        !     call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0 )
+        ! endif
 
     end select
 

@@ -204,7 +204,7 @@ subroutine sparse_to_dense(params)
             minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
         else
             write(*,'("Wrote data of input-file: ", A," to file: ", A, " - Minlevel:", i3," Maxlevel:", i3)') &
-            trim(adjustl(file_in)), level, trim(adjustl(file_out)), minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
+            trim(adjustl(file_in)), trim(adjustl(file_out)), minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
         endif
     end if
 

@@ -331,21 +331,21 @@ contains
 
 
 
-    subroutine  print_mat(Mat)
+    ! subroutine  print_mat(Mat)
 
-        real(kind=rk), intent(in)       :: Mat(:,:)
-        integer                         :: i, j
-        character(len=16) :: fmt
-        character(len=3) :: ncols_str
+    !     real(kind=rk), intent(in)       :: Mat(:,:)
+    !     integer                         :: i, j
+    !     character(len=16) :: fmt
+    !     character(len=3) :: ncols_str
 
-        write(*,*) " "
-        write(ncols_str,'(i3.3)') size(Mat,2)
-        fmt = '('//ncols_str//'(es12.4,1x))'
-        do j = 1,size(Mat,1)
-            write(*,fmt) Mat(j,:)
-        end do
+    !     write(*,*) " "
+    !     write(ncols_str,'(i3.3)') size(Mat,2)
+    !     fmt = '('//ncols_str//'(es12.4,1x))'
+    !     do j = 1,size(Mat,1)
+    !         write(*,fmt) Mat(j,:)
+    !     end do
 
-    end subroutine print_mat
+    ! end subroutine print_mat
 
 
     !##############################################################

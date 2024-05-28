@@ -197,11 +197,15 @@ subroutine sparse_to_dense(params)
     call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 
     if (params%rank==0 ) then
-        write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
-        trim(adjustl(file_in)), level, trim(adjustl(file_out))
-        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now if no operator or --operator=sparse-to-dense is used)")') &
-        minActiveLevel_tree( tree_ID ),&
-        maxActiveLevel_tree( tree_ID )
+        if (operator=="sparse-to-dense") then
+            write(*,'("Wrote data of input-file: ", A," now on uniform grid (level",i3, ") to file: ",A)') &
+            trim(adjustl(file_in)), level, trim(adjustl(file_out))
+            write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical)")') &
+            minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
+        else
+            write(*,'("Wrote data of input-file: ", A," to file: ", A, " - Minlevel:", i3," Maxlevel:", i3)') &
+            trim(adjustl(file_in)), level, trim(adjustl(file_out)), minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
+        endif
     end if
 
     call deallocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)

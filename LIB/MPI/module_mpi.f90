@@ -47,10 +47,6 @@ module module_MPI
     ! it is faster to use named consts than strings, although strings are nicer to read
     integer(kind=ik), PARAMETER   :: SENDER = 1, RECVER = 2, RESPRE = 3
 
-    ! we set up a table that gives us directly the inverse neighbor relations.
-    ! it is filled (once) in init_ghost_nodes
-    integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
-
     ! We frequently need to know the indices of a patch for ghost nodes or parts of interor. Thus we save them
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
@@ -87,6 +83,11 @@ module module_MPI
     PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_level_from_MC
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches
     PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_level, coarse_extension_reconstruct_level, xfer_block_data, prepare_update_family_metadata
+
+    ! we set up a table that gives us directly the inverse neighbor relations.
+    ! it is filled (once) in init_ghost_nodes
+    PUBLIC :: inverse_neighbor
+    integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
 
 
 contains

@@ -183,13 +183,5 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         refinement_status = -1
     else
         refinement_status = 0
-
-        ! if (level == 4 .and. params%rank == 0) then
-        !     call Spaghetti2Mallat_block(params, u, u_wc)
-        !     write(*, '("Detail ", es8.1, " eps ", es8.1)') detail(1), eps_use
-        !     do ny = 1,26
-        !         write(*, '(26(es8.1, 1x))') u_wc(1:26, ny, 1, 1)
-        !     enddo
-        ! endif
     end if
 end subroutine threshold_block

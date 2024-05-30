@@ -565,58 +565,56 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               ! is set in SET_WING_BOUNDING_BOX_FOURIER
               if ( x_wing(1) >= Insect%wing_bounding_box(1,wingID)-s &
                     .and. x_wing(1) <= Insect%wing_bounding_box(2,wingID)+s) then
-!                  if ( x_wing(2) >= Insect%wing_bounding_box(3,wingID)-s .and. x_wing(2) <= Insect%wing_bounding_box(4,wingID)+s) then
                   if ( x_wing(2) > 0.0d0 .and. x_wing(2) < rblade ) then
                       if ( x_wing(3) >= Insect%wing_bounding_box(5,wingID)-s &
                             .and. x_wing(3) <= Insect%wing_bounding_box(6,wingID)+s) then
-
-                          !-- calculate the polar parameter (normalized angle)
-                          ylte = x_wing(2)
-                          theta = dacos( 1.0d0 - 2.0d0*ylte/rblade )
-                          theta = theta / (2.d0*pi)
-
-                          !-- construct xle by evaluating the Fourier series
-                          xle = Radius_Fourier(theta,Insect,wingID)
-
-                          !-- construct xte by evaluating the Fourier series
-                          xte = Radius_Fourier(1.0d0-theta,Insect,wingID)
-
-                          !-- amplitude
-                          R0 = 0.5*(xle-xte)
-
-                          !-- get smooth rectangular function
-                          R = dabs ( x_wing(1) - 0.5*(xte+xle) )
-                          R_tmp = steps(R,R0, Insect%smooth)
-
-                          ! wing corrugation (i.e. deviation from a flat plate)
-                          if ( Insect%corrugated(wingID) ) then
-                              ! if the wing is corrugated, its height profile is read from ini file
-                              ! and interpolated at the position on the wing
-                              zz0 = interp2_nonper( x_wing(1), x_wing(2), corrugation_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
-                          else
+                            !-- calculate the polar parameter (normalized angle)
+                            ylte = x_wing(2)
+                            theta = dacos( 1.0d0 - 2.0d0*ylte/rblade )
+                            theta = theta / (2.d0*pi)
+                            
+                            !-- construct xle by evaluating the Fourier series
+                            xle = Radius_Fourier( 2.0_rk*pi*theta,Insect,wingID)
+                                
+                            !-- construct xte by evaluating the Fourier series
+                            xte = Radius_Fourier( 2.0_rk*pi*(1.0d0-theta),Insect,wingID)
+                            
+                            !-- amplitude
+                            R0 = 0.5*(xle-xte)
+                            
+                            !-- get smooth rectangular function
+                            R = dabs ( x_wing(1) - 0.5*(xte+xle) )
+                            R_tmp = steps(R, R0, Insect%smooth)
+                            
+                            ! wing corrugation (i.e. deviation from a flat plate)
+                            if ( Insect%corrugated(wingID) ) then
+                                ! if the wing is corrugated, its height profile is read from ini file
+                                ! and interpolated at the position on the wing
+                                zz0 = interp2_nonper( x_wing(1), x_wing(2), corrugation_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
+                            else
                               ! no corrugation - the wing is a flat surface
                               zz0 = 0.0_pr
-                          endif
-
-                          zz0 = zz0 * wsign
-
-                          ! wing thickness
-                          if ( Insect%wing_thickness_distribution(wingID)=="variable") then
-                              ! variable wing thickness is read from an array in the wing.ini file
-                              ! and interpolated linearly at the x_wing position.
-                              t = interp2_nonper( x_wing(1), x_wing(2), wing_thickness_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), wing_thickness_a(wingID), wing_thickness_b(wingID) )
-                          else
-                              ! constant thickness, read from main params.ini file
-                              t = Insect%WingThickness
-                          endif
-
-                          z_tmp = steps( dabs(x_wing(3)-zz0), 0.5d0*t, Insect%smooth ) ! thickness
-                          mask_tmp = z_tmp*R_tmp
-
-                          !-----------------------------------------
-                          ! set new value for mask and velocity us
-                          !-----------------------------------------
-                          if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
+                            endif
+                            
+                            zz0 = zz0 * wsign
+                            
+                            ! wing thickness
+                            if ( Insect%wing_thickness_distribution(wingID)=="variable") then
+                                ! variable wing thickness is read from an array in the wing.ini file
+                                ! and interpolated linearly at the x_wing position.
+                                t = interp2_nonper( x_wing(1), x_wing(2), wing_thickness_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), wing_thickness_a(wingID), wing_thickness_b(wingID) )
+                            else
+                                ! constant thickness, read from main params.ini file
+                                t = Insect%WingThickness
+                            endif
+                            
+                            z_tmp = steps( dabs(x_wing(3)-zz0), 0.5d0*t, Insect%smooth ) ! thickness
+                            mask_tmp = z_tmp*R_tmp
+                            
+                            !-----------------------------------------
+                            ! set new value for mask and velocity us
+                            !-----------------------------------------
+                            if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
                               mask(ix,iy,iz) = mask_tmp
                               mask_color(ix,iy,iz) = color_wing
                           endif

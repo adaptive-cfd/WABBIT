@@ -245,7 +245,7 @@ program main
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
             ! Snych'ing becomes much more expensive one the grid is refined.
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+            call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
             ! refine the mesh
             call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
@@ -298,7 +298,7 @@ program main
             t4 = MPI_wtime()
             if (params%filter_type /= "no_filter") then
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
-                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+                    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 
                     call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
                 end if
@@ -310,7 +310,7 @@ program main
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             endif
@@ -419,7 +419,7 @@ program main
     !*******************************************************************
     if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
         ! we need to sync ghost nodes for some derived qtys, for sure
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
 
         call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
     endif

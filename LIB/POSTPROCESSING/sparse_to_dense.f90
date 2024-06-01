@@ -125,7 +125,7 @@ subroutine sparse_to_dense(params)
     elseif (operator=="refine-everywhere") then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="coarsen-everywhere") then
-        params%number_blocks = lgt_n(tree_ID) / params%number_procs + 7_ik
+        params%number_blocks = (lgt_n(tree_ID) / params%number_procs + 7_ik)
     endif
 
     if (params%rank==0) then
@@ -143,6 +143,8 @@ subroutine sparse_to_dense(params)
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
+    write(*, '("Number of blocks: ", i0)') params%number_blocks
+
     ! read input data
     call readHDF5vct_tree( (/file_in/), params, hvy_block, tree_ID)
 
@@ -153,7 +155,7 @@ subroutine sparse_to_dense(params)
     ! balance the load
     call balanceLoad_tree(params, hvy_block, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     if (operator=="sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
@@ -195,11 +197,15 @@ subroutine sparse_to_dense(params)
     call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 
     if (params%rank==0 ) then
-        write(*,'("Wrote data of input-file: ",A," now on uniform grid (level",i3, ") to file: ",A)') &
-        trim(adjustl(file_in)), level, trim(adjustl(file_out))
-        write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical now if --sparse-to-dense is used)")') &
-        minActiveLevel_tree( tree_ID ),&
-        maxActiveLevel_tree( tree_ID )
+        if (operator=="sparse-to-dense") then
+            write(*,'("Wrote data of input-file: ", A," now on uniform grid (level",i3, ") to file: ",A)') &
+            trim(adjustl(file_in)), level, trim(adjustl(file_out))
+            write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical)")') &
+            minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
+        else
+            write(*,'("Wrote data of input-file: ", A," to file: ", A, " - Minlevel:", i3," Maxlevel:", i3)') &
+            trim(adjustl(file_in)), trim(adjustl(file_out)), minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
+        endif
     end if
 
     call deallocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)

@@ -118,12 +118,10 @@ subroutine post_evaluate_thresholding(params)
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=nwork)
 
-    hvy_details = -1.0_rk
-
     ! read input data
     call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
 
 
     Jmin_active = minActiveLevel_tree(tree_ID)
@@ -131,7 +129,7 @@ subroutine post_evaluate_thresholding(params)
 
     do level = Jmax_active, Jmin_active, -1
         write(*,*) level
-        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, iteration, ignore_maxlevel=.true.)
+        call coarseningIndicator_level( time, params, level, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, iteration, ignore_maxlevel=.true., input_is_WD=.false.)
     enddo
 
 
@@ -140,7 +138,7 @@ subroutine post_evaluate_thresholding(params)
         do k = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k, tree_ID)
             call lgt2hvy(hvyID, lgtID, params%rank, params%number_blocks)
-            write(*,'(i6,1x,i2,1x,i2,4x,es12.4)') lgtID,  lgt_block( lgtID, IDX_MESH_LVL), lgt_block( lgtID, IDX_REFINE_STS ), hvy_details(1,hvyID)
+            write(*,'(i6,1x,i2,1x,i2,4x)') lgtID,  lgt_block( lgtID, IDX_MESH_LVL), lgt_block( lgtID, IDX_REFINE_STS )
         enddo
     endif
 

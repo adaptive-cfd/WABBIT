@@ -1,30 +1,32 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, detail_precomputed, eps )
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps)
     implicit none
 
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
+    !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array
+    !! They are expected to be already wavelet decomposed in Mallat-ordering
     real(kind=rk), intent(inout)        :: u(:, :, :, :)
     !> it can be useful not to consider all components for thresholding here.
     !! e.g. to work only on the pressure or vorticity.
     logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
-    ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
-    ! we pass the level to this routine
+    !> If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+    !! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
-    !
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
     real(kind=rk), intent(inout)        :: norm( size(u,4) )
-    ! if different from the default eps (params%eps), you can pass a different value here. This is optional
-    ! and used for example when thresholding the mask function.
+    !> if different from the default eps (params%eps), you can pass a different value here. This is optional
+    !! and used for example when thresholding the mask function.
     real(kind=rk), intent(in), optional :: eps
-    real(kind=rk), intent(inout)        :: detail_precomputed(:)
+    !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
+    integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
 
-    integer(kind=ik)                    :: dF, i, j, l, p
+    integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3)
     real(kind=rk)                       :: detail( size(u,4) )
     integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
-    real(kind=rk)                       :: t0, eps2
+    real(kind=rk)                       :: eps_use
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -43,7 +45,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
-    t0     = MPI_Wtime()
     nx     = size(u, 1)
     ny     = size(u, 2)
     nz     = size(u, 3)
@@ -55,14 +56,28 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     detail = -1.0_rk
 
     if (allocated(u_wc)) then
-        if (.not. areArraysSameSize(u, u_wc) ) deallocate(u_wc)
+        if (size(u_wc, 4) > nc) deallocate(u_wc)
     endif
     if (allocated(wc)) then
-        if (.not. areArraysSameSize(u, wc(:,:,:,:,1)) ) deallocate(wc)
+        if (size(wc, 4) > nc) deallocate(wc)
     endif
-
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
+
+    ! set the indices we want to treshold
+    idx(:, :) = 1
+    if (present(indices)) then
+        idx(:, :) = indices(:, :)
+    else  ! full interior block
+        idx(1, 1) = g+1
+        idx(2, 1) = Bs(1)+g
+        idx(1, 2) = g+1
+        idx(2, 2) = Bs(2)+g
+        if (dim == 3) then
+            idx(1, 3) = g+1
+            idx(2, 3) = Bs(3)+g
+        endif
+    endif
 
 
 #ifdef DEV
@@ -71,46 +86,33 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
 #endif
 
-    ! no precomputed detail available, compute it here.
-    if (detail_precomputed(1) < -0.1_rk) then
-        ! write(*,*) "recomputing"
-        ! perform the wavlet decomposition of the block
-        ! Note we could not reonstruct here, because the neighboring WC/SC are not
-        ! synced. However, here, we only check the details on a block, so there is no
-        ! need for reconstruction.
+    if (.not. input_is_WD) then
         u_wc = u
         call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
-
-        ! NOTE: if the coarse reconstruction is performed before this routine is called, then
-        ! the WC affected by the coarseExtension are automatically zero. There is no need to reset
-        ! them again. -> checked in postprocessing that this is indeed the case.
-        call spaghetti2inflatedMallat_block(params, u_wc, wc)
-
-        if (params%dim == 2) then
-            do p = 1, nc
-                ! if all details are smaller than C_eps, we can coarsen.
-                ! check interior WC only
-                detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, :, p, 2:4)) )
-            enddo
-        else
-            do p = 1, nc
-                ! if all details are smaller than C_eps, we can coarsen.
-                ! check interior WC only
-                detail(p) = maxval( abs(wc(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, p, 2:8)) )
-            enddo
-        endif
-
+        call Spaghetti2inflatedMallat_block(params, u_wc, wc)
     else
-        ! detail is precomputed in coarseExtensionUpdate_tree (because we compute
-        ! the FWT there anyways)
-        detail(1:nc) = detail_precomputed(1:nc)
+        call Spaghetti2inflatedMallat_block(params, u, wc)
+    endif
+
+
+    if (params%dim == 2) then
+        do p = 1, nc
+            ! if all details are smaller than C_eps, we can coarsen.
+            ! check interior WC only
+            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:4)) )
+        enddo
+    else
+        do p = 1, nc
+            ! if all details are smaller than C_eps, we can coarsen.
+            ! check interior WC only
+            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:8)) )
+        enddo
     endif
 
     detail(1:nc) = detail(1:nc) / norm(1:nc)
 
-    ! Disable detail checking for qtys we do not want to consider. NOTE FIXME this
-    ! is not very efficient, as it would be better to not even compute the wavelet transform
-    ! in the first place (but this is more work and selective thresholding is rarely used..)
+    ! We could disable detail checking for qtys we do not want to consider,
+    ! but this is more work and selective thresholding is rarely used
     do p = 1, nc
         if (.not. thresholding_component(p)) detail(p) = 0.0_rk
     enddo
@@ -147,25 +149,26 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !
 
     ! default thresholding level is the one in the parameter struct
-    eps2 = params%eps
+    eps_use = params%eps
     ! but if we pass another one, use that.
-    if (present(eps)) eps2 = eps
+    if (present(eps)) eps_use = eps
 
+    ! write(*, '("Detail ", es8.1, " eps ", es8.1)') detail(1), eps_use
 
     select case(params%eps_norm)
     case ("Linfty")
         ! do nothing, our wavelets are normalized in L_infty norm by default, hence
         ! a simple threshold controls this norm
-        eps2 = eps2
+        eps_use = eps_use
 
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
         ! we have to have a level-dependent threshold
-        eps2 = eps2 * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
+        eps_use = eps_use * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity
-        eps2 = eps2 * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )
+        eps_use = eps_use * ( 2**(-level*(params%dim+2.0_rk)*0.5_rk) )
 
     case default
         call abort(20022811, "ERROR:threshold_block.f90:Unknown wavelet normalization!")
@@ -175,13 +178,10 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
     ! the block is tagged as "wants to coarsen" by setting the tag -1
     ! note gradedness and completeness may prevent it from actually going through with that
-    if ( maxval(detail) < eps2) then
+    if ( maxval(detail) < eps_use) then
         ! coarsen block, -1
         refinement_status = -1
     else
         refinement_status = 0
     end if
-
-    ! timings
-    call toc( "threshold_block (w/o ghost synch.)", MPI_Wtime() - t0 )
 end subroutine threshold_block

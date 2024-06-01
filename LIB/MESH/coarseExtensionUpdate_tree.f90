@@ -16,7 +16,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID )
 
     do level = Jmax_active, Jmin_active, -1
         call coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, hvy_active(:,tree_ID), &
-        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level, hvy_details=hvy_details )
+        hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.false., level=level)
     enddo
 
 end subroutine

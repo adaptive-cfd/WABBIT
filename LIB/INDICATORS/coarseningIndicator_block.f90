@@ -9,8 +9,10 @@
 !! -1 block wants to coarsen \n
 ! ********************************************************************************************
 
-subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, indicator, &
-    iteration, refinement_status, norm, level, detail_precomputed, block_mask)
+subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
+    refinement_status, norm, level, input_is_WD, block_mask, indices)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
 
     implicit none
     type (type_params), intent(in)      :: params
@@ -25,13 +27,8 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     real(kind=rk), intent(inout), optional :: block_mask(:, :, :, :)
     !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
-    !> block spacing and origin
-    real(kind=rk), intent(in)           :: dx(1:3), x0(1:3)
     !> how to choose blocks for refinement
     character(len=*), intent(in)        :: indicator
-    !> coarsening iteration index. coarsening is done until the grid has reached
-    !! the steady state; therefore, this routine is called several times for
-    integer(kind=ik), intent(in)        :: iteration
     ! If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
     ! we pass the level to this routine
     integer(kind=ik), intent(in)        :: level
@@ -39,19 +36,36 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     integer(kind=ik), intent(out)       :: refinement_status
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
-    real(kind=rk), intent(inout)        :: detail_precomputed(:)
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
+    !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
+    integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz
+    integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz, idx(2,3)
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, mask_max, mask_min
     logical :: thresholding_component(1:size(block_data,4))
-
+    real(kind=rk) :: t0  !< timing for debugging
 
     Jmax = params%Jmax
     Bs = params%Bs
     g = params%g
+
+    ! set the indices we want to treshold
+    idx(:, :) = 1
+    if (present(indices)) then
+        idx(:, :) = indices(:, :)
+    else  ! full interior block
+        idx(1, 1) = g+1
+        idx(2, 1) = Bs(1)+g
+        idx(1, 2) = g+1
+        idx(2, 2) = Bs(2)+g
+        if (params%dim == 3) then
+            idx(1, 3) = g+1
+            idx(2, 3) = Bs(3)+g
+        endif
+    endif
 
     !> This routine sets the -1 coarsening flag on a block. it uses different methods to
     !! decide where to coarsen, each acts on one block. Note due to gradedness and completeness
@@ -79,6 +93,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         endif
 
     case ("threshold-state-vector", "primary-variables")
+        ! t0 = MPI_Wtime()
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
         !! to be used can be specified in the PARAMS file. default is all componants.
@@ -89,8 +104,10 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, detail_precomputed )
+        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
 
+        ! timing for debugging - block based so should not be deployed for productive versions
+        ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
@@ -104,6 +121,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
     ! not available, the option is useless but can cause errors.
     ! NOTE: since the CDF44 wavelet is expensive, we use an alternative method to detect the gradient.
     if (params%threshold_mask .and. present(block_mask)) then
+        ! t0 = MPI_Wtime()
         ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
         refinement_status_mask = -1_ik ! default we coarsen
         mask_max = 0.0_rk
@@ -144,6 +162,9 @@ subroutine coarseningIndicator_block( params, block_data, block_work, dx, x0, in
         ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0
         ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
         refinement_status = max(refinement_status, refinement_status_mask)
+
+        ! timing for debugging - block based so should not be deployed for productive versions
+        ! call toc( "coarseningIndicator_block (mask_comp)", MPI_Wtime()-t0 )
     endif
 
 end subroutine coarseningIndicator_block

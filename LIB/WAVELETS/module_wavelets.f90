@@ -1136,16 +1136,16 @@ contains
         wc = 0.0_rk
 
         ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
-        ! in the sense that Nx*Ny data gives 4 * Nx*Ny decomposition.
+        ! in the sense that Nx*Ny data gives 4/8 * Nx*Ny decomposition.
 
-        ! copy from Spaghetti to Mallat ordering
+        ! copy from Spaghetti to inflated Mallat ordering
         if (modulo(g, 2) == 0) then
             ! even g
             if (params%dim == 2) then
-                wc( 1:nx:2, 1:ny:2, :, :, 1) = u(1:nx:2, 1:ny:2, 1:nz:2, :)
-                wc( 1:nx:2, 1:ny:2, :, :, 2) = u(2:nx:2, 1:ny:2, 1:nz:2, :)
-                wc( 1:nx:2, 1:ny:2, :, :, 3) = u(1:nx:2, 2:ny:2, 1:nz:2, :)
-                wc( 1:nx:2, 1:ny:2, :, :, 4) = u(2:nx:2, 2:ny:2, 1:nz:2, :)
+                wc( 1:nx:2, 1:ny:2, :, :, 1) = u(1:nx:2, 1:ny:2, :, :)
+                wc( 1:nx:2, 1:ny:2, :, :, 2) = u(2:nx:2, 1:ny:2, :, :)
+                wc( 1:nx:2, 1:ny:2, :, :, 3) = u(1:nx:2, 2:ny:2, :, :)
+                wc( 1:nx:2, 1:ny:2, :, :, 4) = u(2:nx:2, 2:ny:2, :, :)
             else
                 wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 1) = u(1:nx:2, 1:ny:2, 1:nz:2, :)
                 wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 2) = u(2:nx:2, 1:ny:2, 1:nz:2, :)
@@ -1179,8 +1179,10 @@ contains
     end subroutine
 
 
-
-    subroutine mallat2spaghetti_block(params, wc, u)
+    ! Inflated Mallat ordering is a HACK. I was just easier to code.
+    ! That does not mean its wrong, it isn't. But is uses extra memory (although
+    ! that is negligible) and does unnecessary copy actions.
+    subroutine inflatedMallat2spaghetti_block(params, wc, u, sc_only)
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
@@ -1200,7 +1202,14 @@ contains
         ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         !
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        !> Option to only convert SC
+        logical, optional, intent(in)  :: sc_only
+
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_s, i_e
+        logical sc_only_set
+
+        sc_only_set = .false.
+        if (present(sc_only)) sc_only_set = sc_only
 
         nx = size(u, 1)
         ny = size(u, 2)
@@ -1215,60 +1224,410 @@ contains
         endif
 #endif
 
-        if (modulo(g, 2) == 0) then
-            ! even g
-            u(1:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
-            u(2:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
-            u(1:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
-            u(2:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
+        ! note that what we call "Mallat ordering" here is in fact the "inflated" Mallat
+        ! in the sense that Nx*Ny data gives 4/8 * Nx*Ny decomposition.
+
+        ! compute index shift for odd g, ignoring outmost elements
+        i_s = 1 + modulo(g, 2)  ! 1 for even, 2 for odd
+        i_e = 0 + modulo(g, 2)  ! 0 for even, 1 for odd
+
+        ! copy from inflated Mallat to Mallat ordering
+        if (params%dim == 2) then
+            u(       i_s:nx-i_e:2,   i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 1)
+            if (.not. sc_only_set) then
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 2)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 3)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2, :, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 4)
+            endif
         else
-            ! odd g
-            u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
-            u(3:nx:2, 2:ny-1:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
-            u(2:nx-1:2, 3:ny:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
-            u(3:nx:2, 3:ny:2    , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
+            u(       i_s:nx-i_e:2,   i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 1)
+            if (.not. sc_only_set) then
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 2)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 3)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2,   i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 4)
+
+                u(   i_s:nx-i_e:2,   i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 5)
+                u( 1+i_s:nx-i_e:2,   i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 6)
+                u(   i_s:nx-i_e:2, 1+i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 7)
+                u( 1+i_s:nx-i_e:2, 1+i_s:ny-i_e:2, 1+i_s:nz-i_e:2, :) = wc( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 8)
+            endif
         endif
+
+        ! ! copy from inflated Mallat to Spaghetti ordering
+        ! if (modulo(g, 2) == 0) then
+        !     ! even g
+        !     if (params%dim == 2) then
+        !         u(1:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
+        !         u(2:nx:2, 1:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
+        !         u(1:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
+        !         u(2:nx:2, 2:ny:2, :, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
+        !     else
+        !         u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 1)
+        !         u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 2)
+        !         u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 3)
+        !         u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 4)
+
+        !         u(1:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 5)
+        !         u(2:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 6)
+        !         u(1:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 7)
+        !         u(2:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 8)
+        !     endif
+        ! else
+        !     ! odd g
+        !     if (params%dim == 2) then
+        !         u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
+        !         u(3:nx:2  , 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
+        !         u(2:nx-1:2, 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
+        !         u(3:nx:2  , 3:ny:2, :, :)   = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
+        !     else
+        !         u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1)
+        !         u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2)
+        !         u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3)
+        !         u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4)
+
+        !         u(2:nx-1:2, 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5)
+        !         u(3:nx:2  , 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6)
+        !         u(2:nx-1:2, 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7)
+        !         u(3:nx:2  , 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8)
+        !     endif
+        ! endif
+
+    end subroutine
+
+
+    subroutine spaghetti2Mallat_block(params, u, wc)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX                                        2D     3D     LABEL
+        ! -----------------------------------------    --    ---     ---------------------------------
+        ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
+        ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
+#ifdef DEV
+        if (.not.areArraysSameSize(u, wc)) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+#endif
+
+        wc = 0.0_rk
 
         ! copy from Spaghetti to Mallat ordering
         if (modulo(g, 2) == 0) then
             ! even g
             if (params%dim == 2) then
-                u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, :, :, 1)
-                u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, :, :, 2)
-                u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, :, :, 3)
-                u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, :, :, 4)
+                wc(      1:nx/2,      1:ny/2, :, :) = u(1:nx:2, 1:ny:2, :, :)
+                wc(      1:nx/2, ny/2+1:ny  , :, :) = u(2:nx:2, 1:ny:2, :, :)
+                wc( nx/2+1:nx  ,      1:ny/2, :, :) = u(1:nx:2, 2:ny:2, :, :)
+                wc( nx/2+1:nx  , ny/2+1:ny  , :, :) = u(2:nx:2, 2:ny:2, :, :)
             else
-                u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 1)
-                u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 2)
-                u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 3)
-                u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 4)
+                wc(      1:nx/2,      1:ny/2,      1:nz/2, :) = u(1:nx:2, 1:ny:2, 1:nz:2, :)
+                wc(      1:nx/2, ny/2+1:ny  ,      1:nz/2, :) = u(2:nx:2, 1:ny:2, 1:nz:2, :)
+                wc( nx/2+1:nx  ,      1:ny/2,      1:nz/2, :) = u(1:nx:2, 2:ny:2, 1:nz:2, :)
+                wc( nx/2+1:nx  , ny/2+1:ny  ,      1:nz/2, :) = u(2:nx:2, 2:ny:2, 1:nz:2, :)
 
-                u(1:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 5)
-                u(2:nx:2, 1:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 6)
-                u(1:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 7)
-                u(2:nx:2, 2:ny:2, 2:nz:2, :) = wc( 1:nx:2, 1:ny:2, 1:nz:2, :, 8)
+                wc(      1:nx/2,      1:ny/2, nz/2+1:nz  , :) = u(1:nx:2, 1:ny:2, 2:nz:2, :)
+                wc(      1:nx/2, ny/2+1:ny  , nz/2+1:nz  , :) = u(2:nx:2, 1:ny:2, 2:nz:2, :)
+                wc( nx/2+1:nx  ,      1:ny/2, nz/2+1:nz  , :) = u(1:nx:2, 2:ny:2, 2:nz:2, :)
+                wc( nx/2+1:nx  , ny/2+1:ny  , nz/2+1:nz  , :) = u(2:nx:2, 2:ny:2, 2:nz:2, :)
             endif
         else
             ! odd g
             if (params%dim == 2) then
-                u(2:nx-1:2, 2:ny-1:2, :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 1)
-                u(3:nx:2  , 2:ny-1:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 2)
-                u(2:nx-1:2, 3:ny:2  , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 3)
-                u(3:nx:2  , 3:ny:2    , :, :) = wc( 2:nx-1:2, 2:ny-1:2, :, :, 4)
+                wc(      2:nx/2,      2:ny/2, :, :) = u(2:nx-1:2, 2:ny-1:2, :, :)
+                wc(      2:nx/2, ny/2+1:ny-1, :, :) = u(3:nx:2  , 2:ny-1:2, :, :)
+                wc( nx/2+1:nx-1,      2:ny/2, :, :) = u(2:nx-1:2, 3:ny:2  , :, :)
+                wc( nx/2+1:nx-1, ny/2+1:ny-1, :, :) = u(3:nx:2  , 3:ny:2  , :, :)
             else
-                u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1)
-                u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2)
-                u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3)
-                u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4)
+                wc(      2:nx/2,      2:ny/2,      2:nz/2, :) = u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :)
+                wc(      2:nx/2, ny/2+1:ny-1,      2:nz/2, :) = u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :)
+                wc( nx/2+1:nx-1,      2:ny/2,      2:nz/2, :) = u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :)
+                wc( nx/2+1:nx-1, ny/2+1:ny-1,      2:nz/2, :) = u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :)
 
-                u(2:nx-1:2, 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5)
-                u(3:nx:2  , 2:ny-1:2, 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6)
-                u(2:nx-1:2, 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7)
-                u(3:nx:2  , 3:ny:2  , 3:nz:2, :) = wc( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8)
+                wc(      2:nx/2,      2:ny/2, nz/2+1:nz-1, :) = u(2:nx-1:2, 2:ny-1:2, 3:nz:2  , :)
+                wc(      2:nx/2, ny/2+1:ny-1, nz/2+1:nz-1, :) = u(3:nx:2  , 2:ny-1:2, 3:nz:2  , :)
+                wc( nx/2+1:nx-1,      2:ny/2, nz/2+1:nz-1, :) = u(2:nx-1:2, 3:ny:2  , 3:nz:2  , :)
+                wc( nx/2+1:nx-1, ny/2+1:ny-1, nz/2+1:nz-1, :) = u(3:nx:2  , 3:ny:2  , 3:nz:2  , :)
             endif
         endif
-
     end subroutine
+
+
+
+    subroutine Mallat2Spaghetti_block(params, wc, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX                                        2D     3D     LABEL
+        ! -----------------------------------------    --    ---     ---------------------------------
+        ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
+        ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
+        !
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
+#ifdef DEV
+        if (.not.areArraysSameSize(u, wc)) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+#endif
+
+        u = 0.0_rk
+
+        ! copy from Mallat to Spaghetti ordering
+        if (modulo(g, 2) == 0) then
+            ! even g
+            if (params%dim == 2) then
+                u(1:nx:2, 1:ny:2, :, :) = wc(      1:nx/2,      1:ny/2, :, :)
+                u(2:nx:2, 1:ny:2, :, :) = wc(      1:nx/2, ny/2+1:ny  , :, :)
+                u(1:nx:2, 2:ny:2, :, :) = wc( nx/2+1:nx  ,      1:ny/2, :, :)
+                u(2:nx:2, 2:ny:2, :, :) = wc( nx/2+1:nx  , ny/2+1:ny  , :, :)
+            else
+                u(1:nx:2, 1:ny:2, 1:nz:2, :) = wc(      1:nx/2,      1:ny/2,      1:nz/2, :)
+                u(2:nx:2, 1:ny:2, 1:nz:2, :) = wc(      1:nx/2, ny/2+1:ny  ,      1:nz/2, :)
+                u(1:nx:2, 2:ny:2, 1:nz:2, :) = wc( nx/2+1:nx  ,      1:ny/2,      1:nz/2, :)
+                u(2:nx:2, 2:ny:2, 1:nz:2, :) = wc( nx/2+1:nx  , ny/2+1:ny  ,      1:nz/2, :)
+
+                u(1:nx:2, 1:ny:2, 2:nz:2, :) = wc(      1:nx/2,      1:ny/2, nz/2+1:nz  , :)
+                u(2:nx:2, 1:ny:2, 2:nz:2, :) = wc(      1:nx/2, ny/2+1:ny  , nz/2+1:nz  , :)
+                u(1:nx:2, 2:ny:2, 2:nz:2, :) = wc( nx/2+1:nx  ,      1:ny/2, nz/2+1:nz  , :)
+                u(2:nx:2, 2:ny:2, 2:nz:2, :) = wc( nx/2+1:nx  , ny/2+1:ny  , nz/2+1:nz  , :)
+            endif
+        else
+            ! odd g
+            if (params%dim == 2) then
+                u(2:nx-1:2, 2:ny-1:2, :, :) = wc(      2:nx/2,      2:ny/2, :, :)
+                u(3:nx:2  , 2:ny-1:2, :, :) = wc(      2:nx/2, ny/2+1:ny-1, :, :)
+                u(2:nx-1:2, 3:ny:2  , :, :) = wc( nx/2+1:nx-1,      2:ny/2, :, :)
+                u(3:nx:2  , 3:ny:2  , :, :) = wc( nx/2+1:nx-1, ny/2+1:ny-1, :, :)
+            else
+                u(2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :) = wc(      2:nx/2,      2:ny/2,      2:nz/2, :)
+                u(3:nx:2  , 2:ny-1:2, 2:nz-1:2, :) = wc(      2:nx/2, ny/2+1:ny-1,      2:nz/2, :)
+                u(2:nx-1:2, 3:ny:2  , 2:nz-1:2, :) = wc( nx/2+1:nx-1,      2:ny/2,      2:nz/2, :)
+                u(3:nx:2  , 3:ny:2  , 2:nz-1:2, :) = wc( nx/2+1:nx-1, ny/2+1:ny-1,      2:nz/2, :)
+
+                u(2:nx-1:2, 2:ny-1:2, 3:nz:2  , :) = wc(      2:nx/2,      2:ny/2, nz/2+1:nz-1, :)
+                u(3:nx:2  , 2:ny-1:2, 3:nz:2  , :) = wc(      2:nx/2, ny/2+1:ny-1, nz/2+1:nz-1, :)
+                u(2:nx-1:2, 3:ny:2  , 3:nz:2  , :) = wc( nx/2+1:nx-1,      2:ny/2, nz/2+1:nz-1, :)
+                u(3:nx:2  , 3:ny:2  , 3:nz:2  , :) = wc( nx/2+1:nx-1, ny/2+1:ny-1, nz/2+1:nz-1, :)
+            endif
+        endif
+    end subroutine
+
+
+
+    ! Inflated Mallat ordering is a HACK. I was just easier to code.
+    ! That does not mean its wrong, it isn't. But is uses extra memory (although
+    ! that is negligible) and does unnecessary copy actions.
+    subroutine Mallat2inflatedMallat_block(params, wc, u)
+        implicit none
+        type (type_params), intent(in) :: params
+        ! The WC and u array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX                                        2D     3D     LABEL
+        ! -----------------------------------------    --    ---     ---------------------------------
+        ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
+        ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! u(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! u(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! u(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! u(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! u(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! u(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
+
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
+#ifdef DEV
+        if (.not.areArraysSameSize(wc, u(:,:,:,:,1))) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+#endif
+
+        u = 0.0_rk
+
+        ! copy from Mallat to inflated Mallat ordering
+        if (modulo(g, 2) == 0) then
+            ! even g
+            if (params%dim == 2) then
+                u( 1:nx:2, 1:ny:2, :, :, 1) = wc(      1:nx/2,      1:ny/2, :, :)
+                u( 1:nx:2, 1:ny:2, :, :, 2) = wc(      1:nx/2, ny/2+1:ny  , :, :)
+                u( 1:nx:2, 1:ny:2, :, :, 3) = wc( nx/2+1:nx  ,      1:ny/2, :, :)
+                u( 1:nx:2, 1:ny:2, :, :, 4) = wc( nx/2+1:nx  , ny/2+1:ny  , :, :)
+            else
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 1) = wc(      1:nx/2,      1:ny/2,      1:nz/2, :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 2) = wc(      1:nx/2, ny/2+1:ny  ,      1:nz/2, :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 3) = wc( nx/2+1:nx  ,      1:ny/2,      1:nz/2, :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 4) = wc( nx/2+1:nx  , ny/2+1:ny  ,      1:nz/2, :)
+
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 5) = wc(      1:nx/2,      1:ny/2, nz/2+1:nz  , :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 6) = wc(      1:nx/2, ny/2+1:ny  , nz/2+1:nz  , :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 7) = wc( nx/2+1:nx  ,      1:ny/2, nz/2+1:nz  , :)
+                u( 1:nx:2, 1:ny:2, 1:nz:2, :, 8) = wc( nx/2+1:nx  , ny/2+1:ny  , nz/2+1:nz  , :)
+            endif
+        else
+            ! odd g
+            if (params%dim == 2) then
+                u( 2:nx-1:2, 2:ny-1:2, :, :, 1) = wc(      2:nx/2,      2:ny/2, :, :)
+                u( 2:nx-1:2, 2:ny-1:2, :, :, 2) = wc(      2:nx/2, ny/2+1:ny-1, :, :)
+                u( 2:nx-1:2, 2:ny-1:2, :, :, 3) = wc( nx/2+1:nx-1,      2:ny/2, :, :)
+                u( 2:nx-1:2, 2:ny-1:2, :, :, 4) = wc( nx/2+1:nx-1, ny/2+1:ny-1, :, :)
+            else
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 1) = wc(      2:nx/2,      2:ny/2,      2:nz/2, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 2) = wc(      2:nx/2, ny/2+1:ny-1,      2:nz/2, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 3) = wc( nx/2+1:nx-1,      2:ny/2,      2:nz/2, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 4) = wc( nx/2+1:nx-1, ny/2+1:ny-1,      2:nz/2, :)
+
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 5) = wc(      2:nx/2,      2:ny/2, nz/2+1:nz-1, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 6) = wc(      2:nx/2, ny/2+1:ny-1, nz/2+1:nz-1, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 7) = wc( nx/2+1:nx-1,      2:ny/2, nz/2+1:nz-1, :)
+                u( 2:nx-1:2, 2:ny-1:2, 2:nz-1:2, :, 8) = wc( nx/2+1:nx-1, ny/2+1:ny-1, nz/2+1:nz-1, :)
+            endif
+        endif
+    end subroutine
+
+
+
+    ! Inflated Mallat ordering is a HACK. I was just easier to code.
+    ! That does not mean its wrong, it isn't. But is uses extra memory (although
+    ! that is negligible) and does unnecessary copy actions.
+    subroutine inflatedMallat2Mallat_block(params, u, wc, sc_only)
+        implicit none
+        type (type_params), intent(in) :: params
+        ! The WC and u array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
+        ! Note: the precise naming of SC/WC is not really important. we just apply
+        ! the correct decomposition/reconstruction filters - thats it.
+        !
+        ! INDEX                                        2D     3D     LABEL
+        ! -----------------------------------------    --    ---     ---------------------------------
+        ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
+        ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
+        ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
+        ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+        ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+        ! INDEX            2D     3D     LABEL
+        ! -----            --    ---     ---------------------------------
+        ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
+        ! u(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
+        ! u(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+        ! u(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
+        ! u(:,:,:,:,5)          HHG     wcz wavelet coeffs
+        ! u(:,:,:,:,6)          HGG     wcxz wavelet coeffs
+        ! u(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+        ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
+        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
+        !> Option to only convert SC
+        logical, optional, intent(in)  :: sc_only
+
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_s, i_e
+        logical sc_only_set
+
+        sc_only_set = .false.
+        if (present(sc_only)) sc_only_set = sc_only
+
+        nx = size(u, 1)
+        ny = size(u, 2)
+        nz = size(u, 3)
+        nc = size(u, 4)
+        g  = params%g
+        Bs = params%bs
+
+#ifdef DEV
+        if (.not.areArraysSameSize(wc, u(:,:,:,:,1))) then
+            call abort(27222119, "Allocated arrays are not compatible?! Time for a drink.")
+        endif
+#endif
+
+        wc = 0.0_rk
+
+        ! compute index shift for odd g, ignoring outmost elements
+        i_s = 1 + modulo(g, 2)  ! 1 for even, 2 for odd
+        i_e = 0 + modulo(g, 2)  ! 0 for even, 1 for odd
+
+        ! copy from inflated Mallat to Mallat ordering
+        if (params%dim == 2) then
+            wc(        i_s:nx/2  ,    i_s:ny/2  , :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 1)
+            if (.not. sc_only_set) then
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e, :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 2)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  , :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 3)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e, :, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, :, :, 4)
+            endif
+        else
+            wc(        i_s:nx/2  ,    i_s:ny/2  ,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 1)
+            if (.not. sc_only_set) then
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 2)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  ,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 3)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e,    i_s:nz/2  , :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 4)
+        
+                wc(    i_s:nx/2  ,    i_s:ny/2  , nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 5)
+                wc(    i_s:nx/2  , ny/2+1:ny-i_e, nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 6)
+                wc( nx/2+1:nx-i_e,    i_s:ny/2  , nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 7)
+                wc( nx/2+1:nx-i_e, ny/2+1:ny-i_e, nz/2+1:nz-i_e, :) = u( i_s:nx-i_e:2, i_s:ny-i_e:2, i_s:nz-i_e:2, :, 8)
+            endif
+        endif
+    end subroutine
+
 
 
     ! manipulate wavelet coefficients in a neighborhood direction: applied
@@ -1296,8 +1655,8 @@ contains
         integer(kind=ik), intent(in) :: neighborhood
         integer(kind=ik), intent(in), optional :: Nwcl_optional, Nwcr_optional
 
-        integer(kind=ik) :: Nwcl, Nwcr, Nscl, Nscr, Nreconl, Nreconr
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d
+        integer(kind=ik) :: Nwcl, Nwcr
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3)
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1305,123 +1664,24 @@ contains
         nc = size(wc, 4)
         g = params%g
         Bs = params%bs
-        Nscl    = params%Nscl
-        Nscr    = params%Nscr
         Nwcl    = params%Nwcl
         Nwcr    = params%Nwcr
-        Nreconl = params%Nreconl
-        Nreconr = params%Nreconr
         d       = 2_ik ** params%dim
 
         ! sometimes we just need to delete the WC in the ghost nodes layer
         ! in which case we set Nwcl=Nwcr=g
         if (present(Nwcl_optional)) Nwcl = Nwcl_optional
         if (present(Nwcr_optional)) Nwcr = Nwcr_optional
-        
-        if (params%dim == 2) then
-            ! 2D
-            select case(neighborhood)
-            case (9:10)
-                ! FIXME to be modified for any other than CDF44
-                ! NOTE: even though we set Nwcl=12 points to zero, this does not mean we
-                ! kill 12 WC. They are on the extended grid, so effectively only 12/2
-                ! are killed, many of which are in the ghost nodes layer
-                ! -x
-                wc(1:Nwcl, :, :, 1:nc, 2:d) = 0.0_rk
-            case (15:16)
-                ! -y
-                wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (11:12)
-                ! +x
-                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
-            case (13:14)
-                ! +y
-                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(5)
-                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(6)
-                wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case(7)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case(8)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            end select
-        else
-            ! 3D
-            ! The finer neighbors are modified
-            select case(neighborhood)
-            ! ---faces---
-            case (35:38)
-                ! +x
-                wc(nx-Nwcr+1:nx, :, :, 1:nc, 2:d) = 0.0_rk
-            case (43:46)
-                ! -x
-                wc(1:Nwcl, :, :, 1:nc, 2:d) = 0.0_rk
-            case (39:42)
-                ! +y
-                wc(:, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case (31:34)
-                ! -y
-                wc(:, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (27:30)
-                ! +z
-                wc(:, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (47:50)
-                ! -z
-                wc(:, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
 
-            ! --- corners ---
-            case (26)
-                wc(1:Nwcl, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (23)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (22)
-                wc(1:Nwcl, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (19)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (25)
-                wc(1:Nwcl, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (21)
-                wc(1:Nwcl, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (20)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (24)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
+        idx(:, :) = 1
+        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/))
 
-            ! ---(partial) edges---
-            case (51:52)
-                wc(:, 1:Nwcl, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (53:54)
-                wc(nx-Nwcr+1:nx, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (55:56)
-                wc(:, ny-Nwcr+1:ny, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (57:58)
-                wc(1:Nwcl, :, nz-Nwcr+1:nz, 1:nc, 2:d) = 0.0_rk
-            case (59:60)
-                wc(:, 1:Nwcl, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (61:62)
-                wc(nx-Nwcr+1:nx, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (63:64)
-                wc(:, ny-Nwcr+1:ny, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (65:66)
-                wc(1:Nwcl, :, 1:Nwcl, 1:nc, 2:d) = 0.0_rk
-            case (67:68)
-                wc(nx-Nwcr+1:nx, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (69:70)
-                wc(1:Nwcl, 1:Nwcl, :, 1:nc, 2:d) = 0.0_rk
-            case (71:72)
-                wc(nx-Nwcr+1:nx, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-            case (73:74)
-                wc(1:Nwcl, ny-Nwcr+1:ny, :, 1:nc, 2:d) = 0.0_rk
-
-            end select
-
-        endif
+        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = 0.0_rk
     end subroutine
 
 
 
-    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood)
+    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood, skip_ghosts)
         implicit none
 
         type (type_params), intent(in) :: params
@@ -1442,10 +1702,11 @@ contains
         ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         !
         real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik), intent(in) :: neighborhood
+        integer(kind=ik), intent(in)   :: neighborhood   !> Which neighborhood to apply manipulation
+        logical, optional, intent(in)  :: skip_ghosts    !> Flag to skip ghost points if they have been synched
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
-        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr
+        integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1458,101 +1719,97 @@ contains
         Nreconl = params%Nreconl
         Nreconr = params%Nreconr
 
-
-        if (params%dim == 2) then
-            ! 2D
-            select case(neighborhood)
-            case (9:10)
-                ! -x
-                wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
-            case (11:12)
-                ! +x
-                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
-            case (13:14)
-                ! +y
-                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
-            case (15:16)
-                ! -y
-                wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
-            case(5)
-                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
-            case(6)
-                wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
-            case(7)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
-            case(8)
-                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
-            end select
+        idx(:, :) = 1
+        ! Normally we also reset boundary values. However if they have been synched to the field we want to leave them as they are
+        if (present(skip_ghosts)) then
+            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/), &
+                X_s=(/g, g, g/), X_e=(/g, g, g/))
         else
-            ! 3D
-            ! The finer neighbors are modified
-            select case(neighborhood)
-            ! ---faces---
-            case (35:38)
-                ! +x
-                wc(nx-Nscr+1:nx, :, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, :, 1:nc)
-            case (43:46)
-                ! -x
-                wc(1:Nscl, :, :, 1:nc, 1) = u_copy(1:Nscl, :, :, 1:nc)
-            case (39:42)
-                ! +y
-                wc(:, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, :, 1:nc)
-            case (31:34)
-                ! -y
-                wc(:, 1:Nscl, :, 1:nc, 1) = u_copy(:, 1:Nscl, :, 1:nc)
-            case (27:30)
-                ! +z
-                wc(:, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, :, nz-Nscr+1:nz, 1:nc)
-            case (47:50)
-                ! -z
-                wc(:, :, 1:Nscl, 1:nc, 1) = u_copy(:, :, 1:Nscl, 1:nc)
-            ! --- corners ---
-            case (26)
-                wc(1:Nscl, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, 1:Nscl, 1:nc)
-            case (23)
-                wc(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, 1:Nscl, 1:nc)
-            case (22)
-                wc(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (19)
-                wc(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (25)
-                wc(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, 1:Nscl, 1:nc)
-            case (21)
-                wc(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (20)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (24)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, 1:Nscl, 1:nc)
-            ! ---(partial) edges---
-            case (51:52)
-                wc(:, 1:Nscl, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, 1:Nscl, nz-Nscr+1:nz, 1:nc)
-            case (53:54)
-                wc(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, nz-Nscr+1:nz, 1:nc)
-            case (55:56)
-                wc(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, nz-Nscr+1:nz, 1:nc)
-            case (57:58)
-                wc(1:Nscl, :, nz-Nscr+1:nz, 1:nc, 1) = u_copy(1:Nscl, :, nz-Nscr+1:nz, 1:nc)
-            case (59:60)
-                wc(:, 1:Nscl, 1:Nscl, 1:nc, 1) = u_copy(:, 1:Nscl, 1:Nscl, 1:nc)
-            case (61:62)
-                wc(nx-Nscr+1:nx, :, 1:Nscl, 1:nc, 1) = u_copy(nx-Nscr+1:nx, :, 1:Nscl, 1:nc)
-            case (63:64)
-                wc(:, ny-Nscr+1:ny, 1:Nscl, 1:nc, 1) = u_copy(:, ny-Nscr+1:ny, 1:Nscl, 1:nc)
-            case (65:66)
-                wc(1:Nscl, :, 1:Nscl, 1:nc, 1) = u_copy(1:Nscl, :, 1:Nscl, 1:nc)
-            case (67:68)
-                wc(nx-Nscr+1:nx, 1:Nscl, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, 1:Nscl, :, 1:nc)
-            case (69:70)
-                wc(1:Nscl, 1:Nscl, :, 1:nc, 1) = u_copy(1:Nscl, 1:Nscl, :, 1:nc)
-            case (71:72)
-                wc(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(nx-Nscr+1:nx, ny-Nscr+1:ny, :, 1:nc)
-            case (73:74)
-                wc(1:Nscl, ny-Nscr+1:ny, :, 1:nc, 1) = u_copy(1:Nscl, ny-Nscr+1:ny, :, 1:nc)
-            end select
-
+            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/))
         endif
 
+        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 1) = &
+            u_copy(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
+
     end subroutine
+
+
+
+    !> \brief From a neighbourhood, compute the indices of the boundary patch until specific points N_s (left end) or N_e (right end)
+    !> We have the option to exclude some points on the left or right end, usefull to skip ghost points for example
+    !> This function is used for coarseExtensionManipulation to get the range of influence of the boundary patches
+    !> This works only for leveldiff = 0,1 (coarse and same-level neighbors)
+    !  ToDo: adapt for finer neighbours with leveldiff = -1
+    subroutine get_indices_of_modify_patch(params, neighborhood, idx, N_xyz, N_s, N_e, X_s, X_e)
+        implicit none
+
+        type (type_params), intent(in)           :: params              !> Good ol' params
+        integer(kind=ik), intent(in)             :: neighborhood        !> Which neighborhood to apply manipulation
+        integer(kind=ik), intent(out)            :: idx(1:2, 1:3)   !> Output of indices, first entry is l/r and second is dim
+        integer(kind=ik), intent(in)             :: N_xyz(1:3)          !> Size of blocks including ghost points, should be size(block, i_dim)
+        integer(kind=ik), intent(in)             :: N_s(1:)             !> Number of points to modify at start, vec with entry for each dimension
+        integer(kind=ik), intent(in)             :: N_e(1:)             !> Number of points to modify at end, vec with entry for each dimension
+        integer(kind=ik), intent(in), optional   :: X_s(1:)             !> Number of points to skip at start, vec with entry for each dimension
+        integer(kind=ik), intent(in), optional   :: X_e(1:)             !> Number of points to skip at end, vec with entry for each dimension
+
+        integer(kind=ik) :: dim, i_dim
+        ! Indexes where to start or finish, short name because elsewise this list gets looong
+        integer(kind=ik) :: I_s(1:3), I_e(1:3)
+
+        dim = params%dim
+
+        ! Pre-init indices by setting the full domain that we look at, X_s = 0, X_e = g = 1
+        ! g g g g g           s s s s -
+        ! g i i i g           s s s s -
+        ! g i i i g           s s s s -
+        ! g i i i g           s s s s -
+        ! g g g g g           - - - - -
+        do i_dim = 1, dim
+            if (present(X_s)) then
+                idx(1, i_dim) = 1 + X_s(i_dim)
+            else
+                idx(1, i_dim) = 1
+            endif
+            if (present(X_e)) then
+                idx(2, i_dim) = N_xyz(i_dim) - X_e(i_dim)
+            else
+                idx(2, i_dim) = N_xyz(i_dim)
+            endif
+        enddo
+
+        ! now lets get to the select beast, this limits / restricts the patch for the specific neighborhood
+        ! example from above with N_s = N_e = 2 and selecting neighborhood 9 or -x edge for 2D
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! s s s s -           s s - - -
+        ! - - - - -           - - - - -
+        if (params%dim == 2) then
+            ! 2D, first surpress indices for third dimension
+            ! index blocks are: lvl_same faces, lvl_diff faces, edges
+            idx(1:2, 3) = 1
+            if (any((/3,   11,12,    7,8/) == neighborhood)) idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
+            if (any((/1,   9,10,     5,6/) == neighborhood)) idx(2, 1) = N_s(1)  ! -x
+            if (any((/2,   13,14,    5,7/) == neighborhood)) idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
+            if (any((/4,   15,16,    6,8/) == neighborhood)) idx(2, 2) = N_s(2)  ! -y
+        else
+            ! 3D
+            ! index blocks are: lvl_same faces, lvl_same edges, lvl_diff faces, corners, lvl_diff edges
+            if (any((/3,   8,12,15,17,    35,36,37,38,   19,20,23,24,   53,54,61,62,67,68,71,72/) == neighborhood)) &
+                idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
+            if (any((/5,   10,14,16,18,   43,44,45,46,   21,22,25,26,   57,58,65,66,69,70,73,74/) == neighborhood)) &
+                idx(2, 1) = N_s(1)  ! -x
+            if (any((/4,   9,13,17,18,    39,40,41,42,   20,21,24,25,   55,56,63,64,71,72,73,74/) == neighborhood)) &
+                idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
+            if (any((/2,   7,11,15,16,    31,32,33,34,   19,22,23,26,   51,52,59,60,67,68,69,70/) == neighborhood)) &
+                idx(2, 2) = N_s(2)  ! -y
+            if (any((/1,   7,8,9,10,      27,28,29,30,   19,20,21,22,   51,52,53,54,55,56,57,58/) == neighborhood)) &
+                idx(1, 3) = N_xyz(3) - N_e(3) + 1  ! +z
+            if (any((/6,   11,12,13,14,   47,48,49,50,   23,24,25,26,   59,60,61,62,63,64,65,66/) == neighborhood)) &
+                idx(2, 3) = N_s(3)  ! -z
+        endif
+    end subroutine get_indices_of_modify_patch
+
 
 
     subroutine setup_wavelet(params, g_wavelet, verbose)

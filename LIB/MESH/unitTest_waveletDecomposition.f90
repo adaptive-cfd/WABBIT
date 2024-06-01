@@ -60,7 +60,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         endif
     end do
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
@@ -74,7 +74,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
     end do
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, &
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active(:,tree_ID), hvy_n(tree_ID) )
 
 
@@ -84,8 +84,15 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:size(hvy_block,4), 1:8 ))
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)
+        ! Test Sp -> InfMall -> Mall -> InfMall -> Sp
         call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-        call mallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
+        call inflatedMallat2Mallat_block(params, wc, hvy_block(:,:,:,:,hvyID))
+        call Mallat2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+        call inflatedMallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
+
+        ! Test Sp -> Mall -> Sp
+        call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc(:,:,:,:,1))
+        call Mallat2spaghetti_block(params, wc(:,:,:,:,1), hvy_block(:,:,:,:,hvyID))
     end do
     deallocate(wc)
 

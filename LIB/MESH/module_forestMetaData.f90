@@ -33,6 +33,8 @@ module module_forestMetaData
     integer(kind=ik), allocatable, public    :: lgt_block(:, :)
     !> List of neighbours (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_neighbor(:,:)
+    !> List of family (heavy data) for each tree
+    integer(kind=ik), allocatable, public    :: hvy_family(:,:)
     !> List of active blocks (light data) for each tree
     integer(kind=ik), allocatable, public    :: lgt_active(:,:)
     !> Number of active blocks (light data) for each tree
@@ -42,9 +44,6 @@ module module_forestMetaData
     integer(kind=ik), allocatable, public    :: hvy_active(:,:)
     !> Number of active blocks (heavy data) for each tree
     integer(kind=ik), allocatable, public    :: hvy_n(:)
-
-    !> Maximum wavelet coefficient for each component of the state vector.
-    real(kind=rk), allocatable, public    :: hvy_details(:,:)
 
     !> \brief Sorted nlist of numerical treecodes
     !> \details The following list contains the numerical treecode and the lightID for the active blocks

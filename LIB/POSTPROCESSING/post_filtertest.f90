@@ -62,12 +62,12 @@ subroutine post_filtertest(params)
 !
 ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ! to get a mesh where coarsening is possible evrywhere refine one time
-! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+! call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 ! call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
 ! lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_flow )
 !
-! call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+! call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! do k = 1, hvy_n(tree_ID_flow)
 !     !!!!!!!
@@ -89,16 +89,16 @@ subroutine post_filtertest(params)
 ! enddo
 ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     call saveHDF5_tree("input_000020000000.h5", time, iteration, 1, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow),&
 !     lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow) )
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, lgt_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), hvy_neighbor)
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     call saveHDF5_tree("filter_000020000000.h5", time, iteration, 1, params, lgt_block, hvy_block, lgt_active(:,tree_ID_flow),&
 !     lgt_n(tree_ID_flow), hvy_n(tree_ID_flow), hvy_active(:,tree_ID_flow) )
@@ -122,19 +122,19 @@ subroutine post_filtertest(params)
 !     call updateMetadata_tree(params, lgt_block, hvy_neighbor, lgt_active, &
 !     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow)
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     call adapt_tree( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
 !     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_ID_flow, "everywhere", hvy_tmp=hvy_tmp, ignore_maxlevel=.true. )
 !
 !     write(*,*) "adapted to=", lgt_n(tree_ID_flow)
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     call refine_tree( params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
 !     lgt_sortednumlist, hvy_active, hvy_n, "everywhere", tree_ID=tree_ID_flow )
 !
-!     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+!     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
 !
 !     write(*,*) "refined to=", lgt_n(tree_ID_flow)
 !

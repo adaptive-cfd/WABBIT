@@ -25,7 +25,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: memory_this, memory_total
-    integer             :: status, nwork, nx, ny, nz, max_neighbors, mpierr, nrhs_slots
+    integer             :: status, nwork, nx, ny, nz, max_neighbors, max_family, mpierr, nrhs_slots
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
@@ -74,8 +74,10 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     if (params%dim==2) then
         nz = 1
         max_neighbors = 16
+        max_family = 9
     else
         max_neighbors = 74
+        max_family = 17
     endif
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
@@ -209,17 +211,6 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
         "hvy_block", memory_this, shape(hvy_block)
     endif
-
-    !---------------------------------------------------------------------------
-    allocate( hvy_details(Neqn, params%number_blocks) )
-    ! this array is small so we can actually initialize it
-    hvy_details = -1.0_rk
-    memory_this = product(real(shape(hvy_details)))*8.0e-9
-    memory_total = memory_total + memory_this
-    if (rank==0) then
-        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",2(i9,1x))') &
-        "hvy_details", memory_this, shape(hvy_details)
-    endif
     
 
     !---------------------------------------------------------------------------
@@ -276,6 +267,15 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     if (rank==0) then
         write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
         "hvy_neighbor", memory_this, shape(hvy_neighbor)
+    endif
+
+    if (allocated(hvy_family)) deallocate(hvy_family)
+    allocate( hvy_family( params%number_blocks, max_family ) )
+    memory_this = product(real(shape(hvy_family)))*8.0e-9
+    memory_total = memory_total + memory_this
+    if (rank==0) then
+        write(*,'("INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+        "hvy_family", memory_this, shape(hvy_family)
     endif
 
     !---------------------------------------------------------------------------)

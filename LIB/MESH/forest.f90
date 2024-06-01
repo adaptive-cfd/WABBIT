@@ -460,7 +460,7 @@ subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
 
     call updateMetadata_tree( params, tree_ID_dest )
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID_dest), hvy_n(tree_ID_dest))
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID_dest), hvy_n(tree_ID_dest))
 
     call toc( "copy_tree (copy synchronize hvy and lgt)", MPI_Wtime()-t_elapse )
 
@@ -644,7 +644,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
         endif
     end do
 
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
     call balanceLoad_tree( params, hvy_block, tree_ID )
 end subroutine
 
@@ -815,12 +815,12 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
             ! update neighbor relations and synchronice ghosts of 1st tree
             call updateNeighbors_tree( params, tree_ID1 )
 
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
+            call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
 
             ! update neighbor relations and synchronice ghosts of 2nd tree
             call updateNeighbors_tree( params, tree_ID2 )
 
-            call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID2), hvy_n(tree_ID2))
+            call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID2), hvy_n(tree_ID2))
 
         endif
     end do
@@ -865,7 +865,7 @@ subroutine refine_tree2(params, hvy_block, hvy_tmp, tree_ID)
     call updateMetadata_tree(params, tree_ID)
 
     ! synchronize ghosts
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID))
+    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID))
 end subroutine
 !##############################################################
 
@@ -1449,7 +1449,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
 
         call updateMetadata_tree( params, tree_ID1 )
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
     endif
 
     params%wavelet = MR
@@ -1465,7 +1465,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     !     ! update neighbor relations and synchronice ghosts of 1st tree
     !     call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active(:, dest_tree_ID), &
     !     lgt_n(dest_tree_ID), lgt_sortednumlist(:,:,dest_tree_ID), hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID) )
-    !     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
+    !     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
     !     if (tree_ID1 .ne. tree_ID2) then
     !         call coarse_tree_2_reference_mesh(params, tree_n, &
     !             lgt_block, lgt_active(:,tree_ID1),lgt_n, lgt_sortednumlist(:,:,tree_ID1), &
@@ -1481,7 +1481,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     !     ! update neighbor relations and synchronice ghosts of 1st tree
     !     call updateNeighbors_tree( params, lgt_block, hvy_neighbor, lgt_active(:, tree_ID1), &
     !     lgt_n(tree_ID1), lgt_sortednumlist(:,:,tree_ID1), hvy_active(:, tree_ID1), hvy_n(tree_ID1) )
-    !     call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
+    !     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID1), hvy_n(tree_ID1))
     !
     !     call adapt_tree( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID2), &
     !     lgt_n(tree_ID2), lgt_sortednumlist(:,:,tree_ID2), hvy_active(:,tree_ID2), &

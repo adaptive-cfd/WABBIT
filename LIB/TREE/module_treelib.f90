@@ -8,6 +8,7 @@ module module_treelib
   contains
 
 #include "get_neighbor_treecode.f90"
+#include "neighborhood.f90"
 
   !> \author engels
   !> \brief Compute block spacing and origin from lgt_block

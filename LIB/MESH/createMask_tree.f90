@@ -209,7 +209,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
         ! Note: at this point he grid is rather coarse (fewer blocks), and the sync step is rather cheap.
         ! Snyc'ing becomes much more expensive once the grid is refined.
         ! sync possible only before pruning
-        call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
+        call sync_ghosts_all( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
 
         ! refine the mesh
@@ -256,7 +256,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
     ! syncing now and pruning later keeps the ghost nodes of the time-independent mask function sync'ed (as they
     ! do not change)
-    call sync_ghosts( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
+    call sync_ghosts_all( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_mask), hvy_n(tree_ID_mask) )
 
     ! we need the mask function both on Jmax (during the RHS) and Jmax-1
     ! (during saving after coarsening)

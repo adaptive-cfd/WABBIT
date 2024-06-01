@@ -401,7 +401,7 @@ contains
     !===========================================================================
 
     !> \brief return the light_id for the given position
-    integer(kind=tsize) function position_to_lgt_id (position, params)
+    integer(kind=ik) function position_to_lgt_id (position, params)
         ! Function-declarations
         double precision, dimension(3)  , intent(in)    :: position         !< position vector \f$ 0<position(i)\le 1\f$
         type(type_params),                intent(in)    :: params           !< params of infile
@@ -589,31 +589,31 @@ contains
 
     !===========================================================================
 
-    subroutine signalEndCalculation (myBridge)
-        !! Send a message to the other world to signal the end of the calculation session
-        !! Subroutine-declarations
-        type(bridgeMPI), intent(in)                     :: myBridge        ! type bridge on the particle side
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        character(1)                                    :: endCalculationMessage ! Message sent to the fluid world
-        integer                                         :: ierr            ! MPI communication error
-        integer                                         :: nProc           ! loop index (fluid process rank)
+    ! subroutine signalEndCalculation (myBridge)
+    !     !! Send a message to the other world to signal the end of the calculation session
+    !     !! Subroutine-declarations
+    !     type(bridgeMPI), intent(in)                     :: myBridge        ! type bridge on the particle side
+    !     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !     character(1)                                    :: endCalculationMessage ! Message sent to the fluid world
+    !     integer                                         :: ierr            ! MPI communication error
+    !     integer                                         :: nProc           ! loop index (fluid process rank)
 
-        ! Wait for all particle processes
-        call MPI_barrier(myBridge%myWorld, ierr)
+    !     ! Wait for all particle processes
+    !     call MPI_barrier(myBridge%myWorld, ierr)
 
-        ! Only the root particle process sent the message
-        ! NOTE: one should try to implement this via an intercommunicator broadcast
-        if (myBridge%myWorldRank == 0) then                              ! only the root process sends the message
-            !! - assign the message to send (but this value is not important)
-            endCalculationMessage = 'b'
-            !! - send the message to the fluid processes
-            do nProc = 0, myBridge%otherWorldSize - 1                      ! loop over all fluid processes
-                call MPI_send(endCalculationMessage, 1, MPI_character, nProc, end_calculation, &
-                myBridge%otherWorld, ierr)
-            end do                                                         ! end loop over all fluid processes
-        end if                                                           ! end condition regarding the rank
+    !     ! Only the root particle process sent the message
+    !     ! NOTE: one should try to implement this via an intercommunicator broadcast
+    !     if (myBridge%myWorldRank == 0) then                              ! only the root process sends the message
+    !         !! - assign the message to send (but this value is not important)
+    !         endCalculationMessage = 'b'
+    !         !! - send the message to the fluid processes
+    !         do nProc = 0, myBridge%otherWorldSize - 1                      ! loop over all fluid processes
+    !             call MPI_send(endCalculationMessage, 1, MPI_character, nProc, end_calculation, &
+    !             myBridge%otherWorld, ierr)
+    !         end do                                                         ! end loop over all fluid processes
+    !     end if                                                           ! end condition regarding the rank
 
-    end subroutine signalEndCalculation
+    ! end subroutine signalEndCalculation
 
 
 

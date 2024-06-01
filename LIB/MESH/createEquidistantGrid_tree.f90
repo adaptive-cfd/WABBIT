@@ -108,7 +108,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
                             call hvy2lgt( lgt_id_last, params%number_blocks, params%rank, params%number_blocks )
 
                             ! get a free block on this rank
-                            call get_free_local_light_id( params, icpu, lgt_id)
+                            call get_free_local_light_id( params, icpu, lgt_id, message="createEquidistantGrid_tree")
                             ! and the corresponding heavy id
                             call lgt2hvy( heavy_id, lgt_id, icpu, params%number_blocks )
 

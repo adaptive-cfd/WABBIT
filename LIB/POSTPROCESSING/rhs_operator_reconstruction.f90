@@ -140,12 +140,12 @@ subroutine rhs_operator_reconstruction(params)
 
     ! this hack ensures, on mono_CPU, that later on, refine+coarsening always ends up in the same order in hvy_actve
     if (params%adapt_tree) then
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
+        call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
         ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
 
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
+        call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_u), hvy_n(tree_ID_u))
 
         call adapt_tree( time, params, hvy_block, tree_ID_u, "everywhere", hvy_tmp )
 
@@ -212,11 +212,11 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
         !---------------------------------------------------------------------------
         ! refine grid ones
         !---------------------------------------------------------------------------
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp) )
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp) )
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
         ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp )
 
-        call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp))
+        call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_tmp), hvy_n(tree_ID_tmp))
     endif
 
     hvy_work(:,:,:,:,:,1) = 0
@@ -269,7 +269,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                 if ( params%adapt_tree ) then
-                    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei) )
+                    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei) )
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                     ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
 
@@ -282,7 +282,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! In fact, each point is then computed only once. Note: if you set the point on a high lgt_id, then
                 ! it will be "sync'ed down" to lower light IDs, so you can find the point more than once
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                call sync_ghosts(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei))
+                call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! Now compute rhs(u+he_i) of the derivative 1/h[rhs(u + h* e_i) - rhs(u)]
                 ! call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, lgt_block, &
@@ -306,8 +306,8 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! Note that on a coarse/fine interface, wabbit computes two values for the derivative
                 ! on the coarse and fine level. This synchronizing step lets us keep only either of those,
                 ! depending on fineWins or coarseWins
-                call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei))
-                call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u), hvy_n(tree_ID_rhs_u))
+                call sync_ghosts_all(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_ei), hvy_n(tree_ID_ei))
+                call sync_ghosts_all(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u), hvy_n(tree_ID_rhs_u))
 
                 call delete_tree(params, tree_ID_rhs_u_ei)
                 call substract_two_trees(params, hvy_work(:,:,:,:,:,1), hvy_tmp, tree_ID1=tree_ID_ei, tree_ID2=tree_ID_rhs_u, dest_tree_ID=tree_ID_rhs_u_ei)
@@ -320,7 +320,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 if ( params%adapt_tree ) then
                     call updateMetadata_tree(params, tree_ID_rhs_u_ei)
 
-                    call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
+                    call sync_ghosts_all(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
                     ! call adapt_tree( time, params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, lgt_active(:,tree_ID_rhs_u_ei), &
                     !  lgt_n(tree_ID_rhs_u_ei), lgt_sortednumlist(:,:,tree_ID_rhs_u_ei), hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei), tree_ID_rhs_u_ei, "everywhere", hvy_tmp, external_loop=.true. )
 
@@ -329,7 +329,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
 
                     call updateMetadata_tree(params, tree_ID_rhs_u_ei)
 
-                    call sync_ghosts(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
+                    call sync_ghosts_all(params, lgt_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID_rhs_u_ei), hvy_n(tree_ID_rhs_u_ei))
                 endif
                 ! save operator line to text file.
                 ! note: unfortunately, we use the index on the finest level, i.e., we temporarily

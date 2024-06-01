@@ -331,21 +331,21 @@ contains
 
 
 
-    subroutine  print_mat(Mat)
+    ! subroutine  print_mat(Mat)
 
-        real(kind=rk), intent(in)       :: Mat(:,:)
-        integer                         :: i, j
-        character(len=16) :: fmt
-        character(len=3) :: ncols_str
+    !     real(kind=rk), intent(in)       :: Mat(:,:)
+    !     integer                         :: i, j
+    !     character(len=16) :: fmt
+    !     character(len=3) :: ncols_str
 
-        write(*,*) " "
-        write(ncols_str,'(i3.3)') size(Mat,2)
-        fmt = '('//ncols_str//'(es12.4,1x))'
-        do j = 1,size(Mat,1)
-            write(*,fmt) Mat(j,:)
-        end do
+    !     write(*,*) " "
+    !     write(ncols_str,'(i3.3)') size(Mat,2)
+    !     fmt = '('//ncols_str//'(es12.4,1x))'
+    !     do j = 1,size(Mat,1)
+    !         write(*,fmt) Mat(j,:)
+    !     end do
 
-    end subroutine print_mat
+    ! end subroutine print_mat
 
 
     !##############################################################
@@ -1520,7 +1520,7 @@ contains
             if ( params%adapt_tree) then
                 call adapt_tree( 0.0_rk, params, hvy_block, dest_tree_ID, params%coarsening_indicator, hvy_tmp )
             else
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
+                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
             endif
 
             t_elapse = MPI_WTIME() - t_elapse

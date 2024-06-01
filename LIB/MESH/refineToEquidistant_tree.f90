@@ -92,7 +92,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
 
         call updateMetadata_tree(params, tree_ID)
 
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID), hvy_n(tree_ID) )
     end do
 
     ! final balancing: this routine is often used in postprocessing (and during simulations

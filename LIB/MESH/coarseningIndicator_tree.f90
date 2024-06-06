@@ -1,8 +1,8 @@
 !> \brief Decides for all blocks if they can stay or want to coarsen.
 !> This method goes a bit against the naming convention, as for default wavelet cases it acts
-!! level wise but for specific indicators (everywhere or random) it acts on the whole tree.
-subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, hvy_mask)
+!! level-wise or leaf-wise but for specific indicators (everywhere or random) it acts on the whole tree.
+subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
+    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask)
 
     use module_indicators
 
@@ -23,15 +23,16 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
     !! the steady state; therefore, this routine is called several times during the
     !! mesh adaptation. Random coarsening (used for testing) is done only in the first call.
     integer(kind=ik), intent(in)        :: iteration
-    
-    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
 
-    ! for the mask generation (time-independent mask) we require the mask on the highest
-    ! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
+    logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
+    !> for the mask generation (time-independent mask) we require the mask on the highest
+    !! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
     logical, intent(in)                 :: ignore_maxlevel
+    !> If this flag is true, then not the level but the refinement flag is tested for REF_TMP_UNTREATED (leaf-wise loop)
+    logical, intent(in)                 :: check_ref_tmp
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level
+    integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level, ref_stat
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
@@ -58,10 +59,22 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
     ! this is skipped if indicator=="everywhere" .and. indicator=="random" are used
     ! why? Because we want to coarsen blocks level by level, but the indicator is only set in the first iteration
     ! elsewise we would just coarsen all blocks to Jmin and not every or random leaf-block one time
-    if (.not. (iteration > 0 .and. (indicator=="everywhere" .or. indicator=="random"))) then
+    ! For leaf-wise iterations we also do not want to wipe, we set the status for all blocks at the beginning of adapt_tree
+
+    ! Outside calls of coarseningIndicator not in adapt_tree want to wipe refinement stati to "stay" before calling the indicator
+    ! In adapt_tree we compute leaf-wise and all blocks will be marked during the iterations with REF_TMP_UNTREATED
+    if (.not. check_ref_tmp) then
         do k = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k, tree_ID)
             lgt_block( lgtID, IDX_REFINE_STS ) = 0
+        enddo
+    endif
+    ! If adapt_tree is called with "everywhere" or "random" we coarsen everything on the first loop but new blocks get untreated flag
+    ! We have to ignore those so we reset their ref status
+    if (iteration > 0 .and. (indicator=="everywhere" .or. indicator=="random")) Then
+        do k = 1, lgt_n(tree_ID)
+            lgtID = lgt_active(k, tree_ID)
+            if (lgt_block( lgtID, IDX_REFINE_STS ) == REF_TMP_UNTREATED) lgt_block( lgtID, IDX_REFINE_STS ) = 0
         enddo
     endif
 
@@ -209,10 +222,12 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
                     lgtID = lgt_active(k, tree_ID)
                     ! random number
                     call random_number(r)
-                    ! set refinement status to coarsen based on random numbers.
+                    ! set refinement status to coarsen based on random numbers or let them stay
                     if ( r <= crsn_chance ) then
                         lgt_block(lgtID, IDX_REFINE_STS) = -1
                         tags = tags + 1
+                    else
+                        lgt_block(lgtID, IDX_REFINE_STS) = 0
                     endif
                 enddo
             endif
@@ -231,11 +246,16 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
             hvyID = hvy_active(k, tree_ID)
             call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
             level = lgt_block( lgtID, IDX_MESH_LVL)
+            ref_stat = lgt_block( lgtID, IDX_REFINE_STS)
 
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
             ! this should prevent filtering artifacts at block-block interfaces.
-            if (level /= level_this) cycle
+            if (level /= level_this .and. .not. check_ref_tmp) cycle
+            ! leaf wise coarsening: in the "biorthogonal" case, we start at leaf level and
+            ! iterate until there is no change. Only blocks with "untreated" flag in refinement status are allowed to coarsen.
+            ! this should prevent filtering artifacts at block-block interfaces.
+            if (ref_stat /= REF_TMP_UNTREATED .and. check_ref_tmp) cycle
 
             ! force blocks on maximum refinement level to coarsen, if parameter is set.
             ! Note this behavior can be bypassed using the ignore_maxlevel switch.
@@ -263,13 +283,13 @@ subroutine coarseningIndicator_level( time, params, level_this, hvy_block, hvy_t
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
 
-    if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random") then
+    if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. params%isLiftedWavelet) then
         ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
         ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
         ! in that case we set the neighbouring block to be important as well (with a temporary flag)
         t0 = MPI_Wtime()
-        call addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
-        call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0 )
+        call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
+        call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0)
     endif
 
 end subroutine

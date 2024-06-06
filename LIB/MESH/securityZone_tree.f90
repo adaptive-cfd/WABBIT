@@ -136,7 +136,8 @@ end subroutine
 
 
 !> This adds a buffer zone around blocks if the CE would remove valuable WC
-subroutine addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_block, hvy_tmp, indicator, norm, input_is_WD)
+!> It is usually called after coarsening indicator where all blocks are WDed and have flag -1, 0 or REF_TMP_TREATED_COARSEN
+subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, input_is_WD)
 
     use module_indicators
 
@@ -146,9 +147,9 @@ subroutine addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_bloc
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)    !< heavy data array - block data might be wavelet decomposed form
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)      !< not used but we need to pass it to coarseningIdicator_block
     character(len=*), intent(in)   :: indicator                   !< how to choose blocks for refinement
-    integer(kind=ik), intent(in)   :: level_this, tree_ID         !< level and tree to look at
+    integer(kind=ik), intent(in)   :: tree_ID                     !< tree to look at
     real(kind=rk), intent(inout)   :: norm(:)                     !< the computed norm for each component of the vector
-    logical, intent(in)            :: input_is_WD                 !< flag if hvy_block is already wavelet decomposed
+    logical, intent(in)            :: input_is_WD                 !< flag if hvy_block is already wavelet decomposed, for coarseningIndicatorBlock
 
     integer(kind=ik), parameter :: TMP_STATUS = 17
     integer(kind=ik) :: level_me, ref_status, neighborhood, i_neighborhood, ref_status_neighbor, ref_check, &
@@ -179,9 +180,8 @@ subroutine addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_bloc
         level_me   = lgt_block( lgtID, IDX_MESH_LVL )
         ref_status = lgt_block( lgtID, IDX_REFINE_STS )
 
-        ! is the block on the level we look at?
         ! is this block assigned 0 (it wants to stay and is significant)?
-        if ((level_me == level_this).and.(ref_status == 0)) then
+        if (ref_status == 0) then
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists ?
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
@@ -191,14 +191,14 @@ subroutine addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_bloc
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
                     ! the neighbor wants to coarsen
-                    if ((ref_status_neighbor == -1).and.(level_neighbor == level_this)) then
+                    if ((ref_status_neighbor == -1).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
                         call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/), &
                             X_s=(/ g, g, g/), X_e=(/ g, g, g/))
                         ref_check = -1
 
                         call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
-                        hvy_tmp(:,:,:,:,hvyID), indicator, ref_check, norm, level_this, input_is_WD, indices=idx)
+                        hvy_tmp(:,:,:,:,hvyID), indicator, ref_check, norm, level_me, input_is_WD, indices=idx)
 
                         ! encode into refinement status if the neighboring block can coarsen or not (reasoning explained below)
                         if (ref_check == 0) then
@@ -230,7 +230,7 @@ subroutine addSecurityZone_CE_level( time, params, level_this, tree_ID, hvy_bloc
 
         ! is the block on the level we look at?
         ! is this block assigned -1 (it wants to coarsen)?
-        if ((level_me == level_this).and.(ref_status == -1)) then
+        if (ref_status == -1) then
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
                 ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant

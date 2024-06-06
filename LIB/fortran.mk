@@ -283,7 +283,7 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
-	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 waveletDecomposition_tree.f90 refineToEquidistant_tree.f90 \
+	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 refineToEquidistant_tree.f90 \
 	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
 	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
 	refinementExecute.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 \

@@ -357,7 +357,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     !     enddo
     !     enddo
     !     close(14)
-    !     stop
+    !     abort(197)
     ! enddo
     !
     ! deallocate(WCtmp)
@@ -367,7 +367,8 @@ end subroutine
 
 !> \brief Modify the SC and WC of a wavelet decomposed blocks at fine/coarse interfaces
 !> This routine assumes that the input is already wavelet decomposed in spaghetti form
-subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level, sc_skip_ghosts)
+!> It will work on all blocks or which have the REF_TMP_UNTREATED flag in refinement status for leaf-wise operation
+subroutine coarse_extension_modify_tree(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, tree_ID, sc_skip_ghosts)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -380,10 +381,10 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)           !< heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
-    integer(kind=ik), intent(in)        :: level                       !< current level
+    integer(kind=ik), intent(in)        :: tree_ID                     !< Tree to be investigated
     logical, optional, intent(in)       :: sc_skip_ghosts              !< for second CE modify we can skip ghosts points
 
-    integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID
+    integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID, tree_me
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
     logical                             :: toBeManipulated, scSkipGhosts
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
@@ -408,6 +409,8 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
         hvyID = hvy_active(k)
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         level_me       = lgt_block( lgtID, IDX_MESH_LVL )
+        tree_me        = lgt_block( lgtID, IDX_TREE_ID )
+
         ! check if this block is to be modified
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
@@ -417,7 +420,7 @@ subroutine coarse_extension_modify_level(params, lgt_block, hvy_data, hvy_tmp, h
                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
                 ! we proceed level-wise
-                if ((level_neighbor < level_me).and.(level_me==level)) then
+                if ((level_neighbor < level_me) .and. (tree_me==tree_ID)) then
                     toBeManipulated = .true.
                     ! nnn = nnn + 1
                     ! its enough if one neighborhood is true
@@ -469,7 +472,8 @@ end subroutine
 
 
 
-subroutine coarse_extension_reconstruct_level(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n, level)
+!> \brief Apply CE for all blocks in a tree. This copies back the old values and then overwrites those on affected patches
+subroutine coarse_extension_reconstruct_tree(params, lgt_block, hvy_data, hvy_tmp, hvy_neighbor, hvy_active, hvy_n, lgt_n)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -482,7 +486,6 @@ subroutine coarse_extension_reconstruct_level(params, lgt_block, hvy_data, hvy_t
     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)           !< heavy data array - neighbor data
     integer(kind=ik), intent(in)        :: hvy_active(:)               !< list of active blocks (heavy data)
     integer(kind=ik), intent(in)        :: hvy_n, lgt_n                !< number of active blocks (heavy and light data)
-    integer(kind=ik), intent(in)        :: level                       !< current level
 
     integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID, Nreconl, Nreconr
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor, idx(2,3)
@@ -520,12 +523,9 @@ subroutine coarse_extension_reconstruct_level(params, lgt_block, hvy_data, hvy_t
                 lgtID_neighbor = hvy_neighbor( hvyID, neighborhood )
                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
-                ! we proceed level-wise
-                if ((level_neighbor < level_me).and.(level_me==level)) then
+                ! check if this patch is a CE patch
+                if ((level_neighbor < level_me)) then
                     toBeManipulated = .true.
-
-                    ! nnn = nnn + 1
-                    ! its enough if one neighborhood is true
                     exit
                 endif
             endif
@@ -577,10 +577,8 @@ subroutine coarse_extension_reconstruct_level(params, lgt_block, hvy_data, hvy_t
             !     enddo
             ! endif
 
-        else  ! block is not modified, rewrite old values if it was transformed
-            if (level_me == level) then
-                hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
-            endif
+        else  ! block is not modified, rewrite old values
+            hvy_data(:,:,:,1:nc,hvyID) = hvy_tmp(:,:,:,1:nc,hvyID)
         endif
     enddo
 end subroutine

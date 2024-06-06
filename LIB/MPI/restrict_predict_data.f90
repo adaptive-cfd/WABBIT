@@ -1,5 +1,5 @@
 subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
-    level_diff, hvy_block, hvy_id )
+    level_diff, hvy_block, num_eqn, hvy_id )
 
     implicit none
 
@@ -14,6 +14,7 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     integer(kind=ik), intent(in)                    :: level_diff
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), intent(in)                    :: num_eqn      !< How many components? Needed as in between we use hvy_tmp
     integer(kind=ik), intent(in)                    :: hvy_id
 
     ! some neighborhoods are intrinsically on the same level (level_diff=0)
@@ -24,11 +25,11 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     if ( level_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
-        call predict_data( params, res_pre_data, ijk, hvy_block, hvy_id )
+        call predict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id )
 
     elseif ( level_diff == +1) then
         ! The neighbor is coarser: we have to downsample the data
-        call restrict_data( params, res_pre_data, ijk, hvy_block, hvy_id )
+        call restrict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id )
 
     else
         call abort(123005, "Lord Vader, restrict_predict_data is called with leveldiff /= -+1")
@@ -37,7 +38,7 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
 end subroutine restrict_predict_data
 
-subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
+subroutine restrict_data( params, res_data, ijk, hvy_block, num_eqn, hvy_id )
     implicit none
 
     type (type_params), intent(in)  :: params
@@ -47,6 +48,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     integer(kind=ik), intent(in)    :: ijk(2,3)
     !> heavy data array - block data
     real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), intent(in)    :: num_eqn      !< How many components? Needed as in between we use hvy_tmp
     integer(kind=ik), intent(in)    :: hvy_id
 
     integer(kind=ik)                :: ix, iy, iz, dF, nc, nx, ny, nz
@@ -54,7 +56,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     nx = size(hvy_block,1)
     ny = size(hvy_block,2)
     nz = size(hvy_block,3)
-    nc = size(hvy_block,4)
+    nc = num_eqn
 
 #ifdef DEV
     if (.not. allocated(params%HD)) call abort(230301051, "Pirates! Maybe setup_wavelet was not called?")
@@ -65,11 +67,11 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
     ! by applying the filter only in the required patch.
     ! Pro: we maybe save a bi of CPU time, as we usually do not need the entire block filtered
     ! Con: more work and maybe we compute some values twice (if patches overlap)
-    if (.not. isFiltered(hvy_id)) then
-        call blockFilterXYZ_interior_vct( params, hvy_block(:,:,:,:,hvy_id), hvy_filtered(:,:,:,:,hvy_id), params%HD, &
+    if (hvy_id /= filtered_hvy_ID) then
+        call blockFilterXYZ_interior_vct( params, hvy_block(:,:,:,1:nc,hvy_id), hvy_filtered(:,:,:,1:nc), params%HD, &
         lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%g)
 
-        isFiltered(hvy_id) = .true.
+        filtered_hvy_ID = hvy_id
     endif
 
     do dF = 1, nc
@@ -79,7 +81,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
 
                     ! write restricted (downsampled) data
                     res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
-                    = hvy_filtered( ix, iy, iz, dF, hvy_id )
+                    = hvy_filtered( ix, iy, iz, dF)
                     ! res_data( (ix-ijk(1,1))/2+1, (iy-ijk(1,2))/2+1, (iz-ijk(1,3))/2+1, dF) &
                     ! = hvy_block( ix, iy, iz, dF, hvy_id )
                 end do
@@ -89,7 +91,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, hvy_id )
 end subroutine restrict_data
 
 
-subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
+subroutine predict_data( params, pre_data, ijk, hvy_block, num_eqn, hvy_id )
     implicit none
 
     type (type_params), intent(in)                  :: params
@@ -99,12 +101,13 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, hvy_id )
     integer(kind=ik), intent(in)                    :: ijk(2,3)
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), intent(in)                    :: num_eqn      !< How many components? Needed as in between we use hvy_tmp
     integer(kind=ik), intent(in)                    :: hvy_id
 
     integer(kind=ik) :: dF, nx, ny, nz, nc
 
 
-    nc = size(hvy_block,4)
+    nc = num_eqn
 
     ! data size
     nx = ijk(2,1) - ijk(1,1) + 1

@@ -10,23 +10,28 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensureGradedness_tree( params, tree_ID )
+subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
 
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in), optional :: mark_TMP_flag          !< Set refinement of completeness to 0 or temporary flag
     integer(kind=ik)                    :: ierr                   ! MPI error variable
     integer(kind=ik)                    :: rank                   ! process rank
     ! loop variables
     integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
     counter, hvy_id, neighbor_status, Jmax, proc_id, lgt_id
-    logical                             :: grid_changed, test2    ! status of grid changing
-
+    logical                             :: grid_changed, grid_changed_tmp, markTMPflag    ! status of grid changing
 
     ! number of neighbor relations
     ! 2D: 16, 3D: 74
     integer(kind=ik) :: neighbor_num
     real(kind=rk) :: t0
+
+    ! If we loop leaf-wise we do not want blocks to be set to 0 if not all sisters exist
+    ! as we want to keep the wavelet-decomposed values and maybe just have to wait a step longer
+    markTMPflag = .false.
+    if (present(mark_TMP_flag)) markTMPflag = mark_TMP_flag
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -77,7 +82,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
             ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
             if ( lgt_block( lgt_id , IDX_REFINE_STS ) == -1) then
                 ! check if all sisters share the -1 status, remove it if they don't
-                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim) )
+                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time
@@ -86,6 +91,8 @@ subroutine ensureGradedness_tree( params, tree_ID )
 
             !-----------------------------------------------------------------------
             ! This block (still) wants to coarsen
+            ! Neighbor blocks with REF_TMP_TREATED_COARSEN want to coarsen in theory but have to stay
+            ! atleast for this iteration so they are treated as stat=0
             !-----------------------------------------------------------------------
             if ( lgt_block( lgt_id , IDX_REFINE_STS ) == -1) then
                 ! loop over all neighbors
@@ -101,7 +108,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                             ! block can not coarsen, if neighbor wants to refine
                             if ( neighbor_status == -1 ) then
                                 ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                            elseif ( neighbor_status == 0 ) then
+                            elseif ( neighbor_status == 0 .or. neighbor_status == REF_TMP_TREATED_COARSEN ) then
                                 ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
                             elseif ( neighbor_status == 1 ) then
                                 ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
@@ -117,7 +124,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                             ! neighbor on lower level
                             if ( neighbor_status == -1 ) then
                                 ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok
-                            elseif ( neighbor_status == 0 ) then
+                            elseif ( neighbor_status == 0 .or. neighbor_status == REF_TMP_TREATED_COARSEN ) then
                                 ! neighbor wants to stay, I want to coarsen, it is one level coarser, -> ok
                             elseif ( neighbor_status == 1 ) then
                                 ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
@@ -133,7 +140,7 @@ subroutine ensureGradedness_tree( params, tree_ID )
                                     grid_changed = .true.
                                 endif
 
-                            elseif ( neighbor_status == 0 ) then
+                            elseif ( neighbor_status == 0 .or. neighbor_status == REF_TMP_TREATED_COARSEN ) then
                                 ! neighbor wants to stay and I want to coarsen, but
                                 ! I cannot do that (there would be two levels between us)
                                 ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
@@ -142,9 +149,9 @@ subroutine ensureGradedness_tree( params, tree_ID )
                                     grid_changed = .true.
                                 endif
 
-                            elseif ( neighbor_status == -1) then
+                            elseif ( neighbor_status == -1 ) then
                                 ! neighbor wants to coarsen, which is what I want too,
-                                ! so we both would just go up one level together - that's fine
+                                ! so we both would just go down one level together - that's fine
                             end if
                         else
                             call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -191,8 +198,8 @@ subroutine ensureGradedness_tree( params, tree_ID )
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
         ! only the blocks it holds, not blocks held by other ranks.
-        test2 = grid_changed
-        call MPI_Allreduce(test2, grid_changed, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, ierr )
+        grid_changed_tmp = grid_changed
+        call MPI_Allreduce(grid_changed_tmp, grid_changed, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, ierr )
 
         !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()

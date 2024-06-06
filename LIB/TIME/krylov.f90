@@ -450,7 +450,7 @@ END subroutine DGPADM
 !     h(j+1,j)= h_all
 !     if(h(j+1,j) .eq. 0.0_rk) then
 !         write(*,*)'h(',j+1,j,')  =0.0'
-!         stop
+!         abort(197)
 !     else
 !         v(:,:,:,:,j+1)=v(:,:,:,:,j+1)/h(j+1,j)
 !     end if

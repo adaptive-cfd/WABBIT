@@ -19,7 +19,7 @@ module module_MPI
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
-    integer(kind=ik), PARAMETER   :: S_META_FULL = 6  ! how many metadata entries we collect in the logik-loop
+    integer(kind=ik), PARAMETER   :: S_META_FULL = 7  ! how many metadata entries we collect in the logik-loop
 #ifdef DEV
     integer(kind=ik), PARAMETER   :: S_META_SEND = 5  ! how many metadata entries will be send, plus rank
 #else
@@ -62,13 +62,10 @@ module module_MPI
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
 
-    ! FIXME: This is a very large work array - equivalent of a whole statevector copy.
-    ! only a subset of it will be actually used, still.
-    ! Its tedious to pass another work array (and hvy_tmp is not the right size neither)
-    ! So for now this is a HACK solution
-    real(kind=rk), allocatable :: hvy_filtered(:, :, :, :, :)
-    ! the 2nd one is small:
-    logical, allocatable :: isFiltered(:)
+    ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a new block we scrap the old filtered values
+    real(kind=rk), allocatable :: hvy_filtered(:, :, :, :)
+    ! We need to save which block currently is filtered
+    integer(kind=ik) :: filtered_hvy_ID
 
 
 
@@ -80,9 +77,9 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_level_from_MC
+    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_TMP_from_MF, sync_SCWC_from_MC
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches
-    PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_level, coarse_extension_reconstruct_level, xfer_block_data, prepare_update_family_metadata
+    PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
@@ -410,19 +407,13 @@ subroutine ghosts_ensure_correct_buffer_size(params, hvy_block)
         allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, nc) )
     endif
 
-    if (allocated(isFiltered)) then
-        if (size(isFiltered,1)<size(hvy_block,5)) deallocate(isFiltered)
-    endif
-    if (.not. allocated(isFiltered)) allocate(isFiltered(1:size(hvy_block,5)))
-    ! this one needs initializing:
-    isFiltered = .false.
+    ! initialize that no block is currently filtered
+    filtered_hvy_ID = -1
 
     if (allocated(hvy_filtered)) then
-        if (.not. areArraysSameSize(hvy_block, hvy_filtered)) deallocate(hvy_filtered)
+        if (nc > size(hvy_filtered, 4)) deallocate(hvy_filtered)
     endif
-    ! FIXME: This is a very large work array - equivalent of a whole statevector copy.
-    ! only a subset of it will be actually used, still
-    if (.not. allocated(hvy_filtered)) allocate(hvy_filtered(1:nx, 1:ny, 1:nz, 1:nc, 1:size(hvy_block,5)) )
+    if (.not. allocated(hvy_filtered)) allocate(hvy_filtered(1:nx, 1:ny, 1:nz, 1:nc) )
 
 
 end subroutine

@@ -128,7 +128,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             endif
         enddo
     end do
-    call toc( "coarseExtension 1 (toBeManipulated list)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 1 (toBeManipulated list)", 1010, MPI_Wtime()-t0 )
     ! write(*,*) "rank", params%rank, "N", nnn, hvy_n, lgt_n, "level=", level
     !---------------------------------------------------------------------------
 
@@ -141,7 +141,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
         g_this = max(ubound(params%HD,1), ubound(params%GD,1))! ubound GD is the largest (GD is not symmetric but HD is)
         call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
             level, g_minus=g_this, g_plus=g_this)
-        call toc( "coarseExtension (sync 1)", MPI_Wtime()-t0 )
+        call toc( "coarseExtension (sync 1)", 1011, MPI_Wtime()-t0 )
     endif
 
 
@@ -176,7 +176,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
         endif
     end do
-    call toc( "coarseExtension 2 (FWT)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 2 (FWT)", 1012, MPI_Wtime()-t0 )
 
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,7 +189,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     call sync_level_only( params, lgt_block, hvy_block, hvy_neighbor, &
     hvy_active, hvy_n, level, g_minus=g_spaghetti, g_plus=g_spaghetti)
     ! Note we tested it and syncSameLevelOnly1=.true. is indeed slightly faster (compared to full sync)
-    call toc( "coarseExtension 3 (sync 2)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 3 (sync 2)", 1013, MPI_Wtime()-t0 )
 
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -314,7 +314,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
             endif
         enddo
     end do
-    call toc( "coarseExtension 4 (manipulation loop)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 4 (manipulation loop)", 1014, MPI_Wtime()-t0 )
 
     ! unfortunately, the above loop affects the load balancing. in the sync_ghosts
     ! step, CPUS will be in sync again, but since they arrive at different times at this line of
@@ -326,7 +326,7 @@ subroutine coarseExtensionUpdate_level( params, lgt_block, hvy_block, hvy_work, 
     t0 = MPI_Wtime()
     g_this = max(ubound(params%HD,1),ubound(params%GD,1))
     call sync_level_with_all_neighbours( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus=g_this, g_plus=g_this)
-    call toc( "coarseExtension 5 (sync 3)", MPI_Wtime()-t0 )
+    call toc( "coarseExtension 5 (sync 3)", 1015, MPI_Wtime()-t0 )
 
 
     ! code used to verify that FWT after manip yields same coeffs

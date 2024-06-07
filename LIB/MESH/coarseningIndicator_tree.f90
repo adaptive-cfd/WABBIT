@@ -87,7 +87,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
         call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
-        call toc( "coarseningIndicator (createMask_tree)", MPI_Wtime()-t0 )
+        call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
     endif
 
 
@@ -137,7 +137,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
         ! call abort(2801191,"your thresholding does not work with threshold-mask.")
 
-        ! call toc( "coarseningIndicator (prepare thresholdfield)", MPI_Wtime()-t0 )
+        ! call toc( "coarseningIndicator (prepare thresholdfield)", 121, MPI_Wtime()-t0 )
     endif
 
 
@@ -182,7 +182,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! during dev is it useful to know what the normalization is, if that is active
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
 
-        call toc( "coarseningIndicator (norm)", MPI_Wtime()-t0 )
+        call toc( "coarseningIndicator (norm)", 122, MPI_Wtime()-t0 )
     endif
 
     !---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 endif
             endif
         enddo
-        call toc( "coarseningIndicator (coarseIndicator_block)", MPI_Wtime()-t0 )
+        call toc( "coarseningIndicator (coarseIndicator_block)", 123, MPI_Wtime()-t0 )
 
     end select
 
@@ -289,7 +289,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! in that case we set the neighbouring block to be important as well (with a temporary flag)
         t0 = MPI_Wtime()
         call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
-        call toc( "coarseningIndicator (security_zone_check)", MPI_Wtime()-t0)
+        call toc( "coarseningIndicator (security_zone_check)", 124, MPI_Wtime()-t0)
     endif
 
 end subroutine

@@ -282,7 +282,7 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
         t1 = MPI_wtime()
         call prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, count_send_total, &
             istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
-        call toc( "sync ghosts (prepare metadata)", MPI_wtime()-t1 )
+        call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
         !***************************************************************************
         ! (ii) sending handled by xfer_block_data
@@ -300,11 +300,11 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
                 call xfer_block_data(params, hvy_block, count_send_total, hvy_tmp=hvy_tmp)
             endif
         endif
-        call toc( "sync ghosts (xfer_block_data)", MPI_wtime()-t1 )
+        call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t1 )
 
     end do ! loop over stages 1,2
 
-    call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
+    call toc( "sync ghosts (TOTAL)", 80, MPI_wtime()-t0 )
 
 end subroutine sync_ghosts_generic
 
@@ -451,7 +451,7 @@ end subroutine sync_ghosts_generic
 !
 !         ! call fixInterpolatedPoints_postSync( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
 !
-!     call toc( "WRAPPER: sync ghosts", MPI_wtime()-t0 )
+!     call toc( "WRAPPER: sync ghosts", 19, MPI_wtime()-t0 )
 !
 ! end subroutine sync_ghosts_nostages
 

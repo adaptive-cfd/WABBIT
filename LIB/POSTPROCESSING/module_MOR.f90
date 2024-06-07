@@ -616,9 +616,9 @@ contains
             call snapshot_POD( params, hvy_block, hvy_tmp, truncation_error, truncation_rank, save_all)
         endif
         t_elapse(2) = MPI_Wtime()-t_elapse(2)
-        call toc( "post_POD (read + coarse): ", t_elapse(1) )
-        call toc( "post_POD (snapshot_POD): ", t_elapse(2) )
-        call toc( "post_POD (total wPOD algo): ", t_elapse(1) + t_elapse(2) )
+        call toc( "post_POD (read + coarse): ", 350, t_elapse(1) )
+        call toc( "post_POD (snapshot_POD): ", 351, t_elapse(2) )
+        call toc( "post_POD (total wPOD algo): ", 352, t_elapse(1) + t_elapse(2) )
 
     end subroutine
     !##############################################################
@@ -1152,7 +1152,7 @@ contains
         C = C / Volume
         C = C / real(N_snapshots,kind=rk)
 
-        call toc( "compute_covariance_matrix", MPI_WTIME() - t_elapse )
+        call toc( "compute_covariance_matrix", 353, MPI_WTIME() - t_elapse )
 
     end subroutine
     !##############################################################

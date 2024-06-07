@@ -52,14 +52,14 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hv
     ! endif
 
     call send_prepare_external(params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
-    call toc( "xfer_block_data (prepare data)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (prepare data)", 70, MPI_wtime()-t0 )
 
     !***************************************************************************
     ! (ii) transfer part (send/recv)
     !***************************************************************************
     t0 = MPI_wtime()
     call start_xfer_mpi( params, isend, irecv, verbose_check)
-    call toc( "xfer_block_data (start_xfer_mpi)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (start_xfer_mpi)", 71, MPI_wtime()-t0 )
 
     !***************************************************************************
     ! (iii) Unpack received data in the ghost node layers
@@ -67,18 +67,18 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hv
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
     call unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
-    call toc( "xfer_block_data (unpack internal)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (unpack internal)", 72, MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
     ! to be completed
     t0 = MPI_wtime()
     call finalize_xfer_mpi(params, isend, irecv, verbose_check)
-    call toc( "xfer_block_data (finalize_xfer_mpi)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (finalize_xfer_mpi)", 73, MPI_wtime()-t0 )
 
     ! process-external ghost points (copy from buffer)
     t0 = MPI_wtime()
     call unpack_ghostlayers_external( params, hvy_data, verbose_check )
-    call toc( "xfer_block_data (unpack external)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (unpack external)", 74, MPI_wtime()-t0 )
 
 end subroutine xfer_block_data
 

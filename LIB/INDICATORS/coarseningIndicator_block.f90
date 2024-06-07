@@ -107,7 +107,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
 
         ! timing for debugging - block based so should not be deployed for productive versions
-        ! call toc( "coarseningIndicator_block (treshold_block)", MPI_Wtime()-t0 )
+        ! call toc( "coarseningIndicator_block (treshold_block)", 1000, MPI_Wtime()-t0 )
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
@@ -164,7 +164,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         refinement_status = max(refinement_status, refinement_status_mask)
 
         ! timing for debugging - block based so should not be deployed for productive versions
-        ! call toc( "coarseningIndicator_block (mask_comp)", MPI_Wtime()-t0 )
+        ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )
     endif
 
 end subroutine coarseningIndicator_block

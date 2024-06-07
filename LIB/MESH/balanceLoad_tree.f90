@@ -148,7 +148,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
     if (lgt_n(tree_ID) > 1) then
         call quicksort(sfc_sorted_list, 1, lgt_n(tree_ID), 3)
     end if
-    call toc( "balanceLoad_tree (SFC+sort)", MPI_wtime()-t1 )
+    call toc( "balanceLoad_tree (SFC+sort)", 91, MPI_wtime()-t1 )
 
     !---------------------------------------------------------------------------------
     ! 2nd: plan communication (fill list of blocks to transfer)
@@ -217,7 +217,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
     !---------------------------------------------------------------------------------
     call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree" )
 
-    call toc( "balanceLoad_tree (comm)", MPI_wtime()-t1 )
+    call toc( "balanceLoad_tree (comm)", 92, MPI_wtime()-t1 )
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     ! NOTE: an idea would be to also xfer the neighboring information (to save the updateNeighbors_tree
@@ -226,5 +226,5 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, predictable_dist)
     call updateMetadata_tree(params, tree_ID)
 
     ! timing
-    call toc( "balanceLoad_tree (TOTAL)", MPI_wtime()-t0 )
+    call toc( "balanceLoad_tree (TOTAL)", 90, MPI_wtime()-t0 )
 end subroutine balanceLoad_tree

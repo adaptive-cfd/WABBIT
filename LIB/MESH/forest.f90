@@ -450,7 +450,7 @@ subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
         !--------------------
         hvy_block( :, :, :, :, hvy_id_dest) = hvy_block( :, :, :, :, hvy_id_source)
     end do ! loop over source tree
-    call toc( "copy_tree (copy heavy_data)", MPI_Wtime()-t_elapse )
+    call toc( "copy_tree (copy heavy_data)", 250, MPI_Wtime()-t_elapse )
 
 
     ! always synchronize lgt_data when you have changed lgt_block locally
@@ -462,7 +462,7 @@ subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
 
     call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, tree_ID_dest), hvy_n(tree_ID_dest))
 
-    call toc( "copy_tree (copy synchronize hvy and lgt)", MPI_Wtime()-t_elapse )
+    call toc( "copy_tree (copy synchronize hvy and lgt)", 251, MPI_Wtime()-t_elapse )
 
 end subroutine
 !##############################################################
@@ -964,7 +964,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
         call store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, tree_ID2)
 
         call refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2)
-        call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+        call toc( "pointwise_tree_arithmetic (refine_trees2same_lvl)", 252, MPI_Wtime()-t_elapse )
     end if
 
     if (tree_ID1 .ne. tree_ID2) then
@@ -977,7 +977,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
         call balanceLoad_tree( params, hvy_block, tree_ID2 )
     end if
 
-    call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", MPI_Wtime()-t_elapse )
+    call toc( "pointwise_tree_arithmetic (balancing after refine_trees2same_lvl)", 253, MPI_Wtime()-t_elapse )
 
     !=================================================
     ! Decide which pointwice arithmetic shell be used
@@ -1423,7 +1423,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     case default
         call abort(135,"Operation:  "//op//"  unknown")
     end select
-    call toc( "pointwise_tree_arithmetic (hvy_data operation)", MPI_Wtime()-t_elapse )
+    call toc( "pointwise_tree_arithmetic (hvy_data operation)", 254, MPI_Wtime()-t_elapse )
 
     t_elapse = MPI_Wtime()
 
@@ -1487,7 +1487,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     !     lgt_n(tree_ID2), lgt_sortednumlist(:,:,tree_ID2), hvy_active(:,tree_ID2), &
     !     hvy_n(tree_ID2), tree_ID2, params%coarsening_indicator, hvy_tmp )
     ! end if
-    call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", MPI_Wtime()-t_elapse )
+    call toc( "pointwise_tree_arithmetic (coarse to reference mesh)", 255, MPI_Wtime()-t_elapse )
 end subroutine
 !##############################################################
 
@@ -1820,9 +1820,9 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
 
     t_elapse = MPI_WTIME() - t_elapse
 
-    call toc( "scalra prod (prepare: refine_tree+balanceLoad_tree)", t_inc(1) )
-    call toc( "scalra prod (hvy_data operation)", t_inc(2) )
-    call toc( "scalra prod (total)", t_elapse )
+    call toc( "scalra prod (prepare: refine_tree+balanceLoad_tree)", 256, t_inc(1) )
+    call toc( "scalra prod (hvy_data operation)", 257, t_inc(2) )
+    call toc( "scalra prod (total)", 258, t_elapse )
 end function
 !##############################################################
 

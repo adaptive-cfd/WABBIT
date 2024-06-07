@@ -99,5 +99,5 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         call saveHDF5_tree( fname, time, iteration, k, params, hvy_tmp, tree_ID)
     enddo
 
-    call toc( "save_data", MPI_wtime()-t0 )
+    call toc( "TOPLEVEL: save_data", 15, MPI_wtime()-t0 )
 end subroutine save_data

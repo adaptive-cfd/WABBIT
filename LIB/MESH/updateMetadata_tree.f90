@@ -32,5 +32,5 @@ subroutine updateMetadata_tree(params, tree_ID, update_neighbors, update_family)
     if (u_n) call updateNeighbors_tree(params, tree_ID)
     if (u_f) call updateFamily_tree(params, tree_ID)
 
-    call toc( "updateMetadata_tree (lists+neighbors)", MPI_wtime()-t0 )
+    call toc( "updateMetadata_tree (lists+neighbors)", 59, MPI_wtime()-t0 )
 end subroutine

@@ -42,14 +42,14 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
     call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
-    call toc( "refine_tree (refinementIndicator_tree)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (refinementIndicator_tree)", 141, MPI_Wtime()-t1 )
 
 
     !> (b) remove refinement flag for blocks that are on the finest level and thus
     !! cannot be refined anymore.
     t1 = MPI_Wtime()
     call respectJmaxJmin_tree( params, tree_ID )
-    call toc( "refine_tree (respectJmaxJmin_tree)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (respectJmaxJmin_tree)", 142, MPI_Wtime()-t1 )
 
 
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
@@ -59,7 +59,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     if ( indicator /= "everywhere" ) then
       call ensureGradedness_tree( params, tree_ID )
     endif
-    call toc( "refine_tree (ensureGradedness_tree)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (ensureGradedness_tree)", 143, MPI_Wtime()-t1 )
 
 
     !---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     else
         call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
     end if
-    call toc( "refine_tree (refinement_execute)", MPI_Wtime()-t1 )
+    call toc( "refine_tree (refinement_execute)", 144, MPI_Wtime()-t1 )
 
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
@@ -124,13 +124,13 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
         t1 = MPI_Wtime()
         call balanceLoad_tree( params, hvy_block, tree_ID )
-        call toc( "refine_tree (balanceLoad_tree)", MPI_Wtime()-t1 )
+        call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 
     ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, &
     ! hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 
-    call toc( "refine_tree (lists+neighbors)", t_misc )
-    call toc( "refine_tree (TOTAL)", MPI_wtime()-t0 )
+    call toc( "refine_tree (lists+neighbors)", 146, t_misc )
+    call toc( "refine_tree (TOTAL)", 140, MPI_wtime()-t0 )
 
 end subroutine refine_tree

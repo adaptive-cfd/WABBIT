@@ -193,7 +193,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
                 end do
             end if ! refinement status
         end do ! loop over blocks
-        call toc( "ensureGradedness_tree (processing part)", MPI_Wtime()-t0 )
+        call toc( "ensureGradedness_tree (processing part)", 130, MPI_Wtime()-t0 )
 
         ! since not all mpiranks change something in their light data, but all have to perform
         ! the same iterations, we sync the grid_changed indicator here. Note each mpirank changed
@@ -204,7 +204,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
         !> after locally modifying refinement statusses, we need to synchronize light data
         t0 = MPI_wtime()
         call synchronize_lgt_data( params, refinement_status_only=.true. )
-        call toc( "ensureGradedness_tree (sync_lgt)", MPI_Wtime()-t0 )
+        call toc( "ensureGradedness_tree (sync_lgt)", 131, MPI_Wtime()-t0 )
 
         ! avoid infinite loops
         counter = counter + 1

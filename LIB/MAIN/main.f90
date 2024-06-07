@@ -201,7 +201,7 @@ program main
 
 
     ! timing
-    call toc( "init_data", MPI_wtime()-sub_t0 )
+    call toc( "TOPLEVEL: init_data", 14, MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -250,7 +250,7 @@ program main
             ! refine the mesh
             call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
         endif
-        call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
 
         Jmin1 = minActiveLevel_tree(tree_ID_flow)
@@ -270,7 +270,7 @@ program main
             !*******************************************************************
             t4 = MPI_wtime()
             call timeStep_tree( time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID_flow )
-            call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
 
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
@@ -303,7 +303,7 @@ program main
                     call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
                 end if
             end if
-            call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: filter", 12, MPI_wtime()-t4)
 
             !*******************************************************************
             ! statistics
@@ -342,7 +342,7 @@ program main
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
             endif
         endif
-        call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
 
         !***********************************************************************
@@ -440,7 +440,8 @@ program main
     call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! make a summary of the program parts, which have been profiled using toc(...)
-    ! and print it to stdout
+    ! and print it to stdout, safe total time just before to insert it as well
+    call toc( "TOPLEVEL: TOTAL", 9, MPI_wtime()-t0)
     call summarize_profiling( WABBIT_COMM )
 
     call deallocate_forest(params, hvy_block, hvy_work, hvy_tmp)

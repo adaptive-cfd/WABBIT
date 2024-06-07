@@ -200,7 +200,9 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     ! setup correct patches and get indices, used for move_mallat_patch_block
     ! this is in theory only needed when we change g but if this is every done I want to avoid nasty bug finding
     call family_setup_patches(params, output_to_file=.false.)
-
+    ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
+    ! make sure they have the right size
+    call xfer_ensure_correct_buffer_size(params, hvy_block)
 
     !---------------------------------------------------------------------------
     ! create new empty blocks on rank with most daughters if it does not exist

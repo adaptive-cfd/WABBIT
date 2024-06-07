@@ -78,7 +78,7 @@ module module_MPI
 ! public parts of this module
 
     PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_TMP_from_MF, sync_SCWC_from_MC
-    PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches
+    PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
     PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 
     ! we set up a table that gives us directly the inverse neighbor relations.
@@ -377,7 +377,7 @@ subroutine init_ghost_nodes( params )
 
 end subroutine
 
-subroutine ghosts_ensure_correct_buffer_size(params, hvy_block)
+subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
     implicit none
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)

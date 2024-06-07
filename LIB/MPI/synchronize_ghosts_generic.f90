@@ -251,7 +251,7 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     call ghosts_setup_patches(params, gminus=gminus, gplus=gplus, output_to_file=.false.)
     ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
     ! make sure they have the right size
-    call ghosts_ensure_correct_buffer_size(params, hvy_block)
+    call xfer_ensure_correct_buffer_size(params, hvy_block)
 
 ! Diagonal neighbors (not required for the RHS)
 ! 2D: 5,6,7,8

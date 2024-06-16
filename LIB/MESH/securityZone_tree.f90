@@ -119,7 +119,7 @@ subroutine addSecurityZone_level( time, params, level_this, tree_ID, hvy_block, 
             ! When blocks on lower levels are refined these need the boundary information from neighbouring patches
             ! However, these are not available as we only sync level-wise
             ! Since this case is super rare we just take the costs and do a full sync here
-            call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )    
+            call sync_ghosts_tree( params, hvy_block, tree_ID )    
 
             ! creating new blocks is not always possible without creating even more blocks to ensure gradedness
             call ensureGradedness_tree( params, tree_ID )
@@ -190,8 +190,12 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     level_neighbor             = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
+                    ! if (lgtID == 32160) then
+                    !     write(*, '("BH-", i0, " BL-", i0, " N-", i0, " NBL-", i0, " NR-", i0)') hvyID, lgtID, neighborhood, lgtID_neighbor, ref_status_neighbor
+                    ! endif
+
                     ! the neighbor wants to coarsen
-                    if ((ref_status_neighbor == -1).and.(level_neighbor == level_me)) then
+                    if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
                         call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/), &
                             X_s=(/ g, g, g/), X_e=(/ g, g, g/))
@@ -202,6 +206,9 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
                         ! encode into refinement status if the neighboring block can coarsen or not (reasoning explained below)
                         if (ref_check == 0) then
+                            ! write(*, '("SZ1 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
+                            !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
+
                             call lgt_encode_significant_patch(lgtID, neighborhood, params%dim)
                         endif
                     endif
@@ -230,7 +237,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
         ! is the block on the level we look at?
         ! is this block assigned -1 (it wants to coarsen)?
-        if (ref_status == -1) then
+        if (ref_status == -1 .or. ref_status == REF_TMP_TREATED_COARSEN) then
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
                 ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant
@@ -246,6 +253,9 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ! does the neighbor has significancy flag and significant patch in this neighborhood relation?
                     if (ref_status_neighbor > 0) then  ! need to check elsewise all significancy encodings are wrong
                         if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood, params%dim)) then
+                            ! write(*, '("SZ2 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
+                            !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
+
                             ! revoke coarsening status. note we must use a temp status or otherwise all blocks
                             ! will revoke their coarsening
                             lgt_block( lgtID, IDX_REFINE_STS ) = TMP_STATUS
@@ -255,6 +265,10 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
             enddo
         endif
     enddo
+
+    ! After decoding the significancy, we need to synch changed stati between all blocks
+    ! JB: Missing second synchronize was a bug I searched for long time
+    call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
     ! synchronous lgt_loop in order to set all encoded significancies and TMP_STATUS to 0
     do k = 1, lgt_n(tree_ID)

@@ -612,12 +612,12 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
                 end if
 
                 ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
-                ! because symmetry conditions are used.
-                if (thereMustBeANeighbor) then
-                    if ((.not. exists .and. ALL(params%periodic_BC)).or.(maxval(abs(n_domain))==0.and..not.exists)) then
-                        ! construct print format dynamically after Jmax
-                        write(*, '("Dir ", i0, ", lvl_down=", l1, " lvl=", i0, ":", 4(1x, i0), " TC: ", b64.64)') &
-                            dir, lvl_down_neighbor, level+1, tcFinerAppendDigit, tcb_Block
+                ! because symmetry conditions are used, check for .not. error to only print it once
+                if (thereMustBeANeighbor .and. .not. error) then
+                    if (.not. exists .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
+                        call adjacent_wrapper_b(tcb_Block, tcb_Virtual, dir, level=level, dim=params%dim, max_level=Jmax)
+                        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i0, ", lgtID-", i0, " lvl-", i0, " TC-", i0, "-", b64.64, A, "Checked same-lvl TC-", i0, "-", b64.64, " and lower-lvl TC-", i0, "-", b64.64)') &
+                            params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block, NEW_LINE('a'), tcb_Virtual, tcb_Virtual, tcb_Neighbor, tcb_Neighbor
                         error = .true.
                     endif
                 endif

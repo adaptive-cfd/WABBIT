@@ -7,7 +7,7 @@
 !!    2. Data is send / received via buffers, buffer is assumed to fit all data!
 !!    3. Data is send / received directly (for whole blocks)
 !> Before this step, all metadata and datasizes have to be prepared in send_counter and recv_counter
-subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -15,6 +15,7 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hv
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: tree_ID                      !< which tree to study
     integer(kind=ik), intent(in)   :: count_send_total             !< total amount of data to send from this rank
 
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
@@ -48,10 +49,10 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hv
     end do
     ! ! test send/receive sizes
     ! if (present(verbose_check)) then
-        ! write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+    !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
-    call send_prepare_external(params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
     call toc( "xfer_block_data (prepare data)", 70, MPI_wtime()-t0 )
 
     !***************************************************************************
@@ -66,7 +67,7 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check, hv
     !***************************************************************************
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
-    call unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
     call toc( "xfer_block_data (unpack internal)", 72, MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
@@ -87,11 +88,12 @@ end subroutine xfer_block_data
 !> \brief Prepare data to be sent with MPI \n
 !! This already applies res_pre so that the recver only has to sort in the data correctly. \n
 !! Fills the send buffer
-subroutine send_prepare_external( params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
+subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)
+    integer(kind=ik), intent(in)   :: tree_ID                      !< which tree to study
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
     integer(kind=ik), intent(in)   :: count_send_total             !< total amount of data to send from this rank
 
@@ -274,12 +276,13 @@ end subroutine unpack_ghostlayers_external
 
 !> \brief Unpack all internal patches which do not have to be sent
 !! This simply copies from hvy_data, applies res_pre and then copies it back into the correct position
-subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
+subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: count_send_total  !< total amount of patches for do loop
+    integer(kind=ik), intent(in)        :: tree_ID                 !< which tree to study
+    integer(kind=ik), intent(in)        :: count_send_total        !< total amount of patches for do loop
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
@@ -526,16 +529,13 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_active, hvy_n, count_send, ncomponents, &
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponents, &
         s_Level, s_M2C, s_C2M, s_M2F, s_F2M)
 
     implicit none
 
     type (type_params), intent(in)      :: params
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)     !< light data array
-    integer(kind=ik), intent(in)        :: hvy_family(:,:)     !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_active(:)       !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n               !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID             !< which tree to study
 
     integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
@@ -592,9 +592,9 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
     real_pos(:) = 0
 
     count_send = 0
-    do k_block = 1, hvy_n
+    do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block)
+        sender_hvyID = hvy_active(k_block, tree_ID)
         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
         level = lgt_block( sender_lgtID, IDX_MESH_LVL )
         tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))

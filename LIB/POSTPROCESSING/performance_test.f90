@@ -83,7 +83,7 @@ subroutine performance_test(params)
             ! refine everywhere
             t4 = MPI_wtime()
             if ( params%adapt_tree ) then
-                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )

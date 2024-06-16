@@ -329,3 +329,7 @@ $(OBJDIR)/%.o: %.f90 $(MOBJS)
 
 clean-fortran:
 	rm -rf $(PROGRAMS) $(OBJDIR) a.out wabbit wabbit-post
+
+# when running tests in zero there could be traces - make sure they are cleaned
+clean-source:
+	rm -f *.key *.h5 *.t *.dat *.htg *.vtm success

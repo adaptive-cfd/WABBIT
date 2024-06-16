@@ -287,15 +287,15 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter
-    call prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_active(:, tree_ID), hvy_n(tree_ID), n_xfer, size(hvy_block, 4), &
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, size(hvy_block, 4), &
         s_M2C=.true.)
-    call xfer_block_data(params, hvy_block, n_xfer, verbose_check=.true.)
+    call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     ! now the mother refinement flags have to be reset and daughter blocks to be deleted
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
         level_me = lgt_block( lgtID, IDX_MESH_LVL )
-        ! delete daughter blocks
+        ! delete daughter blocks that wanted to refine
         if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
             lgt_block(lgtID, :) = -1
             lgt_block(lgtID, IDX_REFINE_STS) = 0

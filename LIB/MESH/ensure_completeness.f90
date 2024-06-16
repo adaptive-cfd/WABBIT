@@ -41,12 +41,13 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
             end do
         elseif ( status >= 0 ) then
             ! We found all sister blocks, but they do not all share the -1 status: none
-            ! of them can be coarsened, remove the status.
+            ! of them can be coarsened, remove the coarsening status by passing it on
+            ! can be 0 for staying or REF_TMP_GRADED_STAY which will be simply passed on
             do l = 1, N_sisters
-                lgt_block( sisters(l), IDX_REFINE_STS )  = 0
+                lgt_block( sisters(l), IDX_REFINE_STS )  = status
             end do
         else
-            call abort(197005, "This is odd - all sisters have temporary flag?")
+            call abort(197005, "This is odd - all sisters have temporary flag <-1?")
         end if
     else
         ! We did not even find all sisters, that means a part of the four blocks is already
@@ -54,7 +55,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
         ! flag
         do l = 1, N_sisters
             ! change status only for the existing sisters, mark temporary for leaf-wise as maybe this sister will be created soon
-            if (sisters(l)>0) then
+            if (sisters(l) /= -1) then
                 lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
             endif
         end do

@@ -56,6 +56,7 @@ contains
     !  120- 124    coarseningIndicator
     !  130- 131    ensureGradedness
     !  140- 146    refine_tree
+    !  150- 158    coarseExtensionUpdate_tree
     !  200-1000 Other
     !  250- 258    forest
     !  350- 354    module_MOR
@@ -204,13 +205,12 @@ contains
     !> \brief Interchange algorithm sorting after one number, copy from quicksort but here to sort out the importing things
     !> \details This algorithm sorts the array a from position first to position last.
     subroutine interchange_sort_timing(a, left_end, right_end)
-        use module_params
         implicit none
-        integer(kind=ik), intent(inout) ::  a(:,:)
-        integer(kind=ik) :: left_end, right_end
+        integer, intent(inout) ::  a(:,:)
+        integer :: left_end, right_end
 
-        integer(kind=ik) :: i, j
-        integer(kind=ik), dimension(size(a, 2)) :: temp
+        integer :: i, j
+        integer, dimension(size(a, 2)) :: temp
 
         do i = left_end, right_end - 1
             do j = i+1, right_end

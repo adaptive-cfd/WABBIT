@@ -2,7 +2,7 @@
 !> This method goes a bit against the naming convention, as for default wavelet cases it acts
 !! level-wise or leaf-wise but for specific indicators (everywhere or random) it acts on the whole tree.
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask)
+    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask, norm_out)
 
     use module_indicators
 
@@ -30,9 +30,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     logical, intent(in)                 :: ignore_maxlevel
     !> If this flag is true, then not the level but the refinement flag is tested for REF_TMP_UNTREATED (leaf-wise loop)
     logical, intent(in)                 :: check_ref_tmp
+    real(kind=rk), intent(out), optional :: norm_out(:)  !< We can output the norm as well
 
     ! local variables
-    integer(kind=ik) :: k, Jmax, neq, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level, ref_stat
+    integer(kind=ik) :: k_b, k_nc, Jmax, n_eqn, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level, ref_stat
     integer(kind=ik), dimension(3) :: Bs
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
@@ -51,7 +52,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     consider_hvy_tmp = .false.
     inputIsWD = input_is_WD
     Jmax = params%Jmax
-    neq = params%n_eqn
+    n_eqn = params%n_eqn
     Bs = params%Bs
     g = params%g
 
@@ -64,16 +65,16 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! Outside calls of coarseningIndicator not in adapt_tree want to wipe refinement stati to "stay" before calling the indicator
     ! In adapt_tree we compute leaf-wise and all blocks will be marked during the iterations with REF_TMP_UNTREATED
     if (.not. check_ref_tmp) then
-        do k = 1, lgt_n(tree_ID)
-            lgtID = lgt_active(k, tree_ID)
+        do k_b = 1, lgt_n(tree_ID)
+            lgtID = lgt_active(k_b, tree_ID)
             lgt_block( lgtID, IDX_REFINE_STS ) = 0
         enddo
     endif
     ! If adapt_tree is called with "everywhere" or "random" we coarsen everything on the first loop but new blocks get untreated flag
-    ! We have to ignore those so we reset their ref status
+    ! We have to ignore those as we only want to refine once so we reset their ref status
     if (iteration > 0 .and. (indicator=="everywhere" .or. indicator=="random")) Then
-        do k = 1, lgt_n(tree_ID)
-            lgtID = lgt_active(k, tree_ID)
+        do k_b = 1, lgt_n(tree_ID)
+            lgtID = lgt_active(k_b, tree_ID)
             if (lgt_block( lgtID, IDX_REFINE_STS ) == REF_TMP_UNTREATED) lgt_block( lgtID, IDX_REFINE_STS ) = 0
         enddo
     endif
@@ -89,7 +90,6 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
         call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
     endif
-
 
     ! the indicator primary-variables is for compressible Navier-Stokes and first
     ! converts the actual state vector to "traditional" quantities (the primary variables)
@@ -132,7 +132,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! enddo
 
         ! ! note here we sync hvy_tmp (=derived qty) and not hvy_block
-        ! call sync_ghosts_all( params, lgt_block, hvy_tmp(:,:,:,1:N_thresholding_components,:), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        ! call sync_ghosts_all( params, hvy_tmp(:,:,:,1:N_thresholding_components,:), tree_ID )
 
         ! if (params%threshold_mask .and. N_thresholding_components /= params%n_eqn) &
         ! call abort(2801191,"your thresholding does not work with threshold-mask.")
@@ -152,16 +152,17 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     !! default norm is 1 so in this case eps is an absolute value.
     if (.not. allocated(norm)) allocate(norm(1:N_thresholding_components))
-    norm = 1.0_rk
+    norm = -99999  ! reset as random value
 
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
         t0 = MPI_Wtime()
-        if ( .not. consider_hvy_tmp ) then
+        if ( .not. consider_hvy_tmp .and. .not. check_ref_tmp) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
             call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
         else
-            ! use derived qtys instead (hvy_tmp)
+            ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
+            ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and values copied to hvy_tmp
             call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 
@@ -183,6 +184,11 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
 
         call toc( "coarseningIndicator (norm)", 122, MPI_Wtime()-t0 )
+    else
+        norm = 1.0_rk  ! set to 1
+    endif
+    if (present(norm_out)) then
+        norm_out(1:N_thresholding_components) = norm(1:N_thresholding_components)
     endif
 
     !---------------------------------------------------------------------------
@@ -198,9 +204,9 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! because otherwise, the grid would continue changing, and the coarsening
         ! stops only if all blocks are at Jmin.
         if (iteration==0) then
-            do k = 1, lgt_n(tree_ID)
+            do k_b = 1, lgt_n(tree_ID)
                 ! flag for coarsening
-                lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = -1
+                lgt_block(lgt_active(k_b, tree_ID), IDX_REFINE_STS) = -1
             enddo
         endif
 
@@ -218,8 +224,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 ! hence the probability for a block to actually coarsen is only crsn_chance**(2^D))
                 crsn_chance = (0.50_rk)**(1.0_rk / 2.0_rk**params%dim)
 
-                do k = 1, lgt_n(tree_ID)
-                    lgtID = lgt_active(k, tree_ID)
+                do k_b = 1, lgt_n(tree_ID)
+                    lgtID = lgt_active(k_b, tree_ID)
                     ! random number
                     call random_number(r)
                     ! set refinement status to coarsen based on random numbers or let them stay
@@ -242,8 +248,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening
         ! is used. hence, checking the flag params%threshold_mask alone is not enough.
-        do k = 1, hvy_n(tree_ID)
-            hvyID = hvy_active(k, tree_ID)
+        do k_b = 1, hvy_n(tree_ID)
+            hvyID = hvy_active(k_b, tree_ID)
             call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
             level = lgt_block( lgtID, IDX_MESH_LVL)
             ref_stat = lgt_block( lgtID, IDX_REFINE_STS)
@@ -281,15 +287,5 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     ! after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
-
-
-    if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. params%isLiftedWavelet) then
-        ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
-        ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
-        ! in that case we set the neighbouring block to be important as well (with a temporary flag)
-        t0 = MPI_Wtime()
-        call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, inputIsWD)
-        call toc( "coarseningIndicator (security_zone_check)", 124, MPI_Wtime()-t0)
-    endif
 
 end subroutine

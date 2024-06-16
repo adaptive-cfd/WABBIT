@@ -66,7 +66,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         call updateMetadata_tree(params, tree_ID)
 
         ! synching is required for the adaptation step
-        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+        call sync_ghosts_tree( params, hvy_block, tree_ID )
 
         ! even if we read the initial condition from file, we can still adapt it immediately
         ! so the max error is eps. This is useful if we read a dense field where we already know that
@@ -231,7 +231,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
 
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
     ! it is a safety issue. Better simply keep it.
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_tree( params, hvy_block, tree_ID )
 
     call MPI_barrier(WABBIT_COMM, k)
 

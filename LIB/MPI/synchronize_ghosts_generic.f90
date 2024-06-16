@@ -1,41 +1,11 @@
-!> Wrapper to synch level only with itself, used for synching wavelet-decomposed values
-subroutine sync_level_only(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus, g_plus)
-    implicit none
-
-    type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
-    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
-    integer(kind=ik), intent(in) :: level                           !< what level to synch from and to
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
-
-    integer(kind=ik) :: gminus, gplus
-    gminus = params%g
-    gplus = params%g
-    ! if we sync a different number of ghost nodes
-    if (present(g_minus)) gminus = g_minus
-    if (present(g_plus))   gplus = g_plus
-
-    ! set level to -1 to enable synching between all
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-        g_minus=gminus, g_plus=gplus, s_level=level, s_M2M = .true.)
-
-end subroutine sync_level_only
-
-
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_MF(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
@@ -49,23 +19,47 @@ subroutine sync_TMP_from_MF(params, lgt_block, hvy_block, hvy_neighbor, hvy_acti
     if (present(g_plus))   gplus = g_plus
 
     ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-        g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.false., hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
 
 
-!> Wrapper to synch level from coarser neighbours and same-level neighbors
-!! Used after coarse extension to update SC and WC, coarse neighbours need to be synched from hvy_tmp
-subroutine sync_SCWC_from_MC(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, hvy_tmp, g_minus, g_plus)
+
+!> Wrapper to synch blocks with temporary flag from all neighbors
+!> Used before wavelet decomposition
+subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
+    integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
+    !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
+    real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
+
+    integer(kind=ik) :: gminus, gplus
+    gminus = params%g
+    gplus = params%g
+    ! if we sync a different number of ghost nodes
+    if (present(g_minus)) gminus = g_minus
+    if (present(g_plus))   gplus = g_plus
+
+    ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.true., hvy_tmp=hvy_tmp)
+
+end subroutine sync_TMP_from_all
+
+
+
+!> Wrapper to synch level from coarser neighbours and same-level neighbors
+!! Used after coarse extension to update SC and WC, coarse neighbours need to be synched from hvy_tmp
+subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus)
+    implicit none
+
+    type (type_params), intent(in) :: params
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus
@@ -78,73 +72,18 @@ subroutine sync_SCWC_from_MC(params, lgt_block, hvy_block, hvy_neighbor, hvy_act
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-        g_minus=gminus, g_plus=gplus, s_level=-1, s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=-1, s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp, verbose_check=.true.)
 
 end subroutine sync_SCWC_from_MC
 
 
-!> Wrapper to synch all ghost-point patches from and between the same level, used for level-wise algorithms
-subroutine sync_level_to_all_neighbours(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus, g_plus)
-    implicit none
-
-    type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
-    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
-    integer(kind=ik), intent(in) :: level                           !< what level to synch from and to
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
-
-    integer(kind=ik) :: gminus, gplus
-    gminus = params%g
-    gplus = params%g
-    ! if we sync a different number of ghost nodes
-    if (present(g_minus)) gminus = g_minus
-    if (present(g_plus))   gplus = g_plus
-
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=gminus, g_plus=gplus, &
-        s_level=level, s_M2M = .true., s_M2C = .true., s_C2M = .false., s_M2F = .true., s_F2M = .false.)
-
-end subroutine sync_level_to_all_neighbours
-
-
-!> Wrapper to synch all ghost-point patches from and between the same level, used for level-wise algorithms
-subroutine sync_level_with_all_neighbours(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, level, g_minus, g_plus)
-    implicit none
-
-    type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
-    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
-    integer(kind=ik), intent(in) :: level                           !< what level to synch from and to
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
-
-    integer(kind=ik) :: gminus, gplus
-    gminus = params%g
-    gplus = params%g
-    ! if we sync a different number of ghost nodes
-    if (present(g_minus)) gminus = g_minus
-    if (present(g_plus))   gplus = g_plus
-
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus=gminus, g_plus=gplus, &
-        s_level=level, s_M2M = .true., s_M2C = .true., s_C2M = .true., s_M2F = .true., s_F2M = .true.)
-
-end subroutine sync_level_with_all_neighbours
-
 !> Wrapper to synch all ghost-point patches
-subroutine sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus, g_plus)
+subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus
 
     integer(kind=ik) :: gminus, gplus
@@ -155,32 +94,29 @@ subroutine sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_activ
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, &
-        g_minus=gminus, g_plus=gplus, s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true.)
 
-end subroutine sync_ghosts_all
+end subroutine sync_ghosts_tree
 
 
 !> This function deals with ghost-node synching \n
 !! It is a generic function with many flags, streamlining all synching process \n
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
-subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n, g_minus, g_plus, &
-    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp)
+subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
+    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp, verbose_check)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
     implicit none
 
     type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: lgt_block(:, :)               !< light data array
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
-    integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)             !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)   :: hvy_active(:)                 !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)   :: hvy_n                         !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
     integer(kind=ik), intent(in), optional  :: s_level
@@ -192,7 +128,7 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
 
     integer(kind=ik) sLevel
-    logical :: SM2M = .false., SM2C = .false., SC2M = .false., SM2F = .false., SF2M = .false.
+    logical :: SM2M, SM2C, SC2M, SM2F, SF2M
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
@@ -212,9 +148,15 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     endif
 
     ! if this mpirank has no active blocks, it has nothing to do here.
-    if (hvy_n == 0) return
+    if (hvy_n(tree_ID) == 0) return
 
+    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
     sLevel = -1
+    sM2M = .false.
+    sM2C = .false.
+    sC2M = .false.
+    sM2F = .false.
+    sF2M = .false.
     if (present(s_Level)) sLevel = s_Level
     if (present(s_M2M)) sM2M = s_M2M
     if (present(s_M2C)) sM2C = s_M2C
@@ -228,14 +170,18 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
     N       = params%number_blocks
     myrank  = params%rank
     mpisize = params%number_procs
-    ! default is two stages: first, copy&decimate, then interpolate
-    Nstages = 2
+    ! default is three stages:
+    !    1. M2M, copy
+    !    2. M2C, F2M, decimate, independent from coarser neighbor but needs same-level data
+    !    3. M2F, C2M, interpolate, needs same-level and finer neighbor data
+    Nstages = 3
     ! if we sync a different number of ghost nodes
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
 #ifdef DEV
-    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, hvy_active, hvy_n )
+    ! for dev check ghosts by wiping if we set all of them
+    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
 #endif
 
     !-----------------------------------------------------------------------
@@ -266,10 +212,6 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
 ! Idea is described in inskape notes.
 !
 
-
-
-
-
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
     do istage = 1, Nstages
@@ -280,7 +222,7 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
         ! Also applies logic about what should be synched and saves all metadata unsorted in one array
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()
-        call prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, count_send_total, &
+        call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
             istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
@@ -292,12 +234,12 @@ subroutine sync_ghosts_generic( params, lgt_block, hvy_block, hvy_neighbor, hvy_
         !***************************************************************************
         t1 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
-            call xfer_block_data(params, hvy_block, count_send_total)
+            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, verbose_check=verbose_check)
         else
             if (sLevel < -1) then
-                call xfer_block_data(params, hvy_block, count_send_total, hvy_tmp=hvy_tmp, REF_FLAG=sLevel)
+                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, REF_FLAG=sLevel, verbose_check=verbose_check)
             else
-                call xfer_block_data(params, hvy_block, count_send_total, hvy_tmp=hvy_tmp)
+                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, verbose_check=verbose_check)
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t1 )
@@ -462,21 +404,18 @@ end subroutine sync_ghosts_generic
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, count_send, istage, ncomponents, &
+subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, ncomponents, &
     s_Level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M)
 
     implicit none
 
     type (type_params), intent(in)      :: params
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)     !< light data array
-    integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)   !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_active(:)       !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n               !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID             !< which tree to study
 
     integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
-    integer(kind=ik), intent(in)        :: istage
+    integer(kind=ik), intent(in)        :: istage  !< current stage out of three
 
     !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
     integer(kind=ik), intent(in), optional  :: s_level
@@ -486,7 +425,7 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
     logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to J+1
     logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to J
     integer(kind=ik) sLevel
-    logical :: SM2M = .false., SM2C = .false., SC2M = .false., SM2F = .false., SF2M = .false.
+    logical :: SM2M, SM2C, SC2M, SM2F, SF2M
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
@@ -496,7 +435,13 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
     integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, N, neighborhood, recver_rank, recver_ref
     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
 
+    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
     sLevel = -1
+    sM2M = .false.
+    sM2C = .false.
+    sC2M = .false.
+    sM2F = .false.
+    sF2M = .false.
     if (present(s_Level)) sLevel = s_Level
     if (present(s_M2M)) sM2M = s_M2M
     if (present(s_M2C)) sM2C = s_M2C
@@ -516,9 +461,9 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
     real_pos(:) = 0
 
     count_send = 0
-    do k_block = 1, hvy_n
+    do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block)
+        sender_hvyID = hvy_active(k_block, tree_ID)
         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
         level = lgt_block( sender_lgtID, IDX_MESH_LVL )
         sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
@@ -550,17 +495,17 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
                 recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
-                ! stage=1, level_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
+                ! stage=2, level_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
                 !          or (sLevel<-1 and ref=sLevel and M2C) or (sLevel<-1 and ref_n=sLevel and F2M)
                 ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
                 !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=2, level_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
+                ! stage=3, level_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
                 !          or (sLevel<-1 and ref=sLevel and M2F) or (sLevel<-1 and ref_n=sLevel and C2M)
 
                 ! send counter. how much data will I send to other mpiranks?
-                if  ((istage==1 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
+                if  ((istage==2 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
                     .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sF2M))) &
-                .or. (istage==2 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
+                .or. (istage==3 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
                     .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sC2M))) &
                 .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                     .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
@@ -591,19 +536,19 @@ subroutine prepare_ghost_synch_metadata(params, lgt_block, hvy_neighbor, hvy_act
                 endif
 
                 ! Receive logic, following cases exist currently, all linked as .or.:
-                ! stage=1, level_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
+                ! stage=2, level_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
                 !          or (sLevel<-1 and ref_n=sLevel and M2C) or (sLevel<-1 and ref=sLevel and F2M)
                 ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
                 !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=2, level_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
+                ! stage=3, level_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
                 !          or (sLevel<-1 and ref_n=sLevel and M2F) or (sLevel<-1 and ref=sLevel and C2M)
 
                 ! recv counter. how much data will I recv from other mpiranks?
                 ! This is NOT the same number as before
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((istage==1 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
+                    if  ((istage==2 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sF2M))) &
-                    .or. (istage==2 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
+                    .or. (istage==3 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
                     .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                         .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then

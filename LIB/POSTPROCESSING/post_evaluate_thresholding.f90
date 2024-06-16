@@ -121,7 +121,7 @@ subroutine post_evaluate_thresholding(params)
     ! read input data
     call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+    call sync_ghosts_tree( params, hvy_block, tree_ID)
 
 
     Jmin_active = minActiveLevel_tree(tree_ID)

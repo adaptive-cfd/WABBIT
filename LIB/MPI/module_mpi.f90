@@ -7,6 +7,13 @@ module module_MPI
     use module_treelib
     use module_helpers
 
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+    use module_forestMetaData
+
     implicit none
 
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
@@ -63,9 +70,11 @@ module module_MPI
     logical :: ghost_nodes_module_ready = .false.
 
     ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a new block we scrap the old filtered values
-    real(kind=rk), allocatable :: hvy_filtered(:, :, :, :)
+    real(kind=rk), allocatable :: hvy_restricted(:, :, :, :)
+    real(kind=rk), allocatable :: hvy_predicted(:, :, :, :)
     ! We need to save which block currently is filtered
-    integer(kind=ik) :: filtered_hvy_ID
+    integer(kind=ik) :: restricted_hvy_ID
+    integer(kind=ik) :: predicted_hvy_ID
 
 
 
@@ -77,9 +86,9 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts_all, sync_level_with_all_neighbours, sync_level_to_all_neighbours, sync_level_only, sync_TMP_from_MF, sync_SCWC_from_MC
+    PUBLIC :: sync_ghosts_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
-    PUBLIC :: coarseExtensionUpdate_level, coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
+    PUBLIC :: coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 
     ! we set up a table that gives us directly the inverse neighbor relations.
     ! it is filled (once) in init_ghost_nodes
@@ -408,12 +417,21 @@ subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
     endif
 
     ! initialize that no block is currently filtered
-    filtered_hvy_ID = -1
+    restricted_hvy_ID = -1
+    predicted_hvy_ID = -1
 
-    if (allocated(hvy_filtered)) then
-        if (nc > size(hvy_filtered, 4)) deallocate(hvy_filtered)
+    if (allocated(hvy_restricted)) then
+        if (nc > size(hvy_restricted, 4)) deallocate(hvy_restricted)
     endif
-    if (.not. allocated(hvy_filtered)) allocate(hvy_filtered(1:nx, 1:ny, 1:nz, 1:nc) )
+    if (.not. allocated(hvy_restricted)) allocate(hvy_restricted(1:nx, 1:ny, 1:nz, 1:nc) )
+
+    if (allocated(hvy_predicted)) then
+        if (nc > size(hvy_predicted, 4)) deallocate(hvy_predicted)
+    endif
+    if (.not. allocated(hvy_restricted)) then
+        if (params%dim == 3) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1:nz*2, 1:nc) )
+        if (params%dim == 2) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1, 1:nc) )
+    endif
 
 
 end subroutine

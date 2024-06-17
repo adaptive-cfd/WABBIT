@@ -68,7 +68,12 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, num_eqn, hvy_id )
     ! block. Result is stored in a large work array. Note we could try to optimize this
     ! by applying the filter only in the required patch.
     ! Pro: we maybe save a bi of CPU time, as we usually do not need the entire block filtered
-    ! Con: more work and maybe we compute some values twice (if patches overlap)
+   - - - - - - - -
+!                      g g g g g g g g         - - - - - - - -
+!   Block relations       Block in                Block out
+! b = block, m = medium neighbor, c = coarse n, f = fine n, g = ghost point, i = interior point, f = filtered point, - = value should not be used
+! Note: The bottom left value is copied (i) due to the finer neighbor in the bottom left corner, the top values due to the coarser top neighbor.
+! Ghost points of output should not be used, as they may have been filtered correctly, partially or left unfiltered arbitrarily    ! Con: more work and maybe we compute some values twice (if patches overlap)
     if (hvy_ID /= restricted_hvy_ID) then
         call restrict_copy_at_CE(params, hvy_block, hvy_ID, nc)
 
@@ -104,7 +109,8 @@ end subroutine restrict_data
 
 
 !> \brief Uses HD filter at all interfaces and copies values everywhere where it would use from coarser or finer neighbor
-!> Used for sync in order to match values with coarse extension
+!> Used for sync in order to match values with coarse extension. Coarser AND finer neighbors cannot be filtered as there values
+!! are not present in the ghost layers, so for all those patches where filters need those points the values will be copied.
 !
 !                      g g g g g g g g         - - - - - - - -
 !                      g g g g g g g g         - - - - - - - -
@@ -112,13 +118,8 @@ end subroutine restrict_data
 !      m b b m         g g i i i i g g         - - f f f f - -
 !      m b b m         g g i i i i g g         - - f f f f - -
 !      f m m m         g g i i i i g g         - - i f f f - -
-!                      g g g g g g g g         - - - - - - - -
-!                      g g g g g g g g         - - - - - - - -
-!   Block relations      Block in                Block out
-! b = block, m = medium neighbor, c = coarse n, f = fine n, g = ghost point, i = interior point, f = filtered point, - = value should not be used
+!                      g g g g g g g g      
 subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn)
-    ! this routine imports forestMetaData as we need to work with hvy_neighbor, hvy_data, lgt_block and others and I want to avoid passing it on everywhere
-    use module_forestMetaData
 
     implicit none
     type (type_params), intent(in) :: params  !< good ol params
@@ -145,7 +146,7 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn)
         if ( lgt_ID_n /= -1 ) then
             lvl_diff = lvl_me - lgt_block(lgt_ID_n, IDX_MESH_LVL)
             if (lvl_diff == -1 .or. lvl_diff == +1) then
-                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), k_n, skip_ghosts=.false.)
+                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), k_n, skip_ghosts=.true.)
             endif
         endif
     end do

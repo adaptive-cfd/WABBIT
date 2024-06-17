@@ -383,6 +383,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
     ! they may have passed several level also. Now, the distribution of blocks may no longer
     ! be balanced, so we have to balance load now
+    ! ToDo: Put balanceLoad directly after loop, implement version that does not copy ghost points as we sync afterwards anyways
     t0 = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (balanceLoad_tree)", 115, MPI_Wtime()-t0 )

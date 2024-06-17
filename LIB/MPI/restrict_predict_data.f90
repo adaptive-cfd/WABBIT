@@ -68,12 +68,7 @@ subroutine restrict_data( params, res_data, ijk, hvy_block, num_eqn, hvy_id )
     ! block. Result is stored in a large work array. Note we could try to optimize this
     ! by applying the filter only in the required patch.
     ! Pro: we maybe save a bi of CPU time, as we usually do not need the entire block filtered
-   - - - - - - - -
-!                      g g g g g g g g         - - - - - - - -
-!   Block relations       Block in                Block out
-! b = block, m = medium neighbor, c = coarse n, f = fine n, g = ghost point, i = interior point, f = filtered point, - = value should not be used
-! Note: The bottom left value is copied (i) due to the finer neighbor in the bottom left corner, the top values due to the coarser top neighbor.
-! Ghost points of output should not be used, as they may have been filtered correctly, partially or left unfiltered arbitrarily    ! Con: more work and maybe we compute some values twice (if patches overlap)
+    ! Con: more work and maybe we compute some values twice (if patches overlap)
     if (hvy_ID /= restricted_hvy_ID) then
         call restrict_copy_at_CE(params, hvy_block, hvy_ID, nc)
 
@@ -112,13 +107,19 @@ end subroutine restrict_data
 !> Used for sync in order to match values with coarse extension. Coarser AND finer neighbors cannot be filtered as there values
 !! are not present in the ghost layers, so for all those patches where filters need those points the values will be copied.
 !
-!                      g g g g g g g g         - - - - - - - -
-!                      g g g g g g g g         - - - - - - - -
+!                      g g o o o o o o         - - - - - - - -
+!                      g g o o o o o o         - - - - - - - -
 !      m c c c         g g i i i i g g         - - i i i i - -
 !      m b b m         g g i i i i g g         - - f f f f - -
 !      m b b m         g g i i i i g g         - - f f f f - -
 !      f m m m         g g i i i i g g         - - i f f f - -
-!                      g g g g g g g g      
+!                      o o g g g g g g         - - - - - - - -
+!                      o o g g g g g g         - - - - - - - -
+!   Block relations       Block in                Block out
+! b = block, m = medium neighbor, c = coarse n, f = fine n
+! g = ghost point, o = outdated ghost point, i = interior point, f = filtered point, - = value should not be used
+! Note: The bottom left value is copied (i) due to the finer neighbor in the bottom left corner, the top values due to the coarser top neighbor.
+! Ghost points of output should not be used, as they may have been filtered correctly, wrongly, partially or left unfiltered arbitrarily
 subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn)
 
     implicit none

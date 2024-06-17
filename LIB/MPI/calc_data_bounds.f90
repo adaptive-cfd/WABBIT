@@ -1642,7 +1642,7 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
             data_bounds(1,2) = g+1
             data_bounds(2,2) = Bs(2)+g
             data_bounds(1,3) = g+1
-            data_bounds(2,3) = Bs(2)+g
+            data_bounds(2,3) = Bs(3)+g
         !---3D------family relation, assume values on finer side are already WD in mallat-ordering
         case(-1, -2, -3, -4, -5, -6, -7, -8)
             if (level_diff == 0) then
@@ -1655,7 +1655,7 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
                 data_bounds(1,2) = ceiling(g/2.0)+1
                 data_bounds(2,2) = ceiling(g/2.0)+Bs(2)/2
                 data_bounds(1,3) = ceiling(g/2.0)+1
-                data_bounds(2,3) = ceiling(g/2.0)+Bs(2)/2
+                data_bounds(2,3) = ceiling(g/2.0)+Bs(3)/2
             ! Transfer directly into domain wich is not decomposed so we only select the part
             else
                 if (modulo(-relation-1, 2) == 0) then
@@ -1674,7 +1674,7 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
                 endif
                 if (modulo((-relation-1)/4, 2) == 0) then
                     data_bounds(1,3) = g+1
-                    data_bounds(2,3) = g+Bs(2)/2
+                    data_bounds(2,3) = g+Bs(3)/2
                 else
                     data_bounds(1,3) = g+1+Bs(3)/2
                     data_bounds(2,3) = g+Bs(3)

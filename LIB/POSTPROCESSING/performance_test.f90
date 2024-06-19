@@ -83,12 +83,12 @@ subroutine performance_test(params)
             ! refine everywhere
             t4 = MPI_wtime()
             if ( params%adapt_tree ) then
-                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )
             endif
-            call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
             Nblocks_rhs = lgt_n(tree_ID_flow)
 
 
@@ -97,7 +97,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
             do it = 1, params%N_dt_per_grid
                 t4 = MPI_wtime()
                 call timeStep_tree( time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID=tree_ID_flow )
-                call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
+                call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
             enddo
 
             ! Adapt mesh (coarsening where possible)
@@ -106,7 +106,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! actual coarsening
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
             endif
-            call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
             Nblocks = lgt_n(tree_ID_flow)
 
             t0_timesteps(j) = MPI_wtime() - t0

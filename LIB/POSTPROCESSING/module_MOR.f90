@@ -616,9 +616,9 @@ contains
             call snapshot_POD( params, hvy_block, hvy_tmp, truncation_error, truncation_rank, save_all)
         endif
         t_elapse(2) = MPI_Wtime()-t_elapse(2)
-        call toc( "post_POD (read + coarse): ", t_elapse(1) )
-        call toc( "post_POD (snapshot_POD): ", t_elapse(2) )
-        call toc( "post_POD (total wPOD algo): ", t_elapse(1) + t_elapse(2) )
+        call toc( "post_POD (read + coarse): ", 350, t_elapse(1) )
+        call toc( "post_POD (snapshot_POD): ", 351, t_elapse(2) )
+        call toc( "post_POD (total wPOD algo): ", 352, t_elapse(1) + t_elapse(2) )
 
     end subroutine
     !##############################################################
@@ -1152,7 +1152,7 @@ contains
         C = C / Volume
         C = C / real(N_snapshots,kind=rk)
 
-        call toc( "compute_covariance_matrix", MPI_WTIME() - t_elapse )
+        call toc( "compute_covariance_matrix", 353, MPI_WTIME() - t_elapse )
 
     end subroutine
     !##############################################################
@@ -1520,7 +1520,7 @@ contains
             if ( params%adapt_tree) then
                 call adapt_tree( 0.0_rk, params, hvy_block, dest_tree_ID, params%coarsening_indicator, hvy_tmp )
             else
-                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:, dest_tree_ID), hvy_n(dest_tree_ID))
+                call sync_ghosts_tree( params, hvy_block, dest_tree_ID)
             endif
 
             t_elapse = MPI_WTIME() - t_elapse

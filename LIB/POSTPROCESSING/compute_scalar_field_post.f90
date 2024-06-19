@@ -111,7 +111,7 @@ subroutine compute_scalar_field_post(params)
     ! update neighbor relations
     call updateNeighbors_tree(params, tree_ID)
 
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_tree( params, hvy_block, tree_ID )
 
     ! calculate vorticity from velocities
     do k = 1, hvy_n(tree_ID)

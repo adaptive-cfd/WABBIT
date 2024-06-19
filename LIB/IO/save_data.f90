@@ -34,7 +34,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     n_domain = 0
 
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+    call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
     ! create mask function at current time. (this routine is rarely called and thus
     ! the overhead of calling createMask_tree if the mask is not stored is supposed
@@ -45,7 +45,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     ! any saved file must be sync'ed, because we store
     ! the 1st ghost node for visualization.
     if (params%penalization) then
-        call sync_ghosts_all( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
     endif
 
 
@@ -78,7 +78,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
     ! uniqueGrid modification:
     ! any saved file must be sync'ed, because we store the 1st ghost node for visualization.
-    call sync_ghosts_all( params, lgt_block, hvy_tmp(:,:,:,1:params%N_fields_saved,:), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+    call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%N_fields_saved,:), tree_ID_flow )
 
 
     ! actual saving step. one file per component.
@@ -99,5 +99,5 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         call saveHDF5_tree( fname, time, iteration, k, params, hvy_tmp, tree_ID)
     enddo
 
-    call toc( "save_data", MPI_wtime()-t0 )
+    call toc( "TOPLEVEL: save_data", 15, MPI_wtime()-t0 )
 end subroutine save_data

@@ -59,8 +59,11 @@ program main
     real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
-    character(len=clong)               :: filename
+    character(len=clong)                :: filename
+    ! some variables, loop, debug information and more
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
+    integer(kind=ik)                    :: adapt_blocks(1:32), adapt_iterations  ! 32 as maximum amount of levels
+    character(len=2*clong)              :: write_statement  ! dynamically build the output lengths
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
@@ -201,7 +204,7 @@ program main
 
 
     ! timing
-    call toc( "init_data", MPI_wtime()-sub_t0 )
+    call toc( "TOPLEVEL: init_data", 14, MPI_wtime()-sub_t0 )
 
     !---------------------------------------------------------------------------
     ! main time loop
@@ -245,12 +248,12 @@ program main
             ! including the ghost nodes)
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
             ! Snych'ing becomes much more expensive one the grid is refined.
-            call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+            call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
             ! refine the mesh
             call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
         endif
-        call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
 
         Jmin1 = minActiveLevel_tree(tree_ID_flow)
@@ -270,7 +273,7 @@ program main
             !*******************************************************************
             t4 = MPI_wtime()
             call timeStep_tree( time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID_flow )
-            call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
 
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
@@ -298,19 +301,19 @@ program main
             t4 = MPI_wtime()
             if (params%filter_type /= "no_filter") then
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
-                    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+                    call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
                     call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
                 end if
             end if
-            call toc( "TOPLEVEL: filter", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: filter", 12, MPI_wtime()-t4)
 
             !*******************************************************************
             ! statistics
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             endif
@@ -336,13 +339,15 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    log_blocks=adapt_blocks, log_iterations=adapt_iterations)
             endif
         endif
-        call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+        call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
 
         !***********************************************************************
@@ -361,12 +366,24 @@ program main
         t2 = MPI_wtime() - t2
         ! output on screen
         if (rank==0) then
-            write(*, '("RUN: it=",i7,1x," time=",f16.9,1x,"t_wall=",es9.3," Nb=(",i6,"/",i6,") J_rhs=",i2,":",i2," J_coarsened=",i2,":",i2, " dt=",es8.1," mem=",i3,"%")') &
-             iteration, time, t2, Nblocks_rhs, Nblocks, &
-             Jmin1, Jmax1, &
-             minActiveLevel_tree(tree_ID_flow), &
-             maxActiveLevel_tree(tree_ID_flow), dt, &
-             nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
+            write(*, '("RUN: it=",i7)', advance='no') iteration
+            write(*, '(" time=",f16.9, " t_wall=",es9.3)', advance='no') time, t2
+            write(*, '(" Nb=(",i6,"/",i6,")")', advance='no') Nblocks_rhs, Nblocks
+            write(*, '(" J=(",i2,":",i2,"/",i2,":",i2, ")")', advance='no') Jmin1, Jmax1, minActiveLevel_tree(tree_ID_flow), maxActiveLevel_tree(tree_ID_flow)
+            write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
+#ifdef DEV
+            ! for development I want to put some more things and start with blocks for adapt tree, length is adapted automatically
+            if (adapt_iterations > 2) then  ! adapt_tree did only one loop where num_blocks where reduced so we can skip it entirely
+                if (adapt_iterations > 3) then  ! write doesnt like if the format statement contains 0 length parts so we need an if-condition
+                    write(write_statement, '("(", A, i0, A, ")")') '" adapt iter Nb:(", ', adapt_iterations-3, '(i6,"/"), i6, ")"'
+                else
+                    write(write_statement, '("(", A, ")")') '" adapt iter Nb:(", i6, ")"'
+                endif
+                write(*, write_statement, advance='no') adapt_blocks(1:adapt_iterations-2)  ! -2 to skip final values we have already earlier
+            endif
+            ! write(*, '()', advance='no')
+#endif
+            write(*, '("")')  ! line break
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
              ! information, so I renamed it when adding those (since post-scripts would no longer be compatible
@@ -419,7 +436,7 @@ program main
     !*******************************************************************
     if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
         ! we need to sync ghost nodes for some derived qtys, for sure
-        call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow))
+        call sync_ghosts_tree( params, hvy_block, tree_ID_flow)
 
         call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
     endif
@@ -440,7 +457,8 @@ program main
     call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! make a summary of the program parts, which have been profiled using toc(...)
-    ! and print it to stdout
+    ! and print it to stdout, safe total time just before to insert it as well
+    call toc( "TOPLEVEL: TOTAL", 9, MPI_wtime()-t0)
     call summarize_profiling( WABBIT_COMM )
 
     call deallocate_forest(params, hvy_block, hvy_work, hvy_tmp)

@@ -25,6 +25,10 @@ module module_mesh
         module procedure set_desired_num_blocks_per_rank1, set_desired_num_blocks_per_rank2
     end interface
 
+    ! used in adapt_tree to work leaf-wise
+    integer, parameter :: REF_TMP_UNTREATED = -2             ! should be < -1
+    integer, parameter :: REF_TMP_TREATED_COARSEN = -3       ! should be < -1
+
 
 contains
 
@@ -33,7 +37,6 @@ contains
 #include "unitTest_ghostSync.f90"
 #include "unitTest_waveletDecomposition.f90"
 #include "unitTest_refineCoarsen.f90"
-#include "waveletDecomposition_tree.f90"
 #include "refineToEquidistant_tree.f90"
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"

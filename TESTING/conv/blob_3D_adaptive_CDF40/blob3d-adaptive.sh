@@ -15,7 +15,7 @@ sad=0
 # list of prefixes the test generates
 prefixes=(phi)
 # list of possible times
-times=(000000000000 000000051549)
+times=(000000000000 000000025000)
 
 # run actual test
 ${mpi_command} ./wabbit ${params} ${memory}

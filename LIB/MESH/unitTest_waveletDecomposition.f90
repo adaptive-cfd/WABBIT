@@ -60,8 +60,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         endif
     end do
 
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_tree( params, hvy_block, tree_ID )
 
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
@@ -74,8 +73,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
     end do
 
-    call sync_ghosts_all( params, lgt_block, hvy_block, hvy_neighbor, &
-    hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_tree( params, hvy_block, tree_ID )
 
 
     !---------------------------------------------------------------------------

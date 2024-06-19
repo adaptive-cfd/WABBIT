@@ -9,14 +9,16 @@
 ! NOTE: we require the light data lgt_block to be synchronized BEFORE calling this routine.
 !       No synchronization step is required afterwards.
 !
-subroutine updateMetadata_tree(params, tree_ID, update_neighbors, update_family)
+subroutine updateMetadata_tree(params, tree_ID, update_neighbors, update_family, verbose_check)
     implicit none
 
     type (type_params), intent(in) :: params            !< good ol' params
     integer(kind=ik), intent(in)   :: tree_ID           !< Tree to look at
     logical, optional, intent(in)  :: update_neighbors  !< flag if neighbours should be updated, defaults to .true.
     logical, optional, intent(in)  :: update_family     !< flag if family should be updated, defaults to .true.
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
+    integer(kind=ik) :: k_b, lgt_ID
     real(kind=rk) :: t0
     logical u_n, u_f
     t0 = MPI_wtime()
@@ -29,8 +31,25 @@ subroutine updateMetadata_tree(params, tree_ID, update_neighbors, update_family)
     call createActiveSortedLists_tree(params, tree_ID)
     ! call createActiveSortedLists_tree_old(params, tree_ID)
 
+    ! if (present(verbose_check) .and. params%rank == 0) then
+    !     if (params%rank == 0) then
+    !         do k_b = 1, lgt_n(tree_ID)
+    !             lgt_ID = lgt_active(k_b, tree_ID)
+    !             write(*, '("2 - R0 - Exists BL-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " - ", b32.32)') lgt_ID, &
+    !                 lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2), lgt_block(lgt_id, IDX_TC_2)
+    !         enddo
+    !         do k_b = 1, lgt_n(tree_ID)
+    !             lgt_ID = lgt_sortednumlist(1, k_b, tree_ID)
+    !             write(*, '("3 - R0 - Exists BL-", i0, " L-", i0, " Ref-", i0, " TC-List-", i0, " - ", b32.32, " TC-", i0, " - ", b32.32)') lgt_ID, &
+    !                 lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), &
+    !                 lgt_sortednumlist(3, k_b, tree_ID), lgt_sortednumlist(3, k_b, tree_ID), &
+    !                 lgt_block(lgt_id, IDX_TC_2), lgt_block(lgt_id, IDX_TC_2)
+    !         enddo
+    !     endif
+    ! endif
+
     if (u_n) call updateNeighbors_tree(params, tree_ID)
     if (u_f) call updateFamily_tree(params, tree_ID)
 
-    call toc( "updateMetadata_tree (lists+neighbors)", MPI_wtime()-t0 )
+    call toc( "updateMetadata_tree (lists+neighbors)", 59, MPI_wtime()-t0 )
 end subroutine

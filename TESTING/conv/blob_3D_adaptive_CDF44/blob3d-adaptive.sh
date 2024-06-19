@@ -16,7 +16,7 @@ sad=0
 # list of prefixes the test generates
 prefixes=(phi)
 # list of possible times
-times=(000000000000 000000018042)
+times=(000000000000 000000015000)
 
 
 # run actual test

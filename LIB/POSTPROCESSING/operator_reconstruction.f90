@@ -248,14 +248,14 @@ subroutine operator_reconstruction(params)
             !---------------------------------------------------------------
             ! synchronize ghosts. This was done for the redundantGrid -> check if still required for the uniqueGrid (as of 2023)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+            call sync_ghosts_tree(params, hvy_block, tree_ID)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
 call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
 !                call refine_tree( params, hvy_block, "everywhere", tree_ID )
 
-                call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+                call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif
 
 
@@ -294,13 +294,13 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
             ! on the coarse and fine level. This synchronizing step lets us keep only either of those,
             ! depending on fineWins or coarseWins
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+            call sync_ghosts_tree(params, hvy_block, tree_ID)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
 
-                call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID))
+                call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif
 
 

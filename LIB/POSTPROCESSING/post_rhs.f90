@@ -87,7 +87,7 @@ subroutine post_rhs(params)
     ! balance the load
     call balanceLoad_tree(params, hvy_block, tree_ID)
 
-    call sync_ghosts_all(params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID) )
+    call sync_ghosts_tree(params, hvy_block, tree_ID )
 
     ! compute right hand side
     call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID)

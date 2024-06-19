@@ -7,7 +7,7 @@
 !!    2. Data is send / received via buffers, buffer is assumed to fit all data!
 !!    3. Data is send / received directly (for whole blocks)
 !> Before this step, all metadata and datasizes have to be prepared in send_counter and recv_counter
-subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
+subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -15,20 +15,22 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: tree_ID                      !< which tree to study
     integer(kind=ik), intent(in)   :: count_send_total             !< total amount of data to send from this rank
 
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
+
+    !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
+    real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
-    integer(kind=ik)   :: k, neighborhood, level_diff
-    integer(kind=ik)   :: recver_rank, recver_hvyID, patch_size
-    integer(kind=ik)   :: sender_hvyID, sender_lgtID
-    integer(kind=ik)   :: ijk(2,3), isend, irecv
+    integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset, k, ijk(2,3), isend, irecv
     real(kind=rk)      :: t0
 
     Bs      = params%Bs
@@ -50,48 +52,34 @@ subroutine xfer_block_data(params, hvy_data, count_send_total, verbose_check)
     !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
-    do k = 0, count_send_total-1  ! we do MPI so lets stick to 0-based for a moment
-        recver_rank = meta_send_all(S_META_FULL*k + 3)
-        ! internal relation needs to prepare nothing and will be handled later
-        if ( myrank /= recver_rank ) then
-            ! unpack from metadata array what we need
-            sender_hvyID = meta_send_all(S_META_FULL*k + 1)
-            recver_hvyID = meta_send_all(S_META_FULL*k + 2)
-            neighborhood = meta_send_all(S_META_FULL*k + 4)
-            level_diff = meta_send_all(S_META_FULL*k + 5)
-            patch_size = meta_send_all(S_META_FULL*k + 6)
-
-            ! external relation (MPI communication)
-            call send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, recver_hvyID, neighborhood, level_diff, patch_size, verbose_check)
-        end if
-    end do ! loop over all patches (all heavy_n where neighborhood exists and ghost synching is applied)
-    call toc( "xfer_block_data (prepare data)", MPI_wtime()-t0 )
+    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call toc( "xfer_block_data (prepare data)", 70, MPI_wtime()-t0 )
 
     !***************************************************************************
     ! (ii) transfer part (send/recv)
     !***************************************************************************
     t0 = MPI_wtime()
     call start_xfer_mpi( params, isend, irecv, verbose_check)
-    call toc( "xfer_block_data (start_xfer_mpi)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (start_xfer_mpi)", 71, MPI_wtime()-t0 )
 
     !***************************************************************************
     ! (iii) Unpack received data in the ghost node layers
     !***************************************************************************
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
-    call unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check)
-    call toc( "xfer_block_data (unpack internal)", MPI_wtime()-t0 )
+    call unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call toc( "xfer_block_data (unpack internal)", 72, MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
     ! to be completed
     t0 = MPI_wtime()
     call finalize_xfer_mpi(params, isend, irecv, verbose_check)
-    call toc( "xfer_block_data (finalize_xfer_mpi)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (finalize_xfer_mpi)", 73, MPI_wtime()-t0 )
 
     ! process-external ghost points (copy from buffer)
     t0 = MPI_wtime()
     call unpack_ghostlayers_external( params, hvy_data, verbose_check )
-    call toc( "xfer_block_data (unpack external)", MPI_wtime()-t0 )
+    call toc( "xfer_block_data (unpack external)", 74, MPI_wtime()-t0 )
 
 end subroutine xfer_block_data
 
@@ -100,25 +88,32 @@ end subroutine xfer_block_data
 !> \brief Prepare data to be sent with MPI \n
 !! This already applies res_pre so that the recver only has to sort in the data correctly. \n
 !! Fills the send buffer
-subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
-    recver_hvyID, relation, level_diff, patch_size, verbose_check)
+subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
     implicit none
 
     type (type_params), intent(in) :: params
-    integer(kind=ik), intent(in)   :: recver_rank ! zero-based
-    integer(kind=ik), intent(in)   :: sender_hvyID, recver_hvyID
-    integer(kind=ik), intent(in)   :: relation  !< neighborhood 1:74, full block 0, family -1:-8
-    integer(kind=ik), intent(in)   :: level_diff
-    integer(kind=ik), intent(in)   :: patch_size
     real(kind=rk), intent(inout)   :: hvy_data(:, :, :, :, :)
+    integer(kind=ik), intent(in)   :: tree_ID                      !< which tree to study
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
+    integer(kind=ik), intent(in)   :: count_send_total             !< total amount of data to send from this rank
+
+    !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
+    real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+
+    integer(kind=ik)   :: recver_rank, myrank, sender_hvyID, sender_ref, recver_hvyID, level_diff, patch_size, recver_lgtID, sender_lgtID
+    integer(kind=ik)   :: relation  ! neighborhood 1:74, full block 0, family -1:-8
+
+    ! merged information of level diff and an indicator that we have a historic finer sender
+    integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
+    integer(kind=ik)   :: patch_ijk(2,3), size_buff(4), nc, k_patch
+    logical            :: use_hvy_TMP
 
     ! Following are global data used but defined in module_mpi:
     ! res_pre_data, rDara_sendBuffer
 
-    ! merged information of level diff and an indicator that we have a historic finer sender
-    integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
-    integer(kind=ik)   :: patch_ijk(2,3), size_buff(4), nc
+    myrank  = params%rank
+
 
     nc = size(hvy_data,4)
     if (size(res_pre_data,4) < nc) then
@@ -130,55 +125,85 @@ subroutine send_prepare_external( params, recver_rank, hvy_data, sender_hvyID, &
         allocate( res_pre_data(size_buff(1), size_buff(2), size_buff(3), size_buff(4)) )
     endif
 
-    ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
-    ! They depend on the neighbor-relation, level difference and the bounds type.
-    ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-    if ( level_diff == 0 .or. relation < 1 ) then
-        ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
-        ! we will send to our neighbor mpirank
-        patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+    do k_patch = 0, count_send_total-1  ! we do MPI so lets stick to 0-based for a moment
+        recver_rank = meta_send_all(S_META_FULL*k_patch + 4)
+        ! internal relation needs to prepare nothing and will be handled later
+        if ( myrank == recver_rank ) cycle
 
-        call Patch2Line( params, line_buffer, buffer_size, &
-        hvy_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
+        ! unpack from metadata array what we need
+        sender_hvyID = meta_send_all(S_META_FULL*k_patch + 1)
+        sender_ref = meta_send_all(S_META_FULL*k_patch + 2)
+        recver_hvyID = meta_send_all(S_META_FULL*k_patch + 3)
+        relation = meta_send_all(S_META_FULL*k_patch + 5)
+        level_diff = meta_send_all(S_META_FULL*k_patch + 6)
+        patch_size = meta_send_all(S_META_FULL*k_patch + 7)
 
-    else
-        ! up/downsample data first for neighbor relations, then flatten to 1D buffer
-        patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+        ! check if to use hvy_temp
+        use_hvy_TMP = .false.
+        if (present(hvy_tmp) .and. present(REF_FLAG)) then
+            if (sender_ref /= REF_FLAG) use_hvy_TMP = .true.
+        endif
 
-        call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_data, sender_hvyID )
+        ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
+        ! They depend on the neighbor-relation, level difference and the bounds type.
+        ! The last index is 1-sender 2-receiver 3-restricted/predicted.
+        if ( level_diff == 0 .or. relation < 1 ) then
+            ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
+            ! we will send to our neighbor mpirank
+            patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
 
-        patch_ijk = ijkPatches(:,:, relation, level_diff, RESPRE)
+            if (use_hvy_TMP) then
+                call Patch2Line( params, line_buffer, buffer_size, &
+                hvy_tmp( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
+            else
+                call Patch2Line( params, line_buffer, buffer_size, &
+                hvy_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
+            endif
 
-        call Patch2Line( params, line_buffer, buffer_size, &
-        res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
-    end if
+        else
+            ! up/downsample data first for neighbor relations, then flatten to 1D buffer
+            patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
 
-    ! now append data, first lets find the positions in the array, +1 to skip count number
-    buffer_offset = sum(meta_send_counter(0:recver_rank-1))*S_META_SEND + sum(data_send_counter(0:recver_rank-1)) + recver_rank + 1
-    data_offset = buffer_offset + real_pos(recver_rank)
+            ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
+            if (use_hvy_TMP .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_tmp, nc, sender_hvyID )
+            else
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_data, nc, sender_hvyID )
+            endif
 
-    if (buffer_size /= patch_size) then
-        write(*, '("ERROR: I am confused because real buffer_size is not equivalent to theoretical one:", i0, " - ", i0)') buffer_size, patch_size
-        call abort(666)
-    endif
+            patch_ijk = ijkPatches(:,:, relation, level_diff, RESPRE)
 
-    ! set metadata, encoded in float, as ints up to 2^53 can be exactly represented with doubles this is not a problem
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 1) = recver_hvyID
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 2) = relation
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 3) = level_diff
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 4) = buffer_size
+            call Patch2Line( params, line_buffer, buffer_size, &
+            res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
+        end if
+
+        ! now append data, first lets find the positions in the array, +1 to skip count number
+        buffer_offset = sum(meta_send_counter(0:recver_rank-1))*S_META_SEND + sum(data_send_counter(0:recver_rank-1)) + recver_rank + 1
+        data_offset = buffer_offset + real_pos(recver_rank)
+
+        if (buffer_size /= patch_size) then
+            write(*, '("ERROR: I am confused because real buffer_size is not equivalent to theoretical one:", i0, " - ", i0)') buffer_size, patch_size
+            call abort(666)
+        endif
+
+        ! set metadata, encoded in float, as ints up to 2^53 can be exactly represented with doubles this is not a problem
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 1) = recver_hvyID
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 2) = relation
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 3) = level_diff
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 4) = buffer_size
 #ifdef DEV
-    rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 5) = recver_rank  ! receiver rank only for DEV
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 5) = recver_rank  ! receiver rank only for DEV
 #endif
 
-    ! set data
-    if (buffer_size>0) then
-        rData_sendBuffer( data_offset:data_offset+buffer_size-1 ) = line_buffer(1:buffer_size)
-    endif
+        ! set data
+        if (buffer_size>0) then
+            rData_sendBuffer( data_offset:data_offset+buffer_size-1 ) = line_buffer(1:buffer_size)
+        endif
 
-    ! shift positions
-    real_pos(recver_rank) = real_pos(recver_rank) + buffer_size
-    int_pos(recver_rank) = int_pos(recver_rank) + 1
+        ! shift positions
+        real_pos(recver_rank) = real_pos(recver_rank) + buffer_size
+        int_pos(recver_rank) = int_pos(recver_rank) + 1
+    end do ! loop over all patches (all heavy_n where neighborhood exists and ghost synching is applied)
 
 end subroutine send_prepare_external
 
@@ -251,34 +276,46 @@ end subroutine unpack_ghostlayers_external
 
 !> \brief Unpack all internal patches which do not have to be sent
 !! This simply copies from hvy_data, applies res_pre and then copies it back into the correct position
-subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total, verbose_check )
+subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
     implicit none
 
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: count_send_total  !< total amount of patches for do loop
+    integer(kind=ik), intent(in)        :: tree_ID                 !< which tree to study
+    integer(kind=ik), intent(in)        :: count_send_total        !< total amount of patches for do loop
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
+    !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
+    real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
 
-    integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID
+    integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID, sender_ref
     integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
     integer(kind=ik) :: sender_hvyID, level_diff
     integer(kind=ik) :: send_ijk(2,3), recv_ijk(2,3), nc, myrank
+    logical          :: use_hvy_tmp
 
     nc = size(hvy_data,4)
     myrank  = params%rank
 
     do k_patch = 0, count_send_total-1
         ! check if this ghost point patch is addressed from me to me
-        recver_rank = meta_send_all(S_META_FULL*k_patch + 3)
+        recver_rank = meta_send_all(S_META_FULL*k_patch + 4)
         if (recver_rank == myrank) then
             ! unpack required info:  sender_hvyID, recver_hvyID, neighborhood, level_diff
             sender_hvyID = meta_send_all(S_META_FULL*k_patch + 1)
-            recver_hvyID = meta_send_all(S_META_FULL*k_patch + 2)
-            relation     = meta_send_all(S_META_FULL*k_patch + 4)
-            level_diff   = meta_send_all(S_META_FULL*k_patch + 5)
+            sender_ref =   meta_send_all(S_META_FULL*k_patch + 2)
+            recver_hvyID = meta_send_all(S_META_FULL*k_patch + 3)
+            relation     = meta_send_all(S_META_FULL*k_patch + 5)
+            level_diff   = meta_send_all(S_META_FULL*k_patch + 6)
 
             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
             call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
+
+            use_hvy_tmp = .false.
+            if (present(hvy_tmp) .and. present(REF_FLAG)) then
+                if (sender_ref /= REF_FLAG) use_hvy_tmp = .true.
+            endif
+
 
             if ( level_diff == 0  .or. relation < 1 ) then
                 ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
@@ -288,12 +325,23 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, count_send_total, verb
                 send_ijk = ijkPatches(:,:, relation, level_diff, RECVER)
                 recv_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
 
-                hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
+                if (use_hvy_tmp) then
+                    hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
+                    hvy_tmp( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
+                else
+                    hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
+                    hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
+                endif
             else
                 ! interpolation or restriction before inserting
-                call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
-                relation, level_diff, hvy_data, sender_hvyID )
+                ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
+                if (use_hvy_tmp .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
+                    relation, level_diff, hvy_tmp, nc, sender_hvyID )
+                else
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
+                    relation, level_diff, hvy_data, nc, sender_hvyID )
+                endif
     
                 ! copy interpolated / restricted data to ghost nodes layer
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
@@ -481,16 +529,13 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_active, hvy_n, count_send, ncomponents, &
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponents, &
         s_Level, s_M2C, s_C2M, s_M2F, s_F2M)
 
     implicit none
 
     type (type_params), intent(in)      :: params
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)     !< light data array
-    integer(kind=ik), intent(in)        :: hvy_family(:,:)     !< heavy data array - neighbor data
-    integer(kind=ik), intent(in)        :: hvy_active(:)       !< list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n               !< number of active blocks (heavy data)
+    integer(kind=ik), intent(in)        :: tree_ID             !< which tree to study
 
     integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
@@ -511,7 +556,7 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, myrank, mylastdigit, N, family, recver_rank
+    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, mylastdigit, N, family, recver_rank
     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
     integer(kind=tsize) :: tc
 
@@ -547,13 +592,14 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
     real_pos(:) = 0
 
     count_send = 0
-    do k_block = 1, hvy_n
+    do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block)
+        sender_hvyID = hvy_active(k_block, tree_ID)
         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
         level = lgt_block( sender_lgtID, IDX_MESH_LVL )
         tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))
         mylastdigit = tc_get_digit_at_level_b(tc, dim=params%dim, level=level, max_level=params%Jmax)
+        sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
 
         ! check if mother exists
         if (hvy_family(sender_hvyID, 1) /= -1) then
@@ -588,11 +634,12 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
 
                 ! now lets save all metadata in one array without caring for rank sorting for now
                 meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                meta_send_all(S_META_FULL*count_send + 2) = recver_hvyID
-                meta_send_all(S_META_FULL*count_send + 3) = recver_rank
-                meta_send_all(S_META_FULL*count_send + 4) = -1 - mylastdigit
-                meta_send_all(S_META_FULL*count_send + 5) = -1  ! inverse as adjusted to receiver
-                meta_send_all(S_META_FULL*count_send + 6) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
+                meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
+                meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
+                meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                meta_send_all(S_META_FULL*count_send + 5) = -1 - mylastdigit
+                meta_send_all(S_META_FULL*count_send + 6) = -1  ! inverse as adjusted to receiver
+                meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                 
                 count_send = count_send + 1
             endif
@@ -659,11 +706,12 @@ subroutine prepare_update_family_metadata(params, lgt_block, hvy_family, hvy_act
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
                     meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                    meta_send_all(S_META_FULL*count_send + 2) = recver_hvyID
-                    meta_send_all(S_META_FULL*count_send + 3) = recver_rank
-                    meta_send_all(S_META_FULL*count_send + 4) = -family
-                    meta_send_all(S_META_FULL*count_send + 5) = 1  ! inverse as adjusted to receiver
-                    meta_send_all(S_META_FULL*count_send + 6) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
+                    meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
+                    meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
+                    meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                    meta_send_all(S_META_FULL*count_send + 5) = -family
+                    meta_send_all(S_META_FULL*count_send + 6) = 1  ! inverse as adjusted to receiver
+                    meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
                     count_send = count_send + 1
                 endif

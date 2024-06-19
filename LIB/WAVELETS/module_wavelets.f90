@@ -265,7 +265,7 @@ contains
             call abort(23070811,"Error: unkown order_predictor="//trim(adjustl(order_predictor)))
 
         end select
-        N = size(c,1)/2
+        N = size(c,1)/2  ! which value can be interpolated first? 1-based, 4th and 6th skip 1 or 2 points
 
 #ifdef DEV
         if ( 2*nxcoarse-1 /= nxfine .or. 2*nycoarse-1 /= nyfine .or. 2*nzcoarse-1 /= nzfine ) then
@@ -539,84 +539,85 @@ contains
     end subroutine
 
 
-    ! apply the filter only inside the block, where the filter coefficients are
-    ! not reaching into the ghost nodes layer.
-    ! Here, interior == a subset of the blocks interior values, so that the filter is
-    ! applied without using the ghost nodes at all. NOT the interior of the block (g+1):(Bs+g)
-    !
-    ! g g g g g g g g g g g          g g g g g g g g g g g
-    ! g g g g g g g g g g g          g g g g g g g g g g g
-    ! g g i i i i i i i g g          g g i i i i i i i g g
-    ! g g i i i i i i i g g          g g i f f f f f i g g
-    ! g g i i i i i i i g g          g g i f f f f f i g g
-    ! g g i i i i i i i g g          g g i f f f f f i g g
-    ! g g i i i i i i i g g          g g i i i i i i i g g
-    ! g g g g g g g g g g g          g g g g g g g g g g g
-    ! g g g g g g g g g g g          g g g g g g g g g g g
-    ! Fig1: g= ghost i=internal      Fig2: f=filtered
-    subroutine blockFilterXYZ_interior_vct(params, u, u_filtered, coefs_filter, a, b, g)
-        implicit none
-        type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
-        integer(kind=ik) :: a, b, g
-        real(kind=rk), intent(in) :: coefs_filter(a:b)
-        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift
-        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+    ! The drawing appears to be wrong! This is not what it does
+!     ! apply the filter only inside the block, where the filter coefficients are
+!     ! not reaching into the ghost nodes layer.
+!     ! Here, interior == a subset of the blocks interior values, so that the filter is
+!     ! applied without using the ghost nodes at all. NOT the interior of the block (g+1):(Bs+g)
+!     !
+!     ! g g g g g g g g g g g          g g g g g g g g g g g
+!     ! g g g g g g g g g g g          g g g g g g g g g g g
+!     ! g g i i i i i i i g g          g g i i i i i i i g g
+!     ! g g i i i i i i i g g          g g i f f f f f i g g
+!     ! g g i i i i i i i g g          g g i f f f f f i g g
+!     ! g g i i i i i i i g g          g g i f f f f f i g g
+!     ! g g i i i i i i i g g          g g i i i i i i i g g
+!     ! g g g g g g g g g g g          g g g g g g g g g g g
+!     ! g g g g g g g g g g g          g g g g g g g g g g g
+!     ! Fig1: g= ghost i=internal      Fig2: f=filtered
+!     subroutine blockFilterXYZ_interior_vct(params, u, u_filtered, coefs_filter, a, b, g)
+!         implicit none
+!         type (type_params), intent(in) :: params
+!         real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
+!         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+!         integer(kind=ik) :: a, b, g
+!         real(kind=rk), intent(in) :: coefs_filter(a:b)
+!         integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift
+!         real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
 
-        ! if the filter is just 1, then we copy and we're done.
-        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-        if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
-            u_filtered = u
-            return
-        endif
+!         ! if the filter is just 1, then we copy and we're done.
+!         ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+!         if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
+!             u_filtered = u
+!             return
+!         endif
 
-        nx = size(u, 1)
-        ny = size(u, 2)
-        nz = size(u, 3)
-        nc = size(u, 4)
+!         nx = size(u, 1)
+!         ny = size(u, 2)
+!         nz = size(u, 3)
+!         nc = size(u, 4)
 
-        if (allocated(u_tmp)) then
-            if (.not. areArraysSameSize(u_tmp, u)) deallocate(u_tmp)
-        endif
-        if (.not.allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
-        u_tmp = u
+!         if (allocated(u_tmp)) then
+!             if (.not. areArraysSameSize(u_tmp, u)) deallocate(u_tmp)
+!         endif
+!         if (.not.allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
+!         u_tmp = u
 
-!---
-        ! call blockFilterXYZ_wherePossible_vct( params, u, u_filtered, coefs_filter, a, b)
-        !
-        ! u_tmp( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :) = u_filtered( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :)
-        ! u_filtered = u_tmp
-!---
+! !---
+!         ! call blockFilterXYZ_wherePossible_vct( params, u, u_filtered, coefs_filter, a, b)
+!         !
+!         ! u_tmp( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :) = u_filtered( -a+1+g:nx-b-g, -a+1+g:ny-b-g, -a+1+g:nz-b-g, :)
+!         ! u_filtered = u_tmp
+! !---
 
-        u_filtered = u_tmp
-        u_filtered(-a+1+g:nx-b-g, :, :, :) = 0.0_rk
-        do ix = -a+1+g, nx-b-g
-            do shift = a, b
-                u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
-            enddo
-        enddo
+!         u_filtered = u_tmp
+!         u_filtered(-a+1+g:nx-b-g, :, :, :) = 0.0_rk
+!         do ix = -a+1+g, nx-b-g
+!             do shift = a, b
+!                 u_filtered(ix, :, :, :) = u_filtered(ix, :, :, :) + u_tmp(ix+shift, :, :, :)*coefs_filter(shift)
+!             enddo
+!         enddo
 
-        u_tmp = u_filtered
-        u_filtered(:, -a+1+g:ny-b-g, :, :) = 0.0_rk
-        do iy = -a+1+g, ny-b-g
-            do shift = a, b
-                u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
-            enddo
-        enddo
+!         u_tmp = u_filtered
+!         u_filtered(:, -a+1+g:ny-b-g, :, :) = 0.0_rk
+!         do iy = -a+1+g, ny-b-g
+!             do shift = a, b
+!                 u_filtered(:, iy, :, :) = u_filtered(:, iy, :, :) + u_tmp(:, iy+shift, :, :)*coefs_filter(shift)
+!             enddo
+!         enddo
 
 
-        if (nz == 1) return
+!         if (nz == 1) return
 
-        u_tmp = u_filtered
-        u_filtered(:, :, -a+1+g:nz-b-g, :) = 0.0_rk
-        do iz = -a+1+g, nz-b-g
-            do shift = a, b
-                u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
-            enddo
-        enddo
+!         u_tmp = u_filtered
+!         u_filtered(:, :, -a+1+g:nz-b-g, :) = 0.0_rk
+!         do iz = -a+1+g, nz-b-g
+!             do shift = a, b
+!                 u_filtered(:, :, iz, :) = u_filtered(:, :, iz, :) + u_tmp(:, :, iz+shift, :)*coefs_filter(shift)
+!             enddo
+!         enddo
 
-    end subroutine
+!     end subroutine
 
     ! applies one of params% HD GD HR GR filters in each direction
     subroutine blockFilterCustom_vct( params, u, u_filtered, filter_x, filter_y, filter_z )
@@ -1701,7 +1702,7 @@ contains
         ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
         ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
         !
-        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
         integer(kind=ik), intent(in)   :: neighborhood   !> Which neighborhood to apply manipulation
         logical, optional, intent(in)  :: skip_ghosts    !> Flag to skip ghost points if they have been synched
 
@@ -1728,7 +1729,7 @@ contains
             call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/))
         endif
 
-        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 1) = &
+        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = &
             u_copy(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
 
     end subroutine
@@ -2134,19 +2135,19 @@ contains
         endif
 
         if (params%rank==0 .and. verbose1) then
-            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) "                      Wavelet-setup"
-            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,*) "The wavelet is ", trim(adjustl(params%wavelet))
-            write(*,*) "During coarse extension, we will copy SC:", params%Nscl, params%Nscr
-            write(*,*) "During coarse extension, we will delete WC:", params%Nwcl, params%Nwcr
-            write(*,*) "During coarse extension, we will reconstruct u:", params%Nreconl, params%Nreconr
-            write(*,*) "The predictor is: ", trim(adjustl(params%order_predictor))
+            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,'(A)') "                      Wavelet-setup"
+            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
+            write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
+            write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
+            write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
+            write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
-            write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
             ! this code has been used to plot our wavelets in PYTHON.
             a = maxval( (/&

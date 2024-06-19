@@ -116,12 +116,12 @@
 !         call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 2)
 !     end if
 !     t(5) = MPI_wtime()
-!     call toc("createActiveSortedLists_tree (reset lgt_n)", t(1)-t0)
-!     call toc("createActiveSortedLists_tree (loop over hvy_n)", t(2)-t(1))
-!     call toc("createActiveSortedLists_tree (comm)", t(3)-t(2))
-!     call toc("createActiveSortedLists_tree (loop over lgt_n_sum)", t(4)-t(3))
-!     call toc("createActiveSortedLists_tree (quicksort)", t(5)-t(4))
-!     call toc("createActiveSortedLists_tree", MPI_wtime()-t0)
+    ! call toc("createActiveSortedLists_tree (reset lgt_n)", 51, t(1)-t0)
+    ! call toc("createActiveSortedLists_tree (loop over hvy_n)", 52, t(2)-t(1))
+    ! call toc("createActiveSortedLists_tree (comm)", 53, t(3)-t(2))
+    ! call toc("createActiveSortedLists_tree (loop over lgt_n)", 54, t(4)-t(3))
+    ! call toc("createActiveSortedLists_tree (quicksort)", 55, t(5)-t(4))
+    ! call toc("createActiveSortedLists_tree (TOTAL)", 50, MPI_wtime()-t0)
 ! end subroutine createActiveSortedLists_tree_comm
 
 
@@ -260,12 +260,12 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
         call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 4)
     end if
     t(5) = MPI_wtime()
-    call toc("createActiveSortedLists_tree (reset lgt_n)", t(1)-t0)
-    call toc("createActiveSortedLists_tree (loop over hvy_n)", t(2)-t(1))
-    call toc("createActiveSortedLists_tree (comm)", t(3)-t(2))
-    call toc("createActiveSortedLists_tree (loop over lgt_n)", t(4)-t(3))
-    call toc("createActiveSortedLists_tree (quicksort)", t(5)-t(4))
-    call toc("createActiveSortedLists_tree", MPI_wtime()-t0)
+    call toc("createActiveSortedLists_tree (reset lgt_n)", 51, t(1)-t0)
+    call toc("createActiveSortedLists_tree (loop over hvy_n)", 52, t(2)-t(1))
+    call toc("createActiveSortedLists_tree (comm)", 53, t(3)-t(2))
+    call toc("createActiveSortedLists_tree (loop over lgt_n)", 54, t(4)-t(3))
+    call toc("createActiveSortedLists_tree (quicksort)", 55, t(5)-t(4))
+    call toc("createActiveSortedLists_tree (TOTAL)", 50, MPI_wtime()-t0)
 end subroutine createActiveSortedLists_tree
 
 ! ! ################################################################################
@@ -360,11 +360,11 @@ end subroutine createActiveSortedLists_tree
 !         call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 2)
 !     end if
 !     t(4) = MPI_wtime()
-!     call toc("createActiveSortedLists_tree (set lgt_n)", t(1)-t0)
-!     call toc("createActiveSortedLists_tree (reset lgt,hvy list)", t(2)-t(1))
-!     call toc("createActiveSortedLists_tree (loop over lgt_n)", t(3)-t(2))
-!     call toc("createActiveSortedLists_tree (quicksort)", t(4)-t(3))
-!     call toc("createActiveSortedLists_tree", MPI_wtime()-t0)
+!     call toc("createActiveSortedLists_tree (set lgt_n)", 51, t(1)-t0)
+!     call toc("createActiveSortedLists_tree (reset lgt,hvy list)", 52, t(2)-t(1))
+!     call toc("createActiveSortedLists_tree (loop over lgt_n)", 53, t(3)-t(2))
+!     call toc("createActiveSortedLists_tree (quicksort)", 54, t(4)-t(3))
+!     call toc("createActiveSortedLists_tree (total)", 50, MPI_wtime()-t0)
 ! end subroutine createActiveSortedLists_tree_old
 
 
@@ -528,7 +528,7 @@ end subroutine createActiveSortedLists_tree
 !     ! The forest size is defined as the maximum number of trees in the forest.
 !     if (tree_n > fsize) call abort(1402192, "Too many trees in the forest!!" )
 
-!     call toc("createActiveSortedLists_forest", MPI_wtime()-t0)
+!     call toc("createActiveSortedLists_forest", 58, MPI_wtime()-t0)
 ! end subroutine createActiveSortedLists_forest_comm
 
 
@@ -662,5 +662,5 @@ subroutine createActiveSortedLists_forest(params)
     ! The forest size is defined as the maximum number of trees in the forest.
     if (tree_n > fsize) call abort(1402192, "Too many trees in the forest!!" )
 
-    call toc("createActiveSortedLists_forest", MPI_wtime()-t0)
+    call toc("createActiveSortedLists_forest", 58, MPI_wtime()-t0)
 end subroutine createActiveSortedLists_forest

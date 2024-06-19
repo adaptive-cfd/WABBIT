@@ -190,7 +190,7 @@ subroutine post_dry_run
             ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
             ! Snyc'ing becomes much more expensive once the grid is refined.
             ! sync possible only before pruning
-            call sync_ghosts_all( params, lgt_block, hvy_mask, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+            call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
 
             ! refine the mesh, but only where the mask is interesting (not everywhere!)
@@ -229,8 +229,7 @@ subroutine post_dry_run
         call WRITE_INSECT_DATA(time)
 
         ! before (possible) pruning, we sync the ghosts
-        call sync_ghosts_all( params, lgt_block, hvy_mask, hvy_neighbor, &
-        hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+        call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
         if (pruned) then
             if (params%rank==0) write(*,*) "now pruning!"

@@ -30,7 +30,7 @@ module module_timing
     ! each timing slot gets a name and number so it can be easily identified
     ! name is to identify it later by name, they will only be checked for uniqueness for DEV
     ! num is to uniquely address one timing, they should not overlap for different names
-    character(len=100), dimension(:), allocatable :: name_comp_time
+    character(len=120), dimension(:), allocatable :: name_comp_time
     integer, dimension(:, :), allocatable :: num_comp_time
 
 contains
@@ -49,7 +49,7 @@ contains
     !        59    updateMetadata_tree
     !   60-  63    synchronize_lgt_data
     !   70-  74    xfer_block_data
-    !   80-  82    sync ghosts
+    !   80-  85    sync ghosts
     !   90-  92    balanceLoad_tree
     !  100- 200 adapt functions
     !  100- 115    adapt_tree

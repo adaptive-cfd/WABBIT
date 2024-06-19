@@ -137,7 +137,8 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 
     integer(kind=ik) :: ijk(2,3), isend, irecv, count_send_total
     integer(kind=ik) :: bounds_type, istage, inverse, gminus, gplus
-    real(kind=rk) :: t0, t1
+    real(kind=rk) :: t0, t1, t2
+    character(len=clong) :: toc_statement
 
     t0 = MPI_wtime()
 
@@ -222,6 +223,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
         ! Also applies logic about what should be synched and saves all metadata unsorted in one array
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()
+        t2 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
             istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
@@ -243,6 +245,8 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t1 )
+        write(toc_statement, '(A, i0, A)') "sync ghosts (stage ", istage, " TOTAL)"
+        call toc( toc_statement, 82+istage, MPI_wtime()-t1 )
 
     end do ! loop over stages 1,2
 

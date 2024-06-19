@@ -150,7 +150,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         !     endif
         ! enddo
 
-        ! Wavelet-transform all blocks on this level
+        ! Wavelet-transform all remaining non-decomposed blocks
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form
         t0 = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
@@ -171,7 +171,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! For Jmax if dealiasing, just compute H filter
                 ! Data SC/WC now in Spaghetti order
                 if (level_me == params%Jmax .and. params%force_maxlevel_dealiasing) then
-                    call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvy_ID), tmp_wd(:,:,:,:,1), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
+                    call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvy_ID), tmp_wd(:,:,:,:,1), params%HD, &
+                        lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
                     call inflatedMallat2spaghetti_block(params, tmp_wd, hvy_block(:,:,:,:,hvy_ID), sc_only=.true.)
                 else
                     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))

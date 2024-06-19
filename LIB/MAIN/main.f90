@@ -206,6 +206,8 @@ program main
     ! timing
     call toc( "TOPLEVEL: init_data", 14, MPI_wtime()-sub_t0 )
 
+    ! call abort(197, "Shhhh, Julius is testing!")
+
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------

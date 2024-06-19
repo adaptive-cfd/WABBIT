@@ -90,6 +90,13 @@ subroutine post_compression_unit_test(params)
     
     Bs = params%Bs
     g  = params%g
+
+    ! usually set in ini_file_to_params during a simulation, needs to be set explicitly
+    ! in postprocessing. Note: the global defaults are .true. in module_params' definition,
+    ! and most recent code (>06/2024) disables both for nonlifted wavelets,
+    ! but for clarity we set them here anyways:
+    params%useCoarseExtension = params%isLiftedWavelet
+    params%useSecurityZone = params%isLiftedWavelet    
     
     
     eps(1:51) = (/1.00000000e-10, 1.58489319e-10, 2.51188643e-10, 3.98107171e-10, &

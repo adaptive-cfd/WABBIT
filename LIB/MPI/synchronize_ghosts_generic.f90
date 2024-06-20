@@ -180,11 +180,6 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-#ifdef DEV
-    ! for dev check ghosts by wiping if we set all of them
-    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
-#endif
-
     !-----------------------------------------------------------------------
     ! set up constant arrays
     !-----------------------------------------------------------------------
@@ -199,6 +194,11 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
     ! make sure they have the right size
     call xfer_ensure_correct_buffer_size(params, hvy_block)
+
+#ifdef DEV
+    ! for dev check ghosts by wiping if we set all of them
+    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
+#endif
 
 ! Diagonal neighbors (not required for the RHS)
 ! 2D: 5,6,7,8

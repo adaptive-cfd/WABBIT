@@ -408,8 +408,8 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
         endif
 
         if (phi_max>2000.0_rk) then
-            write(*,*) phi_max
-            call abort(280420232,"large values in phi. that cannot be good.")
+            write(*,'("Phi_max: ", es9.3)') i, phi_max
+            call abort(280420232,"Large values in phi. That cannot be good.")
         endif
     end do
 

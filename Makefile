@@ -45,7 +45,7 @@ doc:
 # Unit Testing
 #================================================================
 test: all 
-	./TESTING/runtests.sh
+	./TESTING/runtests.py
 
 #================================================================
 # If the object directory doesn't exist, create it.

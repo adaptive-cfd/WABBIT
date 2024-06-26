@@ -1166,31 +1166,20 @@ contains
 
     ! manipulate wavelet coefficients in a neighborhood direction: applied
     ! if we find a coarser neighbor in this direction (coarse extension)
-    subroutine coarseExtensionManipulateWC_block(params, wc, neighborhood, Nwcl_optional, Nwcr_optional)
+    subroutine coarseExtensionManipulateWC_block(params, wc, neighborhood, Nwcl_optional, Nwcr_optional, set_garbage)
         implicit none
 
         type (type_params), intent(in) :: params
-        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
-        ! Note: the precise naming of SC/WC is not really important. we just apply
-        ! the correct decomposition/reconstruction filters - thats it.
-        !
-        ! INDEX            2D     3D     LABEL
-        ! -----            --    ---     ---------------------------------
-        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
-        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
-        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
-        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
-        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
-        !
-        real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik), intent(in) :: neighborhood
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc   !< input/output in WD spaghetti format
+        integer(kind=ik), intent(in) :: neighborhood                 !< Which neighborhood to apply manipulation
         integer(kind=ik), intent(in), optional :: Nwcl_optional, Nwcr_optional
+        !> If set to true, we set a really large value into the patch so that the simulation can crash on purpose
+        !> This is used to make clear that those values are not correct and should not be used
+        logical, intent(in), optional :: set_garbage
 
         integer(kind=ik) :: Nwcl, Nwcr
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3)
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), i_dim
+        real(kind=rk) :: setNumber
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1207,10 +1196,40 @@ contains
         if (present(Nwcl_optional)) Nwcl = Nwcl_optional
         if (present(Nwcr_optional)) Nwcr = Nwcr_optional
 
+        ! sometimes we are not allowed to access the WC (from finer level neighbors) so lets ensure the simulation crashes in that case
+        setNumber = 0.0_rk
+        if (present(set_garbage)) then
+            if (set_garbage) setNumber = -9.0e200_rk
+        endif
+
         idx(:, :) = 1
         call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/))
 
-        wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = 0.0_rk
+        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+        !     1 2 3 4 5 6 7 8 9 A B C
+        !     G G G S W S W S W G G G
+        !                 I I I
+        ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+        ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+        ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
+        ! this gives problem if the last point is a SC so we need to handle this special case
+        do i_dim = 1, params%dim
+            if (idx(2, i_dim) /= size(wc, i_dim)) then
+                idx(2, i_dim) = idx(2, i_dim) + modulo(g + idx(2, i_dim), 2)
+            endif
+        enddo
+
+        ! set values, we have to skip the SC
+        wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+        wc(idx(1,1)  :idx(2,1)  , idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+        if (params%dim == 3) then
+            wc(idx(1,1)  :idx(2,1)  , idx(1,2)  :idx(2,2)  , idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+        endif
+
+        ! wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = setNumber
     end subroutine
 
 
@@ -1219,30 +1238,15 @@ contains
         implicit none
 
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_copy
-        ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
-        ! Note: the precise naming of SC/WC is not really important. we just apply
-        ! the correct decomposition/reconstruction filters - thats it.
-        !
-        ! INDEX            2D     3D     LABEL
-        ! -----            --    ---     ---------------------------------
-        ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-        ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-        ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
-        ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
-        ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
-        ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-        ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
-        ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
-        !
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
-        integer(kind=ik), intent(in)   :: neighborhood   !> Which neighborhood to apply manipulation
-        logical, optional, intent(in)  :: skip_ghosts    !> Flag to skip ghost points if they have been synched
-        integer(kind=ik), intent(in), optional   :: ijk(2,3)       !< ijk of patch that we only care about, if not given it is the full block
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc   !< input/output in WD spaghetti format
+        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u_copy  !< original values from which we copy
+        integer(kind=ik), intent(in)   :: neighborhood               !< Which neighborhood to apply manipulation
+        logical, optional, intent(in)  :: skip_ghosts                !< Flag to skip ghost points if they have been synched
+        integer(kind=ik), intent(in), optional   :: ijk(2,3)         !< ijk of patch that we only care about, if not given it is the full block
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
         integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
-        logical          :: skip_copy
+        logical          :: skip_copy  ! sometimes this is called but actually nothing will be changed, in this case we skip it
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1265,6 +1269,18 @@ contains
             call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/))
         endif
 
+        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+        !     1 2 3 4 5 6 7 8 9 A B C
+        !     G G G S W S W S W G G G
+        !                 I I I
+        ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+        ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+        ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
+        ! However, here we treat SC so we can ignore it completely
+
         ! sometimes we do not want to look at the full block, then we can skip the copy where the indices do not matter
         if (present(ijk)) then
             ! check in each dimension if the indices lie outside the affected range
@@ -1275,8 +1291,8 @@ contains
         endif
 
         if (.not. skip_copy) then
-            wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = &
-                u_copy(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
+            wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = &
+                u_copy(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc)
         endif
 
     end subroutine
@@ -1369,7 +1385,7 @@ contains
         integer(kind=ik), intent(out), optional :: g_wavelet
         logical, intent(in), optional :: verbose
         logical :: verbose1
-        integer(kind=ik) :: i, g_min, a 
+        integer(kind=ik) :: i, g_min, a, block_min
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
@@ -1676,8 +1692,32 @@ contains
             g_wavelet = g_min
         else
             if (params%g < g_min) then
-                write(*,*) trim(adjustl(params%wavelet)), " g=", params%g, " <   g_min=", g_min
+                write(*,'(A, A, i3, A, i3)') trim(adjustl(params%wavelet)), " g=", params%g, " < g_min=", g_min
                 call abort(8888881, "The selected wavelet requires more ghost nodes.")
+            endif
+        endif
+
+        ! conditions for minimum blocksize for lifted wavelets arising from coarse extension:
+        !    1. coarse extension reconstructs needs SC or WC from finer neighbors
+        !    2. finer neighbors need values for their reconstruction that we altered with our reconstruction
+        ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
+        block_min = 0
+        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+            ! first dependency: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
+            ! this is critical and we currently cannot get those values
+            block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-1, abs(lbound(params%HR, dim=1))-2))
+            block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
+            ! second dependency: our finer neighbors need our reconstructed values to reconstruct itself it's values
+            ! if that is the case we have an upwards dependency which is currently not handled
+            block_min = max(block_min, params%Nreconr + (ubound(params%HR, dim=1)+1)/2)
+            block_min = max(block_min, params%Nreconl + abs(lbound(params%HR, dim=1))/2)
+
+            ! block needs to be larger as constraints
+            block_min = block_min+1
+
+            if (any(params%Bs(:params%dim) < block_min)) then
+                write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
+                call abort(8888881, "The selected wavelet requires larger blocksizes to do the correct coarse extension.")
             endif
         endif
 
@@ -1689,6 +1729,7 @@ contains
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
             write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
+            write(*,'(A55, i4, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
@@ -1944,6 +1985,7 @@ contains
         ! then overwrites this copy action). However, during coarseExtension, specifically the reconstruction step, this copy
         ! step enables us to use a smaller block size (dictated by the reconstruction size, and not reconstruction size + reconst. filter support)
         ! because we set WC==0 and indeed the SC are copied here an correct.
+        ! JB ToDo
         u_wc = u_copy
 
         if (params%dim==2) then

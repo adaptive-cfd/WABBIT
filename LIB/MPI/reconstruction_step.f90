@@ -16,7 +16,6 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
     integer(kind=ik)                    :: iteration, k, neighborhood, lgtID, hvyID, tree_me
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_neighbor, lgtID_neighbor
     logical                             :: toBeManipulated, scSkipGhosts
-    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
@@ -25,11 +24,6 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
 
     scSkipGhosts = .false.
     if (present(sc_skip_ghosts)) scSkipGhosts = sc_skip_ghosts
-
-    if (allocated(wc)) then
-        if (size(wc, 4) < nc) deallocate(wc)
-    endif
-    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
 
     do k = 1, hvy_n(tree_ID)
         ! Set toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
@@ -59,9 +53,6 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
         enddo
 
         if (toBeManipulated) then
-            ! transform to inflated mallat
-            call spaghetti2inflatedMallat_block(params, hvy_data(:,:,:,:,hvyID), wc)
-
             ! loop over all relevant neighbors
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! neighbor exists ?
@@ -73,28 +64,22 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
 
                     if (level_neighbor < level_me) then
                         ! manipulation of coeffs
-                        call coarseExtensionManipulateWC_block(params, wc, neighborhood)
-                        call coarseExtensionManipulateSC_block(params, wc(:, :, :, :, 1), hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
+                        ! call coarseExtensionManipulateWC_block(params, wc, neighborhood)
+                        ! call coarseExtensionManipulateSC_block(params, wc(:, :, :, :, 1), hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
+                        call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvyID), neighborhood)
+                        call coarseExtensionManipulateSC_block(params, hvy_data(:,:,:,:,hvyID), hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
                     elseif (level_neighbor > level_me) then
-                        ! it is actually possible for a block to have both finer and coarser neighbors. If its
-                        ! coarser, (level_neighbor<level_me), then coarseExtension is applied to this block.
-                        ! However for small Bs (or large wavelets, i.e. large Nreconr Nreconl), the coarseExt
-                        ! reconstruction step also takes into account the ghost nodes layer on the adjacent 
-                        ! side. If this adjacent block is then finer (level_neighbor > level_me), those WC
-                        ! should be zero and this is what we assure here, as they have not been correctly computed
-                        call coarseExtensionManipulateWC_block(params, wc, neighborhood, params%g, params%g)
-                        ! note if the neighboring blocks are on the same level, the WC are sync'ed between the 
-                        ! blocks, and we must NOT delete them.
+                        ! It is actually possible for a block to have both finer and coarser neighbors ranging from level J-1 to J+1
+                        ! In order to reconstruct values on level J, we need the WC and SC which are on this level.
+                        ! Finer neighbor has its decomposition ready for level J+1 but we cannot sync it for level J
+                        ! So it is impossible to reconstruct values if the filters range into J+1 ghost nodes
                         
-                        ! What about the SC?
-                        ! See the extensive comment in WaveDecomposition_dim1 on that. 
-                        ! "Magically", the SC are correct.
+                        ! Let's ensure this crashes just to show that filters should not range into finer level ghost nodes
+                        ! call coarseExtensionManipulateWC_block(params, wc, neighborhood, params%g, params%g, set_garbage=.true.)
+                        call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvyID), neighborhood, params%g, params%g, set_garbage=.true.)
                     endif
                 endif
             enddo
-
-            ! transform wc from inflated mallat back to spaghetti
-            call inflatedMallat2spaghetti_block(params, wc, hvy_data(:,:,:,:,hvyID))
         endif
     enddo
 end subroutine

@@ -198,6 +198,10 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
     if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
+    ! if (present(verbose_check)) then
+    !     call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=.true., s_M2C=.true., s_M2F=.true.)
+    ! endif
+
 #endif
 
 ! Diagonal neighbors (not required for the RHS)

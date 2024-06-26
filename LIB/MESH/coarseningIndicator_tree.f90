@@ -162,7 +162,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
         else
             ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
-            ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and values copied to hvy_tmp
+            ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and original values copied to hvy_tmp
+            ! norm is computed from original values, not WD values
             call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 

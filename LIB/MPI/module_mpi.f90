@@ -143,8 +143,8 @@ subroutine init_ghost_nodes( params )
             write(*,'("            ▕   ╰╯   ▏" )')
             write(*,'("            ▕╱╲╱╲╱╲╱╲▏")')
             write(*,'("---------------------------------------------------------")')
-            write(*,'("GHOSTS-INIT: We can synchronize at most N_MAX_COMPONENTS=",i2)') N_MAX_COMPONENTS
-            write(*,'("GHOSTS-INIT: g=",i2)') params%g
+            write(*,'("GHOST-INIT: We can synchronize at most N_MAX_COMPONENTS=",i2)') N_MAX_COMPONENTS
+            write(*,'("GHOST-INIT: g= ",i2, " , g_RHS= ", i2)') params%g, params%g_rhs
         endif
 
         if ( params%dim==3 ) then
@@ -201,15 +201,15 @@ subroutine init_ghost_nodes( params )
         !-----------------------------------------------------------------------
         ! allocate synch buffer
         if (rank==0) then
-            write(*,'("GHOSTS-INIT: Attempting to allocate the ghost-sync-buffer.")')
+            write(*,'("GHOST-INIT: Attempting to allocate the ghost-sync-buffer.")')
 
-            write(*,'("GHOSTS-INIT: buffer_N_int=",i12," buffer_N=",i12)') &
+            write(*,'("GHOST-INIT: buffer_N_int=",i12," buffer_N=",i12)') &
             buffer_N_int, buffer_N
 
-            write(*,'("GHOSTS-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
+            write(*,'("GHOST-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
                 2.0*dble(buffer_N_int)*8e-9
 
-            write(*,'("GHOSTS-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
+            write(*,'("GHOST-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
                 2.0*dble(buffer_N)*8e-9
             write(*,'("---------------- allocating now ----------------")')
         endif
@@ -224,16 +224,16 @@ subroutine init_ghost_nodes( params )
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
+            write(*,'("GHOST-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
             "rData_sendBuffer", shape(rData_sendBuffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
+            write(*,'("GHOST-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
             "rData_recvBuffer", shape(rData_recvBuffer)
 
-            write(*,'("GHOSTS-INIT: on each mpirank, rData_sendBuffer size is",f9.4," GB ")') &
+            write(*,'("GHOST-INIT: on each mpirank, rData_sendBuffer size is",f9.4," GB ")') &
             product(real(shape(rData_sendBuffer)))*8e-9
 
-            write(*,'("GHOSTS-INIT: on each mpirank, rData_recvBuffer size is",f9.4," GB ")') &
+            write(*,'("GHOST-INIT: on each mpirank, rData_recvBuffer size is",f9.4," GB ")') &
             product(real(shape(rData_recvBuffer)))*8e-9
         endif
 

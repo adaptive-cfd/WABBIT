@@ -24,7 +24,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 
     integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3)
     real(kind=rk)                       :: detail( size(u,4) )
-    integer(kind=ik)                    :: g, dim, Jmax, nx, ny, nz, nc
+    integer(kind=ik)                    :: g, i_dim, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: eps_use
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
@@ -79,6 +79,23 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         endif
     endif
 
+    ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+    !     1 2 3 4 5 6 7 8 9 A B C
+    !     G G G S W S W S W G G G
+    !                 I I I
+    ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+    ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+    ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+    ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+    idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+    ! also, when the last point is a SC, the last point is only partially included but its WC have to be considered
+    ! this gives problem if the last point is a SC so we need to handle this special case
+    do i_dim = 1, params%dim
+        if (idx(2, i_dim) /= size(u, i_dim)) then
+            idx(2, i_dim) = idx(2, i_dim) + modulo(idx(2, i_dim) - idx(1, i_dim) + 1, 2)
+        endif
+    enddo
+
 
 #ifdef DEV
     if (.not. allocated(params%GD)) call abort(1213149, "The cat is angry: Wavelet-setup not yet called?")
@@ -87,27 +104,21 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 #endif
 
     if (.not. input_is_WD) then
-        u_wc = u
+        u_wc = u  ! Wavelet decompose full block
         call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
-        call Spaghetti2inflatedMallat_block(params, u_wc, wc)
     else
-        call Spaghetti2inflatedMallat_block(params, u, wc)
+        ! copy only part we need
+        u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), :) = &
+           u(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), :)
     endif
 
+    ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
+    u_wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, :) = 0.0_rk
 
-    if (params%dim == 2) then
-        do p = 1, nc
-            ! if all details are smaller than C_eps, we can coarsen.
-            ! check interior WC only
-            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:4)) )
-        enddo
-    else
-        do p = 1, nc
-            ! if all details are smaller than C_eps, we can coarsen.
-            ! check interior WC only
-            detail(p) = maxval( abs(wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p, 2:8)) )
-        enddo
-    endif
+    do p = 1, nc
+        ! if all details are smaller than C_eps, we can coarsen, check interior WC only
+        detail(p) = maxval( abs(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)) )
+    enddo
 
     detail(1:nc) = detail(1:nc) / norm(1:nc)
 
@@ -117,9 +128,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         if (.not. thresholding_component(p)) detail(p) = 0.0_rk
     enddo
 
-    ! ich habe die wavelet normalization ausgebruetet und aufgeschrieben.
-    ! ich schicke dir die notizen gleich (photos).
-    !
     ! also wir brauchen einen scale(level)- dependent threshold, d.h. \epsilon_j
     ! zudem ist dieser abhaengig von der raum dimension d.
     !

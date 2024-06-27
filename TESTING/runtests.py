@@ -86,9 +86,14 @@ class WabbitTest:
             result2.stdout = result1.stdout + "\n" + result2.stdout
 
             # compare all files present in test_dir
-            all_similar, output = self.compare_files(tmp_dir)
-            result2.stdout += output
-            result2.returncode = not all_similar
+            try:
+                all_similar, output = self.compare_files(tmp_dir)
+                result2.stdout += output
+                result2.returncode = not all_similar
+            # catch any error - for example HDF5 error - and then say the test failed
+            # this is important to still print the log (and continue)
+            except:
+                result2.returncode = 1
 
             # change back to test_dir
             os.chdir(self.test_dir)
@@ -109,9 +114,14 @@ class WabbitTest:
             result1 = subprocess.run(command1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
 
             # compare all files present in test_dir
-            all_similar, output = self.compare_files(tmp_dir)
-            result1.stdout += output
-            result1.returncode = not all_similar
+            try:
+                all_similar, output = self.compare_files(tmp_dir)
+                result1.stdout += output
+                result1.returncode = not all_similar
+            # catch any error - for example HDF5 error - and then say the test failed
+            # this is important to still print the log (and continue)
+            except:
+                result1.returncode = 1
 
             # change back to test_dir
             os.chdir(self.test_dir)

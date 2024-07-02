@@ -192,7 +192,7 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
 
         if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
             ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
-            call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
             hvy_block(:,:,:,:,hvyID) = wc
         endif
     enddo

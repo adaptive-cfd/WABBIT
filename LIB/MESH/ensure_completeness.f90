@@ -13,7 +13,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
     integer(kind=ik), intent(in)        :: lgt_id                         !< Concerned Block
     logical, intent(in), optional       :: mark_TMP_flag                  !< Set refinement of completeness to 0 or temporary flag
     integer(kind=ik)                    :: Jmax, k, l                     ! max treelevel
-    integer(kind=ik)                    :: N_sisters, status, markTMPflag ! loop variables
+    integer(kind=ik)                    :: N_sisters, markTMPflag, lgt_sisters(1:2**params%dim)  ! loop variables
 
     Jmax = params%Jmax
     N_sisters = size(sisters)
@@ -27,28 +27,25 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
     ! zero (-1 would mean not found)
     if ( minval(sisters(1:N_sisters)) > 0 ) then
 
-        ! now loop over all sisters, check if they also want to coarsen and have status -1
-        ! only if all sisters agree to coarsen, they can all be merged into their mother block.
-        status = -1
-        do l = 1, N_sisters
-            status = max( status, lgt_block(sisters(l), IDX_REFINE_STS) )
-        end do
+        lgt_sisters = lgt_block(sisters(1:N_sisters), IDX_REFINE_STS )
 
-        ! if all agree and share the status -1, then we can indeed coarsen, keep -1 status
-        if ( status == -1 ) then
+        ! first check : any block wants to stay so all blocks have to stay
+        if ( any(lgt_sisters(:) == 0) ) then
+            lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = 0
+
+        ! second check: any block has temp_gradedness flag > 0 - all blocks that want to stay have to wait with temp flag
+        elseif ( any(lgt_sisters(:) > 0) ) then
             do l = 1, N_sisters
-                lgt_block( sisters(l), IDX_REFINE_STS )  = -1
+                if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
             end do
-        elseif ( status >= 0 ) then
-            ! We found all sister blocks, but they do not all share the -1 status: none
-            ! of them can be coarsened, remove the coarsening status by passing it on
-            ! can be 0 for staying or REF_TMP_GRADED_STAY which will be simply passed on
-            do l = 1, N_sisters
-                lgt_block( sisters(l), IDX_REFINE_STS )  = status
-            end do
+        ! third check: all blocks have either temp flag or want to coarsen and can do it so lets change all flags to coarsen (-1)
+        elseif ( all(lgt_sisters(:) < 0)) then
+            lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = -1
+
+        ! other cases should not occur currently
         else
-            call abort(197005, "This is odd - all sisters have temporary flag <-1?")
-        end if
+            call abort(197, "How did you end up here?")
+        endif
     else
         ! We did not even find all sisters, that means a part of the four blocks is already
         ! refined. Therefore, they cannot be coarsened in any case, and we remove the coarsen

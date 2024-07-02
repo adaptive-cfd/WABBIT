@@ -2,7 +2,7 @@
 !> This method goes a bit against the naming convention, as for default wavelet cases it acts
 !! level-wise or leaf-wise but for specific indicators (everywhere or random) it acts on the whole tree.
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask, norm_out)
+    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask, norm_inout)
 
     use module_indicators
 
@@ -25,12 +25,13 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     integer(kind=ik), intent(in)        :: iteration
 
     logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
+
     !> for the mask generation (time-independent mask) we require the mask on the highest
     !! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
     logical, intent(in)                 :: ignore_maxlevel
     !> If this flag is true, then not the level but the refinement flag is tested for REF_TMP_UNTREATED (leaf-wise loop)
     logical, intent(in)                 :: check_ref_tmp
-    real(kind=rk), intent(out), optional :: norm_out(:)  !< We can output the norm as well
+    real(kind=rk), intent(inout), optional :: norm_inout(:)  !< We can output the norm as well
 
     ! local variables
     integer(kind=ik) :: k_b, k_nc, Jmax, n_eqn, lgtID, g, mpierr, hvyID, p, N_thresholding_components, tags, ierr, level, ref_stat
@@ -38,7 +39,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    logical :: consider_hvy_tmp, inputIsWD
+    logical :: consider_hvy_tmp, inputIsWD, check_mask
     real(kind=rk) :: t0  !< timing for debugging
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -82,13 +83,22 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     ! construct mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except in the "dealiasing step", because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random") then
+    ! additionally, mask check can be skipped after first (or second for dealiasing) step, as leaf-wise blocks then definetly stay due to mask or not
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and. &
+        (( params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. iteration < 2 ) &
+        .or. .not. (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) .and. iteration == 0)) then
+
         t0 = MPI_Wtime()
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
+        ! JB ToDo: CLASH WITH HVY_TMP NEEDS TO BE RESOLVED
         call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
         call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
+        ! simplify if-condition downwards and check mask for indicator if it was created here
+        check_mask = .true.
+    else
+        check_mask = .false.
     endif
 
     ! the indicator primary-variables is for compressible Navier-Stokes and first
@@ -156,40 +166,48 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
-        t0 = MPI_Wtime()
-        if ( .not. consider_hvy_tmp .and. .not. check_ref_tmp) then
-            ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
-            call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
+        if (( params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. iteration > 1 ) &
+        .or. .not. (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) .and. iteration > 0 .and. present(norm_inout)) then
+
+            ! norm was computed in first iteration - we assume it doesnt change significantly when the grid coarsens, for dealising we do one further step
+            ! this saves recomputing the norm every iteration over the whole grid while it practically does not change much
+            norm(1:N_thresholding_components) = norm_inout(1:N_thresholding_components)
         else
-            ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
-            ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and original values copied to hvy_tmp
-            ! norm is computed from original values, not WD values
-            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            t0 = MPI_Wtime()
+            if ( .not. consider_hvy_tmp .and. .not. check_ref_tmp) then
+                ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
+                call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
+            else
+                ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
+                ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and original values copied to hvy_tmp
+                ! norm is computed from original values, not WD values
+                call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            endif
+
+            ! HACK
+    !        if (params%physics_type == "ACM-new") then
+    !            if (params%eps_norm == "Linfty") then
+    !                norm(1:params%dim) = maxval( norm(1:params%dim) )
+    !            elseif (params%eps_norm == "L2") then
+    !                norm(1:params%dim) = sqrt( sum(norm(1:params%dim)**2) )
+    !            endif
+            ! endif
+
+            ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
+            do p = 1, N_thresholding_components
+                if (norm(p) <= 1.0e-9_rk) norm(p) = 1.0_rk
+            enddo
+
+            ! during dev is it useful to know what the normalization is, if that is active
+            call append_t_file('eps_norm.t', (/time, norm, params%eps/))
+
+            call toc( "coarseningIndicator (norm)", 122, MPI_Wtime()-t0 )
         endif
-
-        ! HACK
-!        if (params%physics_type == "ACM-new") then
-!            if (params%eps_norm == "Linfty") then
-!                norm(1:params%dim) = maxval( norm(1:params%dim) )
-!            elseif (params%eps_norm == "L2") then
-!                norm(1:params%dim) = sqrt( sum(norm(1:params%dim)**2) )
-!            endif
-        ! endif
-
-        ! avoid division by zero (corresponds to using an absolute eps if the norm is very small)
-        do p = 1, N_thresholding_components
-            if (norm(p) <= 1.0e-9_rk) norm(p) = 1.0_rk
-        enddo
-
-        ! during dev is it useful to know what the normalization is, if that is active
-        call append_t_file('eps_norm.t', (/time, norm, params%eps/))
-
-        call toc( "coarseningIndicator (norm)", 122, MPI_Wtime()-t0 )
     else
         norm = 1.0_rk  ! set to 1
     endif
-    if (present(norm_out)) then
-        norm_out(1:N_thresholding_components) = norm(1:N_thresholding_components)
+    if (present(norm_inout)) then
+        norm_inout(1:N_thresholding_components) = norm(1:N_thresholding_components)
     endif
 
     !---------------------------------------------------------------------------
@@ -271,7 +289,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
                 lgt_block(lgtID, IDX_REFINE_STS) = -1
             else
                 ! evaluate the criterion on this block.
-                if (params%threshold_mask .and. present(hvy_mask)) then
+                if (check_mask) then
                     call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                     hvy_tmp(:,:,:,:,hvyID), indicator, &
                     lgt_block(lgtID, IDX_REFINE_STS), norm, level, inputIsWD, hvy_mask(:,:,:,:,hvyID))

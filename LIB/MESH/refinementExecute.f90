@@ -209,7 +209,7 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
 
         end do
         ! transform to spaghetti form as this is what we usually work with
-        call Mallat2Spaghetti_block(params, tmp_wd, hvy_block(:, :, :, :, free_heavy_id))
+        call Mallat2Spaghetti_block(params, tmp_wd(:, :, :, 1:size(hvy_block,4)), hvy_block(:, :, :, 1:size(hvy_block,4), free_heavy_id))
     end do
 
     ! delete mother

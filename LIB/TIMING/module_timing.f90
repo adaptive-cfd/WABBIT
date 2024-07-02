@@ -193,9 +193,9 @@ contains
                 k_sorted = num_comp_time(k_timings, 2)
                 if (num_comp_time(k_timings, 1) /= -1) then
 #ifdef DEV
-                write(*,'(A60, 2(2x, f12.3), 4x, f6.3, 2(2x, i8))') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1)), num_comp_time(k_timings, 1)
+                write(*,'(A60, 2(2x, f12.3), 2x, f8.3, 2(2x, i8))') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1)), num_comp_time(k_timings, 1)
 #else
-                write(*,'(A60, 2(2x, f12.3), 4x, f6.3, 2x, i8)') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1))
+                write(*,'(A60, 2(2x, f12.3), 2x, f8.3, 2x, i8)') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1))
 #endif
                 endif
             end do

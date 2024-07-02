@@ -49,11 +49,9 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
     rank = params%rank
 
     if ( params%dim == 3 ) then
-        ! 3D:
-        neighbor_num = 74
+        neighbor_num = 74  ! 3D
     else
-        ! 2D:
-        neighbor_num = 16
+        neighbor_num = 16  ! 2D
     end if
 
     ! we repeat the ensureGradedness_tree procedure until this flag is .false. since as long

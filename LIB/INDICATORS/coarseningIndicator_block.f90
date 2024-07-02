@@ -128,39 +128,26 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         mask_min = 2.0_rk
 
         if (params%dim == 3) then
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        if ((block_mask(ix,iy,iz,1) > 1.0e-9_rk).and.(block_mask(ix,iy,iz,1) < 1.0_rk-1.0e-9_rk)) then
-                            ! but if we find intermediate values on the block (i.e. its neither uniformily
-                            ! 0 nor 1), the block contains the fluid/solid interface and is not coarsened.
-                            refinement_status_mask = 0_ik
-                        endif
-                        mask_max = max(mask_max, block_mask(ix,iy,iz,1))
-                        mask_min = min(mask_min, block_mask(ix,iy,iz,1))
-                    enddo
-                enddo
-            enddo
+            ! check if any interface point is within the block
+            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) < 1.0_rk-1.0e-9_rk)) then
+                refinement_status_mask = 0_ik
+            endif
+            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
         else
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    if ((block_mask(ix,iy,1,1) > 1.0e-6_rk).and.(block_mask(ix,iy,1,1) < 1.0_rk-1.0e-6_rk)) then
-                        ! but if we find intermediate values on the block (i.e. its neither uniformily
-                        ! 0 nor 1), the block contains the fluid/solid interface and is not coarsened.
-                        refinement_status_mask = 0_ik
-                    endif
-                    mask_max = max(mask_max, block_mask(ix,iy,1,1))
-                    mask_min = min(mask_min, block_mask(ix,iy,1,1))
-                enddo
-            enddo
+            ! check if any interface point is within the block
+            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) < 1.0_rk-1.0e-9_rk)) then
+                refinement_status_mask = 0_ik
+            endif
+            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
+            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
         endif
 
-        ! maybe the resolution is so coarse no point on the smoothing layer exists...
+        ! maybe the resolution is so coarse no point on the smoothing layer exists
+        ! in that case if both 1 and 0 are in a mask it also has to contain an interface
         if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
 
-        ! refinement_status_state: -1 refinement_status_mask: -1 ==>  -1
-        ! refinement_status_state: 0  refinement_status_mask: -1 ==>   0
-        ! refinement_status_state: 0  refinement_status_mask: 0  ==>   0
+        ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
         refinement_status = max(refinement_status, refinement_status_mask)
 
         ! timing for debugging - block based so should not be deployed for productive versions

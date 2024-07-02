@@ -171,9 +171,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! For Jmax if dealiasing, just compute H filter
                 ! Data SC/WC now in Spaghetti order
                 if (level_me == params%Jmax .and. params%force_maxlevel_dealiasing) then
-                    call blockFilterXYZ_vct( params, hvy_block(:,:,:,:,hvy_ID), tmp_wd(:,:,:,:,1), params%HD, &
+                    call blockFilterXYZ_vct( params, hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), tmp_wd(:,:,:,1:size(hvy_block, 4),1), params%HD, &
                         lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
-                    call inflatedMallat2spaghetti_block(params, tmp_wd, hvy_block(:,:,:,:,hvy_ID), sc_only=.true.)
+                    call inflatedMallat2spaghetti_block(params, tmp_wd(:,:,:,1:size(hvy_block, 4),:), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), sc_only=.true.)
                 else
                     call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))
                 endif

@@ -78,7 +78,6 @@ class WabbitTest:
             os.chdir(self.test_dir)
 
     def run(self, write_diff=False):
-        cwd = os.getcwd()  # this should be the run directory
         if self.test_name == "equi_refineCoarsen_FWT_IWT":
             # change to directory
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-coarsen-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
@@ -150,9 +149,11 @@ class WabbitTest:
             os.chdir(self.test_dir)
             return result1
         else:
-            print("Not implemented yet")
+            self.logger.error("Not implemented yet")
             return False
     
+
+    # I want to log at the same time to the console and possibly files as well, so I solve this with the logging module which handles the streams
     def init_logging(self, verbose=False, suite_log_handler=None, stdout_handler=None):
         log_file = None
         if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
@@ -177,6 +178,7 @@ class WabbitTest:
             self.logger.addHandler(stdout_handler)
 
 
+    # remove residual files and possibly overwrite reference results
     def clean_up(self, replace=False, keep_tmp=False, logger=logger):
         if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
             # remove files - only .dat files are created
@@ -200,6 +202,8 @@ class WabbitTest:
         # change back to directory where we were
         os.chdir(self.run_dir)
 
+
+    # takes every reference file in the test folder and tries to compare it to available test results in tmp folder
     def compare_files(self, tmp_dir, verbose=True, write_diff=False):
         tmp_files = glob.glob(os.path.join(tmp_dir, "*.h5"))
         tmp_split = [os.path.split(i_file)[1] for i_file in tmp_files]
@@ -356,10 +360,10 @@ def main():
     logger_suite.addHandler(stdout_handler)
 
     # check if user actually wants to replace test results
-    if args.replace:
-        response = input("Are you REALLY sure you want to reset all test results? (yes/no): ").strip().lower()
+    if args.replace or args.replace_fail:
+        response = input("Are you REALLY sure you want to reset all or some reference results? (yes/no): ").strip().lower()
         if response in ['yes', 'y']:
-            logger_suite.info("Going to replace all reference results!")
+            logger_suite.info("Going to replace all or some reference results!")
         else:
             logger_suite.info("Ok alright, I understand. I also often do not know what I am doing so come back once you know that it's the right time.")
             sys.exit()
@@ -389,17 +393,16 @@ def main():
             logger_suite.info(f"\n\t \033[4m WABBIT: run existing unit test {args.test} \033[0m\n")
             tests_run = [test_dict]
         else:
-            logger_suite.error(f"ERROR: {args.test} is not a valid unit test")
+            logger_suite.error(f"ERROR: {args.test} is not a valid unit test or group of tests")
             sys.exit(1)
 
     happy_sum = 0
     sad_sum = 0
     summary = []
 
+    # give user some information
     logger_suite.info(f"employed command for parallel exec: {mpi_command}")
     logger_suite.info(f"memory flag for wabbit is: {memory}\n")
-    # ToDo!
-    # logger_suite.info("to modify the command, pass --memory=[MEMORY] and/or --mpi_command=[MPI COMMAND] in shell\n")
 
     if nprocs != 4:
         logger_suite.info(f"{fail_color}WARNING{end_color}")
@@ -432,16 +435,9 @@ def main():
             result = test_obj.run(write_diff=args.write_diff)
             ts_end_time = time.time() - ts_start_time
 
+            for i_handler in logger_suite.handlers: i_handler.terminator = ""
             if isinstance(result, subprocess.Popen):
-                # with open(logfile, 'w') as f:
-                #     f.write(result.stdout)
-                #     f.write(result.stderr)
-                # if args.print_test:
-                #     print(result.stdout)
-                #     print(result.stderr)
-
                 # write output to console, make it a bit fancy
-                for i_handler in logger_suite.handlers: i_handler.terminator = ""
                 if result.returncode == 0:
                     print(f"{pass_color}", end="")  # this only works for console
                     logger_suite.info(f"\tPass")
@@ -456,8 +452,13 @@ def main():
                 print(f"{end_color}", end="")  # this only works for console                    
                 logger_suite.info(f"\tTime= {ts_end_time:7.3f} s")
             else:
-                logger_suite.info(f"{fail_color}\tFail {end_color}\tTest was not executed")
+                print(f"{fail_color}", end="")  # this only works for console
+                logger_suite.info(f"\tFail")
+                print(f"{end_color}", end="")  # this only works for console                    
+                for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
+                logger_suite.info(f"\tTest was not executed")
 
+            # remove temporary dir and replace reference results if wanted
             if args.replace_fail:
                 test_obj.clean_up(replace=(result.returncode != 0), keep_tmp=args.keep_tmp, logger=logger_suite)
             else:
@@ -466,15 +467,27 @@ def main():
 
     total_time = time.time() - start_time
     logger_suite.info(f"\nFinished all tests. Time= {total_time:7.3f} s\n")
-    # print("All in all we have:\n")
 
-    # for i, ts in enumerate(tests):
-    #     if not ts.startswith("---"):
-    #         status = f"{pass_color}ok{end_color}" if summary[i] == 0 else f"{fail_color}X{end_color}"
-    #         print(f"{ts:80s} {status}")
+    # give a little summary
+    logger_suite.info(f"All in all we have:")
+    for i_handler in logger_suite.handlers: i_handler.terminator = ""
+    logger_suite.info(f"\t")
+    for i_res in summary:
+        if i_res==0:
+            print(f"{pass_color}", end="")  # this only works for console
+            logger_suite.info(f"O")
+        else:
+            print(f"{fail_color}", end="")  # this only works for console
+            logger_suite.info(f"X")
+        print(f"{end_color}", end="")  # this only works for console                    
+    for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
 
-    # print(f"\n\t {pass_color}sum happy tests: {end_color}\t{happy_sum}")
-    # print(f"\n\t {fail_color}sum sad tests: {end_color}\t{sad_sum}")
+    print(f"{pass_color}", end="")  # this only works for console
+    logger_suite.info(f"\n\n\t   sum happy tests:\t{happy_sum}")
+    print(f"{fail_color}", end="")  # this only works for console
+    logger_suite.error(f"\t   sum sad tests:\t{sad_sum}")
+    print(f"{end_color}", end="")  # this only works for console                    
+
 
 if __name__ == "__main__":
     main()

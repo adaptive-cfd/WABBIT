@@ -47,6 +47,9 @@ doc:
 test: all 
 	./TESTING/runtests.py
 
+compression_test: all
+	cd ./TESTING/compression; ./compression_test.py --wabbit-dir="../../" -p
+
 #================================================================
 # If the object directory doesn't exist, create it.
 #================================================================

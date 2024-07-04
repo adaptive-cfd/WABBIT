@@ -7,6 +7,7 @@ TESTING/B_SWIRL/adapt_*
 TESTING/B_SWIRL/adaptiv*_swirl-*
 TESTING/navier_stokes/funnel/*.dat
 TESTING/navier_stokes/filter/**/*.dat
+TESTING/compression/*.csv
 *times.dat
 *.log
 *.t

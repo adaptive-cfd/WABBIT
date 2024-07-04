@@ -228,31 +228,47 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
         ! the constant part needs to be generated on Jmax (where RHS is computed)
         do k = 1, hvy_n(tree_ID_mask)
             hvy_id = hvy_active(k, tree_ID_mask)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-            ! NOTE: if I am not mistaken, we could at this point also escape zero-valued blocks (Thomas, Yokohama, 23 Oct 2019)
-            ! ==> you are mistaken. some blocks contain garbage and will not be removed
-            ! probably you could set those blocks to zero but until we use the µCT really, we should not bother.
-            ! if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk .and. iter>Jmax-Jmin-2   ) then
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-                call get_block_spacing_origin( params, lgt_id, x0, dx )
-                call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, &
-                hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
-            ! endif
+            ! expensive:
+            call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
         enddo
 
-        ! we found that sometimes, we end up with more blocks than expected
-        ! and some zero-blocks can be coarsened again. doing that turned out to be
-        ! important for large-scale simulations
-        call adapt_tree( time, params, hvy_mask, tree_ID_mask, "mask-allzero-noghosts", hvy_tmp, ignore_maxlevel=.true.)
+        ! Deactivated following code (TE, 28jun2024), it seems unnecessary? We refine blocks that contain traces of the mask 
+        ! function, then set the mask function again. How should we create blocks that can be coarsened again? -> skip adapt_tree part here
 
+        ! ! we found that sometimes, we end up with more blocks than expected
+        ! ! and some zero-blocks can be coarsened again. doing that turned out to be
+        ! ! important for large-scale simulations
+        ! call adapt_tree( time, params, hvy_mask, tree_ID_mask, "threshold-state-vector", hvy_tmp, ignore_maxlevel=.true.)
 
-        if (params%rank==0) then
-            write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
-            maxActiveLevel_tree(tree_ID_mask), lgt_n(tree_ID_mask), lgt_n
-        endif
+        ! ! TODO (TE, 28jun2024): It is not 100% clear to me why the constant mask looks like every 2nd point is deleted at this
+        ! ! point. 
+
+        ! ! re-create mask on the adapted grid
+        ! do k = 1, hvy_n(tree_ID_mask)
+        !     hvy_id = hvy_active(k, tree_ID_mask)
+
+        !     ! As the adapt_tree routine coarsened the grid, it modified the data and we need to set it again.
+        !     ! Note, however, that we can at least exploit the fact that we have already created it once, and use the
+        !     ! modified mask data as an indicator where to re-create the mask now.
+        !     if (maxval(hvy_mask(:,:,:,1,hvy_id)) > 1.0e-9_rk ) then
+        !         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        !         call get_block_spacing_origin( params, lgt_id, x0, dx )
+
+        !         ! expensive:
+        !         call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_mask(:,:,:,:,hvy_id), "time-independent-part" )
+        !     endif
+        ! enddo
+
+        ! if (params%rank==0) then
+        !     write(*,'("Did coarsening for time-independent mask. Now: Jmax=",i2, " Nb=",i7," lgt_n=",(4(i6,1x)))') &
+        !     maxActiveLevel_tree(tree_ID_mask), lgt_n(tree_ID_mask), lgt_n
+        ! endif
     enddo
 
-    ! call saveHDF5_tree('timeindepmasknoprung_0000000001.h5', time, 0_ik, 1, params, hvy_mask, tree_ID_mask)
+    ! call saveHDF5_tree('constmask_1.h5', time, 0_ik, 1, params, hvy_mask, tree_ID_mask)
 
     ! syncing now and pruning later keeps the ghost nodes of the time-independent mask function sync'ed (as they
     ! do not change)

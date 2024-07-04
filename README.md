@@ -30,7 +30,7 @@ WABBIT needs several packages installed in order to compile and run, the main de
 
 Further information on the installation and compilation of all pre-requesites can be found in the wiki under [Install-WABBIT-with-requirements](../../wiki/Install-WABBIT-with-requirements).
 
-A list of all environment variables to be set can be find in the wiki under [Loading-prerequesites](../../Loading-prerequesites). Ensure that the WABBIT-specific variables for HDF5 are set in order for the compilation to finish successfully.
+A list of all environment variables to be set can be find in the wiki under [Loading-prerequesites](../../wiki/Loading-prerequesites). Ensure that the WABBIT-specific variables for HDF5 are set in order for the compilation to finish successfully.
 
 ## Running WABBIT
 Customize the template `.ini`-file and rename file to `[your_filename.ini]`, run WABBIT and pass it the `.ini`-file as well as the total amount of memory used:

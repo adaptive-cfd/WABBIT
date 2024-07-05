@@ -3,8 +3,10 @@ import numpy as np
 import os, sys, argparse, subprocess, select, logging, shutil
 import matplotlib.pyplot as plt
 
+use_latex = not (shutil.which('latex') == None)
+
 plt.rcParams.update({
-    "text.usetex": "true",
+    "text.usetex": "true" if use_latex else "false",
     "font.size": 11,
     "axes.linewidth": 1,
     "lines.linewidth": 1,
@@ -66,6 +68,7 @@ def run_tests(args):
 
 
 def plot(args):
+    logging.info("Plotting compression test results")
     fig1 = plt.figure(1, figsize=[4, 4])
     fig2 = plt.figure(2, figsize=[4, 4])
     fig3 = plt.figure(3, figsize=[4, 4])
@@ -73,8 +76,12 @@ def plot(args):
     for wavelet in wavelet_list:  
         d = np.loadtxt(f'error_{wavelet}.csv', delimiter=';', skiprows=1)
         
-        fig1.gca().loglog( d[:,0], d[:,1], '.-' , label =f"$L_2$ {wavelet}", mfc='w', markersize=5)
-        fig2.gca().loglog( d[:,0], d[:,2], '.-' , label =f"$L_\infty$ {wavelet}", mfc='w', markersize=5)
+        if use_latex:
+            fig1.gca().loglog( d[:,0], d[:,1], '.-' , label =f"$L_2$ {wavelet}", mfc='w', markersize=5)
+            fig2.gca().loglog( d[:,0], d[:,2], '.-' , label =f"$L_\infty$ {wavelet}", mfc='w', markersize=5)
+        else:
+            fig1.gca().loglog( d[:,0], d[:,1], '.-' , label =f"L2 {wavelet}", mfc='w', markersize=5)
+            fig2.gca().loglog( d[:,0], d[:,2], '.-' , label =f"Linfty {wavelet}", mfc='w', markersize=5)  
         
         ####  plot compression rate
         fig3.gca().loglog(d[:,0], d[:,3] / 2**(args.dim*args.Jmax), '.-', label = wavelet, mfc='w', markersize=5)
@@ -87,22 +94,31 @@ def plot(args):
     for i_fig in [fig1, fig2, fig3]:
         plt.figure(i_fig)
         plt.legend(handlelength=1, columnspacing=1, labelspacing=0.1, handletextpad=0.3)
-        plt.xlabel("Threshold epsilon")
-        plt.suptitle(f"Bs=${args.Bs}$ Jmax=${args.Jmax}$ dim=${args.dim}$ eps-norm=$L_\infty$ eps-normalized=T", fontsize=10)
+        if use_latex:
+            plt.xlabel("Threshold $\epsilon$")
+        else:
+            plt.xlabel("Threshold epsilon")
+        if use_latex: plt.suptitle(f"Bs=${args.Bs}$ Jmax=${args.Jmax}$ dim=${args.dim}$ eps-norm=$L_\infty$ eps-normalized=T", fontsize=10)
+        else: plt.suptitle(f"Bs={args.Bs} Jmax={args.Jmax} dim={args.dim} eps-norm=Linfty eps-normalized=T", fontsize=10)
         plt.tight_layout(rect=[0, 0.01, 1, 0.98], pad=0.15)  # rect respects suptitle
 
     plt.figure(fig1); plt.savefig("compression-error-L2.png")
+    logging.info("Created figure     \"compression-error-L2.png\"")
     plt.figure(fig2); plt.savefig("compression-error-Linfty.png")
+    logging.info("Created figure     \"compression-error-Linfty.png\"")
     plt.figure(fig3); plt.savefig("compression-ratio.png")
+    logging.info("Created figure     \"compression-ratio.png\"")
     try:
         from matplotlib.backends.backend_pdf import PdfPages
         with PdfPages('compression-test.pdf') as pdf:
             plt.figure(fig1); pdf.savefig()
             plt.figure(fig2); pdf.savefig()
             plt.figure(fig3); pdf.savefig()
+        logging.info("Created pdf report \"compression-test.pdf\"")
+        
     except Exception as e:
-        print("An error occurred when trying to creatre multi-page pdf document:")
-        print(e)
+        logging.error("An error occurred when trying to creatre multi-page pdf document:")
+        logging.error(e)
 
 
 def main():
@@ -143,7 +159,8 @@ def main():
     if args.plot:
         plot(args)
     
-    os.remove("header.txt")  # this is not really needed for this version
+    if os.path.isfile("header.txt"):
+        os.remove("header.txt")  # this is not really needed for this version
 
 if __name__ == "__main__":
     main()

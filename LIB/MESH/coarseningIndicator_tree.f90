@@ -2,7 +2,7 @@
 !> This method goes a bit against the naming convention, as for default wavelet cases it acts
 !! level-wise or leaf-wise but for specific indicators (everywhere or random) it acts on the whole tree.
 subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tmp, &
-    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, check_ref_TMP, hvy_mask, norm_inout)
+    tree_ID, indicator, iteration, ignore_maxlevel, input_is_WD, leaf_loop_tmp, hvy_mask, norm_inout)
 
     use module_indicators
 
@@ -30,7 +30,8 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     !! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
     logical, intent(in)                 :: ignore_maxlevel
     !> If this flag is true, then not the level but the refinement flag is tested for REF_TMP_UNTREATED (leaf-wise loop)
-    logical, intent(in)                 :: check_ref_tmp
+    !! It will then use the input from hvy_tmp as the non-decomposed values
+    logical, intent(in)                 :: leaf_loop_tmp
     real(kind=rk), intent(inout), optional :: norm_inout(:)  !< We can output the norm as well
 
     ! local variables
@@ -65,7 +66,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
 
     ! Outside calls of coarseningIndicator not in adapt_tree want to wipe refinement stati to "stay" before calling the indicator
     ! In adapt_tree we compute leaf-wise and all blocks will be marked during the iterations with REF_TMP_UNTREATED
-    if (.not. check_ref_tmp) then
+    if (.not. leaf_loop_tmp) then
         do k_b = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k_b, tree_ID)
             lgt_block( lgtID, IDX_REFINE_STS ) = 0
@@ -174,7 +175,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             norm(1:N_thresholding_components) = norm_inout(1:N_thresholding_components)
         else
             t0 = MPI_Wtime()
-            if ( .not. consider_hvy_tmp .and. .not. check_ref_tmp) then
+            if ( .not. consider_hvy_tmp .and. .not. leaf_loop_tmp) then
                 ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
                 call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
             else
@@ -276,11 +277,11 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             ! level wise coarsening: in the "biorthogonal" case, we start at J_max_active and
             ! iterate down to J_min. Only blocks on the level "level_this" are allowed to coarsen.
             ! this should prevent filtering artifacts at block-block interfaces.
-            if (level /= level_this .and. .not. check_ref_tmp) cycle
+            if (level /= level_this .and. .not. leaf_loop_tmp) cycle
             ! leaf wise coarsening: in the "biorthogonal" case, we start at leaf level and
             ! iterate until there is no change. Only blocks with "untreated" flag in refinement status are allowed to coarsen.
             ! this should prevent filtering artifacts at block-block interfaces.
-            if (ref_stat /= REF_TMP_UNTREATED .and. check_ref_tmp) cycle
+            if (ref_stat /= REF_TMP_UNTREATED .and. leaf_loop_tmp) cycle
 
             ! force blocks on maximum refinement level to coarsen, if parameter is set.
             ! Note this behavior can be bypassed using the ignore_maxlevel switch.

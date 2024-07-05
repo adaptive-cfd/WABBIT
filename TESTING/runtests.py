@@ -142,7 +142,9 @@ class WabbitTest:
                 result1.returncode = not all_similar
             # catch any error - for example HDF5 error - and then say the test failed
             # this is important to still print the log (and continue)
-            except:
+            except Exception as e:
+                self.logger.error("ERROR: Was not able to compare files")
+                self.logger.error(e)
                 result1.returncode = 1
 
             # change back to test_dir

@@ -163,8 +163,8 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
     ! how large is the patch to be checked?
     ! this parameter could be set conservative (Nrec) or aggressive (Nwc)
     ! since for unlifted wavelets we also always coarsen aggressively over block boundaries, we do the same here and do not deploy any extra buffer
-    N_buffer_l    = params%Nrecl
-    N_buffer_r    = params%Nrecr
+    N_buffer_l    = params%Nreconl
+    N_buffer_r    = params%Nreconr
     idx(:, :) = 1
 
     !--------------------------------------------------------------------------------------------------------------------

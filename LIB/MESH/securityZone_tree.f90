@@ -153,15 +153,18 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
     integer(kind=ik), parameter :: TMP_STATUS = 17
     integer(kind=ik) :: level_me, ref_status, neighborhood, i_neighborhood, ref_status_neighbor, ref_check, &
-    hvyID, lgtID, k, level_neighbor, lgtID_neighbor, idx(2,3), nx, ny, nz, g, Nreconl, Nreconr
+    hvyID, lgtID, k, level_neighbor, lgtID_neighbor, idx(2,3), nx, ny, nz, g, N_buffer_l, N_buffer_r
     logical :: refinement, inputIsWD
 
     nx = size(hvy_block, 1)
     ny = size(hvy_block, 2)
     nz = size(hvy_block, 3)
     g = params%g
-    Nreconl    = params%Nreconl
-    Nreconr    = params%Nreconr
+    ! how large is the patch to be checked?
+    ! this parameter could be set conservative (Nrec) or aggressive (Nwc)
+    ! since for unlifted wavelets we also always coarsen aggressively over block boundaries, we do the same here and do not deploy any extra buffer
+    N_buffer_l    = params%Nreconl
+    N_buffer_r    = params%Nreconr
     idx(:, :) = 1
 
     !--------------------------------------------------------------------------------------------------------------------
@@ -197,7 +200,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ! the neighbor wants to coarsen
                     if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
-                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/), &
+                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
                             X_s=(/ g, g, g/), X_e=(/ g, g, g/))
                         ref_check = -1
 

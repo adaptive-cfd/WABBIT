@@ -852,7 +852,7 @@ do iter= 1, 1
             enddo
 
             ! repack to Spaghetti-ordering
-            call inflatedMallat2spaghetti_block(params, wc, hvy_block(:,:, :,:,hvyID))
+            call inflatedMallat2spaghetti_block(params, wc(:, :, :, 1:nc, :), hvy_block(:,:, :,1:nc,hvyID))
         endif
     end do
 

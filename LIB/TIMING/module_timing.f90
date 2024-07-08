@@ -30,7 +30,7 @@ module module_timing
     ! each timing slot gets a name and number so it can be easily identified
     ! name is to identify it later by name, they will only be checked for uniqueness for DEV
     ! num is to uniquely address one timing, they should not overlap for different names
-    character(len=120), dimension(:), allocatable :: name_comp_time
+    character(len=80), dimension(:), allocatable :: name_comp_time
     integer, dimension(:, :), allocatable :: num_comp_time
 
 contains
@@ -79,7 +79,7 @@ contains
         if (.not. allocated( name_comp_time)) then
             ! note: fix size of time measurements array
             ! allocate array for time measurements - data
-            allocate(  comp_time( MAX_TIMING_SLOTS, 2 )  )
+            allocate(  comp_time( MAX_TIMING_SLOTS, 3 )  ) ! first is call counter, second sum, third max
             ! reset times
             comp_time = 0.0_dp
             ! allocate array for time measurements - names and nums
@@ -116,6 +116,7 @@ contains
             comp_time(k, 1)   =  comp_time(k, 1) + 1.0_dp
         endif
         comp_time(k, 2)   =  comp_time(k, 2) + t_elapsed_this
+        comp_time(k, 3)   =  max(comp_time(k, 3), t_elapsed_this)
     end subroutine toc
 
 
@@ -132,7 +133,7 @@ contains
         integer, intent(in)   :: comm
         !---------------------------------------
         integer :: rank, k_timings, k_sorted, number_procs,ierr
-        real(kind=dp), dimension(:), allocatable :: avg, std
+        real(kind=dp), dimension(:), allocatable :: avg, max, std
 
         call MPI_Comm_rank(comm, rank, ierr)
         call MPI_Comm_size(comm, number_procs, ierr)
@@ -143,13 +144,16 @@ contains
         endif
 
         allocate(avg(1:MAX_TIMING_SLOTS))
+        allocate(max(1:MAX_TIMING_SLOTS))
         allocate(std(1:MAX_TIMING_SLOTS))
 
         ! sum times (over all mpi processes) for all slots
         call MPI_Allreduce( comp_time(:,2), avg, MAX_TIMING_SLOTS, MPI_REAL8, MPI_SUM,  comm, ierr)
-
         ! average times (over all mpi processes) for all slots
         avg = avg / dble(number_procs)
+
+        ! max
+        call MPI_Allreduce( comp_time(:,3), max, MAX_TIMING_SLOTS, MPI_REAL8, MPI_MAX,  comm, ierr)
 
         ! standard deviation
         std = (comp_time(:,2) -  avg)**2.0_dp
@@ -160,6 +164,11 @@ contains
         else
             std = sqrt( std / dble(number_procs - 1 ))
         end if
+        ! make it relative to avg and to percent
+        do k_timings = 1, MAX_TIMING_SLOTS
+            ! check if we divide by 0 and skip that as it is a zero-entry
+            if (avg(k_timings) /= 0.0) std(k_timings) = std(k_timings) / avg(k_timings) * 100
+        enddo
 
         ! write indices as unique ids into second entry so that we can retrieve it for the other arrays
         ! CONTINUE HERE
@@ -172,25 +181,25 @@ contains
 
         ! output, with DEV we output the unique ID as well to have an overview
         if (rank==0) then
-            write(*,'(122("_"))')
+            write(*,'(108("_"))')
 #ifdef DEV
-            write(*, '(A80, 4(A14))') "Timing name" // repeat(" ", 30), "AVG in s", "+/- STD in s", "COUNT calls", "Unique ID"
+            write(*, '(A60, 2(A14), 3(A10))') "Timing name" // repeat(" ", 30), "AVG (s)", "MAX (s)", "STD (%)", "COUNT", "Unique ID"
 #else
-            write(*, '(A80, 3(A14))') "Timing name" // repeat(" ", 30), "AVG in s", "+/- STD in s", "COUNT calls"
+            write(*, '(A60, 2(A14), 2(A10))') "Timing name" // repeat(" ", 30), "AVG (s)", "MAX (s)", "STD (%)", "COUNT"
 #endif
-            write(*,'(122("_"))')
+            write(*,'(108("_"))')
             do k_timings = 1, MAX_TIMING_SLOTS
                 ! get the index in the arrays from the sorted list
                 k_sorted = num_comp_time(k_timings, 2)
                 if (num_comp_time(k_timings, 1) /= -1) then
 #ifdef DEV
-                write(*,'(A80, 2(2x, f12.3), 2(2x, i12))') name_comp_time(k_sorted), avg(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1)), num_comp_time(k_timings, 1)
+                write(*,'(A60, 2(2x, f12.3), 2x, f8.3, 2(2x, i8))') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1)), num_comp_time(k_timings, 1)
 #else
-                write(*,'(A80, 2(2x, f12.3), 2x, i12)') name_comp_time(k_sorted), avg(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1))
+                write(*,'(A60, 2(2x, f12.3), 2x, f8.3, 2x, i8)') name_comp_time(k_sorted), avg(k_sorted), max(k_sorted), std(k_sorted), int(comp_time(k_sorted, 1))
 #endif
                 endif
             end do
-            write(*,'(122("_"))')
+            write(*,'(108("_"))')
         end if
 
         ! MPI Barrier to be sure to see the above write statements

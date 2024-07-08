@@ -4,7 +4,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !> user defined parameter structure
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array
-    !! They are expected to be already wavelet decomposed in Mallat-ordering
+    !! When input_is_WD is set they are expected to be already wavelet decomposed in Spaghetti-ordering
     real(kind=rk), intent(inout)        :: u(:, :, :, :)
     !> it can be useful not to consider all components for thresholding here.
     !! e.g. to work only on the pressure or vorticity.
@@ -27,22 +27,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     integer(kind=ik)                    :: g, i_dim, dim, Jmax, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: eps_use
-    ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
-    ! Note: the precise naming of SC/WC is not really important. we just apply
-    ! the correct decomposition/reconstruction filters - thats it.
-    !
-    ! INDEX            2D     3D     LABEL (NAME)
-    ! -----            --    ---     ---------------------------------
-    ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-    ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-    ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
-    ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
-    ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
-    ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-    ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
-    ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
-    !
-    real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
     nx     = size(u, 1)
@@ -56,12 +40,8 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     detail = -1.0_rk
 
     if (allocated(u_wc)) then
-        if (size(u_wc, 4) > nc) deallocate(u_wc)
+        if (size(u_wc, 4) < nc) deallocate(u_wc)
     endif
-    if (allocated(wc)) then
-        if (size(wc, 4) > nc) deallocate(wc)
-    endif
-    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc, 1:8) )
     if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
 
     ! set the indices we want to treshold
@@ -104,16 +84,16 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 #endif
 
     if (.not. input_is_WD) then
-        u_wc = u  ! Wavelet decompose full block
-        call waveletDecomposition_block(params, u_wc) ! data on u (WC/SC) now in Spaghetti order
+        u_wc(:, :, :, 1:nc) = u(:, :, :, 1:nc)  ! Wavelet decompose full block
+        call waveletDecomposition_block(params, u_wc(:, :, :, 1:nc)) ! data on u (WC/SC) now in Spaghetti order
     else
         ! copy only part we need
-        u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), :) = &
-           u(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), :)
+        u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = &
+           u(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
     endif
 
     ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
-    u_wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, :) = 0.0_rk
+    u_wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = 0.0_rk
 
     do p = 1, nc
         ! if all details are smaller than C_eps, we can coarsen, check interior WC only

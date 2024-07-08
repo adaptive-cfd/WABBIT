@@ -12,12 +12,12 @@ subroutine spaghetti2inflatedMallat_block(params, u, wc)
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-    ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-    ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,2)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,3)    HG    HGH     wcx wavelet coeffs
     ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
     ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
-    ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-    ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,6)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
@@ -96,12 +96,12 @@ subroutine inflatedMallat2spaghetti_block(params, wc, u, sc_only)
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! wc(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-    ! wc(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-    ! wc(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,2)    GH    GHH     wcy wavelet coeffs
+    ! wc(:,:,:,:,3)    HG    HGH     wcx wavelet coeffs
     ! wc(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
     ! wc(:,:,:,:,5)          HHG     wcz wavelet coeffs
-    ! wc(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-    ! wc(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,6)          GHG     wcyz wavelet coeffs
+    ! wc(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
@@ -209,12 +209,12 @@ subroutine spaghetti2Mallat_block(params, u, wc)
     ! INDEX                                        2D     3D     LABEL
     ! -----------------------------------------    --    ---     ---------------------------------
     ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
     ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
@@ -288,12 +288,12 @@ subroutine Mallat2Spaghetti_block(params, wc, u)
     ! INDEX                                        2D     3D     LABEL
     ! -----------------------------------------    --    ---     ---------------------------------
     ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
     ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     !
     real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
@@ -369,23 +369,23 @@ subroutine Mallat2inflatedMallat_block(params, wc, u)
     ! INDEX                                        2D     3D     LABEL
     ! -----------------------------------------    --    ---     ---------------------------------
     ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
     ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-    ! u(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-    ! u(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! u(:,:,:,:,2)    GH    GHH     wcy wavelet coeffs
+    ! u(:,:,:,:,3)    HG    HGH     wcx wavelet coeffs
     ! u(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
     ! u(:,:,:,:,5)          HHG     wcz wavelet coeffs
-    ! u(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-    ! u(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! u(:,:,:,:,6)          GHG     wcyz wavelet coeffs
+    ! u(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
 
@@ -461,23 +461,23 @@ subroutine inflatedMallat2Mallat_block(params, u, wc, sc_only)
     ! INDEX                                        2D     3D     LABEL
     ! -----------------------------------------    --    ---     ---------------------------------
     ! wc(     1:nx/2,     1:ny/2,     1:nz/2,:)    HH    HHH     sc scaling function coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,     1:nz/2,:)    GH    GHH     wcy wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,     1:nz/2,:)    HG    HGH     wcx wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,     1:nz/2,:)    GG    GGH     wcxy wavelet coeffs
     ! wc(     1:nx/2,     1:ny/2,nz/2+1:nz  ,:)          HHG     wcz wavelet coeffs
-    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
+    ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
-    ! u(:,:,:,:,2)    HG    HGH     wcx wavelet coeffs
-    ! u(:,:,:,:,3)    GH    GHH     wcy wavelet coeffs
+    ! u(:,:,:,:,2)    GH    GHH     wcy wavelet coeffs
+    ! u(:,:,:,:,3)    HG    HGH     wcx wavelet coeffs
     ! u(:,:,:,:,4)    GG    GGH     wcxy wavelet coeffs
     ! u(:,:,:,:,5)          HHG     wcz wavelet coeffs
-    ! u(:,:,:,:,6)          HGG     wcxz wavelet coeffs
-    ! u(:,:,:,:,7)          GHG     wcyz wavelet coeffs
+    ! u(:,:,:,:,6)          GHG     wcyz wavelet coeffs
+    ! u(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
     !> Option to only convert SC

@@ -44,6 +44,10 @@ def run_wabbit(command, logger):
     return process
 
 # this object defines a wabbit test
+# new tests can be implemented by:
+#   - defining the test folder location in __init__
+#   - defining what should be executed in run
+#   - defining where the log-file should be in init_logging
 class WabbitTest:
     ini = test_name = wavelet = dim = mpi_command = memory = test_dir = cwd = run_dir = logger = None
     valid = True  # check if something in initialization went wrong
@@ -59,6 +63,7 @@ class WabbitTest:
         self.mpi_command = mpi_command
         self.memory = memory
 
+        # define here where the test folder will be located relative to the run directory!
         if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets")
         elif self.test_name == "adaptive":
@@ -77,6 +82,8 @@ class WabbitTest:
         if self.valid:
             os.chdir(self.test_dir)
 
+
+    # actually run the test! Here new tests can be added, when working with ini-files, use the block with blob and acm and point to the correct ini file
     def run(self, write_diff=False):
         if self.test_name == "equi_refineCoarsen_FWT_IWT":
             # change to directory
@@ -121,6 +128,7 @@ class WabbitTest:
             os.chdir(self.test_dir)
             return result2
         elif self.test_name in ["blob_equi", "blob_adaptive", "acm"]:
+            # lets say where the ini-file is
             if self.test_name in ["blob_equi", "blob_adaptive"]:
                 ini_file = os.path.join("..", "blob-convection.ini")  # relative to tmp_dir
             elif self.test_name in ["acm"]:
@@ -156,6 +164,7 @@ class WabbitTest:
     
 
     # I want to log at the same time to the console and possibly files as well, so I solve this with the logging module which handles the streams
+    # for a new test the log-file location needs to be specified
     def init_logging(self, verbose=False, suite_log_handler=None, stdout_handler=None):
         log_file = None
         if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
@@ -262,6 +271,7 @@ class WabbitTest:
                     
 
 # these are all tests that we can run
+# new blocks can be added with "---NAME---" and new tests by providing name, wavelet and dimension
 tests = [
         # "---post---",
         # "TESTING/wabbit_post/pod/pod_test.sh",

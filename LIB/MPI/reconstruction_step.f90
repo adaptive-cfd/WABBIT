@@ -64,8 +64,6 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
 
                     if (level_neighbor < level_me) then
                         ! manipulation of coeffs
-                        ! call coarseExtensionManipulateWC_block(params, wc, neighborhood)
-                        ! call coarseExtensionManipulateSC_block(params, wc(:, :, :, :, 1), hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
                         call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvyID), neighborhood)
                         call coarseExtensionManipulateSC_block(params, hvy_data(:,:,:,:,hvyID), hvy_tmp(:,:,:,:,hvyID), neighborhood, scSkipGhosts)
                     elseif (level_neighbor > level_me) then
@@ -74,9 +72,10 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, sc_s
                         ! Finer neighbor has its decomposition ready for level J+1 but we cannot sync it for level J
                         ! So it is impossible to reconstruct values if the filters range into J+1 ghost nodes
                         
+#ifdef DEV
                         ! Let's ensure this crashes just to show that filters should not range into finer level ghost nodes
-                        ! call coarseExtensionManipulateWC_block(params, wc, neighborhood, params%g, params%g, set_garbage=.true.)
                         call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvyID), neighborhood, params%g, params%g, set_garbage=.true.)
+#endif
                     endif
                 endif
             enddo

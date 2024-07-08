@@ -24,8 +24,8 @@ subroutine post_dry_run
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: filename,fname   ! filename of *.ini file used to read parameters
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask
+    character(len=cshort)               :: filename, fname, grid_list
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2
     type(inifile) :: FILE
@@ -53,8 +53,12 @@ subroutine post_dry_run
         write(*,*) "--------------------------------------------------------------"
         write(*,*) " This routine is mostly used for ACM and insects"
         write(*,*) "--------------------------------------------------------------"
+        write(*,*) " Two modes are available: "
+        write(*,*) "    1/ create mask on minimum grid, which may be different from fluid grid"
+        write(*,*) "    2/ create mask on a list of given grids, then identical to fluid grid"
+        write(*,*) "--------------------------------------------------------------"
         write(*,*) " Call:"
-        write(*,*) " ./wabbit-post --dry-run PARAMS.ini --memory=20.0GB"
+        write(*,*) " ./wabbit-post --dry-run PARAMS.ini --memory=20.0GB --Jmin=1 --grid-list=none --pruned"
         write(*,*) ""
         write(*,*) " Other parameters:"
         write(*,*) ""
@@ -63,9 +67,12 @@ subroutine post_dry_run
         write(*,*) "    speed up visualization, but the data is incomplete: you cannot"
         write(*,*) "    read those fields into wabbit."
         write(*,*) ""
-        write(*,*) " --Jmin"
+        write(*,*) " --Jmin The minimum tree level, default is taken from INI file."
         write(*,*) ""
-        write(*,*) " [Insects]::smoothing_thickness=local;"
+        write(*,*) " --grid-list=list.txt"
+        write(*,*) "   If given, we read in the specified h5 files and create the mask"
+        write(*,*) "   on the same grid. Output is stored in mask_XXXXXXXXXXXX.h5 as usual, "
+        write(*,*) "   but the time stamp is taken from the file(s)."
         write(*,*) ""
     endif
 
@@ -81,6 +88,7 @@ subroutine post_dry_run
 
     call get_cmd_arg( "--pruned", pruned, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
+    call get_cmd_arg( "--grid-list", grid_list, default="none" )
 
     ! for the dry run we dont need to use the fancy wavelets
     params%wavelet = "CDF20"
@@ -168,102 +176,132 @@ subroutine post_dry_run
     "   rot_dt_r_w_z"/) )
     !-----------------------------------
 
-    do while ( time < params%time_max )
-        ! start with an equidistant grid on coarsest level.
-        ! routine also deletes any existing mesh in the tree.
-        call createEquidistantGrid_tree( params, hvy_mask, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
+    if (grid_list == "none" ) then
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+        ! traditional mode: create the grid AND the mask, possibly with pruning.
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
+
+        do while ( time < params%time_max )
+            ! start with an equidistant grid on coarsest level.
+            ! routine also deletes any existing mesh in the tree.
+            call createEquidistantGrid_tree( params, hvy_mask, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
 
 
-        if (params%rank==0) then
-            write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7," time=",g12.4)') &
-            maxActiveLevel_tree(tree_ID_flow), lgt_n(tree_ID_flow), time
-        endif
+            if (params%rank==0) then
+                write(*,'("Starting mask generation. Now: Jmax=",i2, " Nb=",i7," time=",g12.4)') &
+                maxActiveLevel_tree(tree_ID_flow), lgt_n(tree_ID_flow), time
+            endif
 
-        ! generate complete mask on the initial equidistant grid
-        call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
-
-
-        ! refine the grid near the interface and re-generate the mask function.
-        do iter = 1, (Jmax - Jmin)
-            ! synchronization before refinement (because the interpolation takes place on the extended blocks
-            ! including the ghost nodes)
-            ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
-            ! Snyc'ing becomes much more expensive once the grid is refined.
-            ! sync possible only before pruning
-            call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
+            ! generate complete mask on the initial equidistant grid
+            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
 
 
-            ! refine the mesh, but only where the mask is interesting (not everywhere!)
-            ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
-            call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
+            ! refine the grid near the interface and re-generate the mask function.
+            do iter = 1, (Jmax - Jmin)
+                ! synchronization before refinement (because the interpolation takes place on the extended blocks
+                ! including the ghost nodes)
+                ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
+                ! Snyc'ing becomes much more expensive once the grid is refined.
+                ! sync possible only before pruning
+                call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
+
+
+                ! refine the mesh, but only where the mask is interesting (not everywhere!)
+                ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
+                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
+
+                ! on new grid, create the mask again
+                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+                Nmask = lgt_n(tree_ID_flow)
+
+                ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
+                ! is effectively ignored. It seems redundant; if we set a small eps (done independent
+                ! of the parameter file), this yields the same result
+                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+
+                ! on new grid, create the mask again
+                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+
+                ! current finest level is:
+                Jnow = maxActiveLevel_tree(tree_ID_flow)
+
+                if (params%rank==0) then
+                    write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
+                    & After coarsening: Jmax=",i2, " Nb=",i7)') Nmask, Jnow, lgt_n(tree_ID_flow)
+                endif
+
+                ! We're done once the mask is created on the final level. Relevant only if the start grid is not
+                ! created on Jmin, but on Jequi
+                if (Jnow==Jmax) exit
+            enddo
 
             ! on new grid, create the mask again
             call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
             Nmask = lgt_n(tree_ID_flow)
 
-            ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
-            ! is effectively ignored. It seems redundant; if we set a small eps (done independent
-            ! of the parameter file), this yields the same result
-            call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+            call WRITE_INSECT_DATA(time)
 
-            ! on new grid, create the mask again
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            ! before (possible) pruning, we sync the ghosts
+            call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
-            ! current finest level is:
-            Jnow = maxActiveLevel_tree(tree_ID_flow)
+            if (pruned) then
+                if (params%rank==0) write(*,*) "now pruning!"
 
-            if (params%rank==0) then
-                write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
-                & After coarsening: Jmax=",i2, " Nb=",i7)') Nmask, Jnow, lgt_n(tree_ID_flow)
+                call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow)
             endif
 
-            ! We're done once the mask is created on the final level. Relevant only if the start grid is not
-            ! created on Jmin, but on Jequi
-            if (Jnow==Jmax) exit
+            !***********************************************************************
+            ! Write fields to HDF5 file
+            !***********************************************************************
+            ! call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
+            ! lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
+
+            ! create filename
+            write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
+            call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+
+            !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
+            !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )
+
+    !        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+    !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+    !        lgt_n, hvy_n, hvy_active, dF=2, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+
+    !        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+    !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+    !        lgt_n, hvy_n, hvy_active, dF=3, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+
+            ! write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+            ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
+            ! lgt_n, hvy_n, hvy_active, dF=4, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+
+            time = time + params%write_time
+        end do
+
+    else
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Grid mode: create the mask on a given grid (do not create the grid here)
+        ! Given is a list of files to take the grid from.
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        io_error = 0
+        open(unit=14,file=grid_list, action='read', status='old')
+        do while (io_error==0)
+            read (14,'(A)',iostat=io_error) fname
+
+            ! read in the file
+            call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
+
+            ! create the mask
+            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+
+            ! as we intend to create the mask on a given grid, pruning makes no sense
+
+            ! store mask file
+            write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
+            call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=.false.)
         enddo
-
-        ! on new grid, create the mask again
-        call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
-        Nmask = lgt_n(tree_ID_flow)
-
-        call WRITE_INSECT_DATA(time)
-
-        ! before (possible) pruning, we sync the ghosts
-        call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
-
-        if (pruned) then
-            if (params%rank==0) write(*,*) "now pruning!"
-
-            call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow)
-        endif
-
-        !***********************************************************************
-        ! Write fields to HDF5 file
-        !***********************************************************************
-        ! call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-        ! lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
-
-        ! create filename
-        write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
-        call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
-
-        !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
-        !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )
-
-!        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
-!        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-!        lgt_n, hvy_n, hvy_active, dF=2, tree_ID=tree_ID_flow, time=time, iteration=-1 )
-
-!        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
-!        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-!        lgt_n, hvy_n, hvy_active, dF=3, tree_ID=tree_ID_flow, time=time, iteration=-1 )
-
-        ! write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
-        ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-        ! lgt_n, hvy_n, hvy_active, dF=4, tree_ID=tree_ID_flow, time=time, iteration=-1 )
-
-        time = time + params%write_time
-    end do
+        close (14)
+    endif
 
 
 

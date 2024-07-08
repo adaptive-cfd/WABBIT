@@ -93,7 +93,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
         ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
         ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
-        ! JB ToDo: CLASH WITH HVY_TMP NEEDS TO BE RESOLVED
+        ! JB ToDo: CLASH WITH HVY_TMP NEEDS TO BE RESOLVED - partial masks can overwrite hvy_tmp data
         call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
         call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
         ! simplify if-condition downwards and check mask for indicator if it was created here

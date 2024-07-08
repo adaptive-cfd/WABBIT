@@ -66,7 +66,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
 
         t0 = MPI_wtime()
         ! we loop over heavy data here: parallel execution.
-        ! ToDo: We could make this collectively, only need to change finding the sisters for non-rank blocks without access to hvy_family
+        ! We could make this collectively, only need to change finding the sisters for non-rank blocks without access to hvy_family
         ! However, then we would need to call find_sister over all lgt blocks with -1 (potentially many), so in the end it is sync_lgt against many times doesBlockExist
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)

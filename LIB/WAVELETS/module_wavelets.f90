@@ -1341,11 +1341,11 @@ contains
         ! The HR filter is always defined by the first number of the CDFXY filter
         ! The HD filter changes depending on both numbers
         if (params%wavelet(4:4) == "2") then
-            ! H filter
+            ! H TILDE filter
             allocate( params%HR(-1:1) )
             params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
 
-            ! H TILDE filter
+            ! H filter
             if (params%wavelet(5:5) .eq. "0") then
                 allocate( params%HD(0:0) )
                 params%HD = (/1.0_rk/)
@@ -1370,11 +1370,11 @@ contains
             endif
 
         elseif (params%wavelet(4:4) == "4") then
-            ! H filter
+            ! H TILDE filter
             allocate( params%HR(-3:3) )
             params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
 
-            ! H TILDE filter
+            ! H filter
             if (params%wavelet(5:5) == "0") then
                 allocate( params%HD(0:0) )
                 params%HD = (/1.0_rk/)
@@ -1415,11 +1415,11 @@ contains
                 call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )      
             endif
         elseif (params%wavelet(4:4) == "6") then
-            ! H filter  
+            ! H TILDE filter  
             allocate( params%HR(-5:5) )
             params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
 
-            ! H TILDE filter
+            ! H filter
             if (params%wavelet(5:5) == "0") then
                 allocate( params%HD(0:0) )
                 params%HD = (/1.0_rk/)

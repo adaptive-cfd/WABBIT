@@ -264,9 +264,9 @@ subroutine ini_blocks(params, FILE )
    ! check for X in CDFXY
    if (params%wavelet(4:4) == "2") then
       g_default = 2
-   elseif (params%wavelet(4:4) == "4")
+   elseif (params%wavelet(4:4) == "4") then
       g_default = 4
-   elseif (params%wavelet(4:4) == "6")
+   elseif (params%wavelet(4:4) == "6") then
       g_default = 6
    else 
       call abort(2320241, "no default specified for this wavelet...")
@@ -276,11 +276,11 @@ subroutine ini_blocks(params, FILE )
    lifted_wavelet = params%wavelet(5:5) /= "0"
    if (params%wavelet(5:5) == "2") then
       g_default = g_default + 1
-   elseif (params%wavelet(5:5) == "4")
+   elseif (params%wavelet(5:5) == "4") then
       g_default = g_default + 3
-   elseif (params%wavelet(5:5) == "6")
+   elseif (params%wavelet(5:5) == "6") then
       g_default = g_default + 5
-   elseif (params%wavelet(5:5) == "8")
+   elseif (params%wavelet(5:5) == "8") then
       g_default = g_default + 7
    else
       call abort(2320241, "no default specified for this wavelet...")

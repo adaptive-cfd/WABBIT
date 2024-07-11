@@ -69,7 +69,8 @@ module module_MPI
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
 
-    ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a new block we scrap the old filtered values
+    ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a
+    ! new block we delete the old filtered values from the previous one.
     real(kind=rk), allocatable :: hvy_restricted(:, :, :, :)
     real(kind=rk), allocatable :: hvy_predicted(:, :, :, :)
     ! We need to save which block currently is filtered
@@ -86,7 +87,7 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC
+    PUBLIC :: sync_ghosts_tree, sync_ghosts_RHS_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
     PUBLIC :: coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 

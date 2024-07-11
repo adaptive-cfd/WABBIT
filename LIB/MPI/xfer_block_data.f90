@@ -7,7 +7,7 @@
 !!    2. Data is send / received via buffers, buffer is assumed to fit all data!
 !!    3. Data is send / received directly (for whole blocks)
 !> Before this step, all metadata and datasizes have to be prepared in send_counter and recv_counter
-subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -23,6 +23,7 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+    logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
     ! Following are global data used but defined in module_mpi:
@@ -32,6 +33,12 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset, k, ijk(2,3), isend, irecv
     real(kind=rk)      :: t0
+    logical :: ignoreFilter
+
+    !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
+    ignoreFilter = .false.
+    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
+
 
     Bs      = params%Bs
     myrank  = params%rank
@@ -52,7 +59,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
-    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
+    REF_FLAG, ignore_Filter=ignoreFilter)
     call toc( "xfer_block_data (prepare data)", 70, MPI_wtime()-t0 )
 
     !***************************************************************************
@@ -67,7 +75,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     !***************************************************************************
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
-    call unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG)
+    call unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, &
+    hvy_tmp, REF_FLAG, ignore_Filter=ignoreFilter)
     call toc( "xfer_block_data (unpack internal)", 72, MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
@@ -88,7 +97,7 @@ end subroutine xfer_block_data
 !> \brief Prepare data to be sent with MPI \n
 !! This already applies res_pre so that the recver only has to sort in the data correctly. \n
 !! Fills the send buffer
-subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
+subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter )
     implicit none
 
     type (type_params), intent(in) :: params
@@ -100,6 +109,8 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+    logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
+
 
     integer(kind=ik)   :: recver_rank, myrank, sender_hvyID, sender_ref, recver_hvyID, level_diff, patch_size, recver_lgtID, sender_lgtID
     integer(kind=ik)   :: relation  ! neighborhood 1:74, full block 0, family -1:-8
@@ -107,7 +118,12 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
     ! merged information of level diff and an indicator that we have a historic finer sender
     integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
     integer(kind=ik)   :: patch_ijk(2,3), size_buff(4), nc, k_patch
-    logical            :: use_hvy_TMP
+    logical            :: use_hvy_TMP, ignoreFilter
+
+    ignoreFilter = .false.
+    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
+
+
 
     ! Following are global data used but defined in module_mpi:
     ! res_pre_data, rDara_sendBuffer
@@ -166,9 +182,9 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
             ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
             if (use_hvy_TMP .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
-                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_tmp, nc, sender_hvyID )
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
             else
-                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_data, nc, sender_hvyID )
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_data, nc, sender_hvyID, ignoreFilter)
             endif
 
             patch_ijk = ijkPatches(:,:, relation, level_diff, RESPRE)
@@ -276,7 +292,7 @@ end subroutine unpack_ghostlayers_external
 
 !> \brief Unpack all internal patches which do not have to be sent
 !! This simply copies from hvy_data, applies res_pre and then copies it back into the correct position
-subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG )
+subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter )
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -287,12 +303,17 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+    logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
+
 
     integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID, sender_ref
     integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
     integer(kind=ik) :: sender_hvyID, level_diff
     integer(kind=ik) :: send_ijk(2,3), recv_ijk(2,3), nc, myrank
-    logical          :: use_hvy_tmp
+    logical          :: use_hvy_tmp, ignoreFilter
+
+    ignoreFilter = .false.
+    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
 
     nc = size(hvy_data,4)
     myrank  = params%rank
@@ -337,10 +358,10 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
                 if (use_hvy_tmp .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
                     call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
-                    relation, level_diff, hvy_tmp, nc, sender_hvyID )
+                    relation, level_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
                 else
                     call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
-                    relation, level_diff, hvy_data, nc, sender_hvyID )
+                    relation, level_diff, hvy_data, nc, sender_hvyID, ignoreFilter )
                 endif
     
                 ! copy interpolated / restricted data to ghost nodes layer

@@ -98,13 +98,40 @@ subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus)
 
 end subroutine sync_ghosts_tree
 
+!> Wrapper to synch all ghost-point patches, but not using the filter.
+!! This is done during the RHS evaluation: the stencil size of the FD discretization is short,
+!! and consequently only the first few ghost nodes are used. In the coarseExtension, those are copied
+!! anyways (being near the coarse/fine interface, the appropriate filter cannot be applied).
+!! Therefore, for reasons of consistency and performance, we can ignore the filter in ghost nodes
+!! sync'ing. This corresponds to using non-lifted wavelets.
+subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
+    implicit none
+
+    type (type_params), intent(in) :: params
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
+
+    integer(kind=ik) :: gminus, gplus
+    gminus = params%g
+    gplus = params%g
+    ! if we sync a different number of ghost nodes
+    if (present(g_minus)) gminus = g_minus
+    if (present(g_plus))   gplus = g_plus
+
+    ! set level to -1 to enable synching between all, set stati to send to all levels
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, &
+    s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true., ignore_Filter=.true.)
+
+end subroutine
+
 
 !> This function deals with ghost-node synching \n
 !! It is a generic function with many flags, streamlining all synching process \n
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
 subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
-    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp, verbose_check)
+    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp, verbose_check, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -125,10 +152,11 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to J
     logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to J+1
     logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to J
+    logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
 
     integer(kind=ik) sLevel
-    logical :: SM2M, SM2C, SC2M, SM2F, SF2M
+    logical :: SM2M, SM2C, SC2M, SM2F, SF2M, ignoreFilter
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
     integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
@@ -158,12 +186,14 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     sC2M = .false.
     sM2F = .false.
     sF2M = .false.
+    ignoreFilter = .false.
     if (present(s_Level)) sLevel = s_Level
     if (present(s_M2M)) sM2M = s_M2M
     if (present(s_M2C)) sM2C = s_M2C
     if (present(s_C2M)) sC2M = s_C2M
     if (present(s_M2F)) sM2F = s_M2F
     if (present(s_F2M)) sF2M = s_F2M
+    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
 
     gminus  = params%g
     gplus   = params%g
@@ -208,14 +238,6 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 ! 2D: 5,6,7,8
 ! 3D: 7-18, 19-26, 51-74
 !
-! 2nd IDEA: stage-free ghost nodes.
-! ==> did not work yet
-! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
-! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
-! are directly interpolated correctly. 19 apr 2023: This can be made work, but it is tedious and does not yield an
-! immense speedup neither. On my local machine, its ~5%, but on large scale parallel sims, it may be more significant.
-! Idea is described in inskape notes.
-!
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
@@ -226,8 +248,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
         ! prepare metadata. This computes from the grid info how much data I recv and send to all other mpiranks.
         ! Also applies logic about what should be synched and saves all metadata unsorted in one array
         ! internal nodes are included in metadata but not counted
-        t1 = MPI_wtime()
-        t2 = MPI_wtime()  ! stage duration
+        t1 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
             istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
@@ -238,17 +259,20 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
         !    - with sLevel < -1: we decide after refinement flag present in sLevel if we want to use hvy_temp
         !    - elsewise: use hvy_tmp for prediction (used in updating SC from coarser neighbours)
         !***************************************************************************
-        t1 = MPI_wtime()
+        t2 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
-            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, verbose_check=verbose_check)
+            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignoreFilter, &
+            verbose_check=verbose_check)
         else
             if (sLevel < -1) then
-                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, REF_FLAG=sLevel, verbose_check=verbose_check)
+                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
+                REF_FLAG=sLevel, ignore_Filter=ignoreFilter, verbose_check=verbose_check)
             else
-                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, verbose_check=verbose_check)
+                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
+                ignore_Filter=ignoreFilter, verbose_check=verbose_check)
             endif
         endif
-        call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t1 )
+        call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )
         write(toc_statement, '(A, i0, A)') "sync ghosts (stage ", istage, " TOTAL)"
         call toc( toc_statement, 82+istage, MPI_wtime()-t1 )
 
@@ -257,153 +281,6 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     call toc( "sync ghosts (TOTAL)", 80, MPI_wtime()-t0 )
 
 end subroutine sync_ghosts_generic
-
-! subroutine sync_ghosts_nostages( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-!
-!     implicit none
-!
-!     type (type_params), intent(in) :: params
-!     !> light data array
-!     integer(kind=ik), intent(in)   :: lgt_block(:, :)
-!     !> heavy data array - block data
-!     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)
-!     !> heavy data array - neighbor data
-!     integer(kind=ik), intent(in)   :: hvy_neighbor(:,:)
-!     !> list of active blocks (heavy data)
-!     integer(kind=ik), intent(in)   :: hvy_active(:)
-!     !> number of active blocks (heavy data)
-!     integer(kind=ik), intent(in)   :: hvy_n
-!
-!     integer(kind=ik)   :: myrank, mpisize, ii0, ii1, Bs(1:3)
-!     integer(kind=ik)   :: N, k, neighborhood, level_diff
-!     integer(kind=ik)   :: recver_lgtID, recver_rank, recver_hvyID
-!     integer(kind=ik)   :: sender_hvyID, sender_lgtID
-!
-!     integer(kind=ik) :: ijk(2,3), isend, irecv
-!     integer(kind=ik) :: bounds_type, inverse
-!     real(kind=rk) :: t0
-!
-!     t0 = MPI_wtime()
-!
-!     if (.not. ghost_nodes_module_ready) then
-!         ! in order to keep the syntax clean, buffers are module-global and need to be
-!         ! allocated here.
-!         call init_ghost_nodes( params )
-!     endif
-!
-!     ! if this mpirank has no active blocks, it has nothing to do here.
-!     if (hvy_n == 0) return
-!
-! !
-! ! New Idea (09 Apr 2023)
-! !
-! ! During adapt_mesh, which is the most performance-hungry part of the algorithm with biorthogonal wavelets
-! ! we should sync certain levels only. This we need also for the complete wavelet transform and denoising/CVS.
-! ! Synching a level should mean we syn (J,J-1). We start from Jmax. This means: sync all neighborhoods that
-! ! involve level J, also on blocks of level J-1. It does not mean a block on (J-1) is completely synced, just those
-! ! neighborhoods.
-! !
-! ! 2nd IDEA: stage-free ghost nodes.
-! ! It turn out, if the coarser block sends not-correctly interpolatedy points, they can be corrected on the
-! ! receiving fine block. Only a few are affected; the ones toward the interface. The ones further away
-! ! are directly interpolated correctly.
-!
-!     Bs    = params%Bs
-!     N     = params%number_blocks
-!     myrank  = params%rank
-!     mpisize = params%number_procs
-!
-!     ! call reset_ghost_nodes(  params, hvy_block, hvy_active, hvy_n )
-!
-!         !***************************************************************************
-!         ! (i) stage initialization
-!         !***************************************************************************
-!         int_pos(:) = 1
-!         real_pos(:) = 0
-!         internalNeighbor_pos = 1
-!
-!         ! compute, locally from the grid info, how much data I recv from and send to all
-!         ! other mpiranks. this gives us the start indices of each rank in the send/recv buffers. Note
-!         ! we do not count our internal nodes (.false. as last argument), as they are not put in the
-!         ! buffer at any time.
-!         call get_my_sendrecv_amount_with_ranks_nostages(params, lgt_block, hvy_neighbor, hvy_active, hvy_n, &
-!              data_recv_counter, data_send_counter, meta_recv_counter, meta_send_counter, &
-!              count_internal=.false., ncomponents=size(hvy_block,4))
-!
-!
-!         ! reset iMetaData_sendBuffer, but only the parts that will actually be treated.
-!         do k = 1, params%number_procs
-!             ii0 = sum(meta_send_counter(0:(k-1)-1)) + 1
-!             ii1 = ii0 + meta_send_counter(k-1)
-!             iMetaData_sendBuffer(ii0:ii1) = -99
-!
-!             ii0 = sum(meta_recv_counter(0:(k-1)-1)) + 1
-!             ii1 = ii0 + meta_recv_counter(k-1)
-!             iMetaData_recvBuffer(ii0:ii1) = -99
-!         enddo
-!
-!
-!         !***************************************************************************
-!         ! (ii) prepare data for sending
-!         !***************************************************************************
-!         do k = 1, hvy_n
-!             ! calculate light id
-!             sender_hvyID = hvy_active(k)
-!             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-!
-!             ! loop over all neighbors
-!             do neighborhood = 1, size(hvy_neighbor, 2)
-!                 ! neighbor exists
-!                 if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
-!                     ! neighbor light data id
-!                     recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
-!                     ! calculate neighbor rank
-!                     call lgt2proc( recver_rank, recver_lgtID, N )
-!                     ! neighbor heavy id
-!                     call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
-!                     ! define level difference: sender - receiver, so +1 means sender on higher level
-!                     ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
-!                     ! leveldiff =  0 : sender is same level as recver
-!                     ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-!                     level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
-!
-!                     if ( myrank == recver_rank ) then
-!                         ! internal relation (no communication) has its own buffer (to avoid senseless copying
-!                         ! from send to recv buffer)
-!                         meta_send_all( internalNeighbor_pos:internalNeighbor_pos+4-1 ) = (/sender_hvyID, recver_hvyID, neighborhood, level_diff/)
-!                         internalNeighbor_pos = internalNeighbor_pos + 4
-!                     else
-!                         ! external relation (MPI communication)
-!                         call send_prepare_external( params, recver_rank, hvy_block, sender_hvyID, recver_hvyID, neighborhood, level_diff )
-!                     end if ! (myrank==recver_rank)
-!                 end if ! neighbor exists
-!             end do ! loop over all possible  neighbors
-!         end do ! loop over all heavy active
-!
-!         !***************************************************************************
-!         ! (iii) transfer part (send/recv)
-!         !***************************************************************************
-!         call start_xfer_mpi( params, iMetaData_sendBuffer, rData_sendBuffer, iMetaData_recvBuffer, rData_recvBuffer, isend, irecv )
-!
-!
-!         !***************************************************************************
-!         ! (iv) Unpack received data in the ghost node layers
-!         !***************************************************************************
-!         ! process-internal ghost points (direct copy)
-!         call unpack_ghostlayers_internal( params, hvy_block )
-!
-!         ! before unpacking the data we received from other ranks, we wait for the transfer
-!         ! to be completed
-!         call finalize_xfer_mpi(params, isend, irecv)
-!
-!         ! process-external ghost points (copy from buffer)
-!         call unpack_ghostlayers_external( params, hvy_block )
-!
-!         ! call fixInterpolatedPoints_postSync( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n)
-!
-!     call toc( "WRAPPER: sync ghosts", 19, MPI_wtime()-t0 )
-!
-! end subroutine sync_ghosts_nostages
 
 
 
@@ -427,11 +304,11 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
 
     !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
     integer(kind=ik), intent(in), optional  :: s_level
-    logical, intent(in), optional  :: s_M2M                         !< Synch from level J   to J
-    logical, intent(in), optional  :: s_M2C                         !< Synch from level J   to J-1
-    logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to J
-    logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to J+1
-    logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to J
+    logical, intent(in), optional  :: s_M2M         !< Synch from level J   to J
+    logical, intent(in), optional  :: s_M2C         !< Synch from level J   to J-1
+    logical, intent(in), optional  :: s_C2M         !< Synch from level J-1 to J
+    logical, intent(in), optional  :: s_M2F         !< Synch from level J   to J+1
+    logical, intent(in), optional  :: s_F2M         !< Synch from level J+1 to J
     integer(kind=ik) sLevel
     logical :: SM2M, SM2C, SC2M, SM2F, SF2M
 

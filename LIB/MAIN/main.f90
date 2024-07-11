@@ -315,7 +315,7 @@ program main
             !*******************************************************************
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
-                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
+                call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             endif
@@ -438,7 +438,7 @@ program main
     !*******************************************************************
     if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
         ! we need to sync ghost nodes for some derived qtys, for sure
-        call sync_ghosts_tree( params, hvy_block, tree_ID_flow)
+        call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow)
 
         call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
     endif

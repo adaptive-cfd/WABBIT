@@ -64,7 +64,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     endif
 
     ! synchronize ghost nodes
-    call sync_ghosts_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs  )
+    call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs  )
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -103,7 +103,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
 
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
-        call sync_ghosts_tree( params, hvy_work(:,:,:,:,:,y1), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,:,:,y1), tree_ID, g_minus=grhs, g_plus=grhs  )
 
         call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g

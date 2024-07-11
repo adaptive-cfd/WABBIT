@@ -258,31 +258,33 @@ subroutine ini_blocks(params, FILE )
 
    ! annoyingly, this is redundant with the definition in setup_wavelet, but as setup_wavelet is part of module_wavelets
    ! which use module_params it cannot be called here (circular dependency....)
-   select case(params%wavelet)
-    case ('CDF20')
+   ! compute the number of ghost points, which for CDFXY is X for unlifted and X+Y-1 for lifted wavelets
+   ! check if it is lifted or unlifted, which depends on Y (0 for unlifted and >0 for lifted wavelets)
+
+   ! check for X in CDFXY
+   if (params%wavelet(4:4) == "2") then
       g_default = 2
-      lifted_wavelet = .false.
-    case ('CDF22')
-      g_default = 3
-      lifted_wavelet = .true.
-    case ('CDF40')
+   elseif (params%wavelet(4:4) == "4")
       g_default = 4
-      lifted_wavelet = .false.
-    case ('CDF42')
-      g_default = 5
-      lifted_wavelet = .true.
-    case ('CDF44', 'CDF62')
-      g_default = 7
-      lifted_wavelet = .true.
-    case ('CDF60')
+   elseif (params%wavelet(4:4) == "6")
       g_default = 6
-      lifted_wavelet = .false.
-    case ('CDF46')
-      g_default = 9
-      lifted_wavelet = .true.
-    case default
+   else 
       call abort(2320241, "no default specified for this wavelet...")
-   end select
+   endif
+
+   ! check for Y in CDFXY
+   lifted_wavelet = params%wavelet(5:5) /= "0"
+   if (params%wavelet(5:5) == "2") then
+      g_default = g_default + 1
+   elseif (params%wavelet(5:5) == "4")
+      g_default = g_default + 3
+   elseif (params%wavelet(5:5) == "6")
+      g_default = g_default + 5
+   elseif (params%wavelet(5:5) == "8")
+      g_default = g_default + 7
+   else
+      call abort(2320241, "no default specified for this wavelet...")
+   endif
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )

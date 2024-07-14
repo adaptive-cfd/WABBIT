@@ -269,12 +269,14 @@ subroutine ini_blocks(params, FILE )
    elseif (params%wavelet(4:4) == "6") then
       g_default = 6
    else 
-      call abort(2320241, "no default specified for this wavelet...")
+      call abort(2320242, "no default specified for this wavelet...")
    endif
 
    ! check for Y in CDFXY
    lifted_wavelet = params%wavelet(5:5) /= "0"
-   if (params%wavelet(5:5) == "2") then
+   if (params%wavelet(5:5) == "0") then
+      ! g stays the same
+   elseif (params%wavelet(5:5) == "2") then
       g_default = g_default + 1
    elseif (params%wavelet(5:5) == "4") then
       g_default = g_default + 3
@@ -283,7 +285,7 @@ subroutine ini_blocks(params, FILE )
    elseif (params%wavelet(5:5) == "8") then
       g_default = g_default + 7
    else
-      call abort(2320241, "no default specified for this wavelet...")
+      call abort(2320243, "no default specified for this wavelet...")
    endif
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )

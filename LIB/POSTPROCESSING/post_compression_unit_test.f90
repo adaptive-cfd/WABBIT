@@ -67,9 +67,14 @@ subroutine post_compression_unit_test(params)
     call get_cmd_arg( "--eps-norm", params%eps_norm, default="Linfty" )
     call get_cmd_arg( "--Bs", params%Bs(1), default=18 )
     call get_cmd_arg( "--Bs", params%Bs(2), default=18 )
-    call get_cmd_arg( "--Bs", params%Bs(3), default=18 )
     call get_cmd_arg( "--Jmax", params%Jmax, default=4 )
     call get_cmd_arg( "--dim", params%dim, default=2 )
+
+    if ( params%dim == 3) then
+        call get_cmd_arg( "--Bs", params%Bs(3), default=18 )
+    else
+        params%Bs(3) = 1
+    endif
 
     ! fixed parameters
     params%domain_size = 2.0_rk

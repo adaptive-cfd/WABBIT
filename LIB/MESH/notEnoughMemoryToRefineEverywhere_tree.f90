@@ -1,13 +1,14 @@
 
 ! check if we still have enough memory left: for very large simulations
 ! we cannot affort to have them fail without the possibility to resume them
-logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
+logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID, time)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
     implicit none
     type (type_params), intent(inout) :: params
     integer(kind=ik), intent(in)      :: tree_ID
+    real(kind=rk), intent(in)         :: time  ! used to differentiate for force_maxlevel_dealiasing
 
     integer :: hvy_n_max, k, hvy_n_afterRefinement, hvyID, lgtID
 
@@ -28,8 +29,9 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID)
 
     ! Routine is called BEFORE refinement. figure out how many blocks
     ! that will be after refinement
-    if (params%force_maxlevel_dealiasing) then
-        ! with dealiasing, the relation is very simple.
+    if (params%force_maxlevel_dealiasing .and. time > 0.0) then
+        ! with dealiasing, the relation is very simple, as all blocks have to be on level JMax-1 or smaller
+        ! however, this might not be true when a file is read in and has not been treated yet
         hvy_n_afterRefinement = hvy_n(tree_ID) * (2**params%dim)
 
     else

@@ -236,7 +236,7 @@ program main
 
         ! check if we still have enough memory left: for very large simulations
         ! we cannot affort to have them fail without the possibility to resume them
-        if (notEnoughMemoryToRefineEverywhere_tree(params, tree_ID_flow)) then
+        if (notEnoughMemoryToRefineEverywhere_tree(params, tree_ID_flow, time)) then
             ! yippieh, a goto statement. thats soooo 90s.
             goto 17
         endif

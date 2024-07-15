@@ -23,9 +23,8 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
         if (mark_TMP_flag) markTMPflag = REF_TMP_TREATED_COARSEN
     endif
 
-    ! if all sisters exists, then the array should not contain values smaller
-    ! zero (-1 would mean not found)
-    if ( minval(sisters(1:N_sisters)) > 0 ) then
+    ! if all sisters exists, then the array should not contain -1
+    if ( all(sisters(1:N_sisters) /= -1) ) then
 
         lgt_sisters = lgt_block(sisters(1:N_sisters), IDX_REFINE_STS )
 

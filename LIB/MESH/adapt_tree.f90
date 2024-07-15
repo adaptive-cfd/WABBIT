@@ -135,19 +135,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         endif
 
 
-        ! ! I often need to check block values when debugging so I leave it here
-        ! do k = 1, hvy_n(tree_ID)
-        !     hvy_ID = hvy_active(k, tree_ID)
-        !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 2 .and. lgt_block(lgt_id, IDX_TC_2) == 58720256) then
-        !         write(*, '("0 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, hvy_id, &
-        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-        !         do iy = 2,25, 2
-        !             write(*, '(25(es9.2))') hvy_block(2:25:2, iy, 1, 1, hvy_id)
-        !         enddo
-        !     endif
-        ! enddo
-
         ! Wavelet-transform all remaining non-decomposed blocks
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form
         t_block = MPI_Wtime()
@@ -180,19 +167,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " FWT)"
         call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
-
-        ! ! I often need to check block values when debugging so I leave it here
-        ! do k = 1, hvy_n(tree_ID)
-        !     hvy_ID = hvy_active(k, tree_ID)
-        !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 52428800) then
-        !         write(*, '("1 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, hvy_id, &
-        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-        !         do iy = 2,25, 2
-        !             write(*, '(25(es9.2))') hvy_block(2:25:2, iy, 1, 1, hvy_id)
-        !         enddo
-        !     endif
-        ! enddo
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
@@ -228,42 +202,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " coarseningIndicator_tree)"
         call toc( toc_statement, 1300+iteration, MPI_Wtime()-t_block )
 
-        ! ! I often need to check block values when debugging so I leave it here
-        ! if (abs(time - 0.08125) < 1e+5) then
-        !     do k = 1, hvy_n(tree_ID)
-        !         hvy_ID = hvy_active(k, tree_ID)
-        !         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !         if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 50331648) then
-        !             write(*, '("2 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, hvy_id, &
-        !                 lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-        !             do iy = 1,params%Bs(1)+2*params%g, 1
-        !                 write(*, '(60(es9.2))') hvy_block(1:params%Bs(1)+2*params%g:1, iy, 1, 1, hvy_id)
-        !             enddo
-        !         endif
-        !     enddo   
-        ! endif
-
         ! After coarseningIndicator_tree, the situation is:
         ! coarseningIndicator_tree works on LEVEL (for wavelet cases).
         ! blocks that are significant on that level now have status 0, others (on this level) have -1
         ! Any blocks on other levels have status 0.
-
-        ! ! Coarse Extension sets WC to zero inside a block regardless of if it is kept or not
-        ! ! This can mean that we delete WC which are important, filtering out parts of the flow
-        ! ! In order to prevent this, neighbouring blocks are kept if it would delete necessary WC
-        ! if (params%useSecurityZone) then
-        !     if ((indicator=="threshold-state-vector") .or. (indicator=="primary-variables")) then
-        !         ! Note: we can add the security zone also for non-lifted wavelets (although this 
-        !         ! does not make much sense, but for development...)
-        !         t0 = MPI_Wtime()
-        !         call addSecurityZone_level( time, params, level, tree_ID, hvy_block, hvy_tmp )
-        !         call toc( "adapt_tree (addSecurityZone_level)", 107, MPI_Wtime()-t0 )
-        !     endif
-        ! endif
-        ! ! In addSecurityZone_tree, some blocks on level J have revoked their -1 status to 0, some
-        ! ! new blocks may have been created and they have the status 0 as well.
-        ! ! Note: as the algorithm proceeds level-wise, a block on level J is not checked again - it
-        ! ! is not possible to 'accidentally' delete the newly created blocks later on.
 
         if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. params%useCoarseExtension .and. params%isLiftedWavelet) then
             ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
@@ -327,60 +269,53 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! log some statistics - amount of iterations
     if (present(log_iterations)) log_iterations = iteration
 
-    ! After the last coarsening step, some blocks were (possibly) coarsened.
-    ! If that happened (and it is the usual case), suddenly new blocks have coarser neighbors, and
-    ! on those, the coarseExt needs to be done again.
-    t_block = MPI_Wtime()
     if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+        ! If iteration hit Jmax-Jmin, some blocks might have been coarsened in last iteration.
+        ! If that happened, suddenly new blocks have coarser neighbors, and on those, the coarseExt needs to be done again.
+        t_block = MPI_Wtime()
         call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
-    endif
-    call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
+        ! synch SC and WC from new coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
+        ! Attention1: For finer neighbours this is not possible, so near fine interfaces we cannot reconstruct correct values.
+        ! Attention2: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
+        t_block = MPI_Wtime()
+        call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti)
+        call toc( "adapt_tree (sync all <- MC)", 112, MPI_Wtime()-t_block )
 
-    ! synch SC and WC from new coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
-    ! Attention1: For finer neighbours this is not possible, so near fine interfaces we cannot reconstruct correct values.
-    ! Attention2: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
-    t_block = MPI_Wtime()
-    call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti)
-    call toc( "adapt_tree (sync all <- MC)", 112, MPI_Wtime()-t_block )
-
-    ! ! I often need to check block values when debugging so I leave it here
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvy_ID = hvy_active(k, tree_ID)
-    !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-    !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 52428800) then
-    !         write(*, '("3 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') 8, params%rank, lgt_ID, hvy_id, &
-    !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-    !         do iy = 1,26, 1
-    !             write(*, '(26(es9.2))') hvy_block(1:26:1, iy, 1, 1, hvy_id)
-    !         enddo
-    !     endif
-    ! enddo 
-
-
-    ! After synching with coarser neighbors, the spaghetti form of the whole ghost patch is filled with values
-    ! We now need to delete all values in spots of WC, leaving only the correct SC values from coarse neighbours
-    ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
-    ! We do this in order tu bundle up the synchronizations in the step before as the modification is really cheap
-    t_block = MPI_Wtime()
-    if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+        ! After synching with coarser neighbors, the spaghetti form of the whole ghost patch is filled with values
+        ! We now need to delete all values in spots of WC, leaving only the correct SC values from coarse neighbours
+        ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
+        ! We do this in order to bundle up the synchronizations in the step before as the modification is really cheap
+        t_block = MPI_Wtime()
         call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, sc_skip_ghosts=.true.)
-    endif
-    call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
 
-    ! Wavelet-reconstruct all blocks in one go
-    ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
-    t_block = MPI_Wtime()
-    if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+        ! Wavelet-reconstruct all blocks in one go
+        ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
+        t_block = MPI_Wtime()
         call coarse_extension_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
-    else  ! just set back all values to the original ones
+        call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
+    else 
+        ! If there is no coarse extension to be done then we can simply set back all values directly
+        ! just set back all values to the original ones
+        t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)    
             hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID)
         end do
+        call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
     endif
-    call toc( "adapt_tree (RWT)", 113, MPI_Wtime()-t_block )
+
+
+    ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
+    ! they may have passed several level also. Rebalance for optimal loadbalancing
+    ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
+    t_block = MPI_Wtime()
+    call balanceLoad_tree( params, hvy_block, tree_ID)
+    call toc( "adapt_tree (balanceLoad_tree)", 115, MPI_Wtime()-t_block )
+
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values
     ! Just once here at the end after reconstruct so everything is in order
@@ -388,14 +323,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call sync_ghosts_tree( params, hvy_block, tree_ID )
     call toc( "adapt_tree (sync post)", 114, MPI_Wtime()-t_block )
 
-
-    ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
-    ! they may have passed several level also. Now, the distribution of blocks may no longer
-    ! be balanced, so we have to balance load now
-    ! ToDo: Put balanceLoad directly after loop, implement version that does not copy ghost points as we sync afterwards anyways
-    t_block = MPI_Wtime()
-    call balanceLoad_tree( params, hvy_block, tree_ID )
-    call toc( "adapt_tree (balanceLoad_tree)", 115, MPI_Wtime()-t_block )
 
     call toc( "adapt_tree (TOTAL)", 100, MPI_wtime()-t_all)
 end subroutine

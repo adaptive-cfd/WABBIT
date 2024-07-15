@@ -288,7 +288,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
 	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
 	refinementExecute.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 \
-	ensure_completeness.f90 executeCoarsening_tree.f90 merge_blocks.f90 balanceLoad_tree.f90 set_desired_num_blocks_per_rank.f90 \
+	ensure_completeness.f90 executeCoarsening_tree.f90 merge_blocks.f90 balanceLoad_tree.f90 \
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \

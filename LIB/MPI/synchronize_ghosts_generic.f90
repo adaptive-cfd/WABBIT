@@ -52,9 +52,9 @@ end subroutine sync_TMP_from_all
 
 
 
-!> Wrapper to synch level from coarser neighbours and same-level neighbors
+!> Wrapper to synch from coarser neighbours and same-level neighbors
 !! Used after coarse extension to update SC and WC, coarse neighbours need to be synched from hvy_tmp
-subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus)
+subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus, level)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -62,17 +62,20 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level
 
-    integer(kind=ik) :: gminus, gplus
+    integer(kind=ik) :: gminus, gplus, level_apply
     gminus = params%g
     gplus = params%g
+    level_apply = -1
     ! if we sync a different number of ghost nodes
-    if (present(g_minus)) gminus = g_minus
-    if (present(g_plus))   gplus = g_plus
+    if (present(g_minus))    gminus = g_minus
+    if (present(g_plus))      gplus = g_plus
+    if (present(level)) level_apply = level
 
     ! set level to -1 to enable synching between all
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=-1, s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp, verbose_check=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=level_apply, &
+        s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp, verbose_check=.true.)
 
 end subroutine sync_SCWC_from_MC
 

@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -33,10 +33,6 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     N = 2**params%dim
     ! at worst every block is on a different rank
     if (.not. allocated(xfer_list)) allocate(xfer_list(3, size(lgt_block,1)))
-
-    ! transfer counter
-    n_xfer = 0
-
 
     !---------------------------------------------------------------------------
     ! first, prepare for xfer (gather information: which blocks are sent where)
@@ -94,6 +90,7 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID )
     enddo
 
     ! actual xfer
+    n_xfer = 0  ! transfer counter
     call block_xfer( params, xfer_list, n_xfer, hvy_block )
 
     ! the active lists are outdates after the transfer: we need to create
@@ -129,7 +126,7 @@ end subroutine executeCoarsening_tree
 !> \brief Apply mesh coarsening with values currently in WD form. \n
 !! Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag )
+subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag, no_deletion )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -139,6 +136,8 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     logical, intent(in), optional       :: mark_TMP_flag                !< Set refinement of completeness to 0 or temporary flag
+    !> do not delete but only create mother blocks and send data
+    logical, intent(in), optional       :: no_deletion
 
     ! loop variables
     integer(kind=ik)                    :: k, Jmax, N, j, rank
@@ -146,15 +145,19 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, ierr, lgtID, hvyID, level_me, lgt_merge_id, digit_merge
+    integer(kind=ik)                    :: data_rank, n_xfer, lgtID, hvyID, level_me, lgt_merge_id, digit_merge
     integer(kind=ik)                    :: nx, ny, nz, nc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
     logical                             :: markTMPflag
+    logical                             :: noDeletion
+
 
     integer(kind=ik)  :: iy
 
     markTMPflag = .false.
     if (present(mark_TMP_flag)) markTMPflag = mark_TMP_flag
+    noDeletion = .false.
+    if (present(no_deletion)) noDeletion = no_deletion
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -176,9 +179,6 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
         if (size(wc, 4) < nc) deallocate(wc)
     endif
     if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc) )
-
-    ! transfer counter
-    n_xfer = 0
 
     !---------------------------------------------------------------------------
     ! transfer all blocks that want to coarsen to Mallat format
@@ -209,12 +209,9 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     !---------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         ! Check if the block will be coarsened.
-        !
-        ! FIRST condition: only work on light data, if block is active. Usually, you would do that just with
-        ! the active list. NOTE HERE: due to previous iterations
-        !
-        ! SECOND condition: block wants to coarsen, i.e. it has the status -1. Note the routine
-        ! ensureGradedness_tree removes the -1 flag if not all sister blocks share it
+        ! FIRST condition: only work on light data, if block is active.
+        ! SECOND condition: block wants to coarsen, i.e. it has the status -1.
+
         hvyID = hvy_active(k, tree_ID)
         call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
         level_me = lgt_block( lgtID, IDX_MESH_LVL )
@@ -237,20 +234,23 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     
                 ! construct new mother block if on my rank and create light data entry for the new block
                 if (data_rank == rank) then
-                    ! get lgtID as first daughter block on correct rank and move values in-place
-                    lgt_merge_id = -1
-                    do j = 1, N
-                        if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
-                            lgt_merge_id = lgt_daughters(j)
-                            call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
-                            ! we need to compute the last digit to in-place move the patch correctly
-                            treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
-                            digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level_me, params%Jmax)
-                            call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
-                        endif
-                    enddo
-                    ! call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
-                    ! treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+                    if (.not. noDeletion) then  ! create mother block from one of the sister blocks and move patch directly
+                        ! get lgtID as first daughter block on correct rank and move values in-place
+                        lgt_merge_id = -1
+                        do j = 1, N
+                            if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
+                                lgt_merge_id = lgt_daughters(j)
+                                call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
+                                ! we need to compute the last digit to in-place move the patch correctly
+                                treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
+                                digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level_me, params%Jmax)
+                                call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
+                            endif
+                        enddo
+                    else  ! create mother block as a new block
+                        call get_free_local_light_id(params, data_rank, lgt_merge_id, message="executeCoarsening_WD")
+                        treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+                    endif
 
                     ! change meta_data of mother block
                     lgt_block( lgt_merge_id, : ) = -1
@@ -286,20 +286,115 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag 
     call updateMetadata_tree(params, tree_ID, update_neighbors=.false.)
 
 
-    ! actual xfer, this works on all blocks that have a mother / daughter
+    ! actual xfer, this works on all blocks that have a mother / daughter and ref -1
+    n_xfer = 0  ! transfer counter
     call prepare_update_family_metadata(params, tree_ID, n_xfer, size(hvy_block, 4), &
         s_M2C=.true.)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
-    ! now the mother refinement flags have to be reset and daughter blocks to be deleted
+    ! now the daughter blocks are to be deleted or marked that they are completed
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
         level_me = lgt_block( lgtID, IDX_MESH_LVL )
-        ! delete daughter blocks that wanted to refine
+        call lgt2proc( rank_daughters(1), lgtID, params%number_blocks )
         if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
-            lgt_block(lgtID, :) = -1
+            if (.not. noDeletion) then
+                ! delete daughter blocks
+                lgt_block(lgtID, :) = -1
+            elseif (rank_daughters(1) == rank) then
+                call lgt2hvy(hvyID, lgtID, rank, params%number_blocks)
+                ! block has to be retransformed into spaghetti form
+                call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
+                hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+            endif
+            ! mark daughter blocks as completed
             lgt_block(lgtID, IDX_REFINE_STS) = 0
         endif
     enddo
 
+
 end subroutine executeCoarsening_WD_tree
+
+
+subroutine sync_2_daughters_level(params, hvy_block, tree_ID, level)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+
+    type (type_params), intent(in)      :: params                       !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
+    integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
+    integer(kind=ik), intent(in)        :: level                        !< level of mothers
+
+    ! loop variables
+    integer(kind=ik)                    :: k, Jmax, N, j, rank
+    ! rank of proc to keep the coarsened data
+    integer(kind=ik)                    :: data_rank, n_xfer, lgtID, hvyID, level_me
+    integer(kind=ik)                    :: nx, ny, nz, nc
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
+    nx = size(hvy_block,1)
+    ny = size(hvy_block,2)
+    nz = size(hvy_block,3)
+    nc = size(hvy_block,4)
+
+    Jmax = params%Jmax
+    rank = params%rank
+    ! number of blocks to merge, 4 or 8
+    N = 2**params%dim
+    ! at worst every block is on a different rank
+    if (allocated(wc)) then
+        if (size(wc, 4) < nc) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc) )
+
+    !---------------------------------------------------------------------------
+    ! transfer all daughters to mallat format, so that sending is smooth
+    !---------------------------------------------------------------------------
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+
+        ! check if block exists and (mother block on same level) or (block on finer level (MUST BE daughter block))
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. level_me == level+1) then
+            ! This block will send or receive and its data needs to be transferred to Mallat for correct copying
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+        endif
+    enddo
+
+    ! setup correct patches and get indices, used for move_mallat_patch_block
+    ! this is in theory only needed when we change g but if this is every done I want to avoid nasty bug finding
+    call family_setup_patches(params, output_to_file=.false.)
+    ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
+    ! make sure they have the right size
+    call xfer_ensure_correct_buffer_size(params, hvy_block)
+
+    ! actual xfer, this works on all blocks that are on this level and have a daughter
+    n_xfer = 0  ! transfer counter
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, size(hvy_block, 4), &
+        s_M2F=.true., s_Level=level)
+    call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
+
+    ! now the daughter blocks need to be retransformed to spaghetti and mother blocks can be deleted
+    do k = 1, hvy_n(tree_ID)
+        hvyID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
+        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+
+        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. level_me == level+1) then
+            ! block has to be retransformed into spaghetti form
+            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+        endif
+    enddo
+
+end subroutine sync_2_daughters_level

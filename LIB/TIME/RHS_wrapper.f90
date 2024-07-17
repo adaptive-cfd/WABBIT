@@ -32,11 +32,13 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     integer(kind=2)                     :: n_domain(1:3)
     real(kind=rk)                       :: t0, t1
 
-    ! grid parameter
-    Bs = params%Bs
-    g  = params%g
-    t0 = MPI_wtime()
+    Bs       = params%Bs
+    g        = params%g
+    t0       = MPI_wtime()
     n_domain = 0
+    x0       = 0.0_rk
+    dx       = 0.0_rk
+    hvy_ID   = 1
 
     !-------------------------------------------------------------------------
     ! CoarseExtension update of input data
@@ -58,7 +60,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()
     ! performs initializations in the RHS module, such as resetting integrals
-    hvy_id = hvy_active(1, tree_ID) ! for this stage, just pass any block (result does not depend on block)
+    ! for this stage, just pass any block (result does not depend on block), hvy_id=1 and set x0=dx=0
     call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
          hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "init_stage" )
 
@@ -91,7 +93,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
-    hvy_id = hvy_active(1, tree_ID) ! for this stage, just pass any block (result does not depend on block)
+    ! for this stage, just pass any block (result does not depend on block), hvy_id=1 and set x0=dx=0
     call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
     hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "post_stage" )
     call toc( "RHS_wrapper::integral-stage", 22, MPI_wtime()-t1 )

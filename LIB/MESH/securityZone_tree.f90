@@ -186,7 +186,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
         level_me   = lgt_block( lgtID, IDX_MESH_LVL )
         ref_status = lgt_block( lgtID, IDX_REFINE_STS )
 
-        ! ignore blocks on Jmax when they are forced to coarsen
+        ! ignore blocks on Jmax when they are forced to coarsen, it is quite unnecessary but better be safe then sorry
         if (level_me == params%JMax .and. params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) cycle
 
         ! is this block assigned 0 (it wants to stay and is significant)?
@@ -260,7 +260,8 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
                     ! does the neighbor has significancy flag and significant patch in this neighborhood relation?
-                    if (ref_status_neighbor > 0) then  ! need to check elsewise all significancy encodings are wrong
+                    ! Is neighbor on the same level so we can actually check the patches?
+                    if (ref_status_neighbor > 0 .and. level_neighbor == level_me) then  ! need to check elsewise all significancy encodings are wrong
                         if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood, params%dim)) then
                             ! write(*, '("SZ2 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
                             !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor

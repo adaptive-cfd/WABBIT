@@ -131,7 +131,7 @@ subroutine dense_to_sparse(params)
         max_neighbors = 74
     else
         number_dense_blocks = 4_ik**level
-        max_neighbors = 12
+        max_neighbors = 16
     end if
 
     if (params%rank==0) then

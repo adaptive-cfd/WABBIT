@@ -601,7 +601,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
         ! in that case we set the neighbouring block to be important as well (with a temporary flag)
         t_block = MPI_Wtime()
-        call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, .true.)
+        call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
         call toc( "adapt_tree (security_zone_check)", 107, MPI_Wtime()-t_block)
     endif
 

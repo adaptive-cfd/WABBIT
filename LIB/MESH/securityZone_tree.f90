@@ -137,7 +137,7 @@ end subroutine
 
 !> This adds a buffer zone around blocks if the CE would remove valuable WC
 !> It is usually called after coarsening indicator where all blocks are WDed and have flag -1, 0 or REF_TMP_TREATED_COARSEN
-subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, input_is_WD)
+subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel, input_is_WD)
 
     use module_indicators
 
@@ -150,6 +150,9 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
     integer(kind=ik), intent(in)   :: tree_ID                     !< tree to look at
     real(kind=rk), intent(inout)   :: norm(:)                     !< the computed norm for each component of the vector
     logical, intent(in)            :: input_is_WD                 !< flag if hvy_block is already wavelet decomposed, for coarseningIndicatorBlock
+    !> for the mask generation (time-independent mask) we require the mask on the highest
+    !! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
+    logical, intent(in)                 :: ignore_maxlevel
 
     integer(kind=ik), parameter :: TMP_STATUS = 17
     integer(kind=ik) :: level_me, ref_status, neighborhood, i_neighborhood, ref_status_neighbor, ref_check, &
@@ -182,6 +185,9 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
         level_me   = lgt_block( lgtID, IDX_MESH_LVL )
         ref_status = lgt_block( lgtID, IDX_REFINE_STS )
+
+        ! ignore blocks on Jmax when they are forced to coarsen
+        if (level_me == params%JMax .and. params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) cycle
 
         ! is this block assigned 0 (it wants to stay and is significant)?
         if (ref_status == 0) then

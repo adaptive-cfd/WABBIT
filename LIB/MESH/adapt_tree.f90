@@ -211,18 +211,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
             ! in that case we set the neighbouring block to be important as well (with a temporary flag)
             t_block = MPI_Wtime()
-            call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, .true.)
+            call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
             call toc( "adapt_tree (security_zone_check)", 107, MPI_Wtime()-t_block)
 
             write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " security_zone_check)"
             call toc( toc_statement, 1400+iteration, MPI_Wtime()-t_block )
         endif
 
-        ! check if block has reached maximal level, if so, remove refinement flags
+        ! check if block has reached minimal level, if so, remove refinement flags
         t_block = MPI_Wtime()
-        if (ignore_maxlevel2 .eqv. .false.) then
-            call respectJmaxJmin_tree( params, tree_ID )
-        endif
+        call respectJmaxJmin_tree( params, tree_ID )
         call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
 
         ! unmark blocks that cannot be coarsened due to gradedness and completeness
@@ -316,14 +314,14 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
     t_block = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID)
-    call toc( "adapt_tree (balanceLoad_tree)", 115, MPI_Wtime()-t_block )
+    call toc( "adapt_tree (balanceLoad_tree)", 116, MPI_Wtime()-t_block )
 
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values
     ! Just once here at the end after reconstruct so everything is in order
     t_block = MPI_Wtime()
     call sync_ghosts_tree( params, hvy_block, tree_ID )
-    call toc( "adapt_tree (sync post)", 114, MPI_Wtime()-t_block )
+    call toc( "adapt_tree (sync post)", 115, MPI_Wtime()-t_block )
 
 
     call toc( "adapt_tree (TOTAL)", 100, MPI_wtime()-t_all)
@@ -531,8 +529,6 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! after locally modifying refinement statusses, we need to synchronize light data
         call synchronize_lgt_data( params, refinement_status_only=.true. )
 
-        write(*, '("R", i0, " Loop ", i0, " before sending data")') params%rank, iteration
-
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Create or update mother blocks with SC of daughter blocks
         ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
@@ -543,15 +539,15 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " update_mothers)"
         call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
 
-        write(*, '("R", i0, " Loop ", i0, " after sending data")') params%rank, iteration
-
         ! update grid lists: active list, neighbor relations, etc
         ! Attention: Here we have an overfull grid, with the way updateNeighbors is build it still chooses neighbors as from a normal grid
         ! Meaning: First same-lvl J, then coarser J-1, then finer J+1
         ! For finished full WDed grids, no cell should have a finer neighbor but only the same-lvl mothers of those as neighbors
         call updateMetadata_tree(params, tree_ID, verbose_check=.true.)
 
-        write(*, '("R", i0, " Loop ", i0, " after updateMetadata")') params%rank, iteration
+        if (params%rank == 0) then
+            write(*, '("it ", i0, " blocks = ", i0)') iteration, lgt_n(tree_ID)
+        endif
 
         ! iteration counter
         iteration = iteration + 1
@@ -565,10 +561,16 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
     end do
 
-    write(*, '("Finished first loop")')
-
     ! log some statistics - amount of iterations
     if (present(log_iterations)) log_iterations = iteration
+
+    ! in order to work on all blocks and work with coarseningIndicator_tree logic, we set all ref status as unset to work as in a leaf-wise loop
+    ! no need for syncing afterwards as coarseningIndicator works locally
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        lgt_block(lgt_id, IDX_REFINE_STS) = REF_TMP_UNTREATED
+    enddo
 
     !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
     ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
@@ -640,12 +642,22 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     iteration = 0
     do level = Jmin, Jmax_active
 
+        write(*, '("Hello 1 R", i0, " it", i0)') params%rank, iteration
+        call flush()
+        
+        ! the following will be a bit more difficult to deal with
+        ! grid is redundant but neighbor relations until now are not. I will need to change the definitions
+        ! however - for now finer and coarser neighbor relations share the same numbers
+
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! At this point no cells should have fine-level neighbors anyways
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
         t_block = MPI_Wtime()
         call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti, level=level)
-        call toc( "adapt_tree (sync level <- MC)", 112, MPI_Wtime()-t_block )
+        call toc( "adapt_tree (sync all <- MC)", 112, MPI_Wtime()-t_block )
+
+        write(*, '("Hello 2 R", i0, " it", i0)') params%rank, iteration
+        call flush()
 
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync level <- MC)"
         call toc( toc_statement, 1750+iteration, MPI_Wtime()-t_block )
@@ -657,6 +669,9 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         t_block = MPI_Wtime()
         call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, sc_skip_ghosts=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+
+        write(*, '("Hello 3 R", i0, " it", i0)') params%rank, iteration
+        call flush()
 
         ! Wavelet-reconstruct blocks on level
         ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
@@ -675,15 +690,21 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
             endif
         end do
-        call toc( "adapt_tree (RWT)", 113, MPI_Wtime()-t_block )
+        call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
 
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " RWT)"
         call toc( toc_statement, 1850+iteration, MPI_Wtime()-t_block )
+
+        write(*, '("Hello 4 R", i0, " it", i0)') params%rank, iteration
+        call flush()
 
         ! now we need to update the SC of all daughters
         t_block = MPI_Wtime()
         call sync_2_daughters_level(params, hvy_block, tree_ID, level)
         call toc( "adapt_tree (sync level 2 daughters)", 114, MPI_Wtime()-t_block )
+
+        write(*, '("Hello 5 R", i0, " it", i0)') params%rank, iteration
+        call flush()
 
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync level 2 daughters)"
         call toc( toc_statement, 1900+iteration, MPI_Wtime()-t_block )
@@ -693,6 +714,9 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
         iteration = iteration + 1
     enddo
+
+    write(*, '("Hello X R", i0, " it", i0)') params%rank
+    call flush()
 
     ! delete all blocks with daughters
     do k = 1, hvy_n(tree_ID)
@@ -717,14 +741,14 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
     t_block = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID)
-    call toc( "adapt_tree (balanceLoad_tree)", 115, MPI_Wtime()-t_block )
+    call toc( "adapt_tree (balanceLoad_tree)", 116, MPI_Wtime()-t_block )
 
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values
     ! Just once here at the end after reconstruct so everything is in order
     t_block = MPI_Wtime()
     call sync_ghosts_tree( params, hvy_block, tree_ID )
-    call toc( "adapt_tree (sync post)", 114, MPI_Wtime()-t_block )
+    call toc( "adapt_tree (sync post)", 115, MPI_Wtime()-t_block )
 
 
     call toc( "adapt_tree (TOTAL)", 100, MPI_wtime()-t_all)

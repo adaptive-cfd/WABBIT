@@ -23,7 +23,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
 
     integer(kind=ik), dimension(3) :: Bs
     integer(kind=ik) :: j, k, hvy_id, z1, z2, g, l, grhs
-    real(kind=rk) :: t
+    real(kind=rk) :: t, t_call, t_stage
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save  :: rk_coeffs(:,:)
 
@@ -53,18 +53,24 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     rk_coeffs = params%butcher_tableau
 
     ! synchronize ghost nodes
+    t_call = MPI_wtime()
     call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs)
+    call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
     ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
     ! slot after the copy of the state vector (hence 2)
+    t_call = MPI_wtime()
     call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), hvy_mask, hvy_tmp, tree_ID)
+    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
     ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
+    t_call = MPI_wtime()
     call rigid_solid_rhs(time + dt*rk_coeffs(1,1), iteration, Insect%STATE, Insect%rhs(:,2), &
     params_acm%force_insect_g, params_acm%moment_insect_g, Insect)
+    call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
     ! save data at time t to heavy work array
     ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
@@ -83,6 +89,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1) - 1
+        t_stage = MPI_wtime()
         !-----------------------------------------------------------------------
         ! prepare input for the RK substep
         !-----------------------------------------------------------------------
@@ -125,17 +132,25 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         ! RK substep
         !-----------------------------------------------------------------------
         ! synchronize ghost nodes for new input
+        t_call = MPI_wtime()
         call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs)
+        call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
         ! note substeps are at different times, use temporary time "t"
         t = time + dt*rk_coeffs(j,1)
 
         ! computes mask from Insect%STATE, computes aerodyn forces using hvy_block, both hvy_block and Insect%STATE are updated above
+        t_call = MPI_wtime()
         call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp, tree_ID)
+        call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
+        t_call = MPI_wtime()
         call rigid_solid_rhs(t, iteration, Insect%STATE, Insect%rhs(:,j+1), &
         params_acm%force_insect_g, params_acm%moment_insect_g, Insect)
+        call toc( "timestep (RHS rigid solid)", 22, MPI_wtime()-t_call)
+
+        call toc( "timestep (RK stage)", 23, MPI_wtime()-t_stage)
     end do
 
 

@@ -48,7 +48,7 @@ subroutine post_unit_test(params)
     params%block_distribution = "sfc_hilbert"
     params%Jmax = 5
     params%Jmin = 1
-    params%Bs = 22
+    params%Bs = 24
     params%domain_size = 1.0_rk
 
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=1 )

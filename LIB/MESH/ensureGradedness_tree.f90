@@ -73,6 +73,36 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
             call hvy2lgt(lgt_id, hvy_id, rank, N)
             ref_me = lgt_block( lgt_id , IDX_REFINE_STS )
 
+
+            !-------------------------------------------------------------------
+            ! completeness
+            !-------------------------------------------------------------------
+            ! We first remove the -1 flag from blocks which cannot be coarsened because their sisters
+            ! disagree. If 1/4 or 1/8 blocks has 0 or +1 status, this cannot be changed. Therefore we first
+            ! remove the status -1 from the blocks which have non-1 sisters. This is not only a question of
+            ! simplicity. Consider 8 blocks on the same level:
+            !      This block has to remove its -1 status as well, as the 4 neighbors to the right cannot coarsen
+            !      v
+            ! -1  -1    -1   0
+            ! -1  -1    -1  -1
+            ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
+
+            ! With security zone some blocks are waiting for their neighbors to coarsen, we check every first counter if blocks can now coarsen
+            ! and they will be elsewise revoked, this is important if all 4/8 sisters share REF_TMP_TREATED_COARSEN
+            if ( ref_me == -1 .or. (counter==0 .and. ref_me == REF_TMP_TREATED_COARSEN .and. markTMPflag)) then
+                ! check if all sisters want to coarsen, remove the status it if they don't
+
+                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag )
+                ! if the flag is removed, then it is removed only on mpiranks that hold at least
+                ! one of the blocks, but the removal may have consequences everywhere. hence,
+                ! we force the iteration to be executed one more time
+                if (lgt_block(lgt_id , IDX_REFINE_STS) /= ref_me) then
+                    ref_me = lgt_block(lgt_id , IDX_REFINE_STS)  ! updating variable in case it changed
+                    grid_changed = .true.
+                endif
+            endif
+
+
             !-----------------------------------------------------------------------
             ! This block (still) wants to coarsen
             ! Neighbor blocks with REF_TMP_TREATED_COARSEN or REF_TMP_GRADED_STAY want to coarsen in theory but have to stay
@@ -97,11 +127,8 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
                             elseif ( ref_n == 1 ) then
                                 ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
                                 ! I have at least to stay on my level.
-                                ! Note we cannot simply set 0 as we could accidentally overwrite a refinement flag
-                                if (lgt_block( lgt_id, IDX_REFINE_STS )<0) then
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = max( 0, lgt_block( lgt_id, IDX_REFINE_STS ) )
-                                    grid_changed = .true.
-                                endif
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                                grid_changed = .true.
 
                             end if
                         elseif (mylevel - neighbor_level == 1) then
@@ -117,12 +144,9 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
                             ! neighbor on higher level
                             ! neighbor wants to refine, ...
                             if ( ref_n == +1) then
-                                ! ... so I also have to refine (not only can I NOT coarsen, I actually
-                                ! have to refine!)
-                                if (lgt_block( lgt_id, IDX_REFINE_STS )<+1) then
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = max( +1, lgt_block( lgt_id, IDX_REFINE_STS ) )
-                                    grid_changed = .true.
-                                endif
+                                ! ... so I also have to refine (not only can I NOT coarsen, I actually have to refine!)
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+                                grid_changed = .true.
 
                             elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
                                 ! neighbor wants to stay and I want to coarsen, but
@@ -183,33 +207,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
                 end do
             end if ! refinement status
 
-
-            !-------------------------------------------------------------------
-            ! completeness
-            !-------------------------------------------------------------------
-            ! We first remove the -1 flag from blocks which cannot be coarsened because their sisters
-            ! disagree. If 1 of 4 or 1/8 blocks has 0 or +1 status, this cannot be changed. Therefore we first
-            ! remove the status -1 from the blocks which have non-1 sisters. This is not only a question of
-            ! simplicity. Consider 8 blocks on the same level:
-            !      This block has to remove its -1 status as well, as the 4 neighbors to the right cannot coarsen
-            !      v
-            ! -1  -1    -1   0
-            ! -1  -1    -1  -1
-            ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
-
-            ! With security zone some blocks are waiting for their neighbors to coarsen, we check every first counter if blocks can now coarsen
-            ! and they will be elsewise revoked, this is important if all 4/8 sisters share REF_TMP_TREATED_COARSEN
-            if ( ref_me == -1 .or. (counter==0 .and. ref_me == REF_TMP_TREATED_COARSEN .and. markTMPflag)) then
-                ! check if all sisters share the -1 status, remove it if they don't
-
-                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag )
-                ! call find_sisters(params, lgt_ID, lgt_id_sisters(:))
-                ! call ensure_completeness( params, lgt_id, lgt_id_sisters, mark_TMP_flag=markTMPflag )
-                ! if the flag is removed, then it is removed only on mpiranks that hold at least
-                ! one of the blocks, but the removal may have consequences everywhere. hence,
-                ! we force the iteration to be executed one more time
-                if (lgt_block(lgt_id , IDX_REFINE_STS) /= -1) grid_changed = .true.
-            endif
         end do ! loop over blocks
         call toc( "ensureGradedness_tree (processing part)", 130, MPI_Wtime()-t0 )
 

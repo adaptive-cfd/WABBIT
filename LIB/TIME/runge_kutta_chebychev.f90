@@ -26,7 +26,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
     integer :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
     integer, parameter :: y00=1, F0=2
     integer :: i, k, s, hvy_id, grhs
-    real(kind=rk) :: tau
+    real(kind=rk) :: tau, t_call, t_stage
     logical, save :: setup_complete = .false.
     logical, save :: informed = .false.
 
@@ -59,7 +59,9 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
     if (s<4) call abort(1715929,"runge-kutta-chebychev: s cannot be less than 4")
 
     ! synchronize ghost nodes
+    t_call = MPI_wtime()
     call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs  )
+    call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
@@ -74,25 +76,36 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
 
     ! F0 (RHS at initial time, old time level)
     ! note: call sync_ghosts on input data before
+    t_call = MPI_wtime()
     call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, tree_ID )
+    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
     ! euler step
+    t_call = MPI_wtime()
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
         ! y1 = y0 + mu_tilde(1) * dt * F0;
         hvy_work(:,:,:,:,hvy_id, y1 ) = hvy_work(:,:,:,:,hvy_id, y0) &
         + mu_tilde(s,1) * dt * hvy_work(:,:,:,:,hvy_id, F0)
     enddo
+    call toc( "timestep (Euler step)", 22, MPI_wtime()-t_call)
 
     ! runge-kutta-chebychev stages
     do i = 2, s
+        t_stage = MPI_wtime()
         ! for explicitly time-dependend RHS [tau = time + c(i-1)*dt;]
         tau = time + c(s,i-1)*dt
 
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
+        t_call = MPI_wtime()
         call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,:,:,y1), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
+
+        t_call = MPI_wtime()
         call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
+        call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
+
 
         ! main formula
         ! y2 = (1-mu(i)-nu(i)) * y00 + mu(i) * y1 + nu(i) * y0 + mu_tilde(i)*dt*F1 + gamma_tilde(i)*dt*F0;
@@ -114,6 +127,8 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
             y2 = tmp(1)
         endif
         ! write(*,*) i, ":", y0, y1, y2
+
+        call toc( "timestep (RKC stage)", 23, MPI_wtime()-t_stage)
     end do
 
     ! return result

@@ -52,7 +52,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()
     call createMask_tree(params, time, hvy_mask, hvy_tmp)
-    call toc( "RHS_wrapper::createMask_tree", 21, MPI_wtime()-t1 )
+    call toc( "RHS_wrapper::createMask_tree", 31, MPI_wtime()-t1 )
 
 
     !-------------------------------------------------------------------------
@@ -96,7 +96,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     ! for this stage, just pass any block (result does not depend on block), hvy_id=1 and set x0=dx=0
     call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
     hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "post_stage" )
-    call toc( "RHS_wrapper::integral-stage", 22, MPI_wtime()-t1 )
+    call toc( "RHS_wrapper::integral-stage", 32, MPI_wtime()-t1 )
 
 
     !-------------------------------------------------------------------------
@@ -121,7 +121,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, &
         x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:, hvy_id), "local_stage", n_domain)
     enddo
-    call toc( "RHS_wrapper::local-stage", 23, MPI_wtime()-t1 )
+    call toc( "RHS_wrapper::local-stage", 33, MPI_wtime()-t1 )
 
-    call toc( "RHS_wrapper (TOTAL)", 20, MPI_wtime()-t0 )
+    call toc( "RHS_wrapper (TOTAL)", 30, MPI_wtime()-t0 )
 end subroutine RHS_wrapper

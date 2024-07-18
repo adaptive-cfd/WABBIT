@@ -570,7 +570,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to daughters J+1
     logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to mother J
     integer(kind=ik) sLevel
-    logical :: SM2C = .false., SC2M = .false., SM2F = .false., SF2M = .false.
+    logical :: SM2C, SC2M, SM2F, SF2M
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
@@ -578,7 +578,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     !    meta_send_all (possibly needs renaming after this function)
 
     integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, mylastdigit, N, family, recver_rank
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
+    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size, recver_ref
     integer(kind=tsize) :: tc
 
     !-----------------------------------------------------------------------
@@ -594,6 +594,10 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     call family_setup_patches(params, output_to_file=.false.)
 
     sLevel = -1
+    sM2C = .false.
+    sC2M = .false.
+    sM2F = .false.
+    sF2M = .false.
     if (present(s_Level)) sLevel = s_Level
     if (present(s_M2C)) sM2C = s_M2C
     if (present(s_C2M)) sC2M = s_C2M
@@ -630,12 +634,14 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
             call lgt2proc( recver_rank, recver_lgtID, N )
             ! mother heavy id
             call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+            ! mother ref
+            recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
 
             ! Send logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
+            ! (sLevel=-1 and M2C and ref=-1) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
 
             ! send counter. how much data will I send to my mother?
-            if  ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M)) then
+            if  ((sLevel==-1 .and. sM2C .and. sender_ref==-1) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M)) then
 
                 ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
                 ! receiver before sending with interpolation or downsampling.
@@ -666,12 +672,12 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
             endif
 
             ! Receive logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
+            ! (sLevel=-1 and M2F and ref_n=+1) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
 
             ! recv counter. how much data will I recv from my mother?
             ! This is NOT the same number as before
             if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                if  ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
+                if  ((sLevel==-1 .and. sM2F .and. recver_ref==+1) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
                     ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
 
                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
@@ -702,12 +708,14 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                 call lgt2proc( recver_rank, recver_lgtID, N )
                 ! daughter heavy id
                 call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+                ! daughter ref
+                recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
+                ! (sLevel=-1 and M2F and ref=+1) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
 
                 ! send counter. how much data will I send to my mother?
-                if  ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M)) then
+                if  ((sLevel==-1 .and. sM2F .and. sender_ref==+1) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M)) then
 
                     ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
                     ! receiver before sending with interpolation or downsampling.
@@ -738,12 +746,12 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                 endif
 
                 ! Receive logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
+                ! (sLevel=-1 and M2C and ref_n=-1) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
 
                 ! recv counter. how much data will I recv from my mother?
                 ! This is NOT the same number as before
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
+                    if  ((sLevel==-1 .and. sM2C .and. recver_ref==-1) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
                         ijk = ijkPatches(:, :, -family, -1, RECVER)
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &

@@ -22,7 +22,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     integer :: M_iter
     integer :: i, j, k, l, iter, grhs
     real(kind=rk) :: normv, eps, beta, err_tolerance
-    real(kind=rk) :: h_klein, err, t0
+    real(kind=rk) :: h_klein, err, t_call, t_stage
 
     M_max = params%M_krylov
     grhs = params%g_rhs
@@ -43,24 +43,32 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     endif
 
     ! synchronize ghost nodes
+    t_call = MPI_wtime()
     call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs )
+    call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
     ! compute norm "normv" of input state vector ("hvy_block")
+    t_call = MPI_wtime()
     call wabbit_norm( params, hvy_block, normv, tree_ID)
     if (normv < epsilon(1.0_rk)) normv = 1.0_rk
     eps = normv * sqrt(epsilon(1.0_rk))
+    call toc( "timestep (Norm)", 22, MPI_wtime()-t_call)
 
 
     ! the very last slot (M+3) is the "reference right hand side"
+    t_call = MPI_wtime()
     call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,M_max+3), hvy_mask, hvy_tmp, tree_ID )
+    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
     ! compute norm "beta", which is the norm of the reference RHS evaluation
     ! NSF: this guy is called normuu
+    t_call = MPI_wtime()
     call wabbit_norm( params, hvy_work(:,:,:,:,:,M_max+3), beta, tree_ID )
     if (beta < epsilon(1.0_rk)) beta = 1.0_rk
+    call toc( "timestep (Norm)", 22, MPI_wtime()-t_call)
 
     ! start iteration, fill first slot
     do k = 1, hvy_n(tree_ID)
@@ -73,6 +81,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     ! we loop over the full size of subspace, then exit prematurely
     ! if possible.
     do M_iter = 1, M_max
+        t_stage = MPI_wtime()
 
         ! perturbed right hand side is first-to-last (M+2) slot
         do k = 1, hvy_n(tree_ID)
@@ -81,9 +90,14 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
+        t_call = MPI_wtime()
         call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,:,:,M_max+2), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
+
+        t_call = MPI_wtime()
         call RHS_wrapper( time, params, hvy_work(:,:,:,:,:,M_max+2), hvy_work(:,:,:,:,:,M_max+1), &
         hvy_mask, hvy_tmp, tree_ID )
+        call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
         ! linearization of RHS slot (M_max+1)
         do k = 1, hvy_n(tree_ID)
@@ -125,10 +139,10 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
             H_tmp(M_iter+1,M_iter+2)  = 1.0_rk
 
             ! compute matrix exponential
-            t0 = MPI_wtime()
+            t_call = MPI_wtime()
             phiMat(1:M_iter+2, 1:M_iter+2) = expM_pade( dt*H_tmp(1:M_iter+2, 1:M_iter+2) )
             phiMat(M_iter+1, M_iter+1)     = h_klein*phiMat(M_iter, M_iter+2)
-            call toc( "Krylov: matrix exponential", 24, MPI_wtime()-t0)
+            call toc( "timestep (Krylov matrix exponential)", 24, MPI_wtime()-t_call)
 
 
             ! *** Error estimate ***!
@@ -154,6 +168,8 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
                 exit
             endif
         endif
+
+        call toc( "timestep (Krylov stage)", 23, MPI_wtime()-t_stage)
     enddo
     !**************************************!
     !*** end of iterations             ****!

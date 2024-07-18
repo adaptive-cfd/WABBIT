@@ -148,14 +148,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         !     endif
         ! enddo
 
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Wavelet-transform all remaining non-decomposed blocks
-        ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form,
+        ! while hvy_tmp will hold a copy of the input data (allowing to skip the expensive IWT)
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)
     
-            ! We compute detail coefficients on the fly here, for all blocks
-            ! on the level.
+            ! We compute detail coefficients on the fly here, for all existing blocks (leaf-loop)
             call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
             ref_stat = lgt_block( lgt_ID, IDX_REFINE_STS )
     

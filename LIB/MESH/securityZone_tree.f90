@@ -189,21 +189,21 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                 ! neighbor exists ?
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
-                    lgtID_neighbor             = hvy_neighbor( hvyID, neighborhood )
-                    level_neighbor             = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+                    lgtID_neighbor      = hvy_neighbor( hvyID, neighborhood )
+                    level_neighbor      = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
-                    ! if (lgtID == 32160) then
-                    !     write(*, '("BH-", i0, " BL-", i0, " N-", i0, " NBL-", i0, " NR-", i0)') hvyID, lgtID, neighborhood, lgtID_neighbor, ref_status_neighbor
-                    ! endif
 
-                    ! the neighbor wants to coarsen
+                    ! the neighbor wants to coarsen. This yields the risk that after coarsening, the newly appearing coarseExt
+                    ! deletes important WC on this block (hvyID). This we'll prevent.
                     if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
-                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
-                            X_s=(/ g, g, g/), X_e=(/ g, g, g/))
-                        ref_check = -1
+                        ! Get indices of patch (idx)
+                        call get_indices_of_modify_patch(params, neighborhood, idx, (/nx, ny, nz/), (/N_buffer_l, N_buffer_l, N_buffer_l/), &
+                            (/N_buffer_r, N_buffer_r, N_buffer_r/), X_s=(/g, g, g/), X_e=(/g, g, g/))
 
+                        ! Inside the patch idx, check if there are significant details
+                        ref_check = -1 ! ref_check will change to 0 if there are significant details
                         call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                         hvy_tmp(:,:,:,:,hvyID), indicator, ref_check, norm, level_me, input_is_WD, indices=idx)
 
@@ -220,7 +220,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
         endif
     enddo
 
-    ! We look at one block which is signfiant and want to change the refinement status of neighbours, however these neighbors might reside on a different proc
+    ! We look at one block which is significant and want to change the refinement status of neighbours, however these neighbors might reside on a different proc.
     ! The next synchronize_lgt_data call will then overwrite those values. We therefore need to communicate with the owners of the neighboring block
     ! if the status has changed or not. This is however a bit tricky as we don't know how many cells have to be updated and information send
     ! We circumvent this by encoding the patch which is significant into the refinement status and then decoding this information, knowing which blocks
@@ -238,11 +238,11 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
         level_me   = lgt_block( lgtID, IDX_MESH_LVL )
         ref_status = lgt_block( lgtID, IDX_REFINE_STS )
 
-        ! is the block on the level we look at?
         ! is this block assigned -1 (it wants to coarsen)?
+        ! -> this can possibly be revoked here, if it would result in detail deletion on another block
         if (ref_status == -1 .or. ref_status == REF_TMP_TREATED_COARSEN) then
             do neighborhood = 1, size(hvy_neighbor, 2)
-                ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
+                ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the significant patch bit
                 ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant
                 i_neighborhood = inverse_neighbor(neighborhood, params%dim)
 

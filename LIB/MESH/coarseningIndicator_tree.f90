@@ -72,6 +72,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
             lgt_block( lgtID, IDX_REFINE_STS ) = 0
         enddo
     endif
+    
     ! If adapt_tree is called with "everywhere" or "random" we coarsen everything on the first loop but new blocks get untreated flag
     ! We have to ignore those as we only want to refine once so we reset their ref status
     if (iteration > 0 .and. (indicator=="everywhere" .or. indicator=="random")) Then

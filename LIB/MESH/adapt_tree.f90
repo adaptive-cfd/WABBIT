@@ -57,8 +57,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-    t_block          = MPI_Wtime()
-    t_all          = MPI_Wtime()
+    t_block     = MPI_Wtime()
+    t_all       = MPI_Wtime()
     iteration   = 0
     iterate     = .true.
     Jmin        = params%Jmin
@@ -86,7 +86,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! until the number of blocks is constant (no new blocks are created in the process anyways) or iteration=JMax-JMin
 
     ! For fine and medium neighbors of a block first sync correctly sets boundary values and all operations (CE, coarsening, even CVS) on
-    ! the neighbour do not change the wavelet decomposition on this block
+    ! the neighbour do not change the wavelet decomposition on this block.
     ! For coarse neighbors we apply coarse extension, this effectively decouples the wavelet decomposition from this blocks
 
     ! In order to not investigate blocks again, we will give everyone a temporary flag that they are not wavelet decomposed yet
@@ -95,26 +95,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED            
     end do
 
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! Coarsening is an iterative process done until the grid does not change anymore
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     do while (iterate)
         t_loop = MPI_Wtime()
         lgt_n_old = lgt_n(tree_ID)
 
-
-        ! ! I often need to check block values when debugging so I leave it here
-        ! do k = 1, hvy_n(tree_ID)
-        !     hvy_ID = hvy_active(k, tree_ID)
-        !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 52428800) then
-        !         write(*, '("1 I-", i0, " R-", i0, " B-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, &
-        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-        !         do iy = 1,34
-        !             write(*, '(34(es8.1))') hvy_block(1:34, iy, 1, 1, hvy_id)
-        !         enddo
-        !     endif
-        ! enddo
-
-
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! synchronize ghost nodes - required to apply wavelet filters
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! block only needs information from medium and fine neighbors as CE will cut dependency to coarse neighbors
         t_block = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
@@ -134,7 +124,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         endif
 
-	!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    	!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Wavelet-transform all remaining non-decomposed blocks
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form,
@@ -169,25 +159,25 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " FWT)"
         call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
 
-        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
-        ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
-        ! This is the first coarse extension before removing blocks
-        ! As every block is assumed to be WDed here we can do it on the whole tree
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! coarseExtension
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Remove wavelet coefficients near a fine/coarse interface on the fine block. This is the first coarse 
+        ! extension before removing blocks. As every block is assumed to be wavelet-decomposed (WD) here we can do it on the whole tre.
         t_block = MPI_Wtime()
         if (params%useCoarseExtension .and. params%isLiftedWavelet) then
             call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
         endif
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )     
 
-        !> coarseningIndicator_tree resets ALL refinement_status to 0 (all blocks, not only level)
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Coarsening indicator: flag blocks for coarsening
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Check the entire grid where to coarsen. Note this is a wrapper for coarseningIndicator_block, which
-        ! acts on a single block only.
-        ! We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the default, other indicators
-        ! are used mostly for testing.
-        ! The routine first sets all blocks (regardless of level) to 0 (STAY).
-        ! In the wavelet case, we check the blocks for their largest detail (=wavelet coeff).
-        ! The routine assigns -1 (COARSEN) to a block, if it matches the criterion. This status may however be revoked below.
+        ! acts on a single block only.We distinguish two cases: wavelet or no wavelet (Shakespeare!). The wavelet case is the 
+        ! default, other indicators are used mostly for testing. In the wavelet case, we check the blocks for their largest 
+        ! detail (=wavelet coeff). The routine assigns -1 (COARSEN) to a block, if it matches the criterion. 
+        ! This status may however be revoked below.
         t_block = MPI_Wtime()
         if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
@@ -207,10 +197,13 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! coarseningIndicator_tree works on all blocks (for wavelet cases).
         ! blocks that are significant now have status 0, others have -1
 
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! add bufferZone
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. params%useCoarseExtension .and. params%isLiftedWavelet) then
             ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
             ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
-            ! in that case we set the neighbouring block to be important as well (with a temporary flag)
+            ! in that case we set the neighbouring block to be important as well.
             t_block = MPI_Wtime()
             call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
             call toc( "adapt_tree (security_zone_check)", 107, MPI_Wtime()-t_block)
@@ -219,6 +212,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             call toc( toc_statement, 1400+iteration, MPI_Wtime()-t_block )
         endif
 
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! ensure flagging results in a valid grid
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! check if block has reached minimal level, if so, remove refinement flags
         t_block = MPI_Wtime()
         call respectJmaxJmin_tree( params, tree_ID )
@@ -232,7 +228,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " ensureGradedness_tree)"
         call toc( toc_statement, 1500+iteration, MPI_Wtime()-t_block )
 
+
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Adapt the mesh, i.e. actually merge blocks
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! This uses the already wavelet decomposed blocks and coarsens them by effectively copying their SC into the new mother block
         t_block = MPI_Wtime()
         call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true.)
@@ -241,14 +240,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " executeCoarsening_tree)"
         call toc( toc_statement, 1600+iteration, MPI_Wtime()-t_block )
 
-        ! if (params%rank == 0) then
-        !     do k = 1, lgt_n(tree_ID)
-        !         lgt_ID = lgt_active(k, tree_ID)
-        !         write(*, '("2 - R0 - Exists BL-", i0, " L-", i0, " Ref-", i0, "TC-", i0, " - ", b32.32)') lgt_ID, &
-        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2), lgt_block(lgt_id, IDX_TC_2)
-        !     enddo
-        ! endif
 
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! finalization of this iteration
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! update grid lists: active list, neighbor relations, etc
         ! JB: Why is this not in executeCoarsening? This might make more sense
         call updateMetadata_tree(params, tree_ID, verbose_check=.true.)
@@ -267,9 +262,13 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
     end do
 
+    
     ! log some statistics - amount of iterations
     if (present(log_iterations)) log_iterations = iteration
-
+    
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! Iteration done - data still WD => inverse transform
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (params%useCoarseExtension .and. params%isLiftedWavelet) then
         ! If iteration hit Jmax-Jmin, some blocks might have been coarsened in last iteration.
         ! If that happened, suddenly new blocks have coarser neighbors, and on those, the coarseExt needs to be done again.
@@ -292,9 +291,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, sc_skip_ghosts=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
-
         ! Wavelet-reconstruct all blocks in one go
-        ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
+        ! Copy back old values if no coarse extension is applied and otherwise just overwrite the affected patches inside the domain
         t_block = MPI_Wtime()
         call coarse_extension_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
         call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
@@ -311,7 +309,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
 
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
-    ! they may have passed several level also. Rebalance for optimal loadbalancing
+    ! they may have passed several levels also. Rebalance for optimal loadbalancing
     ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
     t_block = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID)
@@ -675,7 +673,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call flush()
 
         ! Wavelet-reconstruct blocks on level
-        ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
+        ! Copy back old values if no coarse extension is applied and otherwise just overwrite the affected patches inside the domain
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)

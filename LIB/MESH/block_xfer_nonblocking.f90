@@ -26,7 +26,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     character(len=*), intent(in), optional :: msg
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
-    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, npoints2
+    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints
     integer :: ierr, tag
     logical :: xfer_started(1:N_xfers)
     logical :: source_block_deleted(1:N_xfers)
@@ -108,8 +108,8 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
             tag = 2*k ! use unique tag for each message
 
             ! open channel to receive one block.
-            call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, mpirank_sender, &
-            tag, WABBIT_COMM, requests(ireq), ierr)
+            call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, &
+                mpirank_sender, tag, WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
 
@@ -126,8 +126,8 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
 
             ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
             ! we have to wait for the MPI_REQUEST to be finnished.
-            call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, mpirank_recver, tag, &
-            WABBIT_COMM, requests(ireq), ierr)
+            call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, &
+                mpirank_recver, tag, WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
 

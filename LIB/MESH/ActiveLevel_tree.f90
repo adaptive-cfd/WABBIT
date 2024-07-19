@@ -22,12 +22,8 @@ function minActiveLevel_tree( tree_ID, use_active_list )
     max_treelevel = maxdigits
     Jmin = max_treelevel
 
-    if (present(use_active_list)) then
-        use_active_list2 = use_active_list
-    else
-        ! default
-        use_active_list2 = .true.
-    endif
+    use_active_list2 = .true.
+    if (present(use_active_list)) use_active_list2 = use_active_list
 
     if (use_active_list2) then
         ! call with active lists (to be preferred, much faster)
@@ -66,11 +62,8 @@ function maxActiveLevel_tree( tree_ID, use_active_list )
 
     Jmax = 0
 
-    if (present(use_active_list)) then
-        use_active_list2 = use_active_list
-    else
-        use_active_list2 = .true.
-    endif
+    use_active_list2 = .true.
+    if (present(use_active_list)) use_active_list2 = use_active_list
 
     if (use_active_list2) then
         ! call with active lists (to be preferred, much faster)

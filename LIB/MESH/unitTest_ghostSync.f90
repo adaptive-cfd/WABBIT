@@ -34,7 +34,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     if ( params%dim == 3 ) then
         max_neighbors = 74
     else
-        max_neighbors = 12
+        max_neighbors = 16
     endif
 
 

@@ -43,7 +43,8 @@ contains
 
     ! List of codes that I somewhat arbitrarily set just to have some kind of sorting for toc calls
     !    9-  15 TOPLEVEL
-    !   20-  24 RHS_WRAPPER, krylov
+    !   20-  24 timestep
+    !   30-  33 RHS_WRAPPER
     !   50- 100 Fundamental functions
     !   50-  55    createActiveSortedLists
     !        59    updateMetadata_tree
@@ -167,7 +168,11 @@ contains
         ! make it relative to avg and to percent
         do k_timings = 1, MAX_TIMING_SLOTS
             ! check if we divide by 0 and skip that as it is a zero-entry
-            if (avg(k_timings) /= 0.0) std(k_timings) = std(k_timings) / avg(k_timings) * 100
+            if (avg(k_timings) > 1e-6) then
+                std(k_timings) = std(k_timings) / avg(k_timings) * 100
+            ! else  ! if the call is really small then just disable averaging
+            !     std(k_timings) = -1
+            endif
         enddo
 
         ! write indices as unique ids into second entry so that we can retrieve it for the other arrays

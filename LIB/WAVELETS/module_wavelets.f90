@@ -1329,246 +1329,174 @@ contains
 
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE
-        ! GD - high pass decomposition filter, G_TILDE
+        ! GD - high pass decomposition filter, G_TILDE - for CDF it is always HR with different sign for every second off-center value
         ! HR - low pass reconstruction filter, H
-        ! GR - high pass reconstruction filter, G
-        select case(params%wavelet)
-        case("CDF62")
-            ! H TILDE filter
-            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-            ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
-            allocate( params%HD(-6:6) )
-            params%HD = (/ -3.0_rk*2.0_rk**(-10.0_rk), &
-                            0.0_rk, &
-                            11.0_rk*2.0_rk**(-9.0_rk), &
-                            0.0_rk, &
-                            -125.0_rk*2.0_rk**(-10.0_rk), &
-                            2.0_rk**(-2.0_rk), &
-                            181.0_rk*2.0_rk**(-8.0_rk), &
-                            2.0_rk**(-2.0_rk), &
-                            -125.0_rk*2.0_rk**(-10.0_rk), &
-                            0.0_rk, &
-                            11.0_rk*2.0_rk**(-9.0_rk), &
-                            0.0_rk, &
-                            -3.0_rk*2.0_rk**(-10.0_rk)/)
+        ! GR - high pass reconstruction filter, G - for CDF it is always HD with different sign for every second off-center value
 
-            ! H filter  
-            allocate( params%HR(-5:5) )
-            params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
-
-            ! G TILDE filter
-            allocate( params%GD(-4:6) )
-            do i = -4, +6
-                if (mod(i,2)==0) then
-                    params%GD(i) = -1.0_rk*params%HR(i-1)
-                else
-                    params%GD(i) = +1.0_rk*params%HR(i-1)
-                endif
-            enddo
-
-            ! G filter
-            allocate( params%GR(-7:5) )
-            do i = -7, 5
-                if (mod(i,2)==0) then
-                    params%GR(i) = -1.0_rk*params%HD(i+1)
-                else
-                    params%GR(i) = +1.0_rk*params%HD(i+1)
-                endif
-            enddo
-
-            params%order_predictor = "multiresolution_6th"
-            params%isLiftedWavelet = .true.
-
-        case("CDF46")
-            ! H TILDE filter
-            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-            ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
-            allocate( params%HD(-8:8) )
-            params%HD = (/&
-            9.0_rk   *2.0_rk**(-14.0_rk), &
-            0.0_rk                      , &
-            -35.0_rk *2.0_rk**(-12.0_rk), &
-            9.0_rk   *2.0_rk**(-10.0_rk), &
-            189.0_rk *2.0_rk**(-12.0_rk), &
-            -59.0_rk *2.0_rk**(-10.0_rk), &
-            -477.0_rk*2.0_rk**(-12.0_rk), &
-            153.0_rk *2.0_rk**( -9.0_rk), &
-            5379.0_rk*2.0_rk**(-13.0_rk), &
-            153.0_rk *2.0_rk**( -9.0_rk), &
-            -477.0_rk*2.0_rk**(-12.0_rk), &
-            -59.0_rk *2.0_rk**(-10.0_rk), &
-            189.0_rk *2.0_rk**(-12.0_rk), &
-            9.0_rk   *2.0_rk**(-10.0_rk), &
-            -35.0_rk *2.0_rk**(-12.0_rk), &
-            0.0_rk                      , &
-            9.0_rk   *2.0_rk**(-14.0_rk)/)
-
-            ! H filter  
-            allocate( params%HR(-3:3) )
-            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-            ! G TILDE filter
-            allocate( params%GD(-2:4) )
-            do i = -2, 4
-                if (mod(i,2)==0) then
-                    params%GD(i) = -1.0_rk*params%HR(i-1)
-                else
-                    params%GD(i) = +1.0_rk*params%HR(i-1)
-                endif
-            enddo
-            ! allocate( params%GD(-2:4) )
-            ! params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-
-            ! G filter
-            allocate( params%GR(-9:7) )
-            do i = -9, 7
-                if (mod(i,2)==0) then
-                    params%GR(i) = -1.0_rk*params%HD(i+1)
-                else
-                    params%GR(i) = +1.0_rk*params%HD(i+1)
-                endif
-            enddo
-
-            params%order_predictor = "multiresolution_4th"
-            params%isLiftedWavelet = .true.
-
-        case("CDF60")
-            ! H TILDE filter
-            allocate( params%HD(0:0) )
-            params%HD = (/1.0_rk/)
-
-           ! H filter  
-            allocate( params%HR(-5:5) )
-            params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
-
-            ! G TILDE filter
-            allocate( params%GD(-4:6) )
-            do i = -4, +6
-                if (mod(i,2)==0) then
-                    params%GD(i) = -1.0_rk*params%HR(i-1)
-                else
-                    params%GD(i) = +1.0_rk*params%HR(i-1)
-                endif
-            enddo
-
-            ! G filter
-            allocate( params%GR(-2:0) )
-            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-
-            params%order_predictor = "multiresolution_6th"
-            params%isLiftedWavelet = .false.
-
-        case("CDF44")
-            ! H TILDE filter
-            ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-            ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
-            allocate( params%HD(-6:6) )
-            params%HD = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), -2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
-            87.0_rk*2.0_rk**(-7.0_rk), &
-            9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), -2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
-
-            ! G TILDE filter
-            allocate( params%GD(-2:4) )
-            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-            ! H filter
-            allocate( params%HR(-3:3) )
-            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-            ! G filter
-            allocate( params%GR(-7:5) )
-            params%GR = (/ -2.0_rk**(-9.0_rk), 0.0_rk,  9.0_rk*2.0_rk**(-8.0_rk), +2.0_rk**(-5.0_rk),  -63.0_rk*2.0_rk**(-9.0_rk),  -9.0_rk*2.0_rk**(-5.0_rk), &
-            87.0_rk*2.0_rk**(-7.0_rk), &
-            -9.0_rk*2.0_rk**(-5.0_rk), -63.0_rk*2.0_rk**(-9.0_rk), 2.0_rk**(-5.0_rk), 9.0_rk*2.0_rk**(-8.0_rk), 0.0_rk, -2.0_rk**(-9.0_rk)/)
-
-            params%order_predictor = "multiresolution_4th"
-            params%isLiftedWavelet = .true.
-
-        case("CDF42")
-            ! H TILDE filter
-            allocate( params%HD(-4:4) )
-            params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), 23.0_rk*2**(-5.0_rk), 2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), 0.0_rk, 2.0_rk**(-6.0_rk) /)
-
-            ! G TILDE filter
-            allocate( params%GD(-2:4) )
-            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-            ! H filter
-            allocate( params%HR(-3:3) )
-            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-            ! G filter
-            allocate( params%GR(-5:3) )
-            params%GR = (/ 2.0_rk**(-6.0_rk), -0.0_rk, -2.0_rk**(-3.0_rk), -2.0_rk**(-2.0_rk), +23.0_rk*2**(-5.0_rk), -2.0_rk**(-2.0_rk), -2.0_rk**(-3.0_rk), -0.0_rk, 2.0_rk**(-6.0_rk) /)
-
-            params%order_predictor = "multiresolution_4th"
-            params%isLiftedWavelet = .true.
-
-        case("CDF40")
-            ! H TILDE filter
-            allocate( params%HD(0:0) )
-            params%HD = (/1.0_rk/)
-
-            ! G TILDE filter
-            allocate( params%GD(-2:4) )
-            params%GD = (/ 1.0_rk/16.0_rk, 0.0_rk, -9.0_rk/16.0_rk, 1.0_rk, -9.0_rk/16.0_rk, 0.0_rk, 1.0_rk/16.0_rk  /)
-
-            ! H filter
-            allocate( params%HR(-3:3) )
-            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-            ! G filter
-            allocate( params%GR(-2:0) )
-            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-
-            params%order_predictor = "multiresolution_4th"
-            params%isLiftedWavelet = .false.
-
-        case("CDF20")
-            ! H TILDE filter
-            allocate( params%HD(0:0) )
-            params%HD = (/1.0_rk/)
-
-            ! G TILDE filter
-            allocate( params%GD(0:2) )
-            params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
-
-            ! H filter
-            allocate( params%HR(-1:1) )
-            params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
-
-            ! G filter
-            allocate( params%GR(-2:0) )
-            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-
-            params%order_predictor = "multiresolution_2nd"
-            params%isLiftedWavelet = .false.
-
-        case("CDF22")
-            ! H TILDE filter
-            allocate( params%HD(-2:2) )
-            params%HD = (-1.0_rk)*(/+1.0_rk/8.0_rk, -1.0_rk/4.0_rk, -3.0_rk/4.0_rk, -1.0_rk/4.0_rk, +1.0_rk/8.0_rk/)
-
-            ! G TILDE filter
-            allocate( params%GD(0:2) )
-            params%GD = (/ -0.5_rk, 1.0_rk, -0.5_rk  /)
-
-            ! H filter
-            allocate( params%HR(-1:1) )
-            params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
-
-            ! G filter
-            allocate( params%GR(-3:1) )
-            params%GR = (-1.0_rk)*params%hd*(/-1.0_rk, 1.0_rk, -1.0_rk, 1.0_rk, -1.0_rk /)
-
-            params%order_predictor = "multiresolution_2nd"
-            params%isLiftedWavelet = .true.
-
-        case default
+        ! check if we have a CDF wavelet
+        if (params%wavelet(1:3) /= "CDF") then
             call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+        endif
+        
+        ! The HR filter is always defined by the first number of the CDFXY filter
+        ! The HD filter changes depending on both numbers
+        if (params%wavelet(4:4) == "2") then
+            ! H TILDE filter
+            allocate( params%HR(-1:1) )
+            params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
 
-        end select
+            ! H filter
+            if (params%wavelet(5:5) .eq. "0") then
+                allocate( params%HD(0:0) )
+                params%HD = (/1.0_rk/)
+            elseif (params%wavelet(5:5) == "2") then
+                allocate( params%HD(-2:2) )
+                params%HD = (/-1.0_rk, +2.0_rk, +6.0_rk, +2.0_rk, -1.0_rk/) / 8.0_rk
+            elseif (params%wavelet(5:5) == "4") then
+                allocate( params%HD(-4:4) )
+                ! from Wavelab Biorthogonal MakeBSFilter
+                params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
+            elseif (params%wavelet(5:5) == "6") then
+                allocate( params%HD(-6:6) )
+                ! from Wavelab Biorthogonal MakeBSFilter
+                params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
+            elseif (params%wavelet(5:5) == "8") then
+                allocate( params%HD(-8:8) )
+                ! from Wavelab Biorthogonal MakeBSFilter
+                params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
+                    10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
+            else
+                call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
+
+        elseif (params%wavelet(4:4) == "4") then
+            ! H TILDE filter
+            allocate( params%HR(-3:3) )
+            params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
+
+            ! H filter
+            if (params%wavelet(5:5) == "0") then
+                allocate( params%HD(0:0) )
+                params%HD = (/1.0_rk/)
+            elseif (params%wavelet(5:5) == "2") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
+                allocate( params%HD(-4:4) )
+                params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, &
+                              -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), &
+                       23.0_rk*2.0_rk**(-5.0_rk), 2.0_rk**(-2.0_rk), &
+                              -2.0_rk**(-3.0_rk), 0.0_rk, &
+                               2.0_rk**(-6.0_rk) /)
+            elseif (params%wavelet(5:5) == "4") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
+                allocate( params%HD(-6:6) )
+                params%HD = (/ -2.0_rk**(-9.0_rk),         0.0_rk, &
+                         9.0_rk*2.0_rk**(-8.0_rk),        -2.0_rk**(-5.0_rk), &
+                       -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
+                        87.0_rk*2.0_rk**(-7.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
+                       -63.0_rk*2.0_rk**(-9.0_rk),        -2.0_rk**(-5.0_rk), &
+                         9.0_rk*2.0_rk**(-8.0_rk),         0.0_rk, &
+                               -2.0_rk**(-9.0_rk)/)
+            elseif (params%wavelet(5:5) == "6") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
+                allocate( params%HD(-8:8) )
+                params%HD = (/ 9.0_rk*2.0_rk**(-14.0_rk),          0.0_rk, &
+                             -35.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
+                             189.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
+                            -477.0_rk*2.0_rk**(-12.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
+                            5379.0_rk*2.0_rk**(-13.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
+                            -477.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
+                             189.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
+                             -35.0_rk*2.0_rk**(-12.0_rk),          0.0_rk, &
+                               9.0_rk*2.0_rk**(-14.0_rk) /)  
+            else
+                call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )      
+            endif
+        elseif (params%wavelet(4:4) == "6") then
+            ! H TILDE filter  
+            allocate( params%HR(-5:5) )
+            params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
+
+            ! H filter
+            if (params%wavelet(5:5) == "0") then
+                allocate( params%HD(0:0) )
+                params%HD = (/1.0_rk/)
+            elseif (params%wavelet(5:5) == "2") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
+                allocate( params%HD(-6:6) )
+                params%HD = (/ -3.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
+                               11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
+                             -125.0_rk*2.0_rk**(-10.0_rk), 2.0_rk**(-2.0_rk), &
+                              181.0_rk*2.0_rk**( -8.0_rk), 2.0_rk**(-2.0_rk), &
+                             -125.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
+                               11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
+                               -3.0_rk*2.0_rk**(-10.0_rk)/)
+            elseif (params%wavelet(5:5) == "4") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=4
+                allocate( params%HD(-8:8) )
+                params%HD = (/ 3.0_rk*2.0_rk**(-13.0_rk),        0.0_rk, &
+                             -13.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
+                              87.0_rk*2.0_rk**(-11.0_rk),       -2.0_rk**(-5.0_rk), &
+                            -243.0_rk*2.0_rk**(-11.0_rk), 9.0_rk*2.0_rk**(-5.0_rk), &
+                            2721.0_rk*2.0_rk**(-12.0_rk), 9.0_rk*2.0_rk**(-5.0_rk), &
+                            -243.0_rk*2.0_rk**(-11.0_rk),       -2.0_rk**(-5.0_rk), &
+                              87.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
+                             -13.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
+                               3.0_rk*2.0_rk**(-13.0_rk) /)  
+            elseif (params%wavelet(5:5) == "6") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=6
+                allocate( params%HD(-10:10) )
+                params%HD = (/ -9.0_rk*2.0_rk**(-17.0_rk),          0.0_rk, &
+                               75.0_rk*2.0_rk**(-16.0_rk),          0.0_rk, &
+                            -1525.0_rk*2.0_rk**(-17.0_rk),   3.0_rk*2.0_rk**(-9.0_rk), &
+                              825.0_rk*2.0_rk**(-14.0_rk), -25.0_rk*2.0_rk**(-9.0_rk), &
+                            -7425.0_rk*2.0_rk**(-16.0_rk),  75.0_rk*2.0_rk**(-8.0_rk), &
+                            21201.0_rk*2.0_rk**(-15.0_rk),  75.0_rk*2.0_rk**(-8.0_rk), &
+                            -7425.0_rk*2.0_rk**(-16.0_rk), -25.0_rk*2.0_rk**(-9.0_rk), &
+                              825.0_rk*2.0_rk**(-14.0_rk),   3.0_rk*2.0_rk**(-9.0_rk), &
+                            -1525.0_rk*2.0_rk**(-17.0_rk),          0.0_rk, &
+                               75.0_rk*2.0_rk**(-16.0_rk),          0.0_rk, &
+                               -9.0_rk*2.0_rk**(-17.0_rk) /)
+            else
+                call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif    
+        else
+            call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+        endif
+
+        ! G TILDE filter - HR filter with different sign for every second off-center value
+        allocate( params%GD( lbound(params%HR, dim=1)+1:ubound(params%HR, dim=1)+1) )
+        do i = lbound(params%GD, dim=1), ubound(params%GD, dim=1)
+            params%GD(i) = (-1.0_rk)**(i-1) * params%HR(i-1)
+        enddo
+                    
+        ! G filter - HD filter with different sign for every second off-center value
+        if (params%wavelet(5:5) == "0") then  ! for unlifted wavelets GR filter is set larger than HD filter
+            allocate( params%GR(-2:0) )
+            params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+        else
+            allocate( params%GR( lbound(params%HD, dim=1)-1:ubound(params%HD, dim=1)-1) )
+            do i = lbound(params%GR, dim=1), ubound(params%GR, dim=1)
+                params%GR(i) = (-1.0_rk)**(i+1) * params%HD(i+1)
+            enddo
+        endif
+
+        ! Unlifted or lifted - every CDFX0er wavelet is considered unlifted and the rest lifted
+        params%isLiftedWavelet = params%wavelet(5:5) /= "0"
+
+        ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually)
+        if (params%wavelet(4:4) == "2") then
+            params%order_predictor = "multiresolution_2nd"
+        elseif (params%wavelet(4:4) == "4") then
+            params%order_predictor = "multiresolution_4th"
+        elseif (params%wavelet(4:4) == "6") then
+            params%order_predictor = "multiresolution_6th"
+        endif
 
         ! minimum number of ghost nodes required for this wavelet
         ! value is determined by largest filter bank
@@ -1628,7 +1556,7 @@ contains
         if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
             ! first condition: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
             ! this is critical and we currently cannot get those values
-            block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-1, abs(lbound(params%HR, dim=1))-2))
+            block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
             block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
             ! second condition: our finer neighbors need our reconstructed values to reconstruct itself it's values
             ! if that is the case we have an upwards dependency which is currently not handled
@@ -1652,7 +1580,7 @@ contains
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
             write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
-            write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
+            if (block_min /= 0) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD

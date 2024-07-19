@@ -21,10 +21,6 @@ module module_mesh
 
     implicit none
 
-    interface set_desired_num_blocks_per_rank
-        module procedure set_desired_num_blocks_per_rank1, set_desired_num_blocks_per_rank2
-    end interface
-
     ! used in adapt_tree to work leaf-wise
     integer, parameter :: REF_TMP_UNTREATED = -2             ! should be < -1
     integer, parameter :: REF_TMP_TREATED_COARSEN = -3       ! should be < -1
@@ -56,7 +52,6 @@ contains
 #include "executeCoarsening_tree.f90"
 #include "merge_blocks.f90"
 #include "balanceLoad_tree.f90"
-#include "set_desired_num_blocks_per_rank.f90"
 #include "treecode_to_sfc_id_2D.f90"
 #include "treecode_to_sfc_id_3D.f90"
 #include "treecode_to_hilbertcode_2D.f90"

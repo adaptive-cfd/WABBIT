@@ -13,7 +13,7 @@ subroutine ini_file_to_params( params, filename )
    ! inifile structure
    type(inifile)                                   :: FILE
    ! maximum memory available on all cpus
-   real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
+   real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
    integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk

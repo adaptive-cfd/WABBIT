@@ -115,6 +115,10 @@ class WabbitTest:
                 return result1
             result2 = run_wabbit(command2, self.logger)
 
+            # the refined file is quite data-heavy but always the same betweend different Y-wavelets if CDFXY. Let's just keep them and test them for unlifted wavelets!
+            if (self.wavelet not in ["CDF20", "CDF40", "CDF60"]):
+                os.remove("vor_00100.h5")
+
             # compare all files present in test_dir
             try:
                 all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
@@ -272,10 +276,11 @@ class WabbitTest:
 
 # these are all tests that we can run
 # new blocks can be added with "---NAME---" and new tests by providing name, wavelet and dimension
+group_names = ["post", "wavelets", "ghost_nodes", "adaptive", "convection", "acm"]
 tests = [
-        # "---post---",
+        # f"---{group_names[0]}---",
         # "TESTING/wabbit_post/pod/pod_test.sh",
-        "---wavelets---",  # group identifier
+        f"---{group_names[1]}---",  # group identifier
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":2},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":2},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF24", "dim":2},
@@ -296,12 +301,14 @@ tests = [
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":3},
+        f"---{group_names[2]}---",  # group identifier
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
+        f"---{group_names[3]}---",  # group identifier
         {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF22", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF40", "dim":2},
@@ -310,7 +317,7 @@ tests = [
         {"test_name":"adaptive", "wavelet":"CDF60", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF62", "dim":2},
 
-        "---convection---",  # group identifier
+        f"---{group_names[4]}---",  # group identifier
         {"test_name":"blob_equi", "wavelet":"CDF40", "dim":2},
         {"test_name":"blob_equi", "wavelet":"CDF20", "dim":3},
         {"test_name":"blob_equi", "wavelet":"CDF40", "dim":3},
@@ -325,7 +332,7 @@ tests = [
         {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
         {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
 
-        "---acm---",  # group identifier
+        f"---{group_names[5]}---",  # group identifier
         {"test_name":"acm", "wavelet":"CDF40", "dim":2},
         {"test_name":"acm", "wavelet":"CDF44", "dim":2},
     ]
@@ -391,7 +398,7 @@ def main():
         tests_run = tests
         logger_suite.info(f"\n\t{underline}WABBIT: run all existing unit tests{end_color}\n")
     # run a group of tests only
-    elif args.test in ["post", "wavelets", "convection", "acm"]:
+    elif args.test in group_names:
         group_run = args.test
         tests_run = tests  # we will check later what tests to run from this group
     else:

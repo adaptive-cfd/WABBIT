@@ -58,13 +58,10 @@ module module_MPI
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation], [level-diff], [sender/receiver/up-downsampled])
-    ! The third index is 1:74 for ghost relations, 0 for whole block, -1:-8 for SC decimation
-    integer(kind=ik), dimension(1:2, 1:3, -8:74, -1:1, 1:3) :: ijkPatches
+    ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation (with level_diff)], [level-diff], [sender/receiver/up-downsampled])
+    ! The third index is 1:56*3 for ghost relations for all three level-diffs, 0 for whole block, -1:-8 for SC decimation
+    integer(kind=ik), dimension(1:2, 1:3, -8:56*3, -1:1, 1:3) :: ijkPatches
 
-    ! it is useful to keep a named constant for the dimensionality here (we use
-    ! it to access e.g. two/three D arrays in inverse_neighbor)
-    integer(kind=ik) :: dim
 
     ! we use this flag to call the allocation routine only once.
     logical :: ghost_nodes_module_ready = .false.
@@ -91,11 +88,6 @@ module module_MPI
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
     PUBLIC :: coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 
-    ! we set up a table that gives us directly the inverse neighbor relations.
-    ! it is filled (once) in init_ghost_nodes
-    PUBLIC :: inverse_neighbor
-    integer(kind=ik), dimension(1:74,2:3) :: inverse_neighbor
-
 
 contains
 
@@ -116,7 +108,7 @@ subroutine init_ghost_nodes( params )
     ! local variables
     integer(kind=ik) :: buffer_N_int, buffer_N, g, Neqn, number_blocks, rank
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: ineighbor, Nneighbor, leveldiff, Ncpu
+    integer(kind=ik) :: ineighbor, leveldiff, Ncpu
     integer(kind=ik) ::  j, rx0, rx1, ry0, ry1, rz0, rz1, sx0, sx1, sy0, sy1, sz0, sz1
     integer(kind=ik) :: i, k, status(1:4)
     integer(kind=ik) :: ijkrecv(2,3)
@@ -170,27 +162,22 @@ subroutine init_ghost_nodes( params )
 
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
-        ! max number of active neighbors: 2D = 12, 3D = 56
-        dim = params%dim
-        if ( dim == 3 ) then
+        ! max number of active neighbors per stage: 2D = 12, 3D = 56
+        if ( params%dim == 3 ) then
             !---3d---3d---
             ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 56 neighbors ACTIVE per block
+            ! at most, we can have 56 neighbors ACTIVE per block per stage
             buffer_N_int = number_blocks * 56 * 6
-            ! how many possible neighbor relations are there?
-            Nneighbor = 74
         else
             !---2d---2d---
             ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 12 neighbors ACTIVE per block
+            ! at most, we can have 12 neighbors ACTIVE per block per stage
             buffer_N_int = number_blocks * 12 * 6
-            ! how many possible neighbor relations are there?
-            Nneighbor = 16
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
         ! for all my blocks
-        if ( dim == 3 ) then
+        if ( params%dim == 3 ) then
             buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g)*(Bs(3)+2*g) - (Bs(1)*Bs(2)*Bs(3)) )
         else
             ! 2D case
@@ -258,120 +245,6 @@ subroutine init_ghost_nodes( params )
         ! This arrays indices are:
         ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
         call ghosts_setup_patches(params, gminus=params%g, gplus=params%g, output_to_file=.true.)
-
-        ! set up table with inverse neighbor relations
-        if (.true.) then ! for folding only
-            inverse_neighbor = -1
-            ! ---2D------2D------2D---
-            inverse_neighbor(1,2) = 3
-            inverse_neighbor(2,2) = 4
-            inverse_neighbor(3,2) = 1
-            inverse_neighbor(4,2) = 2
-            inverse_neighbor(5,2) = 8
-            inverse_neighbor(6,2) = 7
-            inverse_neighbor(7,2) = 6
-            inverse_neighbor(8,2) = 5
-            inverse_neighbor(9,2) = 11
-            inverse_neighbor(10,2) = 12
-            inverse_neighbor(11,2) = 9
-            inverse_neighbor(12,2) = 10
-            inverse_neighbor(13,2) = 15
-            inverse_neighbor(14,2) = 16
-            inverse_neighbor(15,2) = 13
-            inverse_neighbor(16,2) = 14
-            ! ---3D------3D------3D------3D---
-            !'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___'
-            inverse_neighbor(1,3) = 6
-            inverse_neighbor(2,3) = 4
-            inverse_neighbor(3,3) = 5
-            inverse_neighbor(4,3) = 2
-            inverse_neighbor(5,3) = 3
-            inverse_neighbor(6,3) = 1
-            !'_12/___', '_13/___', '_14/___', '_15/___'
-            inverse_neighbor(7,3) = 13
-            inverse_neighbor(8,3) = 14
-            inverse_neighbor(9,3) = 11
-            inverse_neighbor(10,3) = 12
-            !'_62/___', '_63/___', '_64/___', '_65/___'
-            inverse_neighbor(11,3) = 9
-            inverse_neighbor(12,3) = 10
-            inverse_neighbor(13,3) = 7
-            inverse_neighbor(14,3) = 8
-            !'_23/___', '_25/___'
-            inverse_neighbor(15,3) = 18
-            inverse_neighbor(16,3) = 17
-            !'_43/___', '_45/___'
-            inverse_neighbor(17,3) = 16
-            inverse_neighbor(18,3) = 15
-            !'123/___', '134/___', '145/___', '152/___'
-            inverse_neighbor(19,3) = 25
-            inverse_neighbor(20,3) = 26
-            inverse_neighbor(21,3) = 23
-            inverse_neighbor(22,3) = 24
-            !'623/___', '634/___', '645/___', '652/___'
-            inverse_neighbor(23,3) = 21
-            inverse_neighbor(24,3) = 22
-            inverse_neighbor(25,3) = 19
-            inverse_neighbor(26,3) = 20
-            !'__1/123', '__1/134', '__1/145', '__1/152'
-            inverse_neighbor(27,3) = 47
-            inverse_neighbor(28,3) = 48
-            inverse_neighbor(29,3) = 49
-            inverse_neighbor(30,3) = 50
-            !'__2/123', '__2/623', '__2/152', '__2/652'
-            inverse_neighbor(31,3) = 39
-            inverse_neighbor(32,3) = 40
-            inverse_neighbor(33,3) = 41
-            inverse_neighbor(34,3) = 42
-            !'__3/123', '__3/623', '__3/134', '__3/634'
-            inverse_neighbor(35,3) = 45
-            inverse_neighbor(36,3) = 46
-            inverse_neighbor(37,3) = 43
-            inverse_neighbor(38,3) = 44
-            !'__4/134', '__4/634', '__4/145', '__4/645'
-            inverse_neighbor(39,3) = 31
-            inverse_neighbor(40,3) = 32
-            inverse_neighbor(41,3) = 33
-            inverse_neighbor(42,3) = 34
-            !'__5/145', '__5/645', '__5/152', '__5/652'
-            inverse_neighbor(43,3) = 37
-            inverse_neighbor(44,3) = 38
-            inverse_neighbor(45,3) = 35
-            inverse_neighbor(46,3) = 36
-            !'__6/623', '__6/634', '__6/645', '__6/652'
-            inverse_neighbor(47,3) = 27
-            inverse_neighbor(48,3) = 28
-            inverse_neighbor(49,3) = 29
-            inverse_neighbor(50,3) = 30
-            !'_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152'
-            inverse_neighbor(51,3) = 63
-            inverse_neighbor(52,3) = 64
-            inverse_neighbor(53,3) = 66!65
-            inverse_neighbor(54,3) = 65!66
-            inverse_neighbor(55,3) = 59
-            inverse_neighbor(56,3) = 60
-            inverse_neighbor(57,3) = 62
-            inverse_neighbor(58,3) = 61
-            !'_62/623', '_62/652', '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652'
-            inverse_neighbor(59,3) = 55
-            inverse_neighbor(60,3) = 56
-            inverse_neighbor(61,3) = 58
-            inverse_neighbor(62,3) = 57
-            inverse_neighbor(63,3) = 51
-            inverse_neighbor(64,3) = 52
-            inverse_neighbor(65,3) = 54!53
-            inverse_neighbor(66,3) = 53!54
-            !'_23/123', '_23/623', '_25/152', '_25/652'
-            inverse_neighbor(67,3) = 73
-            inverse_neighbor(68,3) = 74
-            inverse_neighbor(69,3) = 71
-            inverse_neighbor(70,3) = 72
-            !'_43/134', '_43/634', '_45/145', '_45/645'
-            inverse_neighbor(71,3) = 69
-            inverse_neighbor(72,3) = 70
-            inverse_neighbor(73,3) = 67
-            inverse_neighbor(74,3) = 68
-        endif
 
         ! this routine is not performance-critical
         call MPI_barrier( WABBIT_COMM, status(1))
@@ -448,53 +321,57 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     logical, intent(in) :: output_to_file
 
     integer(kind=ik) :: N_neighbors, level_diff, neighborhood, i, j, k
-    integer(kind=ik) :: ijkrecv(2,3)
-    integer(kind=ik) :: ijkbuffer(2,3)
-    integer(kind=ik) :: ijksend(2,3)
+    integer(kind=ik) :: ijkrecv(2,3), ijksend(2,3), ijkbuffer(2,3)
+    integer(kind=ik) :: ijkrecv_new(2,3), ijksend_new(2,3), ijkbuffer_new(2,3)
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
 
-    N_neighbors = 74
-    if (params%dim==2) then
-        N_neighbors=16
-    endif
+    N_neighbors = 56*3  ! 56 for all leveldifferences
+    ! if (params%dim==2) then
+    !     N_neighbors=16
+    ! endif
 
     ! set all neighbour relations
     do neighborhood = 1, N_neighbors
+        ! practically for 1-56 they are intrinsically on different levels, however for parity with family relations I keep lvl_diff in ijkpatches
         do level_diff = -1, 1
             !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
             ! The receiver bounds are hard-coded with a huge amount of tedious indices.
-            call set_recv_bounds( params, ijkrecv, neighborhood, level_diff, gminus, gplus)
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv
 
-            ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
-            ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
-            ! up or down sampled.
-            call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, &
-                 gminus, gplus, output_to_file )
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer
+            ! new one
+            call set_recv_bounds( params, ijkrecv_new, neighborhood, level_diff, gminus, gplus)
 
-            ! apply a shift (if we sync only a subset of the layer)
-            !
-            ! g g g g g g g g g g g g        g g g g g g g g g g g g
-            ! g g g g g g g g g g g g        g g g g g g g g g g g g
-            ! g g g g g g g g g g g g        g g S S S S S S S S g g
-            ! g g g u u u u u u g g g        g g S u u u u u u S g g
-            ! g g g u u u u u u g g g        g g S u u u u u u S g g
-            ! g g g u u u u u u g g g        g g S u u u u u u S g g
-            ! g g g u u u u u u g g g        g g S u u u u u u S g g
-            ! g g g u u u u u u g g g        g g S u u u u u u S g g
-            ! g g g g g g g g g g g g        g g S S S S S S S S g g
-            ! g g g g g g g g g g g g        g g g g g g g g g g g g
-            ! g g g g g g g g g g g g        g g g g g g g g g g g g
-            !
-            ! g: ghost u: interior s: synced
-            ! here, params%g=3 and g=1
+            ! ! old one
+            ! call set_recv_bounds_2( params, ijkrecv, neighborhood, level_diff, gminus, gplus)
 
-            ijkPatches(1:2,1:dim, neighborhood, level_diff,RECVER) = ijkPatches(1:2,1:dim, neighborhood, level_diff,RECVER) + (params%g-gminus)
-            ijkPatches(1:2,1:dim, neighborhood, level_diff,SENDER) = ijkPatches(1:2,1:dim, neighborhood, level_diff,SENDER) + (params%g-gminus)
+            ! ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
+            ! ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
+            ! ! up or down sampled.
+            ! call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, &
+            !      gminus, gplus, output_to_file )
+            call set_send_bounds( params, ijksend_new, ijkbuffer_new, neighborhood, level_diff, gminus, gplus)
+
+
+            ! ! debugging borders
+            ! if (params%rank == 0 .and. any(level_diff == (/ 0 /))) then
+            !     if (sum(ijkrecv_new) /= 6) then
+            !         write(*, '("R R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
+            !             params%rank, neighborhood, level_diff, ijkrecv_new, product(ijkrecv_new(2, :) - ijkrecv_new(1, :))
+            !     endif
+            !     if (sum(ijksend_new) /= 6) then
+            !         write(*, '("S R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
+            !             params%rank, neighborhood, level_diff, ijksend_new, product(ijksend_new(2, :) - ijksend_new(1, :))
+            !     endif
+            !     if (sum(ijkbuffer_new) /= 6) then
+            !         write(*, '("B R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
+            !             params%rank, neighborhood, level_diff, ijkbuffer_new, product(ijkbuffer_new(2, :) - ijkbuffer_new(1, :))
+            !     endif
+            ! endif
+
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv_new
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend_new
+            ijkPatches(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer_new
         enddo
     enddo
 
@@ -535,9 +412,7 @@ subroutine family_setup_patches(params, output_to_file)
     logical, intent(in) :: output_to_file
 
     integer(kind=ik) :: N_family, level_diff, family, i, j, k, g
-    integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
-    integer(kind=ik) :: ijksend(2,3)
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
@@ -550,23 +425,23 @@ subroutine family_setup_patches(params, output_to_file)
 
     ! set full block relation
     ! The receiver bounds are hard-coded with a huge amount of tedious indices, they are identical to senders
-    call set_recv_bounds( params, ijkrecv, 0, 0, g, g)
-    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkrecv
-    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkrecv
+    call set_recv_bounds( params, ijkbuffer, 0, 0, g, g)
+    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkbuffer
+    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkbuffer
 
     ! set mother/daughter relations
     ! sender / receiver relations between the level differences are inverted
     do family = -1, -N_family, -1
         ! Fine sender or receiver: affects sc in mallat-ordering, connected to relation -1
         ! This takes different border into account
-        call set_recv_bounds( params, ijkrecv, family, -1, g, g)
-        ijkPatches(1:2,1:3, family,  1, SENDER) = ijkrecv
-        ijkPatches(1:2,1:3, family, -1, RECVER) = ijkrecv
+        call set_recv_bounds( params, ijkbuffer, family, -1, g, g)
+        ijkPatches(1:2,1:3, family,  1, SENDER) = ijkbuffer
+        ijkPatches(1:2,1:3, family, -1, RECVER) = ijkbuffer
 
         ! Coarse sender or receiver: affects specific part of block
-        call set_recv_bounds( params, ijkrecv, family, 1, g, g)
-        ijkPatches(1:2,1:3, family, -1, SENDER) = ijkrecv
-        ijkPatches(1:2,1:3, family,  1, RECVER) = ijkrecv
+        call set_recv_bounds( params, ijkbuffer, family, 1, g, g)
+        ijkPatches(1:2,1:3, family, -1, SENDER) = ijkbuffer
+        ijkPatches(1:2,1:3, family,  1, RECVER) = ijkbuffer
     enddo
 
 #ifdef DEV

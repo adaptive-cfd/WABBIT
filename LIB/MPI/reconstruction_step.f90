@@ -180,7 +180,9 @@ subroutine coarse_extension_reconstruct_tree(params, hvy_data, hvy_tmp, tree_ID,
                     if (level_neighbor < level_me) then
                         ! coarse extension case (neighbor is coarser)
                         idx(:, :) = 1
-                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/))
+                        call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), &
+                        (/Nreconl, Nreconl, Nreconl/), (/Nreconr, Nreconr, Nreconr/), &
+                        g_m=(/params%g, params%g, params%g/), g_p=(/params%g, params%g, params%g/))
 
                         hvy_data(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, hvyID) = &
                             tmp_reconst(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)

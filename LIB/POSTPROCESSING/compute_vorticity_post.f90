@@ -254,6 +254,7 @@ subroutine wavelet_test(params)
     use module_mpi
     use module_operators
     use module_forestMetaData
+    use module_unit_test
 
     implicit none
 
@@ -625,6 +626,7 @@ subroutine wavelet_test_coarsening(params)
     use module_mpi
     use module_operators
     use module_forestMetaData
+    use module_unit_test
 
     implicit none
 

@@ -612,11 +612,11 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> XYZ, values are 1 for dir +, 9 for dir - and 0 for nothing
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
-    integer(kind=ik)                    :: i, n_dim, n_level, max_tclevel
-    integer(kind=tsize)                    :: dir_temp, dir_now
+    integer(kind=ik)                    :: i_dim, n_dim, n_level, max_tclevel
+    integer(kind=tsize)                 :: dir_now
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -626,10 +626,17 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    dir_temp = direction
-    do while (dir_temp /= 0)
+    do i_dim = 1,3
       tc1 = treecode_neighbor
-      call pop(dir_temp, dir_now)
+      dir_now = mod(direction/(10**(3-i_dim)),10)
+
+      if (dir_now == 0) then
+        cycle  ! do nothing and cycle
+      elseif (dir_now == 9) then
+        dir_now = 0
+      endif
+      dir_now = dir_now + 2*(i_dim-1) + 1
+      ! dir_now is now between 1 and 6, being index of [+x, -x, +y, -y, +z, -z]
       call adjacent_faces_b(tc1, treecode_neighbor, dir_now, level=n_level, dim=n_dim, max_level=max_tclevel)
     end do
   end subroutine
@@ -639,33 +646,14 @@ end subroutine get_block_spacing_origin_b
   !> \author JB
   !> \brief Obtain neighbour in 3D for given direction with numerical binary treecode
   !> \details Use math representation and loop over digits
-  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
-  !> for imagination:
-  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-  !!                   - edge: boundary between two sides - use sides numbers for coding
-  !!                   - corner: between three sides - so use all three sides numbers
-  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
-  !!                     so use this corner code in second part of neighbor code
-  !!
-  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
-  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
-  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-  !! corner: '123/___', '134/___', '145/___', '152/___' \n
-  !!         '623/___', '634/___', '645/___', '652/___' \n
-  !! \n
-  !! complete neighbor code array, 74 possible neighbor relations \n
-  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  !> Each digit in variable direction represents one of the dimensions. Digits can take following values:
+  !!    - 9, we look in negative direction in this dimension
+  !!    - 1, we look in positive direction in this dimension
+  !!    - 0, this dimension does not change
+  !! Dependend on the number of 0s, we either look at a face, edge or corner
   ! ********************************************************************************************
   subroutine adjacent_faces_b( treecode, treecode_neighbor, direction, level, dim, max_level)
     implicit none
@@ -694,23 +682,23 @@ end subroutine get_block_spacing_origin_b
     ! We need direction and level from each direction
     select case(direction)
       ! At first we assign the main cardinal directions
-      case(1)  ! T - top side z+1
-        dir_sign = 1
-        dir_fac = 4
-      case(2)  ! W - front side y-1
+      case(1)  ! N - left side x-1
         dir_sign = -1
-        dir_fac = 1
-      case(3)  ! S - right side x+1
+        dir_fac = 2
+      case(2)  ! S - right side x+1
         dir_sign = 1
         dir_fac = 2
+      case(3)  ! W - front side y-1
+        dir_sign = -1
+        dir_fac = 1
       case(4)  ! E - back side y+1
         dir_sign = 1
         dir_fac = 1
-      case(5)  ! N - left side x-1
+      case(5)  ! B - bottom side z-1
         dir_sign = -1
-        dir_fac = 2
-      case(6)  ! B - bottom side z-1
-        dir_sign = -1
+        dir_fac = 4
+      case(6)  ! T - top side z+1
+        dir_sign = 1
         dir_fac = 4
       case default
         call abort(118118, "Lord vader, the treelib does not know the direction")
@@ -759,11 +747,11 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> XYZ, values are 1 for dir +, 9 for dir - and 0 for nothing
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
-    integer(kind=ik)                    :: i, n_level, max_tclevel
-    integer(kind=tsize)                    :: dir_temp, dir_now
+    integer(kind=ik)                    :: i_dim, n_level, max_tclevel
+    integer(kind=tsize)                 :: dir_now
 
     ! Set defaults for dimension, level and max_level
     max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
@@ -772,10 +760,17 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    dir_temp = direction
-    do while (dir_temp /= 0)
+    do i_dim = 1,3
       tc1 = treecode_neighbor
-      call pop(dir_temp, dir_now)
+      dir_now = mod(direction/(10**(3-i_dim)),10)
+
+      if (dir_now == 0) then
+        cycle  ! do nothing and cycle
+      elseif (dir_now == 9) then
+        dir_now = 0
+      endif
+      dir_now = dir_now + 2*(i_dim-1) + 1
+      ! dir_now is now between 1 and 6, being index of [+x, -x, +y, -y, +z, -z]
       call adjacent_faces_d(tc1, treecode_neighbor, dir_now, level=n_level, max_level=max_tclevel)
     end do
   end subroutine
@@ -785,33 +780,14 @@ end subroutine get_block_spacing_origin_b
   !> \author JB
   !> \brief Obtain neighbour in 3D for given direction with numerical decimal treecode
   !> \details Use math representation and loop over digits
-  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
-  !> for imagination:
-  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-  !!                   - edge: boundary between two sides - use sides numbers for coding
-  !!                   - corner: between three sides - so use all three sides numbers
-  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
-  !!                     so use this corner code in second part of neighbor code
-  !!
-  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
-  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
-  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-  !! corner: '123/___', '134/___', '145/___', '152/___' \n
-  !!         '623/___', '634/___', '645/___', '652/___' \n
-  !! \n
-  !! complete neighbor code array, 74 possible neighbor relations \n
-  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  !> Each digit in variable direction represents one of the dimensions. Digits can take following values:
+  !!    - 9, we look in negative direction in this dimension
+  !!    - 1, we look in positive direction in this dimension
+  !!    - 0, this dimension does not change
+  !! Dependend on the number of 0s, we either look at a face, edge or corner
   ! ********************************************************************************************
   subroutine adjacent_faces_d( treecode, treecode_neighbor, direction, level, max_level)
     implicit none
@@ -836,23 +812,23 @@ end subroutine get_block_spacing_origin_b
     ! We need direction and level from each direction
     select case(direction)
       ! At first we assign the main cardinal directions
-      case(1)  ! T - top side z+1
-        dir_sign = 1
-        dir_fac = 4
-      case(2)  ! W - front side y-1
+      case(1)  ! N - left side x-1
         dir_sign = -1
-        dir_fac = 1
-      case(3)  ! S - right side x+1
+        dir_fac = 2
+      case(2)  ! S - right side x+1
         dir_sign = 1
         dir_fac = 2
+      case(3)  ! W - front side y-1
+        dir_sign = -1
+        dir_fac = 1
       case(4)  ! E - back side y+1
         dir_sign = 1
         dir_fac = 1
-      case(5)  ! N - left side x-1
+      case(5)  ! B - bottom side z-1
         dir_sign = -1
-        dir_fac = 2
-      case(6)  ! B - bottom side z-1
-        dir_sign = -1
+        dir_fac = 4
+      case(6)  ! T - top side z+1
+        dir_sign = 1
         dir_fac = 4
       case default
         call abort(118118, "Lord vader, the treelib does not know the direction")

@@ -21,7 +21,7 @@ subroutine dense_to_sparse(params)
     character(len=cshort), allocatable      :: file_out(:)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik)                        :: max_neighbors, level, k, tc_length, lgt_n_tmp
+    integer(kind=ik)                        :: level, k, tc_length, lgt_n_tmp
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in
@@ -128,10 +128,8 @@ subroutine dense_to_sparse(params)
     if (params%dim==3) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
-        max_neighbors = 74
     else
         number_dense_blocks = 4_ik**level
-        max_neighbors = 16
     end if
 
     if (params%rank==0) then

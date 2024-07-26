@@ -30,9 +30,6 @@ contains
 
 #include "securityZone_tree.f90"
 #include "coarseExtensionUpdate_tree.f90"
-#include "unitTest_ghostSync.f90"
-#include "unitTest_waveletDecomposition.f90"
-#include "unitTest_refineCoarsen.f90"
 #include "refineToEquidistant_tree.f90"
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"

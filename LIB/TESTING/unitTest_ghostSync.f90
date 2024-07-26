@@ -1,29 +1,33 @@
-subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail)
+subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
 
     implicit none
-    type (type_params), intent(inout)       :: params                     !> user defined parameter structure
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    type (type_params), intent(inout) :: params                     !> user defined parameter structure
+    real(kind=rk),  intent(inout)     :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), intent(out)        :: hvy_tmp(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
-    real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik), intent(in)            :: tree_ID
-    logical, intent(in)                     :: abort_on_fail
+    real(kind=rk), intent(out)        :: hvy_work(:, :, :, :, :, :)
+    integer(kind=ik), intent(in)      :: tree_ID
+    logical, intent(in)               :: abort_on_fail
+    logical, optional, intent(in)     :: verbose
 
-    integer(kind=ik)                        :: k, l, lgt_id, hvy_id
-    integer(kind=ik)                        :: rank, number_procs
-    real(kind=rk)                           :: ddx(1:3), xx0(1:3)
-    integer(kind=ik)                        :: g, number_blocks, ix, iy, iz
-    integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk)                           :: Lx, Ly, Lz, x, y, z
-    integer(kind=ik)                        :: d,  max_neighbors
-    real(kind=rk)                           :: frequ(1:6)
-    integer(kind=ik)                        :: ifrequ
+    integer(kind=ik)                  :: k, l, lgt_id, hvy_id
+    integer(kind=ik)                  :: rank, number_procs
+    real(kind=rk)                     :: ddx(1:3), xx0(1:3)
+    integer(kind=ik)                  :: g, number_blocks, ix, iy, iz
+    integer(kind=ik), dimension(3)    :: Bs
+    real(kind=rk)                     :: Lx, Ly, Lz, x, y, z
+    integer(kind=ik)                  :: d
+    real(kind=rk)                     :: frequ(1:6)
+    integer(kind=ik)                  :: ifrequ
 
     ! error variable
-    real(kind=rk)                           :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty, t0
-    integer(kind=ik)                        :: ierr, ii
-    logical                                 :: test
+    real(kind=rk)                     :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty, t0
+    integer(kind=ik)                  :: ierr, ii
+    logical                           :: test, apply_verbose
+
+    apply_verbose = .false.
+    if (present(verbose)) apply_verbose = verbose
 
     rank = params%rank
     Lx = params%domain_size(1)
@@ -31,11 +35,6 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     Lz = params%domain_size(3)
 
     d = params%dim
-    if ( params%dim == 3 ) then
-        max_neighbors = 74
-    else
-        max_neighbors = 16
-    endif
 
 
     if (rank == 0) then
@@ -163,6 +162,11 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         ! synchronize ghost nodes (this is what we test here)
         !-----------------------------------------------------------------------
         call sync_ghosts_tree( params, hvy_block, tree_ID )
+
+        ! verbose, only save for first iteration
+        if (apply_verbose .and. ifrequ == 1) then
+            call saveHDF5_tree("grid_0000.h5", 0.0_rk, 1, 1, params, hvy_block, tree_ID, no_sync=.true., save_ghosts=.true.)
+        endif
 
         !-----------------------------------------------------------------------
         ! compute error (normalized, global, 2-norm)

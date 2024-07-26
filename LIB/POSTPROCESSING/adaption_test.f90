@@ -17,7 +17,7 @@ subroutine adaption_test(params)
   character(len=cshort),allocatable   :: eps_str_list(:)
   real(kind=rk), allocatable      :: hvy_block(:, :, :, :, :)
   real(kind=rk), allocatable      :: hvy_tmp(:, :, :, :, :)
-  integer(kind=ik)                :: max_neighbors, level, k, Bs(3), tc_length
+  integer(kind=ik)                :: level, k, Bs(3), tc_length
   real(kind=rk), dimension(3)     :: domain
   integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID_input, tree_ID_adapt
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration

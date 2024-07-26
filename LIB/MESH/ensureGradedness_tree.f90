@@ -23,9 +23,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
     counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, REF_TMP_GRADED_STAY, lgt_id_sisters(2**params%dim)
     logical                             :: grid_changed, grid_changed_tmp, markTMPflag    ! status of grid changing
 
-    ! number of neighbor relations
-    ! 2D: 16, 3D: 74
-    integer(kind=ik) :: neighbor_num
     real(kind=rk) :: t0
 
     ! If we loop leaf-wise we do not want blocks to be set to 0 if not all sisters exist
@@ -47,12 +44,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
     N = params%number_blocks
     Jmax = params%Jmax
     rank = params%rank
-
-    if ( params%dim == 3 ) then
-        neighbor_num = 74  ! 3D
-    else
-        neighbor_num = 16  ! 2D
-    end if
 
     ! we repeat the ensureGradedness_tree procedure until this flag is .false. since as long
     ! as the grid changes due to gradedness requirements, we have to check it again
@@ -110,67 +101,67 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
             !-----------------------------------------------------------------------
             if ( ref_me == -1) then
                 ! loop over all neighbors
-                do i = 1, neighbor_num
-                    if ( hvy_neighbor( hvy_id, i ) > 0 ) then
-                        ! check neighbor treelevel
-                        mylevel         = lgt_block( lgt_id, IDX_MESH_LVL )
-                        neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ), IDX_MESH_LVL )
-                        ref_n = lgt_block( hvy_neighbor( hvy_id, i ), IDX_REFINE_STS )
+                do i = 1, size(hvy_neighbor,2)
+                    if ( hvy_neighbor( hvy_id, i ) < 0 ) cycle
 
-                        if (mylevel == neighbor_level) then
-                            ! neighbor on same level
-                            ! block can not coarsen, if neighbor wants to refine
-                            if ( ref_n == -1 ) then
-                                ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                            elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
-                                ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
-                            elseif ( ref_n == 1 ) then
-                                ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
-                                ! I have at least to stay on my level.
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = 0
-                                grid_changed = .true.
+                    ! check neighbor treelevel
+                    mylevel         = lgt_block( lgt_id, IDX_MESH_LVL )
+                    neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ), IDX_MESH_LVL )
+                    ref_n = lgt_block( hvy_neighbor( hvy_id, i ), IDX_REFINE_STS )
 
-                            end if
-                        elseif (mylevel - neighbor_level == 1) then
-                            ! neighbor on lower level
-                            if ( ref_n == -1 ) then
-                                ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok for me
-                            elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
-                                ! neighbor wants to stay, I want to coarsen, it is one level coarser, -> ok
-                            elseif ( ref_n == 1 ) then
-                                ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
-                            end if
-                        elseif (neighbor_level - mylevel == 1) then
-                            ! neighbor on higher level
-                            ! neighbor wants to refine, ...
-                            if ( ref_n == +1) then
-                                ! ... so I also have to refine (not only can I NOT coarsen, I actually have to refine!)
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = +1
-                                grid_changed = .true.
+                    if (mylevel == neighbor_level) then
+                        ! neighbor on same level
+                        ! block can not coarsen, if neighbor wants to refine
+                        if ( ref_n == -1 ) then
+                            ! neighbor wants to coarsen, as do I, we're on the same level -> ok
+                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                            ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
+                        elseif ( ref_n == 1 ) then
+                            ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
+                            ! I have at least to stay on my level.
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                            grid_changed = .true.
 
-                            elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
-                                ! neighbor wants to stay and I want to coarsen, but
-                                ! I cannot do that (there would be two levels between us)
-                                if (ref_n == 0) then
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = 0
-                                else  ! TMP neighbors pass on TMP flag
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
-                                endif
-                                grid_changed = .true.
-
-                            elseif ( ref_n == -1 ) then
-                                ! neighbor wants to coarsen, which is what I want too,
-                                ! so we both would just go down one level together - that's fine
-                                ! however, for lifted wavelets this is not fine as our neighbor might want to keep me to stay due to securityZone
-                                if (params%useSecurityZone .and. params%isLiftedWavelet .and. markTMPflag) then
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
-                                    grid_changed = .true.
-                                endif
-                            end if
-                        else
-                            call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
                         end if
-                    end if ! if neighbor exists
+                    elseif (mylevel - neighbor_level == 1) then
+                        ! neighbor on lower level
+                        if ( ref_n == -1 ) then
+                            ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok for me
+                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                            ! neighbor wants to stay, I want to coarsen, it is one level coarser, -> ok
+                        elseif ( ref_n == 1 ) then
+                            ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
+                        end if
+                    elseif (neighbor_level - mylevel == 1) then
+                        ! neighbor on higher level
+                        ! neighbor wants to refine, ...
+                        if ( ref_n == +1) then
+                            ! ... so I also have to refine (not only can I NOT coarsen, I actually have to refine!)
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+                            grid_changed = .true.
+
+                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                            ! neighbor wants to stay and I want to coarsen, but
+                            ! I cannot do that (there would be two levels between us)
+                            if (ref_n == 0) then
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                            else  ! TMP neighbors pass on TMP flag
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
+                            endif
+                            grid_changed = .true.
+
+                        elseif ( ref_n == -1 ) then
+                            ! neighbor wants to coarsen, which is what I want too,
+                            ! so we both would just go down one level together - that's fine
+                            ! however, for lifted wavelets this is not fine as our neighbor might want to keep me to stay due to securityZone
+                            if (params%useSecurityZone .and. params%isLiftedWavelet .and. markTMPflag) then
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
+                                grid_changed = .true.
+                            endif
+                        end if
+                    else
+                        call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
+                    end if
                 end do ! loop over neighbors
 
             !-----------------------------------------------------------------------
@@ -178,32 +169,32 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
             !-----------------------------------------------------------------------
             elseif (ref_me == 0 .or. ref_me == REF_TMP_GRADED_STAY .or. ref_me == REF_TMP_TREATED_COARSEN) then
                 ! loop over all neighbors
-                do i = 1, neighbor_num
-                    ! neighbor exists ? If not, this is a bad error
-                    if ( hvy_neighbor( hvy_id, i ) > 0 ) then
-                        mylevel     = lgt_block( lgt_id, IDX_MESH_LVL )
-                        neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_MESH_LVL )
-                        ref_n = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_REFINE_STS )
+                do i = 1, size(hvy_neighbor,2)
+                    ! neighbor exists ? If not, we skip it
+                    if ( hvy_neighbor( hvy_id, i ) < 0 ) cycle
 
-                        if (mylevel == neighbor_level) then
-                            ! me and my neighbor are on the same level
-                            ! As I'd wish to stay where I am, my neighbor is free to go -1,0,+1
-                        elseif (mylevel - neighbor_level == 1) then
-                            ! my neighbor is one level coarser
-                            ! My neighbor can stay or refine, but not coarsen. This case is however handled above (coarsening inhibited)
-                        elseif (neighbor_level - mylevel == 1) then
-                            ! my neighbor is one level finer
-                            if (ref_n == +1) then
-                                ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
-                                if (lgt_block( lgt_id, IDX_REFINE_STS )<+1) then
-                                    lgt_block( lgt_id, IDX_REFINE_STS ) = max( +1, lgt_block( lgt_id, IDX_REFINE_STS ) )
-                                    grid_changed = .true.
-                                endif
-                            end if
-                        else
-                            call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
+                    mylevel     = lgt_block( lgt_id, IDX_MESH_LVL )
+                    neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_MESH_LVL )
+                    ref_n = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_REFINE_STS )
+
+                    if (mylevel == neighbor_level) then
+                        ! me and my neighbor are on the same level
+                        ! As I'd wish to stay where I am, my neighbor is free to go -1,0,+1
+                    elseif (mylevel - neighbor_level == 1) then
+                        ! my neighbor is one level coarser
+                        ! My neighbor can stay or refine, but not coarsen. This case is however handled above (coarsening inhibited)
+                    elseif (neighbor_level - mylevel == 1) then
+                        ! my neighbor is one level finer
+                        if (ref_n == +1) then
+                            ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
+                            if (lgt_block( lgt_id, IDX_REFINE_STS )<+1) then
+                                lgt_block( lgt_id, IDX_REFINE_STS ) = max( +1, lgt_block( lgt_id, IDX_REFINE_STS ) )
+                                grid_changed = .true.
+                            endif
                         end if
-                    end if ! if neighbor exists
+                    else
+                        call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
+                    end if
                 end do
             end if ! refinement status
 

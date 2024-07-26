@@ -1,5 +1,6 @@
 module module_wavelets
     use module_params
+    use module_treelib
 
     implicit none
 
@@ -170,10 +171,11 @@ contains
             call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
         endif
 
-        if ( ((nxfine<7) .or. (nyfine<7)).and.(order_predictor=="multiresolution_4th") ) then
-            write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
-            call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
-        endif
+        ! this, in fact, is not a problem if on the wanted direction no interpolation is requested (only one point in this direction needed)
+        ! if ( ((nxfine<7) .or. (nyfine<7)).and.(order_predictor=="multiresolution_4th") ) then
+        !     write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
+        !     call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
+        ! endif
 #endif
 
         ! setup interpolation coefficients
@@ -1100,9 +1102,10 @@ contains
         !> This is used to make clear that those values are not correct and should not be used
         logical, intent(in), optional :: set_garbage
 
-        integer(kind=ik) :: Nwcl, Nwcr
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), i_dim
-        real(kind=rk) :: setNumber
+        integer(kind=ik) :: Nwcl, Nwcr, i_neighborhood
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), i_dim, i_set
+        logical :: setGarbage
+        real(kind = rk) :: setNumber
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1120,37 +1123,51 @@ contains
         if (present(Nwcr_optional)) Nwcr = Nwcr_optional
 
         ! sometimes we are not allowed to access the WC (from finer level neighbors) so lets ensure the simulation crashes in that case
-        setNumber = 0.0_rk
-        if (present(set_garbage)) then
-            if (set_garbage) setNumber = -9.0e200_rk
-        endif
+        setGarbage = .false.
+        if (present(set_garbage)) setGarbage = set_garbage
 
-        idx(:, :) = 1
-        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/))
+        do i_set = 1,2
+            idx(:, :) = 1
 
-        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
-        !     1 2 3 4 5 6 7 8 9 A B C
-        !     G G G S W S W S W G G G
-        !                 I I I
-        ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
-        ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-        ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
-        ! this gives problem if the last point is a SC so we need to handle this special case
-        do i_dim = 1, params%dim
-            if (idx(2, i_dim) /= size(wc, i_dim)) then
-                idx(2, i_dim) = idx(2, i_dim) + modulo(g + idx(2, i_dim), 2)
+            ! 1: set inside of patch
+            if (i_set == 1) then
+                call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/), &
+                    g_p=(/ g, g, g/), g_m=(/ g, g, g/))
+            ! 2: set ghost patch
+            else
+                ! both lvl_diff and relation are inverted for function
+                call inverse_relation(neighborhood, i_neighborhood)
+                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, i_neighborhood, idx, params%g, params%g, level_diff=-1)
+            endif
+
+            ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+            !     1 2 3 4 5 6 7 8 9 A B C
+            !     G G G S W S W S W G G G
+            !                 I I I
+            ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+            ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+            ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+            ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+            idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+            ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
+            ! this gives problem if the last point is a SC so we need to handle this special case
+            do i_dim = 1, params%dim
+                if (idx(2, i_dim) /= size(wc, i_dim)) then
+                    idx(2, i_dim) = idx(2, i_dim) + modulo(g + idx(2, i_dim), 2)
+                endif
+            enddo
+
+            ! set really low number for ghost patch if we shoudln't access it
+            setNumber = 0.0
+            if (setGarbage .and. i_set == 2) setNumber = -9e200_rk
+
+            ! set values, we have to skip the SC
+            wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            wc(idx(1,1)  :idx(2,1)  , idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            if (params%dim == 3) then
+                wc(idx(1,1)  :idx(2,1)  , idx(1,2)  :idx(2,2)  , idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
             endif
         enddo
-
-        ! set values, we have to skip the SC
-        wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
-        wc(idx(1,1)  :idx(2,1)  , idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
-        if (params%dim == 3) then
-            wc(idx(1,1)  :idx(2,1)  , idx(1,2)  :idx(2,2)  , idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
-        endif
 
         ! wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = setNumber
     end subroutine
@@ -1167,9 +1184,9 @@ contains
         logical, optional, intent(in)  :: skip_ghosts                !< Flag to skip ghost points if they have been synched
         integer(kind=ik), intent(in), optional   :: ijk(2,3)         !< ijk of patch that we only care about, if not given it is the full block
 
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_set, i_neighborhood
         integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
-        logical          :: skip_copy  ! sometimes this is called but actually nothing will be changed, in this case we skip it
+        logical          :: skip_copy, skipGhosts  ! sometimes this is called but actually nothing will be changed, in this case we skip it
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1182,130 +1199,63 @@ contains
         Nreconl = params%Nreconl
         Nreconr = params%Nreconr
         skip_copy = .false.
+        skipGhosts = .false.
+        if (present(skip_ghosts)) skipGhosts = skip_ghosts
 
-        idx(:, :) = 1
-        ! Normally we also reset boundary values. However if they have been synched to the field we want to leave them as they are
-        if (present(skip_ghosts)) then
-            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/), &
-                X_s=(/g, g, g/), X_e=(/g, g, g/))
-        else
-            call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/))
-        endif
+        do i_set = 1,2
+            idx(:, :) = 1
 
-        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
-        !     1 2 3 4 5 6 7 8 9 A B C
-        !     G G G S W S W S W G G G
-        !                 I I I
-        ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
-        ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-        ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
-        ! However, here we treat SC so we can ignore it completely
+            ! 1: set inside of patch
+            if (i_set == 1) then
+                call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/), &
+                    g_p=(/ g, g, g/), g_m=(/ g, g, g/))
+            ! 2: set ghost patch
+            else
+                if (skipGhosts) cycle
+                ! both lvl_diff and relation are inverted for function
+                call inverse_relation(neighborhood, i_neighborhood)
+                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, i_neighborhood, idx, params%g, params%g, level_diff=-1)
+            endif
 
-        ! sometimes we do not want to look at the full block, then we can skip the copy where the indices do not matter
-        if (present(ijk)) then
-            ! check in each dimension if the indices lie outside the affected range
-            ! copy patch has to end before beginning of affected region or begin before end of affected region
-            if (idx(2,1) < ijk(1,1) .or. idx(1,1) > ijk(2,1)) skip_copy = .true.
-            if (idx(2,2) < ijk(1,2) .or. idx(1,2) > ijk(2,2)) skip_copy = .true.
-            if (idx(2,3) < ijk(1,3) .or. idx(1,3) > ijk(2,3) .and. params%dim == 3) skip_copy = .true.
-        endif
+            ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+            !     1 2 3 4 5 6 7 8 9 A B C
+            !     G G G S W S W S W G G G
+            !                 I I I
+            ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+            ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+            ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+            ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+            idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+            ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
+            ! However, here we treat SC so we can ignore it completely
 
-        if (.not. skip_copy) then
-            wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = &
-                u_copy(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc)
-        endif
+            ! sometimes we do not want to look at the full block, then we can skip the copy where the indices do not matter
+            if (present(ijk)) then
+                ! check in each dimension if the indices lie outside the affected range
+                ! copy patch has to end before beginning of affected region or begin before end of affected region
+                if (idx(2,1) < ijk(1,1) .or. idx(1,1) > ijk(2,1)) skip_copy = .true.
+                if (idx(2,2) < ijk(1,2) .or. idx(1,2) > ijk(2,2)) skip_copy = .true.
+                if (idx(2,3) < ijk(1,3) .or. idx(1,3) > ijk(2,3) .and. params%dim == 3) skip_copy = .true.
+            endif
+
+            if (.not. skip_copy) then
+                wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = &
+                    u_copy(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc)
+            endif
+
+        enddo
 
     end subroutine
 
 
 
-    !> \brief From a neighbourhood, compute the indices of the boundary patch until specific points N_s (left end) or N_e (right end)
-    !> We have the option to exclude some points on the left or right end, usefull to skip ghost points for example
-    !> This function is used for coarseExtensionManipulation to get the range of influence of the boundary patches
-    !> This works only for leveldiff = 0,1 (coarse and same-level neighbors)
-    !  ToDo: adapt for finer neighbours with leveldiff = -1
-    subroutine get_indices_of_modify_patch(params, neighborhood, idx, N_xyz, N_s, N_e, X_s, X_e)
-        implicit none
-
-        type (type_params), intent(in)           :: params              !> Good ol' params
-        integer(kind=ik), intent(in)             :: neighborhood        !> Which neighborhood to apply manipulation
-        integer(kind=ik), intent(out)            :: idx(1:2, 1:3)   !> Output of indices, first entry is l/r and second is dim
-        integer(kind=ik), intent(in)             :: N_xyz(1:3)          !> Size of blocks including ghost points, should be size(block, i_dim)
-        integer(kind=ik), intent(in)             :: N_s(1:)             !> Number of points to modify at start, vec with entry for each dimension
-        integer(kind=ik), intent(in)             :: N_e(1:)             !> Number of points to modify at end, vec with entry for each dimension
-        integer(kind=ik), intent(in), optional   :: X_s(1:)             !> Number of points to skip at start, vec with entry for each dimension
-        integer(kind=ik), intent(in), optional   :: X_e(1:)             !> Number of points to skip at end, vec with entry for each dimension
-
-        integer(kind=ik) :: dim, i_dim
-        ! Indexes where to start or finish, short name because elsewise this list gets looong
-        integer(kind=ik) :: I_s(1:3), I_e(1:3)
-
-        dim = params%dim
-
-        ! Pre-init indices by setting the full domain that we look at, X_s = 0, X_e = g = 1
-        ! g g g g g           s s s s -
-        ! g i i i g           s s s s -
-        ! g i i i g           s s s s -
-        ! g i i i g           s s s s -
-        ! g g g g g           - - - - -
-        do i_dim = 1, dim
-            if (present(X_s)) then
-                idx(1, i_dim) = 1 + X_s(i_dim)
-            else
-                idx(1, i_dim) = 1
-            endif
-            if (present(X_e)) then
-                idx(2, i_dim) = N_xyz(i_dim) - X_e(i_dim)
-            else
-                idx(2, i_dim) = N_xyz(i_dim)
-            endif
-        enddo
-
-        ! now lets get to the select beast, this limits / restricts the patch for the specific neighborhood
-        ! example from above with N_s = N_e = 2 and selecting neighborhood 9 or -x edge for 2D
-        ! s s s s -           s s - - -
-        ! s s s s -           s s - - -
-        ! s s s s -           s s - - -
-        ! s s s s -           s s - - -
-        ! - - - - -           - - - - -
-        if (params%dim == 2) then
-            ! 2D, first surpress indices for third dimension
-            ! index blocks are: lvl_same faces, lvl_diff faces, edges
-            idx(1:2, 3) = 1
-            if (any((/3,   11,12,    7,8/) == neighborhood)) idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
-            if (any((/1,   9,10,     5,6/) == neighborhood)) idx(2, 1) = N_s(1)  ! -x
-            if (any((/2,   13,14,    5,7/) == neighborhood)) idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
-            if (any((/4,   15,16,    6,8/) == neighborhood)) idx(2, 2) = N_s(2)  ! -y
-        else
-            ! 3D
-            ! index blocks are: lvl_same faces, lvl_same edges, lvl_diff faces, corners, lvl_diff edges
-            if (any((/3,   8,12,15,17,    35,36,37,38,   19,20,23,24,   53,54,61,62,67,68,71,72/) == neighborhood)) &
-                idx(1, 1) = N_xyz(1) - N_e(1) + 1  ! +x
-            if (any((/5,   10,14,16,18,   43,44,45,46,   21,22,25,26,   57,58,65,66,69,70,73,74/) == neighborhood)) &
-                idx(2, 1) = N_s(1)  ! -x
-            if (any((/4,   9,13,17,18,    39,40,41,42,   20,21,24,25,   55,56,63,64,71,72,73,74/) == neighborhood)) &
-                idx(1, 2) = N_xyz(2) - N_e(2) + 1  ! +y
-            if (any((/2,   7,11,15,16,    31,32,33,34,   19,22,23,26,   51,52,59,60,67,68,69,70/) == neighborhood)) &
-                idx(2, 2) = N_s(2)  ! -y
-            if (any((/1,   7,8,9,10,      27,28,29,30,   19,20,21,22,   51,52,53,54,55,56,57,58/) == neighborhood)) &
-                idx(1, 3) = N_xyz(3) - N_e(3) + 1  ! +z
-            if (any((/6,   11,12,13,14,   47,48,49,50,   23,24,25,26,   59,60,61,62,63,64,65,66/) == neighborhood)) &
-                idx(2, 3) = N_s(3)  ! -z
-        endif
-    end subroutine get_indices_of_modify_patch
-
-
-
-    subroutine setup_wavelet(params, g_wavelet, verbose)
+    subroutine setup_wavelet(params, g_wavelet, g_RHS, verbose)
         implicit none
         type (type_params), intent(inout) :: params
         ! if called with g_wavelet, we return the number of ghost nodes
         ! required for the wavelet filters (used in postprocessing routines
         ! to decide which G is used.)
-        integer(kind=ik), intent(out), optional :: g_wavelet
+        integer(kind=ik), intent(out), optional :: g_wavelet, g_RHS
         logical, intent(in), optional :: verbose
         logical :: verbose1
         integer(kind=ik) :: i, g_min, a, block_min
@@ -1510,6 +1460,17 @@ contains
         g_min = max(g_min, abs(lbound(params%GR, dim=1)))
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
+        ! g_RHS is decided by X in CDFXY
+        if (present(g_RHS)) then
+            if (params%wavelet(4:4) == "2") then
+                g_RHS = 1
+            elseif (params%wavelet(4:4) == "4") then
+                g_RHS = 2
+            elseif (params%wavelet(4:4) == "6") then
+                g_RHS = 3
+            endif
+        endif
+
         ! compute coarse extension parameters. (see inkscape drawing 1d-ghostnodes-coarseextension-V2.svg)
         !
         ! Nscl, Nscr:
@@ -1641,17 +1602,17 @@ contains
             write(*,'(A)') "]"
         endif
 
-        ! the code sets the ghost nodes, not just the modified ones
-        ! i.e. 1:Nscr
-        if (params%isLiftedWavelet) then
-            params%Nscr    = params%Nscr    + g_min
-            params%Nwcr    = params%Nwcr    + g_min
-            params%Nreconr = params%Nreconr + g_min
+        ! ! the code sets the ghost nodes, not just the modified ones
+        ! ! i.e. 1:Nscr
+        ! if (params%isLiftedWavelet) then
+        !     params%Nscr    = params%Nscr    + g_min
+        !     params%Nwcr    = params%Nwcr    + g_min
+        !     params%Nreconr = params%Nreconr + g_min
 
-            params%Nscl    = params%Nscl    + g_min
-            params%Nwcl    = params%Nwcl    + g_min
-            params%Nreconl = params%Nreconl + g_min
-        endif
+        !     params%Nscl    = params%Nscl    + g_min
+        !     params%Nwcl    = params%Nwcl    + g_min
+        !     params%Nreconl = params%Nreconl + g_min
+        ! endif
 
     end subroutine
 
@@ -1684,15 +1645,123 @@ contains
 
 
 
-    ! for debugging
-    subroutine dump_block(u, file)
-        real(kind=rk), dimension(:, :, :, :), intent(in) :: u
-        character(len=*) :: file
-        integer :: ii
-        write(*,*) "Dumping block to "//file
-        open(unit=32, file=file, status="replace")
-        do ii = 1, size(u,2)
-        write(32,'(48(es12.4,";"))') u(:, ii, 1, 1)
+    ! for debugging, prints block or array in 2D to file
+    subroutine dump_block(u, file, to_int, digits, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block (or array)
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append
+        character(len=120) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        do ii = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        close(32)
+    end subroutine
+
+
+    ! for debugging, prints block with border for interior and ghost points to see whats going on inside
+    subroutine dump_block_fancy(u, file, Bs, g, to_int, digits, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer(kind=ik)           :: Bs(3), g
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append
+        character(len=140) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        ! print ghost block lines
+        do ii = Bs(2)+2*g, Bs(2)+g+1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(",i0,"(i",i0,","",""),""   "",",i0,"(i", i0, ","",""),""   "",",i0,"(i",i0,","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        ! print divider
+        if (toInt) then
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+        else
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+        endif
+        ! print interior block lines with divider for left and right ghost points
+        do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        ! print divider
+        if (toInt) then
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+        else
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+        endif
+        ! print ghost block lines
+        do ii = g, 1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
         enddo
         close(32)
     end subroutine

@@ -440,7 +440,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
                     .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                         .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                        inverse = inverse_neighbor(neighborhood, dim)
+                        call inverse_relation(neighborhood, inverse)
 
                         ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
 

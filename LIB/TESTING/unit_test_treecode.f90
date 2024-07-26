@@ -1,8 +1,6 @@
 
 subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail)
 
-  use module_treelib
-
   implicit none
   !> user defined parameter structure
   type (type_params), intent(inout) :: params                   
@@ -40,10 +38,10 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
   dir_2d(2) = "__S"
   dir_2d(3) = "__W"
   dir_2d(4) = "__E"
-  dir_2d_int(1) = 5  ! N - x-1
-  dir_2d_int(2) = 3  ! S - x+1
-  dir_2d_int(3) = 2  ! W - y-1
-  dir_2d_int(4) = 4  ! E - y+1
+  dir_2d_int(1) = 900  ! N - x-1
+  dir_2d_int(2) = 100  ! S - x+1
+  dir_2d_int(3) = 090  ! W - y-1
+  dir_2d_int(4) = 010  ! E - y+1
 
   ! define primary sides to be investigated for 3d
   dir_3d(6) = "__1/___"  ! top z+1
@@ -52,12 +50,12 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
   dir_3d(4) = "__4/___"  ! back y+1
   dir_3d(1) = "__5/___"  ! left x-1
   dir_3d(5) = "__6/___"  ! bottom z-1
-  dir_3d_int(6) = 1  ! top z+1
-  dir_3d_int(3) = 2  ! front y-1
-  dir_3d_int(2) = 3  ! right x+1
-  dir_3d_int(4) = 4  ! back y+1
-  dir_3d_int(1) = 5  ! left x-1
-  dir_3d_int(5) = 6  ! bottom z-1
+  dir_3d_int(1) = 900  ! left x-1
+  dir_3d_int(2) = 100  ! right x+1
+  dir_3d_int(3) = 090  ! front y-1
+  dir_3d_int(4) = 010  ! back y+1
+  dir_3d_int(5) = 009  ! bottom z-1
+  dir_3d_int(6) = 001  ! top z+1
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (params%rank == 0) then
@@ -134,18 +132,6 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       call encoding_d( ixy, newtreecode, 2)
       call encoding(treecode, ixy, 2, 4**treeN, treeN)
 
-      ! tests for JB version - decimal
-      ! loop over all directions - in if condition we set the correct neighbouring index change
-      do j= 1,4
-        call adjacent_wrapper_d( newtreecode, neighbor, dir_2d_int(j), params%Jmax, params%Jmax)
-        call decoding_d(oxy, neighbor, 2)
-        if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2))) &
-        .or. (oxy(2) /= ixy(2) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)))) then
-          write(*,'("UNIT TEST FAILED: treecode num bin ", i0, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d(j), ixy(1:2), oxy(1:2)
-          if (abort_on_fail) call abort(123980)
-        endif
-      end do
-
       ! tests for JB version - binary
       ! loop over all directions - in if condition we set the correct neighbouring index change
       do j= 1,4
@@ -154,7 +140,19 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
         if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2))) &
         .or. (oxy(2) /= ixy(2) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)))) then
-          write(*,'("UNIT TEST FAILED: treecode num bin ", i0, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d(j), ixy(1:2), oxy(1:2)
+          write(*,'("UNIT TEST FAILED: treecode num bin ", i3.3, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d_int(j), ixy(1:2), oxy(1:2)
+          if (abort_on_fail) call abort(123980)
+        endif
+      end do
+
+      ! tests for JB version - decimal
+      ! loop over all directions - in if condition we set the correct neighbouring index change
+      do j= 1,4
+        call adjacent_wrapper_d( newtreecode, neighbor, dir_2d_int(j), params%Jmax, params%Jmax)
+        call decoding_d(oxy, neighbor, 2)
+        if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2))) &
+        .or. (oxy(2) /= ixy(2) + (j-1)/2       * (-1 + 2*modulo((j-1), 2)))) then
+          write(*,'("UNIT TEST FAILED: treecode num dec ", i3.3, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d_int(j), ixy(1:2), oxy(1:2)
           if (abort_on_fail) call abort(123980)
         endif
       end do
@@ -184,20 +182,6 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       call encoding_d( ixy, newtreecode, 3)
       call encoding_revised(treecode, ixy, 3, params%Jmax)
 
-      ! tests for JB version - decimal
-      ! loop over all directions - in if condition we set the correct neighbouring index change
-      do j= 1,6
-        call adjacent_wrapper_d( newtreecode, neighbor, dir_3d_int(j), params%Jmax, params%Jmax)
-        call decoding_d(oxy, neighbor, 3)
-
-        if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
-        .or. (oxy(2) /= ixy(2) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
-        .or. (oxy(3) /= ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)))) then
-          write(*,'("UNIT TEST FAILED: treecode num dec 3D ", i0, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, oxy
-          if (abort_on_fail) call abort(123980)
-        endif
-      end do
-
       ! tests for numerical binary treecode
       ! loop over all directions - in if condition we set the correct neighbouring index change
       do j= 1,6
@@ -207,9 +191,23 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
         .or. (oxy(2) /= ixy(2) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
         .or. (oxy(3) /= ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)))) then
-          write(*,'("UNIT TEST FAILED: treecode num bin 3D ", i0, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, oxy
+          write(*,'("UNIT TEST FAILED: treecode num bin 3D ", i3.3, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d_int(j), ixy, oxy
           if (abort_on_fail) call abort(123980)
       endif
+      end do
+
+      ! tests for JB version - decimal
+      ! loop over all directions - in if condition we set the correct neighbouring index change
+      do j= 1,6
+        call adjacent_wrapper_d( newtreecode, neighbor, dir_3d_int(j), params%Jmax, params%Jmax)
+        call decoding_d(oxy, neighbor, 3)
+
+        if ( (oxy(1) /= ixy(1) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
+        .or. (oxy(2) /= ixy(2) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
+        .or. (oxy(3) /= ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)))) then
+          write(*,'("UNIT TEST FAILED: treecode num dec 3D ", i3.3, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d_int(j), ixy, oxy
+          if (abort_on_fail) call abort(123980)
+        endif
       end do
 
       ! tests for old version

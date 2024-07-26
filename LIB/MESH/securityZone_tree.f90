@@ -206,8 +206,9 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ! the neighbor wants to coarsen
                     if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
-                        call get_indices_of_modify_patch(params, neighborhood, idx, (/ nx, ny, nz/), (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
-                            X_s=(/ g, g, g/), X_e=(/ g, g, g/))
+                        call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), &
+                            (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
+                            g_p=(/ g, g, g/), g_m=(/ g, g, g/))
                         ref_check = -1
 
                         call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
@@ -250,7 +251,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
                 ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant
-                i_neighborhood = inverse_neighbor(neighborhood, params%dim)
+                call inverse_relation(neighborhood, i_neighborhood)
 
                 ! neighbor exists ?
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then

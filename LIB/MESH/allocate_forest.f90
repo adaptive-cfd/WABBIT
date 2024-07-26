@@ -73,12 +73,11 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     if (params%dim==2) then
         nz = 1
-        max_neighbors = 16
         max_family = 9
     else
-        max_neighbors = 74
         max_family = 17
     endif
+    max_neighbors = 56*3
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
     ! that means one rhs is stored in a 5D subset of a 6D array.

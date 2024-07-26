@@ -925,9 +925,9 @@ contains
                 args = str_replace_text( args, '"', '')
                 ! now args is just the substring left of the '=' sign.
 
-                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.") then
+                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.".or.args=="T".or.args=="t") then
                     value = .true.
-                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.") then
+                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.".or.args=="F".or.args=="f") then
                     value = .false.
                 else
                     write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))

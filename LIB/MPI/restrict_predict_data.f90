@@ -20,12 +20,12 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     integer(kind=ik) :: iy  ! debug variable
 
-    ! some neighborhoods are intrinsically on the same level (level_diff=0)
-    ! and thus it makes no sense to call the up/downsampling routine for those
-#ifdef DEV
-    if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
-    if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
-#endif
+!     ! some neighborhoods are intrinsically on the same level (level_diff=0)
+!     ! and thus it makes no sense to call the up/downsampling routine for those
+! #ifdef DEV
+!     if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldn't appear")
+!     if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldn't appear")
+! #endif
 
     if ( level_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data

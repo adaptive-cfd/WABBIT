@@ -54,7 +54,7 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
         rData_sendBuffer(buffer_offset) = meta_send_counter(k)
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
-    ! ! test send/receive sizes
+
     ! if (present(verbose_check)) then
     !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
@@ -199,6 +199,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
         if (buffer_size /= patch_size) then
             write(*, '("ERROR: I am confused because real buffer_size is not equivalent to theoretical one:", i0, " - ", i0)') buffer_size, patch_size
+            write(*, '("relation - ", i0, " lvl_diff - ", i0)') relation, level_diff
             call abort(666)
         endif
 

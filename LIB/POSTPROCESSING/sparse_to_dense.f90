@@ -18,7 +18,7 @@ subroutine sparse_to_dense(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID
 
-    integer(kind=ik)                        :: max_neighbors, level, k, tc_length
+    integer(kind=ik)                        :: level, k, tc_length
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=cshort)                   :: order
@@ -91,10 +91,8 @@ subroutine sparse_to_dense(params)
     if (params%dim==3) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
-        max_neighbors = 74
     else
         number_dense_blocks = 4_ik**level
-        max_neighbors = 16
     end if
 
     if (params%rank==0) then

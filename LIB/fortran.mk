@@ -27,7 +27,7 @@ MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 # Source code directories (colon-separated):
 VPATH = LIB
 VPATH += :LIB/MAIN:LIB/MODULE:LIB/INI:LIB/HELPER:LIB/MESH:LIB/IO:LIB/TIME:LIB/EQUATION:LIB/MPI:LIB/TIMING
-VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew
+VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew:LIB/TESTING
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
 VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/WAVELETS
@@ -245,7 +245,7 @@ $(OBJDIR)/module_timing.o: module_timing.f90
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o \
+$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o \
 	conversion_routines.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -284,7 +284,7 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
-	unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 refineToEquidistant_tree.f90 \
+	refineToEquidistant_tree.f90 \
 	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
 	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
 	refinementExecute.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 \
@@ -292,12 +292,12 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
-	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90 \
+	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 \
 	securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
-	unit_test_treecode.f90
+	$(OBJDIR)/module_treelib.o unit_test_treecode.f90 unitTest_Sync.f90 unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o get_neighbor_treecode.f90 neighborhood.f90

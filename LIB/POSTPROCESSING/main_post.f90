@@ -48,9 +48,6 @@ program main_post
     case ("--extract-slice")
         call post_extract_slice(params)
 
-    case ("--compression-unit-test")
-        call post_compression_unit_test(params)
-
     case ("--evaluate-wavelet-thresholding")
         call post_evaluate_thresholding(params)
 
@@ -95,7 +92,7 @@ program main_post
     case("--sparse-to-dense", "--refine-everywhere")
         call sparse_to_dense(params)
 
-    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test")
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--sync-test", "--treecode-test")
         call post_unit_test(params)
 
     case ("--performance-test")
@@ -103,6 +100,9 @@ program main_post
 
     case ("--adaption-test")
         call adaption_test(params)
+
+    case ("--compression-unit-test")
+        call post_compression_unit_test(params)
 
     case("--dense-to-sparse")
         call dense_to_sparse(params)
@@ -160,8 +160,6 @@ program main_post
             write(*,*) "--sparse-to-dense"
             write(*,*) "--dense-to-sparse"
             write(*,*) "--mean"
-            write(*,*) "--performance_test"
-            write(*,*) "--adaption-test"
             write(*,*) "--vorticity"
             write(*,*) "--vor-abs"
             write(*,*) "--divergence"
@@ -187,6 +185,15 @@ program main_post
             write(*,*) "--generate_forest"
             write(*,*) "--evaluate-wavelet-thresholding"
             write(*,*) "--refine-everywhere"
+            ! tests
+            write(*,*) "--compression-unit-test"
+            write(*,*) "--performance_test"
+            write(*,*) "--adaption-test"
+            write(*,*) "--refine-coarsen-test"
+            write(*,*) "--ghost-nodes-test"
+            write(*,*) "--wavelet-decomposition-unit-test"
+            write(*,*) "--sync-test"
+            write(*,*) "--treecode-test"
 
             if (mode=="--h" .or. mode=="--help") then
                 write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"

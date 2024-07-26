@@ -371,7 +371,7 @@ contains
         integer(kind=ik), allocatable :: iteration(:)
         real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
         real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-        integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                        :: level, k, Bs(3), tc_length
         integer(hid_t)                          :: file_id
         real(kind=rk), dimension(3)             :: domain
         integer(hsize_t), dimension(2)          :: dims_treecode
@@ -644,7 +644,7 @@ contains
         integer(kind=ik), allocatable :: iter_list(:)
         real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
         real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
-        integer(kind=ik)                 :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                 :: level, k, Bs(3), tc_length
         integer(hid_t)                   :: file_id
         real(kind=rk), dimension(3)      :: domain
         integer(hsize_t), dimension(2)   :: dims_treecode
@@ -1180,7 +1180,7 @@ contains
         real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
         integer(kind=ik), allocatable           :: mode_number(:)
 
-        integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                        :: level, k, Bs(3), tc_length
         integer(hid_t)                          :: file_id
         real(kind=rk), dimension(3)             :: domain
         integer(hsize_t), dimension(2)          :: dims_treecode
@@ -1554,7 +1554,7 @@ contains
             integer(kind=ik), allocatable :: iter_list(:)
             real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
             real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
-            integer(kind=ik)                 :: max_neighbors, level, k, Bs(3), tc_length
+            integer(kind=ik)                 :: level, k, Bs(3), tc_length
             integer(hid_t)                   :: file_id
             real(kind=rk), dimension(3)      :: domain
             integer(hsize_t), dimension(2)   :: dims_treecode

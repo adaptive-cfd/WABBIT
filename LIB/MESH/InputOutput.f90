@@ -1,4 +1,4 @@
-subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync)
+subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
     implicit none
 
     character(len=*), intent(in)        :: fname                    !> file name
@@ -9,6 +9,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
     logical, optional, intent(in)       :: no_sync
+    logical, optional, intent(in)       :: save_ghosts
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
@@ -28,7 +29,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
-    logical, parameter                  :: save_ghosts = .false.
+    logical                             :: saveGhosts
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -41,6 +42,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
     no_sync2 = .false.
     if (present(no_sync)) no_sync2 = no_sync
+    saveGhosts = .false.
+    if (present(save_ghosts)) saveGhosts = save_ghosts
 
     ! uniqueGrid modification
     if (.not. no_sync2) then
@@ -68,7 +71,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    if (save_ghosts) then
+    if (saveGhosts) then
         allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n(tree_ID) ), stat=status)
     else
         ! uniqueGrid modification: we save the first ghost node in addition to the internal
@@ -129,7 +132,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         ! ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
         ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n(tree_ID)/) - 1
-        if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        if (saveGhosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
 
     else
 
@@ -140,7 +143,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         ! ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
         ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n(tree_ID)/) - 1
-        if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        if (saveGhosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
 
     endif
 
@@ -162,7 +165,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
             if ( params%dim == 3 ) then
                 ! 3D
-                if (save_ghosts) then
+                if (saveGhosts) then
                     myblockbuffer(:,:,:,l) = hvy_block( :, :, :, dF, hvy_id)
                 else
                     ! myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
@@ -178,14 +181,14 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(2,l) = ddx(2)
                 coords_spacing(3,l) = ddx(1)
 
-                if (save_ghosts) then
+                if (saveGhosts) then
                     coords_origin(1,l) = xx0(3) -dble(g)*ddx(3)
                     coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
                     coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
                 endif
             else
                 ! 2D
-                if (save_ghosts) then
+                if (saveGhosts) then
                     myblockbuffer(:,:,1,l) = hvy_block(:, :, 1, dF, hvy_id)
                 else
                     ! myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
@@ -199,7 +202,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(1,l) = ddx(2)
                 coords_spacing(2,l) = ddx(1)
 
-                if (save_ghosts) then
+                if (saveGhosts) then
                     coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
@@ -251,7 +254,12 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
     call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
     call write_attribute(file_id, "blocks", "version", (/20240410/)) ! this is used to distinguish wabbit file formats
-    call write_attribute(file_id, "blocks", "block-size", Bs)
+    if (saveGhosts) then
+        ! we could split this up into bs and g but for now to work with visualization scripts I keep it at that
+        call write_attribute(file_id, "blocks", "block-size", Bs(:)+2*g)
+    else
+        call write_attribute(file_id, "blocks", "block-size", Bs)
+    endif
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))

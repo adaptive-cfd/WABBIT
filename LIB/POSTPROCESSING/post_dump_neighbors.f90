@@ -37,7 +37,7 @@ subroutine post_dump_neighbors(params)
             write(*,*) " Wabbit postprocessing: dump neighbors"
             write(*,*) "-----------------------------------------------------------"
             write(*,*) " Read in a data field (2D or 3D) and computes the neighbor relations"
-            write(*,*) " (updateNeighbors_tree) for all blocks. then, dumps lgt_block and hvy_neighbor to "
+            write(*,*) " (updateNeighbors_tree) for all blocks. then, dumps hvy_neighbor to "
             write(*,*) " ascii file. Useful for development"
             write(*,*) " Best used in serial monoproc: then, hvy_id == lgt_id"
         end if
@@ -82,25 +82,16 @@ subroutine post_dump_neighbors(params)
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call updateMetadata_tree( params, tree_ID )
 
-    open(14, file="lgt_block.txt", status='replace')
-    do k = 1, size(lgt_block,1)
-        write(14,'(20(i2,1x))') lgt_block(k,:)
-    enddo
-    close(14)
+    ! write neighbor_blocks file
+    if (params%rank == 0) then
+        open(16,file='hvy_neighbors.dat',status='replace')
+        write(16,'(A)') "% lgt_id + 168*neighbors"
+        do k=1,hvy_n(tree_ID)
+            hvy_ID = hvy_active(k, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
 
-    open(14, file="hvy_neighbors.txt", status='replace')
-    do k = 1, size(hvy_neighbor,1)
-        write(14,'(90(i5,1x))') hvy_neighbor(k,:)
-    enddo
-    close(14)
-
-
-    open(14, file="x0_dx.txt", status='replace')
-    do k = 1, size(lgt_block,1)
-        call get_block_spacing_origin( params, k, x0, dx )
-        write(14,'(6(es15.6,1x))') x0, dx
-    enddo
-    close(14)
-
-
+            write(16,'(169(i0, 1x))') lgt_id, hvy_neighbor(k, :)
+        enddo
+        close(16)
+    endif
 end subroutine post_dump_neighbors

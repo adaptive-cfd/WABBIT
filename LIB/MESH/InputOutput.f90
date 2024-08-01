@@ -661,7 +661,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
     call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID)
+    call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
 
     if (present(synchronize_ghosts)) then
         if (synchronize_ghosts) then
@@ -953,7 +953,7 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
 
 
     call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID)
+    call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
 
     call sync_ghosts_tree(params, hvy_block, tree_ID )
 

@@ -48,7 +48,7 @@ subroutine updateMetadata_tree(params, tree_ID, update_neighbors, update_family,
     !     endif
     ! endif
 
-    if (u_n) call updateNeighbors_tree(params, tree_ID)
+    if (u_n) call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
     if (u_f) call updateFamily_tree(params, tree_ID)
 
     call toc( "updateMetadata_tree (lists+neighbors)", 59, MPI_wtime()-t0 )

@@ -15,19 +15,20 @@
 !> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
 !> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 ! ********************************************************************************************
-subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_domain, verbose)
+subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain, search_overlapping, verbose)
 
     implicit none
     type (type_params), intent(in)      :: params                   !< user defined parameter structure
     integer(kind=ik), intent(in)        :: hvyID_block
     integer(kind=ik), intent(in)        :: lgtID_block
-    integer(kind=ik), intent(in)        :: Jmax
     !> direction for neighbor search - number where each digit represents a cardinal direction
     !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
     integer(kind=ik), intent(in)        :: dir                      
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)
+    logical, intent(in)                 :: search_overlapping  !< for CVS multiple neighbors can coexist, so we search all of them
     logical, intent(in), optional       :: verbose  ! no matter the value, if it is present we print additional output
+    
     integer(kind=ik)                    :: neighborDirCode_sameLevel
     integer(kind=ik)                    :: neighborDirCode_coarserLevel, tcFinerAppendDigit(4)
     integer(kind=ik)                    :: neighborDirCode_finerLevel(4)
@@ -48,7 +49,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     ! we have to init tcBlock before we set it elsewise fortran doesnt like it
     tcb_Block    = get_tc(lgt_block(lgtID_block, IDX_TC_1 : IDX_TC_2))
     ! last digit is used very often so we only extract it once
-    tc_last = tc_get_digit_at_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
+    tc_last = tc_get_digit_at_level_b(tcb_Block, dim=params%dim, level=level, max_level=params%Jmax)
 
     ! extract the direction for each dimension from direction for neighbor search - number where each digit represents a cardinal direction
     ! XYZ where each digit can be 0 (no change), 1 (for + direction) or 9 (for - direction)
@@ -130,8 +131,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     ! 1) Check if we find a neighbor on the SAME LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! calculate treecode for neighbor on same level
-    ! call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
-    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=Jmax)
+    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=params%Jmax)
 
     ! check if (hypothetical) neighbor exists and if so find its lgtID
     call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
@@ -139,61 +139,68 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     if (exists) then
         ! we found the neighbor on the same level.
         hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_neighbor
-        return
+        if (.not. search_overlapping) return
     endif
 
+
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! 2) Check if we find a neighbor on the COARSER LEVEL (if that is possible at all)
+    ! 2) Check if we find a neighbor on the FINER LEVEL
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! Note: if those exists, then we always need to find all 4 (for 3D) or 2 of them
+    ! We might be interested to search for coarser neighbors first because their is only one, however for CVS we might have an overfull grid
+    ! but still only want to sync ANY values. Then coarsest neighbors should be chosen last as their values will be interpolated with WC=0
+    ! However, if we did not find any same-lvl neighbor we should not find finer neighbors, it is therefore not too important but for clarity
+    ! in this order
+    if (level < params%Jmax) then
+        do i_dig = 1, dir_free
+            ! first neighbor virtual treecode, one level up
+            tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(i_dig), level=level+1, max_level=params%Jmax, dim=params%dim)
+
+            ! calculate treecode for neighbor on same level (virtual level)
+            call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=params%Jmax, dim=params%dim)
+            ! check if (hypothetical) neighbor exists and if so find its lgtID
+            call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
+
+            if (exists) then
+                hvy_neighbor( hvyID_block, neighborDirCode_sameLevel + i_dig-1  + 2*56) = lgtID_neighbor
+            else
+                exit  ! no need to serch for other ones if one already is not found
+            endif
+
+            ! we can only return here if we found all blocks
+            if (.not. search_overlapping .and. i_dig == dir_free) return
+        end do
+    endif
+
+
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 3) Check if we find a neighbor on the COARSER LEVEL (if that is possible at all)
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! We did not find the neighbor on the same level, and now check on the coarser level.
     ! Just clear all levels before the lower one
-    tcb_Neighbor = tc_clear_until_level_b(tcb_Neighbor, dim=params%dim, level=level-1, max_level=Jmax)
+    tcb_Neighbor = tc_clear_until_level_b(tcb_Neighbor, dim=params%dim, level=level-1, max_level=params%Jmax)
     ! only continue if coarser neighbor can at all exist, consider:
     ! a c E E
     ! b d E E
     ! Then to the right, block b cannot have a coarser neighbor
-    if (neighborDirCode_coarserLevel /= -1) then
+    if (neighborDirCode_coarserLevel /= -1 .and. level > params%Jmin) then
         ! check if (hypothetical) neighbor exists and if so find its lgtID
         call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level-1, tree_id=tree_ID, max_level=params%Jmax)
 
         if ( exists ) then
             ! neighbor is one level down (coarser)
             hvy_neighbor( hvyID_block, neighborDirCode_coarserLevel + 56 ) = lgtID_neighbor
-            return
+            if (.not. search_overlapping) return
         endif
     endif
 
-    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! 3) Check if we find a neighbor on the FINER LEVEL
-    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! Note: there are several neighbors possible on finer levels (up to four in 3D!)
-    ! loop over all 4 possible neighbors
-    if (level < Jmax) then
-        do i_dig = 1, dir_free
-            ! first neighbor virtual treecode, one level up
-            tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(i_dig), level=level+1, max_level=Jmax, dim=params%dim)
-
-            ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=Jmax, dim=params%dim)
-            ! check if (hypothetical) neighbor exists and if so find its lgtID
-            call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
-
-            if (exists) then
-                hvy_neighbor( hvyID_block, neighborDirCode_sameLevel + i_dig-1  + 2*56) = lgtID_neighbor
-            end if
-
-            ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
-            ! we have to find a neighbor for faces, edges and corners might have no neighbors if a coarser block is also at a face
-            ! because symmetry conditions are used, check for .not. error to only print it once
-            if (count(dir_dim == 0) == 2 .and. .not. error) then
-                if (.not. exists .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
-                    call adjacent_wrapper_b(tcb_Block, tcb_Virtual, dir, level=level, dim=params%dim, max_level=Jmax)
-                    write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i0, ", lgtID-", i0, " lvl-", i0, " TC-", i0, "-", b64.64, A, "Checked same-lvl TC-", i0, "-", b64.64, " and lower-lvl TC-", i0, "-", b64.64)') &
-                        params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block, NEW_LINE('a'), tcb_Virtual, tcb_Virtual, tcb_Neighbor, tcb_Neighbor
-                    error = .true.
-                endif
-            endif
-        end do
+    ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
+    ! we have to find a neighbor for faces, edges and corners might have no neighbors if a coarser block is also at a face
+    if (count(dir_dim == 0) == 2 .and. .not. exists .and. .not. search_overlapping&
+        .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
+        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i0, ", lgtID-", i0, " lvl-", i0, " TC-", i0, "-", b64.64)') &
+            params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block
+        error = .true.
     endif
 
 

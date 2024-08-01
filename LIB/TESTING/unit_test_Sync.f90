@@ -236,7 +236,7 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
                 ! write neighbor_blocks file
                 if (params%rank == 0) then
                     open(16,file='hvy_neighbors.dat',status='replace')
-                    write(16,'(A)') "% lgt_id + 157*neighbors"
+                    write(16,'(A)') "% lgt_id + 168*neighbors"
                     do k=1,hvy_n(tree_ID)
                         hvy_ID = hvy_active(k, tree_ID)
                         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)

@@ -813,12 +813,12 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
             call createActiveSortedLists_tree( params, tree_ID2 )
 
             ! update neighbor relations and synchronice ghosts of 1st tree
-            call updateNeighbors_tree( params, tree_ID1 )
+            call updateNeighbors_tree( params, tree_ID1 , search_overlapping=.false.)
 
             call sync_ghosts_tree( params, hvy_block, tree_ID1)
 
             ! update neighbor relations and synchronice ghosts of 2nd tree
-            call updateNeighbors_tree( params, tree_ID2 )
+            call updateNeighbors_tree( params, tree_ID2, search_overlapping=.false.)
 
             call sync_ghosts_tree( params, hvy_block, tree_ID2)
 

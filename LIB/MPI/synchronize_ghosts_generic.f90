@@ -358,14 +358,6 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
 
         ! loop over all neighbors
         do neighborhood = 1, size(hvy_neighbor, 2)
-            ! if (skipDiagonalNeighbors) then
-            !     ! Diagonal neighbors (not required for the RHS)
-            !     ! 2D: 5,6,7,8
-            !     ! 3D: 7-18, 19-26, 51-74
-            !     if (dim==2.and.(neighborhood>=5.and.neighborhood<=8)) cycle
-            !     if (dim==3.and.((neighborhood>=7.and.neighborhood<=26).or.(neighborhood>=51))) cycle
-            ! endif
-
             ! neighbor exists
             if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
                 ! neighbor light data id

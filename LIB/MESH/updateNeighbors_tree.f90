@@ -3,19 +3,21 @@
 !!            - params struct
 !! output:    - neighbor list array
 ! ********************************************************************************************
-subroutine updateNeighbors_tree(params, tree_ID)
+subroutine updateNeighbors_tree(params, tree_ID, search_overlapping)
 
     implicit none
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
+    type (type_params), intent(in)      :: params               !< user defined parameter structure
     integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in)                 :: search_overlapping   !< for CVS multiple neighbors can coexist, so we search all of them
+
+
     logical                             :: error = .false.
-    integer(kind=ik)                    :: mpierror, k, N, Jmax, lgtID, hvyID
+    integer(kind=ik)                    :: mpierror, k, N, lgtID, hvyID
     real(kind=rk)                       :: x0(1:3), dx(1:3)
     integer(kind=2)                     :: n_domain(1:3)
 
 
     N = params%number_blocks
-    Jmax = params%Jmax
 
     ! special case:
     ! if there is only one block => all neighbors are this block
@@ -41,40 +43,41 @@ subroutine updateNeighbors_tree(params, tree_ID)
         !> 0 -> no direction (but finer neighbors can vary in + and - and coarser neighbors have one configuration of those two) 
 
         ! faces, 2D edges
-        call find_neighbor(params, hvyID, lgtID, Jmax, 900, error, n_domain)  ! -x
-        call find_neighbor(params, hvyID, lgtID, Jmax, 100, error, n_domain)  ! +x
-        call find_neighbor(params, hvyID, lgtID, Jmax, 090, error, n_domain)  ! -y
-        call find_neighbor(params, hvyID, lgtID, Jmax, 010, error, n_domain)  ! +y
+        call find_neighbor(params, hvyID, lgtID, 900, error, n_domain, search_overlapping)  ! -x
+        call find_neighbor(params, hvyID, lgtID, 100, error, n_domain, search_overlapping)  ! +x
+        call find_neighbor(params, hvyID, lgtID, 090, error, n_domain, search_overlapping)  ! -y
+        call find_neighbor(params, hvyID, lgtID, 010, error, n_domain, search_overlapping)  ! +y
         if (params%dim == 3) then
-            call find_neighbor(params, hvyID, lgtID, Jmax, 009, error, n_domain)  ! -z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 001, error, n_domain)  ! +z
+            call find_neighbor(params, hvyID, lgtID, 009, error, n_domain, search_overlapping)  ! -z
+            call find_neighbor(params, hvyID, lgtID, 001, error, n_domain, search_overlapping)  ! +z
         endif
         ! edges, 2D corners
-        call find_neighbor(params, hvyID, lgtID, Jmax, 990, error, n_domain)  ! -x-y
-        call find_neighbor(params, hvyID, lgtID, Jmax, 910, error, n_domain)  ! -x+y
-        call find_neighbor(params, hvyID, lgtID, Jmax, 190, error, n_domain)  ! +x-y
-        call find_neighbor(params, hvyID, lgtID, Jmax, 110, error, n_domain)  ! +x+x
+        call find_neighbor(params, hvyID, lgtID, 990, error, n_domain, search_overlapping)  ! -x-y
+        call find_neighbor(params, hvyID, lgtID, 910, error, n_domain, search_overlapping)  ! -x+y
+        call find_neighbor(params, hvyID, lgtID, 190, error, n_domain, search_overlapping)  ! +x-y
+        call find_neighbor(params, hvyID, lgtID, 110, error, n_domain, search_overlapping)  ! +x+x
         if (params%dim == 3) then
-            call find_neighbor(params, hvyID, lgtID, Jmax, 909, error, n_domain)  ! -x-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 901, error, n_domain)  ! -x+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 109, error, n_domain)  ! +x-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 101, error, n_domain)  ! +x+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 099, error, n_domain)  ! -y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 091, error, n_domain)  ! -y+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 019, error, n_domain)  ! +y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 011, error, n_domain)  ! +y+z
+            call find_neighbor(params, hvyID, lgtID, 909, error, n_domain, search_overlapping)  ! -x-z
+            call find_neighbor(params, hvyID, lgtID, 901, error, n_domain, search_overlapping)  ! -x+z
+            call find_neighbor(params, hvyID, lgtID, 109, error, n_domain, search_overlapping)  ! +x-z
+            call find_neighbor(params, hvyID, lgtID, 101, error, n_domain, search_overlapping)  ! +x+z
+            call find_neighbor(params, hvyID, lgtID, 099, error, n_domain, search_overlapping)  ! -y-z
+            call find_neighbor(params, hvyID, lgtID, 091, error, n_domain, search_overlapping)  ! -y+z
+            call find_neighbor(params, hvyID, lgtID, 019, error, n_domain, search_overlapping)  ! +y-z
+            call find_neighbor(params, hvyID, lgtID, 011, error, n_domain, search_overlapping)  ! +y+z
             ! ecorners
-            call find_neighbor(params, hvyID, lgtID, Jmax, 999, error, n_domain)  ! -x-y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 199, error, n_domain)  ! +x-y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 919, error, n_domain)  ! -x+y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 119, error, n_domain)  ! +x+y-z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 991, error, n_domain)  ! -x-y+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 191, error, n_domain)  ! +x-y+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 911, error, n_domain)  ! -x+y+z
-            call find_neighbor(params, hvyID, lgtID, Jmax, 111, error, n_domain)  ! +x+y+z
+            call find_neighbor(params, hvyID, lgtID, 999, error, n_domain, search_overlapping)  ! -x-y-z
+            call find_neighbor(params, hvyID, lgtID, 199, error, n_domain, search_overlapping)  ! +x-y-z
+            call find_neighbor(params, hvyID, lgtID, 919, error, n_domain, search_overlapping)  ! -x+y-z
+            call find_neighbor(params, hvyID, lgtID, 119, error, n_domain, search_overlapping)  ! +x+y-z
+            call find_neighbor(params, hvyID, lgtID, 991, error, n_domain, search_overlapping)  ! -x-y+z
+            call find_neighbor(params, hvyID, lgtID, 191, error, n_domain, search_overlapping)  ! +x-y+z
+            call find_neighbor(params, hvyID, lgtID, 911, error, n_domain, search_overlapping)  ! -x+y+z
+            call find_neighbor(params, hvyID, lgtID, 111, error, n_domain, search_overlapping)  ! +x+y+z
         endif
     end do
 
+    ! error is only set to true inside the functions and never to false, so if one encounters problems then this condition is active
     if (error) then
         call abort(71737, "Grid error: we did not find a neighboring block. Either your data is corrupt (reading from file) or you found a bug (grid generation failed).")
     endif

@@ -1515,7 +1515,7 @@ contains
             !---------------------------------------------------------------------------
             ! adapted reconstructed field
             !---------------------------------------------------------------------------
-            call updateNeighbors_tree( params, dest_tree_ID )
+            call updateNeighbors_tree( params, dest_tree_ID, search_overlapping=.false.)
 
             if ( params%adapt_tree) then
                 call adapt_tree( 0.0_rk, params, hvy_block, dest_tree_ID, params%coarsening_indicator, hvy_tmp )

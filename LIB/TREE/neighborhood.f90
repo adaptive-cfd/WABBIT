@@ -1,3 +1,7 @@
+! Attention: Neighborhood relation is also used in:
+!    - find_neighbors.f90
+!    - remove_nonperiodic_neighbors.f90
+
 !> \brief From a neighbourhood, compute the indices of the sender patch of thickness N_s (left end) or N_e (right end)
 !> This function is kind of like the inverse of getting the ghost node patches, used for the sender patches inside the domain.
 !> Additionally it has the option to extend those patches but does not do so correctly in the ghost point layer

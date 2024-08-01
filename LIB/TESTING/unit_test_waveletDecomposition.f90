@@ -1,4 +1,4 @@
-subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure

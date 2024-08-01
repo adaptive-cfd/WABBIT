@@ -315,7 +315,7 @@ subroutine wavelet_test(params)
 
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
-    call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID=1)
+    call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID=1)
     call reset_tree(params, .true., tree_ID)
 
     call createEquidistantGrid_tree( params, hvy_block, 3, .true., tree_ID )
@@ -703,7 +703,7 @@ subroutine wavelet_test_coarsening(params)
     !----------------------------------------------------------------------------
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn, hvy_work=hvy_work, nrhs_slots1=1)
 
-    call unitTest_waveletDecomposition(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+    call unit_test_waveletDecomposition(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     ! call createEquidistantGrid_tree( params, 4, .true., tree_ID )
     !

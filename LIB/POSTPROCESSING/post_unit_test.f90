@@ -96,15 +96,15 @@ subroutine post_unit_test(params)
 
     select case(operator)
     case("--ghost-nodes-test")
-        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
+        call unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
 
     case("--refine-coarsen-test")
-        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
+        call unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
 
     case("--wavelet-decomposition-unit-test")
-        call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
+        call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
     case("--sync-test")
-        call unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
+        call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
     case("--treecode-test")
         call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true.)
 

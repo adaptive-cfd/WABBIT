@@ -152,14 +152,14 @@ program main
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
-        call unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true.)
-        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
+        call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true.)
+        call unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
     endif
 
     ! check if the wavelet filter banks are okay.
     if (params%test_wavelet_decomposition) then
-        call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
-        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
 

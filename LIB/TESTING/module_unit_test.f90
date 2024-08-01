@@ -14,10 +14,10 @@ module module_unit_test
 contains
 
 #include "unit_test_treecode.f90"
-#include "unitTest_Sync.f90"
-#include "unitTest_ghostSync.f90"
-#include "unitTest_waveletDecomposition.f90"
-#include "unitTest_refineCoarsen.f90"
+#include "unit_test_Sync.f90"
+#include "unit_test_ghostSync.f90"
+#include "unit_test_waveletDecomposition.f90"
+#include "unit_test_refineCoarsen.f90"
 #include "createTestGrids.f90"
 
 end module module_unit_test

@@ -1,4 +1,4 @@
-subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
+subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
 
     implicit none
     type (type_params), intent(inout) :: params                     !> user defined parameter structure

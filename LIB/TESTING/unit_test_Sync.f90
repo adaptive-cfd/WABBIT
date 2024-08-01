@@ -1,4 +1,4 @@
-subroutine unitTest_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unit_test_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
     real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
@@ -65,7 +65,7 @@ subroutine unitTest_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     end do
 end subroutine
 
-subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
+subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
 
     implicit none
     type (type_params), intent(inout)  :: params                     !> user defined parameter structure
@@ -117,7 +117,7 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_o
     ! now test syncing
     do l = params%g, params%g_rhs, -1
         ! reset values
-        call unitTest_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+        call unit_test_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
         g_depth = l
         ! first condition: SC are copied for this length anyways

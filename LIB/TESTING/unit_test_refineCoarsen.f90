@@ -1,4 +1,4 @@
-subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
+subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure

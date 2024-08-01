@@ -96,7 +96,7 @@ subroutine sparse_to_dense(params)
     end if
 
     if (params%rank==0) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,*) "Wabbit sparse-to-dense. Will read a wabbit field and return a"
         write(*,*) "full grid with all blocks at the chosen level."
         write(*,'(A20,1x,A80)') "Reading file:", file_in
@@ -107,7 +107,7 @@ subroutine sparse_to_dense(params)
         write(*,'(A40,1x,A40)') "params%wavelet=", params%wavelet
         write(*,'(A40,1x,i2)') "params%g=", params%g
         write(*,'(A40,1x,A40)') "operator=", operator
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
     ! set max_treelevel for allocation of hvy_block

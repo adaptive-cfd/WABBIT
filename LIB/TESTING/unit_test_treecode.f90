@@ -59,7 +59,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (params%rank == 0) then
-    write(*,'(80("_"))')
+    write(*,'(80("─"))')
     write(*,'("UNIT TEST: Beginning treecode test")')
 
     ! ! space for initial testing
@@ -229,7 +229,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
   if (do_timing) then
     if (params%rank == 0) then
-      write(*,'(80("-"))')
+      write(*,'(80("─"))')
       write(*,'("UNIT TEST: Measuring time for different treecode implementations with ", i0, " iterations")') kk
       write(*,'("===num bin=== measuring time")')
     end if

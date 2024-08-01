@@ -1,4 +1,4 @@
-subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
+subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
 
     implicit none
     type (type_params), intent(inout)       :: params                     !> user defined parameter structure
@@ -8,14 +8,22 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)            :: tree_ID
+    logical, optional, intent(in)           :: verbose
 
-    integer(kind=ik)                        :: k, hvyID, lgtID
+    integer(kind=ik)                        :: k, hvy_id, lgt_id
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), allocatable :: norm(:), norm_ref(:), wc(:,:,:,:,:)
+    integer(kind=tsize)        :: treecode
+    character(len=80)                       :: file_dump
+    logical                                 :: apply_verbose
+
+    apply_verbose = .false.
+    if (present(verbose)) apply_verbose = verbose
 
     if (params%rank == 0) then
-        write(*,'(80("~"))')
+        write(*, '("")')  ! newline
+        write(*,'(80("─"))')
         write(*,'("UNIT TEST: testing if Coarsen(Refine(u)) = Id")')
         write(*,'("This test is performed on an equidistant grid.")')
         write(*,'("It checks if the implementation of Interpolation, Refinement and Block Merging are correct.")')
@@ -47,13 +55,13 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     ! create just some data...
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
         if (params%dim == 3) then
             do ic = 1, nc
                 do iz = g+1, Bs(3)+g
                     do iy = g+1, Bs(2)+g
                         do ix = g+1, Bs(1)+g
-                            hvy_block(ix,iy,iz,ic,hvyID) = rand_nbr()
+                            hvy_block(ix,iy,iz,ic,hvy_id) = rand_nbr()
                         end do
                     end do
                 end do
@@ -62,7 +70,7 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
             do ic = 1, nc
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        hvy_block(ix,iy,:,ic,hvyID) = rand_nbr()
+                        hvy_block(ix,iy,:,ic,hvy_id) = rand_nbr()
                     end do
                 end do
             end do
@@ -70,6 +78,17 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
+
+    ! print out some debugging infos to files
+    if (apply_verbose) then
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k,tree_ID)
+            call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+            treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
+            write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+            call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), file_dump, Bs, g)
+        enddo
+    endif
 
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
@@ -84,6 +103,23 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     ! we compare norms - this is not the most elegant way, but it'll do the trick for now.
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
+    ! print out some debugging infos to files
+    if (apply_verbose) then
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k,tree_ID)
+            call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+            treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
+            write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+            open(unit=32, file=file_dump, status='unknown', position='append')
+            write(32, '(A)') ""  ! new line
+            write(32, '(A)') "After refine-coarsen:"
+            write(32, '(A)') ""  ! new line
+            close(32)
+
+            call dump_block_fancy(hvy_tmp(:, :, :, 1:1, hvy_id), file_dump, Bs, g, append=.true.)
+        enddo
+    endif
+
     norm = abs(norm / norm_ref - 1.0_rk)
 
     if (params%rank==0) write(*,*) "Relative L2 error in Coarsen(Refine(u)) is: ", norm
@@ -92,17 +128,18 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
     else
         if (params%rank==0) then
+            write(*,'(80("─"))')
             write(*,'(A)') "           ( ("
             write(*,'(A)') "            ) )"
-            write(*,'(A)') "          ........"
-            write(*,'(A)') "          |      |]"
-            write(*,'(A)') "          \      /    How lovely that this test suceeded! You've earned yourself a refreshing beverage."
+            write(*,'(A)') "          ........           How lovely that this test suceeded!"
+            write(*,'(A)') "          |      |]       You've earned yourself a refreshing beverage."
+            write(*,'(A)') "          \      /"
             write(*,'(A)') "           `----'"
         endif
     endif
 
     if (params%rank == 0) then
-        write(*,'(80("~"))')
+        write(*,'(80("─"))')
     end if
 
     ! delete the grid we created for this subroutine

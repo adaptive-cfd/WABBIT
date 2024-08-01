@@ -92,7 +92,7 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
     rank = params%rank
 
     if (rank == 0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*,'("UNIT TEST: Beginning rudimentary ghost nodes test")')
     end if
 
@@ -108,49 +108,9 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
     end if
 
     !---------------------------------------------------------------------------
-    ! Test syncing: adaptive with following blocks (numbers at random, just to illustrate)
-    !    2 2 3 3
-    !    2 2 3 3
-    !    1 1 4 5
-    !    1 1 6 7
-    ! We set values to be deterministic, ghost values to -1 and then sync and check if everything is alright
-    ! It is helpful for debugging and makes things really clear
+    ! Test syncing: adaptive with one of the test grids, createGrid_simple_adaptive is enough actually
     !---------------------------------------------------------------------------
-    call createEquidistantGrid_tree( params, hvy_block, 1, .true., tree_ID )
-    ! choose block to refine
-    do k = 1, hvy_n(tree_ID)
-        hvy_ID = hvy_active(k, tree_ID)
-        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-        ! if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 3-tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax)) then
-        if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 2) then
-                lgt_block(lgt_id, IDX_REFINE_STS) = +1
-        endif
-    enddo
-    ! refine and update so that all blocks know of each other
-    if ( params%dim == 3 ) then
-        call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    else
-        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    endif
-    call updateMetadata_tree(params, tree_ID)
-    
-    ! ! check
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvy_ID = hvy_active(k, tree_ID)
-    !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-
-    !     write(*, '(A, i0)') "Neighbors for block ", lgt_id
-    !     call write_neighborhood_info(hvy_neighbor(hvy_id, :), params%dim)
-
-    !     ! call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-    !     ! treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-    !     ! write(*, '(A, i3, A, i0, A, i0, A, 32(i2, 1x))') "TC", treecode, " B", lgt_id, " L", lgt_block(lgt_id, IDX_MESH_LVL), " N: ", hvy_neighbor(hvy_id, 1:32)
-    !     ! write(*, '(A, i3, A, i0, A, i0, A, 32(i2, 1x))') "TC", treecode, " B", lgt_id, " L", lgt_block(lgt_id, IDX_MESH_LVL), " N: ", hvy_neighbor(hvy_id, 56+1:56+32)
-    !     ! write(*, '(A, i3, A, i0, A, i0, A, 32(i2, 1x))') "TC", treecode, " B", lgt_id, " L", lgt_block(lgt_id, IDX_MESH_LVL), " N: ", hvy_neighbor(hvy_id, 2*56+1:2*56+32)
-    ! enddo
-
-    ! call abort(197, "shhhh, Julius is testing!")
+    call createGrid_simple_adaptive_with_borders(params, hvy_block, tree_ID)
 
     ! now test syncing
     do l = params%g, params%g_rhs, -1
@@ -272,6 +232,24 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
 
                     call dump_block_fancy(hvy_tmp(:, :, :, 1:1, hvy_id), file_dump, Bs, g, to_int=.true., digits=4, append=.true.)
                 enddo
+            endif
+
+            ! write information so that we can debug neighbor relations
+            if (l == params%g) then
+                ! write neighbor_blocks file
+                if (params%rank == 0) then
+                    open(16,file='hvy_neighbors.dat',status='replace')
+                    write(16,'(A)') "% lgt_id + 157*neighbors"
+                    do k=1,hvy_n(tree_ID)
+                        hvy_ID = hvy_active(k, tree_ID)
+                        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+
+                        write(16,'(169(i0, 1x))') lgt_id, hvy_neighbor(k, :)
+                    enddo
+                    close(16)
+                endif
+
+                call saveHDF5_tree("gridsync_0001.h5", 0.0_rk, 1, 1, params, hvy_block, tree_ID, no_sync=.true.)
             endif
         endif
     enddo

@@ -77,7 +77,7 @@ module module_ini_files_parser
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("INFO: reading ",i7," lines with ",i7," colums from ",A)') nlines, ncols, file
 
             ! set up format string
@@ -101,7 +101,7 @@ module module_ini_files_parser
             close (14)
 
             write(*,'("Done reading.")')
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
 
         end subroutine read_array_from_ascii_file
 
@@ -120,7 +120,7 @@ module module_ini_files_parser
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("INFO: reading ",i5," lines with ",i3," colums from ",A)') nlines, ncols, file
 
             ! set up format string
@@ -144,7 +144,7 @@ module module_ini_files_parser
             close (14)
 
             write(*,'("Done reading.")')
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         end subroutine read_intarray_from_ascii_file
 
 

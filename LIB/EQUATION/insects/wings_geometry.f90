@@ -2012,9 +2012,9 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     integer(kind=ik) :: i, j, n_radius
 
     if (root) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,'("Reading wing shape from file ",A)') fname
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
     ! instead of the hard-coded values above, read fourier coefficients for wings from

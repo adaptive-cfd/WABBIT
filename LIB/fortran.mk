@@ -297,10 +297,11 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
-	$(OBJDIR)/module_treelib.o unit_test_treecode.f90 unitTest_Sync.f90 unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90
+	$(OBJDIR)/module_treelib.o unit_test_treecode.f90 unitTest_Sync.f90 unitTest_ghostSync.f90 unitTest_waveletDecomposition.f90 unitTest_refineCoarsen.f90 \
+	createTestGrids.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o get_neighbor_treecode.f90 neighborhood.f90
+$(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o neighborhood.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \

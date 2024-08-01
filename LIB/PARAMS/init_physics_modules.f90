@@ -20,9 +20,9 @@ subroutine init_physics_modules( params, filename, N_mask_components)
   character(len=*), intent(in) :: filename
 
   if (params%rank==0) then
-    write(*,'(80("-"))')
+    write(*,'(80("─"))')
     write(*,*) "Initializing physics modules"
-    write(*,'(80("-"))')
+    write(*,'(80("─"))')
   endif
 
   N_mask_components = 0

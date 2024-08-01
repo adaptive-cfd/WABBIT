@@ -4,8 +4,8 @@
 !> neighbor codes: \n
 !  ---------------
 !>   1- 56 : lvl_diff =  0  (same level)
-!>  57-112 : lvl_diff = -1  (coarser neighbor)
-!> 113-168 : lvl_diff = +1  (finer   neighbor)
+!>  57-112 : lvl_diff = +1  (coarser neighbor)
+!> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
 !> 01-08 : X side
 !> 09-16 : Y-side
@@ -86,6 +86,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
         do i_dim = 1,3
             ! first x is free, then y, then z giving this shift
             if (dir_dim(i_dim) /= 0) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 8*(i_dim-1)
+            ! shift indices for positive direction
             if (dir_dim(i_dim) == 1) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 4
         enddo
     elseif (count(dir_dim == 0) == 1) then
@@ -97,6 +98,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
             if (dir_dim(i_dim) == 0) then
                 ! first z varies, then y, then x giving this shift
                 neighborDirCode_sameLevel = neighborDirCode_sameLevel + 8*(3-i_dim)
+            ! shift indices for positive direction
             elseif (dir_dim(i_dim) == 1) then
                 neighborDirCode_sameLevel = neighborDirCode_sameLevel + apply_free*2
                 apply_free = apply_free + 1
@@ -107,6 +109,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     elseif (count(dir_dim == 0) == 0) then
         ! for corners, indices start at 48+1
         neighborDirCode_sameLevel = 49
+        ! shift indices for positive direction
         do i_dim = 1,3
             if (dir_dim(i_dim) == 1) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 2**(i_dim-1)
         enddo

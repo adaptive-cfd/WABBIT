@@ -1132,12 +1132,12 @@ contains
             ! 1: set inside of patch
             if (i_set == 1) then
                 call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), (/Nwcl, Nwcl, Nwcl/), (/Nwcr, Nwcr, Nwcr/), &
-                    g_p=(/ g, g, g/), g_m=(/ g, g, g/))
+                    g_p=(/ g, g, g/), g_m=(/ g, g, g/), lvl_diff=+1)
             ! 2: set ghost patch
             else
                 ! both lvl_diff and relation are inverted for function
-                call inverse_relation(neighborhood, i_neighborhood)
-                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, i_neighborhood, idx, params%g, params%g, level_diff=-1)
+                ! call inverse_relation(neighborhood, i_neighborhood)
+                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 
             ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
@@ -1208,13 +1208,13 @@ contains
             ! 1: set inside of patch
             if (i_set == 1) then
                 call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), (/Nscl, Nscl, Nscl/), (/Nscr, Nscr, Nscr/), &
-                    g_p=(/ g, g, g/), g_m=(/ g, g, g/))
+                    g_p=(/ g, g, g/), g_m=(/ g, g, g/), lvl_diff=+1)
             ! 2: set ghost patch
             else
                 if (skipGhosts) cycle
                 ! both lvl_diff and relation are inverted for function
-                call inverse_relation(neighborhood, i_neighborhood)
-                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, i_neighborhood, idx, params%g, params%g, level_diff=-1)
+                ! call inverse_relation(neighborhood, i_neighborhood)
+                call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 
             ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
@@ -1534,9 +1534,11 @@ contains
         endif
 
         if (params%rank==0 .and. verbose1) then
-            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            write(*,'(A)') "                      Wavelet-setup"
-            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
+            write(*, '("")')
+            write(*,'("╔", 78("═"), "╗")')
+            write(*,'("║", A40, A41)') "Wavelet-setup", "║"
+            write(*,'("╚", 78("═"), "╝")')
             write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
@@ -1547,8 +1549,7 @@ contains
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
-            write(*,'(A)') "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-
+            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
             ! this code has been used to plot our wavelets in PYTHON.
             a = maxval( (/&
             abs(lbound(params%HD, dim=1)), &
@@ -1600,6 +1601,7 @@ contains
                 endif
             enddo
             write(*,'(A)') "]"
+            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
         endif
 
         ! ! the code sets the ghost nodes, not just the modified ones

@@ -33,7 +33,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     if (params%Jini<0) params%Jini = params%Jmin
 
     if (params%rank==0) then
-        write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
+        write(*,'(10("╼╾"), "   ini-cond   ", 27("╼╾"))')
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
         write(*,*) "read_from_files: ", params%read_from_files
@@ -241,7 +241,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         minActiveLevel_tree(tree_ID), &
         maxActiveLevel_tree(tree_ID)
         write(*,'("Initial grid and initial condition terminated.")')
-        write(*,*) "(((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))"
+        write(*,'(40("╼╾"))')
     endif
 
     ! HACK

@@ -58,7 +58,7 @@ module module_MPI
     ! once in a large, module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation (with level_diff)], [level-diff], [sender/receiver/up-downsampled])
+    ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation (with lvl_diff)], [level-diff], [sender/receiver/up-downsampled])
     ! The third index is 1:56*3 for ghost relations for all three level-diffs, 0 for whole block, -1:-8 for SC decimation
     integer(kind=ik), dimension(1:2, 1:3, -8:56*3, -1:1, 1:3) :: ijkPatches
 
@@ -127,31 +127,23 @@ subroutine init_ghost_nodes( params )
         Ncpu            = params%number_procs
 
         if (rank==0) then
-            write(*,'("---------------------------------------------------------")')
-            write(*,'("             ╱▔▔▔▔▔▔╲ ╭━━━━━━━━━━╮")')
-            write(*,'("            ▕ ╭━╮╭━╮ ▏┃GHOST-INIT┃")')
-            write(*,'("            ▕ ┃╭╯╰╮┃ ▏╰┳━━━━━━━━━╯")')
-            write(*,'("            ▕ ╰╯╭╮╰╯ ▏ ┃ ")')
-            write(*,'("            ▕   ┃┃   ▏━╯ ")')
-            write(*,'("            ▕   ╰╯   ▏" )')
-            write(*,'("            ▕╱╲╱╲╱╲╱╲▏")')
-            write(*,'("---------------------------------------------------------")')
+            write(*,'("╔",78("═"),"╗")')
+            write(*,'("║", 19(" "), A, A41)')  "╱▔▔▔▔▔▔╲ ╭━━━━━━━━━━╮", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕ ╭━╮╭━╮ ▏┃GHOST-INIT┃", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕ ┃╭╯╰╮┃ ▏╰┳━━━━━━━━━╯", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕ ╰╯╭╮╰╯ ▏ ┃          ", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕   ┃┃   ▏━╯          ", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕   ╰╯   ▏            ", "║"
+            write(*,'("║", 18(" "), A, A41)') "▕╱╲╱╲╱╲╱╲▏            ", "║"
+            write(*,'("╚",78("═"),"╝")')
             write(*,'("GHOST-INIT: We can synchronize at most N_MAX_COMPONENTS=",i2)') N_MAX_COMPONENTS
             write(*,'("GHOST-INIT: g= ",i2, " , g_RHS= ", i2)') params%g, params%g_rhs
         endif
 
-        if ( params%dim==3 ) then
-            if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. g>=(Bs(3)+1)/2) then
-              call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
-              & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
-              & number_ghost_nodes or increase number_block_nodes.")
-            endif
-        else
-            if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2) then
-              call abort(821151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
-              & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
-              & number_ghost_nodes or increase number_block_nodes.")
-            endif
+        if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. (g>=(Bs(3)+1)/2 .and. params%dim==3)) then
+            call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+            & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+            & number_ghost_nodes or increase number_block_nodes.")
         endif
 
 #ifdef DEV
@@ -199,7 +191,7 @@ subroutine init_ghost_nodes( params )
 
             write(*,'("GHOST-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
                 2.0*dble(buffer_N)*8e-9
-            write(*,'("---------------- allocating now ----------------")')
+            write(*,'(20("─"), A20, 40("─"))') "   allocating now   "
         endif
 
         ! wait now so that if allocation fails, we get at least the above info
@@ -250,9 +242,9 @@ subroutine init_ghost_nodes( params )
         call MPI_barrier( WABBIT_COMM, status(1))
 
         if (rank==0) then
-            write(*,'("---------------------------------------------------------")')
-            write(*,'("                     GHOST-INIT complete :)")')
-            write(*,'("---------------------------------------------------------")')
+            write(*,'("╔", 78("═"), "╗")')
+            write(*,'("║", 20(" "), A, A39)') "GHOST-INIT complete :)", "║"
+            write(*,'("╚", 78("═"), "╝")')
         endif
 
         ghost_nodes_module_ready = .true.
@@ -320,86 +312,72 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     integer(kind=ik), intent(in) :: gminus, gplus
     logical, intent(in) :: output_to_file
 
-    integer(kind=ik) :: N_neighbors, level_diff, neighborhood, i, j, k
-    integer(kind=ik) :: ijkrecv(2,3), ijksend(2,3), ijkbuffer(2,3)
-    integer(kind=ik) :: ijkrecv_new(2,3), ijksend_new(2,3), ijkbuffer_new(2,3)
+    integer(kind=ik) :: N_neighbors, lvl_diff, neighborhood, i, j, k
+    integer(kind=ik) :: ijk_recv(2,3), ijk_send(2,3), ijk_buff(2,3)
+    logical :: debug_to_file
+    character(len=80) :: debug_file_name
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
 
     N_neighbors = 56*3  ! 56 for all leveldifferences
-    ! if (params%dim==2) then
-    !     N_neighbors=16
-    ! endif
+
+#ifdef DEV
+    debug_to_file = .true.
+#else
+    debug_to_file = .false.
+#endif
+    if (debug_to_file) then
+        write(debug_file_name, '(A, A5, 3(A, i0), A)') &
+            "ghost_bounds_", params%wavelet(1:5), "_dim", params%dim, "_Bs", params%Bs(1), "_g", params%g, ".dat"
+        open(16,file=debug_file_name,status='replace')
+        write(16,'(A, A13, 8(A15))') "% ", "Neighborhood" , "lvl_diff", "send/recv/buff", "idx_1", "idx_2", "idy_1", "idy_2", "idz_1", "idz_2"
+    endif
 
     ! set all neighbour relations
     do neighborhood = 1, N_neighbors
         ! practically for 1-56 they are intrinsically on different levels, however for parity with family relations I keep lvl_diff in ijkpatches
-        do level_diff = -1, 1
+        do lvl_diff = -1, 1
             !---------larger ghost nodes (used for refinement and coarsening and maybe RHS)------------
-            ! The receiver bounds are hard-coded with a huge amount of tedious indices.
-
-            ! new one
-            call set_recv_bounds( params, ijkrecv_new, neighborhood, level_diff, gminus, gplus)
-
-            ! ! old one
-            ! call set_recv_bounds_2( params, ijkrecv, neighborhood, level_diff, gminus, gplus)
-
-            ! ! Luckily, knowing the receiver bounds, we can compute the sender bounds as well as
-            ! ! the indices in the buffer arrays, where we temporarily store patches, if they need to be
-            ! ! up or down sampled.
-            ! call compute_sender_buffer_bounds(params, ijkrecv, ijksend, ijkbuffer, neighborhood, level_diff, &
-            !      gminus, gplus, output_to_file )
-            call set_send_bounds( params, ijksend_new, ijkbuffer_new, neighborhood, level_diff, gminus, gplus)
+            ! The receiver and sender bounds are hard-coded with their directions.
+            call set_recv_bounds( params, ijk_recv, neighborhood, lvl_diff, gminus, gplus)
+            call set_send_bounds( params, ijk_send, ijk_buff, neighborhood, lvl_diff, gminus, gplus)
 
 
-            ! ! debugging borders
-            ! if (params%rank == 0 .and. any(level_diff == (/ 0 /))) then
-            !     if (sum(ijkrecv_new) /= 6) then
+            ! ! debugging borders to terminal
+            ! if (params%rank == 0 .and. any(lvl_diff == (/ 0 /))) then
+            !     if (sum(ijkrecv) /= 6) then
             !         write(*, '("R R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
-            !             params%rank, neighborhood, level_diff, ijkrecv_new, product(ijkrecv_new(2, :) - ijkrecv_new(1, :))
+            !             params%rank, neighborhood, lvl_diff, ijkrecv, product(ijkrecv(2, 1:params%dim) - ijkrecv(1, 1:params%dim))
             !     endif
-            !     if (sum(ijksend_new) /= 6) then
+            !     if (sum(ijksend) /= 6) then
             !         write(*, '("S R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
-            !             params%rank, neighborhood, level_diff, ijksend_new, product(ijksend_new(2, :) - ijksend_new(1, :))
+            !             params%rank, neighborhood, lvl_diff, ijksend, product(ijksend(2, 1:params%dim) - ijksend(1, 1:params%dim))
             !     endif
-            !     if (sum(ijkbuffer_new) /= 6) then
+            !     if (sum(ijkbuff) /= 6) then
             !         write(*, '("B R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
-            !             params%rank, neighborhood, level_diff, ijkbuffer_new, product(ijkbuffer_new(2, :) - ijkbuffer_new(1, :))
+            !             params%rank, neighborhood, lvl_diff, ijkbuff, product(ijkbuff(2, 1:params%dim) - ijkbuff(1, 1:params%dim))
             !     endif
             ! endif
 
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, RECVER) = ijkrecv_new
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, SENDER) = ijksend_new
-            ijkPatches(1:2, 1:3, neighborhood, level_diff, RESPRE) = ijkbuffer_new
+            if (debug_to_file) then
+                ! debugging borders to file
+                ! 1: neighborhood, 2: lvl_diff, 3: send/receive/respre, 4-9: Indices
+                write(16,'(9(i15))') neighborhood, lvl_diff, SENDER, ijk_send(:, :)
+                write(16,'(9(i15))') neighborhood, lvl_diff, RECVER, ijk_recv(:, :)
+                write(16,'(9(i15))') neighborhood, lvl_diff, RESPRE, ijk_buff(:, :)
+            endif
+
+            ijkPatches(1:2, 1:3, neighborhood, lvl_diff, RECVER) = ijk_recv
+            ijkPatches(1:2, 1:3, neighborhood, lvl_diff, SENDER) = ijk_send
+            ijkPatches(1:2, 1:3, neighborhood, lvl_diff, RESPRE) = ijk_buff
         enddo
     enddo
 
-
-#ifdef DEV
-    ! this output can be plotted using the python script
-    if ((params%rank==0) .and. output_to_file) then
-        open(16,file='ghost_bounds.dat',status='replace')
-        write(16,'(i3)') params%Bs(1)
-        write(16,'(i3)') params%Bs(2)
-        write(16,'(i3)') params%Bs(3)
-        write(16,'(i3)') params%g
-        write(16,'(i3)') S
-        write(16,'(i3)') A
-        do neighborhood = 1, N_neighbors
-            do level_diff = -1, 1
-                do i = 1, 2
-                    do j = 1, 3
-                        do k = 1, 3
-                            write(16,'(i3)') ijkPatches(i, j, neighborhood, level_diff, k)
-                        enddo
-                    enddo
-                enddo
-            enddo
-        enddo
+    if (debug_to_file) then
         close(16)
+        ! call close_t_file(debug_file_name)
     endif
-#endif
 end subroutine
 
 
@@ -411,8 +389,8 @@ subroutine family_setup_patches(params, output_to_file)
     type (type_params), intent(in) :: params
     logical, intent(in) :: output_to_file
 
-    integer(kind=ik) :: N_family, level_diff, family, i, j, k, g
-    integer(kind=ik) :: ijkbuffer(2,3)
+    integer(kind=ik) :: N_family, lvl_diff, family, i, j, k, g
+    integer(kind=ik) :: ijk_buff(2,3)
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
@@ -425,49 +403,36 @@ subroutine family_setup_patches(params, output_to_file)
 
     ! set full block relation
     ! The receiver bounds are hard-coded with a huge amount of tedious indices, they are identical to senders
-    call set_recv_bounds( params, ijkbuffer, 0, 0, g, g)
-    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijkbuffer
-    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijkbuffer
+    call set_recv_bounds( params, ijk_buff, 0, 0, g, g)
+    ijkPatches(1:2,1:3, 0, 0, RECVER) = ijk_buff
+    ijkPatches(1:2,1:3, 0, 0, SENDER) = ijk_buff
 
     ! set mother/daughter relations
     ! sender / receiver relations between the level differences are inverted
     do family = -1, -N_family, -1
-        ! Fine sender or receiver: affects sc in mallat-ordering, connected to relation -1
+        ! Daughter / Finer sender or receiver: affects sc in mallat-ordering, connected to relation -1
         ! This takes different border into account
-        call set_recv_bounds( params, ijkbuffer, family, -1, g, g)
-        ijkPatches(1:2,1:3, family,  1, SENDER) = ijkbuffer
-        ijkPatches(1:2,1:3, family, -1, RECVER) = ijkbuffer
+        lvl_diff = -1
+        call set_recv_bounds( params, ijk_buff, family, lvl_diff, g, g)
+        ijkPatches(1:2,1:3, family, lvl_diff, SENDER) = ijk_buff
+        ijkPatches(1:2,1:3, family, lvl_diff, RECVER) = ijk_buff
 
-        ! Coarse sender or receiver: affects specific part of block
-        call set_recv_bounds( params, ijkbuffer, family, 1, g, g)
-        ijkPatches(1:2,1:3, family, -1, SENDER) = ijkbuffer
-        ijkPatches(1:2,1:3, family,  1, RECVER) = ijkbuffer
+        ! if (sum(ijk_buff) /= 6) then
+        !     write(*, '("B R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
+        !         params%rank, family, lvl_diff, ijk_buff, product(ijk_buff(2, 1:params%dim) - ijk_buff(1, 1:params%dim))
+        ! endif
+
+        ! Mother / Coarser sender or receiver: affects specific part of block
+        lvl_diff = +1
+        call set_recv_bounds( params, ijk_buff, family, lvl_diff, g, g)
+        ijkPatches(1:2,1:3, family, lvl_diff, SENDER) = ijk_buff
+        ijkPatches(1:2,1:3, family, lvl_diff, RECVER) = ijk_buff
+
+        ! if (sum(ijk_buff) /= 6) then
+        !     write(*, '("B R", i0 ," N ", i2, " lvl_diff ", i2, " patch ", 6(i2, 1x), "  - prod ", i3)') &
+        !         params%rank, family, lvl_diff, ijk_buff, product(ijk_buff(2, 1:params%dim) - ijk_buff(1, 1:params%dim))
+        ! endif
     enddo
-
-#ifdef DEV
-    ! this output can be plotted using the python script
-    if ((params%rank==0) .and. output_to_file) then
-        open(16,file='family_bounds.dat',status='replace')
-        write(16,'(i3)') params%Bs(1)
-        write(16,'(i3)') params%Bs(2)
-        write(16,'(i3)') params%Bs(3)
-        write(16,'(i3)') params%g
-        write(16,'(i3)') S
-        write(16,'(i3)') A
-        do family = -1, -N_family, -1
-            do level_diff = -1, 1
-                do i = 1, 2
-                    do j = 1, 3
-                        do k = 1, 3
-                            write(16,'(i3)') ijkPatches(i, j, family, level_diff, k)
-                        enddo
-                    enddo
-                enddo
-            enddo
-        enddo
-        close(16)
-    endif
-#endif
 
 end subroutine
 

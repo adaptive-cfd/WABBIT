@@ -162,7 +162,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     logical :: SM2M, SM2C, SC2M, SM2F, SF2M, ignoreFilter
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
-    integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
+    integer(kind=ik)   :: N, k, neighborhood, lvl_diff, Nstages
     integer(kind=ik)   :: recver_rank, recver_hvyID, patch_size
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
 
@@ -220,7 +220,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     ! once in a module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+    ! ijkPatches([start,end], [dir], [ineighbor], [lvl_diff], [isendrecv])
     ! As g can be varied (as long as it does not exceed the maximum value params%g), it is set up
     ! each time we sync (at negligibble cost)
     call ghosts_setup_patches(params, gminus=gminus, gplus=gplus, output_to_file=.false.)
@@ -321,7 +321,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
     !    meta_send_all (possibly needs renaming after this function)
 
     integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, N, neighborhood, recver_rank, recver_ref
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
+    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, lvl_diff, status, new_size
 
     ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
     sLevel = -1
@@ -376,30 +376,34 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                 call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
 
                 ! define level difference: sender - receiver, so +1 means sender on higher level
-                ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
-                ! leveldiff =  0 : sender is same level as recver
-                ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-                level_diff = level - lgt_block( recver_lgtID, IDX_MESH_LVL )
+                ! lvl_diff = -1 : sender to finer recver, interpolation on sender side
+                ! lvl_diff =  0 : sender is same level as recver
+                ! lvl_diff = +1 : sender to coarser recver, restriction is applied on sender side
+                lvl_diff = level - lgt_block( recver_lgtID, IDX_MESH_LVL )
                 recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
-                ! stage=2, level_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
+                ! stage=2, lvl_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
                 !          or (sLevel<-1 and ref=sLevel and M2C) or (sLevel<-1 and ref_n=sLevel and F2M)
-                ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
+                ! stage=1, lvl_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
                 !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, level_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
+                ! stage=3, lvl_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
                 !          or (sLevel<-1 and ref=sLevel and M2F) or (sLevel<-1 and ref_n=sLevel and C2M)
 
                 ! send counter. how much data will I send to other mpiranks?
-                if  ((istage==2 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
+                if  ((istage==2 .and. lvl_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
                     .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sF2M))) &
-                .or. (istage==3 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
+                .or. (istage==3 .and. lvl_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
                     .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sC2M))) &
-                .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
+                .or. (istage==1 .and. lvl_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                     .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                    ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
-                    ! receiver before sending with interpolation or downsampling.
-                    ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
+                    
+                    ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
+                    if (lvl_diff==0) then
+                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, SENDER)
+                    else
+                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, RESPRE)
+                    endif
 
                     if (myrank /= recver_rank) then
                         data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -417,32 +421,35 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                     meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
                     meta_send_all(S_META_FULL*count_send + 4) = recver_rank
                     meta_send_all(S_META_FULL*count_send + 5) = neighborhood
-                    meta_send_all(S_META_FULL*count_send + 6) = level_diff
+                    meta_send_all(S_META_FULL*count_send + 6) = lvl_diff
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
                     count_send = count_send + 1
                 endif
 
                 ! Receive logic, following cases exist currently, all linked as .or.:
-                ! stage=2, level_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
+                ! it is defined in logic relative to receiver, so that
+                ! lvl_diff = -1 : recver from finer sender, restriction on sender side
+                ! lvl_diff =  0 : recver is same level as sender
+                ! lvl_diff = +1 : recver from coarser sender, interpolation on sender side
+                !
+                ! stage=2, lvl_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
                 !          or (sLevel<-1 and ref_n=sLevel and M2C) or (sLevel<-1 and ref=sLevel and F2M)
-                ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
+                ! stage=1, lvl_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
                 !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, level_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
+                ! stage=3, lvl_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
                 !          or (sLevel<-1 and ref_n=sLevel and M2F) or (sLevel<-1 and ref=sLevel and C2M)
 
                 ! recv counter. how much data will I recv from other mpiranks?
                 ! This is NOT the same number as before
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((istage==2 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
+                    if  ((istage==2 .and. lvl_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sF2M))) &
-                    .or. (istage==3 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
+                    .or. (istage==3 .and. lvl_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
-                    .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
+                    .or. (istage==1 .and. lvl_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                         .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                        call inverse_relation(neighborhood, inverse)
-
-                        ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
+                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, RECVER)
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -481,136 +488,3 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
     endif
 end subroutine prepare_ghost_synch_metadata
-
-
-! ! returns two lists with numbers of points I send to all other procs and how much I
-! ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
-! subroutine get_my_sendrecv_amount_with_ranks_nostages(params, lgt_block, hvy_neighbor, hvy_active,&
-!      hvy_n, data_recv_counter, data_send_counter, meta_recv_counter, meta_send_counter, &
-!      count_internal, ncomponents)
-!
-!     implicit none
-!
-!     type (type_params), intent(in)      :: params
-!     !> light data array
-!     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-!     !> heavy data array - neighbor data
-!     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-!     !> list of active blocks (heavy data)
-!     integer(kind=ik), intent(in)        :: hvy_active(:)
-!     !> number of active blocks (heavy data)
-!     integer(kind=ik), intent(in)        :: hvy_n, ncomponents
-!     integer(kind=ik), intent(inout)     :: data_recv_counter(0:), data_send_counter(0:)
-!     integer(kind=ik), intent(inout)     :: meta_recv_counter(0:), meta_send_counter(0:)
-!     logical, intent(in)                 :: count_internal
-!
-!     integer(kind=ik) :: k, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
-!     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff, status, new_size
-!
-!     call MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
-!     N = params%number_blocks
-!
-!     data_recv_counter(:) = 0
-!     data_send_counter(:) = 0
-!     meta_recv_counter(:) = 0
-!     meta_send_counter(:) = 0
-!
-!     do k = 1, hvy_n
-!         ! calculate light id
-!         sender_hvyID = hvy_active(k)
-!         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-!
-!         ! loop over all neighbors
-!         do neighborhood = 1, size(hvy_neighbor, 2)
-!             ! neighbor exists
-!             if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
-!                 ! neighbor light data id
-!                 recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
-!                 ! calculate neighbor rank
-!                 call lgt2proc( recver_rank, recver_lgtID, N )
-!                 ! neighbor heavy id
-!                 call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
-!
-!                 ! define level difference: sender - receiver, so +1 means sender on higher level
-!                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
-!                 ! leveldiff =  0 : sender is same level as recver
-!                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-!                 level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
-!
-!
-!                 if (recver_rank /= myrank .or. count_internal) then
-!                     ! it now depends on the stage if we have to sent this data
-!                     ! or not.
-!                     ! In stage 1, only level_diff = {+1, 0} is treated
-!                     ! In stage 2, only level_diff = -1
-!
-!                     ! send counter. how much data will I send to other mpiranks?
-!                     ! why is this RECVER and not sender? Well, complicated. The amount of data on the sender patch
-!                     ! is not the same as in the receiver patch, because we interpolate or downsample. We effectively
-!                     ! transfer only the data the recver wants - not the extra data.
-!                     ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
-!
-!                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
-!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
-!
-!                     ! recv counter. how much data will I recv from other mpiranks?
-!                     ! This is NOT the same number as before
-!                     inverse = inverse_neighbor(neighborhood, dim)
-!
-!                     ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
-!
-!                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
-!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
-!
-!                     ! counter for integer buffer: for each neighborhood, we send 6 integers as metadata
-!                     ! as this is a fixed number it does not depend on the type of neighborhood etc, so
-!                     ! technically one would need only one for send/recv
-!                     meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 6 ! FIVE
-!
-!                     meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 6 ! FIVE
-!                 endif
-!
-!
-!
-!             end if ! neighbor exists
-!         end do ! loop over all possible  neighbors
-!     end do ! loop over all heavy active
-!
-!
-!
-!     ! NOTE: for the int buffer, we mosly start at some index l0 and then loop unitl
-!     ! we find a -99 indicating the end of the buffer. this could be avoided by using
-!     ! for instead of while loops in the main routines, but I do not have time now.
-!     !
-!     ! In the meantime, notice we extent the amount of data by one, to copy the last -99
-!     ! to the buffers
-!     meta_recv_counter(:) = meta_recv_counter(:) + 1
-!     meta_send_counter(:) = meta_send_counter(:) + 1
-!
-!
-!     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
-!     data_recv_counter(:) = data_recv_counter(:) * ncomponents
-!     data_send_counter(:) = data_send_counter(:) * ncomponents
-!
-!     ! NOTE: this feature is against wabbits memory policy: we try to allocate the
-!     ! whole memory of the machine on startup, then work with that. however, we have to
-!     ! reserver portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
-!     ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
-!     if (sum(data_recv_counter) > size(rData_recvBuffer, 1)) then
-!         ! out-of-memory case: the preallocated buffer is not large enough.
-!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
-!         new_size = size(rData_recvBuffer,1)*125/100
-!         deallocate(rData_recvBuffer)
-!         allocate( rData_recvBuffer(1:new_size), stat=status )
-!         if (status /= 0) call abort(999992, "Buffer allocation failed. Not enough memory?")
-!     endif
-!
-!     if (sum(data_send_counter) > size(rData_sendBuffer, 1)) then
-!         ! out-of-memory case: the preallocated buffer is not large enough.
-!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
-!         new_size = size(rData_sendBuffer,1)*125/100
-!         deallocate(rData_sendBuffer)
-!         allocate( rData_sendBuffer(1:new_size), stat=status )
-!         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
-!     endif
-! end subroutine

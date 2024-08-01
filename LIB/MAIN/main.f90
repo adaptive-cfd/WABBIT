@@ -94,7 +94,7 @@ program main
     WABBIT_COMM=MPI_COMM_WORLD
 
     if (rank==0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
@@ -215,9 +215,9 @@ program main
         write(*,*) "params%next_write_time=", params%next_write_time
         write(*,*) "params%next_stats_time=", params%next_stats_time
         write(*,*) ""
-        write(*,*) "        --------------------------------------------------"
-        write(*,*) "        | On your marks, ready, starting main time loop! |"
-        write(*,*) "        --------------------------------------------------"
+        write(*,'(10(" "), "╔", 48("═"), "╗")') 
+        write(*,'(10(" "), A)') "║ On your marks, ready, starting main time loop! ║"
+        write(*,'(10(" "), "╚", 48("═"), "╝")')
         write(*,*) ""
     endif
 
@@ -468,7 +468,7 @@ program main
     ! computing time output on screen
     call cpu_time(t1)
     if (rank==0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 

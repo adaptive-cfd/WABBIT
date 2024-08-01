@@ -186,13 +186,13 @@ contains
 
         ! output, with DEV we output the unique ID as well to have an overview
         if (rank==0) then
-            write(*,'(108("_"))')
+            write(*,'(108("─"))')
 #ifdef DEV
             write(*, '(A60, 2(A14), 3(A10))') "Timing name" // repeat(" ", 30), "AVG (s)", "MAX (s)", "STD (%)", "COUNT", "Unique ID"
 #else
             write(*, '(A60, 2(A14), 2(A10))') "Timing name" // repeat(" ", 30), "AVG (s)", "MAX (s)", "STD (%)", "COUNT"
 #endif
-            write(*,'(108("_"))')
+            write(*,'(108("─"))')
             do k_timings = 1, MAX_TIMING_SLOTS
                 ! get the index in the arrays from the sorted list
                 k_sorted = num_comp_time(k_timings, 2)
@@ -204,7 +204,7 @@ contains
 #endif
                 endif
             end do
-            write(*,'(108("_"))')
+            write(*,'(108("─"))')
         end if
 
         ! MPI Barrier to be sure to see the above write statements

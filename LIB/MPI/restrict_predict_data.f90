@@ -1,5 +1,5 @@
 subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
-    level_diff, hvy_block, num_eqn, hvy_id, ignore_Filter )
+    lvl_diff, hvy_block, num_eqn, hvy_id, ignore_Filter )
 
     implicit none
 
@@ -11,7 +11,7 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
     !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff
+    integer(kind=ik), intent(in)                    :: lvl_diff
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)                    :: num_eqn      !< How many components? Needed as in between we use hvy_tmp
@@ -20,18 +20,18 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     integer(kind=ik) :: iy  ! debug variable
 
-!     ! some neighborhoods are intrinsically on the same level (level_diff=0)
+!     ! some neighborhoods are intrinsically on the same level (lvl_diff=0)
 !     ! and thus it makes no sense to call the up/downsampling routine for those
 ! #ifdef DEV
 !     if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldn't appear")
 !     if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldn't appear")
 ! #endif
 
-    if ( level_diff == -1 ) then
+    if ( lvl_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
         call predict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id )
 
-    elseif ( level_diff == +1) then
+    elseif ( lvl_diff == +1) then
         ! The neighbor is coarser: we have to downsample the data
         call restrict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id, ignore_Filter )
 

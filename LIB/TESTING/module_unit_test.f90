@@ -18,5 +18,6 @@ contains
 #include "unitTest_ghostSync.f90"
 #include "unitTest_waveletDecomposition.f90"
 #include "unitTest_refineCoarsen.f90"
+#include "createTestGrids.f90"
 
 end module module_unit_test

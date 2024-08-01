@@ -15,7 +15,8 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     real(kind=rk), allocatable :: norm(:), norm_ref(:), wc(:,:,:,:,:)
 
     if (params%rank == 0) then
-        write(*,'(80("~"))')
+        write(*, '("")')  ! newline
+        write(*,'(80("─"))')
         write(*,'("UNIT TEST: testing if IWT(FWT(u)) = Id")')
         write(*,'("This test is performed on an equidistant grid.")')
         write(*,'("It checks if the filter banks HD,GD,HR,GR are correct.")')
@@ -116,17 +117,18 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
     else
         if (params%rank==0) then
+            write(*,'(80("─"))')
             write(*,'(A)') "           ( ("
             write(*,'(A)') "            ) )"
-            write(*,'(A)') "          ........"
-            write(*,'(A)') "          |      |]"
-            write(*,'(A)') "          \      /    How lovely that this test suceeded! You've earned yourself a refreshing beverage."
+            write(*,'(A)') "          ........           How lovely that this test suceeded!"
+            write(*,'(A)') "          |      |]       You've earned yourself a refreshing beverage."
+            write(*,'(A)') "          \      /"
             write(*,'(A)') "           `----'"
         endif
     endif
 
     if (params%rank == 0) then
-        write(*,'(80("~"))')
+        write(*,'(80("─"))')
     end if
 
     ! delete the grid we created for this subroutine

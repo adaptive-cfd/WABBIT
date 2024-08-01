@@ -26,20 +26,20 @@ def run_wabbit(command, logger):
         for fd in ret[0]:
             if fd == process.stdout.fileno():
                 read = process.stdout.readline()
-                if read: logger.info(read.strip())
+                if read: logger.info(read.strip("\n"))
             if fd == process.stderr.fileno():
                 read = process.stderr.readline()
-                if read: logger.error(read.rstrip('\00').strip())
+                if read: logger.error(read.strip('\00').strip("\n"))
                     
         # Check if the process has finished
         if process.poll() is not None: break
 
     # Ensure all remaining output is processed
     for read in process.stdout:
-        if read: logger.info(read.strip())
+        if read: logger.info(read.strip("\n"))
 
     for read in process.stderr:
-        if read: logger.error(read.rstrip('\00').strip())
+        if read: logger.error(read.sstrip('\00').strip("\n"))
     
     return process
 

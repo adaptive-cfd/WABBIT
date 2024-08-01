@@ -100,10 +100,10 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
 
     if (rank == 0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
         write(*,'(A)') "ALLOCATING A FOREST"
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
     endif
 
     !---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
 
     if (params%rank == 0) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,'(A)') "FREE: Beginning freeying of memory."
     endif
 
@@ -386,7 +386,7 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
 
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
 end subroutine deallocate_forest

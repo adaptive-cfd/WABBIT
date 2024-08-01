@@ -219,7 +219,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                             ! write(*, '("SZ1 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
                             !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
 
-                            call lgt_encode_significant_patch(lgtID, neighborhood, params%dim)
+                            call lgt_encode_significant_patch(lgtID, neighborhood)
                         endif
                     endif
                 endif
@@ -263,7 +263,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ! does the neighbor has significancy flag and significant patch in this neighborhood relation?
                     ! Is neighbor on the same level so we can actually check the patches?
                     if (ref_status_neighbor > 0 .and. level_neighbor == level_me) then  ! need to check elsewise all significancy encodings are wrong
-                        if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood, params%dim)) then
+                        if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood)) then
                             ! write(*, '("SZ2 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
                             !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
 
@@ -302,16 +302,15 @@ end subroutine
 !> binary refinement status of block that wants to coarsen (-1): 1111.1111.1111.1111:1111.1111.1111.1111
 !> binary refinement status of block that wants to stay (0):     0000.0000.0000.0000:0000.0000.0000.0000
 !> binary range r for any of the 26 patches with flag f, r2l:    0frr.rrrr.rrrr.rrrr.rrrr.rrrr.rrrr.0000
-subroutine lgt_encode_significant_patch(lgtID, neighborhood, dim)
+subroutine lgt_encode_significant_patch(lgtID, neighborhood)
     implicit none
 
     integer(kind=ik), intent(in)   :: lgtID         !< ID of block where information will be encoded
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
-    integer(kind=ik), intent(in)   :: dim           !< params%dim
 
     integer(kind=ik)    :: patchID, ref_encoded
 
-    call neighborhood2patchID(neighborhood, patchID, dim)
+    call neighborhood2patchID(neighborhood, patchID)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)
@@ -337,17 +336,16 @@ end subroutine
 
 !> \brief Decode from refinement status if a block at a specific neighborhood has a significant patch
 !> More explanation can be found at function lgt_encode_significant_patch
-function lgt_decode_significant_patch(lgtID, neighborhood, dim)
+function lgt_decode_significant_patch(lgtID, neighborhood)
     implicit none
 
     integer(kind=ik), intent(in)   :: lgtID                         !< ID of block where information will be encoded
     integer(kind=ik), intent(in)   :: neighborhood                  !< neighborhood of significant patch
-    integer(kind=ik), intent(in)   :: dim                           !< params%dim
     logical                        :: lgt_decode_significant_patch  !< Flag if this neighborhood corresponds to an encoded significant patch
 
     integer(kind=ik)    :: patchID, ref_encoded, bit_extracted
 
-    call neighborhood2patchID(neighborhood, patchID, dim)
+    call neighborhood2patchID(neighborhood, patchID)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)

@@ -42,10 +42,10 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
 
     if (.not. informed) then
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "Runge-Kutta-Chebychev method"
             write(*,'("Using s=",i2," stages")') s
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
         informed = .true.
     endif

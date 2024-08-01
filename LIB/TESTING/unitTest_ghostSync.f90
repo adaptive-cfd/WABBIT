@@ -38,7 +38,8 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
 
     if (rank == 0) then
-        write(*,'(80("_"))')
+        write(*,'("")')  ! newline
+        write(*,'(80("─"))')
         write(*,'("UNIT TEST: Beginning ghost nodes test")')
     end if
 
@@ -64,7 +65,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., l, tree_ID )
 
     if (params%rank == 0) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,'("UNIT TEST: performed ",i2," randomized refinement and coarsening steps")') l
         write(*,'(" done creating a random grid N_blocks=",i5, " Jmax=", i2)') lgt_n(tree_ID), maxActiveLevel_tree(tree_ID)
         write(*,'(" ready for testing.")')
@@ -209,7 +210,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     end do
 
     if (rank==0) then
-        write(*,*) ""
+        write(*,'(80("─"))')
         write(*,*) "        .-."
         write(*,*) "       ( o )"
         write(*,*) "    /\_.' '._/\"
@@ -218,7 +219,7 @@ subroutine unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         write(*,*) "      \    /`"
         write(*,*) "    (__)  /"
         write(*,*) "    `.__.'"
-        write(*,*) ""
+        write(*,'(80("─"))')
         write(*,'(" done - L2 convergence order was ",6(g12.4,1x))')  sqrt(error1(2:6) / error1(1:5))
         write(*,'(" done - L2 mean convergence order was ",g12.4)')  sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
         write(*,'(" done - Linfty convergence order was ",6(g12.4,1x))')  sqrt(error2(2:6) / error2(1:5))

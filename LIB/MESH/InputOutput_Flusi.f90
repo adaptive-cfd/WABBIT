@@ -25,7 +25,7 @@ subroutine read_field_flusi(fname, hvy_block, params, Bs_f, tree_ID)
   call open_file_hdf5( trim(adjustl(fname)), file_id, .false.)
     ! print a message
   if (params%rank==0) then
-      write(*,'(80("_"))')
+      write(*,'(80("─"))')
       write(*,'("READING: Reading Flusi datafield from file ",A)') &
           trim(adjustl(fname))
   end if
@@ -102,7 +102,7 @@ subroutine read_field_flusi_MPI(fname, hvy_block, params, tree_ID)
 
   ! print a message
   if (params%rank==0) then
-      write(*,'(80("_"))')
+      write(*,'(80("─"))')
       write(*,'("READING: Reading Flusi datafield from file ",A)') trim(adjustl(fname))
   end if
 

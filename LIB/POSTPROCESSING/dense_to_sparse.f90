@@ -133,7 +133,7 @@ subroutine dense_to_sparse(params)
     end if
 
     if (params%rank==0) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,*) "Wabbit dense-to-sparse."
         do i = 1, params%n_eqn
             write(*,'(A20,1x,A80)') "Reading file:", params%input_files(i)
@@ -144,7 +144,7 @@ subroutine dense_to_sparse(params)
         write(*,'(A20,1x,es9.3)') "eps:", params%eps
         write(*,'(A20,1x,A80)')"wavelet normalization:", params%eps_norm
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks

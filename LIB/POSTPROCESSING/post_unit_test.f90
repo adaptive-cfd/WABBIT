@@ -99,7 +99,7 @@ subroutine post_unit_test(params)
         call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
 
     case("--refine-coarsen-test")
-        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
+        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
 
     case("--wavelet-decomposition-unit-test")
         call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )

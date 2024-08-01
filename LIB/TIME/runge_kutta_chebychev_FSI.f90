@@ -37,10 +37,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
 
     if (.not. informed) then
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "Runge-Kutta-Chebychev method (FSI version!)"
             write(*,'("Using s=",i2," stages")') s
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
         informed = .true.
     endif

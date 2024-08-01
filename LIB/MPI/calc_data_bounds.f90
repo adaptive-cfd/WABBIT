@@ -26,15 +26,15 @@ end function
 
 
 !> \brief Set send bounds and sender buffer for different neighborhood or patch relations
-!> This uses get_indices_of_modify_patch for the different relations. For level_diff = -1 / +1 restriction or prediction changes
+!> This uses get_indices_of_modify_patch for the different relations. For lvl_diff = -1 / +1 restriction or prediction changes
 !! patch sizes. For this, the necessary buffers for the operators are computed (in data_bounds) and what will be used from those buffers
 !! for sending (in data_buffer)
 !
 !> neighbor codes: \n
 !  ---------------
 !>   1- 56 : lvl_diff =  0  (same level)
-!>  57-112 : lvl_diff = -1  (coarser neighbor)
-!> 113-168 : lvl_diff = +1  (finer   neighbor)
+!>  57-112 : lvl_diff = +1  (coarser neighbor)
+!> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
 !> 01-08 : X side
 !> 09-16 : Y-side
@@ -43,7 +43,7 @@ end function
 !> 33-40 : X-Z edge
 !> 41-48 : Y-Z edge
 !> 49-56 : corners
-subroutine set_send_bounds( params, data_bounds, data_buffer, relation, level_diff, gminus, gplus)
+subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff, gminus, gplus)
     implicit none
 
     type (type_params), intent(in)                  :: params
@@ -55,7 +55,7 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, level_di
     !! 1:74 is neighborhood relation
     integer(kind=ik), intent(in)                    :: relation
     !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff, gminus, gplus
+    integer(kind=ik), intent(in)                    :: lvl_diff, gminus, gplus
 
     integer(kind=ik) :: n(1:3), g(3), Bs(1:3), i_dim, a, min_size, Nsender
 
@@ -85,32 +85,31 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, level_di
     data_bounds(:,:) = 1
     data_buffer(:,:) = 1
 
-    ! It is confusing that gminus and gplus are switched but we are on the sender side!
-    if (level_diff == 0) then
+    if (lvl_diff == 0) then
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
             (/gminus, gminus, gminus/), (/gplus, gplus, gplus/), &
-            g_m=(/g, g, g/), g_p=(/g, g, g/), lvl_diff=level_diff)
-    elseif (level_diff == +1) then  ! restriction
+            g_m=(/g, g, g/), g_p=(/g, g, g/), lvl_diff=lvl_diff)
+    elseif (lvl_diff == +1) then  ! restriction for coarser neighbor
         ! Restriction, example with Bs=8, g=3:
         ! Normal grid:              g   g   g   i   i   i   i   i   i   i   i   g   g   g
         ! Restricted:                           l       lr      lr      r
         ! Values have to be odd (coincide with SC from spaghetti form), thats why left and right are treated differently
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
             (/gminus*2-1, gminus*2-1, gminus*2-1/), (/gplus*2-1, gplus*2-1, gplus*2-1/), &
-            g_m=(/g, g, g/), g_p=(/g+1, g+1, g+1/), lvl_diff=level_diff)
+            g_m=(/g, g, g/), g_p=(/g+1, g+1, g+1/), lvl_diff=lvl_diff)
         ! buffer is the same but 1-based
         do i_dim = 1, params%dim
             Nsender = data_bounds(2, i_dim) - data_bounds(1, i_dim) + 1
             data_buffer(2, i_dim) = (Nsender+1)/2
         enddo
-    elseif (level_diff == -1) then
+    elseif (lvl_diff == -1) then ! prediction for finer neighbor
         ! Prediction, example with Bs=6, g=3, 2nd order:
         ! Normal grid:              g   g   g   i   i   i   i   i   i   g   g   g
         ! Predicted:                            l l l             r r r
         ! Needed for prediction:                r   r           r   r   r
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
             (/gminus/2+1, gminus/2+1, gminus/2+1/), (/(gplus+1)/2+1, (gplus+1)/2+1, (gplus+1)/2+1/), &
-            g_m=(/g, g, g/), g_p=(/g-1, g-1, g-1/), lvl_diff=level_diff)
+            g_m=(/g, g, g/), g_p=(/g-1, g-1, g-1/), lvl_diff=lvl_diff)
 
         ! enlargen area with stencil size
         do i_dim = 1, params%dim
@@ -144,8 +143,8 @@ end subroutine set_send_bounds
 !> neighbor codes: \n
 !  ---------------
 !>   1- 56 : lvl_diff =  0  (same level)
-!>  57-112 : lvl_diff = -1  (coarser neighbor)
-!> 113-168 : lvl_diff = +1  (finer   neighbor)
+!>  57-112 : lvl_diff = +1  (coarser neighbor)
+!> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
 !> 01-08 : X side
 !> 09-16 : Y-side
@@ -154,7 +153,7 @@ end subroutine set_send_bounds
 !> 33-40 : X-Z edge
 !> 41-48 : Y-Z edge
 !> 49-56 : corners
-subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, gplus)
+subroutine set_recv_bounds( params, data_bounds, relation, lvl_diff, gminus, gplus)
     implicit none
 
     type (type_params), intent(in)                  :: params
@@ -163,10 +162,10 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
     !> neighborhood or family relation, id from dirs
     !! -8:-1 is mother/daughter relation
     !! 0 is full block relation, level
-    !! 1:74 is neighborhood relation
+    !! 1:56*3 is neighborhood relation
     integer(kind=ik), intent(in)                    :: relation
     !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff, gminus, gplus
+    integer(kind=ik), intent(in)                    :: lvl_diff, gminus, gplus
 
     integer(kind=ik) :: Bs(1:3), g, i_dim
 
@@ -174,6 +173,6 @@ subroutine set_recv_bounds( params, data_bounds, relation, level_diff, gminus, g
     g = params%g
 
     ! call function from wavelets
-    call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, relation, data_bounds, gminus, gplus, level_diff)
+    call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, relation, data_bounds, gminus, gplus, lvl_diff)
 
 end subroutine set_recv_bounds

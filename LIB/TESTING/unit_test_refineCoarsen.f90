@@ -55,25 +55,7 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
-        if (params%dim == 3) then
-            do ic = 1, nc
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            hvy_block(ix,iy,iz,ic,hvy_id) = rand_nbr()
-                        end do
-                    end do
-                end do
-            end do
-        else
-            do ic = 1, nc
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        hvy_block(ix,iy,:,ic,hvy_id) = rand_nbr()
-                    end do
-                end do
-            end do
-        endif
+        call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )

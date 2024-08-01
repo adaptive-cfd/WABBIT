@@ -9,13 +9,13 @@
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g_m, g_p, lvl_diff)
     implicit none
 
@@ -138,13 +138,13 @@ end subroutine get_indices_of_modify_patch
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus, lvl_diff)
     implicit none
 
@@ -327,13 +327,13 @@ end subroutine get_indices_of_ghost_patch
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine inverse_relation(relation, relation_inverse)
     implicit none
 
@@ -374,7 +374,8 @@ end subroutine inverse_relation
 
 !> \brief Convert neighborhood to corresponding patch
 !> The selection of ID is taken from the neighborhood relation, the structure goes from -2+, x2z, face2edge2corner.
-!! Which numbers are taken is actually not important as long as it is consistent and unique
+!> That means it is consistent with the order of the other entries but the variations are not considered (giving the X-side for example one value).
+!> Which numbers are taken is actually not important as long as it is consistent and unique-
 !
 !> neighbor codes: \n
 !  ---------------
@@ -382,13 +383,13 @@ end subroutine inverse_relation
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine neighborhood2patchID(neighborhood, patchID)
     implicit none
 
@@ -422,13 +423,13 @@ end
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine write_neighborhood_info(hvy_neighbor, dim)
     implicit none
 

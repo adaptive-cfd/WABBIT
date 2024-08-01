@@ -78,7 +78,9 @@ subroutine createGrid_simple_adaptive_with_borders( params, hvy_block, tree_ID )
         hvy_ID = hvy_active(k, tree_ID)
         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
         treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-        if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 1 .and. tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax) == 2) then
+        if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 1 .and. &
+            ((tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax) == 2 .and. params%dim == 2) .or. &
+             (tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax) == 6 .and. params%dim == 3))) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
         endif
     enddo

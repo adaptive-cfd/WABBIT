@@ -306,6 +306,7 @@ contains
         return
     end function startup_conditioner
 
+    
     !==========================================================================
     !> \brief This subroutine returns the value f of a smooth step function \n
     !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
@@ -337,15 +338,17 @@ contains
     !==========================================================================
 
 
+
+    !-------------------------------------------------------------------------------
+    !> This subroutine returns the value f of a smooth step function \n
+    !> The sharp step function would be 1 if x<=t and 0 if x>t \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if x<=t-h \n
+    !> f is 0 if x>t+h \n
+    !> f is variable (smooth) in between
+    !-------------------------------------------------------------------------------
     function smoothstep2(x,t,h)
-        !-------------------------------------------------------------------------------
-        !> This subroutine returns the value f of a smooth step function \n
-        !> The sharp step function would be 1 if x<=t and 0 if x>t \n
-        !> h is the semi-size of the smoothing area, so \n
-        !> f is 1 if x<=t-h \n
-        !> f is 0 if x>t+h \n
-        !> f is variable (smooth) in between
-        !-------------------------------------------------------------------------------
+        
         use module_globals
 
         implicit none
@@ -365,7 +368,9 @@ contains
 
     end function smoothstep2
 
-    ! abort program if file does not exist
+
+
+    !> \brief abort program if file does not exist
     subroutine check_file_exists(fname)
         implicit none
 
@@ -385,18 +390,20 @@ contains
 
     end subroutine check_file_exists
 
-    !---------------------------------------------------------------------------
-    ! wrapper for NaN checking (this may be compiler dependent)
-    !---------------------------------------------------------------------------
+
+
+    !> \brief wrapper for NaN checking (this may be compiler dependent)
     logical function is_nan( x )
         implicit none
-        real(kind=rk) :: x
+        real(kind=rk) :: x  !< value to be checked
         is_nan = .false.
         if (.not. (x.eq.x)) is_nan=.true.
     end function is_nan
 
+
+
+    !> \brief check for one block if a certain datafield contains NaNs
     logical function block_contains_NaN(data)
-        ! check for one block if a certain datafield contains NaNs
         implicit none
         real(kind=rk), intent(in)       :: data(:,:,:)
         integer(kind=ik)                :: nx, ny, nz, ix, iy, iz
@@ -415,9 +422,12 @@ contains
         end do
     end function block_contains_NaN
 
-    ! fill a 4D array of any size with random numbers
+
+
+    !> \brief Fill a 4D array of any size with random numbers
     subroutine random_data( field )
-        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)
+        implicit none
+        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)  !> input field
         integer :: ix,iy,iz,id
 
         do id = 1, size(field,4)
@@ -1006,6 +1016,130 @@ contains
 
       if (iostat /= 0) write(*,*) a, str
     end function
+
+
+
+    ! for debugging, prints block or array in 2D to file
+    subroutine dump_block(u, file, to_int, digits, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block (or array)
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append
+        character(len=120) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        do ii = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        close(32)
+    end subroutine
+
+
+
+    ! for debugging, prints block with border for interior and ghost points to see whats going on inside
+    subroutine dump_block_fancy(u, file, Bs, g, to_int, digits, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer(kind=ik)           :: Bs(3), g
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append
+        character(len=140) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        ! print ghost block lines
+        do ii = Bs(2)+2*g, Bs(2)+g+1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(",i0,"(i",i0,","",""),""   "",",i0,"(i", i0, ","",""),""   "",",i0,"(i",i0,","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        ! print divider
+        if (toInt) then
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+        else
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+        endif
+        ! print interior block lines with divider for left and right ghost points
+        do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        ! print divider
+        if (toInt) then
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+        else
+            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+        endif
+        ! print ghost block lines
+        do ii = g, 1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        close(32)
+    end subroutine
 
 
 end module module_helpers

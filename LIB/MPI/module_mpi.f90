@@ -331,7 +331,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
         write(debug_file_name, '(A, A5, 3(A, i0), A)') &
             "ghost_bounds.dat"
         open(16,file=debug_file_name,status='replace')
-        write(16,'(3(A, i0))') "% dim=", params%dim, ", Bs=", params%Bs(1), ", g=", params%g
+        write(16,'(3(A, i0), 2(A))') "% dim=", params%dim, ", Bs=", params%Bs(1), ", g=", params%g, ", CDF=", params%wavelet
         write(16,'(A, A13, 8(A15))') "% ", "Neighborhood" , "lvl_diff", "send/recv/buff", "idx_1", "idx_2", "idy_1", "idy_2", "idz_1", "idz_2"
     endif
 

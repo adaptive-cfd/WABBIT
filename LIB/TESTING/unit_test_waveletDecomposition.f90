@@ -9,7 +9,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)            :: tree_ID
 
-    integer(kind=ik)                        :: k, hvyID
+    integer(kind=ik)                        :: k, hvy_id
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), allocatable :: norm(:), norm_ref(:), wc(:,:,:,:,:)
@@ -38,26 +38,8 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     ! create just some data...
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        if (params%dim == 3) then
-            do ic = 1, nc
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            hvy_block(ix,iy,iz,ic,hvyID) = rand_nbr()
-                        end do
-                    end do
-                end do
-            end do
-        else
-            do ic = 1, nc
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        hvy_block(ix,iy,:,ic,hvyID) = rand_nbr()
-                    end do
-                end do
-            end do
-        endif
+        hvy_id = hvy_active(k,tree_ID)
+        call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
@@ -68,9 +50,9 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     ! FWT
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        hvy_tmp(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID)
-        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvyID))
+        hvy_id = hvy_active(k,tree_ID)
+        hvy_tmp(:,:,:,1:nc,hvy_id) = hvy_block(:,:,:,1:nc,hvy_id)
+        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
@@ -81,16 +63,16 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     !---------------------------------------------------------------------------
     allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:size(hvy_block,4), 1:8 ))
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
         ! Test Sp -> InfMall -> Mall -> InfMall -> Sp
-        call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-        call inflatedMallat2Mallat_block(params, wc, hvy_block(:,:,:,:,hvyID))
-        call Mallat2inflatedMallat_block(params, hvy_block(:,:,:,:,hvyID), wc)
-        call inflatedMallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvyID))
+        call spaghetti2inflatedMallat_block(params, hvy_block(:,:,:,:,hvy_id), wc)
+        call inflatedMallat2Mallat_block(params, wc, hvy_block(:,:,:,:,hvy_id))
+        call Mallat2inflatedMallat_block(params, hvy_block(:,:,:,:,hvy_id), wc)
+        call inflatedMallat2spaghetti_block(params, wc, hvy_block(:,:,:,:,hvy_id))
 
         ! Test Sp -> Mall -> Sp
-        call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvyID), wc(:,:,:,:,1))
-        call Mallat2spaghetti_block(params, wc(:,:,:,:,1), hvy_block(:,:,:,:,hvyID))
+        call spaghetti2Mallat_block(params, hvy_block(:,:,:,:,hvy_id), wc(:,:,:,:,1))
+        call Mallat2spaghetti_block(params, wc(:,:,:,:,1), hvy_block(:,:,:,:,hvy_id))
     end do
     deallocate(wc)
 
@@ -99,10 +81,10 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     ! IWT
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k,tree_ID)
-        call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvyID))
+        hvy_id = hvy_active(k,tree_ID)
+        call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_id))
         ! error IWT(FWT(u)) - u
-        hvy_block(:,:,:,1:nc,hvyID) = hvy_block(:,:,:,1:nc,hvyID) - hvy_tmp(:,:,:,1:nc,hvyID)
+        hvy_block(:,:,:,1:nc,hvy_id) = hvy_block(:,:,:,1:nc,hvy_id) - hvy_tmp(:,:,:,1:nc,hvy_id)
     end do
 
     ! compute norm of error

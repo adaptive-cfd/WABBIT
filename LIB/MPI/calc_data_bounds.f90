@@ -36,13 +36,13 @@ end function
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff, gminus, gplus)
     implicit none
 
@@ -146,13 +146,13 @@ end subroutine set_send_bounds
 !>  57-112 : lvl_diff = +1  (coarser neighbor)
 !> 113-168 : lvl_diff = -1  (finer   neighbor)
 !> For each range, the different 56 entries are:
-!> 01-08 : X side
-!> 09-16 : Y-side
-!> 17-24 : Z-side
-!> 25-32 : X-Y edge
-!> 33-40 : X-Z edge
-!> 41-48 : Y-Z edge
-!> 49-56 : corners
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 subroutine set_recv_bounds( params, data_bounds, relation, lvl_diff, gminus, gplus)
     implicit none
 

@@ -39,9 +39,13 @@ subroutine reset_ghost_nodes(  params, hvy_block, tree_ID, s_M2M, s_M2C, s_M2F)
           if ( lgt_id_n /= -1 ) then
             lvl_diff = level_me - lgt_block( lgt_id_n, IDX_MESH_LVL )
 
+            if (lvl_diff == 0 .and. k_n > 56) continue
+            if (lvl_diff == +1 .and. (k_n <= 56 .or. k_n > 2*56)) continue
+            if (lvl_diff == -1 .and. k_n <= 2*56) continue
+
             if ((lvl_diff==0 .and. sM2M) .or. (lvl_diff==-1 .and. sM2F) .or. (lvl_diff==+1 .and. sM2C)) then
               ! get indices of ghost patch that is affected
-              ijk = ijkPatches(:,:, k_n, lvl_diff, RECVER)
+              ijk = ijkPatches(:,:, k_n, RECVER)
               ! call get_indices_of_modify_patch(params, k_n, ijk, (/ size(hvy_block, 1), size(hvy_block, 2), size(hvy_block, 3)/), &
               !   (/params%g, params%g, params%g/), (/params%g, params%g, params%g/))
               hvy_block(ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), ijk(1,3):ijk(2,3), :, hvy_ID )           = 9.0e9_rk

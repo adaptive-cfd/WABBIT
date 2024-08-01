@@ -16,7 +16,7 @@ except:
     sys.exit(881)
 
 def run_wabbit(command, logger):
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', errors='ignore')
 
     # Poll both stdout and stderr
     while True:
@@ -30,6 +30,9 @@ def run_wabbit(command, logger):
             if fd == process.stderr.fileno():
                 read = process.stderr.readline()
                 if read: logger.error(read.strip('\00').strip("\n"))
+        
+        # very little wait so that line buffers can be filled appropriately, elsewise
+        time.sleep(0.01)
                     
         # Check if the process has finished
         if process.poll() is not None: break
@@ -39,7 +42,7 @@ def run_wabbit(command, logger):
         if read: logger.info(read.strip("\n"))
 
     for read in process.stderr:
-        if read: logger.error(read.sstrip('\00').strip("\n"))
+        if read: logger.error(read.strip('\00').strip("\n"))
     
     return process
 

@@ -1534,11 +1534,9 @@ contains
         endif
 
         if (params%rank==0 .and. verbose1) then
-            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
-            write(*, '("")')
-            write(*,'("╔", 78("═"), "╗")')
-            write(*,'("║", A40, A41)') "Wavelet-setup", "║"
-            write(*,'("╚", 78("═"), "╝")')
+            write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
+            write(*, '("──╯ │ ╭────╯ │ ╭───   Wavelet-setup   ───╯ │ ╭───────╯   │   ╭───────╯ │ ╭──────")')
+            write(*, '("    ╰─╯      ╰─╯                           ╰─╯           ╰───╯         ╰─╯      ")')
             write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
@@ -1549,7 +1547,8 @@ contains
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
-            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
+            write(*, '(20("╭─╮ "))')
+            write(*, '(20("╯ ╰─"))')
             ! this code has been used to plot our wavelets in PYTHON.
             a = maxval( (/&
             abs(lbound(params%HD, dim=1)), &
@@ -1601,7 +1600,8 @@ contains
                 endif
             enddo
             write(*,'(A)') "]"
-            write(*, '(10("⌣⌢◡◠⌣⌢⌣⌢"))')
+            write(*, '(20("╭─╮ "))')
+            write(*, '(20("╯ ╰─"))')
         endif
 
         ! ! the code sets the ghost nodes, not just the modified ones

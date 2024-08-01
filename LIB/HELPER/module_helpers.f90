@@ -681,7 +681,7 @@ contains
                 value = str_replace_text( value, '"', '')
 
                 if (rank == 0) then
-                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
                 endif
 
                 return
@@ -690,7 +690,7 @@ contains
         enddo
 
         if (rank == 0) then
-            write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
+            write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
         endif
 
     end subroutine
@@ -797,7 +797,7 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302018, "Failed to convert to INTEGER.")
                 endif
 
@@ -855,7 +855,7 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to DOUBLE.")
                 endif
 
@@ -930,7 +930,7 @@ contains
                 elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.".or.args=="F".or.args=="f") then
                     value = .false.
                 else
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to LOGICAL.")
                 endif
 
@@ -972,17 +972,18 @@ contains
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
         if (rank == 0) then
-            write(*,'(80("~"))')
-            write(*,*) "INFORMATION: The command line call was:"
-            write(*,'(80("~"))')
+
+            write(*,'("╔", 78("═"), "╗")')
+            write(*,'("║", 10(" "), A, A32)') "INFORMATION: The command line call was:", "║"
+            write(*,'("╚", 78("═"), "╝")')
 
             do i = 0, command_argument_count()
                 call get_command_argument(i,args)
                 write(*,'(A,1x)', advance="no") trim(adjustl(args))
             enddo
-            write(*,*) " "
+            write(*,*) " "  ! newline
 
-            write(*,'(80("~"))')
+            write(*,'(80("─"))')
         endif
 
     end subroutine

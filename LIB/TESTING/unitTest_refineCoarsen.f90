@@ -23,10 +23,9 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
 
     if (params%rank == 0) then
         write(*, '("")')  ! newline
-        write(*,'(80("─"))')
-        write(*,'("UNIT TEST: testing if Coarsen(Refine(u)) = Id")')
-        write(*,'("This test is performed on an equidistant grid.")')
-        write(*,'("It checks if the implementation of Interpolation, Refinement and Block Merging are correct.")')
+        write(*,'(20("_/¯\"))')
+        write(*,'("UNIT TEST: Testing if Coarsen(Refine(u)) = Id, performed on an equidistant grid.")')
+        write(*,'("UNIT TEST: It checks if the implementation of Interpolation, Refinement and Block Merging are correct.")')
     end if
 
     Bs = params%Bs
@@ -37,12 +36,12 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     allocate(norm_ref(1:params%n_eqn))
 
     if (params%Jmax<2) then
-        if (params%rank==0) write(*,*) "Test cannot be performed because of level restrictions: params%jmax=", params%jmax
+        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for Jmax<2, skipping it."
         return
     endif
 
     if (params%Jmax==params%Jmin) then
-        if (params%rank==0) write(*,*) "Test cannot be performed because of level restrictions: params%jmax=", params%jmax
+        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for equidistant grids, skipping it."
         return
     endif
 
@@ -122,16 +121,16 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
 
     norm = abs(norm / norm_ref - 1.0_rk)
 
-    if (params%rank==0) write(*,*) "Relative L2 error in Coarsen(Refine(u)) is: ", norm
+    if (params%rank==0) write(*,'(A)') "UNIT TEST: Relative L2 error in Coarsen(Refine(u)) is: ", norm
 
     if (norm(1)>1.0e-14_rk) then
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
     else
         if (params%rank==0) then
-            write(*,'(80("─"))')
+            write(*,'(20("_/¯\"))')
             write(*,'(A)') "           ( ("
             write(*,'(A)') "            ) )"
-            write(*,'(A)') "          ........           How lovely that this test suceeded!"
+            write(*,'(A)') "          ........      How lovely that the refine-coarsen test suceeded!"
             write(*,'(A)') "          |      |]       You've earned yourself a refreshing beverage."
             write(*,'(A)') "          \      /"
             write(*,'(A)') "           `----'"
@@ -139,7 +138,7 @@ subroutine unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID
     endif
 
     if (params%rank == 0) then
-        write(*,'(80("─"))')
+        write(*,'(20("_/¯\"))')
     end if
 
     ! delete the grid we created for this subroutine

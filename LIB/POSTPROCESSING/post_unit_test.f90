@@ -104,7 +104,7 @@ subroutine post_unit_test(params)
     case("--wavelet-decomposition-unit-test")
         call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
     case("--sync-test")
-        call unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
+        call unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
     case("--treecode-test")
         call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true.)
 

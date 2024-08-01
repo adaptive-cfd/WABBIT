@@ -65,17 +65,18 @@ subroutine unitTest_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID)
     end do
 end subroutine
 
-subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
+subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail, verbose)
 
     implicit none
-    type (type_params), intent(inout)       :: params                     !> user defined parameter structure
-    real(kind=rk),  intent(inout)           :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    type (type_params), intent(inout)  :: params                     !> user defined parameter structure
+    real(kind=rk),  intent(inout)      :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(out)              :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), intent(out)         :: hvy_tmp(:, :, :, :, :)
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
-    real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik), intent(in)            :: tree_ID
-    logical, optional, intent(in)           :: verbose
+    real(kind=rk), intent(out)         :: hvy_work(:, :, :, :, :, :)
+    integer(kind=ik), intent(in)       :: tree_ID
+    logical, intent(in)                :: abort_on_fail
+    logical, optional, intent(in)      :: verbose
 
     integer(kind=ik)           :: k, l, lgt_id, hvy_id, fail_crit, fail_normal, ierr
     integer(kind=ik)           :: rank, Bs(3)
@@ -92,8 +93,9 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
     rank = params%rank
 
     if (rank == 0) then
-        write(*,'(80("─"))')
+        write(*,'(20("_/¯\"))')
         write(*,'("UNIT TEST: Beginning rudimentary ghost nodes test")')
+        write(*,'("UNIT TEST: It tests if all ghost patches are correctly set up")')
     end if
 
     Bs = params%Bs
@@ -123,12 +125,12 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
         !    it is probably not linked to HR directly but rather for each X in CDFXY necessary but thats what I found
         if (g_depth > abs(lbound(params%HD, dim=1))/2 .and. g_depth > abs(lbound(params%HR, dim=1))) then
             if (rank == 0) then
-                write(*, '("UNIT TEST: Testing g=", i0 ,", using sync with full restriction filter")') g_depth
+                write(*, '("UNIT TEST: Testing g_sync=", i0 ,", using sync with full restriction filter")') g_depth
             endif
             call sync_ghosts_tree( params, hvy_block, tree_ID, g_minus=g_depth, g_plus=g_depth)
         else
             if (rank == 0) then
-                write(*, '("UNIT TEST: Testing g=", i0 ,", using sync with copy for restriction filter")') g_depth
+                write(*, '("UNIT TEST: Testing g_sync=", i0 ,", using sync with copy for restriction filter")') g_depth
             endif
             call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=g_depth, g_plus=g_depth)
         endif
@@ -265,7 +267,7 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose
     else
         if (rank == 0) then
             write(*,'("UNIT TEST: Numbers have been traded, but ", i0, " critical and ", i0, " normal customers are furious and reject their share.")') fail_crit, fail_normal
-            if (fail_crit > 0) then
+            if (fail_crit > 0 .and. abort_on_fail) then
                 call abort(20240721, "We cannot continue our business with unhappy critical tests. Let's have a break for now and check what's going on!")
             endif
         endif

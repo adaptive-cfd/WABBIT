@@ -94,7 +94,7 @@ program main
     WABBIT_COMM=MPI_COMM_WORLD
 
     if (rank==0) then
-        write(*,'(80("─"))')
+        write(*,'(20("─"), A21, 39("─"))') "   STARTING wabbit   "
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
@@ -132,13 +132,27 @@ program main
 
     !---------------------------------------------------------------------------
     ! Unit tests
+    !    - treecode test for neighbor finding
+    !    - sync test for correct patch allocation
+    !    - godes nodes sync test for correct prediction order
+    !    - wavelet decomposition test for filter banks
+    !    - refine-coarsen test for refinement and adaption processes
     !---------------------------------------------------------------------------
+    if (any((/ params%test_treecode, params%test_ghost_nodes_synch, params%test_wavelet_decomposition/)) .and. params%rank==0) then
+        write(*,'("     /¯¯¯\                       /¯¯¯\       /¯¯¯\       /¯¯¯\       /¯¯¯\  ")')
+        write(*,'("    /     \     Unit Tests      /     \     /     \     /     \     /     \ ")')
+        write(*,'("___/       \___________________/       \___/       \___/       \___/       \")')
+        write(*, '("")')
+    end if
+
+
     if (params%test_treecode) then
        call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true. )
     end if
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
+        call unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true.)
         call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
     endif
 

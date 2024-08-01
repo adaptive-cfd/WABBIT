@@ -166,7 +166,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
         if ( lvl_diff == 0 .or. relation < 1 ) then
             ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
             ! we will send to our neighbor mpirank
-            patch_ijk = ijkPatches(:,:, relation, lvl_diff, SENDER)
+            patch_ijk = ijkPatches(:,:, relation, SENDER)
 
             if (use_hvy_TMP) then
                 call Patch2Line( params, line_buffer, buffer_size, &
@@ -178,7 +178,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
         else
             ! up/downsample data first for neighbor relations, then flatten to 1D buffer
-            patch_ijk = ijkPatches(:,:, relation, lvl_diff, SENDER)
+            patch_ijk = ijkPatches(:,:, relation, SENDER)
 
             ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
             if (use_hvy_TMP .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
@@ -187,7 +187,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
                 call restrict_predict_data( params, res_pre_data, patch_ijk, relation, lvl_diff, hvy_data, nc, sender_hvyID, ignoreFilter)
             endif
 
-            patch_ijk = ijkPatches(:,:, relation, lvl_diff, RESPRE)
+            patch_ijk = ijkPatches(:,:, relation, RESPRE)
 
             call Patch2Line( params, line_buffer, buffer_size, &
             res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
@@ -283,7 +283,7 @@ subroutine unpack_ghostlayers_external( params, hvy_data, verbose_check )
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
                 ! They depend on the neighbor-relation, level difference and the bounds type.
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                call Line2Patch( params, line_buffer, ijkPatches(:,:, i_relation, lvl_diff, RECVER), hvy_data, recver_hvyID )
+                call Line2Patch( params, line_buffer, ijkPatches(:,:, i_relation, RECVER), hvy_data, recver_hvyID )
 
                 ! increase buffer position marker
                 offset_data = offset_data + buffer_size
@@ -352,8 +352,8 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
                 ! They depend on the neighbor-relation and level difference
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                recv_ijk = ijkPatches(:,:, i_relation, i_lvl_diff, RECVER)
-                send_ijk = ijkPatches(:,:,   relation,   lvl_diff, SENDER)
+                recv_ijk = ijkPatches(:,:, i_relation, RECVER)
+                send_ijk = ijkPatches(:,:,   relation, SENDER)
 
                 if (use_hvy_tmp) then
                     hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, recver_hvyID ) = &
@@ -371,10 +371,10 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 ! interpolation or restriction before inserting
                 ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
                 if (use_hvy_tmp .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
-                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, lvl_diff, SENDER), &
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, SENDER), &
                     relation, lvl_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
                 else
-                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, lvl_diff, SENDER), &
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, SENDER), &
                     relation, lvl_diff, hvy_data, nc, sender_hvyID, ignoreFilter )
                 endif
     
@@ -383,9 +383,9 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 ! They depend on the neighbor-relation, level difference and the bounds type.
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
     
-                recv_ijk = ijkPatches(:, :, i_relation, i_lvl_diff, RECVER)
-                send_ijk = ijkPatches(:, :,   relation,   lvl_diff, SENDER)
-                buffer_ijk = ijkPatches(:, :, relation,   lvl_diff, RESPRE)
+                recv_ijk = ijkPatches(:, :, i_relation, RECVER)
+                send_ijk = ijkPatches(:, :,   relation, SENDER)
+                buffer_ijk = ijkPatches(:, :, relation, RESPRE)
 
                 ! debug
                 ! write(*, '(2(A, i0), 2(A, 6(i2, 1x)), 2(A, i0), A, 6(i2, 1x))') &
@@ -663,7 +663,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
             ! send counter. how much data will I send to my mother?
             if  ((sLevel==-1 .and. sM2C .and. sender_ref==-1) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M)) then
 
-                ijk = ijkPatches(:, :, -1 - mylastdigit, +1, SENDER)
+                ijk = ijkPatches(:, :, -1 - mylastdigit, SENDER)
 
                 if (myrank /= recver_rank) then
                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -696,7 +696,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
             ! This is NOT the same number as before
             if (myrank /= recver_rank) then  ! only receive from foreign ranks
                 if  ((sLevel==-1 .and. sM2F .and. recver_ref==+1) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
-                    ijk = ijkPatches(:, :, -1 - mylastdigit, -1, RECVER)
+                    ijk = ijkPatches(:, :, -1 - mylastdigit -8, RECVER)  ! -8 for lvl_diff=-1
 
                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -735,7 +735,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                 ! send counter. how much data will I send to my daughters?
                 if  ((sLevel==-1 .and. sM2F .and. sender_ref==+1) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M)) then
 
-                    ijk = ijkPatches(:, :, -family, -1, SENDER)
+                    ijk = ijkPatches(:, :, -family-8, SENDER)  ! -8 for lvl_diff=-1
 
                     if (myrank /= recver_rank) then
                         data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
@@ -754,7 +754,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                     meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
                     meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
                     meta_send_all(S_META_FULL*count_send + 4) = recver_rank
-                    meta_send_all(S_META_FULL*count_send + 5) = -family
+                    meta_send_all(S_META_FULL*count_send + 5) = -family-8
                     meta_send_all(S_META_FULL*count_send + 6) = -1
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
@@ -768,7 +768,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                 ! This is NOT the same number as before
                 if (myrank /= recver_rank) then  ! only receive from foreign ranks
                     if  ((sLevel==-1 .and. sM2C .and. recver_ref==-1) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
-                        ijk = ijkPatches(:, :, -family, +1, RECVER)
+                        ijk = ijkPatches(:, :, -family, RECVER)
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -835,8 +835,8 @@ subroutine move_mallat_patch_block(params, hvy_block, hvy_ID, digit)
     endif
     if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:nc) )
 
-    ijk_r = ijkPatches(:, :, -1 - digit, -1, RECVER)  ! daughter receives from coarser level mother
-    ijk_s = ijkPatches(:, :, -1 - digit, +1, SENDER)  ! mother sends to finer level daughter
+    ijk_r = ijkPatches(:, :, -1 - digit -8, RECVER)  ! daughter receives from coarser level mother, -8 for lvl_diff=-1
+    ijk_s = ijkPatches(:, :, -1 - digit   , SENDER)  ! mother sends to finer level daughter
 
     ! init tmp values
     tmp_wd(:, :, :, :) = 0.0_rk

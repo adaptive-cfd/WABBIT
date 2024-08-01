@@ -162,7 +162,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     logical :: SM2M, SM2C, SC2M, SM2F, SF2M, ignoreFilter
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
-    integer(kind=ik)   :: N, k, neighborhood, lvl_diff, Nstages
+    integer(kind=ik)   :: N, k, neighborhood, Nstages
     integer(kind=ik)   :: recver_rank, recver_hvyID, patch_size
     integer(kind=ik)   :: sender_hvyID, sender_lgtID
 
@@ -400,9 +400,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                     
                     ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
                     if (lvl_diff==0) then
-                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, SENDER)
+                        ijk = ijkPatches(:, :, neighborhood, SENDER)
                     else
-                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, RESPRE)
+                        ijk = ijkPatches(:, :, neighborhood, RESPRE)
                     endif
 
                     if (myrank /= recver_rank) then
@@ -449,7 +449,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                         .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
                     .or. (istage==1 .and. lvl_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
                         .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                        ijk = ijkPatches(:, :, neighborhood, lvl_diff, RECVER)
+                        ijk = ijkPatches(:, :, neighborhood, RECVER)
 
                         data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents

@@ -21,9 +21,6 @@ program main_post
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)                ! determine process rank
     params%rank = rank
 
-    ! this is used to document a bit (one often forgets to write down the params in the command line call)
-    call print_command_line_arguments()
-
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
@@ -32,10 +29,13 @@ program main_post
 
     ! output MPI status
     if (rank==0) then
-        write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
+        write(*,'(20("─"), A26, 34("─"))') "   STARTING wabbit-post   "
         write(*,'("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
+
+    ! this is used to document a bit (one often forgets to write down the params in the command line call)
+    call print_command_line_arguments()
 
     !---------------------------------------------------------------------------
     ! Initialize parameters and grid
@@ -210,7 +210,7 @@ program main_post
     if (rank==0) then
         write(*,*)
         write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
-        write(*,'(40("*"),A,40("*"))') "(regular) EXIT wabbit-post"
+        write(*,'(20("─"),A,34("─"))') "(regular) EXIT wabbit-post"
     endif
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)

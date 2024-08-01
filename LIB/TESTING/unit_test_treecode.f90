@@ -59,8 +59,9 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (params%rank == 0) then
-    write(*,'(80("─"))')
+    write(*,'(20("_/¯\"))')
     write(*,'("UNIT TEST: Beginning treecode test")')
+    write(*,'("UNIT TEST: It tests for treecode functions to find the correct neighbors.")')
 
     ! ! space for initial testing
     ! !> start coordinates random between 20 and 100
@@ -90,7 +91,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     ! call abort(123980)
 
 
-    write(*,'("Checking encoding and decoding")')
+    write(*,'("UNIT TEST: Checking encoding and decoding")')
     ! test several times if indices increase correctly
     do k = 1, kcheck
       !> start coordinates random between 20 and 100
@@ -119,8 +120,8 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         if (abort_on_fail) call abort(123980)
       end if
     end do
-    write(*, '("-> Bravooo, Treecodes can be en- and decoded from block positions")')
-    write(*,'("Checking all cardinal directions in 2D")')
+    write(*, '("UNIT TEST: -> Bravooo, Treecodes can be en- and decoded from block positions")')
+    write(*,'("UNIT TEST: Checking all cardinal directions in 2D")')
 
     ! test several times if indices increase correctly
     do k = 1, kcheck
@@ -169,9 +170,9 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         endif
       end do
     end do
-    write(*,'("-> Bravooo, 2D leaves don''t have to be lonely and can find their neighbours")')
+    write(*,'("UNIT TEST: -> Bravooo, 2D leaves don''t have to be lonely and can find their neighbours")')
 
-    write(*,'("Checking all cardinal directions in 3D")')
+    write(*,'("UNIT TEST: Checking all cardinal directions in 3D")')
     ! test several times if indices increase correctly
     do k = 1, kcheck
       !> start coordinates random between 20 and 100
@@ -224,7 +225,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         endif
       end do
     end do
-    write(*,'("-> Bravooo, 3D leaves don''t have to be lonely and can find their neighbours")')
+    write(*,'("UNIT TEST: -> Bravooo, 3D leaves don''t have to be lonely and can find their neighbours")')
   end if
 
   if (do_timing) then

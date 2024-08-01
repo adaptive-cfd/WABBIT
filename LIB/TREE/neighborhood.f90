@@ -275,33 +275,37 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
     endif
 
     !---2D--3D--family relation, assume values on finer side are already WDed in mallat-ordering
-    if (any(relation_temp == (/ -1, -2, -3, -4, -5, -6, -7, -8 /))) then   
-        if (lvl_diff == 0) then
+    if (relation_temp < 0 .and. relation_temp >= -8) then   
+        if (lvl_diff <= 0) then
             return
         ! lvl_diff=+1 - family is mother and I am the daughter
         ! only transfer SC if this is the finer block, from Mallat ordering
         ! take into account that this depends on if g is even or odd
-        elseif (lvl_diff == +1) then
+        else
             do i_dim = 1, dim
                 idx(1,i_dim) = ceiling(g/2.0)+1
                 idx(2,i_dim) = ceiling(g/2.0)+Bs(i_dim)/2
             enddo
+        endif
+    elseif (relation_temp < -8 .and. relation_temp >= -16) then   
+        if (lvl_diff >= 0) then
+            return
         ! lvl_diff=-1 - family is daughter and I am the mother
         ! Transfer directly from domain wich is not decomposed so we only select the quarter or eigth part
         ! keep in mind: 0,1 varies in y- and 0,2 varies in x-direction
         else
-            if (modulo(-relation_temp-1, 2) == 0) then
+            if (modulo(-relation_temp-9, 2) == 0) then
                 idx(2,2) = g+Bs(1)/2
             else
                 idx(1,2) = g+1+Bs(1)/2
             endif
-            if (modulo((-relation_temp-1)/2, 2) == 0) then
+            if (modulo((-relation_temp-9)/2, 2) == 0) then
                 idx(2,1) = g+Bs(2)/2
             else
                 idx(1,1) = g+1+Bs(2)/2
             endif
             if (dim == 3) then
-                if (modulo((-relation_temp-1)/4, 2) == 0) then
+                if (modulo((-relation_temp-9)/4, 2) == 0) then
                     idx(2,3) = g+Bs(3)/2
                 else
                     idx(1,3) = g+1+Bs(3)/2
@@ -337,9 +341,17 @@ subroutine inverse_relation(relation, relation_inverse)
     integer(kind=ik), intent(out)                   :: relation_inverse
     integer(kind=ik) :: i_dim
 
-    ! full block and family relations invert to themself
-    if (relation <= 0) then
+    ! full block inverts to itself
+    if (relation == 0) then
         relation_inverse = relation
+        return
+    ! family relations swap between (  0)-( -8) and ( -9)-(-16)
+    elseif (relation < 0) then
+        if (relation < -8) then
+            relation_inverse = relation+8
+        else
+            relation_inverse = relation-8
+        endif
         return
     endif
 

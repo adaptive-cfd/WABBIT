@@ -30,7 +30,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, iterations
         if (params%rank==0 .and. verbosity) then
-            write(*,'("RANDOM GRID GENERATION: iteration ",i2," active=",i9," Jmin=",i2," Jmax=",i2)') &
+            write(*,'("RANDOM GRID GENERATION: iteration ",i2," active=",i9," J=(",i2,"/",i2,")")') &
             l, lgt_n(tree_ID), &
             minActiveLevel_tree(tree_ID), &
             maxActiveLevel_tree(tree_ID)
@@ -44,7 +44,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     end do
 
     if (params%rank==0 .and. verbosity) then
-        write(*,'("DID RANDOM GRID GENERATION: active=",i9," Jmin=",i2," Jmax=",i2," density=",es12.4," / ",es12.4)') &
+        write(*,'("DID RANDOM GRID GENERATION: active=",i9," J=(",i2,"/",i2,") density=",es12.4," / ",es12.4)') &
         lgt_n(tree_ID), &
         minActiveLevel_tree(tree_ID), &
         maxActiveLevel_tree(tree_ID), &

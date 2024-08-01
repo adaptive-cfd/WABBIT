@@ -891,7 +891,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write(*,'(" read [",A,"]",T30,A,T60,"as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
+                write(*,'("read [",A,"]",T30,A,T60,"as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
             end if
 
         end subroutine param_matrix

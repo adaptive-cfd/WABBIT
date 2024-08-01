@@ -16,11 +16,10 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
 
     if (params%rank == 0) then
         write(*, '("")')  ! newline
-        write(*,'(80("─"))')
-        write(*,'("UNIT TEST: testing if IWT(FWT(u)) = Id")')
-        write(*,'("This test is performed on an equidistant grid.")')
-        write(*,'("It checks if the filter banks HD,GD,HR,GR are correct.")')
-        write(*,'("Wavelet=",A," g=", i2)') trim(adjustl(params%wavelet)), params%g
+        write(*,'(20("_/¯\"))')
+        write(*,'("UNIT TEST: testing if IWT(FWT(u)) = Id, performed on an equidistant grid.")')
+        write(*,'("UNIT TEST: It checks if the filter banks HD,GD,HR,GR are correct.")')
+        write(*,'("UNIT TEST: Wavelet=",A," g=", i2)') trim(adjustl(params%wavelet)), params%g
     end if
 
     Bs = params%Bs
@@ -111,16 +110,16 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
 
     norm = norm / norm_ref
 
-    if (params%rank==0) write(*,*) "Relative L2 error in IWT(FWT(u)) is: ", norm
+    if (params%rank==0) write(*,'(A)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm
 
     if (norm(1)>1.0e-14_rk) then
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
     else
         if (params%rank==0) then
-            write(*,'(80("─"))')
+            write(*,'(20("_/¯\"))')
             write(*,'(A)') "           ( ("
             write(*,'(A)') "            ) )"
-            write(*,'(A)') "          ........           How lovely that this test suceeded!"
+            write(*,'(A)') "          ........     How lovely that the wavelet decomposition suceeded!"
             write(*,'(A)') "          |      |]       You've earned yourself a refreshing beverage."
             write(*,'(A)') "          \      /"
             write(*,'(A)') "           `----'"
@@ -128,7 +127,7 @@ subroutine unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, 
     endif
 
     if (params%rank == 0) then
-        write(*,'(80("─"))')
+        write(*,'(20("_/¯\"))')
     end if
 
     ! delete the grid we created for this subroutine

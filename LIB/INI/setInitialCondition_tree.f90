@@ -33,7 +33,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     if (params%Jini<0) params%Jini = params%Jmin
 
     if (params%rank==0) then
-        write(*,'(10("╼╾"), "   ini-cond   ", 27("╼╾"))')
+        write(*,'(10("╼╾"), "   ini-cond   ", 23("╼╾"))')
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
         write(*,*) "read_from_files: ", params%read_from_files

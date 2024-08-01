@@ -112,7 +112,7 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_o
     !---------------------------------------------------------------------------
     ! Test syncing: adaptive with one of the test grids, createGrid_simple_adaptive is enough actually
     !---------------------------------------------------------------------------
-    call createGrid_simple_adaptive_with_borders(params, hvy_block, tree_ID)
+    call createGrid_simple_adaptive(params, hvy_block, tree_ID)
 
     ! now test syncing
     do l = params%g, params%g_rhs, -1
@@ -145,11 +145,6 @@ subroutine unitTest_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_o
 
             ! compute block spacing and origin from treecode
             call get_block_spacing_origin( params, lgt_id, xx0, ddx )
-
-            ! write(*, '(A, i3, A, i5)') "TC= ", treecode, " lgt_id= ", lgt_id
-            ! if (treecode==576 .and. l==params%g_rhs) then
-            !     write(*, '(A, 16(i5, 1x))') "Block 576 neighbors: ", hvy_neighbor(hvy_id, :)
-            ! endif
 
             p_f_old = p_f
 

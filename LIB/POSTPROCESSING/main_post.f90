@@ -210,7 +210,7 @@ program main_post
     if (rank==0) then
         write(*,*)
         write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
-        write(*,'(20("─"),A,34("─"))') "(regular) EXIT wabbit-post"
+        write(*,'(20("─"),A,28("─"))') "   (regular) EXIT wabbit-post   "
     endif
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)

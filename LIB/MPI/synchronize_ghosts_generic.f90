@@ -18,8 +18,8 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_t
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.false., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MF_ref", &
+        s_val=REF_TMP_UNTREATED, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
 
@@ -45,8 +45,8 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.true., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_ref", &
+        s_val=REF_TMP_UNTREATED, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_all
 
@@ -64,18 +64,21 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level
 
-    integer(kind=ik) :: gminus, gplus, level_apply
+    integer(kind=ik) :: gminus, gplus
     gminus = params%g
     gplus = params%g
-    level_apply = -1
     ! if we sync a different number of ghost nodes
     if (present(g_minus))    gminus = g_minus
     if (present(g_plus))      gplus = g_plus
-    if (present(level)) level_apply = level
 
-    ! set level to -1 to enable synching between all
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=level_apply, &
-        s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp, verbose_check=.true.)
+    ! if we passed on the level then sync is level-wise
+    if (present(level)) then
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MC_level", &
+            s_val=level, hvy_tmp=hvy_tmp, verbose_check=.true.)
+    else
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MC", &
+            hvy_tmp=hvy_tmp, verbose_check=.true.)
+    endif
 
 end subroutine sync_SCWC_from_MC
 
@@ -97,7 +100,7 @@ subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full")
 
 end subroutine sync_ghosts_tree
 
@@ -124,7 +127,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, &
-    s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true., ignore_Filter=.true.)
+    sync_case="full_RHS", ignore_Filter=.true.)
 
 end subroutine
 
@@ -133,8 +136,8 @@ end subroutine
 !! It is a generic function with many flags, streamlining all synching process \n
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
-subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
-    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp, verbose_check, ignore_Filter)
+subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
+    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -143,23 +146,15 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
+    character(len=*)          :: sync_case                     !< String representing which kind of syncing we want to do
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
-
-    !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
-    integer(kind=ik), intent(in), optional  :: s_level
-    logical, intent(in), optional  :: s_M2M                         !< Synch from level J   to J
-    logical, intent(in), optional  :: s_M2C                         !< Synch from level J   to J-1
-    logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to J
-    logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to J+1
-    logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to J
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
-
-    integer(kind=ik) sLevel
-    logical :: SM2M, SM2C, SC2M, SM2F, SF2M, ignoreFilter
 
     integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
     integer(kind=ik)   :: N, k, neighborhood, Nstages
@@ -181,22 +176,6 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n(tree_ID) == 0) return
-
-    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
-    sLevel = -1
-    sM2M = .false.
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    ignoreFilter = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2M)) sM2M = s_M2M
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
-    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
 
     gminus  = params%g
     gplus   = params%g
@@ -230,17 +209,11 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
-    ! if (present(verbose_check)) then
-    !     call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=.true., s_M2C=.true., s_M2F=.true.)
-    ! endif
+
+    ! disabled for now
+    if (sync_case == "full" .or. sync_case=="full_RHS") call reset_ghost_nodes( params, hvy_block, tree_ID)
 
 #endif
-
-! Diagonal neighbors (not required for the RHS)
-! 2D: 5,6,7,8
-! 3D: 7-18, 19-26, 51-74
-!
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
@@ -253,26 +226,26 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
-            istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
+            istage, sync_case, ncomponents=size(hvy_block,4), s_val=s_val)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
         !***************************************************************************
         ! (ii) sending handled by xfer_block_data
         ! If hvy_temp is present then xfer_block_data has to decide from where to grab the data
-        !    - with sLevel < -1: we decide after refinement flag present in sLevel if we want to use hvy_temp
+        !    - with ref in case: we decide after refinement flag present in s_val if we want to use hvy_temp
         !    - elsewise: use hvy_tmp for prediction (used in updating SC from coarser neighbours)
         !***************************************************************************
         t2 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
-            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignoreFilter, &
+            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignore_Filter, &
             verbose_check=verbose_check)
         else
-            if (sLevel < -1) then
+            if (sync_case=="full_ref" .or. sync_case=="MF_ref" .or. sync_case=="MC_ref") then
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                REF_FLAG=sLevel, ignore_Filter=ignoreFilter, verbose_check=verbose_check)
+                REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
             else
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                ignore_Filter=ignoreFilter, verbose_check=verbose_check)
+                ignore_Filter=ignore_Filter, verbose_check=verbose_check)
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )
@@ -292,50 +265,31 @@ end subroutine sync_ghosts_generic
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, ncomponents, &
-    s_Level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M)
+subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_Val)
 
     implicit none
 
-    type (type_params), intent(in)      :: params
-    integer(kind=ik), intent(in)        :: tree_ID             !< which tree to study
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(in)    :: tree_ID             !< which tree to study
 
-    integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
-    integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
+    integer(kind=ik), intent(in)    :: ncomponents         !< components can vary (for mask for example)
+    integer(kind=ik), intent(out)   :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
-    integer(kind=ik), intent(in)        :: istage  !< current stage out of three
+    integer(kind=ik), intent(in)    :: istage  !< current stage out of three
+    character(len=*)           :: sync_case                     !< String representing which kind of syncing we want to do
 
-    !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
-    integer(kind=ik), intent(in), optional  :: s_level
-    logical, intent(in), optional  :: s_M2M         !< Synch from level J   to J
-    logical, intent(in), optional  :: s_M2C         !< Synch from level J   to J-1
-    logical, intent(in), optional  :: s_C2M         !< Synch from level J-1 to J
-    logical, intent(in), optional  :: s_M2F         !< Synch from level J   to J+1
-    logical, intent(in), optional  :: s_F2M         !< Synch from level J+1 to J
-    integer(kind=ik) sLevel
-    logical :: SM2M, SM2C, SC2M, SM2F, SF2M
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, N, neighborhood, recver_rank, recver_ref
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, lvl_diff, status, new_size
-
-    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
-    sLevel = -1
-    sM2M = .false.
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2M)) sM2M = s_M2M
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
+    integer(kind=ik) :: k_block, myrank, N, neighborhood, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: hvyID, lgtID, level, ref
+    integer(kind=ik) :: hvyID_n, lgtID_n, level_n, ref_n, rank_n
+    logical :: b_send, b_recv
 
     myrank = params%rank
     N = params%number_blocks
@@ -348,48 +302,85 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
     int_pos(:) = 0
     real_pos(:) = 0
 
+    ! translate sync_case to sync_id so that we avoid string comparisons in loops
+    select case(sync_case)
+    case ("full")
+        sync_id = 1
+    case("full_RHS")
+        sync_id = 11
+    case("full_ref")
+        sync_id = 21
+    case("full_level")
+        sync_id = 31
+    case("MC")
+        sync_id = 2
+    case("MC_ref")
+        sync_id = 22
+    case("MC_level")
+        sync_id = 32
+    case("MF")
+        sync_id = 3
+    case("MF_ref")
+        sync_id = 23
+    case("MF_level")
+        sync_id = 33
+    case default
+        call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
+    end select
+
     count_send = 0
     do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block, tree_ID)
-        call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-        level = lgt_block( sender_lgtID, IDX_MESH_LVL )
-        sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
+        hvyID = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgtID, hvyID, myrank, N )
+        level = lgt_block( lgtID, IDX_MESH_LVL )
+        ref = lgt_block( lgtID, IDX_REFINE_STS)
 
         ! loop over all neighbors
         do neighborhood = 1, size(hvy_neighbor, 2)
             ! neighbor exists
-            if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
+            if ( hvy_neighbor( hvyID, neighborhood ) /= -1 ) then
                 ! neighbor light data id
-                recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
+                lgtID_n = hvy_neighbor( hvyID, neighborhood )
                 ! calculate neighbor rank
-                call lgt2proc( recver_rank, recver_lgtID, N )
+                call lgt2proc( rank_n, lgtID_n, N )
                 ! neighbor heavy id
-                call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+                call lgt2hvy( hvyID_n, lgtID_n, rank_n, N )
 
                 ! define level difference: sender - receiver, so +1 means sender on higher level
                 ! lvl_diff = -1 : sender to finer recver, interpolation on sender side
                 ! lvl_diff =  0 : sender is same level as recver
                 ! lvl_diff = +1 : sender to coarser recver, restriction is applied on sender side
-                lvl_diff = level - lgt_block( recver_lgtID, IDX_MESH_LVL )
-                recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+                level_n = lgt_block( lgtID_n, IDX_MESH_LVL )
+                lvl_diff = level - level_n
+                ref_n = lgt_block( lgtID_n, IDX_REFINE_STS)
 
-                ! Send logic, following cases exist currently, all linked as .or.:
-                ! stage=2, lvl_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
-                !          or (sLevel<-1 and ref=sLevel and M2C) or (sLevel<-1 and ref_n=sLevel and F2M)
-                ! stage=1, lvl_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
-                !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, lvl_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
-                !          or (sLevel<-1 and ref=sLevel and M2F) or (sLevel<-1 and ref_n=sLevel and C2M)
+                ! Send logic, I am sender and neighbor is receiver:
+                ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=+1; stage=3 && lvl_diff=-1
+                ! Some special cases:
+                !    REF   - only sync if the refinement value matches s_val for the neighbor
+                !    Level - only send if the neighbor level matches s_val
 
-                ! send counter. how much data will I send to other mpiranks?
-                if  ((istage==2 .and. lvl_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
-                    .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sF2M))) &
-                .or. (istage==3 .and. lvl_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
-                    .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sC2M))) &
-                .or. (istage==1 .and. lvl_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
-                    .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                    
+                ! send counter. how much data will I send to my neighbors on other mpiranks?
+                b_send = .false.
+                ! neighbor wants to receive all patches, ids correspond to full, full_RHS, full_ref, full_level
+                if (any(sync_id == (/ 1,11,21,31/)) .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                ! neighbor wants to receive medium and coarse patches -> send to MF, ids correspond to MC, MC_ref, MC_level
+                elseif (any(sync_id == (/ 2,22,32/)) .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                ! neighbor wants to receive medium and fine patches -> send to MC, ids correspond to MF, MF_ref, MF_level
+                elseif (any(sync_id == (/ 3,23,33/)) .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1))) then
+                        b_send = .true.
+                endif
+                ! special cases, first ref check and then level check
+                if (any(sync_id == (/21,22,23/)) .and. b_send) b_send = s_val == ref_n ! disable sync if neighbor has wrong ref value
+                if (any(sync_id == (/31,32,33/)) .and. b_send) b_send = s_val == level_n  ! disable sync if neighbor has wrong level
+
+                if (b_send) then
                     ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
                     if (lvl_diff==0) then
                         ijk = ijkPatches(:, :, neighborhood, SENDER)
@@ -397,21 +388,21 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                         ijk = ijkPatches(:, :, neighborhood, RESPRE)
                     endif
 
-                    if (myrank /= recver_rank) then
-                        data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                    if (myrank /= rank_n) then
+                        data_send_counter(rank_n) = data_send_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each neighborhood, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of neighborhood etc
                         ! Increase by one so number of integers can vary
-                        meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                        meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
                     endif
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
-                    meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                    meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                    meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                    meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                    meta_send_all(S_META_FULL*count_send + 1) = hvyID  ! needed for same-rank sending
+                    meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                    meta_send_all(S_META_FULL*count_send + 3) = hvyID_n
+                    meta_send_all(S_META_FULL*count_send + 4) = rank_n
                     meta_send_all(S_META_FULL*count_send + 5) = neighborhood
                     meta_send_all(S_META_FULL*count_send + 6) = lvl_diff
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -419,37 +410,48 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
                     count_send = count_send + 1
                 endif
 
-                ! Receive logic, following cases exist currently, all linked as .or.:
+                ! Receive logic, I am receiver and neighbor is sender:
                 ! it is defined in logic relative to receiver, so that
                 ! lvl_diff = -1 : recver from finer sender, restriction on sender side
                 ! lvl_diff =  0 : recver is same level as sender
                 ! lvl_diff = +1 : recver from coarser sender, interpolation on sender side
                 !
-                ! stage=2, lvl_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
-                !          or (sLevel<-1 and ref_n=sLevel and M2C) or (sLevel<-1 and ref=sLevel and F2M)
-                ! stage=1, lvl_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
-                !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, lvl_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
-                !          or (sLevel<-1 and ref_n=sLevel and M2F) or (sLevel<-1 and ref=sLevel and C2M)
+                ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=-1; stage=3 && lvl_diff=+1
+                ! Some special cases:
+                !    REF   - only sync if the refinement value matches s_val for the receiver
+                !    Level - only send if the receiver level matches s_val
 
-                ! recv counter. how much data will I recv from other mpiranks?
+                ! recv counter. how much data will I recv from neighbors on other mpiranks?
                 ! This is NOT the same number as before
-                if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((istage==2 .and. lvl_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
-                        .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sF2M))) &
-                    .or. (istage==3 .and. lvl_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
-                        .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
-                    .or. (istage==1 .and. lvl_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
-                        .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
+                if (myrank /= rank_n) then  ! only receive from foreign ranks
+                    b_recv = .false.
+                    ! I want to receive all patches, ids correspond to full, full_RHS, full_ref, full_level
+                    if (any(sync_id == (/ 1,11,21,31/)) .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1) .or. (istage == 3 .and. lvl_diff==+1))) then
+                            b_recv = .true.
+                    ! I want to receive patches from medium and coarse neighbors, ids correspond to MC, MC_ref, MC_level
+                    elseif (any(sync_id == (/ 2,22,32/)) .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1))) then
+                            b_recv = .true.
+                    ! I want to receive patches from medium and fine neighbors, ids correspond to MF, MF_ref, MF_level
+                    elseif (any(sync_id == (/ 3,23,33/)) .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1))) then
+                            b_recv = .true.
+                    endif
+                    ! special cases, first ref check and then level check
+                    if (any(sync_id == (/21,22,23/)) .and. b_recv) b_recv = s_val == ref ! disable sync if I have wrong ref value
+                    if (any(sync_id == (/31,32,33/)) .and. b_recv) b_recv = s_val == level  ! disable sync if I have wrong level
+
+                    if (b_recv) then
                         ijk = ijkPatches(:, :, neighborhood, RECVER)
 
-                        data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                        data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each neighborhood, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of neighborhood etc
                         ! Increase by one so number of integers can vary
-                        meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                        meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
                     endif
                 endif
             endif ! neighbor exists

@@ -61,12 +61,12 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     params%max_grid_density = 0.10_rk
-    ! perform at most 3 iterations of random refinement/coarsening
+    ! perform at min 3 iterations of random refinement/coarsening
     l = min(3, params%Jmax-params%Jmin)
-    call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., l, tree_ID )
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin, verbosity=.true., iterations=l, tree_ID=tree_ID )
 
     if (maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)) then
-        if (params%rank==0) write(*,*) "UNIT TEST: By chance, generated an equidistant mesh: skipping ghost nodes test"
+        if (params%rank==0) write(*,'(A)') "UNIT TEST: By chance, generated an equidistant mesh: skipping ghost nodes test"
         ! delete the grid we created for this subroutine
         call reset_tree(params, .true., tree_ID=tree_ID)
         return

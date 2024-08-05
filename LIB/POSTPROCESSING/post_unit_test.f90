@@ -68,7 +68,9 @@ subroutine post_unit_test(params)
         params%Jmax = params%Jmax + Jmin_diff
         params%Jmin = params%Jmin + Jmin_diff
 
-        write(*, '(A, i0, A, i0)') "UNIT TEST: Need atleast 32 points over domain length. Adapted Jmin = ", params%Jmin, " and Jmax = ", params%Jmax
+        if (params%rank==0 .and. Jmin_diff /= 0) then
+            write(*, '(A, i0, A, i0)') "UNIT TEST: Need atleast 32 points over domain length. Adapted Jmin = ", params%Jmin, " and Jmax = ", params%Jmax
+        endif
     endif
 
     

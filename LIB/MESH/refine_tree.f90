@@ -63,7 +63,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
 
 
     !---------------------------------------------------------------------------
-    ! check if the refinement step will suceed or if we will run out of memory
+    ! check if the refinement step will succeed or if we will run out of memory
     !---------------------------------------------------------------------------
     ! NOTE: in the simulation part, a second check is performed BEFORE this routine
     ! is called. It then aborts the time loop and dumps a backup for late resuming.

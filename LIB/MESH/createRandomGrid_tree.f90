@@ -1,4 +1,4 @@
-subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, iterations, tree_ID )
+subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init, verbosity, iterations, tree_ID )
 
     implicit none
 
@@ -6,7 +6,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(out)          :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: Jmin, iterations           !> what level to initialize?
+    integer(kind=ik), intent(in)        :: level_init, iterations           !> what level to initialize?
     !> write output
     logical, intent(in)                 :: verbosity
     integer(kind=ik), intent(in)        :: tree_ID
@@ -25,7 +25,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin, verbosity, i
     ! setup the coarsest grid level with some data (we don't care what data, we'll erase it)
     ! Note that active lists + neighbor relations are updated inside this routine as well, as
     ! the grid is modified
-    call createEquidistantGrid_tree( params, hvy_block, min(2, params%Jmin), verbosity, tree_ID=tree_ID )
+    call createEquidistantGrid_tree( params, hvy_block, max(level_init, params%Jmin), verbosity, tree_ID=tree_ID )
 
     ! second: refine some blocks (random), coarsen some blocks (random)
     do l = 1, iterations

@@ -433,10 +433,6 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
   ixy(3) = 27
   level = -3
 
-  ! write(*,'("treecode b random grid", 3(1x, i0))') ixy
-  ! call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., 4, 4 )
-  ! write(*,'("treecode a random grid", 3(1x, i0))') ixy
-
   ! call encoding_n( ixy, newtreecode, dim=3, level=level)
   ! call tcd2array(newtreecode, treecode, level=level, max_level=params%Jmax)
   ! write(*,'("treecode num dec", 4(1x, i0), 1x, 13(i0))') ixy, newtreecode, treecode

@@ -536,7 +536,7 @@ contains
       !-----------------------------------------------------------------------------
       call draw_insect_wings( time, xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
 
-      ! this is a debug test, which suceeded.
+      ! this is a debug test, which succeeded.
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
   end subroutine Draw_Insect
 

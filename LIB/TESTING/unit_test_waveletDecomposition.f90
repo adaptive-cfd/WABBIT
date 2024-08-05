@@ -92,7 +92,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
 
     norm = norm / norm_ref
 
-    if (params%rank==0) write(*,'(A)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm
+    if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm
 
     if (norm(1)>1.0e-14_rk) then
         call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
@@ -101,7 +101,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
             write(*,'(20("_/¯\"))')
             write(*,'(A)') "           ( ("
             write(*,'(A)') "            ) )"
-            write(*,'(A)') "          ........     How lovely that the wavelet decomposition suceeded!"
+            write(*,'(A)') "          ........   How lovely that the wavelet decomposition test succeeded!"
             write(*,'(A)') "          |      |]       You've earned yourself a refreshing beverage."
             write(*,'(A)') "          \      /"
             write(*,'(A)') "           `----'"

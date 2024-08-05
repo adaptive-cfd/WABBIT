@@ -98,6 +98,15 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
         write(*,'("UNIT TEST: It tests if all ghost patches are correctly set up")')
     end if
 
+    if (params%Jmax<2) then
+        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for Jmax<2, skipping it."
+        return
+    endif
+    if (params%Jmax==params%Jmin) then
+        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for equidistant grids, skipping it."
+        return
+    endif
+
     Bs = params%Bs
     g  = params%g
     ! distance of g_min*ddx at periodicity boundaries is ignored to exclude step-effects in comparison

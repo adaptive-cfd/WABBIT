@@ -198,7 +198,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     ! we have to find a neighbor for faces, edges and corners might have no neighbors if a coarser block is also at a face
     if (count(dir_dim == 0) == 2 .and. .not. exists .and. .not. search_overlapping&
         .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
-        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i0, ", lgtID-", i0, " lvl-", i0, " TC-", i0, "-", b64.64)') &
+        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i3, ", lgtID-", i6, " lvl-", i2, " TC-", i21, "-", b64.64)') &
             params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block
         error = .true.
     endif

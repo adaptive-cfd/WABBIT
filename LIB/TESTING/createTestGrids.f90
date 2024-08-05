@@ -20,29 +20,24 @@ subroutine createGrid_simple_adaptive( params, hvy_block, tree_ID )
     ! init grid
     call createEquidistantGrid_tree( params, hvy_block, 1, .true., tree_ID )
 
-    ! we cannod adapt if Jmax is 1, so then we need to skip it
-    if (params%Jmax > 1) then
-
-        ! choose block to refine
-        do k = 1, hvy_n(tree_ID)
-            hvy_ID = hvy_active(k, tree_ID)
-            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-            treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-            ! if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 3-tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax)) then
-            if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 2) then
-                    lgt_block(lgt_id, IDX_REFINE_STS) = +1
-            endif
-        enddo
-
-        ! refine and update so that all blocks know of each other
-        if ( params%dim == 3 ) then
-            call refinementExecute3D_tree( params, hvy_block, tree_ID )
-        else
-            call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
+    ! choose block to refine
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
+        ! if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 3-tc_get_digit_at_level_b( treecode, params%dim, 2, params%Jmax)) then
+        if (tc_get_digit_at_level_b( treecode, params%dim, 1, params%Jmax) == 2) then
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
         endif
-        call updateMetadata_tree(params, tree_ID)
+    enddo
 
+    ! refine and update so that all blocks know of each other
+    if ( params%dim == 3 ) then
+        call refinementExecute3D_tree( params, hvy_block, tree_ID )
+    else
+        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
     endif
+    call updateMetadata_tree(params, tree_ID)
 
 end subroutine
 

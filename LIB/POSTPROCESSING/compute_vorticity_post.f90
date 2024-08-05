@@ -1085,7 +1085,7 @@ subroutine waveletVsRHS_timingTest(params)
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
-    call createRandomGrid_tree( params, hvy_block, hvy_tmp, 2, .true., 4, tree_ID )
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=2, verbosity=.true., iterations=4, tree_ID=tree_ID )
 
 
     t0 = MPI_wtime()

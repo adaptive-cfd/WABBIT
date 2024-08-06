@@ -417,6 +417,70 @@ subroutine neighborhood2patchID(neighborhood, patchID)
     endif
 end 
 
+!> Convert a neighborhood to a different lvl_diff and give back the lower bound of possible indices.
+!> This is needed as neighborhood relations might have multiple counterparts (up to 4)
+function np_l(neighborhood, level)
+    implicit none
+    integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
+    integer(kind=ik), intent(in)  :: level          !< level at which to return the lower bound
+    integer(kind=ik) :: np_l, patchID
+
+    ! convert neighborhood to patch
+    call neighborhood2patchID(neighborhood, patchID)
+
+    ! convert back
+    ! faces - divide by 4 and add ofset
+    if (patchID <= 6) then
+        np_l = (patchID-1) * 4 + 1
+    ! edges, divide by 2 and add offset
+    elseif (patchID <= 6+12) then
+        np_l = (patchID-1-6) * 2 + 1+24
+    ! corners, leave them as they are
+    elseif (patchID <= 6+12+8) then
+        np_l = (patchID-1-6-12) + 1+24+24
+    else
+        call abort(20240723, "You ended up in the wrong neighborhood")
+    endif
+    ! add level offset
+    if (level == +1) then
+        np_l = np_l + 56
+    elseif (level == -1) then
+        np_l = np_l + 2*56
+    endif
+end function
+!> Convert a neighborhood to a different lvl_diff and give back the lower bound of possible indices.
+!> This is needed as neighborhood relations might have multiple counterparts (up to 4)
+function np_u(neighborhood, level)
+    implicit none
+    integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
+    integer(kind=ik), intent(in)  :: level          !< level at which to return the lower bound
+    integer(kind=ik) :: np_u, patchID
+
+    ! convert neighborhood to patch
+    call neighborhood2patchID(neighborhood, patchID)
+
+    ! convert back
+    ! faces - divide by 4 and add ofset
+    if (patchID <= 6) then
+        np_u = (patchID) * 4
+    ! edges, divide by 2 and add offset
+    elseif (patchID <= 6+12) then
+        np_u = (patchID-6) * 2 + 24
+    ! corners, leave them as they are
+    elseif (patchID <= 6+12+8) then
+        np_u = (patchID-6-12) + 24+24
+    else
+        call abort(20240723, "You ended up in the wrong neighborhood")
+    endif
+    ! add level offset
+    if (level == +1) then
+        np_u = np_u + 56
+    elseif (level == -1) then
+        np_u = np_u + 2*56
+    endif
+end function
+
+
 
 
 !> \brief print to output the neighborhood array in a more readable fashion

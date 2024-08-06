@@ -18,7 +18,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_t
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MF_ref", &
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoF_ref", &
         s_val=REF_TMP_UNTREATED, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
@@ -73,10 +73,10 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
 
     ! if we passed on the level then sync is level-wise
     if (present(level)) then
-        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MC_level", &
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC_level", &
             s_val=level, hvy_tmp=hvy_tmp, verbose_check=.true.)
     else
-        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MC", &
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC", &
             hvy_tmp=hvy_tmp, verbose_check=.true.)
     endif
 
@@ -127,7 +127,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, &
-    sync_case="full_RHS", ignore_Filter=.true.)
+    sync_case="full_leaf", ignore_Filter=.true.)
 
 end subroutine
 
@@ -209,9 +209,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-
-    ! disabled for now
-    if (sync_case == "full" .or. sync_case=="full_RHS") call reset_ghost_nodes( params, hvy_block, tree_ID)
+    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
 
 #endif
 
@@ -240,7 +238,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
             call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignore_Filter, &
             verbose_check=verbose_check)
         else
-            if (sync_case=="full_ref" .or. sync_case=="MF_ref" .or. sync_case=="MC_ref") then
+            if (index(sync_case, "ref") > 0) then
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
                 REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
             else
@@ -286,7 +284,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, myrank, N, neighborhood, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: k_block, myrank, N, i_n, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
     integer(kind=ik) :: hvyID, lgtID, level, ref
     integer(kind=ik) :: hvyID_n, lgtID_n, level_n, ref_n, rank_n
     logical :: b_send, b_recv
@@ -303,30 +301,19 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     real_pos(:) = 0
 
     ! translate sync_case to sync_id so that we avoid string comparisons in loops
-    select case(sync_case)
-    case ("full")
-        sync_id = 1
-    case("full_RHS")
-        sync_id = 11
-    case("full_ref")
-        sync_id = 21
-    case("full_level")
-        sync_id = 31
-    case("MC")
-        sync_id = 2
-    case("MC_ref")
-        sync_id = 22
-    case("MC_level")
-        sync_id = 32
-    case("MF")
-        sync_id = 3
-    case("MF_ref")
-        sync_id = 23
-    case("MF_level")
-        sync_id = 33
-    case default
+    ! at first, different neighbor restrictions are considered and set to first digit
+    if (index(sync_case, "full") > 0) sync_id = 1
+    if (index(sync_case, "full_leaf") > 0) sync_id = 2
+    if (index(sync_case, "MoC") > 0) sync_id = 3
+    if (index(sync_case, "MoF") > 0) sync_id = 4
+
+    ! now lets treat the special restrictions, set to the second digit
+    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
+    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+
+    if (sync_id == 0) then
         call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
-    end select
+    endif
 
     count_send = 0
     do k_block = 1, hvy_n(tree_ID)
@@ -336,12 +323,15 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
         level = lgt_block( lgtID, IDX_MESH_LVL )
         ref = lgt_block( lgtID, IDX_REFINE_STS)
 
+        ! for leaf-syncs we ignore non-leaf blocks
+        if (mod(sync_id,10) == 2 .and. any(hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
+
         ! loop over all neighbors
-        do neighborhood = 1, size(hvy_neighbor, 2)
+        do i_n = 1, size(hvy_neighbor, 2)
             ! neighbor exists
-            if ( hvy_neighbor( hvyID, neighborhood ) /= -1 ) then
+            if ( hvy_neighbor( hvyID, i_n ) /= -1 ) then
                 ! neighbor light data id
-                lgtID_n = hvy_neighbor( hvyID, neighborhood )
+                lgtID_n = hvy_neighbor( hvyID, i_n )
                 ! calculate neighbor rank
                 call lgt2proc( rank_n, lgtID_n, N )
                 ! neighbor heavy id
@@ -361,31 +351,71 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 !    REF   - only sync if the refinement value matches s_val for the neighbor
                 !    Level - only send if the neighbor level matches s_val
 
+                ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
+                ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
+                ! For sending, some blocks have to send to multiple neighbors at the same patch in special conditions:
+                !    leaf blocks (without daughters) have to send to both medium and fine neighbors
+                !    root blocks (without mother) have to send to both medium and coarse neighbors
+                ! CVS Leaf updates assume grid is not fully updated and only update to and from other leaf blocks
+                ! this is the highest lvl_diff patch (finer, then medium, then coarser neighbors)
+
                 ! send counter. how much data will I send to my neighbors on other mpiranks?
                 b_send = .false.
-                ! neighbor wants to receive all patches, ids correspond to full, full_RHS, full_ref, full_level
-                if (any(sync_id == (/ 1,11,21,31/)) .and. &
+                ! neighbor wants to receive all patches, ids correspond to full
+                if (mod(sync_id,10) == 1 .and. &
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
                         b_send = .true.
-                ! neighbor wants to receive medium and coarse patches -> send to MF, ids correspond to MC, MC_ref, MC_level
-                elseif (any(sync_id == (/ 2,22,32/)) .and. &
+                        ! CVS: non-leaf blocks do not send to fine neighbors
+                        if (lvl_diff==-1 .and. any(hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                            b_send = .false.
+                        endif
+                        ! CVS: non-root blocks do not send to coarse neighbors
+                        if (lvl_diff==+1 .and. hvy_family(hvyID, 1) /= -1) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive all leaf-patches, ids correspond to full_leaf
+                elseif (mod(sync_id,10) == 2 .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                        ! leaf-wise, Fine->Medium->Coarse
+                        ! check for fine neighbor
+                        if (lvl_diff>=0 .and. any(hvy_neighbor(hvyID, np_l(i_n, -1):np_u(i_n, -1)) /= -1)) then
+                            b_send = .false.
+                        ! check for medium neighbor
+                        elseif (lvl_diff==+1 .and. any(hvy_neighbor(hvyID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive medium and coarse patches -> send to MoF, ids correspond to MoC
+                elseif (mod(sync_id,10) == 3 .and. &
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==-1))) then
                         b_send = .true.
-                ! neighbor wants to receive medium and fine patches -> send to MC, ids correspond to MF, MF_ref, MF_level
-                elseif (any(sync_id == (/ 3,23,33/)) .and. &
+                        ! CVS: non-leaf blocks do not send to fine neighbors
+                        if (lvl_diff/=0 .and. any(hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive medium and fine patches -> send to MoC, ids correspond to MoF
+                elseif (mod(sync_id,10) == 4 .and. &
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1))) then
                         b_send = .true.
+                        ! CVS: non-root blocks do not send to coarse neighbors
+                        if (lvl_diff/=0 .and. hvy_family(hvyID, 1) /= -1) then
+                            b_send = .false.
+                        endif
                 endif
-                ! special cases, first ref check and then level check
-                if (any(sync_id == (/21,22,23/)) .and. b_send) b_send = s_val == ref_n ! disable sync if neighbor has wrong ref value
-                if (any(sync_id == (/31,32,33/)) .and. b_send) b_send = s_val == level_n  ! disable sync if neighbor has wrong level
+
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref_n ! disable sync if neighbor has wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level_n  ! disable sync if neighbor has wrong level
 
                 if (b_send) then
                     ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
                     if (lvl_diff==0) then
-                        ijk = ijkPatches(:, :, neighborhood, SENDER)
+                        ijk = ijkPatches(:, :, i_n, SENDER)
                     else
-                        ijk = ijkPatches(:, :, neighborhood, RESPRE)
+                        ijk = ijkPatches(:, :, i_n, RESPRE)
                     endif
 
                     if (myrank /= rank_n) then
@@ -403,7 +433,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
                     meta_send_all(S_META_FULL*count_send + 3) = hvyID_n
                     meta_send_all(S_META_FULL*count_send + 4) = rank_n
-                    meta_send_all(S_META_FULL*count_send + 5) = neighborhood
+                    meta_send_all(S_META_FULL*count_send + 5) = i_n
                     meta_send_all(S_META_FULL*count_send + 6) = lvl_diff
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
@@ -421,29 +451,70 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 !    REF   - only sync if the refinement value matches s_val for the receiver
                 !    Level - only send if the receiver level matches s_val
 
+                ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
+                ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
+                ! For receiving, receiving has to be restricted:
+                !    non-leaf blocks (with daughters) do not receive from coarse neighbors
+                !    non-root blocks (with mother) do not receive from fine neighbors
+                ! CVS Leaf updates assume grid is not fully updated and only update to and from other leaf blocks
+                ! this is the highest lvl_diff patch (finer, then medium, then coarser neighbors)
+
                 ! recv counter. how much data will I recv from neighbors on other mpiranks?
                 ! This is NOT the same number as before
                 if (myrank /= rank_n) then  ! only receive from foreign ranks
                     b_recv = .false.
-                    ! I want to receive all patches, ids correspond to full, full_RHS, full_ref, full_level
-                    if (any(sync_id == (/ 1,11,21,31/)) .and. &
-                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1) .or. (istage == 3 .and. lvl_diff==+1))) then
+
+                    ! I want to receive all patches, ids correspond to full
+                    if (mod(sync_id,10) == 1 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
                             b_recv = .true.
-                    ! I want to receive patches from medium and coarse neighbors, ids correspond to MC, MC_ref, MC_level
-                    elseif (any(sync_id == (/ 2,22,32/)) .and. &
+                            ! CVS: non-leaf blocks do not receive coarse neighbors
+                            if (lvl_diff==+1 .and. any(hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                                b_recv = .false.
+                            endif
+                            ! CVS: non-root blocks do not receive fine neighbors
+                            if (lvl_diff==-1 .and. hvy_family(hvyID, 1) /= -1) then
+                                b_recv = .false.
+                            endif
+
+                    ! I want to receive all leaf-patches, ids correspond to full_leaf
+                    elseif (mod(sync_id,10) == 2 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
+                            b_recv = .true.
+                            ! leaf-wise, Fine->Medium->Coarse
+                            ! check for fine neighbor
+                            if (lvl_diff>=0 .and. any(hvy_neighbor(hvyID, np_l(i_n, -1):np_u(i_n, -1)) /= -1)) then
+                                b_recv = .false.
+                            ! check for medium neighbor
+                            elseif (lvl_diff==+1 .and. any(hvy_neighbor(hvyID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                                b_recv = .false.
+                            endif
+
+                    ! I want to receive medium and coarse patches, ids correspond to MoC
+                    elseif (mod(sync_id,10) == 3 .and. &
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1))) then
                             b_recv = .true.
-                    ! I want to receive patches from medium and fine neighbors, ids correspond to MF, MF_ref, MF_level
-                    elseif (any(sync_id == (/ 3,23,33/)) .and. &
+                            ! CVS: non-leaf blocks do not receive from coarse neighbors
+                            if (lvl_diff/=0 .and. any(hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                                b_recv = .false.
+                            endif
+
+                    ! I want to receive medium and fine patches,ids correspond to MoF
+                    elseif (mod(sync_id,10) == 4 .and. &
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1))) then
                             b_recv = .true.
+                            ! CVS: non-root blocks do not receive from fine neighbors
+                            if (lvl_diff/=0 .and. hvy_family(hvyID, 1) /= -1) then
+                                b_recv = .false.
+                            endif
                     endif
+
                     ! special cases, first ref check and then level check
-                    if (any(sync_id == (/21,22,23/)) .and. b_recv) b_recv = s_val == ref ! disable sync if I have wrong ref value
-                    if (any(sync_id == (/31,32,33/)) .and. b_recv) b_recv = s_val == level  ! disable sync if I have wrong level
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref ! disable sync if I have wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level  ! disable sync if I have wrong level
 
                     if (b_recv) then
-                        ijk = ijkPatches(:, :, neighborhood, RECVER)
+                        ijk = ijkPatches(:, :, i_n, RECVER)
 
                         data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents

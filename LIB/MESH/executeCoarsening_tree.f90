@@ -283,13 +283,12 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
     call synchronize_lgt_data( params, refinement_status_only=.false.)
     ! update metadata but ignore neighbors - this is important as we temporarily have a non-unique grid
     ! where mothers and daughters coexist
-    call updateMetadata_tree(params, tree_ID, update_neighbors=.false.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter and ref -1
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, size(hvy_block, 4), &
-        s_M2C=.true.)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_ref", ncomponents=size(hvy_block, 4), s_val=-1)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     ! now the daughter blocks are to be deleted or marked that they are completed
@@ -316,7 +315,8 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
 end subroutine executeCoarsening_WD_tree
 
 
-subroutine sync_2_daughters_level(params, hvy_block, tree_ID, level)
+!> For CVS reconstruction we need to update daughters from reconstruction of mothers, this does exactly that
+subroutine sync_M2D_level(params, hvy_block, tree_ID, level)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -380,8 +380,7 @@ subroutine sync_2_daughters_level(params, hvy_block, tree_ID, level)
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, size(hvy_block, 4), &
-        s_M2F=.true., s_Level=level)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_level", ncomponents=size(hvy_block, 4), s_val=level)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     ! now the daughter blocks need to be retransformed to spaghetti and mother blocks can be deleted
@@ -397,4 +396,4 @@ subroutine sync_2_daughters_level(params, hvy_block, tree_ID, level)
         endif
     enddo
 
-end subroutine sync_2_daughters_level
+end subroutine sync_M2D_level

@@ -10,25 +10,28 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
+subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughters )
 
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     logical, intent(in), optional :: mark_TMP_flag          !< Set refinement of completeness to 0 or temporary flag
-    integer(kind=ik)                    :: ierr                   ! MPI error variable
-    integer(kind=ik)                    :: rank                   ! process rank
+    logical, intent(in), optional :: check_daughters          !< For overfull CVS grids completeness has to check the mother as well
+
+    integer(kind=ik)                    :: ierr, rank
     ! loop variables
     integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
     counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, REF_TMP_GRADED_STAY, lgt_id_sisters(2**params%dim)
-    logical                             :: grid_changed, grid_changed_tmp, markTMPflag    ! status of grid changing
+    logical                             :: grid_changed, grid_changed_tmp, markTMPflag, checkDaughters    ! status of grid changing
 
     real(kind=rk) :: t0
 
     ! If we loop leaf-wise we do not want blocks to be set to 0 if not all sisters exist
     ! as we want to keep the wavelet-decomposed values and maybe just have to wait a step longer
     markTMPflag = .false.
+    checkDaughters = .false.
     if (present(mark_TMP_flag)) markTMPflag = mark_TMP_flag
+    if (present(check_daughters)) checkDaughters = check_daughters
     ! for security zone I have to wait for my finer neighbors to coarsen as their security zone might affect me
     ! as gradedness wants to keep me but completeness wants to coarsen we need another temporary flag 
     ! has to be > 0 to not have infinite loop with ensure_completeness
@@ -83,7 +86,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag )
             if ( ref_me == -1 .or. (counter==0 .and. ref_me == REF_TMP_TREATED_COARSEN .and. markTMPflag)) then
                 ! check if all sisters want to coarsen, remove the status it if they don't
 
-                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag )
+                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag, check_daughters=checkDaughters )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time

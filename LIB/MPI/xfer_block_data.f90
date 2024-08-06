@@ -55,7 +55,7 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
 
-    ! if (present(verbose_check)) then
+    ! if (present(verbose_check) .or. .true.) then
     !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
@@ -570,8 +570,7 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponents, &
-        s_Level, s_M2C, s_C2M, s_M2F, s_F2M)
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_val)
 
     implicit none
 
@@ -580,26 +579,21 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
 
     integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
+    character(len=*)                    :: sync_case           !< String representing which kind of syncing we want to do
 
-    integer(kind=ik), intent(in), optional  :: s_level              !< Level to synch, if -1 then all levels are synched
-    ! specific directions, some are master ones and can work independently of s_level:
-    !    1. if s_level == -1 and s_M2C then all mothers will be updated
-    !    2. if s_level == -1 and s_M2F then all daughters will be updated
-    logical, intent(in), optional  :: s_M2C                         !< Synch from level J   to mother J-1
-    logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to daughters J
-    logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to daughters J+1
-    logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to mother J
-    integer(kind=ik) sLevel
-    logical :: SM2C, SC2M, SM2F, SF2M
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, mylastdigit, N, family, recver_rank
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, lvl_diff, status, new_size, recver_ref
+    integer(kind=ik) :: k_block, myrank, mylastdigit, N, family, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: hvy_ID, lgt_ID, level, ref
+    integer(kind=ik) :: hvy_ID_n, lgt_ID_n, level_n, ref_n, rank_n
     integer(kind=tsize) :: tc
+    logical :: b_send, b_recv
 
     !-----------------------------------------------------------------------
     ! set up constant arrays
@@ -613,17 +607,6 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     ! each time we sync (at negligibble cost)
     call family_setup_patches(params, output_to_file=.false.)
 
-    sLevel = -1
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
-
     myrank = params%rank
     N = params%number_blocks
 
@@ -636,52 +619,70 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     int_pos(:) = 0
     real_pos(:) = 0
 
+    ! we have two sync cases for family: update mothers from daughters or update daughters from mothers
+    if (index(sync_case, "D2M") > 0) sync_id = 1
+    if (index(sync_case, "M2D") > 0) sync_id = 2
+
+    ! now lets treat the special restrictions, set to the second digit
+    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
+    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+
+    if (sync_id == 0) then
+        call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
+    endif
+
     count_send = 0
     do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block, tree_ID)
-        call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-        level = lgt_block( sender_lgtID, IDX_MESH_LVL )
-        tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))
+        hvy_ID = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, myrank, N )
+        level = lgt_block( lgt_ID, IDX_MESH_LVL )
+        tc = get_tc(lgt_block(lgt_ID, IDX_TC_1 : IDX_TC_2))
         mylastdigit = tc_get_digit_at_level_b(tc, dim=params%dim, level=level, max_level=params%Jmax)
-        sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
+        ref = lgt_block( lgt_ID, IDX_REFINE_STS)
 
         ! check if mother exists
-        if (hvy_family(sender_hvyID, 1) /= -1) then
+        if (hvy_family(hvy_ID, 1) /= -1) then
             ! mother light data id
-            recver_lgtID = hvy_family(sender_hvyID, 1)
+            lgt_ID_n = hvy_family(hvy_ID, 1)
             ! calculate mother rank
-            call lgt2proc( recver_rank, recver_lgtID, N )
+            call lgt2proc( rank_n, lgt_ID_n, N )
             ! mother heavy id
-            call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+            call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
             ! mother ref
-            recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+            ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
+            level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL)
 
             ! Send logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2C and ref=-1) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
+            ! sync_id=+1 -> D2M, send to mother
 
             ! send counter. how much data will I send to my mother?
-            if  ((sLevel==-1 .and. sM2C .and. sender_ref==-1) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M)) then
+            b_send = .false.
+            if (mod(sync_id,10) == 1) b_send = .true.
+            ! special cases, first ref check and then level check, situated in second digit
+            if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
+            if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
 
+            if (b_send) then
                 ijk = ijkPatches(:, :, -1 - mylastdigit, SENDER)
 
-                if (myrank /= recver_rank) then
-                    data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                if (myrank /= rank_n) then
+                    data_send_counter(rank_n) = data_send_counter(rank_n) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                     ! counter for integer buffer: for each family relation, we send some integers as metadata
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
-                    meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                    meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
 
                     ! write(*, '("Send to mother Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
 
                 ! now lets save all metadata in one array without caring for rank sorting for now
-                meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                meta_send_all(S_META_FULL*count_send + 1) = hvy_ID  ! needed for same-rank sending
+                meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                meta_send_all(S_META_FULL*count_send + 3) = hvy_ID_n
+                meta_send_all(S_META_FULL*count_send + 4) = rank_n
                 meta_send_all(S_META_FULL*count_send + 5) = -1 - mylastdigit
                 meta_send_all(S_META_FULL*count_send + 6) = +1
                 meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -690,21 +691,27 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
             endif
 
             ! Receive logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2F and ref_n=+1) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
+            ! sync_id=+2 -> M2D, receive from mother
 
             ! recv counter. how much data will I recv from my mother?
             ! This is NOT the same number as before
-            if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                if  ((sLevel==-1 .and. sM2F .and. recver_ref==+1) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
+            if (myrank /= rank_n) then  ! only receive from foreign ranks
+                b_recv = .false.
+                if (mod(sync_id,10) == 2) b_recv = .true.
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
+
+                if (b_recv) then
                     ijk = ijkPatches(:, :, -1 - mylastdigit -8, RECVER)  ! -8 for lvl_diff=-1
 
-                    data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                    data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                     ! counter for integer buffer: for each family relation, we send some integers as metadata
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
-                    meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                    meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
 
                     ! write(*, '("Recv from mother Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
@@ -713,47 +720,53 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
 
         ! check if any daughter exists
         ! in order to save blocks we directly set one of the daughters to the mother, so we should check all daughter ids
-        if (any(hvy_family(sender_hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
             ! loop over all daughters
             do family = 1, 2**params%dim
                 ! daughters light data id
-                recver_lgtID = hvy_family(sender_hvyID, 1+2**params%dim+family)
+                lgt_ID_n = hvy_family(hvy_ID, 1+2**params%dim+family)
 
                 ! if it doesn't exist, cycle, this can be the case when a daughter has been directly assigned to the mother
-                if (recver_lgtID == -1) cycle
+                if (lgt_ID_n == -1) cycle
 
                 ! calculate dauther rank
-                call lgt2proc( recver_rank, recver_lgtID, N )
+                call lgt2proc( rank_n, lgt_ID_n, N )
                 ! daughter heavy id
-                call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+                call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
                 ! daughter ref
-                recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+                ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2F and ref=+1) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
+                ! sync_id=+2 -> M2D, send to daughters
 
                 ! send counter. how much data will I send to my daughters?
-                if  ((sLevel==-1 .and. sM2F .and. sender_ref==+1) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M)) then
+                b_send = .false.
+                if (mod(sync_id,10) == 2) b_send = .true.
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
+
+                if (b_send) then
 
                     ijk = ijkPatches(:, :, -family-8, SENDER)  ! -8 for lvl_diff=-1
 
-                    if (myrank /= recver_rank) then
-                        data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                    if (myrank /= rank_n) then
+                        data_send_counter(rank_n) = data_send_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each family relation, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
-                        meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                        meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
 
                         ! write(*, '("Send to children Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
-                    meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                    meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                    meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                    meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                    meta_send_all(S_META_FULL*count_send + 1) = hvy_ID  ! needed for same-rank sending
+                    meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                    meta_send_all(S_META_FULL*count_send + 3) = hvy_ID_n
+                    meta_send_all(S_META_FULL*count_send + 4) = rank_n
                     meta_send_all(S_META_FULL*count_send + 5) = -family-8
                     meta_send_all(S_META_FULL*count_send + 6) = -1
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
@@ -762,21 +775,27 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
                 endif
 
                 ! Receive logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2C and ref_n=-1) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
+                ! sync_id=+1 -> D2M, receive from daughters
 
                 ! recv counter. how much data will I recv from my daughters?
                 ! This is NOT the same number as before
-                if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((sLevel==-1 .and. sM2C .and. recver_ref==-1) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
+                if (myrank /= rank_n) then  ! only receive from foreign ranks
+                    b_recv = .false.
+                    if (mod(sync_id,10) == 1) b_recv = .true.
+                    ! special cases, first ref check and then level check, situated in second digit
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
+
+                    if (b_recv) then
                         ijk = ijkPatches(:, :, -family, RECVER)
 
-                        data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                        data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each family relation, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
-                        meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                        meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
 
                         ! write(*, '("Recv from children Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif

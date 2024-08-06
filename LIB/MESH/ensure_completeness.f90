@@ -4,24 +4,30 @@
 ! ********************************************************************************************
 !> \image html completeness.svg "Ensure Completeness" width=400
 
-subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
+subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_daughters )
 
     implicit none
 
-    type (type_params), intent(in)      :: params                         !< user defined parameter structure
-    integer(kind=ik), intent(inout)     :: sisters(:)                     !< light data array
-    integer(kind=ik), intent(in)        :: lgt_id                         !< Concerned Block
-    logical, intent(in), optional       :: mark_TMP_flag                  !< Set refinement of completeness to 0 or temporary flag
-    integer(kind=ik)                    :: Jmax, k, l                     ! max treelevel
-    integer(kind=ik)                    :: N_sisters, markTMPflag, lgt_sisters(1:2**params%dim)  ! loop variables
+    type (type_params), intent(in)  :: params                !< user defined parameter structure
+    integer(kind=ik), intent(inout) :: sisters(:)            !< light data array
+    integer(kind=ik), intent(in)    :: lgt_id                !< Concerned Block
+    logical, intent(in), optional   :: mark_TMP_flag         !< Set refinement of completeness to 0 or temporary flag
+    logical, intent(in), optional   :: check_daughters          !< For overfull CVS grids completeness has to check the mother as well
+
+    integer(kind=ik)                :: Jmax, k, l, hvy_id, lgt_daughter
+    integer(kind=ik)                :: N_sisters, markTMPflag, lgt_sisters(1:2**params%dim)  ! loop variables
+    logical                         :: checkDaughters
 
     Jmax = params%Jmax
     N_sisters = size(sisters)
+    call lgt2hvy(hvy_id, lgt_id, params%rank, params%number_blocks)  ! needed for mother check
 
     markTMPflag = 0
     if (present(mark_TMP_flag)) then
         if (mark_TMP_flag) markTMPflag = REF_TMP_TREATED_COARSEN
     endif
+    checkDaughters = .false.
+    if (present(check_daughters)) checkDaughters = check_daughters
 
     ! if all sisters exists, then the array should not contain -1
     if ( all(sisters(1:N_sisters) /= -1) ) then
@@ -44,6 +50,19 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag )
         ! other cases should not occur currently
         else
             call abort(197, "How did you end up here?")
+        endif
+
+        ! for CVS grids we need to check if we have a daughter and if so, if she'd like to coarsen as well
+        if (checkDaughters .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+            ! family takes care of one another - if any wants to stay then me and all my sisters have to stay as well
+            do l = 2+2**params%dim, 1+2**(params%dim+1)
+                lgt_daughter = hvy_family(hvy_ID, l)
+                if (lgt_daughter /= -1) then
+                    if (lgt_block(lgt_daughter, IDX_REFINE_STS) == 0) then
+                        lgt_block( sisters(1:N_sisters), IDX_REFINE_STS ) = 0
+                    endif
+                endif
+            enddo
         endif
     else
         ! We did not even find all sisters, that means a part of the four blocks is already

@@ -127,7 +127,7 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn, ijk)
     integer(kind=ik), intent(in)   :: num_eqn !< How many components? Needed as it could vary
     integer(kind=ik), intent(in), optional   :: ijk(2,3)  !< ijk, if this is present we only filter this part
 
-    integer(kind=ik) :: k_n, lvl_me, lvl_diff, lgt_ID, lgt_ID_n, HD_l, HD_r
+    integer(kind=ik) :: i_n, lvl_me, lvl_diff, lgt_ID, lgt_ID_n, HD_l, HD_r
 
     HD_l = lbound(params%HD, dim=1)
     HD_r = ubound(params%HD, dim=1)
@@ -155,13 +155,15 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn, ijk)
     lvl_me = lgt_block(lgt_ID, IDX_MESH_LVL)
 
     ! apply copying, do it for fine and coarse neighbors as we assume for coarse n independency and for fine n that they are not synched
-    do k_n = 1, size(hvy_neighbor, 2)
+    ! CVS: This is only needed for leaf-blocks if no medium neighbor exists
+    do i_n = 1, size(hvy_neighbor, 2)
         ! neighbor exists?
-        lgt_ID_n = hvy_neighbor( hvy_ID, k_n )
+        lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
         if ( lgt_ID_n /= -1 ) then
             lvl_diff = lvl_me - lgt_block(lgt_ID_n, IDX_MESH_LVL)
-            if (lvl_diff == -1 .or. lvl_diff == +1) then
-                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), k_n, skip_ghosts=.true., ijk=ijk)
+            if ((lvl_diff == -1 .or. lvl_diff == +1) .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
+                .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), i_n, ijk=ijk)
             endif
         endif
     end do

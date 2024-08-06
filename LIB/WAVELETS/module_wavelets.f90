@@ -1135,8 +1135,6 @@ contains
                     g_p=(/ g, g, g/), g_m=(/ g, g, g/), lvl_diff=+1)
             ! 2: set ghost patch
             else
-                ! both lvl_diff and relation are inverted for function
-                ! call inverse_relation(neighborhood, i_neighborhood)
                 call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 
@@ -1174,19 +1172,18 @@ contains
 
 
 
-    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood, skip_ghosts, ijk)
+    subroutine coarseExtensionManipulateSC_block(params, wc, u_copy, neighborhood, ijk)
         implicit none
 
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc   !< input/output in WD spaghetti format
         real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u_copy  !< original values from which we copy
         integer(kind=ik), intent(in)   :: neighborhood               !< Which neighborhood to apply manipulation
-        logical, optional, intent(in)  :: skip_ghosts                !< Flag to skip ghost points if they have been synched
         integer(kind=ik), intent(in), optional   :: ijk(2,3)         !< ijk of patch that we only care about, if not given it is the full block
 
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_set, i_neighborhood
         integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
-        logical          :: skip_copy, skipGhosts  ! sometimes this is called but actually nothing will be changed, in this case we skip it
+        logical          :: skip_copy  ! sometimes this is called but actually nothing will be changed, in this case we skip it
 
         nx = size(wc, 1)
         ny = size(wc, 2)
@@ -1199,8 +1196,6 @@ contains
         Nreconl = params%Nreconl
         Nreconr = params%Nreconr
         skip_copy = .false.
-        skipGhosts = .false.
-        if (present(skip_ghosts)) skipGhosts = skip_ghosts
 
         do i_set = 1,2
             idx(:, :) = 1
@@ -1211,9 +1206,6 @@ contains
                     g_p=(/ g, g, g/), g_m=(/ g, g, g/), lvl_diff=+1)
             ! 2: set ghost patch
             else
-                if (skipGhosts) cycle
-                ! both lvl_diff and relation are inverted for function
-                ! call inverse_relation(neighborhood, i_neighborhood)
                 call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 

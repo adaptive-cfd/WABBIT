@@ -355,7 +355,7 @@ def main():
     rep_group.add_argument('--replace', action='store_true', help="Replace reference values with results")
     rep_group.add_argument('--replace-fail', action='store_true', help="Replace reference values with results only for failing tests")
     parser.add_argument('--keep-tmp', action="store_true", help="Do not delete the temporary directories to investigate files")
-    parser.add_argument('--write-diff', action="store_true", help="Write the difference between reference and new results to a file. Could be possibly interpolated")
+    parser.add_argument('--write-diff', action="store_true", help="Write the difference between reference and deviating new results to a file. Could be possibly interpolated")
     parser.add_argument('--wabbit-dir', type=str, default=None, help="Location to where WABBIT is located to run the tests if not in present directory")
     args = parser.parse_args()
 

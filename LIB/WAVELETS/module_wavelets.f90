@@ -1506,7 +1506,7 @@ contains
         !    2. finer neighbors need values for their reconstruction that we altered with our reconstruction
         ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
         block_min = 0
-        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0 .and. .not. params%CVS) then
             ! first dependency: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
             ! this is critical and we currently cannot get those values
             block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
@@ -1533,7 +1533,7 @@ contains
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
             write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
-            if (block_min /= 0) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
+            if (block_min /= 0 .and. .not. params%CVS) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD

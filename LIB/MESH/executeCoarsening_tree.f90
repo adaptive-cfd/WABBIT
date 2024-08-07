@@ -279,11 +279,13 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
         endif
     enddo
 
+    ! ToDo: Set mother-daughter relations inside loop so that I can skip the syncing as it is expensive
+
     ! the active lists are outdated, so lets resynch
     call synchronize_lgt_data( params, refinement_status_only=.false.)
     ! update metadata but ignore neighbors - this is important as we temporarily have a non-unique grid
     ! where mothers and daughters coexist
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=params%CVS)
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter and ref -1

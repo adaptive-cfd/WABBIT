@@ -53,6 +53,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
         endif
 
         ! for CVS grids we need to check if we have a daughter and if so, if she'd like to coarsen as well
+        ! all sisters share the same mother, so this hvy operation will be done correctly on all processors
         if (checkDaughters .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
             ! family takes care of one another - if any wants to stay then me and all my sisters have to stay as well
             do l = 2+2**params%dim, 1+2**(params%dim+1)
@@ -77,3 +78,46 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
     end if
 
 end subroutine ensure_completeness
+
+
+
+!> \brief For CVS, non-leaf blocks are created from finest to coarsest level. Meaning that every non-leaf block will always have a medium-lvl neighbor if they have a coarse-lvl neighbor.
+!! Leaf blocks can always spawn their mother, however for non-leaf blocks to spawn their mother with neighbors for all patches, they need to have all possible
+!! medium-lvl neighbors. If that is not the case, the mother would not have all neighbors to sync with for all her patches, so this block has to wait one iteration.
+subroutine ensure_mother_neighbors( params, hvy_id, mark_TMP_flag)
+
+    implicit none
+
+    type (type_params), intent(in)  :: params                !< user defined parameter structure
+    integer(kind=ik), intent(in)    :: hvy_id                !< Concerned Block
+    logical, intent(in), optional   :: mark_TMP_flag         !< Set refinement of completeness to 0 or temporary flag
+
+    integer(kind=ik)                :: i_n, lgt_id, markTMPflag
+    logical                         :: mother_finds_all_neighbors
+
+    markTMPflag = 0
+    if (present(mark_TMP_flag)) then
+        ! if this is REF_TMP_TREATED_COARSEN, then ensure_completeness would just overwrite it so we set it to a different value
+        if (mark_TMP_flag) markTMPflag = REF_TMP_GRADED_STAY
+    endif
+
+    call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
+    mother_finds_all_neighbors = .true.
+    ! loop over all possible patches that a block can have
+    do i_n = 1,56
+        ! skip patches not available for 2D
+        if (params%dim == 2 .and. is_3D_neighbor(i_n)) cycle
+
+        ! check if block is non-leaf and if there is a medium-lvl neighbor in those patches
+        if (all(hvy_neighbor(hvy_id, np_l(i_n, 0):np_u(i_n, 0)) == -1) .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+            mother_finds_all_neighbors = .false.
+        endif
+    enddo
+
+    ! non-leaf blocks need all medium-lvl neighbors in order to spawn their mother, so if thats not the case it needs to wait
+    if (.not. mother_finds_all_neighbors) then
+        lgt_block( lgt_id, IDX_REFINE_STS ) = markTMPflag
+    endif
+
+end subroutine ensure_mother_neighbors

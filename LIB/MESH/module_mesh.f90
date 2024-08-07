@@ -24,7 +24,10 @@ module module_mesh
     ! used in adapt_tree to work leaf-wise
     integer, parameter :: REF_TMP_UNTREATED = -2             ! should be < -1
     integer, parameter :: REF_TMP_TREATED_COARSEN = -3       ! should be < -1
-
+    ! for security zone I have to wait for my finer neighbors to coarsen as their security zone might affect me
+    ! as gradedness wants to keep me but completeness wants to coarsen we need another temporary flag 
+    ! has to be > 0 to not have infinite loop with ensure_completeness
+    integer, parameter :: REF_TMP_GRADED_STAY = 2            ! should be > 0
 
 contains
 

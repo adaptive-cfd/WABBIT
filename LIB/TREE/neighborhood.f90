@@ -376,6 +376,18 @@ end subroutine inverse_relation
 
 
 
+!> \brief Check if a neighbor is only used for 3D relations or not, useful if 2D neighborhoods need to skip those
+function is_3D_neighbor(neighborhood)
+    implicit none
+    integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
+    logical                        :: is_3D_neighbor
+    integer(kind=ik) :: n_temp
+
+    n_temp = mod(neighborhood-1, 56)+1  ! project level diffs out of the neighborhood
+    is_3D_neighbor = (n_temp > 16 .and. n_temp <= 24) .or. n_temp > 32
+end function
+
+
 !> \brief Convert neighborhood to corresponding patch
 !> The selection of ID is taken from the neighborhood relation, the structure goes from -2+, x2z, face2edge2corner.
 !> That means it is consistent with the order of the other entries but the variations are not considered (giving the X-side for example one value).
@@ -537,7 +549,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     write(*, '(A)') write_s(1:len_trim(write_s))
 
     ! edges - indices 25-48
-    if (any(hvy_neighbor(25:48) /= -1) .or. any(hvy_neighbor(25+56:48+56) /= -1) .or. any(hvy_neighbor(25+56:48+56) /= -1)) then
+    if (any(hvy_neighbor(25:48) /= -1) .or. any(hvy_neighbor(25+56:48+56) /= -1) .or. any(hvy_neighbor(25+2*56:48+2*56) /= -1)) then
         write_s = ""
         write(write_s, '(A8)') "Edges:"
         do i_n = 25,48  ! every side has 2 possible finer blocks or coarser configurations
@@ -580,7 +592,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     endif
 
     ! corners - indices 49-56
-    if (any(hvy_neighbor(49:56) /= -1) .or. any(hvy_neighbor(49+56:56+56) /= -1) .or. any(hvy_neighbor(49+56:56+56) /= -1)) then
+    if (any(hvy_neighbor(49:56) /= -1) .or. any(hvy_neighbor(49+56:56+56) /= -1) .or. any(hvy_neighbor(49+2*56:56+2*56) /= -1)) then
         write_s = ""
         write(write_s, '(A8)') "Corners:"
         do i_n = 49,56  ! every side has 2 possible finer blocks or coarser configurations

@@ -1,12 +1,12 @@
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
+    integer(kind=ik), intent(in)   :: ref_check                     !< ref value to be checked against
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
@@ -19,7 +19,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_t
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoF_ref", &
-        s_val=REF_TMP_UNTREATED, hvy_tmp=hvy_tmp)
+        s_val=ref_check, hvy_tmp=hvy_tmp, verbose_check=.true.)
 
 end subroutine sync_TMP_from_MF
 
@@ -27,13 +27,13 @@ end subroutine sync_TMP_from_MF
 
 !> Wrapper to synch blocks with temporary flag from all neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
+    integer(kind=ik), intent(in)   :: ref_check                     !< ref value to be checked against
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
@@ -46,7 +46,7 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_ref", &
-        s_val=REF_TMP_UNTREATED, hvy_tmp=hvy_tmp)
+        s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_all
 
@@ -74,10 +74,10 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     ! if we passed on the level then sync is level-wise
     if (present(level)) then
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC_level", &
-            s_val=level, hvy_tmp=hvy_tmp, verbose_check=.true.)
+            s_val=level, hvy_tmp=hvy_tmp)
     else
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC", &
-            hvy_tmp=hvy_tmp, verbose_check=.true.)
+            hvy_tmp=hvy_tmp)
     endif
 
 end subroutine sync_SCWC_from_MC
@@ -126,8 +126,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, &
-    sync_case="full_leaf", ignore_Filter=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", ignore_Filter=.true.)
 
 end subroutine
 
@@ -214,7 +213,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
-            istage, sync_case, ncomponents=size(hvy_block,4), s_val=s_val)
+            istage, sync_case, ncomponents=size(hvy_block,4), s_val=s_val, verbose_check=verbose_check)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
         !***************************************************************************
@@ -253,7 +252,7 @@ end subroutine sync_ghosts_generic
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_Val)
+subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_Val, verbose_check)
 
     implicit none
 
@@ -263,11 +262,12 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     integer(kind=ik), intent(in)    :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)   :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
-    integer(kind=ik), intent(in)    :: istage  !< current stage out of three
-    character(len=*)           :: sync_case                     !< String representing which kind of syncing we want to do
+    integer(kind=ik), intent(in)    :: istage              !< current stage out of three
+    character(len=*)                :: sync_case           !< String representing which kind of syncing we want to do
 
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
     integer(kind=ik), intent(in), optional  :: s_val
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
@@ -458,7 +458,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     if (mod(sync_id,10) == 1 .and. &
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
                             b_recv = .true.
-                            ! CVS: non-leaf blocks do not receive coarse neighbors
+                            ! CVS: non-leaf blocks do not receive from coarser neighbors
                             if (lvl_diff==+1 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
                                 b_recv = .false.
                             ! CVS: leaf blocks do not receive from coarser neighbors if there is a medium one for same patch

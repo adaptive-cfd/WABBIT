@@ -21,7 +21,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
     integer(kind=ik)                    :: ierr, rank
     ! loop variables
     integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
-    counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, REF_TMP_GRADED_STAY, lgt_id_sisters(2**params%dim)
+    counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, lgt_id_sisters(2**params%dim)
     logical                             :: grid_changed, grid_changed_tmp, markTMPflag, checkDaughters    ! status of grid changing
 
     real(kind=rk) :: t0
@@ -32,10 +32,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
     checkDaughters = .false.
     if (present(mark_TMP_flag)) markTMPflag = mark_TMP_flag
     if (present(check_daughters)) checkDaughters = check_daughters
-    ! for security zone I have to wait for my finer neighbors to coarsen as their security zone might affect me
-    ! as gradedness wants to keep me but completeness wants to coarsen we need another temporary flag 
-    ! has to be > 0 to not have infinite loop with ensure_completeness
-    REF_TMP_GRADED_STAY = 2
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not

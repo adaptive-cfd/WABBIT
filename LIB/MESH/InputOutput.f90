@@ -1,12 +1,12 @@
 subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
     implicit none
 
-    character(len=*), intent(in)        :: fname                    !> file name
-    real(kind=rk), intent(in)           :: time                     !> time loop parameters
-    integer(kind=ik), intent(in)        :: iteration
-    integer(kind=ik), intent(in)        :: dF                       !> datafield number
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !> heavy data array - block data
+    character(len=*), intent(in)        :: fname                    !< file name
+    real(kind=rk), intent(in)           :: time                     !< time loop parameters, to be added as metadata
+    integer(kind=ik), intent(in)        :: iteration                !< iteration, to be added as metadata
+    integer(kind=ik), intent(in)        :: dF                       !< datafield number
+    type (type_params), intent(in)      :: params                   !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
     logical, optional, intent(in)       :: no_sync
     logical, optional, intent(in)       :: save_ghosts

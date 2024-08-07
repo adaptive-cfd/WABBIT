@@ -105,6 +105,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         !     hvy_ID = hvy_active(k, tree_ID)
         !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
         !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 54525952) then
+        !         write(*, '("1 I-", i0, " R-", i0, " B-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, &
+        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
         !         call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), "block_9.txt", params%Bs, params%g)
         !     endif
         ! enddo
@@ -119,14 +121,14 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             call sync_TMP_from_MF( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
             call toc( "adapt_tree (sync lvl <- MF)", 103, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync lvl <- MF)"
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- MF)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
         else
             call sync_TMP_from_all( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
             call toc( "adapt_tree (sync lvl <- all)", 103, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync lvl <- all)"
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- all)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         endif
 
@@ -161,7 +163,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         end do
         call toc( "adapt_tree (FWT)", 104, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " FWT)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " FWT)"
         call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -193,7 +195,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         endif
         call toc( "adapt_tree (coarseningIndicator_tree)", 106, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " coarseningIndicator_tree)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " coarseningIndicator_tree)"
         call toc( toc_statement, 1300+iteration, MPI_Wtime()-t_block )
 
         ! After coarseningIndicator_tree, the situation is:
@@ -208,7 +210,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true.)
             call toc( "adapt_tree (security_zone_check)", 107, MPI_Wtime()-t_block)
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " security_zone_check)"
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " security_zone_check)"
             call toc( toc_statement, 1400+iteration, MPI_Wtime()-t_block )
         endif
 
@@ -222,7 +224,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call ensureGradedness_tree( params, tree_ID, mark_TMP_flag=.true. )
         call toc( "adapt_tree (ensureGradedness_tree)", 109, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " ensureGradedness_tree)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " ensureGradedness_tree)"
         call toc( toc_statement, 1500+iteration, MPI_Wtime()-t_block )
 
         ! Adapt the mesh, i.e. actually merge blocks
@@ -231,7 +233,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true.)
         call toc( "adapt_tree (executeCoarsening_tree)", 110, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " executeCoarsening_tree)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " executeCoarsening_tree)"
         call toc( toc_statement, 1600+iteration, MPI_Wtime()-t_block )
 
         ! update grid lists: active list, neighbor relations, etc
@@ -248,7 +250,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         ! log some statistics - amount of blocks, after iteration is increased so that it's 1-based
         if (present(log_blocks)) log_blocks(iteration) = lgt_n(tree_ID)
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " TOTAL)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " TOTAL)"
         call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
     end do
 
@@ -392,7 +394,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
 
     ! Wavelet decomposition can be done for each block individually
     ! We iterate leaf-wise, meaning that each block is investigated and coarsened and resulting new blocks are then investigated
@@ -413,13 +415,16 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         t_loop = MPI_Wtime()
         lgt_n_old = lgt_n(tree_ID)
 
-
         ! ! I often need to check block values when debugging so I leave it here
         ! do k = 1, hvy_n(tree_ID)
         !     hvy_ID = hvy_active(k, tree_ID)
         !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 54525952) then
-        !         call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), "block_cvs_9.txt", params%Bs, params%g)
+        !     if (params%rank == 0 .and. lgt_block(lgt_id, IDX_REFINE_STS) == REF_TMP_UNTREATED .and. iteration >= 2) then
+        !     ! if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 54525952) then
+        !         write(*, '("1 I-", i0, " R-", i0, " B-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, &
+        !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
+        !         call write_neighborhood_info(hvy_neighbor(hvy_id, :), params%dim)
+        !         ! call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), "block_cvs_9.txt", params%Bs, params%g)
         !     endif
         ! enddo
 
@@ -432,14 +437,14 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
             call sync_TMP_from_MF( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
             call toc( "adapt_tree (sync lvl <- MF)", 103, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync lvl <- MF)"
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- MF)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
         else
             call sync_TMP_from_all( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
             call toc( "adapt_tree (sync lvl <- all)", 103, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync lvl <- all)"
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- all)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         endif
 
@@ -473,7 +478,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         end do
         call toc( "adapt_tree (FWT)", 104, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " FWT)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " FWT)"
         call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -489,7 +494,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! Prepare refinement status for updating the mother blocks
         do k = 1, lgt_n(tree_ID)
             lgt_ID = lgt_active(k, tree_ID)
-            if (any(lgt_block(lgt_ID, IDX_REFINE_STS) == (/ REF_TMP_UNTREATED , REF_TMP_TREATED_COARSEN /))) then
+            if (any(lgt_block(lgt_ID, IDX_REFINE_STS) == (/ REF_TMP_UNTREATED , REF_TMP_TREATED_COARSEN, REF_TMP_GRADED_STAY /))) then
                 lgt_block(lgt_ID, IDX_REFINE_STS) = -1
             endif
         end do
@@ -499,30 +504,37 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call respectJmaxJmin_tree( params, tree_ID )
         call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
 
+        ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
+        ! to find all needed neighbors, so we let the block wait if that is the case
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+            call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
+        enddo
+        ! after locally modifying refinement statusses, we need to synchronize light data
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
         ! watch for completeness
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
             call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
         enddo
-
-        ! after locally modifying refinement statusses, we need to synchronize light data
-        call synchronize_lgt_data( params, refinement_status_only=.true. )
+        ! Details are not synced between procs, however all procs correctly know which blocks to delete if they have one block in there
+        ! The rest will be synced in executeCoarsening
+        ! call synchronize_lgt_data( params, refinement_status_only=.true. )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Create or update mother blocks with SC of daughter blocks
         ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
         t_block = MPI_Wtime()
+        ! ToDo: Investigate why it takes way more time then it's non_CVS counterpart
         call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true., no_deletion=.true.)
         call toc( "adapt_tree (update_mothers)", 111, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " update_mothers)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " update_mothers)"
         call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
 
         ! update grid lists: active list, neighbor relations, etc
-        ! Attention: Here we have an overfull grid, with the way updateNeighbors is build it still chooses neighbors as from a normal grid
-        ! Meaning: First same-lvl J, then coarser J-1, then finer J+1
-        ! For finished full WDed grids, no cell should have a finer neighbor but only the same-lvl mothers of those as neighbors
+        ! Attention: Here we have an overfull grid, so blocks can have multiple neighbors for the same patch
         call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
 
         ! iteration counter
@@ -533,8 +545,11 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
         ! log some statistics - amount of blocks, after iteration it shoul be increased, the difference showing how many blocks we treated
         if (present(log_blocks)) log_blocks(iteration) = lgt_n(tree_ID)
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " TOTAL)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " TOTAL)"
         call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
+
+        ! write(toc_statement, '(A, i6.6, A)') "test_", iteration, "000000.h5"
+        ! call saveHDF5_tree( toc_statement, 0.0 + dble(iteration), iteration, 1, params, hvy_tmp, tree_ID, no_sync=.true.)
     end do
 
     ! log some statistics - amount of iterations
@@ -623,7 +638,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti, level=level)
         call toc( "adapt_tree (sync all <- MC)", 112, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync level <- MC)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level <- MC)"
         call toc( toc_statement, 1750+iteration, MPI_Wtime()-t_block )
 
         ! After synching with coarser neighbors, the spaghetti form of the whole ghost patch is filled with values
@@ -631,6 +646,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
         ! We do this in order to bundle up the synchronizations in the step before as the modification is really cheap
         t_block = MPI_Wtime()
+        ! ToDo: Adapt CE modify for level and reference, maybe with cases as I've done it with syncing?
         call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, clear_wc_only=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
@@ -652,7 +668,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         end do
         call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " RWT)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " RWT)"
         call toc( toc_statement, 1850+iteration, MPI_Wtime()-t_block )
 
         ! now we need to update the SC of all daughters
@@ -660,30 +676,32 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call sync_M2D_level(params, hvy_block, tree_ID, level)
         call toc( "adapt_tree (sync level 2 daughters)", 114, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " sync level 2 daughters)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level 2 daughters)"
         call toc( toc_statement, 1900+iteration, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (it ", iteration, " TOTAL)"
+        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " TOTAL)"
         call toc( toc_statement, 1950+iteration, MPI_Wtime()-t_loop )
 
         iteration = iteration + 1
     enddo
 
-    ! delete all blocks non-leaf blocks with daughters as we for now do not need them
+    ! delete all non-leaf blocks with daughters as we for now do not need them
     do k = 1, hvy_n(tree_ID)
         hvy_ID = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
         level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
 
-        ! RWT required for a block that is on the level
         if ( any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
             ! we can savely delete blocks as long as we do not update family relations
             lgt_block( lgt_ID, : ) = -1
         endif
     end do
 
+    ! deletion was only made locally (as family relations are hvy), so we need to sync lgt data
+    call synchronize_lgt_data( params, refinement_status_only=.false. )
+
     ! update grid lists: active list, neighbor relations, etc
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
 
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
     ! they may have passed several level also. Rebalance for optimal loadbalancing
@@ -691,6 +709,18 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     t_block = MPI_Wtime()
     call balanceLoad_tree( params, hvy_block, tree_ID)
     call toc( "adapt_tree (balanceLoad_tree)", 116, MPI_Wtime()-t_block )
+
+    ! ! I often need to check block values when debugging so I leave it here
+    ! do k = 1, hvy_n(tree_ID)
+    !     hvy_ID = hvy_active(k, tree_ID)
+    !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+    !     write(*, '("R-", i0, " B-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') params%rank, lgt_ID, &
+    !         lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
+    !     ! if (lgt_block(lgt_id, IDX_MESH_LVL) == 1 .and. lgt_block(lgt_id, IDX_TC_2) == 0) then
+    !     !     call write_neighborhood_info(hvy_neighbor(hvy_id, :), params%dim)
+    !     !     ! call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), "block_cvs_9.txt", params%Bs, params%g)
+    !     ! endif
+    ! enddo
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values
     ! Just once here at the end after reconstruct so everything is in order

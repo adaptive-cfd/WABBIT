@@ -55,8 +55,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
 
-    ! if (present(verbose_check) .or. .true.) then
-    !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+    ! if (present(verbose_check)) then
+    !     write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
     ! endif
 
     call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &

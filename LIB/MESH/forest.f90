@@ -798,15 +798,8 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
 
 
             ! 2) refine blocks
-            if ( params%dim==3 ) then
-                ! 3D:
-                call refinementExecute3D_tree( params, hvy_block, tree_ID1 )
-                call refinementExecute3D_tree( params, hvy_block, tree_ID2 )
-            else
-                ! 2D:
-                call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID1 )
-                call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID2 )
-            end if
+            call refinement_execute_tree( params, hvy_block, tree_ID1 )
+            call refinement_execute_tree( params, hvy_block, tree_ID2 )
 
             ! since lgt_block was synced we have to create the active lists again
             call createActiveSortedLists_tree( params, tree_ID1 )
@@ -854,12 +847,7 @@ subroutine refine_tree2(params, hvy_block, hvy_tmp, tree_ID)
     call respectJmaxJmin_tree( params,  tree_ID )
 
     ! 2) refine blocks
-    if ( params%dim==3 ) then
-        call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    else
-        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    end if
-
+    call refinement_execute_tree( params, hvy_block, tree_ID )
     ! since lgt_block was synced we have to create the active lists again
     ! update neighbor relations
     call updateMetadata_tree(params, tree_ID)

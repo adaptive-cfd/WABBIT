@@ -32,11 +32,7 @@ subroutine createGrid_simple_adaptive( params, hvy_block, tree_ID )
     enddo
 
     ! refine and update so that all blocks know of each other
-    if ( params%dim == 3 ) then
-        call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    else
-        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    endif
+    call refinement_execute_tree( params, hvy_block, tree_ID )
     call updateMetadata_tree(params, tree_ID)
 
 end subroutine
@@ -81,11 +77,7 @@ subroutine createGrid_simple_adaptive_with_borders( params, hvy_block, tree_ID )
     enddo
 
     ! refine and update so that all blocks know of each other
-    if ( params%dim == 3 ) then
-        call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    else
-        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    endif
+    call refinement_execute_tree( params, hvy_block, tree_ID )
     call updateMetadata_tree(params, tree_ID)
 
 end subroutine

@@ -45,33 +45,33 @@ subroutine compute_vorticity_post(params)
     ! does the user need help?
     if (file_ux=='--help' .or. file_ux=='--h') then
         if (params%rank==0) then
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wabbit postprocessing: vorticity / divergence / Q-criterion"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Computes either quantity from velocity files. Output is stored"
-            write(*,*) " in predefined files."
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " --vorticity"
-            write(*,*) "./wabbit-post --vorticity source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
-            write(*,*) " Computes 3 (3D) or 1 (2D) vorticity component, saves in "
-            write(*,*) " vorx_*.h5 [vory_*.h5] [vorz_*.h5]"
-            write(*,*) " order = 2 or 4"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " --vor-abs"
-            write(*,*) "./wabbit-post --vor-abs source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
-            write(*,*) " Computes vorticity magnitude of 3D velocity field, saves in "
-            write(*,*) " vorabs_*.h5"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " --divergence"
-            write(*,*) "./wabbit-post --divergence source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
-            write(*,*) " Computes divergence of 2D/3D velocity field, saves in "
-            write(*,*) " divu_*.h5"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " --Q"
-            write(*,*) "./wabbit-post --Q source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
-            write(*,*) " Computes Q-criterion of 2D/3D velocity field, saves in "
-            write(*,*) " Qcrit_*.h5"
-            write(*,*) "-----------------------------------------------------------"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Wabbit postprocessing: vorticity / divergence / Q-criterion"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Computes either quantity from velocity files. Output is stored"
+            write(*, '(A)') " in predefined files."
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --vorticity"
+            write(*, '(A)') "./wabbit-post --vorticity source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " Computes 3 (3D) or 1 (2D) vorticity component, saves in "
+            write(*, '(A)') " vorx_*.h5 [vory_*.h5] [vorz_*.h5]"
+            write(*, '(A)') " order = 2 or 4"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --vor-abs"
+            write(*, '(A)') "./wabbit-post --vor-abs source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
+            write(*, '(A)') " Computes vorticity magnitude of 3D velocity field, saves in "
+            write(*, '(A)') " vorabs_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --divergence"
+            write(*, '(A)') "./wabbit-post --divergence source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " Computes divergence of 2D/3D velocity field, saves in "
+            write(*, '(A)') " divu_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --Q"
+            write(*, '(A)') "./wabbit-post --Q source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " Computes Q-criterion of 2D/3D velocity field, saves in "
+            write(*, '(A)') " Qcrit_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
         end if
         return
     endif
@@ -285,11 +285,11 @@ subroutine wavelet_test(params)
 
     if (fname1=='--help' .or. fname1=='--h') then
         if (params%rank==0) then
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wabbit postprocessing: wavelet-test"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wavelet test on equidistant grid"
-            write(*,*) "-----------------------------------------------------------"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Wabbit postprocessing: wavelet-test"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Wavelet test on equidistant grid"
+            write(*, '(A)') "-----------------------------------------------------------"
         end if
         return
     endif
@@ -505,11 +505,11 @@ end subroutine
 !     ! does the user need help?
 !     if (fname1=='--help' .or. fname1=='--h') then
 !         if (params%rank==0) then
-!             write(*,*) "-----------------------------------------------------------"
-!             write(*,*) " Wabbit postprocessing: wavelet-test"
-!             write(*,*) "-----------------------------------------------------------"
-!             write(*,*) " Wavelet test on equidistant grid"
-!             write(*,*) "-----------------------------------------------------------"
+!             write(*, '(A)') "-----------------------------------------------------------"
+!             write(*, '(A)') " Wabbit postprocessing: wavelet-test"
+!             write(*, '(A)') "-----------------------------------------------------------"
+!             write(*, '(A)') " Wavelet test on equidistant grid"
+!             write(*, '(A)') "-----------------------------------------------------------"
 !         end if
 !         return
 !     endif
@@ -660,11 +660,11 @@ subroutine wavelet_test_coarsening(params)
     ! does the user need help?
     if (fname1=='--help' .or. fname1=='--h') then
         if (params%rank==0) then
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wabbit postprocessing: wavelet-test"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wavelet test on equidistant grid"
-            write(*,*) "-----------------------------------------------------------"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Wabbit postprocessing: wavelet-test"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " Wavelet test on equidistant grid"
+            write(*, '(A)') "-----------------------------------------------------------"
         end if
         return
     endif
@@ -1092,7 +1092,7 @@ subroutine waveletVsRHS_timingTest(params)
     do k = 1, 100
         call RHS_wrapper(0.0_rk, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID)
     enddo
-    write(*,*) "rhs", MPI_wtime()-t0
+    write(*, '(A)') "rhs", MPI_wtime()-t0
 
     t0 = MPI_wtime()
     do ii = 1, 100
@@ -1102,5 +1102,5 @@ subroutine waveletVsRHS_timingTest(params)
             call WaveReconstruction_dim1( params, hvy_block(:,:,:,:,hvy_id) )
         enddo
     enddo
-    write(*,*) "wavelet", MPI_wtime()-t0
+    write(*, '(A)') "wavelet", MPI_wtime()-t0
 end subroutine

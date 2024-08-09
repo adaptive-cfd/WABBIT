@@ -178,11 +178,7 @@ subroutine sparse_to_dense(params)
     !     call ensureGradedness_tree( params, tree_ID )
     !
     !     ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-    !     if (params%dim == 3) then
-    !         call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    !     else
-    !         call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    !     endif
+    !     call refinement_execute_tree( params, hvy_block, tree_ID )
     !
     !     ! grid has changed...
     !     call updateMetadata_tree(params, tree_ID)

@@ -97,142 +97,39 @@ contains
 
         coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
     end subroutine
+    
 
 
-
-    ! refine the block by one level
-    subroutine prediction_2D(coarse, fine, order_predictor)
-        implicit none
-
-        real(kind=rk), dimension(1:,1:), intent(inout) :: fine
-        real(kind=rk), dimension(1:,1:), intent(inout) :: coarse
-        character(len=*), intent(in)                :: order_predictor
-
-        integer(kind=ik) :: i, j, l
-        integer(kind=ik) :: nxcoarse, nxfine
-        integer(kind=ik) :: nycoarse, nyfine
-        integer(kind=ik) :: ixfine, iyfine, N, shift, shift_fine
-        real(kind=rk), allocatable :: c(:)
-
-        nxcoarse = size(coarse, 1)
-        nycoarse = size(coarse, 2)
-        nxfine   = size(fine  , 1)
-        nyfine   = size(fine  , 2)
-
-        !
-        ! NOTE:
-        ! ======
-        ! As of 07 Aug 2023, this routine does no longer include once-sided interpolation stencils
-        ! because they must not be used anyways. One-sided interpolation corresponds to different
-        ! wavelet functions near the boundaries. This functionality was used a long time ago with
-        ! the "lazy wavelets" CDF20 and CDF40, but we have always seen to the code not using the one-sided
-        ! stencils. Points that cannot be interpolated (where onse-sided interpolation would be used) are returned
-        ! zero.
-        !
-        ! o: matching points (checkerboard copy)
-        ! x: points to be interpolated
-        !
-        ! Input:
-        ! o x o x o x o x o x o x o
-        ! x x x x x x x x x x x x x
-        ! o x o x o x o x o x o x o
-        ! x x x x x x x x x x x x x
-        ! o x o x o x o x o x o x o
-        ! x x x x x x x x x x x x x
-        ! o x o x o x o x o x o x o
-        ! x x x x x x x x x x x x x
-        ! o x o x o x o x o x o x o
-        !
-        ! Output: (here, for 4th order interpolation; x=zeros returned i=interpolated properly)
-        ! o x o x o x o x o x o x o
-        ! x x x x x x x x x x x x x
-        ! o x o i o i o i o i o x o
-        ! x x i i i i i i i i i x x
-        ! o x o i o i o i o i o x o
-        ! x x i i i i i i i i i x x
-        ! o x o i o i o i o i o x o
-        ! x x x x x x x x x x x x x
-        ! o x o x o x o x o x o x o
-        !
-        !
-        ! Why do we have this routine?
-        ! We could, after copying (checkerboard), also simply apply the wavelet%HR filter
-        ! to all points. This yields the same result as this special routine. However,
-        ! note how even for copied (odd indices) points, a number of multiplications and subsequent summation
-        ! is required (although we multiply by zeros). For even points (which are indeed interpolated)
-        ! we require as many multiplications as the filter HR, which contains zeros.
-        ! This routine is thus more efficient (it skips odd points entirely and does not multiply by zero).
-        ! As it is called for every ghost nodes patch (not just to upsample entire blocks), it is performance-critical.
-
-
-#ifdef DEV
-        if ( (2*nxcoarse-1 /= nxfine) .or. (2*nycoarse-1 /= nyfine)) then
-            write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
-            call abort(888193,"ERROR: prediction_2D: arrays wrongly sized..")
-        endif
-
-        ! this, in fact, is not a problem if on the wanted direction no interpolation is requested (only one point in this direction needed)
-        ! if ( ((nxfine<7) .or. (nyfine<7)).and.(order_predictor=="multiresolution_4th") ) then
-        !     write(*,*) "coarse:", nxcoarse, nycoarse, "fine:", nxfine, nyfine
-        !     call abort(888193,"ERROR: prediction_2D: not enough points for 4th order one-sided interp.")
-        ! endif
-#endif
-
-        ! setup interpolation coefficients
-        select case(order_predictor)
-        case ("multiresolution_2nd")
-            allocate(c(1:2))
-            c = (/ 0.5_rk, 0.5_rk /)
-
-        case ("multiresolution_4th")
-            allocate(c(1:4))
-            c = (/ -1.0_rk, 9.0_rk, 9.0_rk, -1.0_rk /) / 16.0_rk
-
-        case ("multiresolution_6th")
-            allocate(c(1:6))
-            c = (/ 3.0_rk, -25.0_rk, 150.0_rk, 150.0_rk, -25.0_rk, 3.0_rk /) / 256.0_rk
-
-        case default
-            call abort(23070811,"Error: unkown order_predictor="//trim(adjustl(order_predictor)))
-
-        end select
-        N = size(c,1)/2
-
-
-        ! fill matching points: the coarse and fine grid share a lot of points (as the
-        ! fine grid results from insertion of one point between each coarse point).
-        ! Sometimes called checkerboard copying
-        fine = 0.0_rk
-        fine(1:nxfine:2, 1:nyfine:2) = coarse(:,:)
-
-        do ixfine= 2*N, nxfine-(2*N-1), 2
-            ! do iyfine =  2*N-1, nyfine-(2*N-2), 2
-            do iyfine =  1, nyfine, 2
-                ! note in this implementation, interp coeffs run
-                ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
-                do shift = 1, size(c,1)
-                    shift_fine = -size(c,1)+(2*shift-1)
-                    fine(ixfine,iyfine) = fine(ixfine,iyfine) + c(shift)*fine(ixfine+shift_fine,iyfine)
-                end do
-            end do
-        end do
-
-        ! do ixfine = 2*N-1, nxfine-(2*N-2), 1
-        do ixfine = 1, nxfine, 1
-            do iyfine =  2*N, nyfine-(2*N-1), 2
-                ! note in this implementation, interp coeffs run
-                ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
-                do shift = 1, size(c,1)
-                    shift_fine = -size(c,1)+(2*shift-1)
-                    fine(ixfine,iyfine) = fine(ixfine,iyfine) + c(shift)*fine(ixfine, iyfine+shift_fine)
-                end do
-            end do
-        end do
-    end subroutine
-
-
-    ! refine the block by one level
-    subroutine prediction_3D(coarse, fine, order_predictor)
+    !> \brief Refine the block by one level using the prediciton operator
+    ! NOTE:
+    ! ======
+    ! As of 07 Aug 2023, this routine does no longer include once-sided interpolation stencils
+    ! because they must not be used anyways. One-sided interpolation corresponds to different
+    ! wavelet functions near the boundaries. This functionality was used a long time ago with
+    ! the "lazy wavelets" CDF20 and CDF40, but we have always seen to the code not using the one-sided
+    ! stencils. Points that cannot be interpolated (where onse-sided interpolation would be used) are returned
+    ! zero.
+    ! o: matching points (checkerboard copy), x: zeros returned, i=interpolated properly
+    !
+    ! Input:                     Output (4th order):
+    ! o   o   o   o   o          o x o x o x o x o
+    !                            x x x x x x x x x
+    ! o   o   o   o   o          o x o i o i o x o
+    !                            x x i i i i i x x
+    ! o   o   o   o   o          o x o i o i o x o
+    !                            x x i i i i i x x
+    ! o   o   o   o   o          o x o i o i o x o
+    !                            x x x x x x x x x
+    ! o   o   o   o   o          o x o x o x o x o
+    ! Why do we have this routine?
+    ! We could, after copying (checkerboard), also simply apply the wavelet%HR filter
+    ! to all points. This yields the same result as this special routine. However,
+    ! note how even for copied (odd indices) points, a number of multiplications and subsequent summation
+    ! is required (although we multiply by zeros). For even points (which are indeed interpolated)
+    ! we require as many multiplications as the filter HR, which contains zeros.
+    ! This routine is thus more efficient (it skips odd points entirely and does not multiply by zero).
+    ! As it is called for every ghost nodes patch (not just to upsample entire blocks), it is performance-critical.
+    subroutine prediction(coarse, fine, order_predictor)
         implicit none
 
         real(kind=rk), dimension(1:,1:,1:), intent(inout) :: fine
@@ -274,7 +171,7 @@ contains
 
 #ifdef DEV
         if ( 2*nxcoarse-1 /= nxfine .or. 2*nycoarse-1 /= nyfine .or. 2*nzcoarse-1 /= nzfine ) then
-            call abort(888195,"ERROR: prediction_3D: arrays wrongly sized..")
+            call abort(888195,"ERROR: prediction - arrays wrongly sized..")
         endif
 #endif
 

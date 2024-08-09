@@ -156,49 +156,49 @@ program main_post
     case default
 
         if (params%rank==0) then
-            write(*,*) "Available Postprocessing tools are:"
-            write(*,*) "--sparse-to-dense"
-            write(*,*) "--dense-to-sparse"
-            write(*,*) "--mean"
-            write(*,*) "--vorticity"
-            write(*,*) "--vor-abs"
-            write(*,*) "--divergence"
-            write(*,*) "--Q"
-            write(*,*) "--OP-rhs"
-            write(*,*) "--OP"
-            write(*,*) "--gradient"
-            write(*,*) "--keyvalues"
-            write(*,*) "--dry-run"
-            write(*,*) "--compare-keys"
-            write(*,*) "--flusi-to-wabbit"
-            write(*,*) "--POD"
-            write(*,*) "--POD-reconstruct"
-            write(*,*) "--POD-error"
-            write(*,*) "--POD-time"
-            write(*,*) "--stl2dist"
-            write(*,*) "--add-two-masks"
-            write(*,*) "--mult-mask"
-            write(*,*) "--mult-mask-direct"
-            write(*,*) "--mult-mask-inverse"
-            write(*,*) "--post_rhs"
-            write(*,*) "--average"
-            write(*,*) "--generate_forest"
-            write(*,*) "--evaluate-wavelet-thresholding"
-            write(*,*) "--refine-everywhere"
+            write(*, '(A)') "Available Postprocessing tools are:"
+            write(*, '(A)') "--sparse-to-dense"
+            write(*, '(A)') "--dense-to-sparse"
+            write(*, '(A)') "--mean"
+            write(*, '(A)') "--vorticity"
+            write(*, '(A)') "--vor-abs"
+            write(*, '(A)') "--divergence"
+            write(*, '(A)') "--Q"
+            write(*, '(A)') "--OP-rhs"
+            write(*, '(A)') "--OP"
+            write(*, '(A)') "--gradient"
+            write(*, '(A)') "--keyvalues"
+            write(*, '(A)') "--dry-run"
+            write(*, '(A)') "--compare-keys"
+            write(*, '(A)') "--flusi-to-wabbit"
+            write(*, '(A)') "--POD"
+            write(*, '(A)') "--POD-reconstruct"
+            write(*, '(A)') "--POD-error"
+            write(*, '(A)') "--POD-time"
+            write(*, '(A)') "--stl2dist"
+            write(*, '(A)') "--add-two-masks"
+            write(*, '(A)') "--mult-mask"
+            write(*, '(A)') "--mult-mask-direct"
+            write(*, '(A)') "--mult-mask-inverse"
+            write(*, '(A)') "--post_rhs"
+            write(*, '(A)') "--average"
+            write(*, '(A)') "--generate_forest"
+            write(*, '(A)') "--evaluate-wavelet-thresholding"
+            write(*, '(A)') "--refine-everywhere"
             ! tests
-            write(*,*) "--compression-unit-test"
-            write(*,*) "--performance_test"
-            write(*,*) "--adaption-test"
-            write(*,*) "--refine-coarsen-test"
-            write(*,*) "--ghost-nodes-test"
-            write(*,*) "--wavelet-decomposition-unit-test"
-            write(*,*) "--sync-test"
-            write(*,*) "--treecode-test"
+            write(*, '(A)') "--compression-unit-test"
+            write(*, '(A)') "--performance_test"
+            write(*, '(A)') "--adaption-test"
+            write(*, '(A)') "--refine-coarsen-test"
+            write(*, '(A)') "--ghost-nodes-test"
+            write(*, '(A)') "--wavelet-decomposition-unit-test"
+            write(*, '(A)') "--sync-test"
+            write(*, '(A)') "--treecode-test"
 
             if (mode=="--h" .or. mode=="--help") then
-                write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
+                write(*, '(A)') "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
             else
-                write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
+                write(*, '(A)') "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
             end if
         end if
     end select
@@ -208,7 +208,7 @@ program main_post
 
     elapsed_time = MPI_wtime() - elapsed_time
     if (rank==0) then
-        write(*,*)
+        write(*, '(A)')
         write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
         write(*,'(20("─"),A,28("─"))') "   (regular) EXIT wabbit-post   "
     endif

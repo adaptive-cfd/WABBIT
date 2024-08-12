@@ -588,10 +588,10 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     if (present(hvy_mask)) then
         ! if present, the mask can also be used for thresholding (and not only the state vector). However,
         ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
-        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, &
+        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, 0, &
             ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true., leaf_loop_TMP=.true., hvy_mask=hvy_mask, norm_inout=norm)
     else
-        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, iteration, &
+        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, indicator, 0, &
             ignore_maxlevel=ignore_maxlevel2, input_is_WD=.true., leaf_loop_TMP=.true., norm_inout=norm)
     endif
     call toc( "adapt_tree (coarseningIndicator_tree)", 106, MPI_Wtime()-t_block )

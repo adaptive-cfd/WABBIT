@@ -1,7 +1,6 @@
 !> \brief Modify the SC and WC of a wavelet decomposed blocks at fine/coarse interfaces
 !> This routine assumes that the input is already wavelet decomposed in spaghetti form
-!> It will work on all blocks or which have the REF_TMP_UNTREATED flag in refinement status for leaf-wise operation
-subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, clear_wc_only)
+subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, s_val, clear_wc_only)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -10,11 +9,14 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, clea
     type (type_params), intent(in)      :: params
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array, WDed in Spaghetti form
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)      !< heavy work data array - block data.
-    integer(kind=ik), intent(in)        :: tree_ID                     !< Tree to be investigated
+    integer(kind=ik), intent(in)        :: tree_ID                     !< Tree to be 
+    character(len=*)                    :: CE_case                     !< String representing which kind of CE we want to do, act on tree, level or ref
+
+    integer(kind=ik), intent(in), optional  :: s_val                   !< if CE_modify acts on level or ref, it is restricted to this value
     logical, optional, intent(in)       :: clear_wc_only               !< for second CE modify we only want to delete WC (actually only in ghost patch)
 
-    integer(kind=ik)                    :: iteration, k, i_n, lgt_ID, hvy_ID, tree_me
-    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_n, lgt_ID_n
+    integer(kind=ik)                    :: iteration, k, i_n, lgt_ID, hvy_ID, tree_me, CE_case_id
+    integer(kind=ik)                    :: nx,ny,nz,nc, level_me, ref_me, level_n, lgt_ID_n
     logical                             :: toBeManipulated, ClearWcOnly
 
     nx = size(hvy_data, 1)
@@ -25,6 +27,18 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, clea
     ClearWcOnly = .false.
     if (present(clear_wc_only)) ClearWcOnly = clear_wc_only
 
+    select case(CE_case)
+    case("tree")
+        CE_case_id = 0
+    case("level")
+        CE_case_id = 1
+    case("ref")
+        CE_case_id = 2
+    case default
+        call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
+    end select
+    
+
     do k = 1, hvy_n(tree_ID)
         ! Set toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
         toBeManipulated = .false.
@@ -32,7 +46,15 @@ subroutine coarse_extension_modify_tree(params, hvy_data, hvy_tmp, tree_ID, clea
         hvy_ID = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
         level_me       = lgt_block( lgt_ID, IDX_MESH_LVL )
+        ref_me         = lgt_block( lgt_ID, IDX_REFINE_STS)
         tree_me        = lgt_block( lgt_ID, IDX_TREE_ID )
+
+        ! for some calls we don't want to work on whole tree so skip some blocks
+        if (CE_case_ID == 1) then
+            if (level_me /= s_val) cycle
+        elseif (CE_case_ID == 2) then
+            if (ref_me /= s_val) cycle
+        endif
 
         ! check if this block is to be modified
         do i_n = 1, size(hvy_neighbor, 2)

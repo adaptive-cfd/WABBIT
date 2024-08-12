@@ -79,7 +79,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
+    t_block = MPI_Wtime()
     call updateMetadata_tree(params, tree_ID)
+    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! Wavelet decomposition can be done for each block individually
     ! We iterate leaf-wise, meaning that each block is investigated and coarsened and resulting new blocks are then investigated
@@ -169,11 +171,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
-        ! This is the first coarse extension before removing blocks
-        ! As every block is assumed to be WDed here we can do it on the whole tree
+        ! As every iteration removes blocks, some blocks might have new coarser neighbors, we always need to call on tree
         t_block = MPI_Wtime()
         if (params%useCoarseExtension .and. params%isLiftedWavelet) then
-            call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
+            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
         endif
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )     
 
@@ -238,7 +239,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
         ! update grid lists: active list, neighbor relations, etc
         ! JB: Why is this not in executeCoarsening? This might make more sense
+        t_block = MPI_Wtime()
         call updateMetadata_tree(params, tree_ID, verbose_check=.true.)
+        call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
         ! iteration counter
         iteration = iteration + 1
@@ -261,7 +264,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! If iteration hit Jmax-Jmin, some blocks might have been coarsened in last iteration.
         ! If that happened, suddenly new blocks have coarser neighbors, and on those, the coarseExt needs to be done again.
         t_block = MPI_Wtime()
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
         ! synch SC and WC from new coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
@@ -276,7 +279,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
         ! We do this in order to bundle up the synchronizations in the step before as the modification is really cheap
         t_block = MPI_Wtime()
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, clear_wc_only=.true.)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", clear_wc_only=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
 
@@ -394,7 +397,9 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
+    t_block = MPI_Wtime()
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! Wavelet decomposition can be done for each block individually
     ! We iterate leaf-wise, meaning that each block is investigated and coarsened and resulting new blocks are then investigated
@@ -409,6 +414,11 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         lgt_ID = lgt_active(k, tree_ID)
         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED            
     end do
+
+    ! Idea: One of the very expensive things is updateMetadata_tree for overfull grids, where a block checks all 56*3 possible neighbors
+    ! We could create beforehand all mothers for this loop and give them a REF flag of TMP_MOTHER or something so that we do not sync with them
+    ! Then, we always only move the leaf layer downwards, WD the blocks and sync values with the mothers
+    ! Syncing lgt_block is then also only done for refinement status
 
     ! iteration for wavelet decomposition - no blocks will be deleted during the loop!
     do while (iterate)
@@ -485,57 +495,62 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
         ! This is the first coarse extension before removing blocks
-        ! As every block is assumed to be WDed here we can do it on the whole tree
+        ! As no blocks are deleted, working on newly created blocks is suficient, they are non-leafs anyways and will be skipped
         t_block = MPI_Wtime()
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=REF_TMP_UNTREATED)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ! Prepare refinement status for updating the mother blocks
-        do k = 1, lgt_n(tree_ID)
-            lgt_ID = lgt_active(k, tree_ID)
-            if (any(lgt_block(lgt_ID, IDX_REFINE_STS) == (/ REF_TMP_UNTREATED , REF_TMP_TREATED_COARSEN, REF_TMP_GRADED_STAY /))) then
-                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
-            endif
-        end do
+        ! Mother blocks: we now create mother blocks and fill their values with the SC from their daughters
+        ! We do this for every but the last iteration, where no mother blocks can be created anyways
+        if (level > Jmin) then
+            ! Prepare refinement status for updating the mother blocks
+            do k = 1, lgt_n(tree_ID)
+                lgt_ID = lgt_active(k, tree_ID)
+                if (any(lgt_block(lgt_ID, IDX_REFINE_STS) == (/ REF_TMP_UNTREATED , REF_TMP_TREATED_COARSEN, REF_TMP_GRADED_STAY /))) then
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+                endif
+            end do
 
-        ! respect lower level boundary
-        t_block = MPI_Wtime()
-        call respectJmaxJmin_tree( params, tree_ID )
-        call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
+            ! respect lower level boundary
+            t_block = MPI_Wtime()
+            call respectJmaxJmin_tree( params, tree_ID )
+            call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
 
-        ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
-        ! to find all needed neighbors, so we let the block wait if that is the case
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
-        enddo
-        ! after locally modifying refinement statusses, we need to synchronize light data
-        call synchronize_lgt_data( params, refinement_status_only=.true. )
-        ! watch for completeness
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-            call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
-        enddo
-        ! Details are not synced between procs, however all procs correctly know which blocks to delete if they have one block in there
-        ! The rest will be synced in executeCoarsening
-        ! call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
+            ! to find all needed neighbors, so we let the block wait if that is the case
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
+            enddo
+            ! after locally modifying refinement statusses, we need to synchronize light data
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! watch for completeness
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
+            enddo
+            ! Details are not synced between procs, however all procs correctly know which blocks to delete if they have one block in there
+            ! The rest will be synced in executeCoarsening
+            ! call synchronize_lgt_data( params, refinement_status_only=.true. )
 
-        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ! Create or update mother blocks with SC of daughter blocks
-        ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
-        t_block = MPI_Wtime()
-        ! ToDo: Investigate why it takes way more time then it's non_CVS counterpart
-        call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true., no_deletion=.true.)
-        call toc( "adapt_tree (update_mothers)", 111, MPI_Wtime()-t_block )
+            ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            ! Create or update mother blocks with SC of daughter blocks
+            ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
+            t_block = MPI_Wtime()
+            call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true., no_deletion=.true.)
+            call toc( "adapt_tree (update_mothers)", 111, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " update_mothers)"
-        call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
+            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " update_mothers)"
+            call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
 
-        ! update grid lists: active list, neighbor relations, etc
-        ! Attention: Here we have an overfull grid, so blocks can have multiple neighbors for the same patch
-        call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+            ! In executeCoarsening we already sync list and family but not neighbors, as no blocks are deleted there we only do this then here
+            ! This call is surprisingly expensive as for overlapping search we always check all 56*3 possible neighbors for every loop
+            t_block = MPI_Wtime()
+            call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_lists=.false., update_neighbors=.true., update_family=.false.)
+            call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
+        endif
 
         ! iteration counter
         iteration = iteration + 1
@@ -618,11 +633,13 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     enddo
 
     ! update grid lists: active list, neighbor relations, etc
+    t_block = MPI_Wtime()
     call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! This is the actual important coarse extension after all cells have been deleted, which modifies now the lasting c-f interfaces
     t_block = MPI_Wtime()
-    call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
+    call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
     call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
     ! Apply CVS filtering here if wanted
@@ -646,8 +663,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
         ! We do this in order to bundle up the synchronizations in the step before as the modification is really cheap
         t_block = MPI_Wtime()
-        ! ToDo: Adapt CE modify for level and reference, maybe with cases as I've done it with syncing?
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, clear_wc_only=.true.)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
 
         ! Wavelet-reconstruct blocks on level
@@ -701,7 +717,9 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     ! update grid lists: active list, neighbor relations, etc
+    t_block = MPI_Wtime()
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
     ! they may have passed several level also. Rebalance for optimal loadbalancing

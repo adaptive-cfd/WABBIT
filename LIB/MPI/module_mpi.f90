@@ -86,7 +86,7 @@ module module_MPI
 
     PUBLIC :: sync_ghosts_tree, sync_ghosts_RHS_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
-    PUBLIC :: coarse_extension_modify_tree, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
+    PUBLIC :: coarse_extension_modify, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
 
 
 contains

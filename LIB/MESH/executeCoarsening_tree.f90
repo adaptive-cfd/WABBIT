@@ -145,11 +145,14 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
     ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, lgtID, hvyID, level_me, lgt_merge_id, digit_merge
+    integer(kind=ik)                    :: lgt_ID_b, hvy_ID_b, level_b, rank_b
+    integer(kind=ik)                    :: data_rank, n_xfer, lgt_merge_id, digit_merge, hvy_ID
     integer(kind=ik)                    :: nx, ny, nz, nc
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
     logical                             :: markTMPflag
     logical                             :: noDeletion
+    real(kind=rk)                       :: t0
+    integer(kind=ik), parameter :: TMP_STATUS = 17
 
 
     integer(kind=ik)  :: iy
@@ -185,44 +188,49 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
     ! this is necessary so that move_mallat_patch_block can move the correct data
     ! elsewise we would need different logic to create the mother block out of one of the daughters
     !---------------------------------------------------------------------------
+    t0 = MPI_Wtime()
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k, tree_ID)
-        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+        hvy_ID_b = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID_b, hvy_ID_b, rank, params%number_blocks)
+        level_b = lgt_block( lgt_ID_b, IDX_MESH_LVL )
 
-        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+        if ( lgt_block(lgt_ID_b, IDX_TC_1 ) >= 0 .and. lgt_block(lgt_ID_b, IDX_REFINE_STS) == -1) then
             ! This block will be coarsened and its data needs to be transferred to Mallat for correct copying
-            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvy_ID_b), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvy_ID_b) = wc(:,:,:,1:nc)
         endif
     enddo
+    call toc( "executeCoarsening (spaghetti2Mallat)", 160, MPI_Wtime()-t0 )
 
+    t0 = MPI_Wtime()
     ! setup correct patches and get indices, used for move_mallat_patch_block
     ! this is in theory only needed when we change g but if this is every done I want to avoid nasty bug finding
     call family_setup_patches(params, output_to_file=.false.)
     ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
     ! make sure they have the right size
     call xfer_ensure_correct_buffer_size(params, hvy_block)
+    call toc( "executeCoarsening (setup buffer)", 161, MPI_Wtime()-t0 )
 
     !---------------------------------------------------------------------------
     ! create new empty blocks on rank with most daughters if it does not exist
     !---------------------------------------------------------------------------
+    t0 = MPI_Wtime()
     do k = 1, hvy_n(tree_ID)
         ! Check if the block will be coarsened.
         ! FIRST condition: only work on light data, if block is active.
         ! SECOND condition: block wants to coarsen, i.e. it has the status -1.
 
-        hvyID = hvy_active(k, tree_ID)
-        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+        hvy_ID_b = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID_b, hvy_ID_b, rank, params%number_blocks)
+        level_b = lgt_block( lgt_ID_b, IDX_MESH_LVL )
 
         ! check if block is active: TC > 0 and block wants to be refined
         ! performance: don't construct tc and check only first int
-        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+        if ( lgt_block(lgt_ID_b, IDX_TC_1 ) >= 0 .and. lgt_block(lgt_ID_b, IDX_REFINE_STS) == -1) then
             ! If this block already has a mother, we do not have to create it once again
-            if (hvy_family(hvyID, 1) == -1) then
+            if (hvy_family(hvy_ID_b, 1) == -1) then
                 ! Get all sisters
-                lgt_daughters(1:N) = hvy_family(hvyID, 2:1+2**params%dim)
+                lgt_daughters(1:N) = hvy_family(hvy_ID_b, 2:1+2**params%dim)
     
                 ! figure out on which rank the sisters lie
                 do j = 1, N
@@ -240,11 +248,11 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
                         do j = 1, N
                             if (rank_daughters(j) == rank .and. lgt_merge_id == -1) then
                                 lgt_merge_id = lgt_daughters(j)
-                                call lgt2hvy(hvyID, lgt_merge_id, rank, params%number_blocks)
+                                call lgt2hvy(hvy_ID, lgt_merge_id, rank, params%number_blocks)
                                 ! we need to compute the last digit to in-place move the patch correctly
                                 treecode = get_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2 ))
-                                digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level_me, params%Jmax)
-                                call move_mallat_patch_block(params, hvy_block, hvyID, digit_merge)
+                                digit_merge = tc_get_digit_at_level_b( treecode, params%dim, level_b, params%Jmax)
+                                call move_mallat_patch_block(params, hvy_block, hvy_ID, digit_merge)
                             endif
                         enddo
                     else  ! create mother block as a new block
@@ -255,8 +263,8 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
                     ! change meta_data of mother block
                     lgt_block( lgt_merge_id, : ) = -1
                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
-                        dim=params%dim, level=level_me-1, max_level=params%Jmax))
-                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_me-1
+                        dim=params%dim, level=level_b-1, max_level=params%Jmax))
+                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_b-1
                     if (markTMPflag) then
                         lgt_block( lgt_merge_id, IDX_REFINE_STS ) = REF_TMP_UNTREATED
                     else
@@ -267,8 +275,8 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
                     ! update sisters on my rank that they have found their mother and can be skipped
                     do j = 1, N
                         if (rank_daughters(j) == rank .and. lgt_daughters(j) /= lgt_merge_id) then
-                            call lgt2hvy(hvyID, lgt_daughters(j), rank, params%number_blocks)
-                            hvy_family(hvyID, 1) = lgt_merge_id
+                            call lgt2hvy(hvy_ID_b, lgt_daughters(j), rank, params%number_blocks)
+                            hvy_family(hvy_ID_b, 1) = lgt_merge_id
                         endif
                     enddo
 
@@ -278,40 +286,45 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
             endif
         endif
     enddo
+    call toc( "executeCoarsening (create mothers)", 162, MPI_Wtime()-t0 )
 
     ! ToDo: Set mother-daughter relations inside loop so that I can skip the syncing as it is expensive
-
+    t0 = MPI_Wtime()
     ! the active lists are outdated, so lets resynch
     call synchronize_lgt_data( params, refinement_status_only=.false.)
-    ! update metadata for overlapping grid - this is important as (atleast) temporarily we have a non-unique grid
-    ! where mothers and daughters coexist
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    ! update metadata for overlapping grid - temporarily we have a non-unique grid where mothers and daughters coexist
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_neighbors=.false.)
+    call toc( "executeCoarsening (sync lgt + updateMetadata)", 163, MPI_Wtime()-t0 )
 
 
     ! actual xfer, this works on all blocks that have a mother / daughter and ref -1
     n_xfer = 0  ! transfer counter
+    t0 = MPI_Wtime()
     call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_ref", ncomponents=size(hvy_block, 4), s_val=-1)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
+    call toc( "executeCoarsening (xfer_block_data)", 164, MPI_Wtime()-t0 )
 
     ! now the daughter blocks are to be deleted or marked that they are completed
+    t0 = MPI_Wtime()
     do k = 1, lgt_n(tree_ID)
-        lgtID = lgt_active(k, tree_ID)
-        level_me = lgt_block( lgtID, IDX_MESH_LVL )
-        call lgt2proc( rank_daughters(1), lgtID, params%number_blocks )
-        if ( lgt_block(lgtID, IDX_REFINE_STS) == -1) then
+        lgt_ID_b = lgt_active(k, tree_ID)
+        level_b = lgt_block( lgt_ID_b, IDX_MESH_LVL )
+        call lgt2proc( rank_daughters(1), lgt_ID_b, params%number_blocks )
+        if ( lgt_block(lgt_ID_b, IDX_REFINE_STS) == -1) then
             if (.not. noDeletion) then
                 ! delete daughter blocks
-                lgt_block(lgtID, :) = -1
+                lgt_block(lgt_ID_b, :) = -1
             elseif (rank_daughters(1) == rank) then
-                call lgt2hvy(hvyID, lgtID, rank, params%number_blocks)
+                call lgt2hvy(hvy_ID_b, lgt_ID_b, rank, params%number_blocks)
                 ! block has to be retransformed into spaghetti form
-                call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
-                hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+                call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvy_ID_b), wc(:,:,:,1:nc))
+                hvy_block(:,:,:,1:nc,hvy_ID_b) = wc(:,:,:,1:nc)
             endif
             ! mark daughter blocks as completed
-            lgt_block(lgtID, IDX_REFINE_STS) = 0
+            lgt_block(lgt_ID_b, IDX_REFINE_STS) = 0
         endif
     enddo
+    call toc( "executeCoarsening (delete daughters or Mallat2Spaghetti)", 165, MPI_Wtime()-t0 )
 
 
 end subroutine executeCoarsening_WD_tree

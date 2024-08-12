@@ -21,8 +21,8 @@ module module_timing
     ! reusable in other projects)
     integer, parameter :: dp = selected_real_kind(8)
 
-    ! we provide at most this many slots for timing:
-    integer, PARAMETER :: MAX_TIMING_SLOTS = 250
+    ! we provide at most this many slots for timing, as there is no string comparison anymore its okay for this to be large
+    integer, PARAMETER :: MAX_TIMING_SLOTS = 400
 
     ! array of time measurements and call counters
     real(kind=dp), dimension(:,:), allocatable :: comp_time
@@ -47,7 +47,7 @@ contains
     !   30-  33 RHS_WRAPPER
     !   50- 100 Fundamental functions
     !   50-  55    createActiveSortedLists
-    !        59    updateMetadata_tree
+    !   57-  59    updateMetadata_tree
     !   60-  63    synchronize_lgt_data
     !   70-  74    xfer_block_data
     !   80-  85    sync ghosts
@@ -58,6 +58,7 @@ contains
     !  130- 131    ensureGradedness
     !  140- 146    refine_tree
     !  150- 158    coarseExtensionUpdate_tree
+    !  160- 165    executeCoarsening_tree
     !  200-1000 Other
     !  250- 258    forest
     !  350- 354    module_MOR
@@ -65,8 +66,7 @@ contains
     ! 1001-1002    Commented block based toc in coarsening indicator
     ! 1010-1015    Old coarse extension
 
-    !> For a given NAME, increase the function call counter by one and store the
-    !> elapsed time in the global arrays.
+    !> For a given NAME, increase the function call counter by one and store the elapsed time in the global arrays.
     subroutine toc( name, num, t_elapsed_this, call_counter )
         implicit none
         character(len=*), intent(in)  :: name

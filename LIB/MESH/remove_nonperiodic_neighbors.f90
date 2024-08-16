@@ -25,6 +25,9 @@ subroutine remove_nonperiodic_neighbors(params, tree_ID)
         if (maxval(abs(n_domain(1:params%dim)))==0) cycle
 
         do a = 1, size(hvy_neighbor,2)
+            ! Always reset variables that we set each loop, this is not the first time we forgot it
+            remove = .False.
+            
             ! if this neighborhood is unused (there is no neighbor in this direction): skip it
             if (hvy_neighbor(hvy_id, a) == -1) then
                 cycle

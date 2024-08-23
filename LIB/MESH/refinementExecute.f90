@@ -59,7 +59,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! interpolate data, then save new data, but cut ghost nodes.
         ! uniqueGrid modification
         if (dim == 2) then
-            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:,:,:), params%order_predictor)
+            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine, params%order_predictor)
             new_data(:,:,1,dF) = data_predict_fine( 2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g, 1 )
         else
             call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine, params%order_predictor)
@@ -70,7 +70,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     ! ------------------------------------------------------------------------------------------------------
     ! second: split new data and write into new blocks
     !--------------------------
-    ! create all four daughters
+    ! create all 4 or 8 daughters
     do k_daughter = 0,2**(params%dim) -1
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
@@ -102,13 +102,13 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         do dF = 1, size(hvy_block,4)
             if (dim == 2) then
                 hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, free_heavy_id ) =  new_data( &
-                        (k_daughter/2)*Bs(1) +1 : Bs(1)*(1+      (k_daughter/2)), &
+                          (k_daughter/2)*Bs(1) +1 : Bs(1)*(1+      (k_daughter/2)), &
                     modulo(k_daughter,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter,2)), 1, dF)
             else
                 hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) =  new_data( &
                     modulo(k_daughter/2,2)*Bs(1) +1 : Bs(1)*(1+modulo(k_daughter/2,2)), &
                     modulo(k_daughter  ,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter  ,2)), &
-                        (k_daughter/4  )*Bs(3) +1 : Bs(3)*(1+      (k_daughter/4  )), dF)
+                          (k_daughter/4  )*Bs(3) +1 : Bs(3)*(1+      (k_daughter/4  )), dF)
             endif
         end do
     end do

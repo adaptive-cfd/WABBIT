@@ -662,5 +662,5 @@ subroutine createActiveSortedLists_forest(params)
     ! The forest size is defined as the maximum number of trees in the forest.
     if (tree_n > fsize) call abort(1402192, "Too many trees in the forest!!" )
 
-    call toc("createActiveSortedLists_forest", 58, MPI_wtime()-t0)
+    call toc("createActiveSortedLists_forest", 56, MPI_wtime()-t0)
 end subroutine createActiveSortedLists_forest

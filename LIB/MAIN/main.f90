@@ -160,6 +160,7 @@ program main
     if (params%test_wavelet_decomposition) then
         call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
         call unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
 

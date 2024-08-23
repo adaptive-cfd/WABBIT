@@ -3,12 +3,13 @@
 !!            - params struct
 !! output:    - neighbor list array
 ! ********************************************************************************************
-subroutine updateNeighbors_tree(params, tree_ID, search_overlapping)
+subroutine updateNeighbors_tree(params, tree_ID, search_overlapping, verbose_check)
 
     implicit none
     type (type_params), intent(in)      :: params               !< user defined parameter structure
     integer(kind=ik), intent(in)        :: tree_ID
     logical, intent(in)                 :: search_overlapping   !< for CVS multiple neighbors can coexist, so we search all of them
+    logical, optional, intent(in)  :: verbose_check       !< Output verbose flag
 
 
     logical                             :: error = .false.
@@ -84,7 +85,7 @@ subroutine updateNeighbors_tree(params, tree_ID, search_overlapping)
 
     ! Is there any non-periodic boundary ?
     if ( .not. All(params%periodic_BC) ) then
-        call remove_nonperiodic_neighbors(params, tree_ID)
+        call remove_nonperiodic_neighbors(params, tree_ID, verbose_check=.true.)
     endif
 
 end subroutine updateNeighbors_tree

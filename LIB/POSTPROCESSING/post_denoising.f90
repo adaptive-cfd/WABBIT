@@ -1,4 +1,4 @@
-subroutine post_unit_test(params)
+subroutine post_denoising(params)
     use module_globals
     use module_mesh
     use module_params
@@ -24,59 +24,50 @@ subroutine post_unit_test(params)
     integer(kind=ik)                        :: Bs, Jmin_diff
     integer(hid_t)                          :: file_id
     character(len=cshort)                   :: order
-    character(len=cshort)                   :: operator
+    character(len=cshort)                   :: fname1
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks, Nb_file
     logical                                 :: verbose
 
-    call get_command_argument(1, operator)
+    ! filename should follow directly after option --denoise
+    call get_command_argument(2, fname1)
+
+    ! does the user need help?
+    if (fname1=='--help' .or. fname1=='--h' .or. fname1=='-h') then
+        if (params%rank==0) then
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "./wabbit-post --denoise FILE_IN --memory=[memory] [options]"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) " This function denoises the input field FILE_IN"
+            write(*,*) " Further options are:"
+            write(*,*) "    --wavelet, --Jmax, --Jmin, --dim, --Bs"
+            write(*,*) "    --verbose : write more fields"
+            write(*,*) "------------------------------------------------------------------"
+        end if
+        return
+    endif
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
 
+    params%cvs = .True.
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
-    call get_cmd_arg( "--Jmax", params%Jmax, default=5 )
+    call get_cmd_arg( "--Jmax", params%Jmax, default=9 )
     call get_cmd_arg( "--Jmin", params%Jmin, default=1 )
     call get_cmd_arg( "--dim", params%dim, default=2 )
     call get_cmd_arg( "--Bs", Bs, default=-1 )
     call get_cmd_arg( "--verbose", verbose, default=.false.)
 
     ! initialize block size dynamically, make it small so that tests dont take too long
-    if (Bs == -1) then
-        ! check for X in CDFXY
-        if (params%wavelet(4:4) == "2") Bs = 6
-        if (params%wavelet(4:4) == "4") Bs = 12
-        if (params%wavelet(4:4) == "6") Bs = 20
-
-        ! check for Y in CDFXY
-        if (params%wavelet(5:5) == "0") Bs = Bs + 0
-        if (params%wavelet(5:5) == "2") Bs = Bs + 4
-        if (params%wavelet(5:5) == "4") Bs = Bs + 10
-        if (params%wavelet(5:5) == "6") Bs = Bs + 16
-        if (params%wavelet(5:5) == "8") Bs = Bs + 22
-    endif
+    if (Bs == -1) Bs = 20
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs
 
-    ! ghost sync test needs at least 32 points over the domain length. We need to ensure that Jmin is fitted accordingly
-    if (operator == "--ghost-nodes-test") then
-        ! -0.1 to ensure integer cast is done correctly
-        Jmin_diff = int(log(32.0/(real(Bs)-0.1)) / log(2.0))+1 - params%Jmin
-        ! now increase both Jmin and Jmax accordingly
-        params%Jmax = params%Jmax + Jmin_diff
-        params%Jmin = params%Jmin + Jmin_diff
-
-        if (params%rank==0 .and. Jmin_diff /= 0) then
-            write(*, '(A, i0, A, i0)') "UNIT TEST: Need atleast 32 points over domain length. Adapted Jmin = ", params%Jmin, " and Jmax = ", params%Jmax
-        endif
-    endif
-
-    
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
-    call get_cmd_arg( "--g", params%g, default=-1 )
+    params%g = -1
     if (params%g == -1) then
         call setup_wavelet(params, g_wavelet=params%g, g_RHS=params%g_RHS)
     else
@@ -95,31 +86,31 @@ subroutine post_unit_test(params)
     params%domain_size = 1.0_rk
 
     params%eps_normalized = .false.
+    params%eps_norm = "L2"
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn) = .true.
-    params%coarsening_indicator = "threshold-state-vector"
+    params%coarsening_indicator = "threshold-image-denoise"
 
-    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=1 )
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=2 )
 
-    select case(operator)
-    case("--ghost-nodes-test")
-        call unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
+    ! read in data
+    call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=tree_ID_flow, verbosity=.true.)
 
-    case("--refine-coarsen-test")
-        call unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
+    ! save data in overfull
+    if (verbose) then
+        call saveHDF5_wavelet_decomposed_tree( "field-before-overfull-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
+    endif
 
-    case("--wavelet-decomposition-unit-test")
-        call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
-    case("--wavelet-decomposition-invertibility-test")
-        call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
-    case("--sync-test")
-        call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
-    case("--treecode-test")
-        call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true.)
+    ! denoise data
+    call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
-    case default
-        call abort(202355462,"unknown operator")
-    end select
+    call saveHDF5_tree( "denoised_000000.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID)
+    call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID)
+
+    if (verbose) then
+        call saveHDF5_wavelet_decomposed_tree( "field-overfull-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
+    endif
+
 
     call deallocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 end subroutine

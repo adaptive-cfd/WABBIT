@@ -92,7 +92,7 @@ program main_post
     case("--sparse-to-dense", "--refine-everywhere")
         call sparse_to_dense(params)
 
-    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--sync-test", "--treecode-test")
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")
         call post_unit_test(params)
 
     case ("--performance-test")
@@ -153,6 +153,13 @@ program main_post
 
     case ("--generate_forest")
         call post_generate_forest(params)
+
+    case ("--denoise")
+        call post_denoising(params)
+
+    case ("--cvs-invertibility-test")
+        call post_cvs_invertibility_test(params)
+        
     case default
 
         if (params%rank==0) then
@@ -185,6 +192,7 @@ program main_post
             write(*, '(A)') "--generate_forest"
             write(*, '(A)') "--evaluate-wavelet-thresholding"
             write(*, '(A)') "--refine-everywhere"
+            write(*, '(A)') "--denoise"
             ! tests
             write(*, '(A)') "--compression-unit-test"
             write(*, '(A)') "--performance_test"
@@ -192,6 +200,7 @@ program main_post
             write(*, '(A)') "--refine-coarsen-test"
             write(*, '(A)') "--ghost-nodes-test"
             write(*, '(A)') "--wavelet-decomposition-unit-test"
+            write(*, '(A)') "--wavelet-decomposition-invertibility-test"
             write(*, '(A)') "--sync-test"
             write(*, '(A)') "--treecode-test"
 

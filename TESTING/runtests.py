@@ -1,6 +1,80 @@
 #!/usr/bin/env python3
 import os, sys, argparse, subprocess, time, shutil, glob, logging, select
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# these are all tests that we can run
+# new groups can be added with "---NAME---" and new tests by providing name, wavelet and dimension
+# new tests need to be implemented in the class WabbitTest by doing:
+#   - defining the test folder location in __init__
+#   - defining what should be executed in run
+#   - defining where the log-file should be in init_logging
+
+group_names = ["post", "wavelets", "ghost_nodes", "adaptive", "convection", "acm", "cvs"]
+tests = [
+        # f"---{group_names[0]}---",
+        # "TESTING/wabbit_post/pod/pod_test.sh",
+        f"---{group_names[1]}---",  # group identifier
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF24", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF26", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF28", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF46", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF64", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF66", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":3},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":3},
+        f"---{group_names[2]}---",  # group identifier
+        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
+        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
+        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":2},
+        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
+        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
+        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
+        f"---{group_names[3]}---",  # group identifier
+        {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF22", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF40", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF42", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF44", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF60", "dim":2},
+        {"test_name":"adaptive", "wavelet":"CDF62", "dim":2},
+
+        f"---{group_names[4]}---",  # group identifier
+        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":2},
+        {"test_name":"blob_equi", "wavelet":"CDF20", "dim":3},
+        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":3},
+        {"test_name":"blob_adaptive", "wavelet":"CDF20", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF42", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF60", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF62", "dim":2},
+        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":3},
+        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
+        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
+
+        f"---{group_names[5]}---",  # group identifier
+        {"test_name":"acm", "wavelet":"CDF40", "dim":2},
+        {"test_name":"acm", "wavelet":"CDF44", "dim":2},
+
+        f"---{group_names[6]}---",  # group identifier
+        {"test_name":"denoise", "wavelet":"CDF44", "dim":2},
+    ]
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 fail_color, pass_color, end_color, underline = '\033[31;1m', '\033[92;1m', '\033[0m', '\033[4m'
 import importlib  
@@ -15,7 +89,7 @@ except:
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     sys.exit(881)
 
-def run_wabbit(command, logger):
+def run_command(command, logger):
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', errors='ignore')
 
     # Poll both stdout and stderr
@@ -47,10 +121,6 @@ def run_wabbit(command, logger):
     return process
 
 # this object defines a wabbit test
-# new tests can be implemented by:
-#   - defining the test folder location in __init__
-#   - defining what should be executed in run
-#   - defining where the log-file should be in init_logging
 class WabbitTest:
     ini = test_name = wavelet = dim = mpi_command = memory = test_dir = cwd = run_dir = logger = None
     valid = True  # check if something in initialization went wrong
@@ -75,6 +145,8 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
         elif self.test_name == "acm":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"acm_cyl_adaptive_{self.wavelet}")
+        elif self.test_name == "denoise":
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"denoise_{self.wavelet}")
         else:
             print("Unknown test name")
             self.valid = False
@@ -92,14 +164,14 @@ class WabbitTest:
             # change to directory
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-coarsen-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-unit-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            result1 = run_wabbit(command1, self.logger)
+            result1 = run_command(command1, self.logger)
             if result1.returncode != 0:
                 return result1
-            result2 = run_wabbit(command2, self.logger)
+            result2 = run_command(command2, self.logger)
             return result2
         elif self.test_name == "ghost_nodes":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --ghost-nodes-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            result = run_wabbit(command, self.logger)
+            result = run_command(command, self.logger)
             return result
         elif self.test_name == "adaptive":
             in_file = os.path.join("..", "..", "vor_000020000000.h5")  # relative to tmp_dir
@@ -113,10 +185,10 @@ class WabbitTest:
             file1, file2 = "vor_00100.h5", "vor_00200.h5"
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --operator=refine-everywhere"
             command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --operator=coarsen-everywhere"
-            result1 = run_wabbit(command1, self.logger)
+            result1 = run_command(command1, self.logger)
             if result1.returncode != 0:
                 return result1
-            result2 = run_wabbit(command2, self.logger)
+            result2 = run_command(command2, self.logger)
 
             # the refined file is quite data-heavy but always the same betweend different Y-wavelets if CDFXY. Let's just keep them and test them for unlifted wavelets!
             if (self.wavelet not in ["CDF20", "CDF40", "CDF60"]):
@@ -134,6 +206,40 @@ class WabbitTest:
             # change back to test_dir
             os.chdir(self.test_dir)
             return result2
+        elif self.test_name == "denoise":
+            # change to directory to tmp
+            tmp_dir = f"{self.test_dir}/tmp"
+            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
+            os.chdir(tmp_dir)
+
+            # define commands, the first creates the file to be denoised and the second actually does the denoising
+            denoise_file = "../../butterfly.png"
+            denoise_h5 = "./butterfly.h5"
+            command1 = f"image2wabbit.py {denoise_file} -o {denoise_h5} --level 5 --bs 16"  # image is already noisy so no extra noise is added
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise {denoise_h5} --wavelet={self.wavelet} --memory={self.memory} --Bs=16"
+                        
+            # first, convert image to a valid wabbit file
+            result1 = run_command(command1, self.logger)
+            if result1.returncode != 0:
+                return result1
+            # now, denoise the file
+            result2 = run_command(command2, self.logger)
+
+            # compare all files present in test_dir
+            try:
+                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
+                result1.returncode = not all_similar
+            # catch any error - for example HDF5 error - and then say the test failed
+            # this is important to still print the log (and continue)
+            except Exception as e:
+                self.logger.error("ERROR: Was not able to compare files")
+                self.logger.error(e)
+                result1.returncode = 1
+
+            # change back to test_dir
+            os.chdir(self.test_dir)
+            return result1
+        # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
         elif self.test_name in ["blob_equi", "blob_adaptive", "acm"]:
             # lets say where the ini-file is
             if self.test_name in ["blob_equi", "blob_adaptive"]:
@@ -149,7 +255,7 @@ class WabbitTest:
             # run simmulation
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit {ini_file} --memory={self.memory}"
             # result1 = subprocess.run(command1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
-            result1 = run_wabbit(command1, self.logger)
+            result1 = run_command(command1, self.logger)
 
             # compare all files present in test_dir
             try:
@@ -182,6 +288,8 @@ class WabbitTest:
             log_file = os.path.join(self.test_dir, "blob-convection.log")
         elif self.test_name == "acm":
             log_file = os.path.join(self.test_dir, "acm_cyl.log")
+        elif self.test_name == "denoise":
+            log_file = os.path.join(self.test_dir, "denoise.log")
         
         open(log_file, 'w').close()  # Clear the log file at the beginning
         # Set up logging for runs, which writes to different log file and with verbose to test log file and stdout as well
@@ -275,70 +383,6 @@ class WabbitTest:
         self.logger.info(f"\tHappy tests: {happy:2d} :)")
         self.logger.info(f"\t  Sad tests: {sad:2d} :(")
         return all_similar
-                    
-
-# these are all tests that we can run
-# new blocks can be added with "---NAME---" and new tests by providing name, wavelet and dimension
-group_names = ["post", "wavelets", "ghost_nodes", "adaptive", "convection", "acm"]
-tests = [
-        # f"---{group_names[0]}---",
-        # "TESTING/wabbit_post/pod/pod_test.sh",
-        f"---{group_names[1]}---",  # group identifier
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF24", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF26", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF28", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF46", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF64", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF66", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":3},
-        f"---{group_names[2]}---",  # group identifier
-        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
-        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
-        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
-        f"---{group_names[3]}---",  # group identifier
-        {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF22", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF40", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF42", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF44", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF60", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF62", "dim":2},
-
-        f"---{group_names[4]}---",  # group identifier
-        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":2},
-        {"test_name":"blob_equi", "wavelet":"CDF20", "dim":3},
-        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF20", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF42", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF60", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF62", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
-
-        f"---{group_names[5]}---",  # group identifier
-        {"test_name":"acm", "wavelet":"CDF40", "dim":2},
-        {"test_name":"acm", "wavelet":"CDF44", "dim":2},
-    ]
 
 
 

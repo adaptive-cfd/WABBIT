@@ -17,7 +17,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     if (params%rank == 0) then
         write(*, '("")')  ! newline
         write(*,'(20("_/¯\"))')
-        write(*,'("UNIT TEST: testing if IWT(FWT(u)) = Id, performed on an equidistant grid.")')
+        write(*,'("UNIT TEST: testing if IWT(FWT(U)) = U, performed on an equidistant grid.")')
         write(*,'("UNIT TEST: It checks if the filter banks HD,GD,HR,GR are correct.")')
         write(*,'("UNIT TEST: Wavelet=",A," g=", i2)') trim(adjustl(params%wavelet)), params%g
     end if
@@ -92,10 +92,10 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
 
     norm = norm / norm_ref
 
-    if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm
+    if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm(1)
 
     if (norm(1)>1.0e-14_rk) then
-        call abort(230306608, "Error in IWT(FWT(U)) is too large! Call the police! Danger!!" )
+        call abort(230306608, "Error! IWT(FWT(U)) /= U! Call the police! Danger!!" )
     else
         if (params%rank==0) then
             write(*,'(20("_/¯\"))')

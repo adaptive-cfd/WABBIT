@@ -55,7 +55,7 @@ subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, 
 
     if (u_n) then
         t_part = MPI_wtime()
-        call updateNeighbors_tree(params, tree_ID, search_overlapping=searchOverlapping)
+        call updateNeighbors_tree(params, tree_ID, search_overlapping=searchOverlapping, verbose_check=verbose_check)
         call toc( "updateMetadata_tree (neighbors)", 57, MPI_wtime()-t_part )
     endif
 

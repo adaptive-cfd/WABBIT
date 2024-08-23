@@ -204,14 +204,14 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
 
     if (rank==0) then
         write(*,'(20("_/¯\"))')
-        write(*,*) "        .-."
-        write(*,*) "       ( o )"
-        write(*,*) "    /\_.' '._/\"
-        write(*,*) "    |         |"
-        write(*,*) "     \       /"
-        write(*,*) "      \    /`"
-        write(*,*) "    (__)  /"
-        write(*,*) "    `.__.'"
+        write(*,'(A)') "        .-."
+        write(*,'(A)') "       ( o )"
+        write(*,'(A)') "    /\_.' '._/\"
+        write(*,'(A)') "    |         |"
+        write(*,'(A)') "     \       /"
+        write(*,'(A)') "      \    /`"
+        write(*,'(A)') "    (__)  /"
+        write(*,'(A)') "    `.__.'"
         write(*,'("UNIT TEST:", " L2 convergence order: ",6(f6.4,1x))') sqrt(error1(2:6) / error1(1:5))
         write(*,'("UNIT TEST:", " L2 mean conv.  order: ",f6.4)') sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
         write(*,'("UNIT TEST:", " L∞ convergence order: ",6(f6.4,1x))') sqrt(error2(2:6) / error2(1:5))

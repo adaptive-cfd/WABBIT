@@ -166,7 +166,7 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     norm = -99999  ! reset as random value
 
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
-    if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" ) then
+    if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/="threshold-cvs" .and. indicator/="threshold-image-denoise") then
         if (( params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. iteration > 1 ) &
         .or. .not. (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel) .and. iteration > 0 .and. present(norm_inout)) then
 

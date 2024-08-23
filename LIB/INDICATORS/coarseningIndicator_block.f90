@@ -92,7 +92,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
             refinement_status = -1
         endif
 
-    case ("threshold-state-vector", "primary-variables")
+    case ("threshold-state-vector", "threshold-cvs", "threshold-image-denoise", "primary-variables")
         ! t0 = MPI_Wtime()
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
@@ -104,7 +104,11 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
+        if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, eps=norm(1))
+        else
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
+        endif
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (treshold_block)", 1000, MPI_Wtime()-t0 )

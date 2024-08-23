@@ -10,17 +10,18 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughters )
+subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughters, verbose_check )
 
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     logical, intent(in), optional :: mark_TMP_flag          !< Set refinement of completeness to 0 or temporary flag
     logical, intent(in), optional :: check_daughters          !< For overfull CVS grids completeness has to check the mother as well
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)                    :: ierr, rank
     ! loop variables
-    integer(kind=ik)                    :: k, i, N, mylevel, neighbor_level, &
+    integer(kind=ik)                    :: k, i, N, level_me, level_n, &
     counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, lgt_id_sisters(2**params%dim)
     logical                             :: grid_changed, grid_changed_tmp, markTMPflag, checkDaughters    ! status of grid changing
 
@@ -62,6 +63,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt(lgt_id, hvy_id, rank, N)
             ref_me = lgt_block( lgt_id , IDX_REFINE_STS )
+            level_me     = lgt_block( lgt_id, IDX_MESH_LVL )
 
 
             !-------------------------------------------------------------------
@@ -92,7 +94,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                 endif
             endif
 
-
             !-----------------------------------------------------------------------
             ! This block (still) wants to coarsen
             ! Neighbor blocks with REF_TMP_TREATED_COARSEN or REF_TMP_GRADED_STAY want to coarsen in theory but have to stay
@@ -104,11 +105,10 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                     if ( hvy_neighbor( hvy_id, i ) < 0 ) cycle
 
                     ! check neighbor treelevel
-                    mylevel         = lgt_block( lgt_id, IDX_MESH_LVL )
-                    neighbor_level  = lgt_block( hvy_neighbor( hvy_id, i ), IDX_MESH_LVL )
+                    level_n  = lgt_block( hvy_neighbor( hvy_id, i ), IDX_MESH_LVL )
                     ref_n = lgt_block( hvy_neighbor( hvy_id, i ), IDX_REFINE_STS )
 
-                    if (mylevel == neighbor_level) then
+                    if (level_me - level_n == 0) then
                         ! neighbor on same level
                         ! block can not coarsen, if neighbor wants to refine
                         if ( ref_n == -1 ) then
@@ -122,7 +122,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                             grid_changed = .true.
 
                         end if
-                    elseif (mylevel - neighbor_level == 1) then
+                    elseif (level_me - level_n == +1) then
                         ! neighbor on lower level
                         if ( ref_n == -1 ) then
                             ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok for me
@@ -131,7 +131,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                         elseif ( ref_n == 1 ) then
                             ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
                         end if
-                    elseif (neighbor_level - mylevel == 1) then
+                    elseif (level_me - level_n == -1) then
                         ! neighbor on higher level
                         ! neighbor wants to refine, ...
                         if ( ref_n == +1) then
@@ -172,24 +172,26 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                     ! neighbor exists ? If not, we skip it
                     if ( hvy_neighbor( hvy_id, i ) < 0 ) cycle
 
-                    mylevel     = lgt_block( lgt_id, IDX_MESH_LVL )
-                    neighbor_level = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_MESH_LVL )
+                    level_n = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_MESH_LVL )
                     ref_n = lgt_block( hvy_neighbor( hvy_id, i ) , IDX_REFINE_STS )
 
-                    if (mylevel == neighbor_level) then
+                    if (present(verbose_check) .and. lgt_id == 48) then
+                        write(*, '(7(A, i0))') "eG it-", counter+1, " R-", params%rank, " B-48 L-", level_me, " Ref-", ref_me, " BN-", hvy_neighbor( hvy_id, i ), &
+                            " LN-", level_n, " RN-", ref_n
+                    endif
+
+                    if (level_me - level_n == 0) then
                         ! me and my neighbor are on the same level
                         ! As I'd wish to stay where I am, my neighbor is free to go -1,0,+1
-                    elseif (mylevel - neighbor_level == 1) then
+                    elseif (level_me - level_n == +1) then
                         ! my neighbor is one level coarser
                         ! My neighbor can stay or refine, but not coarsen. This case is however handled above (coarsening inhibited)
-                    elseif (neighbor_level - mylevel == 1) then
+                    elseif (level_me - level_n == -1) then
                         ! my neighbor is one level finer
                         if (ref_n == +1) then
-                            ! neighbor refines (and we cannot inhibt that) so I HAVE TO do so as well
-                            if (lgt_block( lgt_id, IDX_REFINE_STS )<+1) then
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = max( +1, lgt_block( lgt_id, IDX_REFINE_STS ) )
-                                grid_changed = .true.
-                            endif
+                            ! neighbor refines (and we cannot inhibit that) so I HAVE TO do so as well
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = 1
+                            grid_changed = .true.
                         end if
                     else
                         call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -214,6 +216,10 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
         ! avoid infinite loops
         counter = counter + 1
         if (counter == 10*params%Jmax) call abort(785877, "ERROR: unable to build a graded mesh")
+
+        if (present(verbose_check)) then
+            write(*, '(A, i0)') "ensureGradedness loop ", counter
+        endif
 
     end do ! end do of repeat procedure until grid_changed==.false.
 

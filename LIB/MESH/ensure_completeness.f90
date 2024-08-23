@@ -38,8 +38,8 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
         if ( any(lgt_sisters(:) == 0) ) then
             lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = 0
 
-        ! second check: any block has temp_gradedness flag > 0 - all blocks that want to stay have to wait with temp flag
-        elseif ( any(lgt_sisters(:) > 0) ) then
+        ! second check: any block has temp_gradedness flag > 1 - all blocks that want to stay have to wait with temp flag
+        elseif ( any(lgt_sisters(:) > 1)) then
             do l = 1, N_sisters
                 if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
             end do

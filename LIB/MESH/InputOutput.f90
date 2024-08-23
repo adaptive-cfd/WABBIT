@@ -951,10 +951,61 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
 
     call readHDF5vct_tree(fnames, params, hvy_block, tree_id, verbosity=.true.)
 
-
-    call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
 
     call sync_ghosts_tree(params, hvy_block, tree_ID )
 
 end subroutine read_field2tree
+
+
+
+!> \brief Save tree in full wavelet decomposed form.
+!> This function essentially wraps around full wavelet decomposition and save function.
+!> Attention! The grid will be overfull
+subroutine saveHDF5_wavelet_decomposed_tree(fname, time, iteration, dF, params, hvy_block, hvy_tmp, tree_ID, no_sync, save_ghosts)
+    implicit none
+
+    character(len=*), intent(in)        :: fname                    !< file name
+    real(kind=rk), intent(in)           :: time                     !< time loop parameters, to be added as metadata
+    integer(kind=ik), intent(in)        :: iteration                !< iteration, to be added as metadata
+    integer(kind=ik), intent(in)        :: dF                       !< datafield number
+    type (type_params), intent(in)      :: params                   !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)   !< heavy tmp data array - used for decomposition as buffer
+    integer(kind=ik), intent(in)        :: tree_ID
+    logical, optional, intent(in)       :: no_sync
+    logical, optional, intent(in)       :: save_ghosts
+
+    integer(kind=ik)                    :: k, hvy_ID, lgt_ID
+
+    ! avoid that metadata is not correctly updated
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+
+    call cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp)
+    call saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
+
+    ! delete all non-leaf blocks with daughters as we for now do not need them
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+
+        if ( any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+            ! we can savely delete blocks as long as we do not update family relations
+            lgt_block( lgt_ID, : ) = -1
+        endif
+    end do
+
+    ! deletion was only made locally (as family relations are hvy), so we need to sync lgt data
+    call synchronize_lgt_data( params, refinement_status_only=.false. )
+
+    ! update grid lists: active list, neighbor relations, etc
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+
+    ! rewrite original data, they have been saved in hvy_tmp
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        hvy_block(:, :, :, :, hvy_id) = hvy_tmp(:, :, :, :, hvy_id)
+    enddo
+
+
+end subroutine

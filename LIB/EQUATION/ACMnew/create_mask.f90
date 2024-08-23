@@ -29,19 +29,19 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
     ! check if the array has the right dimension, if not, put money in swear jar.
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
-        write(*,*) shape(mask)
+        write(*,'(A)') shape(mask)
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
     if (size(mask,4) < 5 ) then
-        write(*,*) shape(mask)
+        write(*,'(A)') shape(mask)
         call abort(777108, "mask: wrong number of components (5), there's pirates, captain!")
     endif
 
 
     if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
 
-    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_3D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_3D_ACM called but ACM not initialized"
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ! mask function and boundary values
@@ -205,7 +205,7 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! happens, do nothing.
     if (.not. params_acm%penalization) return
 
-    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_2D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_2D_ACM called but ACM not initialized"
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values

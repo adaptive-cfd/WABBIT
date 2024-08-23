@@ -205,7 +205,6 @@ subroutine post_dry_run
                 ! sync possible only before pruning
                 call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
-
                 ! refine the mesh, but only where the mask is interesting (not everywhere!)
                 ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
                 call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
@@ -217,7 +216,7 @@ subroutine post_dry_run
                 ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
                 ! is effectively ignored. It seems redundant; if we set a small eps (done independent
                 ! of the parameter file), this yields the same result
-                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask, ignore_maxlevel=.true.)
 
                 ! on new grid, create the mask again
                 call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -233,6 +232,10 @@ subroutine post_dry_run
                 ! We're done once the mask is created on the final level. Relevant only if the start grid is not
                 ! created on Jmin, but on Jequi
                 if (Jnow==Jmax) exit
+
+                ! ! create filename
+                ! write( fname,'(a, i0, "_", i12.12, ".h5")') "mask-it", iter, nint(time * 1.0e6_rk)
+                ! call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             enddo
 
             ! on new grid, create the mask again

@@ -25,9 +25,9 @@ subroutine post_dry_run
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new
     real(kind=rk) :: x0(1:3), dx(1:3)
-    logical :: pruned, help1, help2, save_us
+    logical :: pruned, help1, help2, save_us, iterate
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -201,17 +201,19 @@ subroutine post_dry_run
 
 
             ! refine the grid near the interface and re-generate the mask function.
-            do iter = 1, (Jmax - Jmin)
+            iterate = .true.
+            do while (iterate)
+                lgt_n_old = lgt_n(tree_ID_flow)
+
                 ! synchronization before refinement (because the interpolation takes place on the extended blocks
                 ! including the ghost nodes)
                 ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
                 ! Snyc'ing becomes much more expensive once the grid is refined.
-                ! sync possible only before pruning
+                ! Sync possible only before pruning.
                 call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
                 ! refine the mesh, but only where the mask is interesting (not everywhere!)
-                ! call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
-                call refine_tree( params, hvy_mask, hvy_tmp, "everywhere", tree_ID_flow )
+                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
 
                 ! on new grid, create the mask again
                 call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -221,6 +223,7 @@ subroutine post_dry_run
                 ! is effectively ignored. It seems redundant; if we set a small eps (done independent
                 ! of the parameter file), this yields the same result
                 call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! on new grid, create the mask again
                 call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -234,8 +237,11 @@ subroutine post_dry_run
                 endif
 
                 ! We're done once the mask is created on the final level. Relevant only if the start grid is not
-                ! created on Jmin, but on Jequi
-                if (Jnow==Jmax) exit
+                ! created on Jmin, but on Jequi. A second condition is that the grid does not change anymore:
+                ! sometimes, the start level is so coarse that the blocks retain not a single point of the mask
+                ! function, which can lead to not all parts of the grid being properly generated. If *none* of the
+                ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
+                if ((Jnow==Jmax) .and. (lgt_n_new==lgt_n_old)) iterate = .false.
             enddo
 
             ! on new grid, create the mask again

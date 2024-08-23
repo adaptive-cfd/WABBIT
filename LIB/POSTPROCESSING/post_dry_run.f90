@@ -27,7 +27,7 @@ subroutine post_dry_run
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error
     real(kind=rk) :: x0(1:3), dx(1:3)
-    logical :: pruned, help1, help2
+    logical :: pruned, help1, help2, save_us
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -69,6 +69,8 @@ subroutine post_dry_run
         write(*,*) ""
         write(*,*) " --Jmin The minimum tree level, default is taken from INI file."
         write(*,*) ""
+        write(*,*) " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
+        write(*,*) ""
         write(*,*) " --grid-list=list.txt"
         write(*,*) "   If given, we read in the specified h5 files and create the mask"
         write(*,*) "   on the same grid. Output is stored in mask_XXXXXXXXXXXX.h5 as usual, "
@@ -87,8 +89,10 @@ subroutine post_dry_run
     call ini_file_to_params( params, filename )
 
     call get_cmd_arg( "--pruned", pruned, default=.false. )
+    call get_cmd_arg( "--save-us", save_us, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
+    
 
     ! for the dry run we dont need to use the fancy wavelets
     params%wavelet = "CDF20"
@@ -205,10 +209,9 @@ subroutine post_dry_run
                 ! sync possible only before pruning
                 call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
-
                 ! refine the mesh, but only where the mask is interesting (not everywhere!)
-                ! call refine_tree( params, hvy_mask, "mask-anynonzero", tree_ID_flow )
-                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
+                ! call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
+                call refine_tree( params, hvy_mask, hvy_tmp, "everywhere", tree_ID_flow )
 
                 ! on new grid, create the mask again
                 call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
@@ -253,27 +256,19 @@ subroutine post_dry_run
             !***********************************************************************
             ! Write fields to HDF5 file
             !***********************************************************************
-            ! call save_data( iteration, time, params, lgt_block, hvy_block, lgt_active, &
-            ! lgt_n, lgt_sortednumlist, hvy_n, hvy_tmp, hvy_active, hvy_mask, hvy_neighbor )
-
-            ! create filename
             write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-            !call write_tree_field("constmask_000000000001.h5", params, lgt_block, lgt_active, hvy_mask, &
-            !lgt_n, hvy_n, hvy_active, dF=1, tree_ID=tree_ID_mask, time=time, iteration=-1 )
+            if (save_us) then
+                write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-    !        write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
-    !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-    !        lgt_n, hvy_n, hvy_active, dF=2, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+                write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-    !        write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
-    !        call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-    !        lgt_n, hvy_n, hvy_active, dF=3, tree_ID=tree_ID_flow, time=time, iteration=-1 )
-
-            ! write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
-            ! call write_tree_field(fname, params, lgt_block, lgt_active, hvy_mask, &
-            ! lgt_n, hvy_n, hvy_active, dF=4, tree_ID=tree_ID_flow, time=time, iteration=-1 )
+                write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+            endif
 
             time = time + params%write_time
         end do
@@ -299,6 +294,17 @@ subroutine post_dry_run
             ! store mask file
             write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+
+            if (save_us) then
+                write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+
+                write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+
+                write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+            endif
         enddo
         close (14)
     endif

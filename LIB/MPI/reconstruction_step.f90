@@ -17,7 +17,7 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
 
     integer(kind=ik)                    :: iteration, k, i_n, lgt_ID, hvy_ID, tree_me, CE_case_id
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, ref_me, level_n, lgt_ID_n
-    logical                             :: toBeManipulated, ClearWcOnly
+    logical                             :: ClearWcOnly
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
@@ -40,9 +40,6 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
     
 
     do k = 1, hvy_n(tree_ID)
-        ! Set toBeManipulated - This is one of those sneaky errors I searched 10hours for - JB
-        toBeManipulated = .false.
-
         hvy_ID = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
         level_me       = lgt_block( lgt_ID, IDX_MESH_LVL )
@@ -56,7 +53,7 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
             if (ref_me /= s_val) cycle
         endif
 
-        ! check if this block is to be modified
+        ! loop over all relevant neighbors
         do i_n = 1, size(hvy_neighbor, 2)
             ! neighbor exists ?
             if ( hvy_neighbor(hvy_ID, i_n) /= -1 ) then
@@ -64,48 +61,29 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
                 lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
                 level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
 
+                ! coarse extension for coarser neighbors
                 ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
-                if ((level_n < level_me) .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                    .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
-                    toBeManipulated = .true.
-                    exit
-                endif
-            endif
-        enddo
-
-        if (toBeManipulated) then
-            ! loop over all relevant neighbors
-            do i_n = 1, size(hvy_neighbor, 2)
-                ! neighbor exists ?
-                if ( hvy_neighbor(hvy_ID, i_n) /= -1 ) then
-                    ! neighbor light data id
-                    lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
-                    level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
-
-                    ! coarse extension for coarser neighbors
-                    ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
-                    if (level_n < level_me .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                    .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
-                        ! manipulation of coeffs
-                        call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
-                        if (.not. clearWcOnly) then
-                            call coarseExtensionManipulateSC_block(params, hvy_data(:,:,:,:,hvy_ID), hvy_tmp(:,:,:,:,hvy_ID), i_n)
-                        endif
-                    elseif (level_n > level_me) then
-                        ! It is actually possible for a block to have both finer and coarser neighbors ranging from level J-1 to J+1
-                        ! In order to reconstruct values on level J, we need the WC and SC which are on this level.
-                        ! Finer neighbor has its decomposition ready for level J+1 but we cannot sync it for level J
-                        ! So it is impossible to reconstruct values if the filters range into J+1 ghost nodes
-                        
-                        ! Disabled for CVS testing as it is there not the case
+                if (level_n < level_me .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
+                .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+                    ! manipulation of coeffs
+                    call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
+                    if (.not. clearWcOnly) then
+                        call coarseExtensionManipulateSC_block(params, hvy_data(:,:,:,:,hvy_ID), hvy_tmp(:,:,:,:,hvy_ID), i_n)
+                    endif
+                elseif (level_n > level_me) then
+                    ! It is actually possible for a block to have both finer and coarser neighbors ranging from level J-1 to J+1
+                    ! In order to reconstruct values on level J, we need the WC and SC which are on this level.
+                    ! Finer neighbor has its decomposition ready for level J+1 but we cannot sync it for level J
+                    ! So it is impossible to reconstruct values if the filters range into J+1 ghost nodes
+                    
+                    ! Disabled for CVS testing as it is there not the case
 ! #ifdef DEV
 !                         ! Let's ensure this crashes just to show that filters should not range into finer level ghost nodes
 !                         call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvyID), neighborhood, params%g, params%g, set_garbage=.true.)
 ! #endif
-                    endif
                 endif
-            enddo
-        endif
+            endif
+        enddo
     enddo
 end subroutine
 

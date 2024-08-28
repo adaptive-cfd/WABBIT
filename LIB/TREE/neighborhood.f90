@@ -517,7 +517,11 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     integer(kind=ik), intent(in)  :: dim  !< params%dim
     integer(kind=ik) i_n, i_l
     character(len=200)  :: write_s
+    character(len=1) :: lvl_diff(1:3)
     logical :: found_n = .false.
+
+    ! names for the lvl differences, act as same level, lower level (coarser) and higher level (finer)
+    lvl_diff(1:3) = (/"=", "-", "+"/)
 
     ! sides - indices 01-24
     write_s = ""
@@ -525,7 +529,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     do i_n = 1,24  ! every side has 4 possible finer blocks or coarser configurations
         do i_l = 0,2  ! for lvl_diff = 0, -1, 1
             if (hvy_neighbor(i_n + i_l*56) /= -1) then
-                write(write_s(len_trim(write_s)+1:), '(A, i0)') " ", hvy_neighbor(i_n + i_l*56)
+                write(write_s(len_trim(write_s)+1:), '(A, A, i0, A)') " ", lvl_diff(i_l+1), hvy_neighbor(i_n + i_l*56), lvl_diff(i_l+1)
                 found_n = .true.
             endif
         enddo
@@ -553,9 +557,9 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
         write_s = ""
         write(write_s, '(A8)') "Edges:"
         do i_n = 25,48  ! every side has 2 possible finer blocks or coarser configurations
-            do i_l = 0,2  ! for lvl_diff = 0, -1, 1
+            do i_l = 0,2  ! for lvl_diff = 0, +1, -1
                 if (hvy_neighbor(i_n + i_l*56) /= -1) then
-                    write(write_s(len_trim(write_s)+1:), '(A, i0)') " ", hvy_neighbor(i_n + i_l*56)
+                    write(write_s(len_trim(write_s)+1:), '(A, A, i0, A)') " ", lvl_diff(i_l+1), hvy_neighbor(i_n + i_l*56), lvl_diff(i_l+1)
                     found_n = .true.
                 endif
             enddo
@@ -598,7 +602,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
         do i_n = 49,56  ! every side has 2 possible finer blocks or coarser configurations
             do i_l = 0,2  ! for lvl_diff = 0, -1, 1
                 if (hvy_neighbor(i_n + i_l*56) /= -1) then
-                    write(write_s(len_trim(write_s)+1:), '(A, i0)') " ", hvy_neighbor(i_n + i_l*56)
+                    write(write_s(len_trim(write_s)+1:), '(A, A, i0, A)') " ", lvl_diff(i_l+1), hvy_neighbor(i_n + i_l*56), lvl_diff(i_l+1)
                     found_n = .true.
                 endif
             enddo

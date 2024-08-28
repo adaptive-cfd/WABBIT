@@ -1193,15 +1193,15 @@ contains
                 params%HD = (/-1.0_rk, +2.0_rk, +6.0_rk, +2.0_rk, -1.0_rk/) / 8.0_rk
             elseif (params%wavelet(5:5) == "4") then
                 allocate( params%HD(-4:4) )
-                ! from Wavelab Biorthogonal MakeBSFilter
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
                 params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
             elseif (params%wavelet(5:5) == "6") then
                 allocate( params%HD(-6:6) )
-                ! from Wavelab Biorthogonal MakeBSFilter
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
                 params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
             elseif (params%wavelet(5:5) == "8") then
                 allocate( params%HD(-8:8) )
-                ! from Wavelab Biorthogonal MakeBSFilter
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
                 params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
                     10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
             else

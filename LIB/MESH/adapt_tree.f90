@@ -463,7 +463,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
             endif
 
             ! delete all WC where they are too small
-            call cvs_threshold_tree(params, hvy_block, tree_ID, thresh)
+            call cvs_threshold_tree(params, hvy_block, tree_ID, thresh, Jmax_active)
 
             ! now do the CVS loops
             call cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
@@ -512,10 +512,10 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
                 hvy_tmp(:, :, : ,:, hvy_id) = hvy_work(:, :, :, :, hvy_id, 1)  ! normal values
                 hvy_block(:, :, : ,:, hvy_id) = hvy_work(:, :, :, :, hvy_id, 2)  ! WDed values
             enddo
-        endif
 
-        ! delete all WC where they are too small
-        call cvs_threshold_tree(params, hvy_block, tree_ID, thresh)
+            ! delete all WC where they are too small
+            call cvs_threshold_tree(params, hvy_block, tree_ID, thresh, Jmax_active)
+        endif
 
         ! in order to work on all blocks and work with coarseningIndicator_tree logic, we set all ref status as unset to work as in a leaf-wise loop
         ! no need for syncing afterwards as coarseningIndicator works locally

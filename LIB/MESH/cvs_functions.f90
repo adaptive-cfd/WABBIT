@@ -16,6 +16,22 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
     character(len=clong) :: toc_statement
     logical              :: iterate
 
+    ! ! at first, initialize all mothers without any values yet
+    ! t_block = MPI_Wtime()
+    ! call cvs_init_mothers_tree(params, tree_ID)
+    ! call toc( "adapt_tree (init mothers)", 103, MPI_Wtime()-t_block )
+    ! ! Leaf layer starts and gets temporary flag
+    ! do k = 1, hvy_n(tree_ID)
+    !     hvy_ID = hvy_active(k, tree_ID)
+    !     ! check if block is leaf-block / any daughter exists
+    !     if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+    !         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+    !         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED
+    !     endif
+    ! end do
+    ! ! sync ref status
+
+
     ! In order to not investigate blocks again, we will give everyone a temporary flag that they are not wavelet decomposed yet
     do k = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k, tree_ID)
@@ -279,40 +295,158 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
 end subroutine
 
 
-subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh)
+
+! subroutine cvs_init_mothers_tree(params, tree_ID, verbose_check)
+!     implicit none
+
+!     type (type_params), intent(in)      :: params
+!     integer(kind=ik), intent(in)        :: tree_ID
+!     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
+
+!     integer(kind=ik)     :: i_loop, j, k, N, lgt_ID, hvy_ID, lgt_n_old, g_this, level_b, ref_stat, iteration, level, data_rank, lgt_merge_id
+!     real(kind=rk)        :: t_block, t_loop
+!     character(len=clong) :: toc_statement
+!     logical              :: iterate
+!     ! list of block ids, proc ranks
+!     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
+!     integer(kind=tsize)                 :: treecode
+
+!     ! Start with all blocks
+!     do k = 1, lgt_n(tree_ID)
+!         lgt_ID = lgt_active(k, tree_ID)
+!         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED            
+!     end do
+
+!     ! loop downwards until all blocks are on Jmin
+!     level       = maxActiveLevel_tree(tree_ID) ! leaf-wise blocks can have this as maximum level
+!     iteration   = 0
+!     do i_loop = level, params%Jmin, -1
+!         ! watch for completeness
+!         do k = 1, hvy_n(tree_ID)
+!             hvy_id = hvy_active(k, tree_ID)
+!             call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+!             call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
+!         enddo
+
+!         !---------------------------------------------------------------------------
+!         ! create new empty blocks on rank with most daughters if it does not exist
+!         !---------------------------------------------------------------------------
+!         do k = 1, hvy_n(tree_ID)
+!             hvy_ID = hvy_active(k, tree_ID)
+!             call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+!             level_b = lgt_block( lgt_ID, IDX_MESH_LVL )
+
+!             ! check if block wants to be refined and does not have a mother yet
+!             if ( lgt_block(lgt_ID, IDX_REFINE_STS) == -1 .and. hvy_family(hvy_ID, 1) == -1) then
+!                 ! Get all sisters and figure out on which rank the sisters lie
+!                 lgt_daughters(1:N) = hvy_family(hvy_ID, 2:1+2**params%dim)
+!                 do j = 1, N
+!                     call lgt2proc( rank_daughters(j), lgt_daughters(j), params%number_blocks )
+!                 enddo
+!                 ! The merging will be done on the mpirank which holds the most of the sister blocks
+!                 data_rank = most_common_element( rank_daughters(1:N) )
+    
+!                 ! construct new mother block if on my rank and create light data entry for the new block
+!                 if (data_rank == params%rank) then
+!                     call get_free_local_light_id(params, data_rank, lgt_merge_id, message="init_mothers")
+!                     treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+
+!                     ! set meta_data of mother block
+!                     lgt_block( lgt_merge_id, : ) = -1
+!                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
+!                         dim=params%dim, level=level_b-1, max_level=params%Jmax))
+!                     lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_b-1
+!                     if (level_b-1 > params%Jmin) then ! blocks >Jmin want to coarsen in next iteration
+!                         lgt_block( lgt_merge_id, IDX_REFINE_STS ) = -1
+!                     else ! blocks on JMin cannot coarsen further
+!                         lgt_block( lgt_merge_id, IDX_REFINE_STS ) = 0
+!                     endif
+!                     lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
+
+!                     ! update sisters on my rank that they have found their mother and can be skipped
+!                     do j = 1, N
+!                         if (rank_daughters(j) == params%rank .and. lgt_daughters(j) /= lgt_merge_id) then
+!                             call lgt2hvy(hvy_ID, lgt_daughters(j), params%rank, params%number_blocks)
+!                             hvy_family(hvy_ID, 1) = lgt_merge_id
+!                         endif
+!                     enddo
+
+!                     ! write(*, '("Rank ", i0, " created a new block: ", i0, " with TC ", b64.64)') rank, lgt_merge_id, tc_clear_until_level_b(treecode, &
+!                     ! dim=params%dim, level=level-1, max_level=params%Jmax)
+!                 endif
+
+!                 ! change refinement block that it was treated, we will not need it again
+!                 lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+!             endif
+!         enddo
+!         ! the active lists are outdated, so lets resynch
+!         call synchronize_lgt_data( params, refinement_status_only=.false.)
+!         ! update metadata for overlapping grid, blocks need to find their sisters and mothers!
+!         call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_neighbors=.false.)
+
+!         ! increase iteration counter
+!         iteration = iteration+1
+!     enddo
+
+!     ! At last, we update all neighbor relations
+!     call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_lists=.false., update_neighbors=.true., update_family=.false.)
+! end subroutine
+
+
+
+! JB ToDo: This is still kind of work in progress, for 2D L2 thresholding is implemented and for 3D Linfty
+subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh, JMax_active)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
     implicit none
 
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(in)  :: params
     !> heavy data array, WDed values in spaghetti form
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: tree_ID
-    real(kind=rk), intent(in)           :: thresh      !< Threshold for CVS to be applied to all WC
+    real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
+    integer(kind=ik), intent(in)    :: tree_ID
+    real(kind=rk), intent(in)       :: thresh      !< Threshold for CVS to be applied to all WC
+    integer(kind=ik), intent(in)    :: JMax_active !< if not provided it will be computed
 
-    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, level_me, JMax_active
+    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, level_me, JMaxActive
     real(kind=rk)    :: level_fac, wc_fac
 
     ! is the first point a SC or WC?
     even_odd = mod(params%g + 1, 2)
 
-    JMax_active = maxActiveLevel_tree(tree_ID)
+    if (present(JMax_active)) then
+        JMaxActive = JMax_active
+    else
+        JMaxActive = maxActiveLevel_tree(tree_ID)
+    endif
 
     do i_b = 1, hvy_n(tree_ID)
         hvy_ID = hvy_active(i_b, tree_ID)
         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
         level_me = lgt_block(lgt_ID, IDX_MESH_LVL)
-        level_fac = ( 2.0_rk**(+dble((level_me-JMax_active)*params%dim)/2.0_rk) )
+
+        wc_fac = 1.0_rk
+        if (params%eps_norm == "L2") then
+            level_fac = ( 2.0_rk**(+dble((level_me-JMaxActive)*params%dim)/2.0_rk) )
+        elseif (params%eps_norm == "H1") then
+            level_fac = ( 2**(-level_me*(params%dim+2.0_rk)*0.5_rk) )
+        else
+            level_fac = 1.0
+        endif
         
         if (params%dim == 2) then
             do iy = 1, params%Bs(2)+2*params%g
                 do ix = 1, params%Bs(1)+2*params%g
                     ! skip SC
                     if (mod(ix, 2) == even_odd .and. mod(iy, 2) == even_odd) cycle
-                    ! WC for WXY have factor 2
-                    wc_fac = 1.0_rk
-                    if (mod(ix, 2) == 1-even_odd .and. mod(iy, 2) == 1-even_odd) wc_fac = 2.0_rk
+
+                    ! WC need to be renormalized
+                    if (params%eps_norm == "L2") then
+                        wc_fac = 0.5_rk  ! 2.0_rk**(-(params%dim)/2.0_rk)
+                        if (mod(ix, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
+                        if (mod(iy, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
+                    endif
+
                     ! apply thresholding
                     if (abs(hvy_block(ix, iy, 1, 1, hvy_ID)) < thresh * level_fac * wc_fac) then
                         hvy_block(ix, iy, 1, 1, hvy_ID) = 0.0
@@ -325,9 +459,17 @@ subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh)
                     do ix = 1, params%Bs(1)+2*params%g
                         ! skip SC
                         if (mod(ix, 2) == even_odd .and. mod(iy, 2) == even_odd .and. mod(iz, 2) == even_odd) cycle
-                        ! JB ToDo: We do not know how to adapt for cross components yet, this is still tdb!
+
+                        ! WC need to be renormalized
+                        if (params%eps_norm == "L2") then
+                            wc_fac = 1/(sqrt(2.0_rk)*2.0_rk)  ! 2.0_rk**(-(params%dim)/2.0_rk)
+                            if (mod(ix, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
+                            if (mod(iy, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
+                            if (mod(iz, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
+                        endif
+
                         ! apply thresholding
-                        if (abs(hvy_block(ix, iy, iz, 1, hvy_ID)) < thresh * level_fac) then
+                        if (abs(hvy_block(ix, iy, iz, 1, hvy_ID)) < thresh * level_fac * wc_fac) then
                             hvy_block(ix, iy, iz, 1, hvy_ID) = 0.0
                         endif
                     enddo

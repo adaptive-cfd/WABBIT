@@ -105,6 +105,7 @@ subroutine post_denoising(params)
     call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
     call saveHDF5_tree( "denoised_000000.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID)
+    ! Noise will be computed during adapt_tree in hvy_tmp, however this is only correct without load balancing (nProcs=1) and without coarsening
     call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID)
 
     if (verbose) then

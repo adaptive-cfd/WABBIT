@@ -95,6 +95,21 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
     u_wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = 0.0_rk
 
+    ! for L2 norm, the cross components need to be renormalized
+    ! JB ToDo: Maybe this can be done more clever, maybe not multiply but simply have several maxima values?
+    if (params%eps_norm == "L2") then
+        ! components W_X, W_Y, W_Z    have factor 2**(dim/2-1)
+        !            W_xy, W_xz, W_yz have factor 2**(dim/2-2)
+        !            W_xyz             has factor 2**(dim/2-3)
+        ! We treat this by multiplying all values by 2**(dim/2) and then dividing by 2 in each direction for the WC values
+        u_wc(:, :, :, 1:nc) = u_wc(:, :, :, 1:nc) * 2.0_rk**(dble(params%dim)/2.0_rk)
+        u_wc(idx(1,1)+1:idx(2,1)+1:2, :, :, 1:nc) = u_wc(idx(1,1)+1:idx(2,1)+1:2, :, :, 1:nc) / 2.0_rk
+        u_wc(:, idx(1,2)+1:idx(2,2)+1:2, :, 1:nc) = u_wc(:, idx(1,2)+1:idx(2,2)+1:2, :, 1:nc) / 2.0_rk
+        if (params%dim == 3) then
+            u_wc(:, :, idx(1,3)+1:idx(2,3)+1:2, 1:nc) = u_wc(:, :, idx(1,3)+1:idx(2,3)+1:2, 1:nc) / 2.0_rk
+        endif
+    endif
+
     do p = 1, nc
         ! if all details are smaller than C_eps, we can coarsen, check interior WC only
         detail(p) = maxval( abs(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)) )
@@ -151,7 +166,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
-        ! we have to have a level-dependent threshold
+        ! threshold has to be level dependent
         eps_use = eps_use * ( 2.0_rk**(+dble((level-Jmax)*params%dim)/2.0_rk) )
 
     case ("H1")

@@ -239,6 +239,7 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
     
                 ! The merging will be done on the mpirank which holds the most of the sister blocks
                 data_rank = most_common_element( rank_daughters(1:N) )
+                ! data_rank = rank_daughters(N)  ! experimental but deterministic mother choice
     
                 ! construct new mother block if on my rank and create light data entry for the new block
                 if (data_rank == rank) then
@@ -330,8 +331,8 @@ subroutine executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag,
 end subroutine executeCoarsening_WD_tree
 
 
-!> For CVS reconstruction we need to update daughters from reconstruction of mothers, this does exactly that
-subroutine sync_M2D_level(params, hvy_block, tree_ID, level)
+!> For CVS decomposition we need to update mothers from decomposed daughter values, this does exactly that
+subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -340,13 +341,12 @@ subroutine sync_M2D_level(params, hvy_block, tree_ID, level)
     type (type_params), intent(in)      :: params                       !< user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
-    integer(kind=ik), intent(in)        :: level                        !< level of mothers
+    character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
 
     ! loop variables
-    integer(kind=ik)                    :: k, Jmax, N, j, rank
-    ! rank of proc to keep the coarsened data
-    integer(kind=ik)                    :: data_rank, n_xfer, lgtID, hvyID, level_me
-    integer(kind=ik)                    :: nx, ny, nz, nc
+    integer(kind=ik)                    :: k, sync_case_id, nc, data_rank, n_xfer, lgt_ID, hvy_ID, level_me, ref_me
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -355,34 +355,41 @@ subroutine sync_M2D_level(params, hvy_block, tree_ID, level)
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
-    nx = size(hvy_block,1)
-    ny = size(hvy_block,2)
-    nz = size(hvy_block,3)
     nc = size(hvy_block,4)
-
-    Jmax = params%Jmax
-    rank = params%rank
-    ! number of blocks to merge, 4 or 8
-    N = 2**params%dim
-    ! at worst every block is on a different rank
     if (allocated(wc)) then
         if (size(wc, 4) < nc) deallocate(wc)
     endif
-    if (.not. allocated(wc)) allocate(wc(1:nx, 1:ny, 1:nz, 1:nc) )
+    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:nc) )
+
+    select case(sync_case)
+    case("level")
+        sync_case_id = 1
+    case("ref")
+        sync_case_id = 2
+    case default
+        call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
+    end select
 
     !---------------------------------------------------------------------------
     ! transfer all daughters to mallat format, so that sending is smooth
     !---------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k, tree_ID)
-        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+        ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
+        ! skip some blocks
+        if (sync_case_ID == 1) then
+            if (level_me /= s_val) cycle
+        elseif (sync_case_ID == 2) then
+            if (ref_me /= s_val) cycle
+        endif
 
-        ! check if block exists and (mother block on same level) or (block on finer level (MUST BE daughter block))
-        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. level_me == level+1) then
+        ! check if block exists and actually has a mother
+        if ( lgt_block(lgt_ID, IDX_TC_1 ) >= 0 .and. .not. block_is_root(params, hvy_ID)) then
             ! This block will send or receive and its data needs to be transferred to Mallat for correct copying
-            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
         endif
     enddo
 
@@ -395,20 +402,141 @@ subroutine sync_M2D_level(params, hvy_block, tree_ID, level)
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_level", ncomponents=size(hvy_block, 4), s_val=level)
-    call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_" // sync_case, ncomponents=nc, s_val=s_val)
+    call xfer_block_data(params, hvy_block, tree_ID, n_xfer, verbose_check=.true.)
 
-    ! now the daughter blocks need to be retransformed to spaghetti and mother blocks can be deleted
+    ! now the daughter blocks need to be retransformed to spaghetti
     do k = 1, hvy_n(tree_ID)
-        hvyID = hvy_active(k, tree_ID)
-        call hvy2lgt(lgtID, hvyID, rank, params%number_blocks)
-        level_me = lgt_block( lgtID, IDX_MESH_LVL )
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+        ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
+        ! skip some blocks
+        if (sync_case_ID == 1) then
+            if (level_me /= s_val) cycle
+        elseif (sync_case_ID == 2) then
+            if (ref_me /= s_val) cycle
+        endif
 
-        if ( lgt_block(lgtID, IDX_TC_1 ) >= 0 .and. level_me == level+1) then
+        ! check if block exists and actually has a mother
+        if ( lgt_block(lgt_ID, IDX_TC_1 ) >= 0 .and. .not. block_is_root(params, hvy_ID)) then
             ! block has to be retransformed into spaghetti form
-            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvyID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvyID) = wc(:,:,:,1:nc)
+            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
         endif
     enddo
 
-end subroutine sync_M2D_level
+end subroutine sync_D2M
+
+
+!> For CVS reconstruction we need to update daughters from reconstructed mothers, this does exactly that
+subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+
+    type (type_params), intent(in)      :: params                       !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
+    integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
+    character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
+
+    ! loop variables
+    integer(kind=ik)                    :: k, sync_case_id, n_xfer, lgt_ID, hvy_ID, lgt_ID_m, level_m, ref_m, nc
+    logical                             :: change_form
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
+
+    nc = size(hvy_block,4)
+    if (allocated(wc)) then
+        if (size(wc, 4) < nc) deallocate(wc)
+    endif
+    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:nc) )
+
+    select case(sync_case)
+    case("level")
+        sync_case_id = 1
+    case("ref")
+        sync_case_id = 2
+    case default
+        call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
+    end select
+
+    !---------------------------------------------------------------------------
+    ! daughters will actually receive all values in mallat form, we need to change them to mallat to not overwrite WC
+    ! block needs to check if it will receive values and if this is the case - change form
+    !---------------------------------------------------------------------------
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        change_form = .false.
+        
+        ! check if mother exists and wants to send this block data
+        if (.not. block_is_root(params, hvy_ID)) then
+            lgt_ID_m = hvy_family(hvy_ID, 1)
+            level_m = lgt_block( lgt_ID_m, IDX_MESH_LVL )
+            ref_m = lgt_block( lgt_ID_m, IDX_REFINE_STS)
+            ! for some calls we don't want to work on whole tree so skip some blocks
+            if (sync_case_ID == 1) then
+                if (level_m == s_val) change_form = .true.
+            elseif (sync_case_ID == 2) then
+                if (ref_m == s_val) change_form = .true.
+            endif
+        endif
+
+        if (change_form) then
+            ! block has to be transformed into Mallat form
+            call Spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+        endif
+    enddo
+
+    ! setup correct patches and get indices, used for move_mallat_patch_block
+    ! this is in theory only needed when we change g but if this is every done I want to avoid nasty bug finding
+    call family_setup_patches(params, output_to_file=.false.)
+    ! some tiny buffers depend on the number of components (nc=size(hvy_block,4))
+    ! make sure they have the right size
+    call xfer_ensure_correct_buffer_size(params, hvy_block)
+
+    ! actual xfer, this works on all blocks that are on this level and have a daughter
+    n_xfer = 0  ! transfer counter
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_val=s_val)
+    call xfer_block_data(params, hvy_block, tree_ID, n_xfer, verbose_check=.true.)
+
+    !---------------------------------------------------------------------------
+    ! daughters will actually receive all values in mallat form, we need to recopy them to spaghetti to continue
+    ! block needs to check if it received values and if this is the case - change form
+    !---------------------------------------------------------------------------
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+        change_form = .false.
+        
+        ! check if mother exists and wants to send this block data
+        if (.not. block_is_root(params, hvy_ID)) then
+            lgt_ID_m = hvy_family(hvy_ID, 1)
+            level_m = lgt_block( lgt_ID_m, IDX_MESH_LVL )
+            ref_m = lgt_block( lgt_ID_m, IDX_REFINE_STS)
+            ! for some calls we don't want to work on whole tree so skip some blocks
+            if (sync_case_ID == 1) then
+                if (level_m == s_val) change_form = .true.
+            elseif (sync_case_ID == 2) then
+                if (ref_m == s_val) change_form = .true.
+            endif
+        endif
+
+        if (change_form) then
+            ! block has to be retransformed into spaghetti form
+            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
+            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+        endif
+    enddo
+
+end subroutine sync_M2D

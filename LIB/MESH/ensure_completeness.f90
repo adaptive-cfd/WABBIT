@@ -30,16 +30,21 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
     if (present(check_daughters)) checkDaughters = check_daughters
 
     ! if all sisters exists, then the array should not contain -1
-    if ( all(sisters(1:N_sisters) /= -1) ) then
+    if ( all(sisters(1:N_sisters) /= -1)  ) then
 
         lgt_sisters = lgt_block(sisters(1:N_sisters), IDX_REFINE_STS )
+        ! zeroth check : any block exists but has flag REF_TMP_EMPTY, so it has no values and all have to wait
+        if ( any(lgt_sisters(:) == REF_TMP_EMPTY) ) then
+            do l = 1, N_sisters
+                if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
+            enddo
 
         ! first check : any block wants to stay so all blocks have to stay
-        if ( any(lgt_sisters(:) == 0) ) then
+        elseif ( any(lgt_sisters(:) == 0) ) then
             lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = 0
 
         ! second check: any block has temp_gradedness flag > 1 - all blocks that want to stay have to wait with temp flag
-        elseif ( any(lgt_sisters(:) > 1)) then
+        elseif ( any(lgt_sisters(:) == REF_TMP_GRADED_STAY) .or. any(lgt_sisters(:) == REF_TMP_UNTREATED_WAIT)) then
             do l = 1, N_sisters
                 if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
             end do
@@ -54,7 +59,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
 
         ! for CVS grids we need to check if we have a daughter and if so, if she'd like to coarsen as well
         ! all sisters share the same mother, so this hvy operation will be done correctly on all processors
-        if (checkDaughters .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if (checkDaughters .and. .not. block_is_leaf(params, hvy_id)) then
             ! family takes care of one another - if any wants to stay then me and all my sisters have to stay as well
             do l = 2+2**params%dim, 1+2**(params%dim+1)
                 lgt_daughter = hvy_family(hvy_ID, l)
@@ -72,7 +77,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
         do l = 1, N_sisters
             ! change status only for the existing sisters, mark temporary for leaf-wise as maybe this sister will be created soon
             if (sisters(l) /= -1) then
-                lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
+                if (lgt_block( sisters(l), IDX_REFINE_STS ) == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
             endif
         end do
     end if
@@ -110,7 +115,7 @@ subroutine ensure_mother_neighbors( params, hvy_id, mark_TMP_flag)
         if (params%dim == 2 .and. is_3D_neighbor(i_n)) cycle
 
         ! check if block is non-leaf and if there is a medium-lvl neighbor in those patches
-        if (all(hvy_neighbor(hvy_id, np_l(i_n, 0):np_u(i_n, 0)) == -1) .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if (.not. block_has_valid_neighbor(params, hvy_id, i_n, 0) .and. .not. block_is_leaf(params, hvy_id)) then
             mother_finds_all_neighbors = .false.
         endif
     enddo
@@ -121,3 +126,45 @@ subroutine ensure_mother_neighbors( params, hvy_id, mark_TMP_flag)
     endif
 
 end subroutine ensure_mother_neighbors
+
+
+
+!> \brief Ensures no block can WD when they would need to sync with finer neighbor
+!> \details Any sync from finer neighbors for interior blocks would results in an interior CE that needs to be done, as some SC are copied.
+!! This has to be avoided in order to retain the solution quality. We therefore check if a block does not have all medium lvl neighbors and yes, it has to wait.
+!! It introduces another flag as this is BEFORE wavelet decomposition (We don't want blocks to stop from that as this again affects neighbors and so forth)
+subroutine block_can_WD_safely(params, hvy_id)
+    implicit none
+
+    type (type_params), intent(in)  :: params                !< user defined parameter structure
+    integer(kind=ik), intent(in)    :: hvy_id                !< Concerned Block
+
+    integer(kind=ik)                :: i_n, lgt_id, markTMPflag
+    logical                         :: can_block_WD_safely
+
+    call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
+    can_block_WD_safely = .true.
+    ! leafs can always WD safely as we will need to do a CE here
+    if (.not. block_is_leaf(params, hvy_id)) then
+        ! loop over all possible patches that a block can have even though some are looked at multiple times
+        do i_n = 1,56
+            ! skip patches not available for 2D
+            if (params%dim == 2 .and. is_3D_neighbor(i_n)) cycle
+
+            ! check if there is a medium-lvl neighbor in those patches
+            if (.not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
+                can_block_WD_safely = .false.
+                exit
+            endif
+        enddo
+    endif
+
+    if (.not. can_block_WD_safely) then
+        ! block needs to wait
+        lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_UNTREATED_WAIT
+    else
+        ! block can go
+        lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_UNTREATED
+    endif
+end subroutine

@@ -63,8 +63,8 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
 
                 ! coarse extension for coarser neighbors
                 ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
-                if (level_n < level_me .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+                if (level_n < level_me .and. block_is_leaf(params, hvy_ID) &
+                .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
                     ! manipulation of coeffs
                     call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
                     if (.not. clearWcOnly) then
@@ -146,8 +146,8 @@ subroutine coarse_extension_reconstruct_tree(params, hvy_data, hvy_tmp, tree_ID,
                 level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
 
                 ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
-                if ((level_n < level_me) .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                    .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+                if ((level_n < level_me) .and. block_is_leaf(params, hvy_ID) &
+                    .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
                     toBeManipulated = .true.
                     exit
                 endif
@@ -184,8 +184,8 @@ subroutine coarse_extension_reconstruct_tree(params, hvy_data, hvy_tmp, tree_ID,
 
                     ! coarse extension for coarser neighbors
                     ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
-                    if (level_n < level_me .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                        .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+                    if (level_n < level_me .and. block_is_leaf(params, hvy_ID) &
+                        .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
                         ! coarse extension case (neighbor is coarser)
                         idx(:, :) = 1
                         call get_indices_of_modify_patch(params%g, params%dim, i_n, idx, (/ nx, ny, nz/), &

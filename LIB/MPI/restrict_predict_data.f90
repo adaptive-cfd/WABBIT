@@ -161,8 +161,8 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn, ijk)
         lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
         if ( lgt_ID_n /= -1 ) then
             lvl_diff = lvl_me - lgt_block(lgt_ID_n, IDX_MESH_LVL)
-            if ((lvl_diff == -1 .or. lvl_diff == +1) .and. all(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) == -1) &
-                .and. all(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) == -1)) then
+            if ((lvl_diff == -1 .or. lvl_diff == +1) .and. block_is_leaf(params, hvy_ID) &
+                .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
                 call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), i_n, ijk=ijk)
             endif
         endif

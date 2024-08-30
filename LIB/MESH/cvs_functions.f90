@@ -16,35 +16,24 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
     character(len=clong) :: toc_statement
     logical              :: iterate
 
-    ! ! at first, initialize all mothers without any values yet
-    ! t_block = MPI_Wtime()
-    ! call cvs_init_mothers_tree(params, tree_ID)
-    ! call toc( "adapt_tree (init mothers)", 103, MPI_Wtime()-t_block )
-    ! ! Leaf layer starts and gets temporary flag
-    ! do k = 1, hvy_n(tree_ID)
-    !     hvy_ID = hvy_active(k, tree_ID)
-    !     ! check if block is leaf-block / any daughter exists
-    !     if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
-    !         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-    !         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED
-    !     endif
-    ! end do
-    ! ! sync ref status
-
-
-    ! In order to not investigate blocks again, we will give everyone a temporary flag that they are not wavelet decomposed yet
+    ! In order to start with leaf-wise investigation, these will receive the correct ref flag
     do k = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k, tree_ID)
-        lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED            
+        lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED
     end do
+    ! do backup here so we need less logic in synching neighbors
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+    enddo
 
-    ! Idea: One of the very expensive things is updateMetadata_tree for overfull grids, where a block checks all 56*3 possible neighbors
-    ! We could create beforehand all mothers for this loop and give them a REF flag of TMP_MOTHER or something so that we do not sync with them
-    ! Then, we always only move the leaf layer downwards, WD the blocks and sync values with the mothers
-    ! Syncing lgt_block is then also only done for refinement status
-    ! JB ToDo, give new refinement status of blocks that have none-sense values and do not allow syncing
+    ! at first, initialize all mothers without any values yet
+    t_block = MPI_Wtime()
+    call cvs_init_mothers_tree(params, tree_ID)
+    call toc( "adapt_tree (init mothers)", 102, MPI_Wtime()-t_block )
+    ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status REF_TMP_UNTREATED
 
-    ! iteration for wavelet decomposition - no blocks will be deleted during the loop!
+    ! iteration for wavelet decomposition - no blocks will be created or deleted during the loop!
     level       = maxActiveLevel_tree(tree_ID) ! leaf-wise blocks can have this as maximum level
     iterate     = .true.
     iteration   = 0
@@ -56,13 +45,13 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
         ! do k = 1, hvy_n(tree_ID)
         !     hvy_ID = hvy_active(k, tree_ID)
         !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     if (params%rank == 0 .and. lgt_block(lgt_id, IDX_REFINE_STS) == REF_TMP_UNTREATED .and. iteration >= 2) then
+        !     ! if (params%rank == 0 .and. lgt_block(lgt_id, IDX_REFINE_STS) == REF_TMP_UNTREATED .and. iteration >= 2) then
         !     ! if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 54525952) then
-        !         write(*, '("1 I-", i0, " R-", i0, " B-", i0, " L-", i0, " Ref-", i0, " TC-", i0)') iteration, params%rank, lgt_ID, &
+        !         write(*, '("1 I-", i0, " R-", i2, " B-", i6, " L-", i2, " Ref-", i3, " TC-", i0)') iteration, params%rank, lgt_ID, &
         !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)
-        !         call write_neighborhood_info(hvy_neighbor(hvy_id, :), params%dim)
+        !         ! call write_neighborhood_info(hvy_neighbor(hvy_id, :), params%dim)
         !         ! call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), "block_cvs_9.txt", params%Bs, params%g)
-        !     endif
+        !     ! endif
         ! enddo
 
         ! synchronize ghost nodes - required to apply wavelet filters
@@ -85,8 +74,8 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         endif
 
-        ! Wavelet-transform all remaining non-decomposed blocks
-        ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form
+        ! Wavelet-transform all blocks which are untreated
+        ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form for these blocks
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)
@@ -99,6 +88,7 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
             ! FWT required for a block that is on the level
             if (ref_stat == REF_TMP_UNTREATED) then
                 ! hvy_tmp now is a copy with sync'ed ghost points.
+                ! We actually copy here a second time but this is to ensure we have the correct ghost points saved, and copying is not too expensive anyways
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
                 level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
 
@@ -144,40 +134,67 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
             call respectJmaxJmin_tree( params, tree_ID )
             call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
 
-            ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
-            ! to find all needed neighbors, so we let the block wait if that is the case
-            do k = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k, tree_ID)
-                call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
-            enddo
-            ! after locally modifying refinement statusses, we need to synchronize light data
-            call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
+            ! ! to find all needed neighbors, so we let the block wait if that is the case
+            ! do k = 1, hvy_n(tree_ID)
+            !     hvy_id = hvy_active(k, tree_ID)
+            !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+            !     if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) then
+            !         call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
+            !     endif
+            ! enddo
+            ! ! after locally modifying refinement statusses, we need to synchronize light data
+            ! call synchronize_lgt_data( params, refinement_status_only=.true. )
+
             ! watch for completeness
             do k = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
             enddo
-            ! Details are not synced between procs, however all procs correctly know which blocks to delete if they have one block in there
-            ! The rest will be synced in executeCoarsening
-            ! call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! set mother block status, this is done here so that it will directly be synchronized with next sync_lgt call
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) then
+                    lgt_block(hvy_family(hvy_ID, 1), IDX_REFINE_STS) = REF_TMP_UNTREATED
+                endif
+            enddo
+            ! Details are synced so that blocks send to the correct neighbors
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
 
             ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             ! Create or update mother blocks with SC of daughter blocks
             ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
             t_block = MPI_Wtime()
-            call executeCoarsening_WD_tree( params, hvy_block, tree_ID, mark_TMP_flag=.true., no_deletion=.true.)
+            call sync_D2M(params, hvy_block, tree_ID, sync_case="ref", s_val=-1)
             call toc( "adapt_tree (update_mothers)", 111, MPI_Wtime()-t_block )
+
+            ! now the daughter blocks are reset, lgt-loop to avoid synching
+            do k = 1, lgt_n(tree_ID)
+                lgt_ID = lgt_active(k, tree_ID)
+                if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            enddo
+
+            ! check if mother is happy to exist and can continue or if it wants to wait for all medium neighbors
+            ! this also frees it of this burden if it ever happened and it now has all required neighbors
+            ! it is the equivalent to ensure_gradedness
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                ! Here we also directly backup all values for the first time
+                if (lgt_block( lgt_ID, IDX_REFINE_STS) == REF_TMP_UNTREATED) then
+                    hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+                endif
+                if (any(lgt_block( lgt_ID, IDX_REFINE_STS) == (/REF_TMP_UNTREATED, REF_TMP_UNTREATED_WAIT /) )) then
+                    call block_can_WD_safely(params, hvy_id)
+                endif
+            enddo
+            ! Details are synced so that blocks send to the correct neighbors
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
 
             write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " update_mothers)"
             call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
-
-            ! In executeCoarsening we already sync list and family but not neighbors, as no blocks are deleted there we only do this then here
-            ! This call is surprisingly expensive as for overlapping search we always check all 56*3 possible neighbors for every loop
-            t_block = MPI_Wtime()
-            call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_lists=.false., update_neighbors=.true., update_family=.false.)
-            call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
-
         endif
 
         ! iteration counter
@@ -191,13 +208,22 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
         write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " TOTAL)"
         call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
 
-        ! write(toc_statement, '(A, i6.6, A)') "test_", iteration, "000000.h5"
-        ! call saveHDF5_tree( toc_statement, 0.0 + dble(iteration), iteration, 1, params, hvy_tmp, tree_ID, no_sync=.true.)
-
         if (present(verbose_check)) then
             write(*, '(A, i0, A, i0, A)') "Loop ", iteration, " with ", lgt_n(tree_ID), " blocks"
         endif
+
+        ! ! for debugging purposes
+        ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', iteration, "000000.h5"
+        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_block, tree_ID )
+        ! write( toc_statement,'(A, i6.6, A)') 'TestN_', iteration, "000000.h5"
+        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_tmp, tree_ID )
     end do
+
+    ! ! for debugging purposes
+    ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_block, tree_ID )
+    ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_tmp, tree_ID )
 
     ! log some statistics - amount of iterations
     if (present(log_iterations)) log_iterations = iteration
@@ -281,7 +307,7 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
 
         ! now we need to update the SC of all daughters
         t_block = MPI_Wtime()
-        call sync_M2D_level(params, hvy_block, tree_ID, level)
+        call sync_M2D(params, hvy_block, tree_ID, sync_case="level", s_val=level)
         call toc( "adapt_tree (sync level 2 daughters)", 114, MPI_Wtime()-t_block )
 
         write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level 2 daughters)"
@@ -296,101 +322,87 @@ end subroutine
 
 
 
-! subroutine cvs_init_mothers_tree(params, tree_ID, verbose_check)
-!     implicit none
+!> \brief This functions inits all mother blocks from a leaf-only grid down to JMin
+subroutine cvs_init_mothers_tree(params, tree_ID, verbose_check)
+    implicit none
 
-!     type (type_params), intent(in)      :: params
-!     integer(kind=ik), intent(in)        :: tree_ID
-!     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
+    type (type_params), intent(in)      :: params
+    integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
-!     integer(kind=ik)     :: i_loop, j, k, N, lgt_ID, hvy_ID, lgt_n_old, g_this, level_b, ref_stat, iteration, level, data_rank, lgt_merge_id
-!     real(kind=rk)        :: t_block, t_loop
-!     character(len=clong) :: toc_statement
-!     logical              :: iterate
-!     ! list of block ids, proc ranks
-!     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
-!     integer(kind=tsize)                 :: treecode
+    integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit
+    real(kind=rk)        :: t_block, t_loop
+    character(len=clong) :: toc_statement
+    logical              :: iterate
+    ! list of block ids, proc ranks
+    integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
+    integer(kind=tsize)                 :: treecode
 
-!     ! Start with all blocks
-!     do k = 1, lgt_n(tree_ID)
-!         lgt_ID = lgt_active(k, tree_ID)
-!         lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED            
-!     end do
+    ! number of blocks to merge, 4 or 8
+    N = 2**params%dim
+    ! loop downwards until all blocks are on Jmin
+    level       = maxActiveLevel_tree(tree_ID) ! leaf-wise blocks can have this as maximum level
+    iteration   = 0
 
-!     ! loop downwards until all blocks are on Jmin
-!     level       = maxActiveLevel_tree(tree_ID) ! leaf-wise blocks can have this as maximum level
-!     iteration   = 0
-!     do i_loop = level, params%Jmin, -1
-!         ! watch for completeness
-!         do k = 1, hvy_n(tree_ID)
-!             hvy_id = hvy_active(k, tree_ID)
-!             call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-!             call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
-!         enddo
+    ! J: I have decided for the following way of creating mother blocks
+    !   - main loop goes refine-evolve-coarsen, so first iteration will work on all available block
+    !     it is the one with the most data to send and it's nice that we can choose any of the ranks here (as they are all the same)
+    !   - after first iteration, not all sister-information are available, I just create the following mothers after a deterministic way
+    !     and choose the rank of the block with the highest digit, this ensures some form of spread of ranks, after all I do not really care anymore about the amount of data
 
-!         !---------------------------------------------------------------------------
-!         ! create new empty blocks on rank with most daughters if it does not exist
-!         !---------------------------------------------------------------------------
-!         do k = 1, hvy_n(tree_ID)
-!             hvy_ID = hvy_active(k, tree_ID)
-!             call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-!             level_b = lgt_block( lgt_ID, IDX_MESH_LVL )
+    ! just loop until hvy_n does not change anymore, that means all possible mothers have been created
+    do while( hvy_n_old /= hvy_n(tree_ID) )
+        !---------------------------------------------------------------------------
+        ! create new empty blocks on rank with block with digit = 2**dim-1
+        !---------------------------------------------------------------------------
+        do k = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+            level_b = lgt_block( lgt_ID, IDX_MESH_LVL )
 
-!             ! check if block wants to be refined and does not have a mother yet
-!             if ( lgt_block(lgt_ID, IDX_REFINE_STS) == -1 .and. hvy_family(hvy_ID, 1) == -1) then
-!                 ! Get all sisters and figure out on which rank the sisters lie
-!                 lgt_daughters(1:N) = hvy_family(hvy_ID, 2:1+2**params%dim)
-!                 do j = 1, N
-!                     call lgt2proc( rank_daughters(j), lgt_daughters(j), params%number_blocks )
-!                 enddo
-!                 ! The merging will be done on the mpirank which holds the most of the sister blocks
-!                 data_rank = most_common_element( rank_daughters(1:N) )
-    
-!                 ! construct new mother block if on my rank and create light data entry for the new block
-!                 if (data_rank == params%rank) then
-!                     call get_free_local_light_id(params, data_rank, lgt_merge_id, message="init_mothers")
-!                     treecode = get_tc(lgt_block( lgt_daughters(1), IDX_TC_1:IDX_TC_2 ))
+            ! check if block does not have a mother yet and blocks are not on minimum level
+            if ( hvy_family(hvy_ID, 1) == -1 .and. level_b /= params%Jmin) then
+                ! Get digit
+                treecode = get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 ))
+                digit = tc_get_digit_at_level_b(treecode, params%dim, level_b, params%Jmax)
+                ! The merging will be done on the rank of the block with digit 2**dim-1
+                if (digit == 2**params%dim -1) then
+                    ! construct new mother block if on my rank and create light data entry for the new block
+                    call get_free_local_light_id(params, params%rank, lgt_merge_id, message="init_mothers")
+                    call lgt2hvy(hvy_merge_id, lgt_merge_id, params%rank, params%number_blocks)
+                    ! set meta_data of mother block
+                    lgt_block( lgt_merge_id, : ) = -1
+                    call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
+                        dim=params%dim, level=level_b-1, max_level=params%Jmax))
+                    lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_b-1
+                    lgt_block( lgt_merge_id, IDX_REFINE_STS ) = REF_TMP_EMPTY
+                    lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
+                    ! make sure family array for mother block is cleared
+                    hvy_family(hvy_merge_id, :) = -1
+                    
+                    ! update myself that I have created my own mother
+                    ! sisters will not be updated but as only one daughter will surely create the mother there will be no doubles
+                    hvy_family(hvy_ID, 1) = lgt_merge_id
+                endif
+            endif
+        enddo
 
-!                     ! set meta_data of mother block
-!                     lgt_block( lgt_merge_id, : ) = -1
-!                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
-!                         dim=params%dim, level=level_b-1, max_level=params%Jmax))
-!                     lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_b-1
-!                     if (level_b-1 > params%Jmin) then ! blocks >Jmin want to coarsen in next iteration
-!                         lgt_block( lgt_merge_id, IDX_REFINE_STS ) = -1
-!                     else ! blocks on JMin cannot coarsen further
-!                         lgt_block( lgt_merge_id, IDX_REFINE_STS ) = 0
-!                     endif
-!                     lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
+        ! we need to update hvy_active locally to be able to loop correctly
+        hvy_n_old = hvy_n(tree_ID)
+        call createHvyActive_tree(params, tree_ID)
 
-!                     ! update sisters on my rank that they have found their mother and can be skipped
-!                     do j = 1, N
-!                         if (rank_daughters(j) == params%rank .and. lgt_daughters(j) /= lgt_merge_id) then
-!                             call lgt2hvy(hvy_ID, lgt_daughters(j), params%rank, params%number_blocks)
-!                             hvy_family(hvy_ID, 1) = lgt_merge_id
-!                         endif
-!                     enddo
+        iteration = iteration + 1
 
-!                     ! write(*, '("Rank ", i0, " created a new block: ", i0, " with TC ", b64.64)') rank, lgt_merge_id, tc_clear_until_level_b(treecode, &
-!                     ! dim=params%dim, level=level-1, max_level=params%Jmax)
-!                 endif
+        if (present(verbose_check)) then
+            write(*, '(A, i0, A, i0, A, i0)') "R", params%rank, " Deterministic mother addition it ", iteration, ", hvy_n= ", hvy_n(tree_ID)
+        endif
+    enddo
 
-!                 ! change refinement block that it was treated, we will not need it again
-!                 lgt_block( lgt_id, IDX_REFINE_STS ) = 0
-!             endif
-!         enddo
-!         ! the active lists are outdated, so lets resynch
-!         call synchronize_lgt_data( params, refinement_status_only=.false.)
-!         ! update metadata for overlapping grid, blocks need to find their sisters and mothers!
-!         call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_neighbors=.false.)
-
-!         ! increase iteration counter
-!         iteration = iteration+1
-!     enddo
-
-!     ! At last, we update all neighbor relations
-!     call updateMetadata_tree(params, tree_ID, search_overlapping=.true., update_lists=.false., update_neighbors=.true., update_family=.false.)
-! end subroutine
+    ! the active lists are outdated, so lets resynch
+    call synchronize_lgt_data( params, refinement_status_only=.false.)
+    ! At last, we update all full neighbor relations only once
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+end subroutine
 
 
 
@@ -408,17 +420,11 @@ subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh, JMax_active)
     real(kind=rk), intent(in)       :: thresh      !< Threshold for CVS to be applied to all WC
     integer(kind=ik), intent(in)    :: JMax_active !< if not provided it will be computed
 
-    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, level_me, JMaxActive
+    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, level_me
     real(kind=rk)    :: level_fac, wc_fac
 
     ! is the first point a SC or WC?
     even_odd = mod(params%g + 1, 2)
-
-    if (present(JMax_active)) then
-        JMaxActive = JMax_active
-    else
-        JMaxActive = maxActiveLevel_tree(tree_ID)
-    endif
 
     do i_b = 1, hvy_n(tree_ID)
         hvy_ID = hvy_active(i_b, tree_ID)
@@ -427,7 +433,7 @@ subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh, JMax_active)
 
         wc_fac = 1.0_rk
         if (params%eps_norm == "L2") then
-            level_fac = ( 2.0_rk**(+dble((level_me-JMaxActive)*params%dim)/2.0_rk) )
+            level_fac = ( 2.0_rk**(+dble((level_me-JMax_Active)*params%dim)/2.0_rk) )
         elseif (params%eps_norm == "H1") then
             level_fac = ( 2**(-level_me*(params%dim+2.0_rk)*0.5_rk) )
         else

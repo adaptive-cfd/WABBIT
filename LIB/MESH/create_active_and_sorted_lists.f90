@@ -1,128 +1,66 @@
-! !> \brief create all active (lgt/hvy) lists, create also sorted list of active
-! !! light blocks with numerical treecodes
-! !! input:    - light data
-! !! output:   - list of active blocks
-! !!           - number of active blocks
-! !!           - sorted light data with numerical treecodes
-! ! ********************************************************************************************
-! !> Updates active lgt/hvy lists from lgt_block data FOR ONE TREE by looping
-! !> over the hvy ids and synchronizing the active lists with the other procs
-! ! This routine updates active lists for A SINGLE TREE inside a forest
-! subroutine createActiveSortedLists_tree_comm( params, tree_ID)
+!> \brief Loops over all indices on this proc and fills hvy_active and hvy_n arrays
+!> CAUTION: This function works only on one proc, data will not be synced.
+!! Make sure you know what you are doing if using this outside createActiveAndSortedLists 
+subroutine createHvyActive_tree( params, tree_ID, my_lgt_send_buffer)
+    implicit none
+    !-----------------------------------------------------------------
+    type (type_params), intent(in)            :: params                   !< good ol' params
+    integer(kind=ik), intent(in)              :: tree_ID                  !< which tree to work on
+    integer(kind=ik), intent(inout), optional :: my_lgt_send_buffer(:,:)  !< if this is supplied, we fill this array too
+    !-----------------------------------------------------------------
 
-!     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
-!     use module_params
-    
-!     implicit none
-!     !-----------------------------------------------------------------
-!     type (type_params), intent(in)      :: params
-!     integer(kind=ik), intent(in)        :: tree_ID
-!     !-----------------------------------------------------------------
+    integer(kind=ik) :: hvy_ID, lgt_ID
+    ! real(kind=rk) :: t0
 
-!     integer(kind=ik)                    :: k, N, hvy_id, block_rank, ierr, lgt_id
-!     integer(kind=ik)                    :: rank, TREE_ID_IDX, N_blocks_tot, mpisize
-!     real(kind=rk) :: t0,t(5)
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
-!     integer(kind=ik), allocatable, save     :: proc_lgt_n(:), proc_lgt_start(:)
+    hvy_n(tree_ID) = 0
+    ! t0 = MPI_wtime()
 
-!     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
-!     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
-!     ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
-!     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
-!     ! to the last subroutine.)  -Thomas
+    ! =======================================================
+    ! loop over all hvy_data
+    ! =======================================================
+    do hvy_id = 1, params%number_blocks
+        call hvy2lgt( lgt_ID, hvy_id, params%rank, params%number_blocks )
 
-!     t0 = MPI_wtime()
+        ! check if block is active and it matches the tree_ID
+        ! performance: don't construct tc and check only first int if TC > 0
+        if (lgt_block(lgt_ID, IDX_TC_1 ) >= 0 .and. lgt_block(lgt_ID, IDX_TREE_ID) == tree_ID) then
+            ! ---------------------------
+            ! update hvy active
+            ! ---------------------------
+            ! save heavy id, only if proc responsable for block
+            hvy_n(tree_ID) = hvy_n(tree_ID) + 1
+            hvy_active( hvy_n(tree_ID), tree_ID ) = hvy_id
 
-!     mpisize = params%number_procs
-!     rank = params%rank
-!     N    = params%number_blocks
-!     TREE_ID_IDX = IDX_TREE_ID
+            ! for createActiveSortedList_tree we need to fill the buffer too
+            if (present(my_lgt_send_buffer)) then
+                ! sorted list
+                ! first index stores the light id of the block
+                my_lgt_send_buffer(1, hvy_n(tree_ID)) = lgt_ID
 
-!     if (.not.allocated(proc_lgt_n)) allocate( proc_lgt_n(1:mpisize) )
-!     if (.not.allocated(proc_lgt_start)) allocate( proc_lgt_start(1:mpisize) )
+                ! second and third index stores the numerical treecode
+                my_lgt_send_buffer(2:3, hvy_n(tree_ID)) = lgt_block(lgt_ID, IDX_TC_1 : IDX_TC_2)
 
-!     ! reset old lists, use old numbers of active blocks. If the old numbers are
-!     ! invalid (too small too large), then we delete everything in the lists
-!     !> \todo Check if resetting the arrays is not a waste of time in any case!
-!     if (lgt_n(tree_ID) > size(lgt_active, 1)) lgt_n(tree_ID) = size(lgt_active, 1)
-!     if (hvy_n(tree_ID) > size(hvy_active, 1)) hvy_n(tree_ID) = size(hvy_active, 1)
+                ! tree_ID and level are combined into one number for performance purposes
+                ! as max_level is 31 for 2D, we shift tree_ID by 100
+                ! this might be confusing but can be entangled easily
+                ! fourth index stores the level and tree_id
+                my_lgt_send_buffer(4, hvy_n(tree_ID)) = lgt_block(lgt_ID, IDX_MESH_LVL) + tree_ID * 100
 
-!     if (lgt_n(tree_ID)<=0) lgt_n(tree_ID) = size(lgt_active, 1)
-!     if (hvy_n(tree_ID)<=0) hvy_n(tree_ID) = size(hvy_active, 1)
-
-!     ! reset the active lists
-!     lgt_active(1:lgt_n(tree_ID), tree_ID) = -1
-!     hvy_active(1:hvy_n(tree_ID), tree_ID) = -1
-!     lgt_sortednumlist(1:lgt_n(tree_ID),:, tree_ID) = -1
-
-!     ! reset active block numbers
-!     lgt_n(tree_ID) = 0
-!     hvy_n(tree_ID) = 0
-!     t(1) = MPI_wtime()
-
-!     ! =======================================================
-!     ! loop over all hvy_data
-!     ! =======================================================
-!     do hvy_id = 1, N
-!         call hvy2lgt( k, hvy_id, rank, N )
-!         ! block is part of the tree in question
-!         if (lgt_block(k, TREE_ID_IDX) == tree_ID) then
-!             ! assuming that there are more blocks per rank then blocks with the corresponding tree ID
-!             if ( lgt_block(k, 1) /= -1) then ! active ?
-!                 ! ---------------------------
-!                 ! update hvy active
-!                 ! ---------------------------
-!                 ! save heavy id, only if proc responsable for block
-!                 hvy_active( hvy_n(tree_ID) + 1, tree_ID ) = hvy_id
-!                 hvy_n(tree_ID) = hvy_n(tree_ID) + 1
-!             end if
-!         end if
-!     end do
-!     t(2) = MPI_wtime()
-!     ! ==========================================================================
-!     ! MPI Synchronization
-!     ! ==========================================================================
-!     ! Note: lgt_n is hear clearly the same as hvy_n since we have looped
-!     ! over lgt ids of this proc
-!     !n sum up lgt_n over all procs
-!     call MPI_allgather(hvy_n(tree_ID), 1, MPI_INTEGER4, proc_lgt_n, 1, MPI_INTEGER4, WABBIT_COMM, ierr )
-!     ! this is the global buffer size
-!     lgt_n(tree_ID) = sum(proc_lgt_n)
-!     do k = 1, mpisize
-!         proc_lgt_start(k) = sum(proc_lgt_n(1:k-1))! + 1
-!     enddo
-
-!     call MPI_allgatherv( rank*N + hvy_active(1:hvy_n(tree_ID), tree_ID), hvy_n(tree_ID), MPI_INTEGER4, &
-!     lgt_active(1:lgt_n(tree_ID), tree_ID), proc_lgt_n, proc_lgt_start, MPI_INTEGER4, &
-!     WABBIT_COMM, ierr)
-
-!     ! call MPI_allgatherv( lgt_sortednumlist(1:lgt_n, 2), lgt_n, MPI_INTEGER4, &
-!     ! my_lgt_recv_buffer( 1:lgt_n,2 ), proc_lgt_n, proc_lgt_start, MPI_INTEGER4, &
-!     ! WABBIT_COMM, ierr)
-!     t(3) = MPI_wtime()
-!     ! UNPACK SYNCHRONIZED DATA
-!     do k = 1, lgt_n(tree_ID)
-!         lgt_id = lgt_active(k, tree_ID)
-!         lgt_sortednumlist(k, 1, tree_ID) = lgt_id
-!         lgt_sortednumlist(k, 2, tree_ID) = treecode2int(lgt_block(lgt_id, 1:params%Jmax), tree_ID )
-!         ! lgt_sortednumlist(k, 2, tree_ID) = treearray2bid(lgt_block(lgt_id, 1:params%Jmax), &
-!         !     dim=params%dim, tree_ID=tree_ID, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
-!     end do
-
-!     t(4) = MPI_wtime()
-!     ! =======================================================
-!     ! sort list
-!     if (lgt_n(tree_ID) > 1) then
-!         call quicksort(lgt_sortednumlist(:,:,tree_ID), 1, lgt_n(tree_ID), 2)
-!     end if
-!     t(5) = MPI_wtime()
-    ! call toc("createActiveSortedLists_tree (reset lgt_n)", 51, t(1)-t0)
-    ! call toc("createActiveSortedLists_tree (loop over hvy_n)", 52, t(2)-t(1))
-    ! call toc("createActiveSortedLists_tree (comm)", 53, t(3)-t(2))
-    ! call toc("createActiveSortedLists_tree (loop over lgt_n)", 54, t(4)-t(3))
-    ! call toc("createActiveSortedLists_tree (quicksort)", 55, t(5)-t(4))
-    ! call toc("createActiveSortedLists_tree (TOTAL)", 50, MPI_wtime()-t0)
-! end subroutine createActiveSortedLists_tree_comm
+                ! ! fourth index stores the level
+                ! my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL)
+                ! ! fifth index stores the tree_id
+                ! my_lgt_send_buffer(hvy_n(tree_ID), 5) = tree_ID
+            endif
+        endif
+    enddo
+    ! call toc("createHvyActive_tree (loop over hvy_n)", 52, MPI_wtime()-t(1))
+end subroutine
 
 
 ! ################################################################################
@@ -186,45 +124,12 @@ subroutine createActiveSortedLists_tree( params, tree_ID)
 
     ! reset active block numbers
     lgt_n(tree_ID) = 0
-    hvy_n(tree_ID) = 0
+
+    ! =======================================================
+    ! loop over all hvy_data and create hvy_active
+    ! =======================================================
     t(1) = MPI_wtime()
-
-    ! =======================================================
-    ! loop over all hvy_data
-    ! =======================================================
-    do hvy_id = 1, N
-        call hvy2lgt( k, hvy_id, rank, N )
-
-        if (lgt_block(k, IDX_TREE_ID) == tree_ID) then
-            ! check if block is active: TC > 0
-            ! performance: don't construct tc and check only first int
-            if (lgt_block(k, IDX_TC_1 ) >= 0) then
-                ! ---------------------------
-                ! update hvy active
-                ! ---------------------------
-                ! save heavy id, only if proc responsable for block
-                hvy_n(tree_ID) = hvy_n(tree_ID) + 1
-                hvy_active( hvy_n(tree_ID), tree_ID ) = hvy_id
-                ! sorted list
-                ! first index stores the light id of the block
-                my_lgt_send_buffer(1, hvy_n(tree_ID)) = k
-
-                ! second and third index stores the numerical treecode
-                my_lgt_send_buffer(2:3, hvy_n(tree_ID)) = lgt_block(k, IDX_TC_1 : IDX_TC_2)
-
-                ! tree_ID and level are combined into one number for performance purposes
-                ! as max_level is 31 for 2D, we shift tree_ID by 100
-                ! this might be confusing but can be entangled easily
-                ! fourth index stores the level and tree_id
-                my_lgt_send_buffer(4, hvy_n(tree_ID)) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
-
-                ! ! fourth index stores the level
-                ! my_lgt_send_buffer(hvy_n(tree_ID), 4) = lgt_block(k, IDX_MESH_LVL)
-                ! ! fifth index stores the tree_id
-                ! my_lgt_send_buffer(hvy_n(tree_ID), 5) = tree_ID
-            end if
-        end if
-    end do
+    call createHvyActive_tree(params, tree_ID, my_lgt_send_buffer)
     t(2) = MPI_wtime()
 
     ! ==========================================================================

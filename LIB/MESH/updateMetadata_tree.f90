@@ -40,12 +40,12 @@ subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, 
     !     if (params%rank == 0) then
     !         do k_b = 1, lgt_n(tree_ID)
     !             lgt_ID = lgt_active(k_b, tree_ID)
-    !             write(*, '("2 - R0 - Exists BL-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " - ", b32.32)') lgt_ID, &
+    !             write(*, '("2 - R0 - Exists BL-", i6, " L-", i2, " Ref-", i3, " TC-", i10, " - ", b32.32)') lgt_ID, &
     !                 lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2), lgt_block(lgt_id, IDX_TC_2)
     !         enddo
     !         do k_b = 1, lgt_n(tree_ID)
     !             lgt_ID = lgt_sortednumlist(1, k_b, tree_ID)
-    !             write(*, '("3 - R0 - Exists BL-", i0, " L-", i0, " Ref-", i0, " TC-List-", i0, " - ", b32.32, " TC-", i0, " - ", b32.32)') lgt_ID, &
+    !             write(*, '("3 - R0 - Exists BL-", i6, " L-", i2, " Ref-", i3, " TC-List-", i10, " - ", b32.32, " TC-", i0, " - ", b32.32)') lgt_ID, &
     !                 lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), &
     !                 lgt_sortednumlist(3, k_b, tree_ID), lgt_sortednumlist(3, k_b, tree_ID), &
     !                 lgt_block(lgt_id, IDX_TC_2), lgt_block(lgt_id, IDX_TC_2)

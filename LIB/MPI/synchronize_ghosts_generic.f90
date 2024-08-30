@@ -19,7 +19,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_mi
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoF_ref", &
-        s_val=ref_check, hvy_tmp=hvy_tmp, verbose_check=.true.)
+        s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
 
@@ -314,7 +314,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
         ref = lgt_block( lgt_ID, IDX_REFINE_STS)
 
         ! for leaf-syncs we ignore non-leaf blocks
-        if (mod(sync_id,10) == 2 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
+        if (mod(sync_id,10) == 2 .and. .not. block_is_leaf(params, hvy_ID)) cycle
+        ! blocks with ref status REF_TMP_EMPTY do not sync anything
+        if (ref == REF_TMP_EMPTY) cycle
 
         ! loop over all neighbors
         do i_n = 1, size(hvy_neighbor, 2)
@@ -334,6 +336,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
                 lvl_diff = level - level_n
                 ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
+
+                ! blocks with ref status REF_TMP_EMPTY do not sync anything
+                if (ref_n == REF_TMP_EMPTY) cycle
 
                 ! Send logic, I am sender and neighbor is receiver:
                 ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=+1; stage=3 && lvl_diff=-1
@@ -356,11 +361,11 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
                         b_send = .true.
                         ! CVS: non-leaf blocks do not send to fine neighbors
-                        if (lvl_diff==-1 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                        if (lvl_diff==-1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
                             b_send = .false.
                         endif
                         ! CVS: non-root blocks do not send to coarse neighbors
-                        if (lvl_diff==+1 .and. hvy_family(hvy_ID, 1) /= -1) then
+                        if (lvl_diff==+1 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
                             b_send = .false.
                         endif
 
@@ -370,10 +375,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                         b_send = .true.
                         ! leaf-wise, Fine->Medium->Coarse
                         ! check for fine neighbor
-                        if (lvl_diff>=0 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, -1):np_u(i_n, -1)) /= -1)) then
+                        if (lvl_diff>=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, -1)) then
                             b_send = .false.
                         ! check for medium neighbor
-                        elseif (lvl_diff==+1 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                        elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                             b_send = .false.
                         endif
 
@@ -382,7 +387,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==-1))) then
                         b_send = .true.
                         ! CVS: non-leaf blocks do not send to fine neighbors
-                        if (lvl_diff/=0 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                        if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
                             b_send = .false.
                         endif
 
@@ -391,7 +396,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1))) then
                         b_send = .true.
                         ! CVS: non-root blocks do not send to coarse neighbors
-                        if (lvl_diff/=0 .and. hvy_family(hvy_ID, 1) /= -1) then
+                        if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
                             b_send = .false.
                         endif
                 endif
@@ -459,17 +464,17 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
                             b_recv = .true.
                             ! CVS: non-leaf blocks do not receive from coarser neighbors
-                            if (lvl_diff==+1 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                            if (lvl_diff==+1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
                                 b_recv = .false.
                             ! CVS: leaf blocks do not receive from coarser neighbors if there is a medium one for same patch
-                            elseif (lvl_diff==+1 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif                                
                             ! CVS: non-root blocks do not receive fine neighbors
-                            if (lvl_diff==-1 .and. hvy_family(hvy_ID, 1) /= -1) then
+                            if (lvl_diff==-1 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
                                 b_recv = .false.
                             ! CVS: root blocks do not receive from fine neighbors if there is a medium one for same patch
-                            elseif (lvl_diff==-1 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            elseif (lvl_diff==-1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif
 
@@ -479,10 +484,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                             b_recv = .true.
                             ! leaf-wise, Fine->Medium->Coarse
                             ! check for fine neighbor
-                            if (lvl_diff>=0 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, -1):np_u(i_n, -1)) /= -1)) then
+                            if (lvl_diff>=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, -1)) then
                                 b_recv = .false.
                             ! check for medium neighbor
-                            elseif (lvl_diff==+1 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif
 
@@ -491,10 +496,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1))) then
                             b_recv = .true.
                             ! CVS: non-leaf blocks do not receive from coarser neighbors
-                            if (lvl_diff/=0 .and. any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                            if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
                                 b_recv = .false.
                             ! CVS: leaf blocks do not receive from coarser neighbors if there is a medium one for same patch
-                            elseif (lvl_diff/=0 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            elseif (lvl_diff/=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif
 
@@ -503,10 +508,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                         ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1))) then
                             b_recv = .true.
                             ! CVS: non-root blocks do not receive from fine neighbors
-                            if (lvl_diff/=0 .and. hvy_family(hvy_ID, 1) /= -1) then
+                            if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
                                 b_recv = .false.
                             ! CVS: root blocks do not receive from fine neighbors if there is a medium one for same patch
-                            elseif (lvl_diff/=0 .and. any(hvy_neighbor(hvy_ID, np_l(i_n, 0):np_u(i_n, 0)) /= -1)) then
+                            elseif (lvl_diff/=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif
                     endif

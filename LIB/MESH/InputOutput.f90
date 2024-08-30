@@ -660,8 +660,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
-    call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
 
     if (present(synchronize_ghosts)) then
         if (synchronize_ghosts) then
@@ -989,7 +988,7 @@ subroutine saveHDF5_wavelet_decomposed_tree(fname, time, iteration, dF, params, 
         hvy_ID = hvy_active(k, tree_ID)
         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
 
-        if ( any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if ( .not. block_is_leaf(params, hvy_id)) then
             ! we can savely delete blocks as long as we do not update family relations
             lgt_block( lgt_ID, : ) = -1
         endif

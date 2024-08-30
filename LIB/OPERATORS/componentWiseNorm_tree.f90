@@ -56,7 +56,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                ! only sum up over leafs
+                ! only sum up over leafs, we sadly don't have access to function block_is_leaf
                 if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
 
                 call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
@@ -71,7 +71,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
                 hvy_id = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                ! only sum up over leafs
+                ! only sum up over leafs, we sadly don't have access to function block_is_leaf
                 if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
 
                 call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &

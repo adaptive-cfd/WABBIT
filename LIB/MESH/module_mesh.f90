@@ -28,6 +28,8 @@ module module_mesh
     ! as gradedness wants to keep me but completeness wants to coarsen we need another temporary flag 
     ! has to be > 0 to not have infinite loop with ensure_completeness
     integer, parameter :: REF_TMP_GRADED_STAY = 2            ! should be > 0
+    ! in decomposition we do not want any sync with finer neighbors for interior blocks, use another flag and let them wait!
+    integer, parameter :: REF_TMP_UNTREATED_WAIT = 3         ! should be > 0
 
 contains
 

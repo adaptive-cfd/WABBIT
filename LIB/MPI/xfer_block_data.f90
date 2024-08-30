@@ -22,8 +22,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
-    logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status if we should always use hvy_tmp
+    logical, intent(in), optional  :: ignore_Filter                !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
     ! Following are global data used but defined in module_mpi:
@@ -56,7 +56,11 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     end do
 
     ! if (present(verbose_check)) then
-    !     write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+        ! ! for debugging with exactly four procs, useful to see if their is a mismatch in send/receive
+        ! write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+        
+        ! ! for debugging send/receive volume
+        ! write(*, '("Rank ", i0, " Send N ", 1(i6, 1x), "Receive N ", 1(i6, 1x), "Send P ", 1(i2, 1x), "Recv P ", 1(i2, 1x), "Send total ", i3)') myrank, sum(data_send_counter), sum(data_recv_counter), sum(meta_send_counter), sum(meta_recv_counter), count_send_total
     ! endif
 
     call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
@@ -154,7 +158,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
         lvl_diff = meta_send_all(S_META_FULL*k_patch + 6)
         patch_size = meta_send_all(S_META_FULL*k_patch + 7)
 
-        ! check if to use hvy_temp
+        ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
         use_hvy_TMP = .false.
         if (present(hvy_tmp) .and. present(REF_FLAG)) then
             if (sender_ref /= REF_FLAG) use_hvy_TMP = .true.
@@ -341,6 +345,7 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
             call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
 
+            ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
             use_hvy_tmp = .false.
             if (present(hvy_tmp) .and. present(REF_FLAG)) then
                 if (sender_ref /= REF_FLAG) use_hvy_tmp = .true.
@@ -642,7 +647,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
         ref = lgt_block( lgt_ID, IDX_REFINE_STS)
 
         ! check if mother exists
-        if (hvy_family(hvy_ID, 1) /= -1) then
+        if (.not. block_is_root(params, hvy_ID)) then
             ! mother light data id
             lgt_ID_n = hvy_family(hvy_ID, 1)
             ! calculate mother rank
@@ -720,7 +725,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
 
         ! check if any daughter exists
         ! in order to save blocks we directly set one of the daughters to the mother, so we should check all daughter ids
-        if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if (.not. block_is_leaf(params, hvy_id)) then
             ! loop over all daughters
             do family = 1, 2**params%dim
                 ! daughters light data id

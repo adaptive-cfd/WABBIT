@@ -451,8 +451,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         endif
 
         ! convergence loop
-        iteration = 0
-        do while (abs(thresh - thresh_old) > 1e-12)
+        do iteration = 1, 100
             thresh_old = thresh
             ! recopy WDed values from backup
             if (iteration > 1) then
@@ -489,13 +488,13 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
                 thresh = sqrt( 2.0_rk * norm(1)/dble(n_points) * log(dble(n_points)))
             endif
 
-            iteration = iteration + 1
             if (params%rank == 0) then
                 write(*, '(A, i2, 3(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " std= ", sqrt(norm(1)/dble(n_points)), " thresh_diff= ", abs(thresh - thresh_old)
             endif
 
-            ! safetey net
-            if (iteration >= 100) exit
+            ! exit early
+            if (indicator == "threshold-image-denoise" .and. abs(thresh - thresh_old) < 1e-12) exit
+            if (indicator == "threshold-cvs" .and. iteration >= 2) exit  ! CVS computes one iteration and then uses new thresholding, totalling to 2 iterations
         enddo
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -610,7 +609,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
         level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
 
-        if ( any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if ( .not. block_is_leaf(params, hvy_id) ) then
             ! we can savely delete blocks as long as we do not update family relations
             lgt_block( lgt_ID, : ) = -1
         endif

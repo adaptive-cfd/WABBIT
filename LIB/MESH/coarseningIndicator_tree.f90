@@ -265,6 +265,10 @@ subroutine coarseningIndicator_tree( time, params, level_this, hvy_block, hvy_tm
     case default
         t0 = MPI_Wtime()
         ! Default is wavelet thresholding...
+
+        ! if (params%rank == 0) then
+        !     write(*, '(A, 10(es10.3, 2x))') "Norm: ", norm(:)
+        ! endif
         
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
         ! notably because of the ghost nodes unit test, where random refinement / coarsening

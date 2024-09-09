@@ -113,9 +113,11 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
         ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
         ! This is the first coarse extension before removing blocks
         ! As no blocks are deleted, working on newly created blocks is suficient, they are non-leafs anyways and will be skipped
-        t_block = MPI_Wtime()
-        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=REF_TMP_UNTREATED)
-        call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+            t_block = MPI_Wtime()
+            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=REF_TMP_UNTREATED)
+            call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        endif
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Mother blocks: we now create mother blocks and fill their values with the SC from their daughters
@@ -285,9 +287,11 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
         ! In theory, for full WT this CE_modify is only here for two reasons:
         !    1. We need to clear the WC from coarser neighbors, as the values in there are interpolated SC and we need to set those to the correct WC being 0
         !    2. interior WC are deleted so that the SC copy for syncing later is exact with the original values, we assume those WC are not significant
-        t_block = MPI_Wtime()
-        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.true.)
-        call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+            t_block = MPI_Wtime()
+            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.true.)
+            call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        endif
 
         ! Wavelet-reconstruct blocks on level
         t_block = MPI_Wtime()

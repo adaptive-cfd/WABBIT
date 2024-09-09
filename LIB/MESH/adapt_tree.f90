@@ -542,9 +542,6 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
             ! set norm to be thresholded with as thresh norm
             norm(1) = thresh
-        else
-            ! compute norm from pre-saved values
-            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 
         ! in order to work on all blocks and work with coarseningIndicator_tree logic, we set all ref status as unset to work as in a leaf-wise loop
@@ -578,12 +575,12 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! coarseningIndicator_tree works on all blocks (for wavelet cases).
         ! blocks that are significant now have status 0, others have -1
 
-        if (indicator/="everywhere" .and. indicator/="random") then
+        if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. params%useCoarseExtension .and. params%isLiftedWavelet) then
             ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
             ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
             ! in that case we set the neighbouring block to be important as well (with a temporary flag)
             t_block = MPI_Wtime()
-            call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, "threshold-cvs", norm, ignore_maxlevel=.false., input_is_WD=.true.)
+            call addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel=.false., input_is_WD=.true.)
             call toc( "adapt_tree (security_zone_check)", 107, MPI_Wtime()-t_block)
         endif
 
@@ -614,9 +611,12 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
         ! This is the actual important coarse extension after all cells have been deleted, which modifies now the lasting c-f interfaces
-        t_block = MPI_Wtime()
-        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
-        call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        ! As all decompositions have been correct, we do not need to copy the SC and only delete the WC in order to keep the borders clean
+        if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+            t_block = MPI_Wtime()
+            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", clear_wc_only=.true.)
+            call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        endif
 
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

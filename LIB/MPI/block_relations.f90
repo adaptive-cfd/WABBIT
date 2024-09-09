@@ -58,14 +58,14 @@ function block_has_valid_neighbor(params, hvy_ID, i_n, lvl_diff)
 
     block_has_valid_neighbor = .false.
 
-    ! there are several different possibilities, once any is found we can exit
+    ! there are several different possibilities, once any is found we can return
     do i_s = np_l(i_n, lvl_diff), np_u(i_n, lvl_diff)
         lgt_id_n = hvy_neighbor(hvy_ID, i_s)
 
         ! if it exists we have to make sure that its ref flag is not set to REF_TMP_EMPTY
         if (lgt_id_n /= -1) block_has_valid_neighbor = lgt_block(lgt_id_n, IDX_REFINE_STS) /= REF_TMP_EMPTY
 
-        ! if we found a valid neighbor we can exit
-        if (block_has_valid_neighbor) exit
+        ! if we found a valid neighbor we can return early
+        if (block_has_valid_neighbor) return
     enddo
 end function block_has_valid_neighbor

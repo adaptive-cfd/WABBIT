@@ -267,6 +267,12 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
     do level = Jmin, Jmax_active
         t_loop = MPI_Wtime()
 
+        ! ! Normal adapt_tree loop does another CE_modify here to copy the SC, but for full WT this is not necessary
+        ! ! as interior blocks only get values from their medium neighbors and no SC need to be copied
+        ! t_block = MPI_Wtime()
+        ! call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.false.)
+        ! call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
         t_block = MPI_Wtime()
@@ -276,10 +282,9 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
         write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level <- MC)"
         call toc( toc_statement, 1750+iteration, MPI_Wtime()-t_block )
 
-        ! After synching with coarser neighbors, the spaghetti form of the whole ghost patch is filled with values
-        ! We now need to delete all values in spots of WC, leaving only the correct SC values from coarse neighbours
-        ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
-        ! We do this in order to bundle up the synchronizations in the step before as the modification is really cheap
+        ! In theory, for full WT this CE_modify is only here for two reasons:
+        !    1. We need to clear the WC from coarser neighbors, as the values in there are interpolated SC and we need to set those to the correct WC being 0
+        !    2. interior WC are deleted so that the SC copy for syncing later is exact with the original values, we assume those WC are not significant
         t_block = MPI_Wtime()
         call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.true.)
         call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )

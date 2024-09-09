@@ -1094,7 +1094,8 @@ contains
         Nreconr = params%Nreconr
         skip_copy = .false.
 
-        do i_set = 1,2
+        ! only set inside patch, as the other should be updated with syncing
+        do i_set = 1,1
             idx(:, :) = 1
 
             ! 1: set inside of patch

@@ -62,9 +62,10 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
                 level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
 
                 ! coarse extension for coarser neighbors
-                ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl neighbor for the same patch
+                ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl or finer neighbor for the same patch
+                ! In theory checking same-lvl is enough, but their values could be REF_TMP_EMPTY so we need to check finer too if it exists
                 if (level_n < level_me .and. block_is_leaf(params, hvy_ID) &
-                .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
+                .and. .not. (block_has_valid_neighbor(params, hvy_id, i_n, 0) .or. block_has_valid_neighbor(params, hvy_id, i_n, -1))) then
                     ! manipulation of coeffs
                     call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
                     if (.not. clearWcOnly) then

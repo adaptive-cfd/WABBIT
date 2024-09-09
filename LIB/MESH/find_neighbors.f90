@@ -147,7 +147,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     ! 2) Check if we find a neighbor on the FINER LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! Note: if those exists, then we always need to find all 4 (for 3D) or 2 of them
-    ! We might be interested to search for coarser neighbors first because their is only one, however for CVS we might have an overfull grid
+    ! We might be interested to search for coarser neighbors first because their is only one, however for CVS we might have an full tree grid
     ! but still only want to sync ANY values. Then coarsest neighbors should be chosen last as their values will be interpolated with WC=0
     ! However, if we did not find any same-lvl neighbor we should not find finer neighbors, it is therefore not too important but for clarity
     ! in this order

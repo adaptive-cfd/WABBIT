@@ -12,7 +12,7 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
     integer(kind=ik), intent(inout) :: sisters(:)            !< light data array
     integer(kind=ik), intent(in)    :: lgt_id                !< Concerned Block
     logical, intent(in), optional   :: mark_TMP_flag         !< Set refinement of completeness to 0 or temporary flag
-    logical, intent(in), optional   :: check_daughters          !< For overfull CVS grids completeness has to check the mother as well
+    logical, intent(in), optional   :: check_daughters       !< For full tree CVS grids completeness has to check the mother as well
 
     integer(kind=ik)                :: Jmax, k, l, hvy_id, lgt_daughter
     integer(kind=ik)                :: N_sisters, markTMPflag, lgt_sisters(1:2**params%dim)  ! loop variables

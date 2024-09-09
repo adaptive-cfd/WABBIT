@@ -16,7 +16,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     logical, intent(in), optional :: mark_TMP_flag          !< Set refinement of completeness to 0 or temporary flag
-    logical, intent(in), optional :: check_daughters          !< For overfull CVS grids completeness has to check the mother as well
+    logical, intent(in), optional :: check_daughters        !< For full tree CVS grids completeness has to check the mother as well
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)                    :: ierr, rank

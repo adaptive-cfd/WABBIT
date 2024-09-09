@@ -432,7 +432,7 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet decomposition
     ! We iterate root-wise, meaning that each block is investigated and creates new mothers blocks, which will be created along the way.
-    ! AN overfull grid is created and always the most bottom layer is investigated with blocks without mother.
+    ! A full tree grid is created and always the most bottom layer is investigated with blocks without mother.
     ! This is repeated until all blocks on the layer JMin are present
     call cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks=log_blocks, log_iterations=log_iterations)
 

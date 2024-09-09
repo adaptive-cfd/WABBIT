@@ -960,7 +960,7 @@ end subroutine read_field2tree
 
 !> \brief Save tree in full wavelet decomposed form.
 !> This function essentially wraps around full wavelet decomposition and save function.
-!> Attention! The grid will be overfull
+!> Attention! The grid will be a full tree grid
 subroutine saveHDF5_wavelet_decomposed_tree(fname, time, iteration, dF, params, hvy_block, hvy_tmp, tree_ID, no_sync, save_ghosts)
     implicit none
 

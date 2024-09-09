@@ -96,9 +96,9 @@ subroutine post_denoising(params)
     ! read in data
     call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=tree_ID_flow, verbosity=.true.)
 
-    ! save data in overfull
+    ! save data as full tree
     if (verbose) then
-        call saveHDF5_wavelet_decomposed_tree( "field-before-overfull-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
+        call saveHDF5_wavelet_decomposed_tree( "field-before-full-tree-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
     endif
 
     ! denoise data
@@ -109,7 +109,7 @@ subroutine post_denoising(params)
     call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID)
 
     if (verbose) then
-        call saveHDF5_wavelet_decomposed_tree( "field-overfull-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
+        call saveHDF5_wavelet_decomposed_tree( "field-full-tree-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)
     endif
 
 

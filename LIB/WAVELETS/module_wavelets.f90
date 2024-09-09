@@ -1405,11 +1405,11 @@ contains
         ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
         block_min = 0
         if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0 .and. .not. params%CVS) then
-            ! first dependency: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
+            ! first condition: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
             ! this is critical and we currently cannot get those values
             block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
             block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
-            ! second dependency: our finer neighbors need our reconstructed values to reconstruct itself it's values
+            ! second condition: our finer neighbors need our reconstructed values to reconstruct itself it's values
             ! if that is the case we have an upwards dependency which is currently not handled
             block_min = max(block_min, params%Nreconr + (ubound(params%HR, dim=1)+1)/2)
             block_min = max(block_min, params%Nreconl + abs(lbound(params%HR, dim=1))/2)

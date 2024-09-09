@@ -224,6 +224,10 @@ subroutine ini_domain(params, FILE )
    params%periodic_BC = .true.
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
+   if (.not. all(params%periodic_BC)) then
+      call abort(160824, "This code version currently suppors only periodic BC in all directions.")
+   endif
+
    params%symmetry_BC = .not. params%periodic_BC
    call read_param_mpi(FILE, 'Domain', 'symmetry_BC', params%symmetry_BC, params%symmetry_BC )
 

@@ -152,7 +152,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
     logical, intent(in)            :: input_is_WD                 !< flag if hvy_block is already wavelet decomposed, for coarseningIndicatorBlock
     !> for the mask generation (time-independent mask) we require the mask on the highest
     !! level so the "force_maxlevel_dealiasing" option needs to be overwritten. Life is difficult, at times.
-    logical, intent(in)                 :: ignore_maxlevel
+    logical, intent(in)            :: ignore_maxlevel
 
     integer(kind=ik), parameter :: TMP_STATUS = 17
     integer(kind=ik) :: level_me, ref_status, neighborhood, i_neighborhood, ref_status_neighbor, ref_check, &
@@ -195,15 +195,13 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                 ! neighbor exists ?
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
                     ! neighbor light data id
-                    lgtID_neighbor             = hvy_neighbor( hvyID, neighborhood )
-                    level_neighbor             = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+                    lgtID_neighbor      = hvy_neighbor( hvyID, neighborhood )
+                    level_neighbor      = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
-                    ! if (lgtID == 32160) then
-                    !     write(*, '("BH-", i0, " BL-", i0, " N-", i0, " NBL-", i0, " NR-", i0)') hvyID, lgtID, neighborhood, lgtID_neighbor, ref_status_neighbor
-                    ! endif
 
-                    ! the neighbor wants to coarsen
+                    ! the neighbor wants to coarsen. This yields the risk that after coarsening, the newly appearing coarseExt
+                    ! deletes important WC on this block (hvyID). This we'll prevent.
                     if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
                         call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), &
@@ -211,6 +209,8 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                             g_p=(/ g, g, g/), g_m=(/ g, g, g/))
                         ref_check = -1
 
+                        ! Inside the patch idx, check if there are significant details
+                        ref_check = -1 ! ref_check will change to 0 if there are significant details
                         call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvyID), &
                         hvy_tmp(:,:,:,:,hvyID), indicator, ref_check, norm, level_me, input_is_WD, indices=idx)
 
@@ -227,7 +227,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
         endif
     enddo
 
-    ! We look at one block which is signfiant and want to change the refinement status of neighbours, however these neighbors might reside on a different proc
+    ! We look at one block which is significant and want to change the refinement status of neighbours, however these neighbors might reside on a different proc.
     ! The next synchronize_lgt_data call will then overwrite those values. We therefore need to communicate with the owners of the neighboring block
     ! if the status has changed or not. This is however a bit tricky as we don't know how many cells have to be updated and information send
     ! We circumvent this by encoding the patch which is significant into the refinement status and then decoding this information, knowing which blocks
@@ -245,8 +245,8 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
         level_me   = lgt_block( lgtID, IDX_MESH_LVL )
         ref_status = lgt_block( lgtID, IDX_REFINE_STS )
 
-        ! is the block on the level we look at?
         ! is this block assigned -1 (it wants to coarsen)?
+        ! -> this can possibly be revoked here, if it would result in detail deletion on another block
         if (ref_status == -1 .or. ref_status == REF_TMP_TREATED_COARSEN) then
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
@@ -260,7 +260,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     level_neighbor      = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
                     ref_status_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
-                    ! does the neighbor has significancy flag and significant patch in this neighborhood relation?
+                    ! does the neighbor have a significancy flag and significant patch in this neighborhood relation?
                     ! Is neighbor on the same level so we can actually check the patches?
                     if (ref_status_neighbor > 0 .and. level_neighbor == level_me) then  ! need to check elsewise all significancy encodings are wrong
                         if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood)) then
@@ -281,7 +281,10 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
     ! JB: Missing second synchronize was a bug I searched for long time
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
 
-    ! synchronous lgt_loop in order to set all encoded significancies and TMP_STATUS to 0
+    ! The code above has done two things: revoked some coarsening flags and encoded the (rather complicated) patch information
+    ! in the refinement status. Blocks that have revoked their flag were given the TMP_STATUS. We now convert this TMP_STATUS in
+    ! to usual "stay" flag (=0), and we do the same for blocks that have encoded this complicated patch information in their refinement
+    ! status (this is the second condition, lgt_decode_significant_flag(lgtID))
     do k = 1, lgt_n(tree_ID)
         lgtID = lgt_active(k, tree_ID)
         if (lgt_block( lgtID, IDX_REFINE_STS ) > 0) then  ! need to check elsewise all significancy encodings are wrong

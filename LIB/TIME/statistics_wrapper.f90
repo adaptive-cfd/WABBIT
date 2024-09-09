@@ -29,8 +29,12 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     integer(kind=ik), dimension(3)      :: Bs
 
     ! grid parameter
-    Bs    = params%Bs
-    g     = params%g
+    Bs     = params%Bs
+    g      = params%g
+    dx     = 0.0_rk
+    x0     = 0.0_rk
+    hvy_id = 1
+    
 
     call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
@@ -38,10 +42,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     ! 1st stage: init_stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! performs initializations in the RHS module, such as resetting integrals
-    hvy_id = hvy_active(1,tree_ID)
-    call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-    call get_block_spacing_origin( params, lgt_id, x0, dx )
-
+    ! NOTE: this is block-independent and therefore we pass dx=x0=0
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
     hvy_tmp(:,:,:,:,hvy_id), "init_stage", hvy_mask(:,:,:,:, hvy_id))
 
@@ -70,6 +71,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     ! 3rd stage: post integral stage. (called once, not for all blocks)
     !-------------------------------------------------------------------------
     ! in rhs module, used for example for MPI_REDUCES
+    ! NOTE: this is block-independent and therefore we pass dx=x0=0
     hvy_id = hvy_active(1,tree_ID)
     call STATISTICS_meta(params%physics_type, time, dt, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
     hvy_tmp(:,:,:,:,hvy_id), "post_stage", hvy_mask(:,:,:,:, hvy_id))

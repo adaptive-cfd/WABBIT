@@ -394,7 +394,7 @@ program main
         ! output on screen
         if (rank==0) then
             write(*, '("RUN: it=",i7)', advance='no') iteration
-            write(*, '(" time=",f16.9, " t_wall=",es9.3)', advance='no') time, t2
+            write(*, '(" time=",f16.9, " t_wall=",es10.3)', advance='no') time, t2
             write(*, '(" Nb=(",i6,"/",i6,")")', advance='no') Nblocks_rhs, Nblocks
             write(*, '(" J=(",i2,":",i2,"/",i2,":",i2, ")")', advance='no') Jmin1, Jmax1, minActiveLevel_tree(tree_ID_flow), maxActiveLevel_tree(tree_ID_flow)
             write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)

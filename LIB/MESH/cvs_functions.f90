@@ -490,3 +490,34 @@ subroutine cvs_threshold_tree(params, hvy_block, tree_ID, thresh, JMax_active)
     enddo
 
 end subroutine
+
+
+subroutine cvs_delete_non_leafs(params, tree_ID)
+    implicit none
+
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(in)    :: tree_ID
+
+    integer(kind=ik) :: hvy_ID, lgt_ID, k
+    real(kind=rk)    :: t_block
+
+    ! delete all non-leaf blocks with daughters as we for now do not have any use for them
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+
+        if ( .not. block_is_leaf(params, hvy_id) ) then
+            ! we can savely delete blocks as long as we do not update family relations
+            lgt_block( lgt_ID, : ) = -1
+        endif
+    end do
+
+    ! deletion was only made locally (as family relations are hvy), so we need to sync lgt data
+    call synchronize_lgt_data( params, refinement_status_only=.false. )
+
+    ! update grid lists: active list, neighbor relations, etc
+    t_block = MPI_Wtime()
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
+
+end subroutine

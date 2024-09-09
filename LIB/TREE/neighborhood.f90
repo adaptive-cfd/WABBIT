@@ -67,7 +67,7 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     enddo
 
     ! now lets get to the select beast, this further limits / restricts the patch for the specific neighborhood
-    ! example with g=1, N_s=N_e=1 and selecting neighborhood 9 or -x edge for 2D
+    ! example with g=1, N_s=N_e=1 and selecting neighborhood 1 or -x edge for 2D
     ! g g g g g           - - - - -
     ! g i i i g           - s - - -
     ! g i i i g           - s - - -

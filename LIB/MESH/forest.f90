@@ -522,7 +522,7 @@ function compute_tree_L2norm(params, hvy_block, hvy_tmp, tree_ID, verbosity ) &
 
     L2norm = scalar_product_two_trees(params, hvy_block, hvy_tmp, tree_ID1=tree_ID, tree_ID2=tree_ID)
     L2norm = sqrt(L2norm)
-    if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
+    if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e13.6)') L2norm
 end function
 !##############################################################
 

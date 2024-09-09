@@ -197,7 +197,7 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
 
         ! output
         if (rank==0) then
-            write(*,'("UNIT TEST: ghost nodes sync error_L2= ",es10.4,", error_L∞= ",es10.4,", frequ=",f5.1)')  &
+            write(*,'("UNIT TEST: ghost nodes sync error_L2= ",es11.4,", error_L∞= ",es11.4,", frequ=",f5.1)')  &
             error1(ifrequ), error2(ifrequ), frequ(ifrequ)
         end if
     end do

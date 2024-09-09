@@ -539,6 +539,12 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
 
             ! delete all WC where they are too small
             call cvs_threshold_tree(params, hvy_block, tree_ID, thresh, Jmax_active)
+
+            ! set norm to be thresholded with as thresh norm
+            norm(1) = thresh
+        else
+            ! compute norm from pre-saved values
+            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
         endif
 
         ! in order to work on all blocks and work with coarseningIndicator_tree logic, we set all ref status as unset to work as in a leaf-wise loop
@@ -556,7 +562,6 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
         ! In the wavelet case, we check the blocks for their largest detail (=wavelet coeff).
         ! The routine assigns -1 (COARSEN) to a block, if it matches the criterion. This status may however be revoked below.
         t_block = MPI_Wtime()
-        norm(1) = thresh
         if (present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in coarseningIndicator_tree
@@ -627,26 +632,8 @@ subroutine adapt_tree_cvs( time, params, hvy_block, tree_ID, indicator, hvy_tmp,
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
-    do k = 1, hvy_n(tree_ID)
-        hvy_ID = hvy_active(k, tree_ID)
-        call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
-        level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-
-        if ( .not. block_is_leaf(params, hvy_id) ) then
-            ! we can savely delete blocks as long as we do not update family relations
-            lgt_block( lgt_ID, : ) = -1
-        endif
-    end do
-
-    ! deletion was only made locally (as family relations are hvy), so we need to sync lgt data
-    call synchronize_lgt_data( params, refinement_status_only=.false. )
-
-    ! update grid lists: active list, neighbor relations, etc
-    t_block = MPI_Wtime()
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
-    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
+    call cvs_delete_non_leafs(params, tree_ID)
 
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
     ! they may have passed several level also. Rebalance for optimal loadbalancing

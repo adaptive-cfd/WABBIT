@@ -18,6 +18,7 @@ subroutine post_evaluate_thresholding(params)
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
+    logical                            :: bool_dump
 
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
@@ -52,21 +53,21 @@ subroutine post_evaluate_thresholding(params)
             write(*,*) "-----------------------------------------------------------"
             write(*,*) " --eps=1.0e-3"
             write(*,*) " --eps-norm=Linfty"
-            write(*,*) " --wavelet=CDF44"
             write(*,*) " --eps-normalized=1"
+            write(*,*) " --wavelet=CDF44"
+            write(*,*) " --indicator=threshold-state-vector"
+            write(*,*) " --dump=0                              - print everything to command line"
             write(*,*) "-----------------------------------------------------------"
         end if
         return
     endif
 
-    ! because we print the details, theyre heavy, so some parallel issuses, easier on monoproc
-    if (params%number_procs>1) call abort(9991911, "serial routine, use NCPU=1")
-
     call get_cmd_arg( "--eps-normalized", params%eps_normalized, default=.true. )
     call get_cmd_arg( "--eps-norm", params%eps_norm, default="L2" )
     call get_cmd_arg( "--eps", params%eps, default=-1.0_rk )
     call get_cmd_arg( "--indicator", indicator, default="threshold-state-vector" )
-    call get_cmd_arg( "--wavelet", params%wavelet, default="CDF40" )
+    call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
+    call get_cmd_arg( "--dump", bool_dump, default=.false. )
 
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
@@ -133,15 +134,15 @@ subroutine post_evaluate_thresholding(params)
             ignore_maxlevel=.true., input_is_WD=.false., leaf_loop_TMP=.false.)
     enddo
 
-
-
-    if (params%rank == 0) then
+    ! print to command line but only if requested
+    if (params%rank == 0 .and. bool_dump) then
         do k = 1, lgt_n(tree_ID)
             lgtID = lgt_active(k, tree_ID)
             call lgt2hvy(hvyID, lgtID, params%rank, params%number_blocks)
             write(*,'(i6,1x,i2,1x,i2,4x)') lgtID,  lgt_block( lgtID, IDX_MESH_LVL), lgt_block( lgtID, IDX_REFINE_STS )
         enddo
     endif
+
 
     call saveHDF5_tree(fname, time, iteration, 1, params, hvy_block, tree_ID )
 end subroutine

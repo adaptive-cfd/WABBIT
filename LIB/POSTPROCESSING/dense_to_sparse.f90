@@ -141,7 +141,7 @@ subroutine dense_to_sparse(params)
         end do
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,A8)') "Wavelets used:", params%wavelet
-        write(*,'(A20,1x,es9.3)') "eps:", params%eps
+        write(*,'(A20,1x,es10.3)') "eps:", params%eps
         write(*,'(A20,1x,A80)')"wavelet normalization:", params%eps_norm
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
         write(*,'(80("─"))')

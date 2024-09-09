@@ -51,6 +51,9 @@ program main_post
     case ("--evaluate-wavelet-thresholding")
         call post_evaluate_thresholding(params)
 
+    case ("--wavelet-decompose", "--wavelet-reconstruct")
+        call post_wavelet_transform(params)
+
     case ("--wavelet-vs-rhs")
         call waveletVsRHS_timingTest(params)
 

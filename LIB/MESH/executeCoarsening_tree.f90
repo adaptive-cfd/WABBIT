@@ -342,7 +342,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
     integer(kind=ik), intent(in), optional  :: s_val
 
     ! loop variables
@@ -440,7 +440,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !< heavy data array - block data in spaghetti WD form
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
     integer(kind=ik), intent(in), optional  :: s_val
 
     ! loop variables
@@ -508,7 +508,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
     call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_val=s_val)
-    call xfer_block_data(params, hvy_block, tree_ID, n_xfer, verbose_check=.true.)
+    call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     !---------------------------------------------------------------------------
     ! daughters will actually receive all values in mallat form, we need to recopy them to spaghetti to continue

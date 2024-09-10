@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
+subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, hvy_mask  )
     use module_indicators
 
     implicit none
@@ -22,10 +22,12 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)   :: tree_ID
+    real(kind=rk), intent(inout), optional   :: hvy_mask(:, :, :, :, :)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                  :: t0, t1, t2, t_misc
-    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id
+    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id
+    real(kind=rk) :: norm(1:params%n_eqn)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -38,10 +40,64 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID  )
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
 
-
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-    call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
+
+    ! JB: test if it works at all, this is not optimized and should be a proof of concept if we can skip refining non-significant blocks and it has an impact
+    ! in order to work on all blocks and work with coarseningIndicator_tree logic, we set all ref status as unset to work as in a leaf-wise loop
+    ! no need for syncing afterwards as coarseningIndicator works locally
+    if (indicator == "significant") then
+        ! significant needs access to functions which are not available for refinemendIndicator so for now I have it here
+
+        ! JB: Time set to 0 for testing
+        if (present(hvy_mask)) call createMask_tree(params, 0.0_rk, hvy_mask, hvy_tmp, all_parts=.false.)
+
+        ! JB: Time set to 0 for testing
+        if (params%eps_normalized .and. params%coarsening_indicator/="everywhere" .and. params%coarsening_indicator/="random" &
+            .and. params%coarsening_indicator/="threshold-cvs" .and. params%coarsening_indicator/="threshold-image-denoise") then
+            call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
+            do k = 1, params%n_eqn
+                if (norm(k) <= 1.0e-9_rk) norm(k) = 1.0_rk
+            enddo
+        else
+            norm(:) = 1.0_rk
+        endif
+
+        do k = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+            
+            ! evaluate the criterion on this block.
+            call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_ID), hvy_tmp(:,:,:,:,hvy_ID), params%coarsening_indicator, &
+            lgt_block(lgt_ID, IDX_REFINE_STS), norm(1:size(hvy_block, 4)), lgt_block(lgt_ID, IDX_MESH_LVL), input_is_WD=.false., block_mask=hvy_mask(:,:,:,:,hvy_ID))
+        enddo
+
+        ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.
+        ! therefore we have to sync the lgt data
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
+
+        ! for lifted wavelets we need the security zone being refined as well elsewise we get problems with CE
+        if (params%useSecurityZone .and. params%coarsening_indicator/="everywhere" .and. params%coarsening_indicator/="random" .and. params%useCoarseExtension .and. params%isLiftedWavelet) then
+            ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
+            ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
+            ! in that case we set the neighbouring block to be important as well (with a temporary flag)
+
+            ! ATTENTION: Input_is_WD=.false. here is incredibly expensive, time set to 0 for testing
+            call addSecurityZone_CE_tree( 0.0_rk, params, tree_ID, hvy_block, hvy_tmp, params%coarsening_indicator, norm, ignore_maxlevel=.false., input_is_WD=.false.)
+        endif
+
+        ! coarseningIndicator and Securityzone work for coarsening, so -1, we now have to translate this to refinement range
+        do k = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k, tree_ID)
+
+            ! set 0 (significant) to +1 (refine), -1 (non-significant) to 0 (stay as it is)
+            if (lgt_block( lgt_id, IDX_REFINE_STS ) == 0) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+            if (lgt_block( lgt_id, IDX_REFINE_STS ) == -1) lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+        enddo
+
+    else
+        call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
+    endif
     call toc( "refine_tree (refinementIndicator_tree)", 141, MPI_Wtime()-t1 )
 
 

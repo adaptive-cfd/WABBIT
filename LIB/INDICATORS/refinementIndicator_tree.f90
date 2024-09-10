@@ -17,6 +17,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
+
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density

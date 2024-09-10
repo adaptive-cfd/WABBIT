@@ -16,10 +16,10 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
     character(len=clong) :: toc_statement
     logical              :: iterate
 
-    ! In order to start with leaf-wise investigation, these will receive the correct ref flag
+    ! In order to start with leaf-wise investigation, these will receive the correct ref flag, being -1
     do k = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k, tree_ID)
-        lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_UNTREATED
+        lgt_block(lgt_ID, IDX_REFINE_STS) = -1
     end do
     ! do backup here so we need less logic in synching neighbors
     do k = 1, hvy_n(tree_ID)
@@ -30,11 +30,16 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
     ! at first, initialize all mothers without any values yet
     t_block = MPI_Wtime()
     call cvs_init_mothers_tree(params, tree_ID)
-    call toc( "adapt_tree (init mothers)", 102, MPI_Wtime()-t_block )
-    ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status REF_TMP_UNTREATED
+    call toc( "decompose_tree (init_mothers_tree)", 110, MPI_Wtime()-t_block )
+    ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status -1
 
-    ! iteration for wavelet decomposition - no blocks will be created or deleted during the loop!
-    level       = maxActiveLevel_tree(tree_ID) ! leaf-wise blocks can have this as maximum level
+    ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    !      leaf-decompose level-update loop
+    ! This might sound confusing, but goes the following:
+    !     first step decomposes all leaf-blocks, this will be the most expensive action per definition
+    !     every update goes level-wise and starts from finest level, new blocks will therefore be ready to decompose leaf-wise
+    ! With this, we keep the heavy computations leaf-wise, so load balanced on the first step, afterwise the level-wise loops needs no refinement flags and lgt_data update
+    level       = maxActiveLevel_tree(tree_ID)
     iterate     = .true.
     iteration   = 0
     do while (iterate)
@@ -60,17 +65,17 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
         ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         if (params%isLiftedWavelet) then
-            call sync_TMP_from_MF( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
-            call toc( "adapt_tree (sync lvl <- MF)", 103, MPI_Wtime()-t_block )
+            call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+            call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- MF)"
+            write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
         else
-            call sync_TMP_from_all( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
-            call toc( "adapt_tree (sync lvl <- all)", 103, MPI_Wtime()-t_block )
+            call sync_TMP_from_all( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+            call toc( "decompose_tree (sync TMP <- all)", 111, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " sync lvl <- all)"
+            write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- all)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
         endif
 
@@ -79,14 +84,11 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)
-    
-            ! We compute detail coefficients on the fly here, for all blocks
-            ! on the level.
             call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
             ref_stat = lgt_block( lgt_ID, IDX_REFINE_STS )
     
             ! FWT required for a block that is on the level
-            if (ref_stat == REF_TMP_UNTREATED) then
+            if (ref_stat == -1) then
                 ! hvy_tmp now is a copy with sync'ed ghost points.
                 ! We actually copy here a second time but this is to ensure we have the correct ghost points saved, and copying is not too expensive anyways
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
@@ -103,101 +105,47 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
                 endif
             endif
         end do
-        call toc( "adapt_tree (FWT)", 104, MPI_Wtime()-t_block )
+        call toc( "decompose_tree (FWT)", 112, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " FWT)"
-        call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
+        write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " FWT)"
+        call toc( toc_statement, 1150+iteration, MPI_Wtime()-t_block )
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
         ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
         ! This is the first coarse extension before removing blocks
-        ! As no blocks are deleted, working on newly created blocks is suficient, they are non-leafs anyways and will be skipped
+        ! As no blocks are deleted, modifying newly decomposed blocks is sufficient, they are non-leafs anyways and will be skipped
         if (params%useCoarseExtension .and. params%isLiftedWavelet) then
-            t_block = MPI_Wtime()
-            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=REF_TMP_UNTREATED)
-            call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+            call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=-1)
         endif
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ! Mother blocks: we now create mother blocks and fill their values with the SC from their daughters
-        ! We do this for every but the last iteration, where no mother blocks can be created anyways
-        if (level > params%Jmin) then
-            ! Prepare refinement status for updating the mother blocks
-            do k = 1, lgt_n(tree_ID)
-                lgt_ID = lgt_active(k, tree_ID)
-                if (any(lgt_block(lgt_ID, IDX_REFINE_STS) == (/ REF_TMP_UNTREATED , REF_TMP_TREATED_COARSEN, REF_TMP_GRADED_STAY /))) then
-                    lgt_block(lgt_ID, IDX_REFINE_STS) = -1
-                endif
-            end do
+        ! Upate refinement flags before synching:
+        !    1. Blocks that have beend decomposed with CE are finished -> They get 0
+        !    2. Mothers on level-1 with status REF_TMP_EMPTY get -1 now to enable sync to them
+        !       they will be decomposed next loop
+        do k = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k, tree_ID)
+            ! update that all blocks with -1 have been decomposed
+            if (lgt_block(lgt_ID, IDX_REFINE_STS) == -1) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            endif
+            ! update all updated mother blocks which are empty (leaf-blocks will never be updated) and set their refinement flag to -1
+            if (lgt_block(lgt_ID, IDX_REFINE_STS) == REF_TMP_EMPTY .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+            endif
+        end do
 
-            ! respect lower level boundary
-            t_block = MPI_Wtime()
-            call respectJmaxJmin_tree( params, tree_ID )
-            call toc( "adapt_tree (respectJmaxJmin_tree)", 108, MPI_Wtime()-t_block )
+        ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        !     Update mother blocks
+        ! We update mother blocks level-wise, with this we always know that all blocks on this level are ready and need no lgt_data update
+        ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
+        t_block = MPI_Wtime()
+        call sync_D2M(params, hvy_block, tree_ID, sync_case="level", s_val=level)
+        call toc( "decompose_tree (sync level 2 mothers)", 113, MPI_Wtime()-t_block )
 
-            ! ! when blocks don't have all neighbors available on medium lvl, the newly created mother block will not be able
-            ! ! to find all needed neighbors, so we let the block wait if that is the case
-            ! do k = 1, hvy_n(tree_ID)
-            !     hvy_id = hvy_active(k, tree_ID)
-            !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-            !     if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) then
-            !         call ensure_mother_neighbors(params, hvy_id, mark_TMP_flag=.true.)
-            !     endif
-            ! enddo
-            ! ! after locally modifying refinement statusses, we need to synchronize light data
-            ! call synchronize_lgt_data( params, refinement_status_only=.true. )
-
-            ! watch for completeness
-            do k = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k, tree_ID)
-                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=.true. )
-            enddo
-            ! set mother block status, this is done here so that it will directly be synchronized with next sync_lgt call
-            do k = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k, tree_ID)
-                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) then
-                    lgt_block(hvy_family(hvy_ID, 1), IDX_REFINE_STS) = REF_TMP_UNTREATED
-                endif
-            enddo
-            ! Details are synced so that blocks send to the correct neighbors
-            call synchronize_lgt_data( params, refinement_status_only=.true. )
-
-            ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            ! Create or update mother blocks with SC of daughter blocks
-            ! This uses the already wavelet decomposed blocks and copies their SC into the new mother block
-            t_block = MPI_Wtime()
-            call sync_D2M(params, hvy_block, tree_ID, sync_case="ref", s_val=-1)
-            call toc( "adapt_tree (update_mothers)", 111, MPI_Wtime()-t_block )
-
-            ! now the daughter blocks are reset, lgt-loop to avoid synching
-            do k = 1, lgt_n(tree_ID)
-                lgt_ID = lgt_active(k, tree_ID)
-                if (lgt_block( lgt_ID, IDX_REFINE_STS) == -1) lgt_block(lgt_ID, IDX_REFINE_STS) = 0
-            enddo
-
-            ! check if mother is happy to exist and can continue or if it wants to wait for all medium neighbors
-            ! this also frees it of this burden if it ever happened and it now has all required neighbors
-            ! it is the equivalent to ensure_gradedness
-            do k = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k, tree_ID)
-                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                ! Here we also directly backup all values for the first time
-                if (lgt_block( lgt_ID, IDX_REFINE_STS) == REF_TMP_UNTREATED) then
-                    hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
-                endif
-                if (any(lgt_block( lgt_ID, IDX_REFINE_STS) == (/REF_TMP_UNTREATED, REF_TMP_UNTREATED_WAIT /) )) then
-                    call block_can_WD_safely(params, hvy_id)
-                endif
-            enddo
-            ! Details are synced so that blocks send to the correct neighbors
-            call synchronize_lgt_data( params, refinement_status_only=.true. )
-
-            write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " update_mothers)"
-            call toc( toc_statement, 1650+iteration, MPI_Wtime()-t_block )
-        endif
+        write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync level 2 mothers)"
+        call toc( toc_statement, 1200+iteration, MPI_Wtime()-t_block )
 
         ! iteration counter
         iteration = iteration + 1
@@ -207,8 +155,8 @@ subroutine cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, l
 
         ! log some statistics - amount of blocks, after iteration it shoul be increased, the difference showing how many blocks we treated
         if (present(log_blocks)) log_blocks(iteration) = lgt_n(tree_ID)
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WD it ", iteration, " TOTAL)"
-        call toc( toc_statement, 1700+iteration, MPI_Wtime()-t_loop )
+        write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " TOTAL)"
+        call toc( toc_statement, 1250+iteration, MPI_Wtime()-t_loop )
 
         if (present(verbose_check)) then
             write(*, '(A, i0, A, i0, A)') "Loop ", iteration, " with ", lgt_n(tree_ID), " blocks"
@@ -271,26 +219,24 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
 
         ! ! Normal adapt_tree loop does another CE_modify here to copy the SC, but for full WT this is not necessary
         ! ! as interior blocks only get values from their medium neighbors and no SC need to be copied
-        ! t_block = MPI_Wtime()
-        ! call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.false.)
-        ! call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
+        ! if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+        !     call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.false.)
+        ! endif
 
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
         t_block = MPI_Wtime()
         call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti, level=level)
-        call toc( "adapt_tree (sync all <- MC)", 112, MPI_Wtime()-t_block )
+        call toc( "reconstruct_tree (sync lvl <- MC)", 115, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level <- MC)"
-        call toc( toc_statement, 1750+iteration, MPI_Wtime()-t_block )
+        write(toc_statement, '(A, i0, A)') "reconstruct_tree (it ", iteration, " sync level <- MC)"
+        call toc( toc_statement, 1300+iteration, MPI_Wtime()-t_block )
 
         ! In theory, for full WT this CE_modify is only here for two reasons:
         !    1. We need to clear the WC from coarser neighbors, as the values in there are interpolated SC and we need to set those to the correct WC being 0
         !    2. interior WC are deleted so that the SC copy for syncing later is exact with the original values, we assume those WC are not significant
         if (params%useCoarseExtension .and. params%isLiftedWavelet) then
-            t_block = MPI_Wtime()
             call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, clear_wc_only=.true.)
-            call toc( "adapt_tree (coarse_extension_modify)", 105, MPI_Wtime()-t_block )
         endif
 
         ! Wavelet-reconstruct blocks on level
@@ -309,21 +255,21 @@ subroutine cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
             endif
         end do
-        call toc( "adapt_tree (reset or RWT)", 113, MPI_Wtime()-t_block )
+        call toc( "reconstruct_tree (RWT)", 116, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " RWT)"
-        call toc( toc_statement, 1850+iteration, MPI_Wtime()-t_block )
+        write(toc_statement, '(A, i0, A)') "reconstruct_tree (it ", iteration, " RWT)"
+        call toc( toc_statement, 1350+iteration, MPI_Wtime()-t_block )
 
         ! now we need to update the SC of all daughters
         t_block = MPI_Wtime()
         call sync_M2D(params, hvy_block, tree_ID, sync_case="level", s_val=level)
-        call toc( "adapt_tree (sync level 2 daughters)", 114, MPI_Wtime()-t_block )
+        call toc( "reconstruct_tree (sync level 2 daughters)", 117, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " sync level 2 daughters)"
-        call toc( toc_statement, 1900+iteration, MPI_Wtime()-t_block )
+        write(toc_statement, '(A, i0, A)') "reconstruct_tree (it ", iteration, " sync level 2 daughters)"
+        call toc( toc_statement, 1400+iteration, MPI_Wtime()-t_block )
 
-        write(toc_statement, '(A, i0, A)') "adapt_tree (WR it ", iteration, " TOTAL)"
-        call toc( toc_statement, 1950+iteration, MPI_Wtime()-t_loop )
+        write(toc_statement, '(A, i0, A)') "reconstruct_tree (it ", iteration, " TOTAL)"
+        call toc( toc_statement, 1450+iteration, MPI_Wtime()-t_loop )
 
         iteration = iteration + 1
     enddo
@@ -520,8 +466,6 @@ subroutine cvs_delete_non_leafs(params, tree_ID)
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     ! update grid lists: active list, neighbor relations, etc
-    t_block = MPI_Wtime()
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
-    call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
 end subroutine

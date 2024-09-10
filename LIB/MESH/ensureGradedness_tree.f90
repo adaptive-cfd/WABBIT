@@ -152,7 +152,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                         elseif ( ref_n == -1 ) then
                             ! neighbor wants to coarsen, which is what I want too,
                             ! so we both would just go down one level together - that's fine
-                            ! however, for lifted wavelets this is not fine as our neighbor might want to keep me to stay due to securityZone
+                            ! however, for lifted wavelets and leaf-only grid this is not fine as our neighbor might want to keep me to stay due to securityZone
                             if (params%useSecurityZone .and. params%isLiftedWavelet .and. markTMPflag) then
                                 lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
                                 grid_changed = .true.

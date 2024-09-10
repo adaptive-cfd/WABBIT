@@ -267,8 +267,12 @@ program main
             ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-            ! refine the mesh
-            call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+            ! refine the mesh, normally "everywhere"
+            if (params%threshold_mask) then
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, hvy_mask=hvy_mask )
+            else
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+            endif
         endif
         call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)

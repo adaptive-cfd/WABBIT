@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps)
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps, verbose_check)
     implicit none
 
     !> user defined parameter structure
@@ -21,17 +21,15 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     real(kind=rk), intent(in), optional :: eps
     !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3)
     real(kind=rk)                       :: detail( size(u,4) )
-    integer(kind=ik)                    :: g, i_dim, dim, Jmax, nx, ny, nz, nc
+    integer(kind=ik)                    :: g, i_dim, dim, Jmax, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: eps_use
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
-    nx     = size(u, 1)
-    ny     = size(u, 2)
-    nz     = size(u, 3)
     nc     = size(u, 4)
     Bs     = params%Bs
     g      = params%g
@@ -42,7 +40,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (allocated(u_wc)) then
         if (size(u_wc, 4) < nc) deallocate(u_wc)
     endif
-    if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
+    if (.not. allocated(u_wc)) allocate(u_wc(1:size(u, 1), 1:size(u, 2), 1:size(u, 3), 1:nc ) )
 
     ! set the indices we want to treshold
     idx(:, :) = 1
@@ -187,4 +185,8 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     else
         refinement_status = 0
     end if
+
+    if (present(verbose_check) .and. any(detail(:) > eps_use / 2.0_rk)) then
+        write(*, '(A, es10.3, A, i2, A, 10(es10.3, 2x))') "Eps: ", eps_use, ", Ref stat: ", refinement_status, ", Details: ", detail(1:nc)
+    endif
 end subroutine threshold_block

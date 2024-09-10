@@ -10,7 +10,7 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
-    refinement_status, norm, level, input_is_WD, block_mask, indices)
+    refinement_status, norm, level, input_is_WD, block_mask, indices, verbose_check)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -39,6 +39,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
     !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz, idx(2,3)
@@ -105,9 +106,9 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 
         thresholding_component = params%threshold_state_vector_component
         if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
-            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, eps=norm(1))
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, eps=norm(1), verbose_check=verbose_check)
         else
-            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, verbose_check=verbose_check)
         endif
 
         ! timing for debugging - block based so should not be deployed for productive versions

@@ -56,11 +56,11 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     end do
 
     ! if (present(verbose_check)) then
-        ! ! for debugging with exactly four procs, useful to see if their is a mismatch in send/receive
-        ! write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+    !     ! for debugging with exactly four procs, useful to see if their is a mismatch in send/receive
+    !     write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
         
-        ! ! for debugging send/receive volume
-        ! write(*, '("Rank ", i0, " Send N ", 1(i6, 1x), "Receive N ", 1(i6, 1x), "Send P ", 1(i2, 1x), "Recv P ", 1(i2, 1x), "Send total ", i3)') myrank, sum(data_send_counter), sum(data_recv_counter), sum(meta_send_counter), sum(meta_recv_counter), count_send_total
+    !     ! ! for debugging send/receive volume
+    !     ! write(*, '("Rank ", i0, " Send N ", 1(i6, 1x), "Receive N ", 1(i6, 1x), "Send P ", 1(i2, 1x), "Recv P ", 1(i2, 1x), "Send total ", i3)') myrank, sum(data_send_counter), sum(data_recv_counter), sum(meta_send_counter), sum(meta_recv_counter), count_send_total
     ! endif
 
     call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
@@ -740,6 +740,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
                 call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
                 ! daughter ref
                 ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
+                level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
                 ! sync_id=+2 -> M2D, send to daughters

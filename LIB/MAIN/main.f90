@@ -360,22 +360,22 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                if (params%CVS) then
-                    call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                else
+                ! if (params%CVS) then
+                !     call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                !         hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
+                ! else
                     call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
                         hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                endif
+                ! endif
             else
                 ! actual coarsening (no mask function is required)
-                if (params%CVS) then
-                    call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                else
+                ! if (params%CVS) then
+                !     call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                !         log_blocks=adapt_blocks, log_iterations=adapt_iterations)
+                ! else
                     call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
                         log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                endif
+                ! endif
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)

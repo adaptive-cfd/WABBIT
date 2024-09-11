@@ -980,7 +980,7 @@ subroutine saveHDF5_wavelet_decomposed_tree(fname, time, iteration, dF, params, 
     ! avoid that metadata is not correctly updated
     call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
 
-    call cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp)
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp)
     call saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
 
     ! delete all non-leaf blocks with daughters as we for now do not need them

@@ -36,14 +36,14 @@ subroutine post_denoising(params)
     ! does the user need help?
     if (fname1=='--help' .or. fname1=='--h' .or. fname1=='-h') then
         if (params%rank==0) then
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --denoise FILE_IN --memory=[memory] [options]"
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) " This function denoises the input field FILE_IN"
-            write(*,*) " Further options are:"
-            write(*,*) "    --wavelet, --Jmax, --Jmin, --dim, --Bs"
-            write(*,*) "    --verbose : write more fields"
-            write(*,*) "------------------------------------------------------------------"
+            write(*,'(A)') "------------------------------------------------------------------"
+            write(*,'(A)') "./wabbit-post --denoise FILE_IN --memory=[memory] [options]"
+            write(*,'(A)') "------------------------------------------------------------------"
+            write(*,'(A)') " This function denoises the input field FILE_IN"
+            write(*,'(A)') " Further options are:"
+            write(*,'(A)') "    --wavelet, --Jmax, --Jmin, --dim, --Bs"
+            write(*,'(A)') "    --verbose : write more fields"
+            write(*,'(A)') "------------------------------------------------------------------"
         end if
         return
     endif
@@ -102,7 +102,7 @@ subroutine post_denoising(params)
     endif
 
     ! denoise data
-    call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
+    call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
     call saveHDF5_tree( "denoised_000000.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID)
     ! Noise will be computed during adapt_tree in hvy_tmp, however this is only correct without load balancing (nProcs=1) and without coarsening

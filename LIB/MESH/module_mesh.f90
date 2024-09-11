@@ -74,7 +74,6 @@ contains
 #include "remove_nonperiodic_neighbors.f90"
 #include "forest.f90"
 #include "notEnoughMemoryToRefineEverywhere_tree.f90"
-#include "cvs_functions.f90"
 
 
 ! analytical data used for wavelet compression test

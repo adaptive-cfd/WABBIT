@@ -72,9 +72,7 @@ subroutine post_evaluate_thresholding(params)
 
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
-    call setup_wavelet(params, params%g)
-
-    call setup_wavelet(params)
+    call setup_wavelet(params, params%g, params%g_rhs)
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
@@ -132,11 +130,8 @@ subroutine post_evaluate_thresholding(params)
     Jmin_active = minActiveLevel_tree(tree_ID)
     Jmax_active = maxActiveLevel_tree(tree_ID)
 
-    do level = Jmax_active, Jmin_active, -1
-        write(*,'(A, i2)') "Investigating level ", level
-        call coarseningIndicator_tree( time, params, level, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, iteration, &
-            ignore_maxlevel=.true., input_is_WD=.false., leaf_loop_TMP=.false.)
-    enddo
+    call coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, tree_ID, params%coarsening_indicator, &
+        ignore_maxlevel=.true., input_is_WD=.false.)
 
     ! print to command line but only if requested
     if (params%rank == 0 .and. bool_dump) then

@@ -1,3 +1,5 @@
+!> \brief Initialize random seed based on system clock
+!> Inspired from GCC example on how to initialize a random seed
 subroutine init_random_seed()
 
     INTEGER :: i, n, clock

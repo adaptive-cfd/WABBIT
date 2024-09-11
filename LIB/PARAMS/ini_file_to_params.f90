@@ -303,11 +303,6 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
-   call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, lifted_wavelet )
-   ! Note: we can add the security zone also for non-lifted wavelets (although this
-   ! does not make much sense, but for development...)
-   ! Default: false for non-lifted, true for lifted wavelets
-   call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet )
 
    if (params%g_rhs > params%g) then
       call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
@@ -336,6 +331,12 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
    call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
+
+   ! for unlifted wavelets we need coarse extension if any WC are changed and reconstruction is requested
+   call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, lifted_wavelet &
+      .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
+   call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet &
+      .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
 
    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
    ! use? in ACM, it can be good NOT to apply it to the pressure.

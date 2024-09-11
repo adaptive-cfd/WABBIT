@@ -76,17 +76,17 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                if (params%CVS) then
-                    call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
-                else
+                ! if (params%CVS) then
+                !     call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
+                ! else
                     call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
-                endif
+                ! endif
             else
-                if (params%CVS) then
-                    call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
-                else
+                ! if (params%CVS) then
+                !     call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+                ! else
                     call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
-                endif
+                ! endif
             endif
 
             iter = iter + 1
@@ -168,17 +168,17 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        if (params%CVS) then
-                            call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
-                        else
+                        ! if (params%CVS) then
+                        !     call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
+                        ! else
                             call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
-                        endif
+                        ! endif
                     else
-                        if (params%CVS) then
-                            call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
-                        else
+                        ! if (params%CVS) then
+                        !     call adapt_tree_CVS( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+                        ! else
                             call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
-                        endif
+                        ! endif
                     endif
 
                     iter = iter + 1

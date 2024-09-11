@@ -183,8 +183,8 @@ class WabbitTest:
 
             # run commands
             file1, file2 = "vor_00100.h5", "vor_00200.h5"
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --operator=refine-everywhere"
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --operator=coarsen-everywhere"
+            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --operator=refine-everywhere --time=1.0"
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --operator=coarsen-everywhere --time=2.0"
             result1 = run_command(command1, self.logger)
             if result1.returncode != 0:
                 return result1

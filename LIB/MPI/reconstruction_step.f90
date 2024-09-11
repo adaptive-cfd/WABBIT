@@ -1,6 +1,6 @@
 !> \brief Modify the SC and WC of a wavelet decomposed blocks at fine/coarse interfaces
 !> This routine assumes that the input is already wavelet decomposed in spaghetti form
-subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, s_val, clear_wc_only)
+subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, s_val, clear_wc, copy_sc)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -13,19 +13,22 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
     character(len=*)                    :: CE_case                     !< String representing which kind of CE we want to do, act on tree, level or ref
 
     integer(kind=ik), intent(in), optional  :: s_val                   !< if CE_modify acts on level or ref, it is restricted to this value
-    logical, optional, intent(in)       :: clear_wc_only               !< for second CE modify we only want to delete WC (actually only in ghost patch)
+    logical, optional, intent(in)       :: clear_wc                    !< optionally disable wc clearing (defaults to true)
+    logical, optional, intent(in)       :: copy_sc                     !< optionally disable sc copy (defaults to true)
 
     integer(kind=ik)                    :: iteration, k, i_n, lgt_ID, hvy_ID, tree_me, CE_case_id
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, ref_me, level_n, lgt_ID_n
-    logical                             :: ClearWcOnly
+    logical                             :: ClearWc, CopySC
 
     nx = size(hvy_data, 1)
     ny = size(hvy_data, 2)
     nz = size(hvy_data, 3)
     nc = size(hvy_data, 4)
 
-    ClearWcOnly = .false.
-    if (present(clear_wc_only)) ClearWcOnly = clear_wc_only
+    ClearWc = .true.
+    CopySC = .true.
+    if (present(clear_wc)) ClearWc = clear_wc
+    if (present(copy_sc)) CopySC = copy_sc
 
     select case(CE_case)
     case("tree")
@@ -67,8 +70,10 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
                 if (level_n < level_me .and. block_is_leaf(params, hvy_ID) &
                 .and. .not. (block_has_valid_neighbor(params, hvy_id, i_n, 0) .or. block_has_valid_neighbor(params, hvy_id, i_n, -1))) then
                     ! manipulation of coeffs
-                    call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
-                    if (.not. clearWcOnly) then
+                    if (clearWC) then
+                        call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)
+                    endif
+                    if (copySC) then
                         call coarseExtensionManipulateSC_block(params, hvy_data(:,:,:,:,hvy_ID), hvy_tmp(:,:,:,:,hvy_ID), i_n)
                     endif
                 elseif (level_n > level_me) then

@@ -100,7 +100,7 @@ subroutine post_cvs_invertibility_test(params)
     endif
 
     ! denoise data
-    call adapt_tree_CVS( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
     ! save second data
     do k = 1, hvy_n(tree_ID)
@@ -113,7 +113,7 @@ subroutine post_cvs_invertibility_test(params)
     endif
 
     ! denoise data
-    call adapt_tree_CVS( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
     ! reference norms
     call componentWiseNorm_tree(params, hvy_work(:, :, :, :, :, 3), tree_ID, "L2", norm_ref1)
@@ -149,7 +149,7 @@ subroutine post_cvs_invertibility_test(params)
     endif
 
     ! denoise data
-    call adapt_tree_CVS( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.false.)
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.false.)
 
     Nb_old = lgt_n(tree_ID)
     if (params%rank == 0) then
@@ -167,7 +167,7 @@ subroutine post_cvs_invertibility_test(params)
     endif
 
     ! denoise data
-    call adapt_tree_CVS( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.false.)
+    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.false.)
 
     if (params%rank == 0) then
         write(*, '(A, i0)') "CVS-TEST: After second adapt_tree loop, Nb= ", lgt_n(tree_ID)

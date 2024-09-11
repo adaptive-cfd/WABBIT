@@ -534,7 +534,7 @@ contains
         allocate(params%threshold_state_vector_component(params%n_eqn))
         params%threshold_state_vector_component(1:params%n_eqn)=.True.
         if (maxmem < 0.0_rk) then
-            params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
+            params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) )
         endif
 
         call adjust_n_ghosts_for_scalarproduct(params)

@@ -111,10 +111,10 @@ subroutine post_wavelet_transform(params)
     ! decompose or reconstruct
     select case(operator)
     case("--wavelet-decompose")
-        call cvs_decompose_tree(params, hvy_block, tree_ID, hvy_tmp)
+        call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp)
 
         if (.not. full_tree) then
-            call cvs_delete_non_leafs(params, tree_ID)
+            call prune_fulltree2leafs(params, tree_ID)
         endif
 
         if (split_components) then
@@ -160,7 +160,7 @@ subroutine post_wavelet_transform(params)
             call abort(240909, "Reconstruction currently only works when providing the values in full tree format")
         endif
 
-        call cvs_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID)
+        call wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
     end select
 
     ! append ending before last underscore or if it doesnt exist before last .

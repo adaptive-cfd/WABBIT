@@ -1378,14 +1378,21 @@ contains
         ! -> it is always the g filter because it is wider AND we set more WC
         ! to zero
         !
-        if (params%isLiftedWavelet) then
-            params%Nscl    = abs(lbound(params%HD, dim=1)) - 1
-            params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
-            params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
+        params%Nscl    = max(abs(lbound(params%HD, dim=1)) - 1, 0)
+        params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
+        params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
 
-            params%Nscr    = ubound(params%HD, dim=1)
-            params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
-            params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
+        params%Nscr    = ubound(params%HD, dim=1)
+        params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
+        params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
+
+        ! for unlifted wavelets no SC are copied, however some WC do have to be wiped in case we ned to reconstruct (CVS and image denoising)
+        ! normally, if no WC are altered we can simply recopy the valeus that we had
+        if (.not. params%isLiftedWavelet) then
+            params%Nwcl = params%Nwcl - 2
+            params%Nreconl = params%Nreconl - 2
+            params%Nwcr = params%Nwcr - 2
+            params%Nreconr = params%Nreconr - 2
         endif
 
         if (present(g_wavelet)) then
@@ -1399,29 +1406,29 @@ contains
             endif
         endif
 
-        ! conditions for minimum blocksize for lifted wavelets arising from coarse extension:
-        !    1. coarse extension reconstructs needs SC or WC from finer neighbors
-        !    2. finer neighbors need values for their reconstruction that we altered with our reconstruction
-        ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
-        block_min = 0
-        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0 .and. .not. params%CVS) then
-            ! first condition: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
-            ! this is critical and we currently cannot get those values
-            block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
-            block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
-            ! second condition: our finer neighbors need our reconstructed values to reconstruct itself it's values
-            ! if that is the case we have an upwards dependency which is currently not handled
-            block_min = max(block_min, params%Nreconr + (ubound(params%HR, dim=1)+1)/2)
-            block_min = max(block_min, params%Nreconl + abs(lbound(params%HR, dim=1))/2)
+        ! ! conditions for minimum blocksize for lifted wavelets arising from coarse extension:
+        ! !    1. coarse extension reconstructs needs SC or WC from finer neighbors
+        ! !    2. finer neighbors need values for their reconstruction that we altered with our reconstruction
+        ! ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
+        ! block_min = 0
+        ! if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0 .and. .not. params%CVS) then
+        !     ! first condition: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
+        !     ! this is critical and we currently cannot get those values
+        !     block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
+        !     block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
+        !     ! second condition: our finer neighbors need our reconstructed values to reconstruct itself it's values
+        !     ! if that is the case we have an upwards dependency which is currently not handled
+        !     block_min = max(block_min, params%Nreconr + (ubound(params%HR, dim=1)+1)/2)
+        !     block_min = max(block_min, params%Nreconl + abs(lbound(params%HR, dim=1))/2)
 
-            ! block needs to be larger as constraints
-            block_min = block_min+1
+        !     ! block needs to be larger as constraints
+        !     block_min = block_min+1
 
-            if (any(params%Bs(:params%dim) < block_min)) then
-                write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
-                call abort(8888881, "The selected wavelet requires larger blocksizes to do the correct coarse extension.")
-            endif
-        endif
+        !     if (any(params%Bs(:params%dim) < block_min)) then
+        !         write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
+        !         call abort(8888881, "The selected wavelet requires larger blocksizes to do the correct coarse extension.")
+        !     endif
+        ! endif
 
         if (params%rank==0 .and. verbose1) then
             write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
@@ -1431,7 +1438,7 @@ contains
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
             write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
-            if (block_min /= 0 .and. .not. params%CVS) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
+            ! if (block_min /= 0 .and. .not. params%CVS) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD

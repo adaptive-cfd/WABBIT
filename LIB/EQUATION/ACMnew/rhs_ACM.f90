@@ -709,22 +709,37 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! --------------------------------------------------------------------------
     ! sponge term.
     ! --------------------------------------------------------------------------
-    if (params_acm%use_sponge) then
-        ! avoid division by multiplying with inverse
-        eps_inv = 1.0_rk / params_acm%C_sponge
+    if (.not. params_acm%geometry == "lamballais") then
+        if (params_acm%use_sponge) then
+            ! avoid division by multiplying with inverse
+            eps_inv = 1.0_rk / params_acm%C_sponge
 
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
+                    ! which is different from the penalization term, which acts only on ux,uy and not p
+                    spo = mask(ix,iy,6) * eps_inv
+
+                    rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
+                    rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
+                    rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*spo
+                enddo
+            enddo
+        end if
+    else
+        ! special treatment lamballais, also for p to p_ref in the ring
+        ! ring stored in sponge mask array
+        ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
+
+        ! use same C_eta as object, not the sponge value
+        eps_inv = 1.0_rk / params_acm%C_eta
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
-                ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
-                ! which is different from the penalization term, which acts only on ux,uy and not p
-                spo = mask(ix,iy,6) * eps_inv
-
-                rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
-                rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
-                rhs(ix,iy,3) = rhs(ix,iy,3) - phi(ix,iy,3)*spo
+                ! mask(:,:,4) contains p_ref forcing in the ring
+                rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4))*eps_inv
             enddo
         enddo
-    end if
+    endif
 
 
 end subroutine RHS_2D_acm

@@ -221,6 +221,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             call draw_cylinder( mask, x0, dx, Bs, g )
         endif
 
+    case ('lamballais')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_lamballais( mask, x0, dx, Bs, g )
+        endif
+
     case ('plate-free')
         if (stage == "time-dependent-part" .or. stage == "all-parts") then
             call draw_plate_free( mask, x0, dx, Bs, g )
@@ -314,7 +319,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     mask = 0.0_rk
 
     ! parameter for smoothing function (width)
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
 
     ! Note: this basic mask function is set on the ghost nodes as well.
@@ -336,6 +341,186 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     end do
 
 end subroutine draw_cylinder
+
+
+
+
+subroutine draw_lamballais(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi
+    ! loop variables
+    integer(kind=ik) :: ix, iy, ix_global, iy_global
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! a mask for the reproduction of the following paper:
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
+    ! Computers & Fluids 75, 103–111, 2013 
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_acm%dx_min
+    h = 1.5_rk * dx_min
+
+    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
+    safety = 5.0_rk * epsilon
+    delta = 2.64822828_rk
+
+    if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
+
+    select case(params_acm%smoothing_type)
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_acm%R0+safety) then
+                    ! inner cylinder
+                    xi = (r-params_acm%R0) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! inner part of ring
+                    xi = -1.0_rk*(r-params_acm%R1) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
+                else 
+                    ! outer part of ring
+                    xi = (r-params_acm%R2) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("discontinuous", "dis")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= params_acm%R0) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = 1.0_rk
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ((r >= params_acm%R1).and.(r <= params_acm%R2)) then
+                    ! ring
+                    mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("cos")
+    !--------------------------------
+        safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_acm%R0+safety) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = smoothstep(r, params_acm%R0, params_acm%C_smooth*params_acm%dx_min)
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! inner part of ring
+                    mask(ix,iy,1) = smoothstep( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
+                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
+                else 
+                    ! outer part of ring
+                    mask(ix,iy,1) = smoothstep(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
+                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    end select
+
+end subroutine draw_lamballais
+
 
 !-------------------------------------------------------------------------------
 ! The "free cylinder" is a 2D mask function that is coupled with the insect module
@@ -498,7 +683,6 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask )
     ! parameter for smoothing function (width)
     h = Insect%C_smooth*minval(dx)
 
-    ! Note: this basic mask function is set on the ghost nodes as well.
     do iz = g+1, Bs(3)+g
         z = dble(iz-(g+1)) * dx(3) + x0(3) - Insect%STATE(3)
         do iy = g+1, Bs(2)+g
@@ -553,7 +737,7 @@ subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
     ! parameter for smoothing function (width)
 
     !h = 2*minval(dx)
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
 
 
@@ -668,7 +852,7 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
     mask = 0.0_rk
 
     ! parameter for smoothing function (width)
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
 
     ! Note: this basic mask function is set on the ghost nodes as well.

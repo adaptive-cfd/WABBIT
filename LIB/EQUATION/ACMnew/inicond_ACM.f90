@@ -32,7 +32,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     real(kind=rk)    :: x, y, z
-    integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar
+    integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar, ix_global, iy_global
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -51,6 +51,25 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     case ("noise")
         call random_data(u)
         u = u * params_acm%beta
+
+    case ("lamballais")
+        if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+    
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+     
+                ! fields are initialized in read_params_ACM
+                ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                u(ix,iy,:,1) = params_acm%u_lamballais(ix_global, iy_global, 1) ! ux
+                u(ix,iy,:,2) = params_acm%u_lamballais(ix_global, iy_global, 2) ! uy
+                u(ix,iy,:,3) = params_acm%u_lamballais(ix_global, iy_global, 3) ! p
+            end do
+        end do
 
     case("pressure-blob")
         if (params_acm%dim==2) then

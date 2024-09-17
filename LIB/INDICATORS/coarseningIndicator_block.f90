@@ -75,21 +75,17 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     case ("maxval-eps")
         ! debug indicator (useful for grid generation tests)
         ! coarsen a block if the maxval of its first component is smaller 0.9 (for passive scalars)
-        if (params%dim==2) then
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) ) <= 0.9_rk ) then
-                refinement_status = -1
-            endif
-        else
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) ) <= 0.9_rk ) then
-                refinement_status = -1
-            endif
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) ) <= 0.9_rk ) then
+            refinement_status = -1
         endif
 
     case ("mask-allzero-noghosts")
-        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) )<1.0e-9_rk ) then
             refinement_status = -1
         endif
-        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )>=1.0_rk- 1.0e-9_rk ) then
+        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) )>=1.0_rk- 1.0e-9_rk ) then
             refinement_status = -1
         endif
 
@@ -132,21 +128,14 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         mask_max = 0.0_rk
         mask_min = 2.0_rk
 
-        if (params%dim == 3) then
-            ! check if any interface point is within the block
-            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) < 1.0_rk-1.0e-9_rk)) then
-                refinement_status_mask = 0_ik
-            endif
-            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-        else
-            ! check if any interface point is within the block
-            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) < 1.0_rk-1.0e-9_rk)) then
-                refinement_status_mask = 0_ik
-            endif
-            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
-            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
+        ! check if any interface point is within the block
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) > 1.0e-9_rk .and. &
+                block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) < 1.0_rk-1.0e-9_rk)) then
+            refinement_status_mask = 0_ik
         endif
+        mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
+        mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
 
         ! maybe the resolution is so coarse no point on the smoothing layer exists
         ! in that case if both 1 and 0 are in a mask it also has to contain an interface

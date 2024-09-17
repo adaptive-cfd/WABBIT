@@ -23,32 +23,76 @@ subroutine post_unit_test(params)
     integer(kind=ik)                        :: level, k, tc_length
     integer(kind=ik)                        :: Bs, Jmin_diff
     integer(hid_t)                          :: file_id
-    character(len=cshort)                   :: order
-    character(len=cshort)                   :: operator
+    character(len=cshort)                   :: operator, help
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks, Nb_file
     logical                                 :: verbose
 
     call get_command_argument(1, operator)
+    call get_command_argument(2, help)
+
+
+    if (params%rank==0) then
+        write(*,'("     /¯¯¯\                       /¯¯¯\       /¯¯¯\       /¯¯¯\       /¯¯¯\  ")')
+        write(*,'("    /     \     Unit Tests      /     \     /     \     /     \     /     \ ")')
+        write(*,'("___/       \___________________/       \___/       \___/       \___/       \")')
+        write(*, '("")')
+        write(*, '(A)') " Wabbit postprocessing: Unit tests"
+        write(*, '("")')
+    endif
+
+    ! does the user need help?
+    if (help=='--help' .or. help=='--h' .or. help=="-h") then
+        if (params%rank==0) then
+            write(*,'(20("_/¯\"))')
+            write(*, '(A)') " Executes one of the available unit test."
+            write(*, '(A)') ""
+            write(*, '(A)') "Example:"
+            write(*, '(A)') "   ./wabbit-post --ghost-nodes-test --wavelet=CDF42 --memory=8.0GB"
+            write(*, '(A)') ""
+            write(*,'(20("_/¯\"))')
+            write(*, '(A)') " Available unit tests:"
+            write(*, '(A)') "   --ghost-nodes-test"
+            write(*, '(A)') "   --refine-coarsen-test"
+            write(*, '(A)') "   --wavelet-decomposition-unit-test"
+            write(*, '(A)') "   --wavelet-decomposition-invertibility-test"
+            write(*, '(A)') "   --sync-test"
+            write(*, '(A)') "   --treecode-test"
+            write(*,'(20("_/¯\"))')
+            write(*, '(A)') "Parameters with default value:"
+            write(*, '(A)') "   --wavelet=CDF44           - wavelet to be utilized"
+            write(*, '(A)') "   --memory=8.0GB            - memory to initialize arrays"
+            write(*, '(A)') "   --JMax=6                  - maximum block level"
+            write(*, '(A)') "   --JMin=6                  - minimum block level"
+            write(*, '(A)') "   --dim=2                   - dimension of test"
+            write(*, '(A)') "   --Bs                      - Block size, default adapts to wavelet"
+            write(*, '(A)') "   --g                       - Amount of ghost points, default adapts to wavelet"
+            write(*, '(A)') "   --verbose=0               - prints and saves more debugging data for tests"
+            write(*, '(A)') "   --max_grid_density=0.1    - Percentage of memory utilization to be targeted for random grids"
+            write(*,'(20("_/¯\"))')
+        end if
+        return
+    endif
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
 
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
-    call get_cmd_arg( "--Jmax", params%Jmax, default=5 )
+    call get_cmd_arg( "--Jmax", params%Jmax, default=6 )
     call get_cmd_arg( "--Jmin", params%Jmin, default=1 )
     call get_cmd_arg( "--dim", params%dim, default=2 )
     call get_cmd_arg( "--Bs", Bs, default=-1 )
     call get_cmd_arg( "--verbose", verbose, default=.false.)
+    call get_cmd_arg( "--max_grid_density", params%max_grid_density, 0.1_rk)
 
     ! initialize block size dynamically, make it small so that tests dont take too long
     if (Bs == -1) then
         ! check for X in CDFXY
         if (params%wavelet(4:4) == "2") Bs = 6
-        if (params%wavelet(4:4) == "4") Bs = 12
-        if (params%wavelet(4:4) == "6") Bs = 20
+        if (params%wavelet(4:4) == "4") Bs = 10
+        if (params%wavelet(4:4) == "6") Bs = 14
 
         ! check for Y in CDFXY
         if (params%wavelet(5:5) == "0") Bs = Bs + 0
@@ -59,20 +103,6 @@ subroutine post_unit_test(params)
     endif
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs
-
-    ! ghost sync test needs at least 32 points over the domain length. We need to ensure that Jmin is fitted accordingly
-    if (operator == "--ghost-nodes-test") then
-        ! -0.1 to ensure integer cast is done correctly
-        Jmin_diff = int(log(32.0/(real(Bs)-0.1)) / log(2.0))+1 - params%Jmin
-        ! now increase both Jmin and Jmax accordingly
-        params%Jmax = params%Jmax + Jmin_diff
-        params%Jmin = params%Jmin + Jmin_diff
-
-        if (params%rank==0 .and. Jmin_diff /= 0) then
-            write(*, '(A, i0, A, i0)') "UNIT TEST: Need atleast 32 points over domain length. Adapted Jmin = ", params%Jmin, " and Jmax = ", params%Jmax
-        endif
-    endif
-
     
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
@@ -111,7 +141,7 @@ subroutine post_unit_test(params)
     case("--wavelet-decomposition-unit-test")
         call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
     case("--wavelet-decomposition-invertibility-test")
-        call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID )
+        call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose )
     case("--sync-test")
         call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
     case("--treecode-test")

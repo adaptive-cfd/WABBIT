@@ -34,8 +34,6 @@ subroutine ini_file_to_params( params, filename )
    ! what wavelet to use?
    ! (check that here as default for number ghost nodes g depends on it)
    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
-   ! Use coherent velocity simulation (CVS)?
-   call read_param_mpi(FILE, 'Wavelet', 'cvs', params%cvs, .false.)
 
    call ini_domain(params, FILE)
    call ini_blocks(params, FILE)

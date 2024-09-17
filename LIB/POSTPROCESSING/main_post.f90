@@ -160,6 +160,9 @@ program main_post
     case ("--denoise")
         call post_denoising(params)
 
+    case ("--denoising-test")
+        call post_denoising_test(params)
+
     case ("--cvs-invertibility-test")
         call post_cvs_invertibility_test(params)
         

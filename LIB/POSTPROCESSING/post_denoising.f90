@@ -11,39 +11,29 @@ subroutine post_denoising(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: file_in
-    character(len=cshort)  :: file_out
+    character(len=cshort)  :: file_in, file_out
     real(kind=rk)          :: time, time_given
     integer(kind=ik)       :: iteration
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
-    integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID
-
-    integer(kind=ik)                        :: level, k, tc_length
-    integer(kind=ik)                        :: Bs, Jmin_diff
-    integer(hid_t)                          :: file_id
-    character(len=cshort)                   :: order
-    character(len=cshort)                   :: fname1
-    real(kind=rk), dimension(3)             :: domain
-    integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: number_dense_blocks, Nb_file
-    logical                                 :: verbose
+    integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID, level, k
+    logical                            :: verbose
 
     ! filename should follow directly after option --denoise
-    call get_command_argument(2, fname1)
+    call get_command_argument(2, file_in)
 
     ! does the user need help?
-    if (fname1=='--help' .or. fname1=='--h' .or. fname1=='-h') then
+    if (file_in=='--help' .or. file_in=='--h' .or. file_in=='-h') then
         if (params%rank==0) then
-            write(*,'(A)') "------------------------------------------------------------------"
-            write(*,'(A)') "./wabbit-post --denoise FILE_IN --memory=[memory] [options]"
-            write(*,'(A)') "------------------------------------------------------------------"
-            write(*,'(A)') " This function denoises the input field FILE_IN"
-            write(*,'(A)') " Further options are:"
-            write(*,'(A)') "    --wavelet, --Jmax, --Jmin, --dim, --Bs"
-            write(*,'(A)') "    --verbose : write more fields"
-            write(*,'(A)') "------------------------------------------------------------------"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "./wabbit-post --denoise FILE_IN --memory=[memory] [options]"
+            write(*,*) "------------------------------------------------------------------"
+            write(*,*) " This function denoises the input field FILE_IN"
+            write(*,*) " Further options are:"
+            write(*,*) "    --wavelet, --Jmin"
+            write(*,*) "    --verbose : write more fields"
+            write(*,*) "------------------------------------------------------------------"
         end if
         return
     endif
@@ -54,16 +44,12 @@ subroutine post_denoising(params)
     params%cvs = .True.
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
-    call get_cmd_arg( "--Jmax", params%Jmax, default=9 )
     call get_cmd_arg( "--Jmin", params%Jmin, default=1 )
-    call get_cmd_arg( "--dim", params%dim, default=2 )
-    call get_cmd_arg( "--Bs", Bs, default=-1 )
     call get_cmd_arg( "--verbose", verbose, default=.false.)
 
-    ! initialize block size dynamically, make it small so that tests dont take too long
-    if (Bs == -1) Bs = 20
-    params%Bs(1:3) = 1
-    params%Bs(1:params%dim) = Bs
+        ! get some parameters from one of the files (they should be the same in all of them)
+    call read_attributes(file_in, lgt_n(tree_ID_flow), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
@@ -94,7 +80,7 @@ subroutine post_denoising(params)
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=2 )
 
     ! read in data
-    call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=tree_ID_flow, verbosity=.true.)
+    call readHDF5vct_tree((/file_in/), params, hvy_block, tree_ID=tree_ID_flow, verbosity=.true.)
 
     ! save data as full tree
     if (verbose) then
@@ -105,8 +91,10 @@ subroutine post_denoising(params)
     call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
 
     call saveHDF5_tree( "denoised_000000.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID)
-    ! Noise will be computed during adapt_tree in hvy_tmp, however this is only correct without load balancing (nProcs=1) and without coarsening
-    call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID)
+    if (verbose) then
+        ! Noise will be computed during adapt_tree in hvy_tmp, however this is only correct without load balancing (nProcs=1) and without coarsening
+        call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID)
+    endif
 
     if (verbose) then
         call saveHDF5_wavelet_decomposed_tree( "field-full-tree-WD_000000.h5", 0.0_rk, 0, 1, params, hvy_block, hvy_tmp, tree_ID)

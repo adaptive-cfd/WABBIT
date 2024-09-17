@@ -70,7 +70,7 @@ tests = [
         {"test_name":"acm", "wavelet":"CDF44", "dim":2},
 
         f"---{group_names[6]}---",  # group identifier
-        {"test_name":"denoise", "wavelet":"CDF44", "dim":2},
+        {"test_name":"denoise", "wavelet":"CDF42", "dim":2},
     ]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -216,7 +216,7 @@ class WabbitTest:
             denoise_file = "../../butterfly.png"
             denoise_h5 = "./butterfly.h5"
             command1 = f"image2wabbit.py {denoise_file} -o {denoise_h5} --level 5 --bs 16"  # image is already noisy so no extra noise is added
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise {denoise_h5} --wavelet={self.wavelet} --memory={self.memory} --Bs=16"
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise {denoise_h5} --wavelet={self.wavelet} --memory={self.memory}"
                         
             # first, convert image to a valid wabbit file
             result1 = run_command(command1, self.logger)
@@ -224,6 +224,9 @@ class WabbitTest:
                 return result1
             # now, denoise the file
             result2 = run_command(command2, self.logger)
+
+            # remove files which are not used for comparisons
+            os.remove(denoise_h5)
 
             # compare all files present in test_dir
             try:

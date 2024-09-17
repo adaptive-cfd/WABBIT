@@ -38,8 +38,6 @@ subroutine post_cvs_invertibility_test(params)
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
 
-    params%cvs = .True.
-
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
     call get_cmd_arg( "--Jmax", params%Jmax, default=9 )
     call get_cmd_arg( "--Jmin", params%Jmin, default=1 )

@@ -62,7 +62,6 @@ program main
     character(len=clong)                :: filename
     ! some variables, loop, debug information and more
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
-    integer(kind=ik)                    :: adapt_blocks(1:32), adapt_iterations  ! 32 as maximum amount of levels
     character(len=2*clong)              :: write_statement  ! dynamically build the output lengths
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
@@ -163,6 +162,9 @@ program main
         call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
+    ! timing
+    call toc( "TOPLEVEL: unit tests", 16, MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -360,22 +362,11 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                ! if (params%CVS) then
-                !     call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                !         hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                ! else
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                ! endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_mask=hvy_mask)
             else
                 ! actual coarsening (no mask function is required)
-                ! if (params%CVS) then
-                !     call adapt_tree_cvs( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                !         log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                ! else
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        log_blocks=adapt_blocks, log_iterations=adapt_iterations)
-                ! endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
@@ -402,18 +393,6 @@ program main
             write(*, '(" Nb=(",i6,"/",i6,")")', advance='no') Nblocks_rhs, Nblocks
             write(*, '(" J=(",i2,":",i2,"/",i2,":",i2, ")")', advance='no') Jmin1, Jmax1, minActiveLevel_tree(tree_ID_flow), maxActiveLevel_tree(tree_ID_flow)
             write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
-#ifdef DEV
-            ! for development I want to put some more things and start with blocks for adapt tree, length is adapted automatically
-            if (adapt_iterations > 2) then  ! adapt_tree did only one loop where num_blocks where reduced so we can skip it entirely
-                if (adapt_iterations > 3) then  ! write doesnt like if the format statement contains 0 length parts so we need an if-condition
-                    write(write_statement, '("(", A, i0, A, ")")') '" adapt iter Nb:(", ', adapt_iterations-3, '(i6,"/"), i6, ")"'
-                else
-                    write(write_statement, '("(", A, ")")') '" adapt iter Nb:(", i6, ")"'
-                endif
-                write(*, write_statement, advance='no') adapt_blocks(1:adapt_iterations-2)  ! -2 to skip final values we have already earlier
-            endif
-            ! write(*, '()', advance='no')
-#endif
             write(*, '("")')  ! line break
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important

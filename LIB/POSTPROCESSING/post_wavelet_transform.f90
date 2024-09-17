@@ -17,7 +17,7 @@ subroutine post_wavelet_transform(params)
     integer(kind=ik), dimension(3)     :: Bs
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
-    integer(kind=ik)                   :: tree_ID=1, hvy_ID, ix, iy, iz
+    integer(kind=ik)                   :: tree_ID=1, hvy_ID, ix, iy, iz, g_offset
     logical                            :: full_tree, split_components
 
     real(kind=rk), dimension(3)        :: dx, x0
@@ -42,19 +42,19 @@ subroutine post_wavelet_transform(params)
     ! does the user need help?
     if (operator=='--help' .or. operator=='--h') then
         if (params%rank==0) then
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wabbit postprocessing: compute wavelet decomposition or wavelet reconstruction"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " compute wavelet transformation for an existing field"
-            write(*,*) ""
-            write(*,*) " ./wabbit-post --wavelet-decompose ux_000.h5 --wavelet=CDF40"
-            write(*,*) " ./wabbit-post --wavelet-reconstruct ux_000.h5 --wavelet=CDF40"
-            write(*,*) ""
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " --wavelet=CDF44"
-            write(*,*) " --full_tree=0         - Save or read in full tree format or only leaf-layer"
-            write(*,*) " --split_components=0  - For decomposition: Save individual files for each wavelet component"
-            write(*,*) "-----------------------------------------------------------"
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " Wabbit postprocessing: compute wavelet decomposition or wavelet reconstruction"
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " compute wavelet transformation for an existing field"
+            write(*,'(A)') ""
+            write(*,'(A)') " ./wabbit-post --wavelet-decompose ux_000.h5 --wavelet=CDF40"
+            write(*,'(A)') " ./wabbit-post --wavelet-reconstruct ux_000.h5 --wavelet=CDF40"
+            write(*,'(A)') ""
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " --wavelet=CDF44"
+            write(*,'(A)') " --full_tree=0         - Save or read in full tree format or only leaf-layer"
+            write(*,'(A)') " --split_components=0  - For decomposition: Save individual files for each wavelet component"
+            write(*,'(A)') "-----------------------------------------------------------"
         end if
         return
     endif
@@ -91,8 +91,8 @@ subroutine post_wavelet_transform(params)
     g  = params%g
 
 
-    ! for full wavelet operations we need 8/7 for 3D or 4/3 for 2D as blocks
-    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk))
+    ! for full wavelet operations we need 8/7 for 3D or 4/3 for 2D as blocks, there can be an imbalance thats why we add another factor
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.1_rk)
 
     if (.not. split_components) then
         params%n_eqn = 1
@@ -123,9 +123,9 @@ subroutine post_wavelet_transform(params)
                 hvy_ID = hvy_active(k, tree_ID)
 
                 ! loop over all 2x2 cluster of points
-                do ix = 1, size(hvy_block, 1), 2
-                    do iy = 1, size(hvy_block, 2), 2
-                        do iz = 1, size(hvy_block, 3), 2
+                do ix = 1+mod(g, 2), size(hvy_block, 1)-mod(g, 2), 2
+                    do iy = 1+mod(g, 2), size(hvy_block, 2)-mod(g, 2), 2
+                        do iz = 1+merge(mod(g, 2), 0, params%dim == 3), size(hvy_block, 3)-merge(mod(g, 2), 0, params%dim == 3), 2
                             if (params%dim == 2) then
                                 ! set components WX, WY, WXY
                                 hvy_block(ix:ix+1, iy:iy+1, iz, 2, hvy_id) = hvy_block(ix+1, iy  , iz, 1, hvy_id)

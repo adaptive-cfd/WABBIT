@@ -1062,6 +1062,17 @@ contains
             if (params%dim == 3) then
                 wc(idx(1,1)  :idx(2,1)  , idx(1,2)  :idx(2,2)  , idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
             endif
+
+            ! wc(idx(1,1)  :idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            ! wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            ! wc(idx(1,1)+1:idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+
+            ! if (params%dim == 3) then
+            !     wc(idx(1,1)  :idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+            !     wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+            !     wc(idx(1,1)  :idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+            !     wc(idx(1,1)+1:idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+            ! endif
         enddo
 
         ! wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc, 2:d) = setNumber
@@ -1395,6 +1406,18 @@ contains
             params%Nreconr = params%Nreconr - 2
         endif
 
+        ! for wavelets with regularity higher than the wavelets NWC needs to be increased, the reasing for me is yet unclear
+        if (params%isLiftedWavelet) then
+            a = 0
+            if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "46") a = 2
+            if (params%wavelet(4:5) == "26") a = 4
+            if (params%wavelet(4:5) == "28") a = 6
+            params%Nwcl = params%Nwcl + a
+            params%Nwcr = params%Nwcr + a
+            params%Nreconl = params%Nreconl + a
+            params%Nreconr = params%Nreconr + a
+        endif
+
         if (present(g_wavelet)) then
             ! if we return the minimal value of ghosts, we assume that you are going to use it
             ! instead of ignoring it -> we can omit checking 
@@ -1406,29 +1429,20 @@ contains
             endif
         endif
 
-        ! ! conditions for minimum blocksize for lifted wavelets arising from coarse extension:
-        ! !    1. coarse extension reconstructs needs SC or WC from finer neighbors
-        ! !    2. finer neighbors need values for their reconstruction that we altered with our reconstruction
-        ! ! the Bs check is because sometimes this is called and Bs is not set yet, I have no idea when to check it then
-        ! block_min = 0
-        ! if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0 .and. .not. params%CVS) then
-        !     ! first condition: we need ghost points in wavelet decomposed form from finer neighbours for our reconstruction which we cannot get
-        !     ! this is critical and we currently cannot get those values
-        !     block_min = max(block_min, params%Nreconr + max(abs(lbound(params%GR, dim=1))-2, abs(lbound(params%HR, dim=1))-2))
-        !     block_min = max(block_min, params%Nreconl + max(ubound(params%GR, dim=1), ubound(params%HR, dim=1)))
-        !     ! second condition: our finer neighbors need our reconstructed values to reconstruct itself it's values
-        !     ! if that is the case we have an upwards dependency which is currently not handled
-        !     block_min = max(block_min, params%Nreconr + (ubound(params%HR, dim=1)+1)/2)
-        !     block_min = max(block_min, params%Nreconl + abs(lbound(params%HR, dim=1))/2)
+        ! conditions for minimum blocksize for lifted wavelets arise from coarse extension and double block-jump
+        !    JB: Origin of these minimum block sizes was not yet found but was tested with invertibility test
+        !    CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
+        block_min = 0
+        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+            if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") block_min = 18
+            if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") block_min = 24
+            if (params%wavelet(4:5) == "66") block_min = 30
 
-        !     ! block needs to be larger as constraints
-        !     block_min = block_min+1
-
-        !     if (any(params%Bs(:params%dim) < block_min)) then
-        !         write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
-        !         call abort(8888881, "The selected wavelet requires larger blocksizes to do the correct coarse extension.")
-        !     endif
-        ! endif
+            if (any(params%Bs(:params%dim) < block_min)) then
+                write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
+                call abort(8888881, "The selected wavelet requires larger blocksizes for coarse extensions.")
+            endif
+        endif
 
         if (params%rank==0 .and. verbose1) then
             write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
@@ -1438,7 +1452,7 @@ contains
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
             write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
-            ! if (block_min /= 0 .and. .not. params%CVS) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
+            if (block_min /= 0) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD

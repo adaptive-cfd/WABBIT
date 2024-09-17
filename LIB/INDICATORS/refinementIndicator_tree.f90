@@ -95,38 +95,21 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         enddo
 
         ! each CPU decides for its blocks if they're refined or not
-        if (params%dim==3) then
-            do k = 1, hvy_n(tree_ID)
-                ! hvy_id of the block we're looking at
-                hvy_id = hvy_active(k, tree_ID)
+        do k = 1, hvy_n(tree_ID)
+            ! hvy_id of the block we're looking at
+            hvy_id = hvy_active(k, tree_ID)
 
-                ! light id of this block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            ! light id of this block
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-                if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) then
-                    lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                endif
-
-                ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6, hvy_id) > 0.0_rk)) then
-                !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                ! endif
-            enddo
-        else
-            do k = 1, hvy_n(tree_ID)
-                ! hvy_id of the block we're looking at
-                hvy_id = hvy_active(k, tree_ID)
-
-                ! light id of this block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-
-                if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) then
-                    lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                endif
-                ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6, hvy_id) > 0.0_rk)) then
-                !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                ! endif
-            enddo
-        endif
+            ! merge selects 2D or 3D bounds depending on params%dim
+            if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            endif
+            ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 6, hvy_id) > 0.0_rk)) then
+            !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            ! endif
+        enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.
         ! therefore we have to sync the lgt data

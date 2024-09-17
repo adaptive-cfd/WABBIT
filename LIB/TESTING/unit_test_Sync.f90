@@ -170,7 +170,7 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
                         x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
                         ! buffer zone around domain borders are ignored as there are jumps in function values which interpolation might not be able to handle
                         if (x < g_min*ddx(1) .or. x >= 1-g_min*ddx(1) .or. y < g_min*ddx(2) .or. y >= 1-g_min*ddx(2) &
-                            .or. ((z < g_min*ddx(3) .or. z >= 1-g_min*ddx(3)) .and. params%dim == 3)) then
+                            .or. ((z < g_min*ddx(3) .or. z >= 1-g_min*ddx(3)) .and. params%dim==3)) then
                             hvy_tmp(ix, iy, iz, 1, hvy_id) = -99.0
                         elseif (((iz <= g-g_depth .or. iz > Bs(3)+g+g_depth) .and. params%dim==3) &
                          .or. iy <= g-g_depth .or. iy > Bs(2)+g+g_depth &

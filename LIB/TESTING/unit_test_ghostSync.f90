@@ -14,15 +14,14 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     integer(kind=ik)                  :: k, l, lgt_id, hvy_id
     integer(kind=ik)                  :: rank, number_procs
     real(kind=rk)                     :: ddx(1:3), xx0(1:3)
-    integer(kind=ik)                  :: g, number_blocks, ix, iy, iz
+    integer(kind=ik)                  :: g, number_blocks, ix, iy, iz, JmaxA, JminA
     integer(kind=ik), dimension(3)    :: Bs
     real(kind=rk)                     :: Lx, Ly, Lz, x, y, z
     integer(kind=ik)                  :: d
-    real(kind=rk)                     :: frequ(1:6)
     integer(kind=ik)                  :: ifrequ
 
     ! error variable
-    real(kind=rk)                     :: error2(1:6), error1(1:6), error_L2, error_Linfty, norm_L2, norm_Linfty, t0
+    real(kind=rk)                     :: error2(1:32), error1(1:32), error_L2, error_Linfty, norm_L2, norm_Linfty, t0
     integer(kind=ik)                  :: ierr, ii
     logical                           :: test, apply_verbose
 
@@ -60,12 +59,13 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     !---------------------------------------------------------------------------
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
-    params%max_grid_density = 0.10_rk
     ! perform at min 3 iterations of random refinement/coarsening
-    l = min(3, params%Jmax-params%Jmin)
+    l = max(3, params%Jmax-params%Jmin)
     call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin, verbosity=.true., iterations=l, tree_ID=tree_ID )
 
-    if (maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)) then
+    JmaxA = maxActiveLevel_tree(tree_ID)
+    JminA = minActiveLevel_tree(tree_ID)
+    if (JmaxA == JminA) then
         if (params%rank==0) write(*,'(A)') "UNIT TEST: By chance, generated an equidistant mesh: skipping ghost nodes test"
         ! delete the grid we created for this subroutine
         call reset_tree(params, .true., tree_ID=tree_ID)
@@ -77,11 +77,10 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     !---------------------------------------------------------------------------
     ! the entire test procedure is repeated for a bunch of frequencies, which is
     ! equivalent to using different block sizes, but way easier to program.
-    ! These frequencies are tested:
-    frequ=(/1.0_rk , 2.0_rk, 4.0_rk, 8.0_rk, 16.0_rk, 32.0_rk/)
+    ! These frequencies start at 1 and go to 2**(JmaxA - JminA)
 
     ! loop over frequencies
-    do ifrequ = 1 , size(frequ)
+    do ifrequ = 1 , JmaxA - JminA + 1
         !-----------------------------------------------------------------------
         ! Fill the above constructed grid with the exact solution values
         !-----------------------------------------------------------------------
@@ -108,9 +107,9 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
 
                             ! use cos functions because theyre symmetric (symmetry BC)
                             hvy_block(ix, iy, iz, 1, hvy_id) &
-                            = cos(frequ(ifrequ)*x/Lx * 2.0_rk*pi) &
-                            * cos(frequ(ifrequ)*y/Ly * 2.0_rk*pi) &
-                            * cos(frequ(ifrequ)*z/Lz * 2.0_rk*pi)
+                            = cos(2.0_rk**dble(ifrequ - 1)*x/Lx * 2.0_rk*pi) &
+                            * cos(2.0_rk**dble(ifrequ - 1)*y/Ly * 2.0_rk*pi) &
+                            * cos(2.0_rk**dble(ifrequ - 1)*z/Lz * 2.0_rk*pi)
                         enddo
                     enddo
                 enddo
@@ -123,8 +122,8 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
 
                         ! use cos functions because theyre symmetric (symmetry BC)
                         hvy_block(ix, iy, 1, 1, hvy_id) &
-                        = cos(frequ(ifrequ)*x/Lx * 2.0_rk*pi) &
-                        * cos(frequ(ifrequ)*y/Ly * 2.0_rk*pi)
+                        = cos(2.0_rk**dble(ifrequ - 1)*x/Lx * 2.0_rk*pi) &
+                        * cos(2.0_rk**dble(ifrequ - 1)*y/Ly * 2.0_rk*pi)
                     enddo
                 enddo
             end if
@@ -198,7 +197,7 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
         ! output
         if (rank==0) then
             write(*,'("UNIT TEST: ghost nodes sync error_L2= ",es11.4,", error_L∞= ",es11.4,", frequ=",f5.1)')  &
-            error1(ifrequ), error2(ifrequ), frequ(ifrequ)
+            error1(ifrequ), error2(ifrequ), 2.0_rk**dble(ifrequ - 1)
         end if
     end do
 
@@ -212,10 +211,10 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
         write(*,'(A)') "      \    /`"
         write(*,'(A)') "    (__)  /"
         write(*,'(A)') "    `.__.'"
-        write(*,'("UNIT TEST:", " L2 convergence order: ",6(f6.4,1x))') sqrt(error1(2:6) / error1(1:5))
-        write(*,'("UNIT TEST:", " L2 mean conv.  order: ",f6.4)') sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk
-        write(*,'("UNIT TEST:", " L∞ convergence order: ",6(f6.4,1x))') sqrt(error2(2:6) / error2(1:5))
-        write(*,'("UNIT TEST:", " L∞ mean conv.  order: ",f6.4)') sum(sqrt(error2(2:6) / error2(1:5))) / 5.0_rk
+        write(*,'("UNIT TEST:", " L2 convergence order: ",32(f6.4,3x))') sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))
+        write(*,'("UNIT TEST:", " L2 mean conv.  order: ",f6.4)') sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)
+        write(*,'("UNIT TEST:", " L∞ convergence order: ",32(f6.4,3x))') sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))
+        write(*,'("UNIT TEST:", " L∞ mean conv.  order: ",f6.4)') sum(sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))) / dble(JmaxA-JminA)
         write(*,'(20("¯\_/"))')
 
     endif
@@ -223,15 +222,15 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     if (abort_on_fail) then
         select case(params%order_predictor)
         case("multiresolution_2nd")
-            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 1.50_rk) then
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 1.50_rk) then
                 call abort(70820231, "2nd order convergence not satisfied")
             endif
         case("multiresolution_4th")
-            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 3.50_rk) then
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 3.50_rk) then
                 call abort(70820231, "4th order convergence not satisfied")
             endif
         case("multiresolution_6th")
-            if ((sum(sqrt(error1(2:6) / error1(1:5))) / 5.0_rk) < 5.50_rk) then
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 5.50_rk) then
                 call abort(70820231, "6th order convergence not satisfied")
             endif
         end select

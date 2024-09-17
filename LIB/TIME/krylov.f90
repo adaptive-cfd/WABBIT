@@ -212,7 +212,7 @@ function expM_pade(H) result(E)
 
     !                  !1.0_rk!, da dt*H -> H uebergeben wird, sonst steht hier dt
     call  DGPADM(ideg,m,1.0_rk,H,ldh,wsp,lwsp,ipiv,iexph,ns,iflag )
-    if(iflag.lt.0) stop "error in computing exp(t*H)"
+    if(iflag.lt.0) call abort(240917, "error in computing exp(t*H)")
 
     do j=1,m
         do i=1,m
@@ -281,7 +281,7 @@ subroutine DGPADM( ideg,m,t,H,ldh,wsp,lwsp,ipiv,iexph,ns,iflag )
     iflag = 0
     if ( ldh.lt.m ) iflag = -1
     if ( lwsp.lt.4*mm+ideg+1 ) iflag = -2
-    if ( iflag.ne.0 ) stop 'bad sizes (in input of DGPADM)'
+    if ( iflag.ne.0 ) call abort(240917,'bad sizes (in input of DGPADM)')
     !*
     !*---  initialise pointers ...
     !*
@@ -369,7 +369,7 @@ subroutine DGPADM( ideg,m,t,H,ldh,wsp,lwsp,ipiv,iexph,ns,iflag )
     endif
     call DAXPY( mm, -1.0d0,wsp(ip),1, wsp(iq),1 )
     call DGESV( m,m, wsp(iq),m, ipiv, wsp(ip),m, iflag )
-    if ( iflag.ne.0 ) stop 'Problem in DGESV (within DGPADM)'
+    if ( iflag.ne.0 ) call abort(240917,'Problem in DGESV (within DGPADM)')
     call DSCAL( mm, 2.0d0, wsp(ip), 1 )
     do j = 1,m
         wsp(ip+(j-1)*(m+1)) = wsp(ip+(j-1)*(m+1)) + 1.0d0

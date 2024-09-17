@@ -125,12 +125,8 @@ subroutine dense_to_sparse(params)
     ! read attributes from file. This is especially important for the number of
     ! blocks the file contains: this will be the number of active blocks right
     ! after reading.
-    if (params%dim==3) then
-        ! how many blocks do we need for the desired level?
-        number_dense_blocks = 8_ik**level
-    else
-        number_dense_blocks = 4_ik**level
-    end if
+    ! how many blocks do we need for the desired level?
+    number_dense_blocks = 2_ik**(params%dim*level)
 
     if (params%rank==0) then
         write(*,'(80("─"))')

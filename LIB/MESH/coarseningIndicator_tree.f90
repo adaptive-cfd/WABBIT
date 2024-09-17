@@ -224,9 +224,9 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
             endif
         enddo
 
-        ! in order to test: sum of tags over processors can be compared
-        call MPI_ALLREDUCE(MPI_IN_PLACE, tags, 1, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, mpierr)
-        if (params%rank==0) write(*, '(A, es10.3, A, es10.3)') "Theoretical coarsening chance: ", crsn_chance, " , actual coarsening fraction: ", dble(tags) / dble(lgt_n(tree_ID)) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)
+        ! ! in order to test: sum of tags over processors can be compared
+        ! call MPI_ALLREDUCE(MPI_IN_PLACE, tags, 1, MPI_INTEGER4, MPI_SUM, WABBIT_COMM, mpierr)
+        ! if (params%rank==0) write(*, '(A, es10.3, A, es10.3)') "Theoretical coarsening chance: ", crsn_chance, " , actual coarsening fraction: ", dble(tags) / dble(lgt_n(tree_ID)) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)
 
     case default
         t0 = MPI_Wtime()

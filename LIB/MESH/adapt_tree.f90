@@ -8,7 +8,7 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, log_blocks, log_iterations)
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, std_est)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -33,9 +33,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_coarsening
     !> during mask generation it can be required to ignore the maxlevel coarsening....life can suck, at times.
     logical, intent(in), optional       :: ignore_maxlevel
-    !> some information that we can log so that we know what happened in the loops
-    integer, intent(out), optional       :: log_blocks(:), log_iterations
     integer(kind=ik), intent(in)        :: tree_ID
+    !> Sometimes we want to pass in and out the estimated std - this probably will be made more smart at some point
+    real(kind=rk), optional, intent(inout) :: std_est
     
     ! loop variables
     integer(kind=ik)                    :: iteration, k, lgt_id
@@ -44,6 +44,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, iterate, toBeManipulated
     integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this, g_spaghetti
     character(len=clong)                :: toc_statement
+    integer(kind=tsize)                 :: treecode
 
     real(kind=rk) :: thresh, thresh_old
 
@@ -58,7 +59,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
-
+   
     t_block     = MPI_Wtime()
     t_all       = MPI_Wtime()
     iteration   = 0
@@ -93,7 +94,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Blocks always pass their SC to their mother (pendant to excuteCoarsening of old function), new blocks only synch from medium neighbors to avoid CE
     ! This is repeated until all blocks on the layer JMin are present with wavelet decomposed values
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks=log_blocks, log_iterations=log_iterations)
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -131,9 +132,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         endif
         thresh_old = -1.0_rk
 
-        if (params%rank == 0) then
-            write(*, '(2(A, es12.4))') "CVS before loop       thresh= ", thresh, " std= ", sqrt(norm(1)/dble(n_points))
-        endif
+        if (present(std_est)) std_est = sqrt(norm(1)/dble(n_points))
+        ! if (params%rank == 0) then
+        !     write(*, '(2(A, es12.4))') "CVS before loop       thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points))
+        ! endif
 
         ! convergence loop
         do iteration = 1, 100
@@ -173,14 +175,19 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 thresh = sqrt( 2.0_rk * norm(1)/dble(n_points) * log(dble(n_points)))
             endif
 
-            if (params%rank == 0) then
-                write(*, '(A, i2, 3(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " std= ", sqrt(norm(1)/dble(n_points)), " thresh_diff= ", abs(thresh - thresh_old)
-            endif
+            if (present(std_est)) std_est = sqrt(norm(1)/dble(n_points))
+            ! if (params%rank == 0) then
+            !     write(*, '(A, i2, 3(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points)), " thresh_diff= ", abs(thresh - thresh_old)
+            ! endif
 
             ! exit early
             if (indicator == "threshold-image-denoise" .and. abs(thresh - thresh_old) < 1e-12) exit
             if (indicator == "threshold-cvs" .and. iteration >= 2) exit  ! CVS computes one iteration and then uses new thresholding, totalling to 2 iterations
         enddo
+
+        ! if (params%rank == 0) then
+        !     write(*, '(A, i2, 2(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points))
+        ! endif
 
         call toc( "adapt_tree (treshold iterative loop)", 103, MPI_Wtime()-t_loop )
     endif
@@ -266,7 +273,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet reconstruction of blocks
     ! Reconstruct all blocks, this is done level-wise and scaling coefficients of daughter blocks are updated along the way
@@ -312,7 +318,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, log_blocks, log_iterations, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -321,8 +327,6 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, log_
     integer(kind=ik), intent(in)        :: tree_ID
     !> heavy tmp data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> some information that we can log so that we know what happened in the loops
-    integer, intent(out), optional       :: log_blocks(:), log_iterations
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level
@@ -467,8 +471,6 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, log_
         ! loop continues until we are on the lowest level.
         iterate = (level >= params%Jmin)
 
-        ! log some statistics - amount of blocks, after iteration it shoul be increased, the difference showing how many blocks we treated
-        if (present(log_blocks)) log_blocks(iteration) = lgt_n(tree_ID)
         write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " TOTAL)"
         call toc( toc_statement, 1250+iteration, MPI_Wtime()-t_loop )
 
@@ -488,9 +490,6 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, log_
     ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_block, tree_ID )
     ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
     ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_tmp, tree_ID )
-
-    ! log some statistics - amount of iterations
-    if (present(log_iterations)) log_iterations = iteration
 end subroutine
 
 

@@ -2213,11 +2213,11 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
         ! check memory allocation
         if (.not. allocated(Insect%bristles_coords)) then
             allocate(Insect%bristles_coords(1:4, 1:a, 1:b)) ! four wings...
-        elseif ( size(Insect%bristles_coords, 2) .ne. a ) then
-            call abort(76237, " Unequal number of bristles not yet supported. Modify wing shape files.")
+        elseif ( size(Insect%bristles_coords, 2) < a ) then
+            call abort(76237, "The 2nd wing cannot have more bristles than the 1st one (techn. limitation). You can swap the wings?")
         endif
 
-        call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID,:,:))
+        call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID, 1:a, 1:b))
     endif
 
 

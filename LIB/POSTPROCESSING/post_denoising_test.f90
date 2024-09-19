@@ -22,7 +22,7 @@ subroutine post_denoising_test(params)
     integer(kind=ik)                        :: level, k, tc_length, Bs, Jmin_diff, n_n, i_n, tree_ID_backup=4, random_seed_size
     integer(hid_t)                          :: file_id
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: number_dense_blocks, Nb_file
+    real(kind=rk)                           :: norm_L2(1:1), norm_Linfty(1:1)
     logical                                 :: verbose, predictable, save_results
 
     ! this routine works on two trees - one for copying and one for data to work with
@@ -155,17 +155,24 @@ subroutine post_denoising_test(params)
         call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true., std_est=std_est)
         t_den = MPI_Wtime()-t_den
 
-        ! print infos on this iteration
-        if (params%rank == 0) then
-            write(*, '(A, i4, 4(A, es10.3))') "Iteration ", i_n+1, ": Std noise - ", n_i, " , Std est - ", std_est, " , S2N ratio - ", signal_strength(1) / n_i**2, " , Denoising time - ", t_den 
-        endif
-
         if (save_results) then
             call saveHDF5_tree( "denoised_000000.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID_flow)
             if (verbose) then
                 ! Noise will be computed during adapt_tree in hvy_tmp, however this is only correct without load balancing (nProcs=1) and without coarsening
                 call saveHDF5_tree( "noise_000000.h5", 0.0_rk, 0, 1, params, hvy_tmp, tree_ID_flow)
             endif
+        endif
+
+        ! compare to original data:
+        call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID_flow, tree_ID_backup)
+        call componentWiseNorm_tree(params, hvy_block, tree_ID_flow, "L2", norm_L2)
+        call componentWiseNorm_tree(params, hvy_block, tree_ID_flow, "Linfty", norm_Linfty)
+
+        ! print infos on this iteration
+        if (params%rank == 0) then
+            write(*, '(A, i4, 6(A, es10.3))') "It", i_n+1, ": Std in / est - ", n_i, " / ", std_est, &
+                " , Err L2 / Linfty - ", norm_L2(1:1), " / ", norm_Linfty(1:1), &
+                " , S2N - ", signal_strength(1) / n_i**2, " , Time - ", t_den 
         endif
 
         if (verbose) then

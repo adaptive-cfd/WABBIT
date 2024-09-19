@@ -4,14 +4,13 @@
 ! ********************************************************************************************
 !> \image html completeness.svg "Ensure Completeness" width=400
 
-subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_daughters )
+subroutine ensure_completeness_block( params, lgt_id, sisters, check_daughters )
 
     implicit none
 
     type (type_params), intent(in)  :: params                !< user defined parameter structure
     integer(kind=ik), intent(inout) :: sisters(:)            !< light data array
     integer(kind=ik), intent(in)    :: lgt_id                !< Concerned Block
-    logical, intent(in), optional   :: mark_TMP_flag         !< Set refinement of completeness to 0 or temporary flag
     logical, intent(in), optional   :: check_daughters       !< For full tree CVS grids completeness has to check the mother as well
 
     integer(kind=ik)                :: Jmax, k, l, hvy_id, lgt_daughter
@@ -22,10 +21,6 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
     N_sisters = size(sisters)
     call lgt2hvy(hvy_id, lgt_id, params%rank, params%number_blocks)  ! needed for mother check
 
-    markTMPflag = 0
-    if (present(mark_TMP_flag)) then
-        if (mark_TMP_flag) markTMPflag = REF_TMP_TREATED_COARSEN
-    endif
     checkDaughters = .false.
     if (present(check_daughters)) checkDaughters = check_daughters
 
@@ -36,19 +31,14 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
         ! zeroth check : any block exists but has flag REF_TMP_EMPTY, so it has no values and all have to wait
         if ( any(lgt_sisters(:) == REF_TMP_EMPTY) ) then
             do l = 1, N_sisters
-                if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
+                if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = 0
             enddo
 
         ! first check : any block wants to stay so all blocks have to stay
         elseif ( any(lgt_sisters(:) == 0) ) then
             lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = 0
 
-        ! second check: any block has temp_gradedness flag > 1 - all blocks that want to stay have to wait with temp flag
-        elseif ( any(lgt_sisters(:) == REF_TMP_GRADED_STAY) .or. any(lgt_sisters(:) == REF_TMP_UNTREATED_WAIT)) then
-            do l = 1, N_sisters
-                if (lgt_block( sisters(l), IDX_REFINE_STS )  == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
-            end do
-        ! third check: all blocks have either temp flag or want to coarsen and can do it so lets change all flags to coarsen (-1)
+        ! second check: all blocks want to coarsen and can do it so lets change all flags to coarsen (-1)
         elseif ( all(lgt_sisters(:) < 0)) then
             lgt_block( sisters(1:N_sisters), IDX_REFINE_STS )  = -1
 
@@ -77,9 +67,9 @@ subroutine ensure_completeness( params, lgt_id, sisters, mark_TMP_flag, check_da
         do l = 1, N_sisters
             ! change status only for the existing sisters, mark temporary for leaf-wise as maybe this sister will be created soon
             if (sisters(l) /= -1) then
-                if (lgt_block( sisters(l), IDX_REFINE_STS ) == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = markTMPflag
+                if (lgt_block( sisters(l), IDX_REFINE_STS ) == -1) lgt_block( sisters(l), IDX_REFINE_STS )  = 0
             endif
         end do
     end if
 
-end subroutine ensure_completeness
+end subroutine ensure_completeness_block

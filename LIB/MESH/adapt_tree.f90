@@ -245,7 +245,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call respectJmaxJmin_tree( params, tree_ID )
 
         ! unmark blocks that cannot be coarsened due to gradedness and completeness, in one go this should converge to the final grid
-        call ensureGradedness_tree( params, tree_ID, mark_TMP_flag=.false., check_daughters=.true.)
+        call ensureGradedness_tree( params, tree_ID, check_daughters=.true.)
 
         ! we do not need to move any cell data anymore, any block with -1 can simply be deleted
         do k = 1, lgt_n(tree_ID)
@@ -368,7 +368,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         ! do k = 1, hvy_n(tree_ID)
         !     hvy_ID = hvy_active(k, tree_ID)
         !     call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
-        !     ! if (params%rank == 0 .and. lgt_block(lgt_id, IDX_REFINE_STS) == REF_TMP_UNTREATED .and. iteration >= 2) then
+        !     ! if (params%rank == 0 .and. lgt_block(lgt_id, IDX_REFINE_STS) == -1 .and. iteration >= 2) then
         !     ! if (lgt_block(lgt_id, IDX_MESH_LVL) == 3 .and. lgt_block(lgt_id, IDX_TC_2) == 54525952) then
         !         write(*, '("1 I-", i0, " R-", i2, " B-", i6, " L-", i2, " Ref-", i3, " TC-", i0)') iteration, params%rank, lgt_ID, &
         !             lgt_block(lgt_id, IDX_MESH_LVL), lgt_block(lgt_id, IDX_REFINE_STS), lgt_block(lgt_id, IDX_TC_2)

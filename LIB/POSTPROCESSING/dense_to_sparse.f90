@@ -41,23 +41,24 @@ subroutine dense_to_sparse(params)
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "                DENSE TO SPARSE "
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "postprocessing subroutine sparse a mesh with a given detail treshold"
-            write(*,*) " "
-            write(*,*) "Command:"
-            write(*,*) "./wabbit-post --dense-to-sparse "
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*) " Parameters: "
-            write(*,*) "  --eps-normalized="
-            write(*,*) "  --eps-norm="
-            write(*,*) "  --eps="
-            write(*,*) "  --indicator="
-            write(*,*) "  --order="
-            write(*,*) "  --files="
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*)
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "                DENSE TO SPARSE "
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail treshold"
+            write(*,'(A)') " "
+            write(*,'(A)') "Command:"
+            write(*,'(A)') "./wabbit-post --dense-to-sparse "
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)') " Parameters and their defaults: "
+            write(*,'(A)') "  --eps-normalized=1"
+            write(*,'(A)') "  --eps-norm=L2"
+            write(*,'(A)') "  --eps=-1"
+            write(*,'(A)') "  --indicator=threshold-state-vector"
+            write(*,'(A)') "  --wavelet=CDF40"
+            write(*,'(A)') "  --files="
+            ! write(*,'(A)') "  --security-zone=1"  ! for dev but can stay hidden
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)')
         end if
         return
     end if
@@ -73,6 +74,7 @@ subroutine dense_to_sparse(params)
     call get_cmd_arg( "--order", order, default="CDF40" )
     call get_cmd_arg( "--wavelet", params%wavelet, default=order )
     call get_cmd_arg( "--files", params%input_files )
+    call get_cmd_arg( "--security-zone", params%useSecurityZone, default=.true.)
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
@@ -130,7 +132,7 @@ subroutine dense_to_sparse(params)
 
     if (params%rank==0) then
         write(*,'(80("─"))')
-        write(*,*) "Wabbit dense-to-sparse."
+        write(*,'(A)') "Wabbit dense-to-sparse."
         do i = 1, params%n_eqn
             write(*,'(A20,1x,A80)') "Reading file:", params%input_files(i)
             write(*,'(A20,1x,A80)') "Writing to file:", file_out(i)

@@ -106,7 +106,7 @@ subroutine coarse_extension_reconstruct_tree(params, hvy_data, hvy_tmp, tree_ID,
     real(kind=rk), intent(inout)        :: hvy_data(:, :, :, :, :)     !< heavy data array
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)      !< heavy work data array - block data.
     integer(kind=ik), intent(in)        :: tree_ID                     !< which tree to study
-    integer(kind=ik), intent(in), optional :: REF_TMP_CHECK               !< if this is passed, only blocks with this ref status will be affected at all
+    integer(kind=ik), intent(in), optional :: REF_TMP_CHECK            !< if this is passed, only blocks with this ref status will be affected at all
 
     integer(kind=ik)                    :: iteration, k, i_n, lgt_ID, hvy_ID, Nreconl, Nreconr
     integer(kind=ik)                    :: nx,ny,nz,nc, level_me, level_n, lgt_ID_n, idx(2,3), ref_me

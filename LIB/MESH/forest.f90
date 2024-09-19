@@ -653,6 +653,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 end subroutine
 
 
+!> \brief Stores the lgt data of two trees in an extra array as backup
 subroutine store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, tree_ID2)
 
     implicit none
@@ -673,10 +674,12 @@ subroutine store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, 
         lgt_n_ref(2) = lgt_n(tree_ID2)
     endif
 
+    ! store lgt data of tree 1
     do k1 = 1, lgt_n(tree_ID1)
         lgt_block_ref(k1,:) = lgt_block(lgt_active(k1,tree_ID1), :)
         lgt_active_ref(k1,1)    = k1
     end do
+    ! store lgt data of tree 2
     do k1 = 1, lgt_n(tree_ID2)
         lgt_block_ref(k1+lgt_n_ref(1),:) = lgt_block(lgt_active(k1,tree_ID2), :)
         lgt_active_ref(k1,2)    = k1 + lgt_n_ref(1)
@@ -965,7 +968,6 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
         ! treecode (but on different trees) at the same rank.
         t_elapse = MPI_WTIME()
         call balanceLoad_tree( params, hvy_block, tree_ID1 )
-
         call balanceLoad_tree( params, hvy_block, tree_ID2 )
     end if
 

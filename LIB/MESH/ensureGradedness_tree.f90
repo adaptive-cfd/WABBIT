@@ -10,12 +10,11 @@
 !! my neighbors, as they might reside on another proc.
 ! ********************************************************************************************
 
-subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughters, verbose_check )
+subroutine ensureGradedness_tree( params, tree_ID, check_daughters, verbose_check )
 
     implicit none
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
-    logical, intent(in), optional :: mark_TMP_flag          !< Set refinement of completeness to 0 or temporary flag
     logical, intent(in), optional :: check_daughters        !< For full tree CVS grids completeness has to check the mother as well
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
@@ -23,15 +22,13 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
     ! loop variables
     integer(kind=ik)                    :: k, i, N, level_me, level_n, &
     counter, hvy_id, ref_n, ref_me, Jmax, proc_id, lgt_id, lgt_id_sisters(2**params%dim)
-    logical                             :: grid_changed, grid_changed_tmp, markTMPflag, checkDaughters    ! status of grid changing
+    logical                             :: grid_changed, grid_changed_tmp, checkDaughters    ! status of grid changing
 
     real(kind=rk) :: t0
 
     ! If we loop leaf-wise we do not want blocks to be set to 0 if not all sisters exist
     ! as we want to keep the wavelet-decomposed values and maybe just have to wait a step longer
-    markTMPflag = .false.
     checkDaughters = .false.
-    if (present(mark_TMP_flag)) markTMPflag = mark_TMP_flag
     if (present(check_daughters)) checkDaughters = check_daughters
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -78,13 +75,10 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
             ! -1  -1    -1   0
             ! -1  -1    -1  -1
             ! It is thus clearly NOT enough to just look at the nearest neighbors in this ensureGradedness_tree routine.
-
-            ! With security zone some blocks are waiting for their neighbors to coarsen, we check every first counter if blocks can now coarsen
-            ! and they will be elsewise revoked, this is important if all 4/8 sisters share REF_TMP_TREATED_COARSEN
-            if ( ref_me == -1 .or. (counter==0 .and. ref_me == REF_TMP_TREATED_COARSEN .and. markTMPflag)) then
+            if ( ref_me == -1) then
                 ! check if all sisters want to coarsen, remove the status it if they don't
 
-                call ensure_completeness( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), mark_TMP_flag=markTMPflag, check_daughters=checkDaughters )
+                call ensure_completeness_block( params, lgt_id, hvy_family(hvy_ID, 2:1+2**params%dim), check_daughters=checkDaughters )
                 ! if the flag is removed, then it is removed only on mpiranks that hold at least
                 ! one of the blocks, but the removal may have consequences everywhere. hence,
                 ! we force the iteration to be executed one more time
@@ -96,8 +90,6 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
 
             !-----------------------------------------------------------------------
             ! This block (still) wants to coarsen
-            ! Neighbor blocks with REF_TMP_TREATED_COARSEN or REF_TMP_GRADED_STAY want to coarsen in theory but have to stay
-            ! atleast for this iteration so they are treated as ref_n=0 and pass on REF_TMP_GRADED_STAY
             !-----------------------------------------------------------------------
             if ( ref_me == -1) then
                 ! loop over all neighbors
@@ -113,7 +105,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                         ! block can not coarsen, if neighbor wants to refine
                         if ( ref_n == -1 ) then
                             ! neighbor wants to coarsen, as do I, we're on the same level -> ok
-                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                        elseif ( ref_n == 0 ) then
                             ! neighbor wants to stay, I want to coarsen, we're on the same level -> ok
                         elseif ( ref_n == 1 ) then
                             ! neighbor wants to refine, I want to coarsen, we're on the same level -> NOT OK
@@ -126,7 +118,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                         ! neighbor on lower level
                         if ( ref_n == -1 ) then
                             ! neighbor wants to coarsen, as do I, it is one level coarser, -> ok for me
-                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                        elseif ( ref_n == 0 ) then
                             ! neighbor wants to stay, I want to coarsen, it is one level coarser, -> ok
                         elseif ( ref_n == 1 ) then
                             ! neighbor wants to refine, I want to coarsen, it is one level coarser, -> ok
@@ -139,24 +131,17 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
                             lgt_block( lgt_id, IDX_REFINE_STS ) = +1
                             grid_changed = .true.
 
-                        elseif ( ref_n == 0 .or. ref_n == REF_TMP_TREATED_COARSEN .or. ref_n == REF_TMP_GRADED_STAY ) then
+                        elseif ( ref_n == 0 ) then
                             ! neighbor wants to stay and I want to coarsen, but
                             ! I cannot do that (there would be two levels between us)
-                            if (ref_n == 0) then
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = 0
-                            else  ! TMP neighbors pass on TMP flag
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
-                            endif
+                            lgt_block( lgt_id, IDX_REFINE_STS ) = 0
                             grid_changed = .true.
 
                         elseif ( ref_n == -1 ) then
                             ! neighbor wants to coarsen, which is what I want too,
                             ! so we both would just go down one level together - that's fine
                             ! however, for lifted wavelets and leaf-only grid this is not fine as our neighbor might want to keep me to stay due to securityZone
-                            if (params%useSecurityZone .and. params%isLiftedWavelet .and. markTMPflag) then
-                                lgt_block( lgt_id, IDX_REFINE_STS ) = REF_TMP_GRADED_STAY
-                                grid_changed = .true.
-                            endif
+                            ! this is only important if not on full tree grid (so not important anymore)
                         end if
                     else
                         call abort(785879, "ERROR: ensureGradedness_tree: my neighbor does not seem to have -1,0,+1 level diff!")
@@ -166,7 +151,7 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
             !-----------------------------------------------------------------------
             ! this block wants to stay on its level
             !-----------------------------------------------------------------------
-            elseif (ref_me == 0 .or. ref_me == REF_TMP_GRADED_STAY .or. ref_me == REF_TMP_TREATED_COARSEN) then
+            elseif (ref_me == 0) then
                 ! loop over all neighbors
                 do i = 1, size(hvy_neighbor,2)
                     ! neighbor exists ? If not, we skip it
@@ -222,14 +207,5 @@ subroutine ensureGradedness_tree( params, tree_ID, mark_TMP_flag, check_daughter
         endif
 
     end do ! end do of repeat procedure until grid_changed==.false.
-
-
-    ! set REF_TMP_GRADED_STAY back to REF_TMP_TREATED_COARSEN so that they have a fitting flag < 0, collective operation
-    do k = 1, lgt_n(tree_ID)
-        lgt_id = lgt_active(k, tree_ID)
-        if (lgt_block( lgt_id , IDX_REFINE_STS ) == REF_TMP_GRADED_STAY) then
-            lgt_block( lgt_id , IDX_REFINE_STS ) = REF_TMP_TREATED_COARSEN
-        endif
-    enddo
 
 end subroutine ensureGradedness_tree

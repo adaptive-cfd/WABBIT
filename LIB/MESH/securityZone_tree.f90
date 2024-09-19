@@ -136,7 +136,7 @@ end subroutine
 
 
 !> This adds a buffer zone around blocks if the CE would remove valuable WC
-!> It is usually called after coarsening indicator where all blocks are WDed and have flag -1, 0 or REF_TMP_TREATED_COARSEN
+!> It is usually called after coarsening indicator where all blocks are WDed and have flag -1 or 0
 subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel, input_is_WD)
 
     use module_indicators
@@ -202,7 +202,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
                     ! the neighbor wants to coarsen. This yields the risk that after coarsening, the newly appearing coarseExt
                     ! deletes important WC on this block (hvyID). This we'll prevent.
-                    if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
+                    if ((ref_status_neighbor == -1).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
                         call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), &
                             (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
@@ -247,7 +247,7 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
         ! is this block assigned -1 (it wants to coarsen)?
         ! -> this can possibly be revoked here, if it would result in detail deletion on another block
-        if (ref_status == -1 .or. ref_status == REF_TMP_TREATED_COARSEN) then
+        if (ref_status == -1) then
             do neighborhood = 1, size(hvy_neighbor, 2)
                 ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
                 ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant

@@ -21,16 +21,6 @@ module module_mesh
 
     implicit none
 
-    ! used in adapt_tree to work leaf-wise
-    integer, parameter :: REF_TMP_UNTREATED = -2             ! should be < -1
-    integer, parameter :: REF_TMP_TREATED_COARSEN = -3       ! should be < -1
-    ! for security zone I have to wait for my finer neighbors to coarsen as their security zone might affect me
-    ! as gradedness wants to keep me but completeness wants to coarsen we need another temporary flag 
-    ! has to be > 0 to not have infinite loop with ensure_completeness
-    integer, parameter :: REF_TMP_GRADED_STAY = 2            ! should be > 0
-    ! in decomposition we do not want any sync with finer neighbors for interior blocks, use another flag and let them wait!
-    integer, parameter :: REF_TMP_UNTREATED_WAIT = 3         ! should be > 0
-
 contains
 
 #include "securityZone_tree.f90"
@@ -50,7 +40,7 @@ contains
 #include "adapt_tree.f90"
 #include "coarseningIndicator_tree.f90"
 #include "ensureGradedness_tree.f90"
-#include "ensure_completeness.f90"
+#include "ensure_completeness_block.f90"
 #include "executeCoarsening_tree.f90"
 #include "merge_blocks.f90"
 #include "balanceLoad_tree.f90"

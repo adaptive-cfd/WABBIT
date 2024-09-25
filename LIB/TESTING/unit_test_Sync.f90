@@ -206,8 +206,8 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
             if (rank == 0) then
                 write(*, '(A, i2)') "UNIT TEST:    ERROR! Did not sync all ghost nodes correctly for g_sync= ", g_depth
             endif
-            ! those are used in simulations often and should be deemed as a critical failure if they do not work
-            if (g_depth == params%g .or. g_depth == params%g_RHS) then
+            ! those are currently the only ones used in simulations and should be deemed as a critical failure if they do not work
+            if (g_depth == params%g .or. g_depth == params%g_RHS .or. g_depth == params%g/2*2) then
                 fail_crit = fail_crit + 1
             else
                 fail_normal = fail_normal + 1
@@ -271,6 +271,7 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
     else
         if (rank == 0) then
             write(*,'("UNIT TEST: Numbers have been traded, but ", i0, " critical and ", i0, " normal customers are furious and reject their share.")') fail_crit, fail_normal
+            write(*,'("UNIT TEST: Only critical values are used within the simulation, so we don''t have to worry about the failures.")')
             if (fail_crit > 0 .and. abort_on_fail) then
                 call abort(20240721, "We cannot continue our business with unhappy critical tests. Let's have a break for now and check what's going on!")
             endif

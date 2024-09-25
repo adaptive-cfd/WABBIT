@@ -9,7 +9,7 @@ import os, sys, argparse, subprocess, time, shutil, glob, logging, select
 #   - defining what should be executed in run
 #   - defining where the log-file should be in init_logging
 
-group_names = ["post", "wavelets", "ghost_nodes", "adaptive", "convection", "acm", "cvs"]
+group_names = ["post", "wavelets", "ghost_nodes", "invertibility", "adaptive", "convection", "acm", "insects", "cvs"]
 tests = [
         # f"---{group_names[0]}---",
         # "TESTING/wabbit_post/pod/pod_test.sh",
@@ -34,6 +34,7 @@ tests = [
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":3},
+
         f"---{group_names[2]}---",  # group identifier
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
@@ -41,7 +42,22 @@ tests = [
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
+
         f"---{group_names[3]}---",  # group identifier
+        {"test_name":"invertibility", "wavelet":"CDF20", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF22", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF24", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF26", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF28", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF40", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF42", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF44", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF46", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF60", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF62", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF64", "dim":2},
+
+        f"---{group_names[4]}---",  # group identifier
         {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF22", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF40", "dim":2},
@@ -50,7 +66,7 @@ tests = [
         {"test_name":"adaptive", "wavelet":"CDF60", "dim":2},
         {"test_name":"adaptive", "wavelet":"CDF62", "dim":2},
 
-        f"---{group_names[4]}---",  # group identifier
+        f"---{group_names[5]}---",  # group identifier
         {"test_name":"blob_equi", "wavelet":"CDF40", "dim":2},
         {"test_name":"blob_equi", "wavelet":"CDF20", "dim":3},
         {"test_name":"blob_equi", "wavelet":"CDF40", "dim":3},
@@ -65,11 +81,15 @@ tests = [
         {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
         {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
 
-        f"---{group_names[5]}---",  # group identifier
+        f"---{group_names[6]}---",  # group identifier
         {"test_name":"acm", "wavelet":"CDF40", "dim":2},
         {"test_name":"acm", "wavelet":"CDF44", "dim":2},
 
-        f"---{group_names[6]}---",  # group identifier
+        f"---{group_names[7]}---",  # group identifier
+        {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_bumblebee", "wavelet":"CDF22", "dim":3},
+
+        f"---{group_names[8]}---",  # group identifier
         {"test_name":"denoise", "wavelet":"CDF42", "dim":2},
     ]
 
@@ -137,7 +157,7 @@ class WabbitTest:
         self.memory = memory
 
         # define here where the test folder will be located relative to the run directory!
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
+        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets")
         elif self.test_name == "adaptive":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets", f"{self.test_name}_{self.wavelet}")
@@ -145,6 +165,8 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
         elif self.test_name == "acm":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"acm_cyl_adaptive_{self.wavelet}")
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", f"{self.test_name}_{self.wavelet}")
         elif self.test_name == "denoise":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"denoise_{self.wavelet}")
         else:
@@ -171,6 +193,10 @@ class WabbitTest:
             return result2
         elif self.test_name == "ghost_nodes":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --ghost-nodes-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
+            result = run_command(command, self.logger)
+            return result
+        elif self.test_name == "invertibility":
+            command = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-invertibility-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             result = run_command(command, self.logger)
             return result
         elif self.test_name == "adaptive":
@@ -243,6 +269,32 @@ class WabbitTest:
             os.chdir(self.test_dir)
             return result1
         # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+            ini_file = os.path.join("..", "PARAMS_dry_run.ini")  # relative to tmp_dir
+
+            # change to directory to tmp
+            tmp_dir = f"{self.test_dir}/tmp"
+            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
+            os.chdir(tmp_dir)
+
+            # run simmulation
+            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --dry-run {ini_file} --memory={self.memory} --pruned"
+            result1 = run_command(command1, self.logger)
+
+            # compare all files present in test_dir
+            try:
+                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
+                result1.returncode = not all_similar
+            # catch any error - for example HDF5 error - and then say the test failed
+            # this is important to still print the log (and continue)
+            except Exception as e:
+                self.logger.error("ERROR: Was not able to compare files")
+                self.logger.error(e)
+                result1.returncode = 1
+
+            # change back to test_dir
+            os.chdir(self.test_dir)
+            return result1
         elif self.test_name in ["blob_equi", "blob_adaptive", "acm"]:
             # lets say where the ini-file is
             if self.test_name in ["blob_equi", "blob_adaptive"]:
@@ -257,7 +309,6 @@ class WabbitTest:
 
             # run simmulation
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit {ini_file} --memory={self.memory}"
-            # result1 = subprocess.run(command1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
             result1 = run_command(command1, self.logger)
 
             # compare all files present in test_dir
@@ -283,7 +334,7 @@ class WabbitTest:
     # for a new test the log-file location needs to be specified
     def init_logging(self, verbose=False, suite_log_handler=None, stdout_handler=None):
         log_file = None
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
+        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
             log_file = os.path.join(self.test_dir, f"{self.test_name}_{self.dim}D_{self.wavelet}.log")
         elif self.test_name == "adaptive":
             log_file = os.path.join(self.test_dir, "run.log")
@@ -291,6 +342,8 @@ class WabbitTest:
             log_file = os.path.join(self.test_dir, "blob-convection.log")
         elif self.test_name == "acm":
             log_file = os.path.join(self.test_dir, "acm_cyl.log")
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+            log_file = os.path.join(self.test_dir, "dry_run.log")
         elif self.test_name == "denoise":
             log_file = os.path.join(self.test_dir, "denoise.log")
         
@@ -309,7 +362,7 @@ class WabbitTest:
 
     # remove residual files and possibly overwrite reference results
     def clean_up(self, replace=False, keep_tmp=False, logger=logger):
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes"]:
+        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
             # remove files - only .dat files are created
             if not keep_tmp:
                 for file in glob.glob("*.dat"):

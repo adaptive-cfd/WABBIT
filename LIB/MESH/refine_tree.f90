@@ -17,7 +17,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, hvy_mask
 
     implicit none
 
-    type (type_params), intent(in) :: params                      !> user defined parameter structure
+    type (type_params), intent(inout) :: params                   !> user defined parameter structure
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement

@@ -1,7 +1,8 @@
 
 !> \brief do coarse extensions for all coarse-fine interfaces on a block
 !> This is very similar to adapt_tree but only affects blocks on coarse-fine interfaces and does not need to loop
-!  !!! ATTENTION !!! This routine is finished but has not been cross-checked yet
+!  !!! ATTENTION !!!         This routine is finished but has not been cross-checked yet
+!  !!! ANOTHER ATTENTION !!! This routine was not adapted to work with full wavelet transformation. It might need a higher blocksize to work correctly
 subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, input_is_synced)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params

@@ -8,7 +8,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
 
     implicit none
     real(kind=rk), intent(in)           :: time                           !< Time used for mask generation
-    type (type_params), intent(in)      :: params                         !< user defined parameter structure
+    type (type_params), intent(inout)   :: params                         !< user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !< heavy data array - block data
     !> heavy work data array - block data, if input_is_wd is true this contains the block values
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)

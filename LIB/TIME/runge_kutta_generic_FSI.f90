@@ -11,7 +11,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(inout)   :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data

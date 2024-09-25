@@ -42,7 +42,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
         norm = sqrt( norm )
     
 
-    case ("CVS")
+    case ("treshold-image-denoise")
         norm = 0.0_rk
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
@@ -60,6 +60,12 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm)
         enddo
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+    
+    case ("treshold-CVS")
+        norm = 0.0_rk
+
+        ! compute enstrophy here
+        return
 
     case ("Linfty")
         norm = -1.0_rk

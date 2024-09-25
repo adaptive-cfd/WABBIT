@@ -27,7 +27,8 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         write(*,'(20("_/¯\"))')
         write(*,'("UNIT TEST: Testing if adapt(adapt(U)) = adapt(U), performed on a non-equidistant grid.")')
         write(*,'("UNIT TEST: It checks if the implementation of wavelet decomposition and reconstruction in adapt_tree is correct.")')
-        write(*,'("UNIT TEST: Due to CVS or coarse extension the first adaption alter values, but later application should not alter them.")')
+        write(*,'("UNIT TEST: Due to CVS or coarse extension the values after the first adaption should be changed for an adaptive grid, but later applications should give the same results.")')
+        write(*,'("UNIT TEST: This test is also used for verifying the minimum blocksize needed for the adapt_tree loop.")')
     end if
 
     Bs = params%Bs

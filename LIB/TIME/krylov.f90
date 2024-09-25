@@ -7,7 +7,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     !> time varible
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(inout)   :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data

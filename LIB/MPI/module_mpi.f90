@@ -60,7 +60,7 @@ module module_MPI
     ! This arrays indices are:
     ! ijkPatches([start,end], [dir (x,y,z)], [neighborhood / relation (with lvl_diff)], [sender/receiver/up-downsampled])
     ! The third index is 1:56*3 for ghost relations for all three level-diffs, 0 for whole block, -1:-16 for SC decimation (with lvl_diff)
-    integer(kind=ik), dimension(1:2, 1:3, -16:56*3, 1:3) :: ijkPatches
+    integer(kind=ik), allocatable :: ijkPatches(:, :, :, :)  ! size=(1:2, 1:3, -16:56*3, 1:3)
 
 
     ! we use this flag to call the allocation routine only once.
@@ -116,6 +116,7 @@ subroutine init_ghost_nodes( params )
     integer(kind=ik) :: ijkrecv(2,3)
     integer(kind=ik) :: ijkbuffer(2,3)
     integer(kind=ik) :: ijksend(2,3)
+    real(kind=rk)    :: memory_this, memory_total
 
     ! on second call, nothing happens
     if (.not. ghost_nodes_module_ready) then
@@ -156,17 +157,17 @@ subroutine init_ghost_nodes( params )
 
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
-        ! max number of active neighbors per stage: 2D = 12, 3D = 56
+        ! max number of active neighbors per stage: 2D = 12+8+8, 3D = 56+24+24, being on lvl J+1,J,J-1
         if ( params%dim == 3 ) then
             !---3d---3d---
             ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 56 neighbors ACTIVE per block per stage
-            buffer_N_int = number_blocks * 56 * 6
+            ! at most, we can have 56+24+24 neighbors ACTIVE per block per stage for full tree grid
+            buffer_N_int = number_blocks * (56+24+24) * S_META_SEND
         else
             !---2d---2d---
             ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 12 neighbors ACTIVE per block per stage
-            buffer_N_int = number_blocks * 12 * 6
+            ! at most, we can have 12+8+8 neighbors ACTIVE per block per stage for full tree grid
+            buffer_N_int = number_blocks * (12+8+8) * S_META_SEND
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
@@ -177,23 +178,24 @@ subroutine init_ghost_nodes( params )
             ! 2D case
             buffer_N = number_blocks * Neqn * ( (Bs(1)+2*g)*(Bs(2)+2*g) - (Bs(1)*Bs(2)) )
         end if
+        memory_total = 0.0
 
         !-----------------------------------------------------------------------
         ! allocate auxiliary memory
         !-----------------------------------------------------------------------
         ! allocate synch buffer
         if (rank==0) then
-            write(*,'("GHOST-INIT: Attempting to allocate the ghost-sync-buffer.")')
+            write(*,'("GHOST-INIT: Allocating ghost-sync-buffers.")')
 
-            write(*,'("GHOST-INIT: buffer_N_int=",i12," buffer_N=",i12)') &
-            buffer_N_int, buffer_N
+            ! write(*,'("GHOST-INIT: buffer_N_int=",i12," buffer_N=",i12)') &
+            ! buffer_N_int, buffer_N
 
-            write(*,'("GHOST-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N_int)*8e-9
+            ! write(*,'("GHOST-INIT: On each MPIRANK, Int  buffer:", f9.4, "GB")') &
+            !     2.0*dble(buffer_N_int)*8e-9
 
-            write(*,'("GHOST-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
-                2.0*dble(buffer_N)*8e-9
-            write(*,'(20("─"), A20, 40("─"))') "   allocating now   "
+            ! write(*,'("GHOST-INIT: On each MPIRANK, Real buffer:", f9.4, "GB")') &
+            !     2.0*dble(buffer_N)*8e-9
+            ! write(*,'(20("─"), A20, 40("─"))') "   allocating now   "
         endif
 
         ! wait now so that if allocation fails, we get at least the above info
@@ -202,22 +204,25 @@ subroutine init_ghost_nodes( params )
         allocate( meta_send_all(1:buffer_N_int), stat=status(1) )
         allocate( rData_sendBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(3) )
         allocate( rData_recvBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(4) )
+        memory_this = (product(real(shape(meta_send_all)))+product(real(shape(rData_sendBuffer)))+product(real(shape(rData_recvBuffer))))*8.0e-9
+        memory_total = memory_total + memory_this
 
         if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
-            write(*,'("GHOST-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-            "rData_sendBuffer", shape(rData_sendBuffer)
+            write(*,'("GHOST-INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "meta_send_all", product(real(shape(meta_send_all)))*8e-9, shape(meta_send_all)
 
-            write(*,'("GHOST-INIT: on each mpirank, Allocated ",A25," SHAPE=",7(i9,1x))') &
-            "rData_recvBuffer", shape(rData_recvBuffer)
+            write(*,'("GHOST-INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "rData_sendBuffer", product(real(shape(rData_sendBuffer)))*8e-9, shape(rData_sendBuffer)
 
-            write(*,'("GHOST-INIT: on each mpirank, rData_sendBuffer size is",f9.4," GB ")') &
-            product(real(shape(rData_sendBuffer)))*8e-9
-
-            write(*,'("GHOST-INIT: on each mpirank, rData_recvBuffer size is",f9.4," GB ")') &
-            product(real(shape(rData_recvBuffer)))*8e-9
+            write(*,'("GHOST-INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &
+            "rData_recvBuffer", product(real(shape(rData_recvBuffer)))*8e-9, shape(rData_recvBuffer)            
         endif
+
+        ! allocate ijkPatches holding the indices of sender and receiver patches
+        ! doesnt scale so size is not counted
+        allocate( ijkPatches(1:2, 1:3, -16:56*3, 1:3), stat=status(1) )
 
         ! thanks to the mix of Fortran and MPI this is quite a nightmare with 0- or 1-based arrays
         allocate( send_request(1:2*Ncpu) )
@@ -226,6 +231,8 @@ subroutine init_ghost_nodes( params )
         allocate( int_pos(0:Ncpu-1), real_pos(0:Ncpu-1))
         allocate( data_recv_counter(0:Ncpu-1), data_send_counter(0:Ncpu-1) )
         allocate( meta_recv_counter(0:Ncpu-1), meta_send_counter(0:Ncpu-1) )
+        memory_this = (10.0*real(Ncpu)+product(real(shape(line_buffer))))*8.0e-9
+        memory_total = memory_total + memory_this
 
         ! wait now so that if allocation fails, we get at least the above info
         call MPI_barrier( WABBIT_COMM, status(1))
@@ -245,6 +252,7 @@ subroutine init_ghost_nodes( params )
         call MPI_barrier( WABBIT_COMM, status(1))
 
         if (rank==0) then
+            write(*,'("INIT: Measured local (on 1 cpu) memory (only ghosts!):   ",g13.5," GB per rank")') memory_total
             write(*,'("╔", 78("═"), "╗")')
             write(*,'("║", 20(" "), A, A39)') "GHOST-INIT complete :)", "║"
             write(*,'("╚", 78("═"), "╝")')

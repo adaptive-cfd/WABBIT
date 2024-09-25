@@ -15,7 +15,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     implicit none
 
     real(kind=rk), intent(in)           :: time
-    type (type_params), intent(in)      :: params  !< good ol' params
+    type (type_params), intent(inout)   :: params  !< good ol' params
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy tmp data array - block data.
@@ -112,8 +112,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         enddo
 
         ! compute first threshold, treat whole field as incoherent
-        ! for now, we use first variable and compute Q1^2 / 2, luckily this is just the norm squared
-        call componentWiseNorm_tree(params, hvy_tmp, tree_ID, "CVS", norm)
+        ! image-denoise: compute Q1^2 / 2 (done on all variables but only first one used?)
+        ! CVS: assume we do ACM and compute enstrophy from computing vorticity on the fly from velocity components
+        call componentWiseNorm_tree(params, hvy_tmp, tree_ID, indicator, norm)
 
         
         n_points = 2_ik**(params%dim*Jmax_active)*product(params%bs(1:params%dim))

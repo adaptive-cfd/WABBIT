@@ -127,20 +127,21 @@ subroutine ini_file_to_params( params, filename )
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
    if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
-      call abort("ERROR: need more ghost nodes for given refinement order")
-   end if
-   if ( (params%g < 6) .and. (params%wavelet=='CDF44') )  then
-      call abort(050920194, "ERROR: for CDF44 wavelet, 6 ghost nodes are required")
+      call abort("ERROR: need more ghost nodes for given refinement interpolation order")
    end if
    if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-      call abort("ERROR: need more ghost nodes for given refinement order")
+      call abort("ERROR: need more ghost nodes for given refinement interpolation order")
    end if
    if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
-      call abort("ERROR: need more ghost nodes for given derivative order")
+      call abort("ERROR: need more ghost nodes for given finite derivative order")
    end if
    if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
-      call abort("ERROR: need more ghost nodes for given derivative order")
+      call abort("ERROR: need more ghost nodes for given finite derivative order")
    end if
+
+   ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
+   if ( (params%g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) params%g_RHS = 3
+   if ( (params%g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) params%g_RHS = 2
 
      ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
@@ -244,7 +245,7 @@ subroutine ini_blocks(params, FILE )
    type(inifile) ,intent(inout)     :: FILE
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
-   integer(kind=ik) :: i, g_default
+   integer(kind=ik) :: i, g_default, g_rhs_default
    real(kind=rk), dimension(:), allocatable  :: tmp
    logical :: lifted_wavelet
 
@@ -266,10 +267,13 @@ subroutine ini_blocks(params, FILE )
    ! check for X in CDFXY
    if (params%wavelet(4:4) == "2") then
       g_default = 2
+      g_rhs_default = 1
    elseif (params%wavelet(4:4) == "4") then
       g_default = 4
+      g_rhs_default = 2
    elseif (params%wavelet(4:4) == "6") then
       g_default = 6
+      g_rhs_default = 3
    else 
       call abort(2320242, "no default specified for this wavelet...")
    endif
@@ -292,7 +296,7 @@ subroutine ini_blocks(params, FILE )
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )
-   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, params%g )
+   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, g_rhs_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )

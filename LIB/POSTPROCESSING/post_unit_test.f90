@@ -85,21 +85,21 @@ subroutine post_unit_test(params)
     call get_cmd_arg( "--dim", params%dim, default=2 )
     call get_cmd_arg( "--Bs", Bs, default=-1 )
     call get_cmd_arg( "--verbose", verbose, default=.false.)
-    call get_cmd_arg( "--max_grid_density", params%max_grid_density, 0.1_rk)
+    call get_cmd_arg( "--max-grid-density", params%max_grid_density, 0.1_rk)
 
-    ! initialize block size dynamically, make it small so that tests dont take too long
+    ! initialize block size dynamically, make it BSmin for every wavelet
     if (Bs == -1) then
-        ! check for X in CDFXY
-        if (params%wavelet(4:4) == "2") Bs = 6
-        if (params%wavelet(4:4) == "4") Bs = 10
-        if (params%wavelet(4:4) == "6") Bs = 14
+        ! unlifted wavelets, +4 per increase in X of CDFX0
+        if (params%wavelet(4:5) == "20") Bs = 6
+        if (params%wavelet(4:5) == "40") Bs = 10
+        if (params%wavelet(4:5) == "60") Bs = 14
 
-        ! check for Y in CDFXY
-        if (params%wavelet(5:5) == "0") Bs = Bs + 0
-        if (params%wavelet(5:5) == "2") Bs = Bs + 4
-        if (params%wavelet(5:5) == "4") Bs = Bs + 10
-        if (params%wavelet(5:5) == "6") Bs = Bs + 16
-        if (params%wavelet(5:5) == "8") Bs = Bs + 22
+        ! lifted wavelets, +6 per increase in X or Y of CDFXY
+        if (params%wavelet(4:5) == "22") Bs = 8
+        if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") Bs = 12
+        if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") Bs = 18
+        if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") Bs = 24
+        if (params%wavelet(4:5) == "66") Bs = 30
     endif
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs

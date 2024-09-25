@@ -3,7 +3,7 @@ subroutine timeStep_tree(time, dt, iteration, params, hvy_block, hvy_work, hvy_m
 
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(inout)     :: iteration
-    type (type_params), intent(in)      :: params                       !> user defined parameter structure
+    type (type_params), intent(inout)   :: params                       !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)

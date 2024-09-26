@@ -109,6 +109,12 @@ module module_acm
     integer(kind=ik) :: Jmax, n_ghosts = -9999999
     integer(kind=ik), dimension(3) :: Bs = -1
 
+    ! stuff for lamballais cylinder
+    real(kind=rk) :: R0, R1, R2
+    character(len=clong) :: file_usx, file_usy, file_usp
+    character(len=cshort) :: smoothing_type
+    real(kind=rk), allocatable :: u_lamballais(:,:,:)
+
     logical :: initialized = .false.
   end type type_params_acm
 
@@ -179,6 +185,8 @@ end subroutine
     real(kind=rk), dimension(3) :: ddx
     integer(kind=ik), intent(out) :: N_mask_components
     integer(kind=ik), intent(in) :: g
+    integer(kind=ik) :: num_lines
+    real(kind=rk), allocatable :: buffer_array(:,:)
 
     type(inifile) :: FILE
     integer :: Neqn, i
@@ -271,6 +279,15 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'freq', params_acm%freq, 1.0_rk )
     call read_param_mpi(FILE, 'VPM', 'C_smooth', params_acm%C_smooth, 1.5_rk )
 
+    ! stuff for lamballais cylinder
+    call read_param_mpi(FILE, 'VPM', 'R0', params_acm%R0, 0.50_rk)
+    call read_param_mpi(FILE, 'VPM', 'R1', params_acm%R1, 1.75_rk)
+    call read_param_mpi(FILE, 'VPM', 'R2', params_acm%R2, 2.25_rk)
+    call read_param_mpi(FILE, 'VPM', 'file_usx', params_acm%file_usx, 'none')
+    call read_param_mpi(FILE, 'VPM', 'file_usy', params_acm%file_usy, 'none')
+    call read_param_mpi(FILE, 'VPM', 'file_usp', params_acm%file_usp, 'none')
+    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'hester')
+
     if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
         call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
     endif
@@ -289,7 +306,7 @@ end subroutine
     call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
-    
+
 
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
     if (params_acm%use_passive_scalar) then
@@ -409,6 +426,27 @@ end subroutine
     if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
         call init_wingsection_from_file(params_acm%wingsection_inifiles(1), wingsections(1), 0.0_rk)
         call init_wingsection_from_file(params_acm%wingsection_inifiles(2), wingsections(2), 0.0_rk)
+    endif
+
+
+    ! read lamballais reference fields, see
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
+    if (params_acm%geometry == "lamballais") then
+        ! read us field
+        call count_lines_in_ascii_file(params_acm%file_usx, num_lines, 0)
+        ! avoid maxcolumns restriction (read in a single long column and reshape)
+        allocate(buffer_array(1:num_lines,1:1))
+        call read_array_from_ascii_file(params_acm%file_usx, buffer_array, 0)
+
+        allocate(params_acm%u_lamballais(0:nx_max-1, 0:nx_max-1, 1:3))
+        ! reshape
+        params_acm%u_lamballais(:,:,1) = reshape(buffer_array, (/nx_max, nx_max/))
+
+        call read_array_from_ascii_file(params_acm%file_usy, buffer_array, 0)
+        params_acm%u_lamballais(:,:,2) = reshape(buffer_array, (/nx_max, nx_max/))
+
+        call read_array_from_ascii_file(params_acm%file_usp, buffer_array, 0)
+        params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
     endif
 
     params_acm%initialized = .true.

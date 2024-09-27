@@ -1,6 +1,7 @@
-!> \brief reset ghosts nodes for all blocks (not just active ones) for debuging
-!> ghost nodes are set to a very large constant.
-!> Currently only works on full arrays
+!> \brief Reset ghosts nodes for all blocks (not just active ones) for debugging
+!> Ghost nodes are set to a very large constant.
+!> Currently only works if we are synching/overwriting all available ghost-patches,
+!! so not for level-wise or ref-wise or any other fancy stuff
 !! input:    - params, light and heavy data \n
 !! output:   - heavy data array
 ! ********************************************************************************************

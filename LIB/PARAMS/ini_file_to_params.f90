@@ -127,32 +127,38 @@ subroutine ini_file_to_params( params, filename )
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
    if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
-      call abort("ERROR: need more ghost nodes for given refinement interpolation order")
+      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
    if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-      call abort("ERROR: need more ghost nodes for given refinement interpolation order")
+      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
-   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
-      call abort("ERROR: need more ghost nodes for given finite derivative order")
+   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) then
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
    if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
-      call abort("ERROR: need more ghost nodes for given finite derivative order")
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
+   end if
+   if ( (params%g < 1) .and. (params%order_discretization == 'FD_2th_central') ) then
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
-   if ( (params%g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) params%g_RHS = 3
+   ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+   ! the third stage (prediction) needs points from the boundary to correctly interpolate values
+   if ( (params%g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) params%g_RHS = 3
    if ( (params%g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) params%g_RHS = 2
+   if ( (params%g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) params%g_RHS = 1
 
-     ! Hack.
+   ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
    ! samples. In 2D, the code generally runs fast and does many time steps, hence
    ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
    if (params%dim == 2) then
     flush_frequency = 50
- else
-    flush_frequency = 10
- endif
+   else
+      flush_frequency = 10
+   endif
 
  
 end subroutine ini_file_to_params
@@ -265,6 +271,8 @@ subroutine ini_blocks(params, FILE )
    ! check if it is lifted or unlifted, which depends on Y (0 for unlifted and >0 for lifted wavelets)
 
    ! check for X in CDFXY
+   ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+   ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if (params%wavelet(4:4) == "2") then
       g_default = 2
       g_rhs_default = 1
@@ -314,12 +322,14 @@ subroutine ini_blocks(params, FILE )
       call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
    end if
 
-   if ( params%Jmax > 18 ) then
+   if ( (params%dim==3 .and. params%Jmax > 21) .or. (params%dim==2 .and. params%Jmax > 32) ) then
       ! as we internally convert the treecode to a single integer number, the number of digits is
-      ! limited by that type. The largest 64-bit integer is 9 223 372 036 854 775 807
-      ! which is 19 digits, but the 18th digit cannot be arbitrarily set. Therefore, 18 refinement levels
-      ! are the maximum this code can currently perform.
-      call abort(170619,"Error: Max treelevel cannot be larger 18 (64bit long integer problem) ")
+      ! limited by what we can encode with 64 bits. dim=3 needs 3 bits while dim=2 needs 2 bits resulting in 21 or 32 levels possible
+      if (params%dim == 3) then
+         call abort(170619,"Error: Max treelevel cannot be larger 21 (64bit long integer problem) ")
+      else
+         call abort(170619,"Error: Max treelevel cannot be larger 32 (64bit long integer problem) ")
+      endif
    end if
 
    ! read switch to turn on|off mesh refinement

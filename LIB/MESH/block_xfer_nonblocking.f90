@@ -28,11 +28,10 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
     integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints
     integer :: ierr, tag
-    logical :: xfer_started(1:N_xfers)
-    logical :: source_block_deleted(1:N_xfers)
+    logical, allocatable, save :: xfer_started(:), source_block_deleted(:)
 
-    ! array of mpi requests, taken from stack. for extremely large N_xfers, that can cause stack problems
-    integer(kind=ik) :: requests(1:2*N_xfers)
+    ! array of mpi requests
+    integer(kind=ik), allocatable, save :: requests(:)
     integer(kind=ik) :: ireq
 
     logical :: not_enough_memory
@@ -46,8 +45,15 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     t0 = MPI_wtime()
     myrank = params%rank
     counter = 0
-    xfer_started = .false.
-    source_block_deleted = .false.
+
+    ! init variables for xfers, maximum is that we send all blocks at the same time
+    ! JB ToDo: Think about if we can simplify this
+    if (.not. allocated(xfer_started)) allocate(xfer_started(1:params%number_blocks*params%number_procs))
+    if (.not. allocated(source_block_deleted)) allocate(source_block_deleted(1:params%number_blocks*params%number_procs))
+    if (.not. allocated(requests)) allocate(requests(1:2*params%number_blocks*params%number_procs))
+
+    xfer_started(1:N_xfers) = .false.
+    source_block_deleted(1:N_xfers) = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
 
@@ -171,11 +177,13 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     if (not_enough_memory) then
         if (counter < 200000) then
             counter = counter + 1
+#ifdef DEV
             if (myrank==0) then
                 ! t0 is just an identifier for the call
                 call append_t_file( "block_xfer.t", (/t0, real(counter,kind=rk), real(Nxfer_total,kind=rk), &
                 real(Nxfer_done,kind=rk), real(Nxfer_notPossibleNow,kind=rk) /) )
             endif
+#endif
             ! like in the golden age of computer programming:
             goto 1
         else

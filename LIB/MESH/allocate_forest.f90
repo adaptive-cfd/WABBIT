@@ -155,11 +155,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         N_MAX_COMPONENTS = params%dim
 
         ! first compute mem per block in points
-        mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
-        ! values from MPI - reference at module_mpi%init_ghost_nodes
-        + 2.0 * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts, 1send 1recv
-        + 3.0 * real(max_neighbors_used) * 5.0 / 2.0 &  ! int buffer (4byte hence /2), sending 6 values each, 3 buffers exist
-        + 2.0 * params%number_procs ! send recv buffers include one number for how many patches are send per cpu
+        mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g)) ! hvy_block
 
         ! hvy_mask
         if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
@@ -175,6 +171,18 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         if ( present(hvy_work) ) then
             mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
         endif
+
+        ! values from MPI - reference at module_mpi%init_ghost_nodes
+        mem_per_block = mem_per_block &
+        + 2.0 * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts, 1send 1recv
+        + 3.0 * real(max_neighbors_used) * 5.0 / 2.0 &  ! int buffer (4byte hence /2), sending 6 values each, 3 buffers exist
+        + 2.0 * params%number_procs ! send recv buffers include one number for how many patches are send per cpu
+
+        ! hvy_neighbor, hvy_family, lgt_block, lgt_sortednumlist, lgt_active
+        mem_per_block = mem_per_block + real(max_family+max_neighbors) + real(number_procs) * real(EXTRA_LGT_FIELDS + 5.0*params%forest_size)
+
+        ! balance load variables
+        mem_per_block = mem_per_block + 10.0*real(number_procs)
 
         ! put a safety buffer on just for miscellaneous arrays that are being created and used
         mem_per_block = mem_per_block * 1.02  ! 2%

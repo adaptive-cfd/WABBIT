@@ -12,8 +12,8 @@ contains
     subroutine restriction_2D(fine, coarse)
         implicit none
 
-        real(kind=rk), dimension(1:,1:), intent(in) :: fine
-        real(kind=rk), dimension(1:,1:), intent(out) :: coarse
+        real(kind=rk), dimension(:,:), intent(in) :: fine
+        real(kind=rk), dimension(:,:), intent(out) :: coarse
         integer(kind=ik), dimension(2) :: nfine, ncoarse
 
         ncoarse(1) = size(coarse,1)
@@ -36,8 +36,8 @@ contains
     ! subroutine restriction_prefilter(params, u, u_filtered)
     !     implicit none
     !     type(type_params), intent(in) :: params
-    !     real(kind=rk), dimension(1:,1:,1:), intent(in) :: u
-    !     real(kind=rk), dimension(1:,1:,1:), intent(out) :: u_filtered
+    !     real(kind=rk), dimension(:,:,:), intent(in) :: u
+    !     real(kind=rk), dimension(:,:,:), intent(out) :: u_filtered
 
     !     if (.not. allocated(params%HD)) call abort(71717172, "wavelet not setup")
 
@@ -48,8 +48,8 @@ contains
     subroutine restriction_prefilter_vct(params, u, u_filtered)
         implicit none
         type(type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(out) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(out) :: u_filtered
 
         if (.not. allocated(params%HD)) call abort(71717172, "wavelet not setup")
 
@@ -78,8 +78,8 @@ contains
     subroutine restriction_3D(fine, coarse)
         implicit none
 
-        real(kind=rk), dimension(1:,1:,1:), intent(in)  :: fine
-        real(kind=rk), dimension(1:,1:,1:), intent(out) :: coarse
+        real(kind=rk), dimension(:,:,:), intent(in)  :: fine
+        real(kind=rk), dimension(:,:,:), intent(out) :: coarse
         integer(kind=ik), dimension(3) :: nfine, ncoarse
 
         ncoarse(1) = size(coarse,1)
@@ -132,8 +132,8 @@ contains
     subroutine prediction(coarse, fine, order_predictor)
         implicit none
 
-        real(kind=rk), dimension(1:,1:,1:), intent(inout) :: fine
-        real(kind=rk), dimension(1:,1:,1:), intent(inout) :: coarse
+        real(kind=rk), dimension(:,:,:), intent(inout) :: fine
+        real(kind=rk), dimension(:,:,:), intent(inout) :: coarse
         character(len=*), intent(in) :: order_predictor
 
         integer(kind=ik) :: i, j, k
@@ -225,8 +225,8 @@ contains
     ! subroutine blockFilterXYZ( params, u, u_filtered, coefs_filter, a, b )
     !     implicit none
     !     type (type_params), intent(in) :: params
-    !     real(kind=rk), dimension(1:,1:,1:), intent(in) :: u
-    !     real(kind=rk), dimension(1:,1:,1:), intent(inout) :: u_filtered
+    !     real(kind=rk), dimension(:,:,:), intent(in) :: u
+    !     real(kind=rk), dimension(:,:,:), intent(inout) :: u_filtered
     !     integer(kind=ik) :: a, b
     !     real(kind=rk), intent(in) :: coefs_filter(a:b)
     !     integer(kind=ik) :: ix, iy, iz, nx, ny, nz, shift, g, Bs(1:3)
@@ -309,8 +309,8 @@ contains
     subroutine blockFilterXYZ_vct( params, u, u_filtered, coefs_filter, fl_l, fl_r, do_restriction)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
         integer(kind=ik), intent(in) :: fl_l, fl_r  !< Filter length left and right
         real(kind=rk), intent(in) :: coefs_filter(fl_l:fl_r)
         logical, intent(in), optional :: do_restriction  !< when we do restriction anyways we can skip every second point
@@ -431,8 +431,8 @@ contains
     subroutine blockFilterXYZ_wherePossible_vct( params, u, u_filtered, coefs_filter, fl_l, fl_r, do_restriction)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
         integer(kind=ik), intent(in) :: fl_l, fl_r  !< Filter length left and right
         real(kind=rk), intent(in) :: coefs_filter(fl_l:fl_r)
         logical, intent(in), optional :: do_restriction  !< when we do restriction anyways we can skip every second point
@@ -510,8 +510,8 @@ contains
     subroutine blockFilterCustom_vct( params, u, u_filtered, filter_x, filter_y, filter_z )
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
         character(len=*), intent(in) :: filter_x, filter_y, filter_z
         integer(kind=ik) :: a, b
         real(kind=rk), allocatable :: coefs_filter(:)
@@ -697,8 +697,8 @@ contains
     subroutine blockFilterCustom1_vct( params, u, u_filtered, filter, direction )
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
         character(len=*), intent(in) :: filter, direction
         integer(kind=ik) :: a, b
         real(kind=rk), allocatable :: coefs_filter(:)
@@ -804,7 +804,7 @@ contains
     subroutine waveletDecomposition_block(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
 
         real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
@@ -823,7 +823,7 @@ contains
     subroutine waveletDecomposition_block_old(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
 
         real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
@@ -886,7 +886,7 @@ contains
     subroutine waveletReconstruction_block(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
 
         call WaveReconstruction_dim1( params, u )
     end subroutine
@@ -896,7 +896,7 @@ contains
 !     subroutine waveletReconstruction_block_old(params, u)
 !         implicit none
 !         type (type_params), intent(in) :: params
-!         real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+!         real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
 !
 !         real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 !         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
@@ -951,7 +951,7 @@ contains
     subroutine setRequiredZerosWCSC_block(params, u)
         implicit none
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
 
         integer(kind=ik) :: nx, ny
 
@@ -992,7 +992,7 @@ contains
         implicit none
 
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc   !< input/output in WD spaghetti format
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc   !< input/output in WD spaghetti format
         integer(kind=ik), intent(in) :: neighborhood                 !< Which neighborhood to apply manipulation
         integer(kind=ik), intent(in), optional :: Nwcl_optional, Nwcr_optional
         !> If set to true, we set a really large value into the patch so that the simulation can crash on purpose
@@ -1084,8 +1084,8 @@ contains
         implicit none
 
         type (type_params), intent(in) :: params
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc   !< input/output in WD spaghetti format
-        real(kind=rk), dimension(1:,1:,1:,1:), intent(in) :: u_copy  !< original values from which we copy
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc   !< input/output in WD spaghetti format
+        real(kind=rk), dimension(:,:,:,:), intent(in) :: u_copy  !< original values from which we copy
         integer(kind=ik), intent(in)   :: neighborhood               !< Which neighborhood to apply manipulation
         integer(kind=ik), intent(in), optional   :: ijk(2,3)         !< ijk of patch that we only care about, if not given it is the full block
 
@@ -1362,6 +1362,8 @@ contains
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
         ! g_RHS is decided by X in CDFXY
+        ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+        ! the third stage (prediction) needs points from the boundary to correctly interpolate values
         if (present(g_RHS)) then
             if (params%wavelet(4:4) == "2") then
                 g_RHS = 1
@@ -1522,8 +1524,8 @@ contains
     subroutine filter1dim(params, u, u_filtered, filter, fl_l, fl_r, skip_g, sampling)
         implicit none
         type (type_params), intent(in) :: params                        !< good ol' params
-        real(kind=rk), dimension(1:), intent(in) :: u                   !< the signal to be filtered
-        real(kind=rk), dimension(1:), intent(inout) :: u_filtered       !< the resulting filtered signal
+        real(kind=rk), dimension(:), intent(in) :: u                   !< the signal to be filtered
+        real(kind=rk), dimension(:), intent(inout) :: u_filtered       !< the resulting filtered signal
         integer, intent(in) :: fl_l, fl_r                               !< filter bound indices left and right
         real(kind=rk), dimension(fl_l:fl_r), intent(in) :: filter       !< the actual filter
         integer, intent(in) :: skip_g                                   !< 0 to filter everything, params%g to skip ghost points

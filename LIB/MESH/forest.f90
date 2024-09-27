@@ -1,3 +1,4 @@
+! \brief Delete blocks of tree where all point values are 0, usefull for mask
 subroutine prune_tree( params, hvy_block, tree_ID)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params

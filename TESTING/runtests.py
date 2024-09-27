@@ -88,6 +88,7 @@ tests = [
         f"---{group_names[7]}---",  # group identifier
         {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_bumblebee", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_emundus_4wings", "wavelet":"CDF22", "dim":3},
 
         f"---{group_names[8]}---",  # group identifier
         {"test_name":"denoise", "wavelet":"CDF42", "dim":2},
@@ -165,7 +166,7 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
         elif self.test_name == "acm":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"acm_cyl_adaptive_{self.wavelet}")
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", f"{self.test_name}_{self.wavelet}")
         elif self.test_name == "denoise":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"denoise_{self.wavelet}")
@@ -269,7 +270,7 @@ class WabbitTest:
             os.chdir(self.test_dir)
             return result1
         # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
             ini_file = os.path.join("..", "PARAMS_dry_run.ini")  # relative to tmp_dir
 
             # change to directory to tmp
@@ -277,8 +278,12 @@ class WabbitTest:
             if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
             os.chdir(tmp_dir)
 
+            save_us = ""
+            if self.test_name in ["dry_emundus_4wings"]:
+                save_us = "--save-us"
+
             # run simmulation
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --dry-run {ini_file} --memory={self.memory} --pruned"
+            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --dry-run {ini_file} --memory={self.memory} --pruned {save_us}"
             result1 = run_command(command1, self.logger)
 
             # compare all files present in test_dir
@@ -342,7 +347,7 @@ class WabbitTest:
             log_file = os.path.join(self.test_dir, "blob-convection.log")
         elif self.test_name == "acm":
             log_file = os.path.join(self.test_dir, "acm_cyl.log")
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
             log_file = os.path.join(self.test_dir, "dry_run.log")
         elif self.test_name == "denoise":
             log_file = os.path.join(self.test_dir, "denoise.log")

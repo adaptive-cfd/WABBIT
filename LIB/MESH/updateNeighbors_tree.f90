@@ -39,7 +39,7 @@ subroutine updateNeighbors_tree(params, tree_ID, search_overlapping, verbose_che
         call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
 
         !> direction for neighbor search - number where each digit represents a cardinal direction XYZ
-        !> 9 -> lower direction (-)
+        !> 9 -> lower direction (-) - we would love to use -1 here but it's obviously not possible so we settled for 9 instead (kind of like 10-1)
         !> 1 -> upper direction (+)
         !> 0 -> no direction (but finer neighbors can vary in + and - and coarser neighbors have one configuration of those two) 
 

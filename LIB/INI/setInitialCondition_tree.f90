@@ -160,9 +160,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask)
                     else
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp)
                     endif
 
                     iter = iter + 1

@@ -20,9 +20,8 @@ module module_globals
     integer, parameter, public  :: EXTRA_LGT_FIELDS    = 5 ! number of data fields additionaly to treecode
     integer, parameter, public  :: tree_ID_flow = 1, tree_ID_mask = 2, tree_ID_mask_coarser = 3
 
-    ! this refinement flag tells us that blocks do exist but do not have any empties, sync with them will be ignored
+    ! this refinement flag tells us a block exists, but it is not filled with meaningful entries. Syncing with these blocks is ignored.
     ! it is global as it may be used at different positions
-    
     integer, parameter :: REF_TMP_EMPTY = 10                  ! should be > 0
     ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
     ! universality dictates that we can also use a different number of components, for example

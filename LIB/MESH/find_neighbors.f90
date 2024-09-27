@@ -21,8 +21,10 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     type (type_params), intent(in)      :: params                   !< user defined parameter structure
     integer(kind=ik), intent(in)        :: hvyID_block
     integer(kind=ik), intent(in)        :: lgtID_block
-    !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> direction for neighbor search - number where each digit represents a cardinal direction XYZ
+    !> 9 -> lower direction (-) - we would love to use -1 here but it's obviously not possible so we settled for 9 instead (kind of like 10-1)
+    !> 1 -> upper direction (+)
+    !> 0 -> no direction (but finer neighbors can vary in + and - and coarser neighbors have one configuration of those two) 
     integer(kind=ik), intent(in)        :: dir                      
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)

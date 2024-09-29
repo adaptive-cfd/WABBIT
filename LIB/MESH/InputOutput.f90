@@ -479,14 +479,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         call read_attribute(file_id, "blocks", "max_level", tc_max_level, 100)
         call read_attribute(file_id, "blocks", "dim", tc_dim, 0)
 
-        ! compare treecode lengths
-        if (tc_max_level > params%Jmax) then
-            ! treecode in input file is greater than the new one, abort and output on screen
-            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-            ! but active level=4). On the other hand, that appears to be rare.
-            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-        end if
-
         ! compare treecode dim
         if (tc_dim /= params%dim) then
             ! treecode in input file is saved with different dimension, as this changes
@@ -507,9 +499,14 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
         ubounds = (/tc_max_level, lbounds(2) + my_hvy_n - 1/)
 
-        ! actual reading of treecodes (= the description of the tree)
+        ! actual reading of treecodes (= the description of the tree) and level
         call read_dset_mpi_hdf5(file_id, "block_treecode_num", lbounds(2:2), ubounds(2:2), block_treecode_num)
         call read_dset_mpi_hdf5(file_id, "level", lbounds(2:2), ubounds(2:2), level)
+
+        ! check if level is smaller or equal to JMax
+        if (maxval(level) > params%Jmax) then
+            call abort(240929, "This file has heights we cannot even imagine! Please increase max_treelevel to work with this file.")
+        endif
 
     ! version(1) < 20240410
     else
@@ -517,13 +514,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         ! check what Jmax was saved in file (check length of treecode in file)
         call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
-        ! compare treecode lengths
-        if (dims_treecode(1) > params%Jmax) then
-            ! treecode in input file is greater than the new one, abort and output on screen
-            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-            ! but active level=4). On the other hand, that appears to be rare.
-            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-        end if
+        ! Check if all levels can be represented with this JMax is done block-wise
 
         allocate( block_treecode(1:dims_treecode(1), 1:my_hvy_n) )
         allocate( block_treecode_num(1:1) )
@@ -617,12 +608,18 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         if (version(1) >= 20240410) then
             ! set mesh level
             lgt_block(free_lgt_id, IDX_MESH_LVL) = level(k)
+            ! if JMax of input file is not equal to JMax of simulation then we need to shift the treecode by factor of 2**(dim*(JMax_sim - JMax_file))
+            treecode = int(dble(block_treecode_num(k)) * 2.0**(params%dim*(params%Jmax - tc_max_level)), kind=tsize)
             ! set treecode
-            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), block_treecode_num(k))
+            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
 
         else  ! old numerical treecode version:
             ! set mesh level
             lgt_block(free_lgt_id, IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+            ! check if level is smaller or equal to JMax
+            if (lgt_block(free_lgt_id, IDX_MESH_LVL) > params%Jmax) then
+                call abort(240929, "This file has heights we cannot even imagine! Please increase max_treelevel to work with this file.")
+            endif
             ! set treecode
             treecode = -1_tsize
             call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &

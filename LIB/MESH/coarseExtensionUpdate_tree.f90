@@ -1,7 +1,8 @@
 
 !> \brief do coarse extensions for all coarse-fine interfaces on a block
 !> This is very similar to adapt_tree but only affects blocks on coarse-fine interfaces and does not need to loop
-!  !!! ATTENTION !!! This routine is finished but has not been cross-checked yet
+!  !!! ATTENTION !!!         This routine is finished but has not been cross-checked yet
+!  !!! ANOTHER ATTENTION !!! This routine was not adapted to work with full wavelet transformation. It might need a higher blocksize to work correctly
 subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, input_is_synced)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -51,9 +52,8 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
                 lgtID_neighbor = hvy_neighbor( hvyID, k_n )
                 level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
 
-                ! we proceed level-wise
                 if ((level_neighbor < level_me)) then
-                    lgt_block(lgtID, IDX_REFINE_STS) = REF_TMP_UNTREATED
+                    lgt_block(lgtID, IDX_REFINE_STS) = -1
                     exit
                 endif
             endif
@@ -62,6 +62,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
 
     ! we also need to wavelet decompose all neighbors of affected blocks so that we can sync the SC and WC
     ! in theory some are not needed (far off the interface) but this is not implemented currently
+    ! ToDo: Only blocks on the same level need to be modified actually
     call synchronize_lgt_data( params, refinement_status_only=.true. )
     do k_b = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k_b, tree_ID)
@@ -77,7 +78,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
                 ref_neighbor = lgt_block( lgtID_neighbor, IDX_REFINE_STS )
 
                 ! we proceed level-wise
-                if (ref_neighbor == REF_TMP_UNTREATED) then
+                if (ref_neighbor == -1) then
                     lgt_block(lgtID, IDX_REFINE_STS) = REF_TMP
                     exit
                 endif
@@ -90,7 +91,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         ref_me       = lgt_block( lgtID, IDX_REFINE_STS )
 
-        if (ref_me == REF_TMP) lgt_block( lgtID, IDX_REFINE_STS ) = REF_TMP_UNTREATED
+        if (ref_me == REF_TMP) lgt_block( lgtID, IDX_REFINE_STS ) = -1
     end do
     ! one more sync so that all ref flags are everywhere, probably this one is not needed anymore but lets keep it clean
     call synchronize_lgt_data( params, refinement_status_only=.true. )
@@ -101,11 +102,11 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
     if (.not. inputIsSynced) then
         t0 = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-        call sync_TMP_from_MF( params, hvy_block, tree_ID, REF_TMP_UNTREATED, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+        call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
         call toc( "coarseExtensionUpdate_tree (sync lvl <- MF)", 153, MPI_Wtime()-t0 )
     endif
 
-    ! Wavelet-transform all blocks on this level
+    ! Wavelet-transform all blocks which have been marked
     ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form for affected blocks
     t0 = MPI_Wtime()
     do k_b = 1, hvy_n(tree_ID)
@@ -116,8 +117,8 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
         call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
         ref_me = lgt_block( lgtID, IDX_REFINE_STS )
 
-        ! FWT required for a block that is on the level
-        if (ref_me == REF_TMP_UNTREATED) then
+        ! FWT required for all blocks that have been marked
+        if (ref_me == -1) then
             ! hvy_tmp now is a copy with sync'ed ghost points.
             hvy_tmp(:,:,:,1:size(hvy_block, 4),hvyID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvyID)
             level_me = lgt_block( lgtID, IDX_MESH_LVL )
@@ -135,7 +136,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
     ! As every block is assumed to be WDed here we can do it on the whole tree
     t0 = MPI_Wtime()
     if (params%useCoarseExtension .and. params%isLiftedWavelet) then
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
     endif
     call toc( "coarseExtensionUpdate_tree (coarse_extension_modify)", 155, MPI_Wtime()-t0 )
 
@@ -153,14 +154,14 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
     ! We do this in order tu bundle up the synchronizations in the step before as the modification is really cheap
     t0 = MPI_Wtime()
     if (params%useCoarseExtension .and. params%isLiftedWavelet) then
-        call coarse_extension_modify_tree(params, hvy_block, hvy_tmp, tree_ID, sc_skip_ghosts=.true.)
+        call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", copy_sc=.false.)
     endif
     call toc( "coarseExtensionUpdate_tree (coarse_extension_modify)", 155, MPI_Wtime()-t0 )
 
     ! Wavelet-reconstruct blocks
     ! Copy back old values if no coarse extension is applied and elsewise just overwrite the affected patches inside the domain
     t0 = MPI_Wtime()
-    call coarse_extension_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID, REF_TMP_CHECK=REF_TMP_UNTREATED)
+    call coarse_extension_reconstruct_tree(params, hvy_block, hvy_tmp, tree_ID, REF_TMP_CHECK=-1)
     call toc( "coarseExtensionUpdate_tree (RWT)", 157, MPI_Wtime()-t0 )
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values

@@ -85,7 +85,6 @@ subroutine synchronize_lgt_data( params, refinement_status_only )
     lgt_end = lgt_id
     lgt_num = lgt_end - lgt_start + 1
 
-
     ! Next, we figure out how much the union of all the different subsets (lgt_start:lgt_end)
     ! on all the mpiranks.
     call MPI_allgather(lgt_num, 1, MPI_INTEGER4, proc_lgt_num, 1, MPI_INTEGER4, WABBIT_COMM, ierr )

@@ -91,14 +91,14 @@ contains
 
         if (rank == 0) then
             write(*, *)
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'(30("#"), " SNAPSHOT POD ", 30("#"))')
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("Number of SNAPSHOTS used: ",i4)') N_snapshots
             write(*,'("Desired Truncation Rank: ", i4)') max_nr_pod_modes
             write(*,'("Maximal Error in L2 norm: ",es12.4)') max_err
             if (params%adapt_tree) write(*,'("Compression threshold eps: ",es12.4)') params%eps
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*, *)
         endif
 
@@ -314,7 +314,7 @@ contains
 
         if (rank == 0) then
             write(*, *)
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("Estimated Truncation Rank r= ",i4)') truncation_rank
             if (truncation_rank < N_snapshots ) then
                 if ( eigenvalues(N_snapshots-truncation_rank)>0) &
@@ -322,7 +322,7 @@ contains
             else
                 write(*,'("Error in L2 norm (sigma_{r+1}): 0")')
             endif
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*, *)
         endif
 
@@ -371,7 +371,7 @@ contains
         integer(kind=ik), allocatable :: iteration(:)
         real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
         real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-        integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                        :: level, k, Bs(3), tc_length
         integer(hid_t)                          :: file_id
         real(kind=rk), dimension(3)             :: domain
         integer(hsize_t), dimension(2)          :: dims_treecode
@@ -534,7 +534,7 @@ contains
         allocate(params%threshold_state_vector_component(params%n_eqn))
         params%threshold_state_vector_component(1:params%n_eqn)=.True.
         if (maxmem < 0.0_rk) then
-            params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs )
+            params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) )
         endif
 
         call adjust_n_ghosts_for_scalarproduct(params)
@@ -571,7 +571,7 @@ contains
         Volume = product(domain(1:params%dim))
 
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "WABBIT POD."
             write(*,*) "Snapshot matrix X build from:"
             do i = 1, N_snapshots
@@ -586,7 +586,7 @@ contains
                     write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
                 end do
             end do
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("L2 norm ||X||_2^2/N_snapshots/Volume: ",g18.8)') L2norm**2/dble(N_snapshots)/Volume
             write(*,'("Data dimension: ",i1,"D")') params%dim
             write(*,'("Domain size is ",3(g12.4,1x))') domain
@@ -600,7 +600,7 @@ contains
             write(*,'("wavelet=",A)') params%wavelet
             write(*,'("Number ghosts=",i2)') params%g
             write(*,'("block_distribution=",A)') params%block_distribution
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
 
         !----------------------------------
@@ -644,7 +644,7 @@ contains
         integer(kind=ik), allocatable :: iter_list(:)
         real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
         real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
-        integer(kind=ik)                 :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                 :: level, k, Bs(3), tc_length
         integer(hid_t)                   :: file_id
         real(kind=rk), dimension(3)      :: domain
         integer(hsize_t), dimension(2)   :: dims_treecode
@@ -924,7 +924,7 @@ contains
         L2norm_snapshots = compute_L2norm(params, hvy_block, hvy_tmp, N_snapshots, verbose)
         Volume = product(domain(1:params%dim))
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "WABBIT POD."
             write(*,*) "Snapshot matrix X build from:"
             do i = 1, N_snapshots
@@ -941,7 +941,7 @@ contains
                     write(*, '("file=",A )') mode_in(i,j)
                 end do
             end do
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("L2 norm ||X||_2^2: ",g18.8)') L2norm_snapshots**2
             write(*,'("Data dimension: ",i1,"D")') params%dim
             write(*,'("Domain size is ",3(g12.4,1x))') domain
@@ -955,7 +955,7 @@ contains
             write(*,'("wavelet=",A)') params%wavelet
             write(*,'("Number ghosts=",i2)') params%g
             write(*,'("block_distribution=",A)') params%block_distribution
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
 
         !---------------------------------------------------------------
@@ -1010,11 +1010,11 @@ contains
 
             if (params%rank == 0) then
                 write(*, *)
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'(30("#"), " Error using Nmodes = ", i4 ,30("#"))') r
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'("relative L2 error ",f12.8)') L2error(r)
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*, *)
             endif
 
@@ -1180,7 +1180,7 @@ contains
         real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
         integer(kind=ik), allocatable           :: mode_number(:)
 
-        integer(kind=ik)                        :: max_neighbors, level, k, Bs(3), tc_length
+        integer(kind=ik)                        :: level, k, Bs(3), tc_length
         integer(hid_t)                          :: file_id
         real(kind=rk), dimension(3)             :: domain
         integer(hsize_t), dimension(2)          :: dims_treecode
@@ -1376,7 +1376,7 @@ contains
 
 
             if (params%rank==0) then
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,*) "WABBIT POD-reconstruction."
                 write(*,*) "POD modes for reconstruction:"
                 do i = 1, N_Modes_used
@@ -1390,7 +1390,7 @@ contains
                         write(*, '(i2, "   ", A)') j, trim(file_in(i,j))
                     end do
                 end do
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'("Temporal coefficients from:",A)') fname_acoefs
                 write(*,'("Number modes used/available=",1x,i4,"/",i4)') N_modes_used, max_nr_modes
                 write(*,'("Data dimension: ",i1,"D")') params%dim
@@ -1403,7 +1403,7 @@ contains
                 write(*,'("Nblocks used (sparse)=",i6)') sum(lgt_n(1:tree_n))
                 write(*,'("Predictor=",A)') params%order_predictor
                 write(*,'("block_distribution=",A)') params%block_distribution
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
             endif
 
             !----------------------------------
@@ -1483,12 +1483,12 @@ contains
 
             if (rank == 0) then
                 write(*, *)
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'(30("#"), " Reconstruct ", 30("#"))')
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'("Number of Modes used: ",i4)') N_modes
                 if (params%adapt_tree) write(*,'("Compression threshold eps: ",es12.4)') params%eps
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*, *)
             endif
 
@@ -1515,7 +1515,7 @@ contains
             !---------------------------------------------------------------------------
             ! adapted reconstructed field
             !---------------------------------------------------------------------------
-            call updateNeighbors_tree( params, dest_tree_ID )
+            call updateNeighbors_tree( params, dest_tree_ID, search_overlapping=.false.)
 
             if ( params%adapt_tree) then
                 call adapt_tree( 0.0_rk, params, hvy_block, dest_tree_ID, params%coarsening_indicator, hvy_tmp )
@@ -1554,7 +1554,7 @@ contains
             integer(kind=ik), allocatable :: iter_list(:)
             real(kind=rk),    allocatable :: hvy_block(:, :, :, :, :)
             real(kind=rk),    allocatable :: hvy_tmp(:, :, :, :, :),a_coefs(:,:)
-            integer(kind=ik)                 :: max_neighbors, level, k, Bs(3), tc_length
+            integer(kind=ik)                 :: level, k, Bs(3), tc_length
             integer(hid_t)                   :: file_id
             real(kind=rk), dimension(3)      :: domain
             integer(hsize_t), dimension(2)   :: dims_treecode
@@ -1807,7 +1807,7 @@ contains
             L2norm_snapshots = compute_L2norm(params, hvy_block, hvy_tmp, N_snapshots, verbose)
             Volume = product(domain(1:params%dim))
             if (params%rank==0) then
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,*) "WABBIT POD."
                 write(*,*) "Snapshot matrix X build from:"
                 do i = 1, N_snapshots
@@ -1824,7 +1824,7 @@ contains
                         write(*, '("file=",A )') mode_in(i,j)
                     end do
                 end do
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
                 write(*,'("L2 norm ||X||_2^2: ",g18.8)') L2norm_snapshots**2
                 write(*,'("Data dimension: ",i1,"D")') params%dim
                 write(*,'("Domain size is ",3(g12.4,1x))') domain
@@ -1838,7 +1838,7 @@ contains
                 write(*,'("wavelet=",A)') params%wavelet
                 write(*,'("Number ghosts=",i2)') params%g
                 write(*,'("block_distribution=",A)') params%block_distribution
-                write(*,'(80("-"))')
+                write(*,'(80("─"))')
             endif
 
             !---------------------------------------------------------------------------

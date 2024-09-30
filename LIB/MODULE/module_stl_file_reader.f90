@@ -277,7 +277,7 @@ contains
 #ifdef TURING
             ! TURING's IBM XL compiler by default reads binary data in BIG ENDIAN exclusively
             ! while it is supposedly possible to modify this behavior with environment variables
-            ! I did not suceed in doing so. the following command ensures reading from unit 13
+            ! I did not succeed in doing so. the following command ensures reading from unit 13
             ! in little endian.
             ! see also:
             ! http://www.ibm.com/support/knowledgecenter/SS2MB5_14.1.0/com.ibm.xlf141.bg.doc/language_ref/sup-setrteopts.html%23sup-setrteopts

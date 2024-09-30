@@ -41,10 +41,8 @@ module module_params
         ! data next write time, store here the next time for output data
         real(kind=rk) :: next_write_time=0.0_rk
         ! this number is used when generating random grids.
-        ! the default of 75% is useful for ghost node unit tests, but we sometimes
-        ! have to create random grids that have no more than 1/8 active blocks so that
-        ! we can still refine them by one level.
-        real(kind=rk) :: max_grid_density = 0.75_rk
+        ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
+        real(kind=rk) :: max_grid_density = 0.1_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable :: butcher_tableau

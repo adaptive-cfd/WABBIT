@@ -136,7 +136,7 @@ end subroutine
 
 
 !> This adds a buffer zone around blocks if the CE would remove valuable WC
-!> It is usually called after coarsening indicator where all blocks are WDed and have flag -1, 0 or REF_TMP_TREATED_COARSEN
+!> It is usually called after coarsening indicator where all blocks are WDed and have flag -1 or 0
 subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, indicator, norm, ignore_maxlevel, input_is_WD)
 
     use module_indicators
@@ -202,11 +202,12 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
                     ! the neighbor wants to coarsen. This yields the risk that after coarsening, the newly appearing coarseExt
                     ! deletes important WC on this block (hvyID). This we'll prevent.
-                    if ((ref_status_neighbor == -1 .or. ref_status_neighbor == REF_TMP_TREATED_COARSEN).and.(level_neighbor == level_me)) then
+                    if ((ref_status_neighbor == -1).and.(level_neighbor == level_me)) then
                         ! check for the patch where wc will be deleted, make sure to exclude ghost patches
-                        ! Get indices of patch (idx)
-                        call get_indices_of_modify_patch(params, neighborhood, idx, (/nx, ny, nz/), (/N_buffer_l, N_buffer_l, N_buffer_l/), &
-                            (/N_buffer_r, N_buffer_r, N_buffer_r/), X_s=(/g, g, g/), X_e=(/g, g, g/))
+                        call get_indices_of_modify_patch(params%g, params%dim, neighborhood, idx, (/ nx, ny, nz/), &
+                            (/N_buffer_l, N_buffer_l, N_buffer_l/), (/N_buffer_r, N_buffer_r, N_buffer_r/), &
+                            g_p=(/ g, g, g/), g_m=(/ g, g, g/))
+                        ref_check = -1
 
                         ! Inside the patch idx, check if there are significant details
                         ref_check = -1 ! ref_check will change to 0 if there are significant details
@@ -215,7 +216,10 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
                         ! encode into refinement status if the neighboring block can coarsen or not (reasoning explained below)
                         if (ref_check == 0) then
-                            call lgt_encode_significant_patch(lgtID, neighborhood, params%dim)
+                            ! write(*, '("SZ1 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
+                            !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
+
+                            call lgt_encode_significant_patch(lgtID, neighborhood)
                         endif
                     endif
                 endif
@@ -243,11 +247,11 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
 
         ! is this block assigned -1 (it wants to coarsen)?
         ! -> this can possibly be revoked here, if it would result in detail deletion on another block
-        if (ref_status == -1 .or. ref_status == REF_TMP_TREATED_COARSEN) then
+        if (ref_status == -1) then
             do neighborhood = 1, size(hvy_neighbor, 2)
-                ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the significant patch bit
-                ! as before we looked block_significant->block_wants2coarsen and now we look block_wants2coarsen->block_significant
-                i_neighborhood = inverse_neighbor(neighborhood, params%dim)
+                ! make sure to invert neighborhood to access the correct patchIDs, this is used only for the singificant patch bit
+                ! as before we looked b_significant->b_wants2coarsen and now we look b_wants2coarsen->b_significant
+                call inverse_relation(neighborhood, i_neighborhood)
 
                 ! neighbor exists ?
                 if ( hvy_neighbor(hvyID, neighborhood) /= -1 ) then
@@ -259,7 +263,10 @@ subroutine addSecurityZone_CE_tree( time, params, tree_ID, hvy_block, hvy_tmp, i
                     ! does the neighbor have a significancy flag and significant patch in this neighborhood relation?
                     ! Is neighbor on the same level so we can actually check the patches?
                     if (ref_status_neighbor > 0 .and. level_neighbor == level_me) then  ! need to check elsewise all significancy encodings are wrong
-                        if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood, params%dim)) then
+                        if (lgt_decode_significant_flag(lgtID_neighbor) .and. lgt_decode_significant_patch(lgtID_neighbor, i_neighborhood)) then
+                            ! write(*, '("SZ2 I-", i0, " R-", i0, " BL-", i0, " BH-", i0, " L-", i0, " Ref-", i0, " TC-", i0, " BLN-", i0, " RefN-", i0)') &
+                            !     9, params%rank, lgtID, hvyid, level_me, ref_status, lgt_block(lgtid, IDX_TC_2), lgtID, ref_status_neighbor
+
                             ! revoke coarsening status. note we must use a temp status or otherwise all blocks
                             ! will revoke their coarsening
                             lgt_block( lgtID, IDX_REFINE_STS ) = TMP_STATUS
@@ -298,16 +305,15 @@ end subroutine
 !> binary refinement status of block that wants to coarsen (-1): 1111.1111.1111.1111:1111.1111.1111.1111
 !> binary refinement status of block that wants to stay (0):     0000.0000.0000.0000:0000.0000.0000.0000
 !> binary range r for any of the 26 patches with flag f, r2l:    0frr.rrrr.rrrr.rrrr.rrrr.rrrr.rrrr.0000
-subroutine lgt_encode_significant_patch(lgtID, neighborhood, dim)
+subroutine lgt_encode_significant_patch(lgtID, neighborhood)
     implicit none
 
     integer(kind=ik), intent(in)   :: lgtID         !< ID of block where information will be encoded
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
-    integer(kind=ik), intent(in)   :: dim           !< params%dim
 
     integer(kind=ik)    :: patchID, ref_encoded
 
-    call neighborhood2patchID(neighborhood, patchID, dim)
+    call neighborhood2patchID(neighborhood, patchID)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)
@@ -333,17 +339,16 @@ end subroutine
 
 !> \brief Decode from refinement status if a block at a specific neighborhood has a significant patch
 !> More explanation can be found at function lgt_encode_significant_patch
-function lgt_decode_significant_patch(lgtID, neighborhood, dim)
+function lgt_decode_significant_patch(lgtID, neighborhood)
     implicit none
 
     integer(kind=ik), intent(in)   :: lgtID                         !< ID of block where information will be encoded
     integer(kind=ik), intent(in)   :: neighborhood                  !< neighborhood of significant patch
-    integer(kind=ik), intent(in)   :: dim                           !< params%dim
     logical                        :: lgt_decode_significant_patch  !< Flag if this neighborhood corresponds to an encoded significant patch
 
     integer(kind=ik)    :: patchID, ref_encoded, bit_extracted
 
-    call neighborhood2patchID(neighborhood, patchID, dim)
+    call neighborhood2patchID(neighborhood, patchID)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)

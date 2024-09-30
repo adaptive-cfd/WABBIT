@@ -146,10 +146,10 @@ subroutine post_add_two_masks(params)
     call createActiveSortedLists_forest(params)
 
     tree_ID = 1
-    call updateNeighbors_tree( params, tree_ID)
+    call updateNeighbors_tree( params, tree_ID, search_overlapping=.false.)
 
     tree_ID = 2
-    call updateNeighbors_tree( params, tree_ID)
+    call updateNeighbors_tree( params, tree_ID, search_overlapping=.false.)
 
     call saveHDF5_tree(fname_out, time, iteration, 1, params, hvy_block, tree_ID=1)
 

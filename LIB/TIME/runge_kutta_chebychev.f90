@@ -12,7 +12,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(inout)   :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
@@ -42,10 +42,10 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work,
 
     if (.not. informed) then
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "Runge-Kutta-Chebychev method"
             write(*,'("Using s=",i2," stages")') s
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
         informed = .true.
     endif

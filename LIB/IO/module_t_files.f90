@@ -1,3 +1,13 @@
+!> \brief Module to handle writing of so-called t-files where array entries can be written to
+!> For every t-file a buffer area will be created and data values are stored and only flushed with specific frequency
+!! in order to avoid excessive file opening and closing
+!> Why do we have this module ?
+!>
+!> On the supercomputers, we are allowed to do very little IO, and that in particular
+!! extends to even very small operations, like dumping a log file to disk. This is only a few
+!! bytes, but opening and closing the file stresses the machine. Therefore, this module is a buffer
+!! for the very simple fortran write statement: We just collect some time steps (flush_frequency)
+!! before dumping this data to disk.
 module module_t_files
     use mpi
     use module_globals
@@ -17,13 +27,7 @@ module module_t_files
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
 
-    ! Why do we have this module ?
-    !
-    ! On the supercomputers, we are allowed to do very little IO, and that in particular
-    ! extends to even very small operations, like dumping a log file to disk. This is only a few
-    ! bytes, but opening and closing the file stresses the machine. Therefore, this module is a buffer
-    ! for the very simple fortran write statement: We just collect some time steps (flush_frequency)
-    ! before dumping this data to disk.
+
 
 
 
@@ -38,11 +42,14 @@ contains
         disable_all_output = .true.
     end subroutine
 
+
+    !> \brief Initialize a file written during simulation
+    !> This initializes the buffer where values for the t_files will be temporarily stored before flushing
     subroutine init_t_file(fname, overwrite, header)
         implicit none
-        character(len=*), intent(in) :: fname
-        character(len=15), dimension(:), optional, intent(in) :: header
-        logical, intent(in) :: overwrite
+        character(len=*), intent(in) :: fname  !< Name of file, mostly should end in ".t"
+        character(len=*), dimension(:), optional, intent(in) :: header  !< Optional array of headers to be written in first line
+        logical, intent(in) :: overwrite  !< If file should be cleared if it already exists
 
         integer :: fileID, mpicode
         logical :: exists
@@ -104,10 +111,13 @@ contains
 
 
 
+    !> \brief Appends an array of real values to the given t-file
+    !> This file has to be initialized with init_t_file before and afterwards closed appropriately
+    !> Values are first stored in an array before being flushed to the file by flush_t_file depending on flush_frequency
     subroutine append_t_file(fname, data_line)
         implicit none
-        character(len=*), intent(in) :: fname
-        real(kind=rk), dimension(:), intent(in) :: data_line
+        character(len=*), intent(in) :: fname                   !< name of the file, mostly should end in ".t"
+        real(kind=rk), dimension(:), intent(in) :: data_line    !< array of real values to append to the file
 
         integer :: fileID, mpicode
 
@@ -160,9 +170,10 @@ contains
 
 
 
+    !> \brief Flushes temporarily stored values to file
     subroutine flush_t_file( fileID )
         implicit none
-        integer, intent(in) :: fileID
+        integer, intent(in) :: fileID   !< name of the file, mostly should end in ".t"
         character(len=cshort) :: format
         integer :: i
 
@@ -178,7 +189,7 @@ contains
         do i = 1, iteration(fileID)-1
             ! make format string
             write(format, '(A,i3.3,A)') "(", n_columns(fileID), "(es15.8,1x))"
-            ! write header
+            ! write data
             write(14,format) data_buffer( i, 1:n_columns(fileID), fileID  )
         enddo
 
@@ -189,9 +200,11 @@ contains
 
 
 
+    !> \brief Write latest bufferd values to files.
+    !> This does not actually close a file but rather ensures that the buffers are appropriately flushed
     subroutine close_t_file(fname)
         implicit none
-        character(len=*), intent(in) :: fname
+        character(len=*), intent(in) :: fname  !< name of the file, mostly should end in ".t"
         integer :: fileID
 
         if (disable_all_output) return
@@ -212,6 +225,8 @@ contains
 
 
 
+    !> \brief Write latest buffered values to files for all files.
+    !> This does not actually close a file but rather ensures that the buffers are appropriately flushed
     subroutine close_all_t_files()
         implicit none
         integer :: fileID

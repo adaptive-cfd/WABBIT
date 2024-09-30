@@ -22,8 +22,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
-    logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status if we should always use hvy_tmp
+    logical, intent(in), optional  :: ignore_Filter                !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
     ! Following are global data used but defined in module_mpi:
@@ -54,9 +54,13 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
         rData_sendBuffer(buffer_offset) = meta_send_counter(k)
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
-    ! ! test send/receive sizes
+
     ! if (present(verbose_check)) then
-    !     write(*, '("Rank ", i0, " Send N ", 4(i0, 1x), "Receive N ", 4(i0, 1x), "Send P ", 4(i0, 1x), "Recv P ", 4(i0, 1x), "Send total ", i0)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+    !     ! for debugging with exactly four procs, useful to see if their is a mismatch in send/receive
+    !     write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
+        
+    !     ! ! for debugging send/receive volume
+    !     ! write(*, '("Rank ", i0, " Send N ", 1(i6, 1x), "Receive N ", 1(i6, 1x), "Send P ", 1(i2, 1x), "Recv P ", 1(i2, 1x), "Send total ", i3)') myrank, sum(data_send_counter), sum(data_recv_counter), sum(meta_send_counter), sum(meta_recv_counter), count_send_total
     ! endif
 
     call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
@@ -112,8 +116,8 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
     logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
-    integer(kind=ik)   :: recver_rank, myrank, sender_hvyID, sender_ref, recver_hvyID, level_diff, patch_size, recver_lgtID, sender_lgtID
-    integer(kind=ik)   :: relation  ! neighborhood 1:74, full block 0, family -1:-8
+    integer(kind=ik)   :: recver_rank, myrank, sender_hvyID, sender_ref, recver_hvyID, lvl_diff, patch_size, recver_lgtID, sender_lgtID
+    integer(kind=ik)   :: relation  ! neighborhood 1:56*3, full block 0, family -1:-8
 
     ! merged information of level diff and an indicator that we have a historic finer sender
     integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
@@ -151,10 +155,10 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
         sender_ref = meta_send_all(S_META_FULL*k_patch + 2)
         recver_hvyID = meta_send_all(S_META_FULL*k_patch + 3)
         relation = meta_send_all(S_META_FULL*k_patch + 5)
-        level_diff = meta_send_all(S_META_FULL*k_patch + 6)
+        lvl_diff = meta_send_all(S_META_FULL*k_patch + 6)
         patch_size = meta_send_all(S_META_FULL*k_patch + 7)
 
-        ! check if to use hvy_temp
+        ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
         use_hvy_TMP = .false.
         if (present(hvy_tmp) .and. present(REF_FLAG)) then
             if (sender_ref /= REF_FLAG) use_hvy_TMP = .true.
@@ -163,10 +167,10 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
         ! They depend on the neighbor-relation, level difference and the bounds type.
         ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-        if ( level_diff == 0 .or. relation < 1 ) then
+        if ( lvl_diff == 0 .or. relation < 1 ) then
             ! simply copy the ghost node layer (no interpolation or restriction here) to a line buffer, which
             ! we will send to our neighbor mpirank
-            patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+            patch_ijk = ijkPatches(:,:, relation, SENDER)
 
             if (use_hvy_TMP) then
                 call Patch2Line( params, line_buffer, buffer_size, &
@@ -178,16 +182,16 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
         else
             ! up/downsample data first for neighbor relations, then flatten to 1D buffer
-            patch_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+            patch_ijk = ijkPatches(:,:, relation, SENDER)
 
             ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
             if (use_hvy_TMP .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
-                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, lvl_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
             else
-                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, level_diff, hvy_data, nc, sender_hvyID, ignoreFilter)
+                call restrict_predict_data( params, res_pre_data, patch_ijk, relation, lvl_diff, hvy_data, nc, sender_hvyID, ignoreFilter)
             endif
 
-            patch_ijk = ijkPatches(:,:, relation, level_diff, RESPRE)
+            patch_ijk = ijkPatches(:,:, relation, RESPRE)
 
             call Patch2Line( params, line_buffer, buffer_size, &
             res_pre_data( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc) )
@@ -199,13 +203,14 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
         if (buffer_size /= patch_size) then
             write(*, '("ERROR: I am confused because real buffer_size is not equivalent to theoretical one:", i0, " - ", i0)') buffer_size, patch_size
+            write(*, '("relation - ", i0, " lvl_diff - ", i0)') relation, lvl_diff
             call abort(666)
         endif
 
         ! set metadata, encoded in float, as ints up to 2^53 can be exactly represented with doubles this is not a problem
         rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 1) = recver_hvyID
         rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 2) = relation
-        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 3) = level_diff
+        rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 3) = lvl_diff
         rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 4) = buffer_size
 #ifdef DEV
         rData_sendBuffer(buffer_offset + int_pos(recver_rank)*S_META_SEND + 5) = recver_rank  ! receiver rank only for DEV
@@ -236,9 +241,9 @@ subroutine unpack_ghostlayers_external( params, hvy_data, verbose_check )
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     integer(kind=ik) :: sender_rank, myrank ! zero-based
-    integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
+    integer(kind=ik) :: relation, i_relation  !< neighborhood 1:56*3, full block 0, family -1:-8
     integer(kind=ik) :: recver_hvyID
-    integer(kind=ik) :: level_diff, bounds_type, buffer_position, buffer_size, rank_destination
+    integer(kind=ik) :: lvl_diff, bounds_type, buffer_position, buffer_size, rank_destination
     integer(kind=ik) :: ijk1(2,3), nc, k_patches, buffer_offset, offset_data, n_patches
 
     myrank = params%rank
@@ -258,15 +263,19 @@ subroutine unpack_ghostlayers_external( params, hvy_data, verbose_check )
                 ! extract metadata
                 recver_hvyID     = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+1))
                 relation         = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+2))
-                level_diff       = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+3))
+                lvl_diff       = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+3))
                 buffer_size      = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+4))
 
-                ! write(*, '("Rank ", i0," Recv external ", 4(i0, 1x))') params%rank, recver_hvyID, relation, level_diff, buffer_size
+                ! write(*, '("Rank ", i0," Recv external ", 4(i0, 1x))') params%rank, recver_hvyID, relation, lvl_diff, buffer_size
+
+                ! we unpack values which where thought of from sender side, now we are at receiver so we need to invert the relation
+                call inverse_relation(relation, i_relation)
+                lvl_diff = lvl_diff * (-1)
 #ifdef DEV
                 rank_destination = int(rData_recvBuffer(buffer_offset+S_META_SEND*k_patches+5))
                 if (rank_destination /= myrank) then
                     write(*,'("rank= ", i0, " dest_id= ", i0, " rel= ", i0, " lvl_diff=", i0, " buff_size=", i0, " send_rank=", i0, " patch_i=", i0)') &
-                        myrank, recver_hvyID, relation, level_diff, buffer_size, rank_destination, sender_rank, k_patches
+                        myrank, recver_hvyID, i_relation, lvl_diff, buffer_size, rank_destination, sender_rank, k_patches
                     call abort(7373872, "ERROR: this data seems to be not mine!")
                 endif
 #endif
@@ -278,7 +287,7 @@ subroutine unpack_ghostlayers_external( params, hvy_data, verbose_check )
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
                 ! They depend on the neighbor-relation, level difference and the bounds type.
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                call Line2Patch( params, line_buffer, ijkPatches(:,:, relation, level_diff, RECVER), hvy_data, recver_hvyID )
+                call Line2Patch( params, line_buffer, ijkPatches(:,:, i_relation, RECVER), hvy_data, recver_hvyID )
 
                 ! increase buffer position marker
                 offset_data = offset_data + buffer_size
@@ -307,9 +316,9 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
 
 
     integer(kind=ik) :: k_patch, recver_rank, recver_hvyID, recver_lgtID, sender_lgtID, sender_ref
-    integer(kind=ik) :: relation  !< neighborhood 1:74, full block 0, family -1:-8
-    integer(kind=ik) :: sender_hvyID, level_diff
-    integer(kind=ik) :: send_ijk(2,3), recv_ijk(2,3), nc, myrank
+    integer(kind=ik) :: relation, i_relation  !< neighborhood 1:56*3, full block 0, family -1:-8
+    integer(kind=ik) :: sender_hvyID, lvl_diff, i_lvl_diff
+    integer(kind=ik) :: recv_ijk(2,3), send_ijk(2,3), buffer_ijk(2,3), nc, myrank
     logical          :: use_hvy_tmp, ignoreFilter
 
     ignoreFilter = .false.
@@ -322,46 +331,56 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
         ! check if this ghost point patch is addressed from me to me
         recver_rank = meta_send_all(S_META_FULL*k_patch + 4)
         if (recver_rank == myrank) then
-            ! unpack required info:  sender_hvyID, recver_hvyID, neighborhood, level_diff
+            ! unpack required info:  sender_hvyID, recver_hvyID, neighborhood, lvl_diff
             sender_hvyID = meta_send_all(S_META_FULL*k_patch + 1)
             sender_ref =   meta_send_all(S_META_FULL*k_patch + 2)
             recver_hvyID = meta_send_all(S_META_FULL*k_patch + 3)
             relation     = meta_send_all(S_META_FULL*k_patch + 5)
-            level_diff   = meta_send_all(S_META_FULL*k_patch + 6)
+            lvl_diff   = meta_send_all(S_META_FULL*k_patch + 6)
+
+            ! we unpack values which where thought of from sender side, receiver side needs to invert the relation
+            call inverse_relation(relation, i_relation)
+            i_lvl_diff = lvl_diff * (-1)
 
             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
             call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
 
+            ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
             use_hvy_tmp = .false.
             if (present(hvy_tmp) .and. present(REF_FLAG)) then
                 if (sender_ref /= REF_FLAG) use_hvy_tmp = .true.
             endif
 
 
-            if ( level_diff == 0  .or. relation < 1 ) then
+            if ( lvl_diff == 0  .or. relation < 1 ) then
                 ! simply copy from sender block to receiver block (NOTE: both are on the same MPIRANK)
                 ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
                 ! They depend on the neighbor-relation and level difference
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
-                send_ijk = ijkPatches(:,:, relation, level_diff, RECVER)
-                recv_ijk = ijkPatches(:,:, relation, level_diff, SENDER)
+                recv_ijk = ijkPatches(:,:, i_relation, RECVER)
+                send_ijk = ijkPatches(:,:,   relation, SENDER)
 
                 if (use_hvy_tmp) then
-                    hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                    hvy_tmp( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
+                    hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, recver_hvyID ) = &
+                    hvy_tmp( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, sender_hvyID)
                 else
-                    hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                    hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, sender_hvyID)
+                    hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, recver_hvyID ) = &
+                    hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, sender_hvyID)
                 endif
+
+                ! debug
+                ! write(*, '(2(A, i0), 1(A, 6(i2, 1x)), 2(A, i0), A, 6(i2, 1x))') &
+                !       "Send rel ",   relation, " lvl_d ",   lvl_diff, " ind_s ", send_ijk(:, :), &
+                !     ", Recv rel ", i_relation, " lvl_d ", i_lvl_diff, " ind ",   recv_ijk(:, :)
             else
                 ! interpolation or restriction before inserting
                 ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
                 if (use_hvy_tmp .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
-                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
-                    relation, level_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, SENDER), &
+                    relation, lvl_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
                 else
-                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, level_diff, SENDER), &
-                    relation, level_diff, hvy_data, nc, sender_hvyID, ignoreFilter )
+                    call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, SENDER), &
+                    relation, lvl_diff, hvy_data, nc, sender_hvyID, ignoreFilter )
                 endif
     
                 ! copy interpolated / restricted data to ghost nodes layer
@@ -369,11 +388,17 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 ! They depend on the neighbor-relation, level difference and the bounds type.
                 ! The last index is 1-sender 2-receiver 3-restricted/predicted.
     
-                send_ijk = ijkPatches(:, :, relation, level_diff, RECVER)
-                recv_ijk = ijkPatches(:, :, relation, level_diff, RESPRE)
+                recv_ijk = ijkPatches(:, :, i_relation, RECVER)
+                send_ijk = ijkPatches(:, :,   relation, SENDER)
+                buffer_ijk = ijkPatches(:, :, relation, RESPRE)
+
+                ! debug
+                ! write(*, '(2(A, i0), 2(A, 6(i2, 1x)), 2(A, i0), A, 6(i2, 1x))') &
+                !       "Send rel ",   relation, " lvl_d ",   lvl_diff, " ind_s ", send_ijk(:, :), "ind_b ", buffer_ijk(:, :), &
+                !     ", Recv rel ", i_relation, " lvl_d ", i_lvl_diff, " ind ",   recv_ijk(:, :)
     
-                hvy_data( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, recver_hvyID ) = &
-                res_pre_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc)
+                hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, recver_hvyID ) = &
+                res_pre_data( buffer_ijk(1,1):buffer_ijk(2,1), buffer_ijk(1,2):buffer_ijk(2,2), buffer_ijk(1,3):buffer_ijk(2,3), 1:nc)
             end if
         endif
     end do
@@ -550,8 +575,7 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponents, &
-        s_Level, s_M2C, s_C2M, s_M2F, s_F2M)
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_val)
 
     implicit none
 
@@ -560,26 +584,21 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
 
     integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
     integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
+    character(len=*)                    :: sync_case           !< String representing which kind of syncing we want to do
 
-    integer(kind=ik), intent(in), optional  :: s_level              !< Level to synch, if -1 then all levels are synched
-    ! specific directions, some are master ones and can work independently of s_level:
-    !    1. if s_level == -1 and s_M2C then all mothers will be updated
-    !    2. if s_level == -1 and s_M2F then all daughters will be updated
-    logical, intent(in), optional  :: s_M2C                         !< Synch from level J   to mother J-1
-    logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to daughters J
-    logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to daughters J+1
-    logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to mother J
-    integer(kind=ik) sLevel
-    logical :: SM2C, SC2M, SM2F, SF2M
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, mylastdigit, N, family, recver_rank
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size, recver_ref
+    integer(kind=ik) :: k_block, myrank, mylastdigit, N, family, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: hvy_ID, lgt_ID, level, ref
+    integer(kind=ik) :: hvy_ID_n, lgt_ID_n, level_n, ref_n, rank_n
     integer(kind=tsize) :: tc
+    logical :: b_send, b_recv
 
     !-----------------------------------------------------------------------
     ! set up constant arrays
@@ -593,17 +612,6 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     ! each time we sync (at negligibble cost)
     call family_setup_patches(params, output_to_file=.false.)
 
-    sLevel = -1
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
-
     myrank = params%rank
     N = params%number_blocks
 
@@ -616,77 +624,99 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
     int_pos(:) = 0
     real_pos(:) = 0
 
+    ! we have two sync cases for family: update mothers from daughters or update daughters from mothers
+    if (index(sync_case, "D2M") > 0) sync_id = 1
+    if (index(sync_case, "M2D") > 0) sync_id = 2
+
+    ! now lets treat the special restrictions, set to the second digit
+    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
+    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+
+    if (sync_id == 0) then
+        call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
+    endif
+
     count_send = 0
     do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block, tree_ID)
-        call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-        level = lgt_block( sender_lgtID, IDX_MESH_LVL )
-        tc = get_tc(lgt_block(sender_lgtID, IDX_TC_1 : IDX_TC_2))
+        hvy_ID = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, myrank, N )
+        level = lgt_block( lgt_ID, IDX_MESH_LVL )
+        tc = get_tc(lgt_block(lgt_ID, IDX_TC_1 : IDX_TC_2))
         mylastdigit = tc_get_digit_at_level_b(tc, dim=params%dim, level=level, max_level=params%Jmax)
-        sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
+        ref = lgt_block( lgt_ID, IDX_REFINE_STS)
 
         ! check if mother exists
-        if (hvy_family(sender_hvyID, 1) /= -1) then
+        if (.not. block_is_root(params, hvy_ID)) then
             ! mother light data id
-            recver_lgtID = hvy_family(sender_hvyID, 1)
+            lgt_ID_n = hvy_family(hvy_ID, 1)
             ! calculate mother rank
-            call lgt2proc( recver_rank, recver_lgtID, N )
+            call lgt2proc( rank_n, lgt_ID_n, N )
             ! mother heavy id
-            call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+            call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
             ! mother ref
-            recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+            ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
+            level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL)
 
             ! Send logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2C and ref=-1) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
+            ! sync_id=+1 -> D2M, send to mother
 
             ! send counter. how much data will I send to my mother?
-            if  ((sLevel==-1 .and. sM2C .and. sender_ref==-1) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M)) then
+            b_send = .false.
+            if (mod(sync_id,10) == 1) b_send = .true.
+            ! special cases, first ref check and then level check, situated in second digit
+            if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
+            if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
 
-                ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
-                ! receiver before sending with interpolation or downsampling.
-                ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
+            if (b_send) then
+                ijk = ijkPatches(:, :, -1 - mylastdigit, SENDER)
 
-                if (myrank /= recver_rank) then
-                    data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                if (myrank /= rank_n) then
+                    data_send_counter(rank_n) = data_send_counter(rank_n) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                     ! counter for integer buffer: for each family relation, we send some integers as metadata
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
-                    meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                    meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
 
                     ! write(*, '("Send to mother Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
 
                 ! now lets save all metadata in one array without caring for rank sorting for now
-                meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                meta_send_all(S_META_FULL*count_send + 4) = recver_rank
+                meta_send_all(S_META_FULL*count_send + 1) = hvy_ID  ! needed for same-rank sending
+                meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                meta_send_all(S_META_FULL*count_send + 3) = hvy_ID_n
+                meta_send_all(S_META_FULL*count_send + 4) = rank_n
                 meta_send_all(S_META_FULL*count_send + 5) = -1 - mylastdigit
-                meta_send_all(S_META_FULL*count_send + 6) = -1  ! inverse as adjusted to receiver
+                meta_send_all(S_META_FULL*count_send + 6) = +1
                 meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                 
                 count_send = count_send + 1
             endif
 
             ! Receive logic, following cases exist currently, all linked as .or.:
-            ! (sLevel=-1 and M2F and ref_n=+1) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
+            ! sync_id=+2 -> M2D, receive from mother
 
             ! recv counter. how much data will I recv from my mother?
             ! This is NOT the same number as before
-            if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                if  ((sLevel==-1 .and. sM2F .and. recver_ref==+1) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F)) then
-                    ijk = ijkPatches(:, :, -1 - mylastdigit, +1, RECVER)
+            if (myrank /= rank_n) then  ! only receive from foreign ranks
+                b_recv = .false.
+                if (mod(sync_id,10) == 2) b_recv = .true.
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
 
-                    data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                if (b_recv) then
+                    ijk = ijkPatches(:, :, -1 - mylastdigit -8, RECVER)  ! -8 for lvl_diff=-1
+
+                    data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                     ! counter for integer buffer: for each family relation, we send some integers as metadata
                     ! this is a fixed number it does not depend on the type of family relation etc
                     ! Increase by one so number of integers can vary
-                    meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                    meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
 
                     ! write(*, '("Recv from mother Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -1 - mylastdigit, lgt_block(sender_lgtID, IDX_TC_2)
                 endif
@@ -695,72 +725,83 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, ncomponen
 
         ! check if any daughter exists
         ! in order to save blocks we directly set one of the daughters to the mother, so we should check all daughter ids
-        if (any(hvy_family(sender_hvyID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+        if (.not. block_is_leaf(params, hvy_id)) then
             ! loop over all daughters
             do family = 1, 2**params%dim
                 ! daughters light data id
-                recver_lgtID = hvy_family(sender_hvyID, 1+2**params%dim+family)
+                lgt_ID_n = hvy_family(hvy_ID, 1+2**params%dim+family)
 
                 ! if it doesn't exist, cycle, this can be the case when a daughter has been directly assigned to the mother
-                if (recver_lgtID == -1) cycle
+                if (lgt_ID_n == -1) cycle
 
                 ! calculate dauther rank
-                call lgt2proc( recver_rank, recver_lgtID, N )
+                call lgt2proc( rank_n, lgt_ID_n, N )
                 ! daughter heavy id
-                call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+                call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
                 ! daughter ref
-                recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+                ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
+                level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL)
 
                 ! Send logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2F and ref=+1) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
+                ! sync_id=+2 -> M2D, send to daughters
 
-                ! send counter. how much data will I send to my mother?
-                if  ((sLevel==-1 .and. sM2F .and. sender_ref==+1) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M)) then
+                ! send counter. how much data will I send to my daughters?
+                b_send = .false.
+                if (mod(sync_id,10) == 2) b_send = .true.
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
 
-                    ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
-                    ! receiver before sending with interpolation or downsampling.
-                    ijk = ijkPatches(:, :, -family, -1, RECVER)
+                if (b_send) then
 
-                    if (myrank /= recver_rank) then
-                        data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                    ijk = ijkPatches(:, :, -family-8, SENDER)  ! -8 for lvl_diff=-1
+
+                    if (myrank /= rank_n) then
+                        data_send_counter(rank_n) = data_send_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each family relation, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
-                        meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                        meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
 
                         ! write(*, '("Send to children Size, sendID, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, sender_hvyID, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
-                    meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                    meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                    meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                    meta_send_all(S_META_FULL*count_send + 4) = recver_rank
-                    meta_send_all(S_META_FULL*count_send + 5) = -family
-                    meta_send_all(S_META_FULL*count_send + 6) = 1  ! inverse as adjusted to receiver
+                    meta_send_all(S_META_FULL*count_send + 1) = hvy_ID  ! needed for same-rank sending
+                    meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                    meta_send_all(S_META_FULL*count_send + 3) = hvy_ID_n
+                    meta_send_all(S_META_FULL*count_send + 4) = rank_n
+                    meta_send_all(S_META_FULL*count_send + 5) = -family-8
+                    meta_send_all(S_META_FULL*count_send + 6) = -1
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
                     count_send = count_send + 1
                 endif
 
                 ! Receive logic, following cases exist currently, all linked as .or.:
-                ! (sLevel=-1 and M2C and ref_n=-1) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
+                ! sync_id=+1 -> D2M, receive from daughters
 
-                ! recv counter. how much data will I recv from my mother?
+                ! recv counter. how much data will I recv from my daughters?
                 ! This is NOT the same number as before
-                if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((sLevel==-1 .and. sM2C .and. recver_ref==-1) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C)) then
-                        ijk = ijkPatches(:, :, -family, -1, RECVER)
+                if (myrank /= rank_n) then  ! only receive from foreign ranks
+                    b_recv = .false.
+                    if (mod(sync_id,10) == 1) b_recv = .true.
+                    ! special cases, first ref check and then level check, situated in second digit
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
 
-                        data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                    if (b_recv) then
+                        ijk = ijkPatches(:, :, -family, RECVER)
+
+                        data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each family relation, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of family relation etc
                         ! Increase by one so number of integers can vary
-                        meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                        meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
 
                         ! write(*, '("Recv from children Size, lastDigit ", 3(i0, 1x), " tc", b32.32)') (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents, -family, lgt_block(sender_lgtID, IDX_TC_2)
                     endif
@@ -819,9 +860,8 @@ subroutine move_mallat_patch_block(params, hvy_block, hvy_ID, digit)
     endif
     if (.not. allocated(tmp_wd)) allocate(tmp_wd(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:nc) )
 
-    ! recver and sender swap is deceiving, but I checked and thats how it goes
-    ijk_r = ijkPatches(:, :, -1 - digit, +1, SENDER)
-    ijk_s = ijkPatches(:, :, -1 - digit, +1, RECVER)
+    ijk_r = ijkPatches(:, :, -1 - digit -8, RECVER)  ! daughter receives from coarser level mother, -8 for lvl_diff=-1
+    ijk_s = ijkPatches(:, :, -1 - digit   , SENDER)  ! mother sends to finer level daughter
 
     ! init tmp values
     tmp_wd(:, :, :, :) = 0.0_rk

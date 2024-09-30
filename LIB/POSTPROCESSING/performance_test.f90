@@ -69,7 +69,7 @@ subroutine performance_test(params)
 
     do a = 1, N_grids
 
-        call createRandomGrid_tree( params, hvy_block, hvy_tmp, Jmin=1, verbosity=.true., iterations=10, tree_ID=tree_ID_flow )
+        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=1, verbosity=.true., iterations=10, tree_ID=tree_ID_flow )
 
         ! on the grid, set some random data
         do k = 1, hvy_n(tree_ID_flow)

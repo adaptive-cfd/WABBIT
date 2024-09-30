@@ -62,7 +62,7 @@ subroutine fractal_tree_init(Insect)
         !*****************************************************************************
         call count_lines_in_ascii_file_mpi(Insect%fractal_tree_file, nlines, 0)
 
-        if (root) write(*,'(80("-"))')
+        if (root) write(*,'(80("─"))')
         if (root) write(*,'("Building a fractal tree with ",i5," rigid cylinders")') nlines
         if (root) write(*,'("Fractal tree scaling factor is ",g16.4)') Insect%fractal_tree_scaling
         if (root) write(*,'("Fractal tree scaling root point is ",3(g16.4,1x))') Insect%fractal_tree_x0

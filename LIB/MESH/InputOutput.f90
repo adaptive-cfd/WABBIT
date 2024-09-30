@@ -1,14 +1,15 @@
-subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync)
+subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
     implicit none
 
-    character(len=*), intent(in)        :: fname                    !> file name
-    real(kind=rk), intent(in)           :: time                     !> time loop parameters
-    integer(kind=ik), intent(in)        :: iteration
-    integer(kind=ik), intent(in)        :: dF                       !> datafield number
-    type (type_params), intent(in)      :: params                   !> user defined parameter structure
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !> heavy data array - block data
+    character(len=*), intent(in)        :: fname                    !< file name
+    real(kind=rk), intent(in)           :: time                     !< time loop parameters, to be added as metadata
+    integer(kind=ik), intent(in)        :: iteration                !< iteration, to be added as metadata
+    integer(kind=ik), intent(in)        :: dF                       !< datafield number
+    type (type_params), intent(in)      :: params                   !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
     logical, optional, intent(in)       :: no_sync
+    logical, optional, intent(in)       :: save_ghosts
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
@@ -28,7 +29,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
-    logical, parameter                  :: save_ghosts = .false.
+    logical                             :: saveGhosts
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -41,6 +42,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
     no_sync2 = .false.
     if (present(no_sync)) no_sync2 = no_sync
+    saveGhosts = .false.
+    if (present(save_ghosts)) saveGhosts = save_ghosts
 
     ! uniqueGrid modification
     if (.not. no_sync2) then
@@ -68,7 +71,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     ! to know our position in the last index of the 4D output array, we need to
     ! know how many blocks all procs have
     allocate(actual_blocks_per_proc( 0:params%number_procs-1 ))
-    if (save_ghosts) then
+    if (saveGhosts) then
         allocate(myblockbuffer( 1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:hvy_n(tree_ID) ), stat=status)
     else
         ! uniqueGrid modification: we save the first ghost node in addition to the internal
@@ -129,7 +132,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         ! ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
         ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n(tree_ID)/) - 1
-        if (save_ghosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        if (saveGhosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
 
     else
 
@@ -140,7 +143,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         ! ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
         ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n(tree_ID)/) - 1
-        if (save_ghosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        if (saveGhosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
 
     endif
 
@@ -162,7 +165,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
             if ( params%dim == 3 ) then
                 ! 3D
-                if (save_ghosts) then
+                if (saveGhosts) then
                     myblockbuffer(:,:,:,l) = hvy_block( :, :, :, dF, hvy_id)
                 else
                     ! myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
@@ -178,14 +181,14 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(2,l) = ddx(2)
                 coords_spacing(3,l) = ddx(1)
 
-                if (save_ghosts) then
+                if (saveGhosts) then
                     coords_origin(1,l) = xx0(3) -dble(g)*ddx(3)
                     coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
                     coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
                 endif
             else
                 ! 2D
-                if (save_ghosts) then
+                if (saveGhosts) then
                     myblockbuffer(:,:,1,l) = hvy_block(:, :, 1, dF, hvy_id)
                 else
                     ! myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
@@ -199,7 +202,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(1,l) = ddx(2)
                 coords_spacing(2,l) = ddx(1)
 
-                if (save_ghosts) then
+                if (saveGhosts) then
                     coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
@@ -251,7 +254,12 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     call write_attribute(file_id, "blocks", "periodic_BC", periodic_BC )
     call write_attribute(file_id, "blocks", "symmetry_BC", symmetry_BC )
     call write_attribute(file_id, "blocks", "version", (/20240410/)) ! this is used to distinguish wabbit file formats
-    call write_attribute(file_id, "blocks", "block-size", Bs)
+    if (saveGhosts) then
+        ! we could split this up into bs and g but for now to work with visualization scripts I keep it at that
+        call write_attribute(file_id, "blocks", "block-size", Bs(:)+2*g)
+    else
+        call write_attribute(file_id, "blocks", "block-size", Bs)
+    endif
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))
@@ -471,14 +479,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         call read_attribute(file_id, "blocks", "max_level", tc_max_level, 100)
         call read_attribute(file_id, "blocks", "dim", tc_dim, 0)
 
-        ! compare treecode lengths
-        if (tc_max_level > params%Jmax) then
-            ! treecode in input file is greater than the new one, abort and output on screen
-            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-            ! but active level=4). On the other hand, that appears to be rare.
-            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-        end if
-
         ! compare treecode dim
         if (tc_dim /= params%dim) then
             ! treecode in input file is saved with different dimension, as this changes
@@ -499,9 +499,14 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         lbounds = (/0, sum(blocks_per_rank_list(0:rank-1))/)
         ubounds = (/tc_max_level, lbounds(2) + my_hvy_n - 1/)
 
-        ! actual reading of treecodes (= the description of the tree)
+        ! actual reading of treecodes (= the description of the tree) and level
         call read_dset_mpi_hdf5(file_id, "block_treecode_num", lbounds(2:2), ubounds(2:2), block_treecode_num)
         call read_dset_mpi_hdf5(file_id, "level", lbounds(2:2), ubounds(2:2), level)
+
+        ! check if level is smaller or equal to JMax
+        if (maxval(level) > params%Jmax) then
+            call abort(240929, "This file has heights we cannot even imagine! Please increase max_treelevel to work with this file.")
+        endif
 
     ! version(1) < 20240410
     else
@@ -509,13 +514,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         ! check what Jmax was saved in file (check length of treecode in file)
         call get_size_datafield(2, file_id, "block_treecode", dims_treecode)
 
-        ! compare treecode lengths
-        if (dims_treecode(1) > params%Jmax) then
-            ! treecode in input file is greater than the new one, abort and output on screen
-            ! NOTE this can be made working if not all levels in the file are actually used (e.g. level_max=17
-            ! but active level=4). On the other hand, that appears to be rare.
-            call abort(73947887, "ERROR: Treecode in file is longer than what is set in INI file.")
-        end if
+        ! Check if all levels can be represented with this JMax is done block-wise
 
         allocate( block_treecode(1:dims_treecode(1), 1:my_hvy_n) )
         allocate( block_treecode_num(1:1) )
@@ -609,12 +608,18 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         if (version(1) >= 20240410) then
             ! set mesh level
             lgt_block(free_lgt_id, IDX_MESH_LVL) = level(k)
+            ! if JMax of input file is not equal to JMax of simulation then we need to shift the treecode by factor of 2**(dim*(JMax_sim - JMax_file))
+            treecode = int(dble(block_treecode_num(k)) * 2.0**(params%dim*(params%Jmax - tc_max_level)), kind=tsize)
             ! set treecode
-            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), block_treecode_num(k))
+            call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
 
         else  ! old numerical treecode version:
             ! set mesh level
             lgt_block(free_lgt_id, IDX_MESH_LVL) = treecode_size(block_treecode(:,k), size(block_treecode,1))
+            ! check if level is smaller or equal to JMax
+            if (lgt_block(free_lgt_id, IDX_MESH_LVL) > params%Jmax) then
+                call abort(240929, "This file has heights we cannot even imagine! Please increase max_treelevel to work with this file.")
+            endif
             ! set treecode
             treecode = -1_tsize
             call array2tcb(treecode, block_treecode(1:dims_treecode(1), k), dim=params%dim, &
@@ -652,8 +657,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
-    call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
 
     if (present(synchronize_ghosts)) then
         if (synchronize_ghosts) then
@@ -943,10 +947,61 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
 
     call readHDF5vct_tree(fnames, params, hvy_block, tree_id, verbosity=.true.)
 
-
-    call createActiveSortedLists_forest(params)
-    call updateNeighbors_tree(params, tree_ID)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
 
     call sync_ghosts_tree(params, hvy_block, tree_ID )
 
 end subroutine read_field2tree
+
+
+
+!> \brief Save tree in full wavelet decomposed form.
+!> This function essentially wraps around full wavelet decomposition and save function.
+!> Attention! The grid will be a full tree grid
+subroutine saveHDF5_wavelet_decomposed_tree(fname, time, iteration, dF, params, hvy_block, hvy_tmp, tree_ID, no_sync, save_ghosts)
+    implicit none
+
+    character(len=*), intent(in)        :: fname                    !< file name
+    real(kind=rk), intent(in)           :: time                     !< time loop parameters, to be added as metadata
+    integer(kind=ik), intent(in)        :: iteration                !< iteration, to be added as metadata
+    integer(kind=ik), intent(in)        :: dF                       !< datafield number
+    type (type_params), intent(in)      :: params                   !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)   !< heavy tmp data array - used for decomposition as buffer
+    integer(kind=ik), intent(in)        :: tree_ID
+    logical, optional, intent(in)       :: no_sync
+    logical, optional, intent(in)       :: save_ghosts
+
+    integer(kind=ik)                    :: k, hvy_ID, lgt_ID
+
+    ! avoid that metadata is not correctly updated
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp)
+    call saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
+
+    ! delete all non-leaf blocks with daughters as we for now do not need them
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+
+        if ( .not. block_is_leaf(params, hvy_id)) then
+            ! we can savely delete blocks as long as we do not update family relations
+            lgt_block( lgt_ID, : ) = -1
+        endif
+    end do
+
+    ! deletion was only made locally (as family relations are hvy), so we need to sync lgt data
+    call synchronize_lgt_data( params, refinement_status_only=.false. )
+
+    ! update grid lists: active list, neighbor relations, etc
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+
+    ! rewrite original data, they have been saved in hvy_tmp
+    do k = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
+        hvy_block(:, :, :, :, hvy_id) = hvy_tmp(:, :, :, :, hvy_id)
+    enddo
+
+
+end subroutine

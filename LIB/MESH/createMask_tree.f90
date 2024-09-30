@@ -3,7 +3,7 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     use module_ACM
     implicit none
 
-    type (type_params), intent(in)         :: params
+    type (type_params), intent(inout)      :: params
     real(kind=rk), intent(in)              :: time
     real(kind=rk), intent(inout)           :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
@@ -168,7 +168,7 @@ end subroutine
 subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     implicit none
 
-    type (type_params), intent(in)      :: params
+    type (type_params), intent(inout)   :: params
     real(kind=rk), intent(in)           :: time
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)

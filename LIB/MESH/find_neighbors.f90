@@ -1,52 +1,45 @@
+!> \brief Given a direction XYZ as +1 / 0 / -1 for each coordinate,
+!! find the neighbor and assign it to the correct index in hvy_neighbor
+!
 !> neighbor codes: \n
 !  ---------------
-!> for imagination:
-!!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-!!                   - edge: boundary between two sides - use sides numbers for coding
-!!                   - corner: between three sides - so use all three sides numbers
-!!                   - block on higher/lower level: block shares face/edge and one unique corner,
-!!                     so use this corner code in second part of neighbor code
-!!
-!! \image html neighborcode.svg "Neighborcode 3D" width=250
-!!
-!!faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-!! edges:  '_12/___', '_13/___', '_14/___', '_15/___'
-!!         '_62/___', '_63/___', '_64/___', '_65/___'
-!!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-!! corner: '123/___', '134/___', '145/___', '152/___'
-!!         '623/___', '634/___', '645/___', '652/___' \n
-!! \n
-!! complete neighbor code array, 74 possible neighbor relations \n
-!! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-!!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-!!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-!!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-!!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-!!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-!!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-!!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+!>   1- 56 : lvl_diff =  0  (same level)
+!>  57-112 : lvl_diff = +1  (coarser neighbor)
+!> 113-168 : lvl_diff = -1  (finer   neighbor)
+!> For each range, the different 56 entries are:
+!> 01-08 : X side (4-,4+)
+!> 09-16 : Y-side (4-,4+)
+!> 17-24 : Z-side (4-,4+)
+!> 25-32 : X-Y edge (2--, 2+-, 2-+, 2++)
+!> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
+!> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
+!> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
 ! ********************************************************************************************
-subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_domain)
+subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain, search_overlapping, verbose)
 
     implicit none
     type (type_params), intent(in)      :: params                   !< user defined parameter structure
     integer(kind=ik), intent(in)        :: hvyID_block
     integer(kind=ik), intent(in)        :: lgtID_block
-    integer(kind=ik), intent(in)        :: Jmax
-    !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> direction for neighbor search - number where each digit represents a cardinal direction XYZ
+    !> 9 -> lower direction (-) - we would love to use -1 here but it's obviously not possible so we settled for 9 instead (kind of like 10-1)
+    !> 1 -> upper direction (+)
+    !> 0 -> no direction (but finer neighbors can vary in + and - and coarser neighbors have one configuration of those two) 
     integer(kind=ik), intent(in)        :: dir                      
     logical, intent(inout)              :: error
     integer(kind=2), intent(in)         :: n_domain(1:3)
+    logical, intent(in)                 :: search_overlapping  !< for CVS multiple neighbors can coexist, so we search all of them
+    logical, intent(in), optional       :: verbose  ! no matter the value, if it is present we print additional output
+    
     integer(kind=ik)                    :: neighborDirCode_sameLevel
     integer(kind=ik)                    :: neighborDirCode_coarserLevel, tcFinerAppendDigit(4)
     integer(kind=ik)                    :: neighborDirCode_finerLevel(4)
     integer(kind=ik)                    :: k, lgtID_neighbor, level, tc_last, tree_ID
     integer(kind=tsize)                 :: tcb_Block, tcb_Neighbor, tcb_Virtual
     logical                             :: exists
-    ! variable to show if there is a valid edge neighbor
-    logical                             :: lvl_down_neighbor
-    logical :: thereMustBeANeighbor
+
+    ! new variables
+    integer(kind=ik)                    :: dir_dim(1:3), dir_free, i_dim, i_dig, apply_free, vary_tc(3)
 
     level      = lgt_block( lgtID_block, IDX_MESH_LVL )
     tree_ID    = lgt_block( lgtID_block, IDX_TREE_ID )
@@ -58,507 +51,89 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     ! we have to init tcBlock before we set it elsewise fortran doesnt like it
     tcb_Block    = get_tc(lgt_block(lgtID_block, IDX_TC_1 : IDX_TC_2))
     ! last digit is used very often so we only extract it once
-    tc_last = tc_get_digit_at_level_b(tcb_Block, dim=params%dim, level=level, max_level=Jmax)
+    tc_last = tc_get_digit_at_level_b(tcb_Block, dim=params%dim, level=level, max_level=params%Jmax)
 
-    ! not all blocks can have coarse neighbors.
-    ! Consider:
-    ! a c E E
-    ! b d E E
-    ! Then to the right, block b cannot have a coarser neighbor
-    lvl_down_neighbor = .false.
-    ! For the faces, we insist on finding neighbors (exception: symmetry conditions).
-    ! for corners and edges, we do not- in the above example, block d does not
-    ! have a neighbor in the top right corner.
-    thereMustBeANeighbor = .false.
+    ! extract the direction for each dimension from direction for neighbor search - number where each digit represents a cardinal direction
+    ! XYZ where each digit can be 0 (no change), 1 (for + direction) or 9 (for - direction)
+    dir_dim(1) = mod(dir/100, 10)
+    dir_dim(2) = mod(dir/10, 10)
+    dir_dim(3) = mod(dir/1, 10)
 
+    ! compute if we are looking at a face (2), edge (1) or corner (0) by how many directions are 0
+    ! in total, we have 2**(dir_free - (params%dim==3)) possible finer neighbors or configurations for coarser neighbors
+    dir_free = 2**count(dir_dim == 0)
+    if (params%dim == 2) dir_free = dir_free / 2
 
-    ! 2D:
-    !   faces: 1. same level: always one neighbor
-    !          2. coarser: one neighbor, two possible neighbor codes
-    !          3. finer: always two neighbors
-    !   edges: 1. same level: always one neighbor
-    !          2. coarser: one neighbor, possibly. Exists only if the coarser blocks corner coincides with the finer blocks corner.
-    !          3. finer: always two neighbors
+    ! compute the digits that are free, do this by looping over the free directions
+    tcFinerAppendDigit(1:4) = 0
+    apply_free = 1  ! needed to switch between if a variable is the first or second "free" variable
+    vary_tc = (/ 2, 1, 4/)  ! x change varies treecode by 2 and y by 1, this is a dumb convention
+    do i_dim = 1,params%dim
+        ! if this direction can vary (0), we let the treecodes vary by it
+        if (dir_dim(i_dim) == 0) then
+            do i_dig = 1,4
+                tcFinerAppendDigit(i_dig) = tcFinerAppendDigit(i_dig) + vary_tc(i_dim)*mod((i_dig-1)/apply_free,2)
+            enddo
+            apply_free = apply_free +1
+        ! if this direction is fixed and goes positive (1), we shift the treecodes
+        elseif (dir_dim(i_dim) == 1) then
+            tcFinerAppendDigit(1:4) = tcFinerAppendDigit(1:4) + vary_tc(i_dim)
+        endif
+    enddo
 
-
-
-
-    ! set auxiliary variables
-    !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
-    select case(dir)
-        case(1)  ! '__1/___'
-            neighborDirCode_sameLevel    = 1
-            thereMustBeANeighbor = .true.
-
-            ! If the neighbor is coarser, then we have only one possible block, but
-            ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tc_last == 4) then
-                neighborDirCode_coarserLevel = 30
-            elseif ( tc_last == 5) then
-                neighborDirCode_coarserLevel = 29
-            elseif ( tc_last == 6) then
-                neighborDirCode_coarserLevel = 27
-            elseif ( tc_last == 7) then
-                neighborDirCode_coarserLevel = 28
-            end if
-            lvl_down_neighbor = .true.
-
-            ! virtual treecodes, list_ids for neighbors on higher level
-            tcFinerAppendDigit(1:4)  = (/ 4, 5, 6, 7 /)
-            neighborDirCode_finerLevel(1:4) = (/ 30, 29, 27, 28 /)
-
-        case(2)  ! '__2/___'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel = 4
-                lvl_down_neighbor = .true.
-                thereMustBeANeighbor = .true.
-                ! virtual treecodes for neighbors on higher level
-                tcFinerAppendDigit(1:2)         = (/ 0, 2 /)
-                neighborDirCode_finerLevel(1:2) = (/ 15, 16 /)
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 0) then
-                    neighborDirCode_coarserLevel = 15
-                elseif ( tc_last == 2) then
-                    neighborDirCode_coarserLevel = 16
-                end if
-
+    ! now we need to find out the corresponding indices where we wanna start
+    if (count(dir_dim == 0) == 2) then
+        ! for sides, indices start at 1
+        neighborDirCode_sameLevel = 1
+        ! shift according to entries
+        do i_dim = 1,3
+            ! first x is free, then y, then z giving this shift
+            if (dir_dim(i_dim) /= 0) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 8*(i_dim-1)
+            ! shift indices for positive direction
+            if (dir_dim(i_dim) == 1) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 4
+        enddo
+    elseif (count(dir_dim == 0) == 1) then
+        ! for edges, indices start at 24+1
+        neighborDirCode_sameLevel = 25
+        ! shift according to entries
+        apply_free = 1  ! needed to switch between if a variable is the first or second "fixed" variable
+        do i_dim = 1,3
+            if (dir_dim(i_dim) == 0) then
+                ! first z varies, then y, then x giving this shift
+                neighborDirCode_sameLevel = neighborDirCode_sameLevel + 8*(3-i_dim)
+            ! shift indices for positive direction
+            elseif (dir_dim(i_dim) == 1) then
+                neighborDirCode_sameLevel = neighborDirCode_sameLevel + apply_free*2
+                apply_free = apply_free + 1
             else
-                neighborDirCode_sameLevel    = 2
-                thereMustBeANeighbor = .true.
-
-                ! If the neighbor is coarser, then we have only one possible block, but
-                ! the finer block (me) may be at four positions, which define the neighborhood code
-                if ( tc_last == 0) then
-                    neighborDirCode_coarserLevel = 34
-                elseif ( tc_last == 2) then
-                    neighborDirCode_coarserLevel = 32
-                elseif ( tc_last == 4) then
-                    neighborDirCode_coarserLevel = 33
-                elseif ( tc_last == 6) then
-                    neighborDirCode_coarserLevel = 31
-                end if
-                lvl_down_neighbor = .true.
-
-                ! virtual treecodes, list_ids for neighbors on higher level
-                tcFinerAppendDigit(1:4)  = (/ 0, 2, 4, 6 /)
-                neighborDirCode_finerLevel(1:4) = (/ 34, 32, 33, 31 /)
-
+                apply_free = apply_free + 1
             endif
+        enddo
+    elseif (count(dir_dim == 0) == 0) then
+        ! for corners, indices start at 48+1
+        neighborDirCode_sameLevel = 49
+        ! shift indices for positive direction
+        do i_dim = 1,3
+            if (dir_dim(i_dim) == 1) neighborDirCode_sameLevel = neighborDirCode_sameLevel + 2**(i_dim-1)
+        enddo
+    endif
 
-        case(3)  ! '__3/___'  or  '__S'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel = 3
-                lvl_down_neighbor = .true.
-                thereMustBeANeighbor = .true.
-                ! virtual treecodes for neighbors on higher level
-                tcFinerAppendDigit(1:2)         = (/ 2, 3 /)
-                neighborDirCode_finerLevel(1:2) = (/ 12, 11 /)
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 3) then
-                    neighborDirCode_coarserLevel = 11
-                elseif ( tc_last == 2) then
-                    neighborDirCode_coarserLevel = 12
-                end if
+    ! lets find the index for level-down neighbor, offset is not yet added
+    do i_dig = 1, dir_free
+        if (tc_last == tcFinerAppendDigit(i_dig)) then
+            neighborDirCode_coarserLevel = neighborDirCode_sameLevel + i_dig - 1
+        endif
+    enddo
 
-            else
-                neighborDirCode_sameLevel    = 3
-                thereMustBeANeighbor = .true.
+    ! debug
+    ! write(*, '(A, i3, A, 4(i2), A, i2)') "Dir= ", dir, " append= ", tcFinerAppendDigit(1:4), " start_id= ", neighborDirCode_sameLevel
 
-                ! If the neighbor is coarser, then we have only one possible block, but
-                ! the finer block (me) may be at four positions, which define the neighborhood code
-                if ( tc_last == 2) then
-                    neighborDirCode_coarserLevel = 36
-                elseif ( tc_last == 3) then
-                    neighborDirCode_coarserLevel = 38
-                elseif ( tc_last == 6) then
-                    neighborDirCode_coarserLevel = 35
-                elseif ( tc_last == 7) then
-                    neighborDirCode_coarserLevel = 37
-                end if
-                lvl_down_neighbor = .true.
-
-                ! virtual treecodes, list_ids for neighbors on higher level
-                tcFinerAppendDigit(1:4)  = (/ 2, 3, 6, 7 /)
-                neighborDirCode_finerLevel(1:4) = (/ 36, 38, 35, 37 /)
-
-            endif
-
-        case(4)  ! '__4/___'  or  '__E'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel = 2
-                lvl_down_neighbor = .true.
-                thereMustBeANeighbor = .true.
-                ! virtual treecodes for neighbors on higher level
-                tcFinerAppendDigit(1:2)         = (/ 1, 3 /)
-                neighborDirCode_finerLevel(1:2) = (/ 13, 14 /)
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 1) then
-                    neighborDirCode_coarserLevel = 13
-                elseif ( tc_last == 3) then
-                    neighborDirCode_coarserLevel = 14
-                end if
-
-            else
-                neighborDirCode_sameLevel    = 4
-                thereMustBeANeighbor = .true.
-
-                ! If the neighbor is coarser, then we have only one possible block, but
-                ! the finer block (me) may be at four positions, which define the neighborhood code
-                if ( tc_last == 1) then
-                    neighborDirCode_coarserLevel = 42
-                elseif ( tc_last == 3) then
-                    neighborDirCode_coarserLevel = 40
-                elseif ( tc_last == 5) then
-                    neighborDirCode_coarserLevel = 41
-                elseif ( tc_last == 7) then
-                    neighborDirCode_coarserLevel = 39
-                end if
-                lvl_down_neighbor = .true.
-
-                ! virtual treecodes, list_ids for neighbors on higher level
-                tcFinerAppendDigit(1:4)  = (/ 1, 3, 5, 7 /)
-                neighborDirCode_finerLevel(1:4) = (/ 42, 40, 41, 39 /)
-
-            endif
-
-        case(5)  ! '__5/___'  or  '__N'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel = 1
-                lvl_down_neighbor = .true.
-                thereMustBeANeighbor = .true.
-                ! virtual treecodes, list_ids for neighbors on higher level
-                tcFinerAppendDigit(1:2)         = (/ 0, 1 /)
-                neighborDirCode_finerLevel(1:2) = (/ 10,  9 /)
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 0) then
-                    neighborDirCode_coarserLevel = 10
-                elseif ( tc_last == 1) then
-                    neighborDirCode_coarserLevel = 9
-                end if
-            
-            else
-                neighborDirCode_sameLevel    = 5
-                thereMustBeANeighbor = .true.
-
-                ! If the neighbor is coarser, then we have only one possible block, but
-                ! the finer block (me) may be at four positions, which define the neighborhood code
-                if ( tc_last == 0) then
-                    neighborDirCode_coarserLevel = 46
-                elseif ( tc_last == 1) then
-                    neighborDirCode_coarserLevel = 44
-                elseif ( tc_last == 4) then
-                    neighborDirCode_coarserLevel = 45
-                elseif ( tc_last == 5) then
-                    neighborDirCode_coarserLevel = 43
-                end if
-                lvl_down_neighbor = .true.
-
-                ! virtual treecodes, list_ids for neighbors on higher level
-                tcFinerAppendDigit(1:4)  = (/ 0, 1, 4, 5 /)
-                neighborDirCode_finerLevel(1:4) = (/ 46, 44, 45, 43 /)
-
-            endif
-
-        case(6)  ! '__6/___'
-            neighborDirCode_sameLevel    = 6
-            thereMustBeANeighbor = .true.
-
-            ! If the neighbor is coarser, then we have only one possible block, but
-            ! the finer block (me) may be at four positions, which define the neighborhood code
-            if ( tc_last == 0) then
-                neighborDirCode_coarserLevel = 50
-            elseif ( tc_last == 1) then
-                neighborDirCode_coarserLevel = 49
-            elseif ( tc_last == 2) then
-                neighborDirCode_coarserLevel = 47
-            elseif ( tc_last == 3) then
-                neighborDirCode_coarserLevel = 48
-            end if
-            lvl_down_neighbor = .true.
-
-            ! virtual treecodes, list_ids for neighbors on higher level
-            tcFinerAppendDigit(1:4)  = (/ 0, 1, 2, 3 /)
-            neighborDirCode_finerLevel(1:4) = (/ 50, 49, 47, 48 /)
-
-        case(12)  ! '_12/___'
-            neighborDirCode_sameLevel    = 7
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 4) then
-                neighborDirCode_coarserLevel = 52
-            elseif ( tc_last == 6) then
-                neighborDirCode_coarserLevel = 51
-            end if
-            lvl_down_neighbor = ( (tc_last == 4) .or. (tc_last == 6) )
-
-            tcFinerAppendDigit(1:2)         = (/ 4, 6 /)
-            neighborDirCode_finerLevel(1:2) = (/ 52, 51 /)
-
-        case(13)  ! '_13/___'
-            neighborDirCode_sameLevel    = 8
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 6) then
-                neighborDirCode_coarserLevel = 53
-            elseif ( tc_last == 7) then
-                neighborDirCode_coarserLevel = 54
-            end if
-            lvl_down_neighbor = ( (tc_last == 6) .or. (tc_last == 7) )
-
-            tcFinerAppendDigit(1:2)         = (/ 6, 7 /)
-            neighborDirCode_finerLevel(1:2) = (/ 53, 54 /)
-
-        case(14)  ! '_14/___'
-            neighborDirCode_sameLevel    = 9
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 5) then
-                neighborDirCode_coarserLevel = 56
-            elseif ( tc_last == 7) then
-                neighborDirCode_coarserLevel = 55
-            end if
-            lvl_down_neighbor = ( (tc_last == 5) .or. (tc_last == 7) )
-
-            tcFinerAppendDigit(1:2)         = (/ 5, 7 /)
-            neighborDirCode_finerLevel(1:2) = (/ 56, 55 /)
-
-        case(15)  ! '_15/___'
-            neighborDirCode_sameLevel    = 10
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 4) then
-                neighborDirCode_coarserLevel = 58
-            elseif ( tc_last == 5) then
-                neighborDirCode_coarserLevel = 57
-            end if
-            lvl_down_neighbor = ( (tc_last == 4) .or. (tc_last == 5) )
-
-            tcFinerAppendDigit(1:2)         = (/ 4, 5 /)
-            neighborDirCode_finerLevel(1:2) = (/ 58, 57 /)
-
-        case(62)  ! '_62/___'
-            neighborDirCode_sameLevel    = 11
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 0) then
-                neighborDirCode_coarserLevel = 60
-            elseif ( tc_last == 2) then
-                neighborDirCode_coarserLevel = 59
-            end if
-            lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 2) )
-
-            tcFinerAppendDigit(1:2)         = (/ 0, 2 /)
-            neighborDirCode_finerLevel(1:2) = (/ 60, 59 /)
-
-        case(63)  ! '_63/___'
-            neighborDirCode_sameLevel    = 12
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 2) then
-                neighborDirCode_coarserLevel = 61
-            elseif ( tc_last == 3) then
-                neighborDirCode_coarserLevel = 62
-            end if
-            lvl_down_neighbor = ( (tc_last == 2) .or. (tc_last == 3) )
-
-            tcFinerAppendDigit(1:2)         = (/ 2, 3 /)
-            neighborDirCode_finerLevel(1:2) = (/ 61, 62 /)
-
-        case(64)  ! '_64/___'
-            neighborDirCode_sameLevel    = 13
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 1) then
-                neighborDirCode_coarserLevel = 64
-            elseif ( tc_last == 3) then
-                neighborDirCode_coarserLevel = 63
-            end if
-            lvl_down_neighbor = ( (tc_last == 1) .or. (tc_last == 3) )
-
-            tcFinerAppendDigit(1:2)         = (/ 1, 3 /)
-            neighborDirCode_finerLevel(1:2) = (/ 64, 63 /)
-
-        case(65)  ! '_65/___'
-            neighborDirCode_sameLevel    = 14
-
-            ! neighbor code for coarser neighbors
-            if ( tc_last == 0) then
-                neighborDirCode_coarserLevel = 66
-            elseif ( tc_last == 1) then
-                neighborDirCode_coarserLevel = 65
-            end if
-            lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 1) )
-
-            tcFinerAppendDigit(1:2)         = (/ 0, 1 /)
-            neighborDirCode_finerLevel(1:2) = (/ 66, 65 /)
-
-        case(23)  ! '_23/___'  or  '_SW'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel     = 8
-                neighborDirCode_coarserLevel  = 8
-                neighborDirCode_finerLevel(1) = 8
-                tcFinerAppendDigit(1) = 2
-                ! only sister block 1, 2 can have valid NE neighbor at one level down
-                if ( (tc_last == 1) .or. (tc_last == 2) ) then
-                    lvl_down_neighbor = .true.
-                end if
-            else
-                neighborDirCode_sameLevel    = 15
-
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 2) then
-                    neighborDirCode_coarserLevel = 68
-                elseif ( tc_last == 6) then
-                    neighborDirCode_coarserLevel = 67
-                end if
-                lvl_down_neighbor = ( (tc_last == 2) .or. (tc_last == 6) )
-
-                tcFinerAppendDigit(1:2)         = (/ 2, 6 /)
-                neighborDirCode_finerLevel(1:2) = (/ 68, 67 /)
-            endif
-
-        case(25)  ! '_25/___'  or  '_NW'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel     = 6
-                neighborDirCode_coarserLevel  = 6
-                neighborDirCode_finerLevel(1) = 6
-                tcFinerAppendDigit(1) = 0
-                ! only sister block 0, 3 can have valid NW neighbor at one level down
-                if ( (tc_last == 0) .or. (tc_last == 3) ) then
-                    lvl_down_neighbor = .true.
-                end if
-            else
-                neighborDirCode_sameLevel    = 16
-
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 0) then
-                    neighborDirCode_coarserLevel = 70
-                elseif ( tc_last == 4) then
-                    neighborDirCode_coarserLevel = 69
-                end if
-                lvl_down_neighbor = ( (tc_last == 0) .or. (tc_last == 4) )
-
-                tcFinerAppendDigit(1:2)         = (/ 0, 4 /)
-                neighborDirCode_finerLevel(1:2) = (/ 70, 69 /)
-            endif
-
-        case(43)  ! '_43/___'  or  '_SE'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel     = 7
-                neighborDirCode_coarserLevel  = 7
-                neighborDirCode_finerLevel(1) = 7
-                tcFinerAppendDigit(1) = 3
-                ! only sister block 0, 3 can have valid SE neighbor at one level down
-                if ( (tc_last == 0) .or. (tc_last == 3) ) then
-                    lvl_down_neighbor = .true.
-                end if
-            else
-                neighborDirCode_sameLevel    = 17
-
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 3) then
-                    neighborDirCode_coarserLevel = 72
-                elseif ( tc_last == 7) then
-                    neighborDirCode_coarserLevel = 71
-                end if
-                lvl_down_neighbor = ( (tc_last == 3) .or. (tc_last == 7) )
-
-                tcFinerAppendDigit(1:2)         = (/ 3, 7 /)
-                neighborDirCode_finerLevel(1:2) = (/ 72, 71 /)
-            endif
-
-        case(45)  ! '_45/___'  or  '_NE'
-            if (params%dim == 2) then
-                neighborDirCode_sameLevel     = 5
-                neighborDirCode_coarserLevel  = 5
-                neighborDirCode_finerLevel(1) = 5
-                tcFinerAppendDigit(1) = 1
-                ! only sister block 1, 2 can have valid NE neighbor at one level down
-                if ( (tc_last == 1) .or. (tc_last == 2) ) then
-                    lvl_down_neighbor = .true.
-                end if
-            else
-                neighborDirCode_sameLevel    = 18
-
-                ! neighbor code for coarser neighbors
-                if ( tc_last == 1) then
-                    neighborDirCode_coarserLevel = 74
-                elseif ( tc_last == 5) then
-                    neighborDirCode_coarserLevel = 73
-                end if
-                lvl_down_neighbor = ( (tc_last == 1) .or. (tc_last == 5) )
-
-                tcFinerAppendDigit(1:2)         = (/ 1, 5 /)
-                neighborDirCode_finerLevel(1:2) = (/ 74, 73 /)
-            endif
-
-        case(123)  ! '123/___'
-            neighborDirCode_sameLevel      = 19
-            neighborDirCode_coarserLevel   = 19
-            neighborDirCode_finerLevel(1)  = 19
-            tcFinerAppendDigit(1) = 6
-            lvl_down_neighbor = ( tc_last == 6 )
-
-        case(134)  ! '134/___'
-            neighborDirCode_sameLevel      = 20
-            neighborDirCode_coarserLevel   = 20
-            neighborDirCode_finerLevel(1)  = 20
-            tcFinerAppendDigit(1) = 7
-            lvl_down_neighbor = ( tc_last == 7 )
-
-        case(145)  ! '145/___'
-            neighborDirCode_sameLevel      = 21
-            neighborDirCode_coarserLevel   = 21
-            neighborDirCode_finerLevel(1)  = 21
-            tcFinerAppendDigit(1) = 5
-            lvl_down_neighbor = ( tc_last == 5 )
-
-        case(152)  ! '152/___'
-            neighborDirCode_sameLevel      = 22
-            neighborDirCode_coarserLevel   = 22
-            neighborDirCode_finerLevel(1)  = 22
-            tcFinerAppendDigit(1) = 4
-            lvl_down_neighbor = ( tc_last == 4 )
-
-        case(623)  ! '623/___'
-            neighborDirCode_sameLevel      = 23
-            neighborDirCode_coarserLevel   = 23
-            neighborDirCode_finerLevel(1)  = 23
-            tcFinerAppendDigit(1) = 2
-            lvl_down_neighbor = ( tc_last == 2 )
-
-        case(634)  ! '634/___'
-            neighborDirCode_sameLevel      = 24
-            neighborDirCode_coarserLevel   = 24
-            neighborDirCode_finerLevel(1)  = 24
-            tcFinerAppendDigit(1) = 3
-            lvl_down_neighbor = ( tc_last == 3 )
-
-        case(645)  ! '645/___'
-            neighborDirCode_sameLevel      = 25
-            neighborDirCode_coarserLevel   = 25
-            neighborDirCode_finerLevel(1)  = 25
-            tcFinerAppendDigit(1) = 1
-            lvl_down_neighbor = ( tc_last == 1 )
-
-        case(652)  ! '652/___'
-            neighborDirCode_sameLevel      = 26
-            neighborDirCode_coarserLevel   = 26
-            neighborDirCode_finerLevel(1)  = 26
-            tcFinerAppendDigit(1) = 0
-            lvl_down_neighbor = ( tc_last == 0 )
-        case default
-            call abort(636300, "A weird error occured.")
-
-    end select
 
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! 1) Check if we find a neighbor on the SAME LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! calculate treecode for neighbor on same level
-    ! call adjacent(tcBlock, tcNeighbor, dir, level, Jmax, params%dim)
-    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=Jmax)
+    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=params%Jmax)
 
     ! check if (hypothetical) neighbor exists and if so find its lgtID
     call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
@@ -566,62 +141,69 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, Jmax, dir, error, n_d
     if (exists) then
         ! we found the neighbor on the same level.
         hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_neighbor
-        return
+        if (.not. search_overlapping) return
     endif
 
+
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! 2) Check if we find a neighbor on the COARSER LEVEL (if that is possible at all)
+    ! 2) Check if we find a neighbor on the FINER LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    if (lvl_down_neighbor) then
-        ! We did not find the neighbor on the same level, and now check on the coarser level.
-        ! Just clear all levels before the lower one
-        tcb_Neighbor = tc_clear_until_level_b(tcb_Neighbor, dim=params%dim, level=level-1, max_level=Jmax)
+    ! Note: if those exists, then we always need to find all 4 (for 3D) or 2 of them
+    ! We might be interested to search for coarser neighbors first because their is only one, however for CVS we might have an full tree grid
+    ! but still only want to sync ANY values. Then coarsest neighbors should be chosen last as their values will be interpolated with WC=0
+    ! However, if we did not find any same-lvl neighbor we should not find finer neighbors, it is therefore not too important but for clarity
+    ! in this order
+    if (level < params%Jmax) then
+        do i_dig = 1, dir_free
+            ! first neighbor virtual treecode, one level up
+            tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(i_dig), level=level+1, max_level=params%Jmax, dim=params%dim)
+
+            ! calculate treecode for neighbor on same level (virtual level)
+            call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=params%Jmax, dim=params%dim)
+            ! check if (hypothetical) neighbor exists and if so find its lgtID
+            call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
+
+            if (exists) then
+                hvy_neighbor( hvyID_block, neighborDirCode_sameLevel + i_dig-1  + 2*56) = lgtID_neighbor
+            else
+                exit  ! no need to serch for other ones if one already is not found
+            endif
+
+            ! we can only return here if we found all blocks
+            if (.not. search_overlapping .and. i_dig == dir_free) return
+        end do
+    endif
+
+
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! 3) Check if we find a neighbor on the COARSER LEVEL (if that is possible at all)
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! We did not find the neighbor on the same level, and now check on the coarser level.
+    ! Just clear all levels before the lower one
+    tcb_Neighbor = tc_clear_until_level_b(tcb_Neighbor, dim=params%dim, level=level-1, max_level=params%Jmax)
+    ! only continue if coarser neighbor can at all exist, consider:
+    ! a c E E
+    ! b d E E
+    ! Then to the right, block b cannot have a coarser neighbor
+    if (neighborDirCode_coarserLevel /= -1 .and. level > params%Jmin) then
         ! check if (hypothetical) neighbor exists and if so find its lgtID
         call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level-1, tree_id=tree_ID, max_level=params%Jmax)
 
-        ! call tcb2array(tcb_Neighbor, tc_test, dim=params%dim, level=level, max_level=Jmax)
-        ! ! write(*, '("neighbour ", a, " orig=", b64.64, " neig=", b64.64)') dir, tcb_Block, tcb_Neighbor
-        ! write(*, '("Coarse neighbour dir=", a, " ta=", 13(i0), " tcb=", 13(i0))') dir, tcNeighbor, tc_test
-
         if ( exists ) then
             ! neighbor is one level down (coarser)
-            hvy_neighbor( hvyID_block, neighborDirCode_coarserLevel ) = lgtID_neighbor
-            return
+            hvy_neighbor( hvyID_block, neighborDirCode_coarserLevel + 56 ) = lgtID_neighbor
+            if (.not. search_overlapping) return
         endif
     endif
 
-
-    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! 3) Check if we find a neighbor on the FINER LEVEL
-    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! Note: there are several neighbors possible on finer levels (up to four in 3D!)
-    ! loop over all 4 possible neighbors
-    if (level < Jmax) then
-        do k = 1, 4
-            if (tcFinerAppendDigit(k) /= -1) then
-                ! first neighbor virtual treecode, one level up
-                tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(k), level=level+1, max_level=Jmax, dim=params%dim)
-
-                ! calculate treecode for neighbor on same level (virtual level)
-                call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=Jmax, dim=params%dim)
-                ! check if (hypothetical) neighbor exists and if so find its lgtID
-                call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
-
-                if (exists) then
-                    hvy_neighbor( hvyID_block, neighborDirCode_finerLevel(k) ) = lgtID_neighbor
-                end if
-
-                ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
-                ! because symmetry conditions are used, check for .not. error to only print it once
-                if (thereMustBeANeighbor .and. .not. error) then
-                    if (.not. exists .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
-                        call adjacent_wrapper_b(tcb_Block, tcb_Virtual, dir, level=level, dim=params%dim, max_level=Jmax)
-                        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i0, ", lgtID-", i0, " lvl-", i0, " TC-", i0, "-", b64.64, A, "Checked same-lvl TC-", i0, "-", b64.64, " and lower-lvl TC-", i0, "-", b64.64)') &
-                            params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block, NEW_LINE('a'), tcb_Virtual, tcb_Virtual, tcb_Neighbor, tcb_Neighbor
-                        error = .true.
-                    endif
-                endif
-            endif
-        end do
+    ! we did not find a neighbor. that may be a bad grid error, or simply, there is none
+    ! we have to find a neighbor for faces, edges and corners might have no neighbors if a coarser block is also at a face
+    if (count(dir_dim == 0) == 2 .and. .not. exists .and. .not. search_overlapping&
+        .and. ( ALL(params%periodic_BC) .or. maxval(abs(n_domain))==0)) then
+        write(*, '("Rank: ", i0, ", found no neighbor in direction: ", i3, ", lgtID-", i6, " lvl-", i2, " TC-", i21, "-", b64.64)') &
+            params%rank, dir, lgtID_block, level, tcb_Block, tcb_Block
+        error = .true.
     endif
+
+
 end subroutine

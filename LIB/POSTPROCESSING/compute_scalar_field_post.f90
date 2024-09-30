@@ -109,7 +109,7 @@ subroutine compute_scalar_field_post(params)
     call createActiveSortedLists_tree( params, tree_ID)
 
     ! update neighbor relations
-    call updateNeighbors_tree(params, tree_ID)
+    call updateNeighbors_tree(params, tree_ID, search_overlapping=.false.)
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
 

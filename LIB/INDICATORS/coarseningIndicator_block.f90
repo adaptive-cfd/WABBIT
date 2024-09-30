@@ -10,7 +10,7 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
-    refinement_status, norm, level, input_is_WD, block_mask, indices)
+    refinement_status, norm, level, input_is_WD, block_mask, indices, verbose_check)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -39,6 +39,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
     !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     ! local variables
     integer(kind=ik) :: k, Jmax, d, j, hvy_id, g, refinement_status_mask, tags, ix, iy, iz, idx(2,3)
@@ -74,25 +75,21 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     case ("maxval-eps")
         ! debug indicator (useful for grid generation tests)
         ! coarsen a block if the maxval of its first component is smaller 0.9 (for passive scalars)
-        if (params%dim==2) then
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) ) <= 0.9_rk ) then
-                refinement_status = -1
-            endif
-        else
-            if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) ) <= 0.9_rk ) then
-                refinement_status = -1
-            endif
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) ) <= 0.9_rk ) then
+            refinement_status = -1
         endif
 
     case ("mask-allzero-noghosts")
-        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )<1.0e-9_rk ) then
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if ( maxval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) )<1.0e-9_rk ) then
             refinement_status = -1
         endif
-        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) )>=1.0_rk- 1.0e-9_rk ) then
+        if ( minval(block_data(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) )>=1.0_rk- 1.0e-9_rk ) then
             refinement_status = -1
         endif
 
-    case ("threshold-state-vector", "primary-variables")
+    case ("threshold-state-vector", "threshold-cvs", "threshold-image-denoise", "primary-variables")
         ! t0 = MPI_Wtime()
         !! use wavelet indicator to check where to coarsen. Note here, active components are considered
         !! and the max over all active components results in the coarsening state -1. The components
@@ -104,7 +101,11 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 #endif
 
         thresholding_component = params%threshold_state_vector_component
-        call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx)
+        if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, eps=norm(1), verbose_check=verbose_check)
+        else
+            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, verbose_check=verbose_check)
+        endif
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (treshold_block)", 1000, MPI_Wtime()-t0 )
@@ -127,21 +128,14 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         mask_max = 0.0_rk
         mask_min = 2.0_rk
 
-        if (params%dim == 3) then
-            ! check if any interface point is within the block
-            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) < 1.0_rk-1.0e-9_rk)) then
-                refinement_status_mask = 0_ik
-            endif
-            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-        else
-            ! check if any interface point is within the block
-            if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) > 1.0e-9_rk .and. block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1) < 1.0_rk-1.0e-9_rk)) then
-                refinement_status_mask = 0_ik
-            endif
-            mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
-            mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, :, 1))
+        ! check if any interface point is within the block
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) > 1.0e-9_rk .and. &
+                block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) < 1.0_rk-1.0e-9_rk)) then
+            refinement_status_mask = 0_ik
         endif
+        mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
+        mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
 
         ! maybe the resolution is so coarse no point on the smoothing layer exists
         ! in that case if both 1 and 0 are in a mask it also has to contain an interface

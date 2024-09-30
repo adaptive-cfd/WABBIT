@@ -13,7 +13,7 @@ subroutine ini_file_to_params( params, filename )
    ! inifile structure
    type(inifile)                                   :: FILE
    ! maximum memory available on all cpus
-   real(kind=rk)                                   :: maxmem, mem_per_block, max_neighbors, nstages
+   real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
    integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
@@ -34,8 +34,6 @@ subroutine ini_file_to_params( params, filename )
    ! what wavelet to use?
    ! (check that here as default for number ghost nodes g depends on it)
    call read_param_mpi(FILE, 'Wavelet', 'wavelet', params%wavelet, 'CDF40')
-   ! Use coherent velocity simulation (CVS)?
-   call read_param_mpi(FILE, 'Wavelet', 'cvs', params%cvs, .false.)
 
    call ini_domain(params, FILE)
    call ini_blocks(params, FILE)
@@ -129,31 +127,38 @@ subroutine ini_file_to_params( params, filename )
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
    if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
-      call abort("ERROR: need more ghost nodes for given refinement order")
-   end if
-   if ( (params%g < 6) .and. (params%wavelet=='CDF44') )  then
-      call abort(050920194, "ERROR: for CDF44 wavelet, 6 ghost nodes are required")
+      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
    if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-      call abort("ERROR: need more ghost nodes for given refinement order")
+      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
-   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized') ) then
-      call abort("ERROR: need more ghost nodes for given derivative order")
+   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) then
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
    if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
-      call abort("ERROR: need more ghost nodes for given derivative order")
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
+   end if
+   if ( (params%g < 1) .and. (params%order_discretization == 'FD_2th_central') ) then
+      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
-     ! Hack.
+   ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
+   ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+   ! the third stage (prediction) needs points from the boundary to correctly interpolate values
+   if ( (params%g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) params%g_RHS = 3
+   if ( (params%g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) params%g_RHS = 2
+   if ( (params%g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) params%g_RHS = 1
+
+   ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
    ! samples. In 2D, the code generally runs fast and does many time steps, hence
    ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
    if (params%dim == 2) then
     flush_frequency = 50
- else
-    flush_frequency = 10
- endif
+   else
+      flush_frequency = 10
+   endif
 
  
 end subroutine ini_file_to_params
@@ -246,7 +251,7 @@ subroutine ini_blocks(params, FILE )
    type(inifile) ,intent(inout)     :: FILE
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
-   integer(kind=ik) :: i, g_default
+   integer(kind=ik) :: i, g_default, g_rhs_default
    real(kind=rk), dimension(:), allocatable  :: tmp
    logical :: lifted_wavelet
 
@@ -266,12 +271,17 @@ subroutine ini_blocks(params, FILE )
    ! check if it is lifted or unlifted, which depends on Y (0 for unlifted and >0 for lifted wavelets)
 
    ! check for X in CDFXY
+   ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+   ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if (params%wavelet(4:4) == "2") then
       g_default = 2
+      g_rhs_default = 1
    elseif (params%wavelet(4:4) == "4") then
       g_default = 4
+      g_rhs_default = 2
    elseif (params%wavelet(4:4) == "6") then
       g_default = 6
+      g_rhs_default = 3
    else 
       call abort(2320242, "no default specified for this wavelet...")
    endif
@@ -294,7 +304,7 @@ subroutine ini_blocks(params, FILE )
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )
-   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, params%g )
+   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, g_rhs_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
@@ -303,11 +313,6 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
-   call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, lifted_wavelet )
-   ! Note: we can add the security zone also for non-lifted wavelets (although this
-   ! does not make much sense, but for development...)
-   ! Default: false for non-lifted, true for lifted wavelets
-   call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet )
 
    if (params%g_rhs > params%g) then
       call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
@@ -317,12 +322,14 @@ subroutine ini_blocks(params, FILE )
       call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
    end if
 
-   if ( params%Jmax > 18 ) then
+   if ( (params%dim==3 .and. params%Jmax > 21) .or. (params%dim==2 .and. params%Jmax > 32) ) then
       ! as we internally convert the treecode to a single integer number, the number of digits is
-      ! limited by that type. The largest 64-bit integer is 9 223 372 036 854 775 807
-      ! which is 19 digits, but the 18th digit cannot be arbitrarily set. Therefore, 18 refinement levels
-      ! are the maximum this code can currently perform.
-      call abort(170619,"Error: Max treelevel cannot be larger 18 (64bit long integer problem) ")
+      ! limited by what we can encode with 64 bits. dim=3 needs 3 bits while dim=2 needs 2 bits resulting in 21 or 32 levels possible
+      if (params%dim == 3) then
+         call abort(170619,"Error: Max treelevel cannot be larger 21 (64bit long integer problem) ")
+      else
+         call abort(170619,"Error: Max treelevel cannot be larger 32 (64bit long integer problem) ")
+      endif
    end if
 
    ! read switch to turn on|off mesh refinement
@@ -336,6 +343,12 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
    call read_param_mpi(FILE, 'Blocks', 'force_maxlevel_dealiasing', params%force_maxlevel_dealiasing, .false. )
    call read_param_mpi(FILE, 'Blocks', 'N_dt_per_grid', params%N_dt_per_grid, 1_ik )
+
+   ! for unlifted wavelets we need coarse extension if any WC are changed and reconstruction is requested
+   call read_param_mpi(FILE, 'Blocks', 'useCoarseExtension', params%useCoarseExtension, lifted_wavelet &
+      .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
+   call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet &
+      .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
 
    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
    ! use? in ACM, it can be good NOT to apply it to the pressure.

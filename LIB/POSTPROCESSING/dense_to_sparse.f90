@@ -21,7 +21,7 @@ subroutine dense_to_sparse(params)
     character(len=cshort), allocatable      :: file_out(:)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik)                        :: max_neighbors, level, k, tc_length, lgt_n_tmp
+    integer(kind=ik)                        :: level, k, tc_length, lgt_n_tmp
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=2)                        :: level_in
@@ -41,23 +41,24 @@ subroutine dense_to_sparse(params)
     call get_command_argument(2, file_in)
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "                DENSE TO SPARSE "
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "postprocessing subroutine sparse a mesh with a given detail treshold"
-            write(*,*) " "
-            write(*,*) "Command:"
-            write(*,*) "./wabbit-post --dense-to-sparse "
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*) " Parameters: "
-            write(*,*) "  --eps-normalized="
-            write(*,*) "  --eps-norm="
-            write(*,*) "  --eps="
-            write(*,*) "  --indicator="
-            write(*,*) "  --order="
-            write(*,*) "  --files="
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*)
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "                DENSE TO SPARSE "
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail treshold"
+            write(*,'(A)') " "
+            write(*,'(A)') "Command:"
+            write(*,'(A)') "./wabbit-post --dense-to-sparse "
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)') " Parameters and their defaults: "
+            write(*,'(A)') "  --eps-normalized=1"
+            write(*,'(A)') "  --eps-norm=L2"
+            write(*,'(A)') "  --eps=-1"
+            write(*,'(A)') "  --indicator=threshold-state-vector"
+            write(*,'(A)') "  --wavelet=CDF40"
+            write(*,'(A)') "  --files="
+            ! write(*,'(A)') "  --security-zone=1"  ! for dev but can stay hidden
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)')
         end if
         return
     end if
@@ -73,6 +74,7 @@ subroutine dense_to_sparse(params)
     call get_cmd_arg( "--order", order, default="CDF40" )
     call get_cmd_arg( "--wavelet", params%wavelet, default=order )
     call get_cmd_arg( "--files", params%input_files )
+    call get_cmd_arg( "--security-zone", params%useSecurityZone, default=.true.)
 
     if (params%eps < 0.0_rk) then
         call abort(2303191,"You must specify the threshold value --eps")
@@ -125,28 +127,22 @@ subroutine dense_to_sparse(params)
     ! read attributes from file. This is especially important for the number of
     ! blocks the file contains: this will be the number of active blocks right
     ! after reading.
-    if (params%dim==3) then
-        ! how many blocks do we need for the desired level?
-        number_dense_blocks = 8_ik**level
-        max_neighbors = 74
-    else
-        number_dense_blocks = 4_ik**level
-        max_neighbors = 16
-    end if
+    ! how many blocks do we need for the desired level?
+    number_dense_blocks = 2_ik**(params%dim*level)
 
     if (params%rank==0) then
-        write(*,'(80("-"))')
-        write(*,*) "Wabbit dense-to-sparse."
+        write(*,'(80("─"))')
+        write(*,'(A)') "Wabbit dense-to-sparse."
         do i = 1, params%n_eqn
             write(*,'(A20,1x,A80)') "Reading file:", params%input_files(i)
             write(*,'(A20,1x,A80)') "Writing to file:", file_out(i)
         end do
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,A8)') "Wavelets used:", params%wavelet
-        write(*,'(A20,1x,es9.3)') "eps:", params%eps
+        write(*,'(A20,1x,es10.3)') "eps:", params%eps
         write(*,'(A20,1x,A80)')"wavelet normalization:", params%eps_norm
         write(*,'(A20,1x,A80)')"indicator:", params%coarsening_indicator
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
     ! is lgt_n > number_dense_blocks (downsampling)? if true, allocate lgt_n blocks

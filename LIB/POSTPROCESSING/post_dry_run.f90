@@ -222,7 +222,7 @@ subroutine post_dry_run
                 ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
                 ! is effectively ignored. It seems redundant; if we set a small eps (done independent
                 ! of the parameter file), this yields the same result
-                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask )
+                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! on new grid, create the mask again

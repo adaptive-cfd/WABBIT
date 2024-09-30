@@ -17,7 +17,7 @@ subroutine adaption_test(params)
   character(len=cshort),allocatable   :: eps_str_list(:)
   real(kind=rk), allocatable      :: hvy_block(:, :, :, :, :)
   real(kind=rk), allocatable      :: hvy_tmp(:, :, :, :, :)
-  integer(kind=ik)                :: max_neighbors, level, k, Bs(3), tc_length
+  integer(kind=ik)                :: level, k, Bs(3), tc_length
   real(kind=rk), dimension(3)     :: domain
   integer(kind=ik) :: treecode_size, number_dense_blocks, tree_ID_input, tree_ID_adapt
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
@@ -109,7 +109,7 @@ subroutine adaption_test(params)
   allocate(params%threshold_state_vector_component(params%n_eqn))
   params%threshold_state_vector_component(1:params%n_eqn)=.True.
   if (maxmem < 0.0_rk) then
-    params%number_blocks = ceiling( 4.0_rk * params%forest_size * number_dense_blocks / params%number_procs )
+    params%number_blocks = ceiling( 4.0_rk * params%forest_size * number_dense_blocks / params%number_procs * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) )
   endif
   !----------------------------------
   ! allocate data

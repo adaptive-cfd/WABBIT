@@ -4,7 +4,7 @@
 subroutine spaghetti2inflatedMallat_block(params, u, wc)
     implicit none
     type (type_params), intent(in) :: params
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -20,7 +20,7 @@ subroutine spaghetti2inflatedMallat_block(params, u, wc)
     ! wc(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
-    real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:,:), intent(inout) :: wc
     integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
     nx = size(u, 1)
@@ -88,7 +88,7 @@ end subroutine
 subroutine inflatedMallat2spaghetti_block(params, wc, u, sc_only)
     implicit none
     type (type_params), intent(in) :: params
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -104,7 +104,7 @@ subroutine inflatedMallat2spaghetti_block(params, wc, u, sc_only)
     ! wc(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! wc(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
     !
-    real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:,:), intent(inout) :: wc
     !> Option to only convert SC
     logical, optional, intent(in)  :: sc_only
 
@@ -201,7 +201,7 @@ end subroutine
 subroutine spaghetti2Mallat_block(params, u, wc)
     implicit none
     type (type_params), intent(in) :: params
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -217,7 +217,7 @@ subroutine spaghetti2Mallat_block(params, u, wc)
     ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     !
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
     nx = size(u, 1)
@@ -280,7 +280,7 @@ end subroutine
 subroutine Mallat2Spaghetti_block(params, wc, u)
     implicit none
     type (type_params), intent(in) :: params
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
     ! The WC array contains SC (scaling function coeffs) as well as all WC (wavelet coeffs)
     ! Note: the precise naming of SC/WC is not really important. we just apply
     ! the correct decomposition/reconstruction filters - thats it.
@@ -296,7 +296,7 @@ subroutine Mallat2Spaghetti_block(params, wc, u)
     ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     !
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
     nx = size(u, 1)
@@ -376,7 +376,7 @@ subroutine Mallat2inflatedMallat_block(params, wc, u)
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
     ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
@@ -387,7 +387,7 @@ subroutine Mallat2inflatedMallat_block(params, wc, u)
     ! u(:,:,:,:,6)          GHG     wcyz wavelet coeffs
     ! u(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
-    real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:,:), intent(inout) :: u
 
     integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
 
@@ -468,7 +468,7 @@ subroutine inflatedMallat2Mallat_block(params, u, wc, sc_only)
     ! wc(nx/2+1:nx  ,     1:ny/2,nz/2+1:nz  ,:)          GHG     wcyz wavelet coeffs
     ! wc(     1:nx/2,ny/2+1:ny  ,nz/2+1:nz  ,:)          HGG     wcxz wavelet coeffs
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
-    real(kind=rk), dimension(1:,1:,1:,1:), intent(inout) :: wc
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     ! INDEX            2D     3D     LABEL
     ! -----            --    ---     ---------------------------------
     ! u(:,:,:,:,1)    HH    HHH     sc scaling function coeffs
@@ -479,7 +479,7 @@ subroutine inflatedMallat2Mallat_block(params, u, wc, sc_only)
     ! u(:,:,:,:,6)          GHG     wcyz wavelet coeffs
     ! u(:,:,:,:,7)          HGG     wcxz wavelet coeffs
     ! u(:,:,:,:,8)          GGG     wcxyz wavelet coeffs
-    real(kind=rk), dimension(1:,1:,1:,1:,1:), intent(inout) :: u
+    real(kind=rk), dimension(:,:,:,:,:), intent(inout) :: u
     !> Option to only convert SC
     logical, optional, intent(in)  :: sc_only
 

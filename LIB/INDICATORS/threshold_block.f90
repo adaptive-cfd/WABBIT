@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps)
+subroutine threshold_block( params, u, thresholding_component, refinement_status, norm, level, input_is_WD, indices, eps, verbose_check)
     implicit none
 
     !> user defined parameter structure
@@ -21,17 +21,15 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     real(kind=rk), intent(in), optional :: eps
     !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
+    logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3)
     real(kind=rk)                       :: detail( size(u,4) )
-    integer(kind=ik)                    :: g, i_dim, dim, Jmax, nx, ny, nz, nc
+    integer(kind=ik)                    :: g, i_dim, dim, Jmax, nc
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk)                       :: eps_use
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
 
-    nx     = size(u, 1)
-    ny     = size(u, 2)
-    nz     = size(u, 3)
     nc     = size(u, 4)
     Bs     = params%Bs
     g      = params%g
@@ -42,7 +40,7 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     if (allocated(u_wc)) then
         if (size(u_wc, 4) < nc) deallocate(u_wc)
     endif
-    if (.not. allocated(u_wc)) allocate(u_wc(1:nx, 1:ny, 1:nz, 1:nc ) )
+    if (.not. allocated(u_wc)) allocate(u_wc(1:size(u, 1), 1:size(u, 2), 1:size(u, 3), 1:nc ) )
 
     ! set the indices we want to treshold
     idx(:, :) = 1
@@ -94,6 +92,21 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 
     ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
     u_wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = 0.0_rk
+
+    ! for L2 norm, the cross components need to be renormalized
+    ! JB ToDo: Maybe this can be done more clever, maybe not multiply but simply have several maxima values?
+    if (params%eps_norm == "L2") then
+        ! components W_X, W_Y, W_Z    have factor 2**(dim/2-1)
+        !            W_xy, W_xz, W_yz have factor 2**(dim/2-2)
+        !            W_xyz             has factor 2**(dim/2-3)
+        ! We treat this by multiplying all values by 2**(dim/2) and then dividing by 2 in each direction for the WC values
+        u_wc(:, :, :, 1:nc) = u_wc(:, :, :, 1:nc) * 2.0_rk**(dble(params%dim)/2.0_rk)
+        u_wc(idx(1,1)+1:idx(2,1)+1:2, :, :, 1:nc) = u_wc(idx(1,1)+1:idx(2,1)+1:2, :, :, 1:nc) / 2.0_rk
+        u_wc(:, idx(1,2)+1:idx(2,2)+1:2, :, 1:nc) = u_wc(:, idx(1,2)+1:idx(2,2)+1:2, :, 1:nc) / 2.0_rk
+        if (params%dim == 3) then
+            u_wc(:, :, idx(1,3)+1:idx(2,3)+1:2, 1:nc) = u_wc(:, :, idx(1,3)+1:idx(2,3)+1:2, 1:nc) / 2.0_rk
+        endif
+    endif
 
     do p = 1, nc
         ! if all details are smaller than C_eps, we can coarsen, check interior WC only
@@ -151,8 +164,8 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
 
     case ("L2")
         ! If we want to control the L2 norm (with wavelets that are normalized in Linfty norm)
-        ! we have to have a level-dependent threshold
-        eps_use = eps_use * ( 2.0_rk**(-dble((level-Jmax)*params%dim)/2.0_rk) )
+        ! threshold has to be level dependent
+        eps_use = eps_use * ( 2.0_rk**(+dble((level-Jmax)*params%dim)/2.0_rk) )
 
     case ("H1")
         ! H1 norm mimicks filtering of vorticity
@@ -172,4 +185,8 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     else
         refinement_status = 0
     end if
+
+    if (present(verbose_check) .and. any(detail(:) > eps_use / 2.0_rk)) then
+        write(*, '(A, es10.3, A, i2, A, 10(es10.3, 2x))') "Eps: ", eps_use, ", Ref stat: ", refinement_status, ", Details: ", detail(1:nc)
+    endif
 end subroutine threshold_block

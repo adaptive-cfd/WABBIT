@@ -21,18 +21,10 @@ module module_mesh
 
     implicit none
 
-    ! used in adapt_tree to work leaf-wise
-    integer, parameter :: REF_TMP_UNTREATED = -2             ! should be < -1
-    integer, parameter :: REF_TMP_TREATED_COARSEN = -3       ! should be < -1
-
-
 contains
 
 #include "securityZone_tree.f90"
 #include "coarseExtensionUpdate_tree.f90"
-#include "unitTest_ghostSync.f90"
-#include "unitTest_waveletDecomposition.f90"
-#include "unitTest_refineCoarsen.f90"
 #include "refineToEquidistant_tree.f90"
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"
@@ -48,7 +40,7 @@ contains
 #include "adapt_tree.f90"
 #include "coarseningIndicator_tree.f90"
 #include "ensureGradedness_tree.f90"
-#include "ensure_completeness.f90"
+#include "ensure_completeness_block.f90"
 #include "executeCoarsening_tree.f90"
 #include "merge_blocks.f90"
 #include "balanceLoad_tree.f90"

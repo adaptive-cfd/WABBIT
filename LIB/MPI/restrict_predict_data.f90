@@ -1,5 +1,5 @@
 subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
-    level_diff, hvy_block, num_eqn, hvy_id, ignore_Filter )
+    lvl_diff, hvy_block, num_eqn, hvy_id, ignore_Filter )
 
     implicit none
 
@@ -11,7 +11,7 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
     !> neighborhood relation, id from dirs
     integer(kind=ik), intent(in)                    :: neighborhood
     !> difference between block levels
-    integer(kind=ik), intent(in)                    :: level_diff
+    integer(kind=ik), intent(in)                    :: lvl_diff
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)                    :: num_eqn      !< How many components? Needed as in between we use hvy_tmp
@@ -20,18 +20,18 @@ subroutine restrict_predict_data( params, res_pre_data, ijk, neighborhood, &
 
     integer(kind=ik) :: iy  ! debug variable
 
-    ! some neighborhoods are intrinsically on the same level (level_diff=0)
-    ! and thus it makes no sense to call the up/downsampling routine for those
-#ifdef DEV
-    if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldnt appear")
-    if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldnt appear")
-#endif
+!     ! some neighborhoods are intrinsically on the same level (lvl_diff=0)
+!     ! and thus it makes no sense to call the up/downsampling routine for those
+! #ifdef DEV
+!     if ( params%dim == 3 .and. (neighborhood<=18) ) call abort(323223,"this case shouldn't appear")
+!     if ( params%dim == 2 .and. (neighborhood<=4) ) call abort(323223,"this case shouldn't appear")
+! #endif
 
-    if ( level_diff == -1 ) then
+    if ( lvl_diff == -1 ) then
         ! The neighbor is finer: we have to predict the data
         call predict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id )
 
-    elseif ( level_diff == +1) then
+    elseif ( lvl_diff == +1) then
         ! The neighbor is coarser: we have to downsample the data
         call restrict_data( params, res_pre_data, ijk, hvy_block, num_eqn, hvy_id, ignore_Filter )
 
@@ -127,7 +127,7 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn, ijk)
     integer(kind=ik), intent(in)   :: num_eqn !< How many components? Needed as it could vary
     integer(kind=ik), intent(in), optional   :: ijk(2,3)  !< ijk, if this is present we only filter this part
 
-    integer(kind=ik) :: k_n, lvl_me, lvl_diff, lgt_ID, lgt_ID_n, HD_l, HD_r
+    integer(kind=ik) :: i_n, lvl_me, lvl_diff, lgt_ID, lgt_ID_n, HD_l, HD_r
 
     HD_l = lbound(params%HD, dim=1)
     HD_r = ubound(params%HD, dim=1)
@@ -155,13 +155,15 @@ subroutine restrict_copy_at_CE(params, hvy_data, hvy_ID, num_eqn, ijk)
     lvl_me = lgt_block(lgt_ID, IDX_MESH_LVL)
 
     ! apply copying, do it for fine and coarse neighbors as we assume for coarse n independency and for fine n that they are not synched
-    do k_n = 1, size(hvy_neighbor, 2)
+    ! CVS: This is only needed for leaf-blocks if no medium neighbor exists
+    do i_n = 1, size(hvy_neighbor, 2)
         ! neighbor exists?
-        lgt_ID_n = hvy_neighbor( hvy_ID, k_n )
+        lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
         if ( lgt_ID_n /= -1 ) then
             lvl_diff = lvl_me - lgt_block(lgt_ID_n, IDX_MESH_LVL)
-            if (lvl_diff == -1 .or. lvl_diff == +1) then
-                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), k_n, skip_ghosts=.true., ijk=ijk)
+            if ((lvl_diff == -1 .or. lvl_diff == +1) .and. block_is_leaf(params, hvy_ID) &
+                .and. .not. block_has_valid_neighbor(params, hvy_id, i_n, 0)) then
+                call coarseExtensionManipulateSC_block(params, hvy_restricted(:,:,:,1:num_eqn), hvy_data(:,:,:,1:num_eqn, hvy_id), i_n, ijk=ijk)
             endif
         endif
     end do
@@ -191,19 +193,10 @@ subroutine predict_data( params, pre_data, ijk, hvy_block, num_eqn, hvy_id )
     nc = num_eqn
 
     ! The neighbor is finer: we have to interpolate the data
-    ! Notice how the indices are now in the beginning of the array, this was once decided whysoever (I hope I change it at some point)
-    if ( params%dim == 3 ) then
-    ! 3D
-        do dF = 1, nc
-            call prediction_3D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), ijk(1,3):ijk(2,3), dF, hvy_id ), &
-                pre_data( 1:2*nx-1, 1:2*ny-1, 1:2*nz-1, dF), &
-            params%order_predictor)
-        end do
-    else
-    ! 2D
-        do dF = 1, nc
-            call prediction_2D( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), 1, dF, hvy_id ), &
-                pre_data( 1:2*nx-1, 1:2*ny-1, 1, dF),  params%order_predictor)
-        end do
-    end if
+    ! Notice how the indices are now in the beginning of the array (1:), this was once decided whysoever (I hope I change it at some point)
+    do dF = 1, nc
+        call prediction( hvy_block( ijk(1,1):ijk(2,1), ijk(1,2):ijk(2,2), ijk(1,3):ijk(2,3), dF, hvy_id ), &
+            pre_data( 1:2*nx-1, 1:2*ny-1, 1:2*nz-1, dF), &
+        params%order_predictor)
+    end do
 end subroutine predict_data

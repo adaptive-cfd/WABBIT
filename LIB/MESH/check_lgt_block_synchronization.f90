@@ -83,6 +83,7 @@ end subroutine
 
 
 
+! This function works, but better use write_neighborhood_info(hvy_neighbor, dim) and loop over all heavy data as it is more descriptive
 subroutine write_neighbors(params, file, tree_ID)
     implicit none
     type (type_params), intent(in)      :: params
@@ -109,7 +110,7 @@ subroutine write_neighbors(params, file, tree_ID)
 
     open(14, file=file, status='replace')
     do k = 1, size(tmp2,1)
-        write(14,'(75(i6,1x))') tmp2(k,:)
+        write(14,'(178(i6,1x))') tmp2(k,:)
     enddo
     close(14)
 end subroutine

@@ -21,9 +21,6 @@ program main_post
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)                ! determine process rank
     params%rank = rank
 
-    ! this is used to document a bit (one often forgets to write down the params in the command line call)
-    call print_command_line_arguments()
-
     ! determine process number
     call MPI_Comm_size(MPI_COMM_WORLD, number_procs, ierr)
     params%number_procs = number_procs
@@ -32,10 +29,13 @@ program main_post
 
     ! output MPI status
     if (rank==0) then
-        write(*,'(40("*"),A,40("*"))') "STARTING wabbit-post"
+        write(*,'(20("─"), A26, 34("─"))') "   STARTING wabbit-post   "
         write(*,'("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
+
+    ! this is used to document a bit (one often forgets to write down the params in the command line call)
+    call print_command_line_arguments()
 
     !---------------------------------------------------------------------------
     ! Initialize parameters and grid
@@ -48,11 +48,11 @@ program main_post
     case ("--extract-slice")
         call post_extract_slice(params)
 
-    case ("--compression-unit-test")
-        call post_compression_unit_test(params)
-
     case ("--evaluate-wavelet-thresholding")
         call post_evaluate_thresholding(params)
+
+    case ("--wavelet-decompose", "--wavelet-reconstruct")
+        call post_wavelet_transform(params)
 
     case ("--wavelet-vs-rhs")
         call waveletVsRHS_timingTest(params)
@@ -95,7 +95,7 @@ program main_post
     case("--sparse-to-dense", "--refine-everywhere")
         call sparse_to_dense(params)
 
-    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test")
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")
         call post_unit_test(params)
 
     case ("--performance-test")
@@ -103,6 +103,9 @@ program main_post
 
     case ("--adaption-test")
         call adaption_test(params)
+
+    case ("--compression-unit-test")
+        call post_compression_unit_test(params)
 
     case("--dense-to-sparse")
         call dense_to_sparse(params)
@@ -153,45 +156,64 @@ program main_post
 
     case ("--generate_forest")
         call post_generate_forest(params)
+
+    case ("--denoise")
+        call post_denoising(params)
+
+    case ("--denoising-test")
+        call post_denoising_test(params)
+
+    case ("--cvs-invertibility-test")
+        call post_cvs_invertibility_test(params)
+        
     case default
 
         if (params%rank==0) then
-            write(*,*) "Available Postprocessing tools are:"
-            write(*,*) "--sparse-to-dense"
-            write(*,*) "--dense-to-sparse"
-            write(*,*) "--mean"
-            write(*,*) "--performance_test"
-            write(*,*) "--adaption-test"
-            write(*,*) "--vorticity"
-            write(*,*) "--vor-abs"
-            write(*,*) "--divergence"
-            write(*,*) "--Q"
-            write(*,*) "--OP-rhs"
-            write(*,*) "--OP"
-            write(*,*) "--gradient"
-            write(*,*) "--keyvalues"
-            write(*,*) "--dry-run"
-            write(*,*) "--compare-keys"
-            write(*,*) "--flusi-to-wabbit"
-            write(*,*) "--POD"
-            write(*,*) "--POD-reconstruct"
-            write(*,*) "--POD-error"
-            write(*,*) "--POD-time"
-            write(*,*) "--stl2dist"
-            write(*,*) "--add-two-masks"
-            write(*,*) "--mult-mask"
-            write(*,*) "--mult-mask-direct"
-            write(*,*) "--mult-mask-inverse"
-            write(*,*) "--post_rhs"
-            write(*,*) "--average"
-            write(*,*) "--generate_forest"
-            write(*,*) "--evaluate-wavelet-thresholding"
-            write(*,*) "--refine-everywhere"
+            write(*, '(A)') "Available Postprocessing tools are:"
+            write(*, '(A)') "--sparse-to-dense"
+            write(*, '(A)') "--dense-to-sparse"
+            write(*, '(A)') "--mean"
+            write(*, '(A)') "--vorticity"
+            write(*, '(A)') "--vor-abs"
+            write(*, '(A)') "--divergence"
+            write(*, '(A)') "--Q"
+            write(*, '(A)') "--OP-rhs"
+            write(*, '(A)') "--OP"
+            write(*, '(A)') "--gradient"
+            write(*, '(A)') "--keyvalues"
+            write(*, '(A)') "--dry-run"
+            write(*, '(A)') "--compare-keys"
+            write(*, '(A)') "--flusi-to-wabbit"
+            write(*, '(A)') "--POD"
+            write(*, '(A)') "--POD-reconstruct"
+            write(*, '(A)') "--POD-error"
+            write(*, '(A)') "--POD-time"
+            write(*, '(A)') "--stl2dist"
+            write(*, '(A)') "--add-two-masks"
+            write(*, '(A)') "--mult-mask"
+            write(*, '(A)') "--mult-mask-direct"
+            write(*, '(A)') "--mult-mask-inverse"
+            write(*, '(A)') "--post_rhs"
+            write(*, '(A)') "--average"
+            write(*, '(A)') "--generate_forest"
+            write(*, '(A)') "--evaluate-wavelet-thresholding"
+            write(*, '(A)') "--refine-everywhere"
+            write(*, '(A)') "--denoise"
+            ! tests
+            write(*, '(A)') "--compression-unit-test"
+            write(*, '(A)') "--performance_test"
+            write(*, '(A)') "--adaption-test"
+            write(*, '(A)') "--refine-coarsen-test"
+            write(*, '(A)') "--ghost-nodes-test"
+            write(*, '(A)') "--wavelet-decomposition-unit-test"
+            write(*, '(A)') "--wavelet-decomposition-invertibility-test"
+            write(*, '(A)') "--sync-test"
+            write(*, '(A)') "--treecode-test"
 
             if (mode=="--h" .or. mode=="--help") then
-                write(*,*) "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
+                write(*, '(A)') "To get more information about each postprocessing tool type: wabbit-post --[one of the listed tools] --help"
             else
-                write(*,*) "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
+                write(*, '(A)') "Your postprocessing option is "// trim(adjustl(mode)) //", which I don't know"
             end if
         end if
     end select
@@ -201,9 +223,9 @@ program main_post
 
     elapsed_time = MPI_wtime() - elapsed_time
     if (rank==0) then
-        write(*,*)
+        write(*, '(A)')
         write(*,'("Elapsed time:", f16.4, " s")') elapsed_time
-        write(*,'(40("*"),A,40("*"))') "(regular) EXIT wabbit-post"
+        write(*,'(20("─"),A,28("─"))') "   (regular) EXIT wabbit-post   "
     endif
     ! MPI Barrier before program ends
     call MPI_Barrier(WABBIT_COMM, ierr)

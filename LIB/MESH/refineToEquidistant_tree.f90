@@ -84,11 +84,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
 
         call ensureGradedness_tree( params, tree_ID )
 
-        if ( params%dim == 3 ) then
-            call refinementExecute3D_tree( params, hvy_block, tree_ID )
-        else
-            call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-        end if
+        call refinement_execute_tree( params, hvy_block, tree_ID )
 
         call updateMetadata_tree(params, tree_ID)
 

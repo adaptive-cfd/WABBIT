@@ -51,6 +51,9 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID, time)
         enddo
     endif
 
+    ! the factor 8/7 or 4/3 comes from the full wavelet transformation being done in adapt_tree
+    hvy_n_afterRefinement = ceiling(hvy_n_afterRefinement * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk))
+
     params%out_of_memory = (hvy_n_afterRefinement > hvy_n_max)
 
     if (params%out_of_memory ) then

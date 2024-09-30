@@ -15,7 +15,7 @@ subroutine rhs_operator_reconstruction(params)
     character(len=cshort) :: file, mode, OPERATOR
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
     integer(kind=ik) :: iteration, k, tc_length, iblock, ix, iy, &
-    g, iz, a1, b1, a2, b2, level,tree_ID_tmp,tree_ID_rhs_u,tree_ID_rhs_u_ei
+    g, iz, level,tree_ID_tmp,tree_ID_rhs_u,tree_ID_rhs_u_ei
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
     integer(kind=ik), dimension(3) :: Bs
     character(len=2)       :: order
@@ -36,6 +36,10 @@ subroutine rhs_operator_reconstruction(params)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
     type(inifile) :: ini_file
     real(kind=rk) :: dt,CFL_number
+
+    ! following are to suppress warnings
+    character(len=80) :: def_wavelet, def_operator
+    logical :: def_adapt
 
     if (params%number_procs>1) call abort(2205121, "OperatorReconstruction is a serial routine...")
 
@@ -85,9 +89,13 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     !OPERATOR = "RHS" ! decide between RHS or Identity
     OPERATOR = "EVOLVE" ! decide between RHS or Identity
-    call get_cmd_arg( "--wavelet", params%wavelet, default= params%wavelet )    ! if not set we take the parameter from the ini file
-    call get_cmd_arg( "--operator", OPERATOR, default= OPERATOR )               ! if not set we take the parameter from the ini file
-    call get_cmd_arg( "--adapt", params%adapt_tree, default= params%adapt_tree )! if not set we take the parameter from the ini file
+    ! it gives warning when using same values as in_out and default so lets transcribe first
+    def_wavelet = params%wavelet
+    def_operator = OPERATOR
+    def_adapt = params%adapt_tree
+    call get_cmd_arg( "--wavelet", params%wavelet, default= def_wavelet )    ! if not set we take the parameter from the ini file
+    call get_cmd_arg( "--operator", OPERATOR, default= def_operator )               ! if not set we take the parameter from the ini file
+    call get_cmd_arg( "--adapt", params%adapt_tree, default= def_adapt )! if not set we take the parameter from the ini file
     CFL_number = params%CFL
     !params%adapt_tree = .False.
     !---------------------------------------------------------------------------
@@ -142,7 +150,7 @@ subroutine rhs_operator_reconstruction(params)
     if (params%adapt_tree) then
         call sync_ghosts_tree(params, hvy_block, tree_ID_u)
 
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
         ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
 
         call sync_ghosts_tree(params, hvy_block, tree_ID_u)
@@ -270,7 +278,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
 
                 if ( params%adapt_tree ) then
                     call sync_ghosts_tree( params, hvy_block, tree_ID_ei )
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+                    call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                     ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
 
                 endif

@@ -40,6 +40,7 @@ module module_insects
   ! elements in derived datatypes) this is their length:
   integer, parameter :: nfft_max = 1024
   ! Maximum number of Hermite interpolation nodes (hardcoded because of sxf90 compiler requirements)
+  ! JB: Array sizes resulting from this number result currently in 50% of WABBITs program size
   integer, parameter :: nhrmt_max = 10000
 
   ! Allocatable arrays used in Insect object
@@ -205,6 +206,7 @@ module module_insects
     real(kind=rk), dimension(1:nfft_max,1:4) :: ai_wings=0.d0, bi_wings=0.d0
     real(kind=rk), dimension(1:4) :: a0_wings=0.d0
     ! fill the R0(theta) array once, then only table-lookup instead of Fseries
+    ! JB: This array increases WABBIT program size quite a bit, consider making it allocatable
     real(kind=rk), dimension(1:25000,1:4) :: R0_table=0.d0
     ! describes the origin of the wings system
     real(kind=rk), dimension(1:4) :: xc=0.d0, yc=0.d0
@@ -536,7 +538,7 @@ contains
       !-----------------------------------------------------------------------------
       call draw_insect_wings( time, xx0, ddx, mask, mask_color, us, Insect, delete=.false.)
 
-      ! this is a debug test, which suceeded.
+      ! this is a debug test, which succeeded.
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
   end subroutine Draw_Insect
 

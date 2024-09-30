@@ -18,7 +18,7 @@ subroutine sparse_to_dense(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID
 
-    integer(kind=ik)                        :: max_neighbors, level, k, tc_length
+    integer(kind=ik)                        :: level, k, tc_length
     integer(kind=ik), dimension(3)          :: Bs
     integer(hid_t)                          :: file_id
     character(len=cshort)                   :: order
@@ -35,25 +35,27 @@ subroutine sparse_to_dense(params)
 
     if (file_in == '--help' .or. file_in == '--h') then
         if ( params%rank==0 ) then
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "                SPARSE to DENSE "
-            write(*,*) "--------------------------------------------------------------"
-            write(*,*) "postprocessing subroutine to refine/coarse mesh to a uniform"
-            write(*,*) "grid (up and downsampling ensured)."
-            write(*,*) ""
-            write(*,*) "Command:"
-            write(*,*) ""
-            write(*,*) "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
-            write(*,*) ""
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*) "./wabbit-post --sparse-to-dense --operator=refine-everywhere source.h5 target.h5 --wavelet=CDF44"
-            write(*,*) ""
-            write(*,*) "-------------------------------------------------------------"
-            write(*,*) "Parameters: "
-            write(*,*) "  --J_target=4"
-            write(*,*) "  If --sparse-to-dense is used, this is the level of the equidistant output grid"
-            write(*,*) ""
-            write(*,*) ""
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "                SPARSE to DENSE "
+            write(*,'(A)') "--------------------------------------------------------------"
+            write(*,'(A)') "postprocessing subroutine to refine/coarse mesh to a uniform"
+            write(*,'(A)') "grid (up and downsampling ensured)."
+            write(*,'(A)') ""
+            write(*,'(A)') "Command:"
+            write(*,'(A)') ""
+            write(*,'(A)') "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
+            write(*,'(A)') ""
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)') "./wabbit-post --sparse-to-dense --operator=refine-everywhere source.h5 target.h5 --wavelet=CDF44"
+            write(*,'(A)') ""
+            write(*,'(A)') "-------------------------------------------------------------"
+            write(*,'(A)') "Parameters: "
+            write(*,'(A)') "  --J_target=4"
+            write(*,'(A)') "     If --sparse-to-dense is used, this is the level of the equidistant output grid"
+            write(*,'(A)') "  --time=0.0"
+            write(*,'(A)') "     Sets time of output file, helps with visualization in paraview if it differs from input file time"
+            write(*,'(A)') ""
+            write(*,'(A)') ""
         end if
         return
     end if
@@ -77,7 +79,10 @@ subroutine sparse_to_dense(params)
 
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
-    call setup_wavelet(params, params%g)
+    call setup_wavelet(params, params%g, params%g_rhs)
+
+    params%useCoarseExtension = params%isLiftedWavelet
+    params%useSecurityZone = params%isLiftedWavelet
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
@@ -91,30 +96,28 @@ subroutine sparse_to_dense(params)
     if (params%dim==3) then
         ! how many blocks do we need for the desired level?
         number_dense_blocks = 8_ik**level
-        max_neighbors = 74
     else
         number_dense_blocks = 4_ik**level
-        max_neighbors = 16
     end if
 
     if (params%rank==0) then
-        write(*,'(80("-"))')
-        write(*,*) "Wabbit sparse-to-dense. Will read a wabbit field and return a"
-        write(*,*) "full grid with all blocks at the chosen level."
+        write(*,'(80("─"))')
+        write(*,'(A)') "Wabbit sparse-to-dense. Will read a wabbit field and return a"
+        write(*,'(A)') "full grid with all blocks at the chosen level."
         write(*,'(A20,1x,A80)') "Reading file:", file_in
         write(*,'(A20,1x,A80)') "Writing to file:", file_out
         write(*,'(A20,1x,A80)') "Predictor used:", params%order_predictor
         write(*,'(A20,1x,i3," => ",i9," Blocks")') "Target level:", level, number_dense_blocks
 
-        write(*,'(A40,1x,A40)') "params%wavelet=", params%wavelet
-        write(*,'(A40,1x,i2)') "params%g=", params%g
-        write(*,'(A40,1x,A40)') "operator=", operator
-        write(*,'(80("-"))')
+        write(*,'(A20,1x,A40)') "params%wavelet:", params%wavelet
+        write(*,'(A20,1x,i2)') "params%g:", params%g
+        write(*,'(A20,1x,A40)') "operator:", operator
+        write(*,'(80("─"))')
     endif
 
     ! set max_treelevel for allocation of hvy_block
     params%Jmax = max(level, tc_length)
-    params%Jmin = 1 !!!!!????
+    params%Jmin = 1
     params%Bs = Bs
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
@@ -125,7 +128,7 @@ subroutine sparse_to_dense(params)
     elseif (operator=="refine-everywhere") then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="coarsen-everywhere") then
-        params%number_blocks = (lgt_n(tree_ID) / params%number_procs + 7_ik)
+        params%number_blocks = ceiling(lgt_n(tree_ID) / dble(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) + 7_ik
     endif
 
     if (params%rank==0) then
@@ -180,11 +183,7 @@ subroutine sparse_to_dense(params)
     !     call ensureGradedness_tree( params, tree_ID )
     !
     !     ! actual refinement of new blocks (Note: afterwards, new blocks have refinement_status=0)
-    !     if (params%dim == 3) then
-    !         call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    !     else
-    !         call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    !     endif
+    !     call refinement_execute_tree( params, hvy_block, tree_ID )
     !
     !     ! grid has changed...
     !     call updateMetadata_tree(params, tree_ID)

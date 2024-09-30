@@ -33,7 +33,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     if (params%Jini<0) params%Jini = params%Jmin
 
     if (params%rank==0) then
-        write(*,*) "(((((((((((((((((((inicond)))))))))))))))))))"
+        write(*,'(10("╼╾"), "   ini-cond   ", 23("╼╾"))')
         write(*,*) "Setting initial condition on all blocks."
         write(*,*) "Adaptive initial condition is: ", adapt
         write(*,*) "read_from_files: ", params%read_from_files
@@ -78,7 +78,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (present(hvy_mask) .and. params%threshold_mask) then
                 call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
             else
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp )
+                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
             endif
 
             iter = iter + 1
@@ -160,9 +160,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask )
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask)
                     else
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp )
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp)
                     endif
 
                     iter = iter + 1
@@ -241,7 +241,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         minActiveLevel_tree(tree_ID), &
         maxActiveLevel_tree(tree_ID)
         write(*,'("Initial grid and initial condition terminated.")')
-        write(*,*) "(((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))"
+        write(*,'(40("╼╾"))')
     endif
 
     ! HACK

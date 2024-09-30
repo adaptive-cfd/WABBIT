@@ -1,3 +1,4 @@
+! \brief Delete blocks of tree where all point values are 0, usefull for mask
 subroutine prune_tree( params, hvy_block, tree_ID)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -404,22 +405,27 @@ end subroutine delete_tree
 !> copy hvy and lgt data of tree_ID_source to tree_ID_dest
 !> after copy the active and sorted lists are updated, as well
 !> as neighbors and ghost nodes
-subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
+subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source, skip_sync_ghosts)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in)    :: params   !< params structure
     integer(kind=ik), intent(in)      :: tree_ID_dest, tree_ID_source !< all data from tree_ID_source gets copied to destination_tree_ID
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    logical, intent(in), optional     :: skip_sync_ghosts  !< sometimes synching ghosts is not desired so we skip it
     !-----------------------------------------------------------------
     integer(kind=ik)    :: Jmax, lgt_id_dest, lgt_id_source, hvy_id_dest, hvy_id_source, fsize
     integer(kind=ik)    :: k, N, rank
     real(kind=rk) :: t_elapse
+    logical skipSyncGhosts
 
     Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
     rank = params%rank
     N = params%number_blocks
+
+    skipSyncGhosts = .false.
+    if (present(skip_sync_ghosts)) skipSyncGhosts = skip_sync_ghosts
 
     if (tree_ID_dest > fsize) call abort(0403191,"tree-copy: destination treeID ou of valid range")
 
@@ -457,10 +463,9 @@ subroutine copy_tree(params, hvy_block, tree_ID_dest, tree_ID_source)
     ! (i.e. when looping over lgt_ids which originate from a hvy_id)
     t_elapse = MPI_WTIME()
     call synchronize_lgt_data( params, refinement_status_only=.false. )
-
     call updateMetadata_tree( params, tree_ID_dest )
 
-    call sync_ghosts_tree( params, hvy_block, tree_ID_dest)
+    if (.not. skipSyncGhosts) call sync_ghosts_tree( params, hvy_block, tree_ID_dest)
 
     call toc( "copy_tree (copy synchronize hvy and lgt)", 251, MPI_Wtime()-t_elapse )
 
@@ -522,7 +527,7 @@ function compute_tree_L2norm(params, hvy_block, hvy_tmp, tree_ID, verbosity ) &
 
     L2norm = scalar_product_two_trees(params, hvy_block, hvy_tmp, tree_ID1=tree_ID, tree_ID2=tree_ID)
     L2norm = sqrt(L2norm)
-    if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e12.6)') L2norm
+    if (params%rank == 0 .and. verbose ) write(*,'("L2 norm: ",e13.6)') L2norm
 end function
 !##############################################################
 
@@ -649,6 +654,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 end subroutine
 
 
+!> \brief Stores the lgt data of two trees in an extra array as backup
 subroutine store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, tree_ID2)
 
     implicit none
@@ -669,10 +675,12 @@ subroutine store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, 
         lgt_n_ref(2) = lgt_n(tree_ID2)
     endif
 
+    ! store lgt data of tree 1
     do k1 = 1, lgt_n(tree_ID1)
         lgt_block_ref(k1,:) = lgt_block(lgt_active(k1,tree_ID1), :)
         lgt_active_ref(k1,1)    = k1
     end do
+    ! store lgt data of tree 2
     do k1 = 1, lgt_n(tree_ID2)
         lgt_block_ref(k1+lgt_n_ref(1),:) = lgt_block(lgt_active(k1,tree_ID2), :)
         lgt_active_ref(k1,2)    = k1 + lgt_n_ref(1)
@@ -798,27 +806,20 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
 
 
             ! 2) refine blocks
-            if ( params%dim==3 ) then
-                ! 3D:
-                call refinementExecute3D_tree( params, hvy_block, tree_ID1 )
-                call refinementExecute3D_tree( params, hvy_block, tree_ID2 )
-            else
-                ! 2D:
-                call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID1 )
-                call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID2 )
-            end if
+            call refinement_execute_tree( params, hvy_block, tree_ID1 )
+            call refinement_execute_tree( params, hvy_block, tree_ID2 )
 
             ! since lgt_block was synced we have to create the active lists again
             call createActiveSortedLists_tree( params, tree_ID1 )
             call createActiveSortedLists_tree( params, tree_ID2 )
 
             ! update neighbor relations and synchronice ghosts of 1st tree
-            call updateNeighbors_tree( params, tree_ID1 )
+            call updateNeighbors_tree( params, tree_ID1 , search_overlapping=.false.)
 
             call sync_ghosts_tree( params, hvy_block, tree_ID1)
 
             ! update neighbor relations and synchronice ghosts of 2nd tree
-            call updateNeighbors_tree( params, tree_ID2 )
+            call updateNeighbors_tree( params, tree_ID2, search_overlapping=.false.)
 
             call sync_ghosts_tree( params, hvy_block, tree_ID2)
 
@@ -854,12 +855,7 @@ subroutine refine_tree2(params, hvy_block, hvy_tmp, tree_ID)
     call respectJmaxJmin_tree( params,  tree_ID )
 
     ! 2) refine blocks
-    if ( params%dim==3 ) then
-        call refinementExecute3D_tree( params, hvy_block, tree_ID )
-    else
-        call refinementExecute2D_tree( params, hvy_block(:,:,1,:,:), tree_ID )
-    end if
-
+    call refinement_execute_tree( params, hvy_block, tree_ID )
     ! since lgt_block was synced we have to create the active lists again
     ! update neighbor relations
     call updateMetadata_tree(params, tree_ID)
@@ -968,12 +964,11 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
     end if
 
     if (tree_ID1 .ne. tree_ID2) then
-        ! because all trees have the same treestructrue thier hilbertcurve is identical
+        ! because all trees have the same treestructrue their hilbertcurve is identical
         ! and therefore balance the load will try to distribute blocks with the same
         ! treecode (but on different trees) at the same rank.
         t_elapse = MPI_WTIME()
         call balanceLoad_tree( params, hvy_block, tree_ID1 )
-
         call balanceLoad_tree( params, hvy_block, tree_ID2 )
     end if
 

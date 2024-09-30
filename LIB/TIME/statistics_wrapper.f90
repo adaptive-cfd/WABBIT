@@ -18,7 +18,7 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     implicit none
 
     real(kind=rk), intent(in)           :: time, dt
-    type (type_params), intent(in)      :: params                     !> user defined parameter structure
+    type (type_params), intent(inout)   :: params                     !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)    !> hvy_mask are qty that depend on the grid and not explicitly on time

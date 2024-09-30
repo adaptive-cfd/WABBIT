@@ -5,7 +5,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     real(kind=rk), intent(in)                       :: time
     integer(kind=ik), intent(in)                    :: iteration
     !> user defined parameter structure
-    type (type_params), intent(in)                  :: params
+    type (type_params), intent(inout)               :: params
     integer(kind=ik), intent(in)                    :: tree_ID
     !> heavy data array - block data
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)

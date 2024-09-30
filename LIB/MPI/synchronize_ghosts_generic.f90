@@ -1,12 +1,12 @@
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
+    integer(kind=ik), intent(in)   :: ref_check                     !< ref value to be checked against
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
@@ -18,8 +18,8 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_t
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.false., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoF_ref", &
+        s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
 
@@ -27,13 +27,13 @@ end subroutine sync_TMP_from_MF
 
 !> Wrapper to synch blocks with temporary flag from all neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    integer(kind=ik), intent(in)   :: REF_TMP_UNTREATED             !< this block has no access to modul_mesh so we need the flag value
+    integer(kind=ik), intent(in)   :: ref_check                     !< ref value to be checked against
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
@@ -45,8 +45,8 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, REF_TMP_UNTREATED, hvy_
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    ! we set s_level to REF_TMP_UNTREATED, this value is < -1 and therefore distinctive, we use this to avoid another parameter
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=REF_TMP_UNTREATED, s_F2M=.true., s_M2M=.true., s_C2M=.true., hvy_tmp=hvy_tmp)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_ref", &
+        s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_all
 
@@ -64,18 +64,21 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level
 
-    integer(kind=ik) :: gminus, gplus, level_apply
+    integer(kind=ik) :: gminus, gplus
     gminus = params%g
     gplus = params%g
-    level_apply = -1
     ! if we sync a different number of ghost nodes
     if (present(g_minus))    gminus = g_minus
     if (present(g_plus))      gplus = g_plus
-    if (present(level)) level_apply = level
 
-    ! set level to -1 to enable synching between all
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=level_apply, &
-        s_M2F=.true., s_M2M=.true., hvy_tmp=hvy_tmp, verbose_check=.true.)
+    ! if we passed on the level then sync is level-wise
+    if (present(level)) then
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC_level", &
+            s_val=level, hvy_tmp=hvy_tmp)
+    else
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC", &
+            hvy_tmp=hvy_tmp)
+    endif
 
 end subroutine sync_SCWC_from_MC
 
@@ -97,7 +100,7 @@ subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full")
 
 end subroutine sync_ghosts_tree
 
@@ -123,8 +126,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, &
-    s_level=-1, s_M2M=.true., s_M2F=.true., s_M2C=.true., ignore_Filter=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", ignore_Filter=.true.)
 
 end subroutine
 
@@ -133,8 +135,8 @@ end subroutine
 !! It is a generic function with many flags, streamlining all synching process \n
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
-subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
-    s_level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M, hvy_tmp, verbose_check, ignore_Filter)
+subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
+    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -143,31 +145,17 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
+    character(len=*)          :: sync_case                     !< String representing which kind of syncing we want to do
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
-
-    !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
-    integer(kind=ik), intent(in), optional  :: s_level
-    logical, intent(in), optional  :: s_M2M                         !< Synch from level J   to J
-    logical, intent(in), optional  :: s_M2C                         !< Synch from level J   to J-1
-    logical, intent(in), optional  :: s_C2M                         !< Synch from level J-1 to J
-    logical, intent(in), optional  :: s_M2F                         !< Synch from level J   to J+1
-    logical, intent(in), optional  :: s_F2M                         !< Synch from level J+1 to J
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
 
-    integer(kind=ik) sLevel
-    logical :: SM2M, SM2C, SC2M, SM2F, SF2M, ignoreFilter
-
-    integer(kind=ik)   :: myrank, mpisize, Bs(1:3), buffer_offset
-    integer(kind=ik)   :: N, k, neighborhood, level_diff, Nstages
-    integer(kind=ik)   :: recver_rank, recver_hvyID, patch_size
-    integer(kind=ik)   :: sender_hvyID, sender_lgtID
-
-    integer(kind=ik) :: ijk(2,3), isend, irecv, count_send_total
-    integer(kind=ik) :: bounds_type, istage, inverse, gminus, gplus
+    integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus
     real(kind=rk) :: t0, t1, t2
     character(len=clong) :: toc_statement
 
@@ -182,32 +170,12 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     ! if this mpirank has no active blocks, it has nothing to do here.
     if (hvy_n(tree_ID) == 0) return
 
-    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
-    sLevel = -1
-    sM2M = .false.
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    ignoreFilter = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2M)) sM2M = s_M2M
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
-    if (present(ignore_Filter)) ignoreFilter = ignore_Filter
-
     gminus  = params%g
     gplus   = params%g
-    Bs      = params%Bs
-    N       = params%number_blocks
-    myrank  = params%rank
-    mpisize = params%number_procs
     ! default is three stages:
     !    1. M2M, copy
-    !    2. M2C, F2M, decimate, independent from coarser neighbor but needs same-level data
-    !    3. M2F, C2M, interpolate, needs same-level and finer neighbor data
+    !    2. M2C, decimate, independent from coarser neighbor but needs same-level data
+    !    3. M2F, interpolate, needs same-level and finer neighbor data
     Nstages = 3
     ! if we sync a different number of ghost nodes
     if (present(g_minus)) gminus = g_minus
@@ -220,7 +188,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
     ! once in a module-global array (which is faster than computing it every time with tons
     ! of IF-THEN clauses).
     ! This arrays indices are:
-    ! ijkPatches([start,end], [dir], [ineighbor], [leveldiff], [isendrecv])
+    ! ijkPatches([start,end], [dir], [ineighbor], [lvl_diff], [isendrecv])
     ! As g can be varied (as long as it does not exceed the maximum value params%g), it is set up
     ! each time we sync (at negligibble cost)
     call ghosts_setup_patches(params, gminus=gminus, gplus=gplus, output_to_file=.false.)
@@ -230,17 +198,9 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    if (sLevel == -1) call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=sM2M, s_M2C=sM2C, s_M2F=sM2F)
-    ! if (present(verbose_check)) then
-    !     call reset_ghost_nodes( params, hvy_block, tree_ID, s_M2M=.true., s_M2C=.true., s_M2F=.true.)
-    ! endif
+    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
 
 #endif
-
-! Diagonal neighbors (not required for the RHS)
-! 2D: 5,6,7,8
-! 3D: 7-18, 19-26, 51-74
-!
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),
     ! then in the second stage we can use interpolation and fill the remaining ones.
@@ -253,26 +213,26 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, g_minus, g_plus, &
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
-            istage, ncomponents=size(hvy_block,4), s_Level=sLevel, s_M2M = sM2M, s_M2C = sM2C, s_C2M = sC2M, s_M2F = sM2F, s_F2M = sF2M)
+            istage, sync_case, ncomponents=size(hvy_block,4), s_val=s_val, verbose_check=verbose_check)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
         !***************************************************************************
         ! (ii) sending handled by xfer_block_data
         ! If hvy_temp is present then xfer_block_data has to decide from where to grab the data
-        !    - with sLevel < -1: we decide after refinement flag present in sLevel if we want to use hvy_temp
+        !    - with ref in case: we decide after refinement flag present in s_val if we want to use hvy_temp
         !    - elsewise: use hvy_tmp for prediction (used in updating SC from coarser neighbours)
         !***************************************************************************
         t2 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
-            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignoreFilter, &
+            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignore_Filter, &
             verbose_check=verbose_check)
         else
-            if (sLevel < -1) then
+            if (index(sync_case, "ref") > 0) then
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                REF_FLAG=sLevel, ignore_Filter=ignoreFilter, verbose_check=verbose_check)
+                REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
             else
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                ignore_Filter=ignoreFilter, verbose_check=verbose_check)
+                ignore_Filter=ignore_Filter, verbose_check=verbose_check)
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )
@@ -292,50 +252,32 @@ end subroutine sync_ghosts_generic
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, ncomponents, &
-    s_Level, s_M2M, s_M2C, s_C2M, s_M2F, s_F2M)
+subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_Val, verbose_check)
 
     implicit none
 
-    type (type_params), intent(in)      :: params
-    integer(kind=ik), intent(in)        :: tree_ID             !< which tree to study
+    type (type_params), intent(in)  :: params
+    integer(kind=ik), intent(in)    :: tree_ID             !< which tree to study
 
-    integer(kind=ik), intent(in)        :: ncomponents         !< components can vary (for mask for example)
-    integer(kind=ik), intent(out)       :: count_send          !< number of ghost patches total to be send, for looping
+    integer(kind=ik), intent(in)    :: ncomponents         !< components can vary (for mask for example)
+    integer(kind=ik), intent(out)   :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
-    integer(kind=ik), intent(in)        :: istage  !< current stage out of three
+    integer(kind=ik), intent(in)    :: istage              !< current stage out of three
+    character(len=*)                :: sync_case           !< String representing which kind of syncing we want to do
 
-    !> Level to synch, if -1 then all levels are synched, if < -1 then it is REF_TMP_UNTREATED and ref status will be checked
-    integer(kind=ik), intent(in), optional  :: s_level
-    logical, intent(in), optional  :: s_M2M         !< Synch from level J   to J
-    logical, intent(in), optional  :: s_M2C         !< Synch from level J   to J-1
-    logical, intent(in), optional  :: s_C2M         !< Synch from level J-1 to J
-    logical, intent(in), optional  :: s_M2F         !< Synch from level J   to J+1
-    logical, intent(in), optional  :: s_F2M         !< Synch from level J+1 to J
-    integer(kind=ik) sLevel
-    logical :: SM2M, SM2C, SC2M, SM2F, SF2M
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    integer(kind=ik), intent(in), optional  :: s_val
+    logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, sender_hvyID, sender_lgtID, sender_ref, myrank, N, neighborhood, recver_rank, recver_ref
-    integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID, level, level_diff, status, new_size
-
-    ! initialize variables, to write 5 times .false. might be long but I tried other ways which surprisingly delivered wrong results
-    sLevel = -1
-    sM2M = .false.
-    sM2C = .false.
-    sC2M = .false.
-    sM2F = .false.
-    sF2M = .false.
-    if (present(s_Level)) sLevel = s_Level
-    if (present(s_M2M)) sM2M = s_M2M
-    if (present(s_M2C)) sM2C = s_M2C
-    if (present(s_C2M)) sC2M = s_C2M
-    if (present(s_M2F)) sM2F = s_M2F
-    if (present(s_F2M)) sF2M = s_F2M
+    integer(kind=ik) :: k_block, myrank, N, i_n, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: hvy_ID, lgt_ID, level, ref
+    integer(kind=ik) :: hvy_ID_n, lgt_ID_n, level_n, ref_n, rank_n
+    logical :: b_send, b_recv
 
     myrank = params%rank
     N = params%number_blocks
@@ -348,109 +290,246 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
     int_pos(:) = 0
     real_pos(:) = 0
 
+    ! translate sync_case to sync_id so that we avoid string comparisons in loops
+    ! at first, different neighbor restrictions are considered and set to first digit
+    if (index(sync_case, "full") > 0) sync_id = 1
+    if (index(sync_case, "full_leaf") > 0) sync_id = 2
+    if (index(sync_case, "MoC") > 0) sync_id = 3
+    if (index(sync_case, "MoF") > 0) sync_id = 4
+
+    ! now lets treat the special restrictions, set to the second digit
+    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
+    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+
+    if (sync_id == 0) then
+        call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
+    endif
+
     count_send = 0
     do k_block = 1, hvy_n(tree_ID)
         ! calculate light id
-        sender_hvyID = hvy_active(k_block, tree_ID)
-        call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-        level = lgt_block( sender_lgtID, IDX_MESH_LVL )
-        sender_ref = lgt_block( sender_lgtID, IDX_REFINE_STS)
+        hvy_ID = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, myrank, N )
+        level = lgt_block( lgt_ID, IDX_MESH_LVL )
+        ref = lgt_block( lgt_ID, IDX_REFINE_STS)
+
+        ! for leaf-syncs we ignore non-leaf blocks
+        if (mod(sync_id,10) == 2 .and. .not. block_is_leaf(params, hvy_ID)) cycle
+        ! blocks with ref status REF_TMP_EMPTY do not sync anything
+        if (ref == REF_TMP_EMPTY) cycle
 
         ! loop over all neighbors
-        do neighborhood = 1, size(hvy_neighbor, 2)
-            ! if (skipDiagonalNeighbors) then
-            !     ! Diagonal neighbors (not required for the RHS)
-            !     ! 2D: 5,6,7,8
-            !     ! 3D: 7-18, 19-26, 51-74
-            !     if (dim==2.and.(neighborhood>=5.and.neighborhood<=8)) cycle
-            !     if (dim==3.and.((neighborhood>=7.and.neighborhood<=26).or.(neighborhood>=51))) cycle
-            ! endif
-
+        do i_n = 1, size(hvy_neighbor, 2)
             ! neighbor exists
-            if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
+            if ( hvy_neighbor( hvy_ID, i_n ) /= -1 ) then
                 ! neighbor light data id
-                recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
+                lgt_ID_n = hvy_neighbor( hvy_ID, i_n )
                 ! calculate neighbor rank
-                call lgt2proc( recver_rank, recver_lgtID, N )
+                call lgt2proc( rank_n, lgt_ID_n, N )
                 ! neighbor heavy id
-                call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
+                call lgt2hvy( hvy_ID_n, lgt_ID_n, rank_n, N )
 
                 ! define level difference: sender - receiver, so +1 means sender on higher level
-                ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
-                ! leveldiff =  0 : sender is same level as recver
-                ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-                level_diff = level - lgt_block( recver_lgtID, IDX_MESH_LVL )
-                recver_ref = lgt_block( recver_lgtID, IDX_REFINE_STS)
+                ! lvl_diff = -1 : sender to finer recver, interpolation on sender side
+                ! lvl_diff =  0 : sender is same level as recver
+                ! lvl_diff = +1 : sender to coarser recver, restriction is applied on sender side
+                level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
+                lvl_diff = level - level_n
+                ref_n = lgt_block( lgt_ID_n, IDX_REFINE_STS)
 
-                ! Send logic, following cases exist currently, all linked as .or.:
-                ! stage=2, level_diff = +1, (sLevel=-1 and M2C) or (level=sLevel and M2C) or (level=sLevel+1 and F2M)
-                !          or (sLevel<-1 and ref=sLevel and M2C) or (sLevel<-1 and ref_n=sLevel and F2M)
-                ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
-                !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, level_diff = -1, (sLevel=-1 and M2F) or (level=sLevel and M2F) or (level=sLevel-1 and C2M)
-                !          or (sLevel<-1 and ref=sLevel and M2F) or (sLevel<-1 and ref_n=sLevel and C2M)
+                ! blocks with ref status REF_TMP_EMPTY do not sync anything
+                if (ref_n == REF_TMP_EMPTY) cycle
 
-                ! send counter. how much data will I send to other mpiranks?
-                if  ((istage==2 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sM2C) .or. (level==sLevel+1 .and. sF2M) &
-                    .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sF2M))) &
-                .or. (istage==3 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sM2F) .or. (level==sLevel-1 .and. sC2M) &
-                    .or. (sLevel<-1 .and. sender_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. recver_ref==sLevel .and. sC2M))) &
-                .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
-                    .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                    ! why is this RECVER and not sender? Because we adjust the data to the requirements of the
-                    ! receiver before sending with interpolation or downsampling.
-                    ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
+                ! Send logic, I am sender and neighbor is receiver:
+                ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=+1; stage=3 && lvl_diff=-1
+                ! Some special cases:
+                !    REF   - only sync if the refinement value matches s_val for the neighbor
+                !    Level - only send if the neighbor level matches s_val
 
-                    if (myrank /= recver_rank) then
-                        data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
+                ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
+                ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
+                ! For sending, some blocks have to send to multiple neighbors at the same patch in special conditions:
+                !    leaf blocks (without daughters) have to send to both medium and fine neighbors
+                !    root blocks (without mother) have to send to both medium and coarse neighbors
+                ! CVS Leaf updates assume grid is not fully updated and only update to and from other leaf blocks
+                ! this is the highest lvl_diff patch (finer, then medium, then coarser neighbors)
+
+                ! send counter. how much data will I send to my neighbors on other mpiranks?
+                b_send = .false.
+                ! neighbor wants to receive all patches, ids correspond to full
+                if (mod(sync_id,10) == 1 .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                        ! CVS: non-leaf blocks do not send to fine neighbors
+                        if (lvl_diff==-1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
+                            b_send = .false.
+                        endif
+                        ! CVS: non-root blocks do not send to coarse neighbors
+                        if (lvl_diff==+1 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive all leaf-patches, ids correspond to full_leaf
+                elseif (mod(sync_id,10) == 2 .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                        ! leaf-wise, Fine->Medium->Coarse
+                        ! check for fine neighbor
+                        if (lvl_diff>=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, -1)) then
+                            b_send = .false.
+                        ! check for medium neighbor
+                        elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive medium and coarse patches -> send to MoF, ids correspond to MoC
+                elseif (mod(sync_id,10) == 3 .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==-1))) then
+                        b_send = .true.
+                        ! CVS: non-leaf blocks do not send to fine neighbors
+                        if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
+                            b_send = .false.
+                        endif
+
+                ! neighbor wants to receive medium and fine patches -> send to MoC, ids correspond to MoF
+                elseif (mod(sync_id,10) == 4 .and. &
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1))) then
+                        b_send = .true.
+                        ! CVS: non-root blocks do not send to coarse neighbors
+                        if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
+                            b_send = .false.
+                        endif
+                endif
+
+                ! special cases, first ref check and then level check, situated in second digit
+                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref_n ! disable sync if neighbor has wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level_n  ! disable sync if neighbor has wrong level
+
+                if (b_send) then
+                    ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
+                    if (lvl_diff==0) then
+                        ijk = ijkPatches(:, :, i_n, SENDER)
+                    else
+                        ijk = ijkPatches(:, :, i_n, RESPRE)
+                    endif
+
+                    if (myrank /= rank_n) then
+                        data_send_counter(rank_n) = data_send_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each neighborhood, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of neighborhood etc
                         ! Increase by one so number of integers can vary
-                        meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 1
+                        meta_send_counter(rank_n) = meta_send_counter(rank_n) + 1
                     endif
 
                     ! now lets save all metadata in one array without caring for rank sorting for now
-                    meta_send_all(S_META_FULL*count_send + 1) = sender_hvyID  ! needed for same-rank sending
-                    meta_send_all(S_META_FULL*count_send + 2) = sender_ref    ! needed for hvy_tmp for adapt_tree
-                    meta_send_all(S_META_FULL*count_send + 3) = recver_hvyID
-                    meta_send_all(S_META_FULL*count_send + 4) = recver_rank
-                    meta_send_all(S_META_FULL*count_send + 5) = neighborhood
-                    meta_send_all(S_META_FULL*count_send + 6) = level_diff
+                    meta_send_all(S_META_FULL*count_send + 1) = hvy_ID  ! needed for same-rank sending
+                    meta_send_all(S_META_FULL*count_send + 2) = ref    ! needed for hvy_tmp for adapt_tree
+                    meta_send_all(S_META_FULL*count_send + 3) = hvy_ID_n
+                    meta_send_all(S_META_FULL*count_send + 4) = rank_n
+                    meta_send_all(S_META_FULL*count_send + 5) = i_n
+                    meta_send_all(S_META_FULL*count_send + 6) = lvl_diff
                     meta_send_all(S_META_FULL*count_send + 7) = (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
                     
                     count_send = count_send + 1
                 endif
 
-                ! Receive logic, following cases exist currently, all linked as .or.:
-                ! stage=2, level_diff = -1, (sLevel=-1 and M2C) or (level=sLevel and F2M) or (level=sLevel-1 and M2C)
-                !          or (sLevel<-1 and ref_n=sLevel and M2C) or (sLevel<-1 and ref=sLevel and F2M)
-                ! stage=1, level_diff =  0, (sLevel=-1 and M2M) or (level=sLevel and M2M)
-                !          or (sLevel<-1 and (ref=sLevel  or ref_n=sLevel) and M2M)
-                ! stage=3, level_diff = +1, (sLevel=-1 and M2F) or (level=sLevel and C2M) or (level=sLevel+1 and M2F)
-                !          or (sLevel<-1 and ref_n=sLevel and M2F) or (sLevel<-1 and ref=sLevel and C2M)
+                ! Receive logic, I am receiver and neighbor is sender:
+                ! it is defined in logic relative to receiver, so that
+                ! lvl_diff = -1 : recver from finer sender, restriction on sender side
+                ! lvl_diff =  0 : recver is same level as sender
+                ! lvl_diff = +1 : recver from coarser sender, interpolation on sender side
+                !
+                ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=-1; stage=3 && lvl_diff=+1
+                ! Some special cases:
+                !    REF   - only sync if the refinement value matches s_val for the receiver
+                !    Level - only send if the receiver level matches s_val
 
-                ! recv counter. how much data will I recv from other mpiranks?
+                ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
+                ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
+                ! For receiving, receiving has to be restricted:
+                !    non-leaf blocks (with daughters) do not receive from coarse neighbors
+                !    non-root blocks (with mother) do not receive from fine neighbors
+                ! CVS Leaf updates assume grid is not fully updated and only update to and from other leaf blocks
+                ! this is the highest lvl_diff patch (finer, then medium, then coarser neighbors)
+
+                ! recv counter. how much data will I recv from neighbors on other mpiranks?
                 ! This is NOT the same number as before
-                if (myrank /= recver_rank) then  ! only receive from foreign ranks
-                    if  ((istage==2 .and. level_diff==-1 .and. ((sLevel==-1 .and. sM2C) .or. (level==sLevel .and. sF2M) .or. (level==sLevel-1 .and. sM2C) &
-                        .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2C) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sF2M))) &
-                    .or. (istage==3 .and. level_diff==+1 .and. ((sLevel==-1 .and. sM2F) .or. (level==sLevel .and. sC2M) .or. (level==sLevel+1 .and. sM2F) &
-                        .or. (sLevel<-1 .and. recver_ref==sLevel .and. sM2F) .or. (sLevel<-1 .and. sender_ref==sLevel .and. sC2M))) &
-                    .or. (istage==1 .and. level_diff== 0 .and. ((sLevel==-1 .and. sM2M) .or. (level==sLevel .and. sM2M) &
-                        .or. (sLevel<-1 .and. (sender_ref==sLevel .or. recver_ref==sLevel) .and. sM2M)))) then
-                        inverse = inverse_neighbor(neighborhood, dim)
+                if (myrank /= rank_n) then  ! only receive from foreign ranks
+                    b_recv = .false.
 
-                        ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
+                    ! I want to receive all patches, ids correspond to full
+                    if (mod(sync_id,10) == 1 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
+                            b_recv = .true.
+                            ! CVS: non-leaf blocks do not receive from coarser neighbors
+                            if (lvl_diff==+1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
+                                b_recv = .false.
+                            ! CVS: leaf blocks do not receive from coarser neighbors if there is a medium one for same patch
+                            elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                                b_recv = .false.
+                            endif                                
+                            ! CVS: non-root blocks do not receive fine neighbors
+                            if (lvl_diff==-1 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
+                                b_recv = .false.
+                            ! CVS: root blocks do not receive from fine neighbors if there is a medium one for same patch
+                            elseif (lvl_diff==-1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                                b_recv = .false.
+                            endif
 
-                        data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
+                    ! I want to receive all leaf-patches, ids correspond to full_leaf
+                    elseif (mod(sync_id,10) == 2 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
+                            b_recv = .true.
+                            ! leaf-wise, Fine->Medium->Coarse
+                            ! check for fine neighbor
+                            if (lvl_diff>=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, -1)) then
+                                b_recv = .false.
+                            ! check for medium neighbor
+                            elseif (lvl_diff==+1 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                                b_recv = .false.
+                            endif
+
+                    ! I want to receive medium and coarse patches, ids correspond to MoC
+                    elseif (mod(sync_id,10) == 3 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1))) then
+                            b_recv = .true.
+                            ! CVS: non-leaf blocks do not receive from coarser neighbors
+                            if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
+                                b_recv = .false.
+                            ! CVS: leaf blocks do not receive from coarser neighbors if there is a medium one for same patch
+                            elseif (lvl_diff/=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                                b_recv = .false.
+                            endif
+
+                    ! I want to receive medium and fine patches,ids correspond to MoF
+                    elseif (mod(sync_id,10) == 4 .and. &
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1))) then
+                            b_recv = .true.
+                            ! CVS: non-root blocks do not receive from fine neighbors
+                            if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
+                                b_recv = .false.
+                            ! CVS: root blocks do not receive from fine neighbors if there is a medium one for same patch
+                            elseif (lvl_diff/=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
+                                b_recv = .false.
+                            endif
+                    endif
+
+                    ! special cases, first ref check and then level check
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref ! disable sync if I have wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level  ! disable sync if I have wrong level
+
+                    if (b_recv) then
+                        ijk = ijkPatches(:, :, i_n, RECVER)
+
+                        data_recv_counter(rank_n) = data_recv_counter(rank_n) + &
                         (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1) * ncomponents
 
                         ! counter for integer buffer: for each neighborhood, we send some integers as metadata
                         ! this is a fixed number it does not depend on the type of neighborhood etc
                         ! Increase by one so number of integers can vary
-                        meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 1
+                        meta_recv_counter(rank_n) = meta_recv_counter(rank_n) + 1
                     endif
                 endif
             endif ! neighbor exists
@@ -481,136 +560,3 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, nco
         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
     endif
 end subroutine prepare_ghost_synch_metadata
-
-
-! ! returns two lists with numbers of points I send to all other procs and how much I
-! ! receive from each proc. note: strictly locally computed, NO MPI comm involved here
-! subroutine get_my_sendrecv_amount_with_ranks_nostages(params, lgt_block, hvy_neighbor, hvy_active,&
-!      hvy_n, data_recv_counter, data_send_counter, meta_recv_counter, meta_send_counter, &
-!      count_internal, ncomponents)
-!
-!     implicit none
-!
-!     type (type_params), intent(in)      :: params
-!     !> light data array
-!     integer(kind=ik), intent(in)        :: lgt_block(:, :)
-!     !> heavy data array - neighbor data
-!     integer(kind=ik), intent(in)        :: hvy_neighbor(:,:)
-!     !> list of active blocks (heavy data)
-!     integer(kind=ik), intent(in)        :: hvy_active(:)
-!     !> number of active blocks (heavy data)
-!     integer(kind=ik), intent(in)        :: hvy_n, ncomponents
-!     integer(kind=ik), intent(inout)     :: data_recv_counter(0:), data_send_counter(0:)
-!     integer(kind=ik), intent(inout)     :: meta_recv_counter(0:), meta_send_counter(0:)
-!     logical, intent(in)                 :: count_internal
-!
-!     integer(kind=ik) :: k, sender_hvyID, sender_lgtID, myrank, N, neighborhood, recver_rank
-!     integer(kind=ik) :: ijk(2,3), inverse, ierr, recver_hvyID, recver_lgtID,level_diff, status, new_size
-!
-!     call MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
-!     N = params%number_blocks
-!
-!     data_recv_counter(:) = 0
-!     data_send_counter(:) = 0
-!     meta_recv_counter(:) = 0
-!     meta_send_counter(:) = 0
-!
-!     do k = 1, hvy_n
-!         ! calculate light id
-!         sender_hvyID = hvy_active(k)
-!         call hvy2lgt( sender_lgtID, sender_hvyID, myrank, N )
-!
-!         ! loop over all neighbors
-!         do neighborhood = 1, size(hvy_neighbor, 2)
-!             ! neighbor exists
-!             if ( hvy_neighbor( sender_hvyID, neighborhood ) /= -1 ) then
-!                 ! neighbor light data id
-!                 recver_lgtID = hvy_neighbor( sender_hvyID, neighborhood )
-!                 ! calculate neighbor rank
-!                 call lgt2proc( recver_rank, recver_lgtID, N )
-!                 ! neighbor heavy id
-!                 call lgt2hvy( recver_hvyID, recver_lgtID, recver_rank, N )
-!
-!                 ! define level difference: sender - receiver, so +1 means sender on higher level
-!                 ! leveldiff = -1 : sender coarser than recver, interpolation on sender side
-!                 ! leveldiff =  0 : sender is same level as recver
-!                 ! leveldiff = +1 : sender is finer than recver, restriction is applied on sender side
-!                 level_diff = lgt_block( sender_lgtID, IDX_MESH_LVL ) - lgt_block( recver_lgtID, IDX_MESH_LVL )
-!
-!
-!                 if (recver_rank /= myrank .or. count_internal) then
-!                     ! it now depends on the stage if we have to sent this data
-!                     ! or not.
-!                     ! In stage 1, only level_diff = {+1, 0} is treated
-!                     ! In stage 2, only level_diff = -1
-!
-!                     ! send counter. how much data will I send to other mpiranks?
-!                     ! why is this RECVER and not sender? Well, complicated. The amount of data on the sender patch
-!                     ! is not the same as in the receiver patch, because we interpolate or downsample. We effectively
-!                     ! transfer only the data the recver wants - not the extra data.
-!                     ijk = ijkPatches(:, :, neighborhood, level_diff, RECVER)
-!
-!                     data_send_counter(recver_rank) = data_send_counter(recver_rank) + &
-!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
-!
-!                     ! recv counter. how much data will I recv from other mpiranks?
-!                     ! This is NOT the same number as before
-!                     inverse = inverse_neighbor(neighborhood, dim)
-!
-!                     ijk = ijkPatches(:, :, inverse, -1*level_diff, RECVER)
-!
-!                     data_recv_counter(recver_rank) = data_recv_counter(recver_rank) + &
-!                     (ijk(2,1)-ijk(1,1)+1) * (ijk(2,2)-ijk(1,2)+1) * (ijk(2,3)-ijk(1,3)+1)
-!
-!                     ! counter for integer buffer: for each neighborhood, we send 6 integers as metadata
-!                     ! as this is a fixed number it does not depend on the type of neighborhood etc, so
-!                     ! technically one would need only one for send/recv
-!                     meta_send_counter(recver_rank) = meta_send_counter(recver_rank) + 6 ! FIVE
-!
-!                     meta_recv_counter(recver_rank) = meta_recv_counter(recver_rank) + 6 ! FIVE
-!                 endif
-!
-!
-!
-!             end if ! neighbor exists
-!         end do ! loop over all possible  neighbors
-!     end do ! loop over all heavy active
-!
-!
-!
-!     ! NOTE: for the int buffer, we mosly start at some index l0 and then loop unitl
-!     ! we find a -99 indicating the end of the buffer. this could be avoided by using
-!     ! for instead of while loops in the main routines, but I do not have time now.
-!     !
-!     ! In the meantime, notice we extent the amount of data by one, to copy the last -99
-!     ! to the buffers
-!     meta_recv_counter(:) = meta_recv_counter(:) + 1
-!     meta_send_counter(:) = meta_send_counter(:) + 1
-!
-!
-!     ! NOTE ACTUAL SEND / RECV DATA IS NEQN
-!     data_recv_counter(:) = data_recv_counter(:) * ncomponents
-!     data_send_counter(:) = data_send_counter(:) * ncomponents
-!
-!     ! NOTE: this feature is against wabbits memory policy: we try to allocate the
-!     ! whole memory of the machine on startup, then work with that. however, we have to
-!     ! reserver portions of that memory for the state vector, the RHS slots, etc, and the ghost nodes
-!     ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
-!     if (sum(data_recv_counter) > size(rData_recvBuffer, 1)) then
-!         ! out-of-memory case: the preallocated buffer is not large enough.
-!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
-!         new_size = size(rData_recvBuffer,1)*125/100
-!         deallocate(rData_recvBuffer)
-!         allocate( rData_recvBuffer(1:new_size), stat=status )
-!         if (status /= 0) call abort(999992, "Buffer allocation failed. Not enough memory?")
-!     endif
-!
-!     if (sum(data_send_counter) > size(rData_sendBuffer, 1)) then
-!         ! out-of-memory case: the preallocated buffer is not large enough.
-!         write(*,'("rank=",i4," OOM for ghost nodes and increases its buffer size to 125%")') myrank
-!         new_size = size(rData_sendBuffer,1)*125/100
-!         deallocate(rData_sendBuffer)
-!         allocate( rData_sendBuffer(1:new_size), stat=status )
-!         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")
-!     endif
-! end subroutine

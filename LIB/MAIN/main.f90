@@ -62,7 +62,6 @@ program main
     character(len=clong)                :: filename
     ! some variables, loop, debug information and more
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
-    integer(kind=ik)                    :: adapt_blocks(1:32), adapt_iterations  ! 32 as maximum amount of levels
     character(len=2*clong)              :: write_statement  ! dynamically build the output lengths
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
@@ -94,7 +93,7 @@ program main
     WABBIT_COMM=MPI_COMM_WORLD
 
     if (rank==0) then
-        write(*,'(80("_"))')
+        write(*,'(20("─"), A21, 39("─"))') "   STARTING wabbit   "
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
     end if
@@ -132,22 +131,40 @@ program main
 
     !---------------------------------------------------------------------------
     ! Unit tests
+    !    - treecode test for neighbor finding
+    !    - sync test for correct patch allocation
+    !    - godes nodes sync test for correct prediction order
+    !    - wavelet decomposition test for filter banks
+    !    - refine-coarsen test for refinement and adaption processes
     !---------------------------------------------------------------------------
+    if (any((/ params%test_treecode, params%test_ghost_nodes_synch, params%test_wavelet_decomposition/)) .and. params%rank==0) then
+        write(*,'("     /¯¯¯\                       /¯¯¯\       /¯¯¯\       /¯¯¯\       /¯¯¯\  ")')
+        write(*,'("    /     \     Unit Tests      /     \     /     \     /     \     /     \ ")')
+        write(*,'("___/       \___________________/       \___/       \___/       \___/       \")')
+        write(*, '("")')
+    end if
+
+
     if (params%test_treecode) then
        call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true. )
     end if
 
     ! perform a convergence test on ghost node sync'ing
     if (params%test_ghost_nodes_synch) then
-        call unitTest_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
+        call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.true.)
+        call unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow, abort_on_fail=.false. )
     endif
 
     ! check if the wavelet filter banks are okay.
     if (params%test_wavelet_decomposition) then
-        call unitTest_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
-        call unitTest_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
+        call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID_flow )
     endif
 
+    ! timing
+    call toc( "TOPLEVEL: unit tests", 16, MPI_wtime()-sub_t0 )
+    sub_t0 = MPI_Wtime()
 
     !---------------------------------------------------------------------------
     ! Initial condition
@@ -215,9 +232,9 @@ program main
         write(*,*) "params%next_write_time=", params%next_write_time
         write(*,*) "params%next_stats_time=", params%next_stats_time
         write(*,*) ""
-        write(*,*) "        --------------------------------------------------"
-        write(*,*) "        | On your marks, ready, starting main time loop! |"
-        write(*,*) "        --------------------------------------------------"
+        write(*,'(10(" "), "╔", 48("═"), "╗")') 
+        write(*,'(10(" "), A)') "║ On your marks, ready, starting main time loop! ║"
+        write(*,'(10(" "), "╚", 48("═"), "╝")')
         write(*,*) ""
     endif
 
@@ -252,8 +269,12 @@ program main
             ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-            ! refine the mesh
-            call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+            ! refine the mesh, normally "everywhere"
+            if (params%threshold_mask) then
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, hvy_mask=hvy_mask )
+            else
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+            endif
         endif
         call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
@@ -342,11 +363,10 @@ program main
 
                 ! actual coarsening (including the mask function)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask, log_blocks=adapt_blocks, log_iterations=adapt_iterations)
+                    hvy_mask=hvy_mask)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    log_blocks=adapt_blocks, log_iterations=adapt_iterations)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
@@ -369,22 +389,10 @@ program main
         ! output on screen
         if (rank==0) then
             write(*, '("RUN: it=",i7)', advance='no') iteration
-            write(*, '(" time=",f16.9, " t_wall=",es9.3)', advance='no') time, t2
+            write(*, '(" time=",f16.9, " t_wall=",es10.3)', advance='no') time, t2
             write(*, '(" Nb=(",i6,"/",i6,")")', advance='no') Nblocks_rhs, Nblocks
             write(*, '(" J=(",i2,":",i2,"/",i2,":",i2, ")")', advance='no') Jmin1, Jmax1, minActiveLevel_tree(tree_ID_flow), maxActiveLevel_tree(tree_ID_flow)
             write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
-#ifdef DEV
-            ! for development I want to put some more things and start with blocks for adapt tree, length is adapted automatically
-            if (adapt_iterations > 2) then  ! adapt_tree did only one loop where num_blocks where reduced so we can skip it entirely
-                if (adapt_iterations > 3) then  ! write doesnt like if the format statement contains 0 length parts so we need an if-condition
-                    write(write_statement, '("(", A, i0, A, ")")') '" adapt iter Nb:(", ', adapt_iterations-3, '(i6,"/"), i6, ")"'
-                else
-                    write(write_statement, '("(", A, ")")') '" adapt iter Nb:(", i6, ")"'
-                endif
-                write(*, write_statement, advance='no') adapt_blocks(1:adapt_iterations-2)  ! -2 to skip final values we have already earlier
-            endif
-            ! write(*, '()', advance='no')
-#endif
             write(*, '("")')  ! line break
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important
@@ -468,7 +476,7 @@ program main
     ! computing time output on screen
     call cpu_time(t1)
     if (rank==0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*,'("END: cpu-time = ",f16.4, " s")')  t1-t0
     end if
 

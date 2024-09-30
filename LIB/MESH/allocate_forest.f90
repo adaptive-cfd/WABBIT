@@ -25,7 +25,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
     real(kind=rk)       :: memory_this, memory_total
-    integer             :: status, nwork, nx, ny, nz, max_neighbors, max_family, mpierr, nrhs_slots
+    integer             :: status, nwork, nx, ny, nz, max_neighbors, max_neighbors_used, max_family, mpierr, nrhs_slots
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
@@ -73,11 +73,13 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     if (params%dim==2) then
         nz = 1
-        max_neighbors = 16
         max_family = 9
+        max_neighbors = 56*2+32 ! 2D has only 32 possibilites but 56 from 3D is used
+        max_neighbors_used = 56+24+24 ! lvl J+1,J,J-1 for full tree grid
     else
-        max_neighbors = 74
         max_family = 17
+        max_neighbors = 56*3
+        max_neighbors_used = 12+8+8 ! lvl J+1,J,J-1 for full tree grid
     endif
 
     ! 19 oct 2018: The work array hvy_work is modified to be used in "register-form"
@@ -101,10 +103,10 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
 
     if (rank == 0) then
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
         write(*,'(A)') "INIT: Beginning memory allocation and initialization."
         write(*,'(A)') "ALLOCATING A FOREST"
-        write(*,'(80("_"))')
+        write(*,'(80("─"))')
     endif
 
     !---------------------------------------------------------------------------
@@ -153,9 +155,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         N_MAX_COMPONENTS = params%dim
 
         ! first compute mem per block in points
-        mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g))  & ! hvy_block
-        + 2.0 * nstages * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts
-        + 2.0 * nstages * real(max_neighbors) * 5 / 2.0  ! int bufer (4byte hence /2)
+        mem_per_block = real(Neqn) * real(product(Bs(1:dim)+2*g)) ! hvy_block
 
         ! hvy_mask
         if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
@@ -171,6 +171,21 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         if ( present(hvy_work) ) then
             mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
         endif
+
+        ! values from MPI - reference at module_mpi%init_ghost_nodes
+        mem_per_block = mem_per_block &
+        + 2.0 * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts, 1send 1recv
+        + 3.0 * real(max_neighbors_used) * 5.0 / 2.0 &  ! int buffer (4byte hence /2), sending 6 values each, 3 buffers exist
+        + 2.0 * params%number_procs ! send recv buffers include one number for how many patches are send per cpu
+
+        ! hvy_neighbor, hvy_family, lgt_block, lgt_sortednumlist, lgt_active
+        mem_per_block = mem_per_block + real(max_family+max_neighbors) + real(number_procs) * real(EXTRA_LGT_FIELDS + 5.0*params%forest_size)
+
+        ! balance load variables
+        mem_per_block = mem_per_block + 10.0*real(number_procs)
+
+        ! put a safety buffer on just for miscellaneous arrays that are being created and used
+        mem_per_block = mem_per_block * 1.02  ! 2%
 
         mem_per_block = mem_per_block * 8.0e-9 ! in GB
         params%number_blocks = nint(maxmem / mem_per_block)
@@ -346,7 +361,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     if (rank == 0) then
         write(*,'("INIT: System is allocating heavy data for ",i7," blocks and ", i3, " fields" )') params%number_blocks, Neqn
         write(*,'("INIT: System is allocating light data for ",i7," blocks" )') number_procs*params%number_blocks
-        write(*,'("INIT: Measured local (on 1 cpu) memory (hvy_block+hvy_work+lgt_block no ghosts!):   ",g15.3," GB per rank")') memory_total
+        write(*,'("INIT: Measured local (on 1 cpu) memory (hvy and lgt arrays, but no ghosts!):   ",g13.5," GB per rank")') memory_total
     end if
 
 end subroutine allocate_forest
@@ -365,7 +380,7 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
 
     if (params%rank == 0) then
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
         write(*,'(A)') "FREE: Beginning freeying of memory."
     endif
 
@@ -387,7 +402,7 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
 
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"
-        write(*,'(80("-"))')
+        write(*,'(80("─"))')
     endif
 
 end subroutine deallocate_forest

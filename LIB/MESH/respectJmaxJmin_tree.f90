@@ -22,7 +22,7 @@ subroutine respectJmaxJmin_tree( params, tree_ID)
             lgt_block( lgt_id, IDX_REFINE_STS ) = 0
         end if
 
-        if ((ref_stat == -1 .or. ref_stat == REF_TMP_TREATED_COARSEN).and.(level <= Jmin)) then
+        if ((ref_stat == -1).and.(level <= Jmin)) then
             ! can not coarsen (set flag to 0 = stay)
             lgt_block( lgt_id, IDX_REFINE_STS ) = 0
         end if

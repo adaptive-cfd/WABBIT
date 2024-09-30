@@ -9,7 +9,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
 
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
-    type (type_params), intent(in)      :: params                       !> user defined parameter structure
+    type (type_params), intent(inout)   :: params                       !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_work(:, :, :, :, :, :)   !> heavy work data array - block data
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
@@ -37,10 +37,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
 
     if (.not. informed) then
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "Runge-Kutta-Chebychev method (FSI version!)"
             write(*,'("Using s=",i2," stages")') s
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
         informed = .true.
     endif

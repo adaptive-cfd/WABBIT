@@ -202,13 +202,13 @@ end subroutine
 
     if (params_acm%mpirank==0) then
         write(*,'(80("~"))')
-        write(*,*) "    _    ____ __  __       _       _ _   "
-        write(*,*) "   / \  / ___|  \/  |     (_)_ __ (_) |_ "
-        write(*,*) "  / _ \| |   | |\/| |_____| | '_ \| | __|"
-        write(*,*) " / ___ \ |___| |  | |_____| | | | | | |_ "
-        write(*,*) "/_/   \_\____|_|  |_|     |_|_| |_|_|\__|"
+        write(*,'(A)') "    _    ____ __  __       _       _ _   "
+        write(*,'(A)') "   / \  / ___|  \/  |     (_)_ __ (_) |_ "
+        write(*,'(A)') "  / _ \| |   | |\/| |_____| | '_ \| | __|"
+        write(*,'(A)') " / ___ \ |___| |  | |_____| | | | | | |_ "
+        write(*,'(A)') "/_/   \_\____|_|  |_|     |_|_| |_|_|\__|"
         write(*,'(80("~"))')
-        write(*,*) "Initializing artificial compressibility module!"
+        write(*,'(A)') "Initializing artificial compressibility module!"
         write(*,'(80("~"))')
     endif
 

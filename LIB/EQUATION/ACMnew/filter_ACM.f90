@@ -46,6 +46,6 @@ subroutine filter_ACM( time, u, g, x0, dx, work_array, mask )
   Bs(2) = size(u,2) - 2*g
   Bs(3) = size(u,3) - 2*g
 
-  if (.not. params_acm%initialized) write(*,*) "WARNING: filter_ACM called but ACM not initialized"
+  if (.not. params_acm%initialized) write(*,'(A)') "WARNING: filter_ACM called but ACM not initialized"
 
 end subroutine

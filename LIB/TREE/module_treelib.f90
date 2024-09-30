@@ -7,7 +7,6 @@ module module_treelib
 
   contains
 
-#include "get_neighbor_treecode.f90"
 #include "neighborhood.f90"
 
   !> \author engels
@@ -101,175 +100,7 @@ module module_treelib
     ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
     x0 = real( ((ixyz) - 1)*(Bs), kind=rk) * dx
 
-end subroutine get_block_spacing_origin_b
-
-
-  ! !===============================================================================
-  ! !> \brief Make tree-identifier from tree id and treecode
-  ! !> \details from a tree id and treearray we make a tree-identifieer, which is
-  ! !! an integer made of the tree_ID and the treecode and level
-  ! !! \note As 0 is defined as not used, tree_ID s start from 1
-  ! function treecode2int(treearray, tree_ID)
-  !     implicit none
-  !     integer(kind=ik), intent(in) :: treearray(:)
-  !     integer(kind=ik), optional, intent(in) :: tree_ID
-  !     integer(kind=tsize) :: N, i, potency
-  !     integer(kind=tsize) :: treecode2int
-  !     N = size(treearray,1)
-
-  !     if (present(tree_ID)) then
-  !         treecode2int = tree_ID
-  !         potency = floor(log10(real(tree_ID)), kind=tsize) + 1_tsize
-  !         ! the +1 is necessary because it seperates the treecode from the tree_ID with a 0
-  !     else
-  !         ! For the rest of wabbit not using tree_IDs we have to make sure that
-  !         ! the results stay the same
-  !         potency = -1_tsize
-  !         treecode2int = 0_tsize
-  !     endif
-
-  !     do i = 1, N
-  !         if (treearray(i) >= 0) then
-  !             ! note zero is a bit tedious for comparison, as 0002 and 2 are the same
-  !             ! therefore, we shift all treecodes by 1, thus 0012 gives 1123 as integer
-  !             treecode2int = treecode2int + (10_tsize**(i+potency)) * ( int(treearray(i),kind=tsize) + 1_tsize )
-  !         endif
-  !     enddo
-
-  ! end function
-  ! !===============================================================================
-
-  ! !===============================================================================
-  ! !> \brief Make unique ID from tree id and treearray - this uses binary TC
-  ! !> \details Wrapper which converts first to numerical binary treecode and then creates ID
-  ! function treearray2bid(treearray, tree_ID, dim, level, max_level)
-  !   implicit none
-  !   !> Treearray
-  !   integer(kind=ik), intent(in) :: treearray(:)
-  !   !> Tree ID, defaults to 0
-  !   integer(kind=ik), optional, intent(in) :: tree_ID
-  !   !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
-  !   integer(kind=ik), optional, intent(in) :: dim
-  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-  !   integer(kind=ik), optional, intent(in) :: max_level
-  !   !> Level at which the block is situated, defaults to max_level.
-  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
-  !   integer(kind=ik), optional, intent(in) :: level
-  !   integer(kind=tsize) :: treearray2bid, tcb_temp
-
-  !   integer(kind=ik)      :: n_dim, n_level, max_tclevel, n_tree_ID
-
-  !   ! Set defaults
-  !   n_tree_ID = 1; if (present(tree_ID)) n_tree_ID = tree_ID
-  !   n_dim = 3; if (present(dim)) n_dim = dim
-  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-  !   n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
-  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
-    
-  !   call array2tcb(tcb_temp, treearray, dim=n_dim, level=n_level, max_level=max_tclevel)
-  !   treearray2bid = tcb2id(tcb_temp, dim=n_dim, tree_ID=n_tree_ID, level=n_level, max_level=max_tclevel)
-
-  ! end function
-  ! !===============================================================================
-
-
-  ! !===============================================================================
-  ! !> \brief Make unique treecode-identifier from numerical decimal treecode, level and tree_id
-  ! !> \details Level is required, as mothers share the same treecode with sister-0.
-  ! !! This is circumvented by increasing every set level by one and keeping unset
-  ! !! ones as 0. If level is not provided it is assumed to be of full level
-  ! !! \note As 0 is defined as all levels unset, tree_ID s start from 1
-  ! !! Example with tree_id 7 for tree_ids 1-99, treecode 10322000 and level 6: 07-21433100
-  ! function tcd2id(treecode, tree_ID, level, max_level)
-  !   implicit none
-  !   !> Treecode in numerical decimal representation
-  !   integer(kind=tsize), intent(in) :: treecode
-  !   !> Tree ID, defaults to 0
-  !   integer(kind=ik), optional, intent(in) :: tree_ID
-  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-  !   integer(kind=ik), optional, intent(in) :: max_level
-  !   !> Level at which the block is situated, defaults to max_level.
-  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
-  !   integer(kind=ik), optional, intent(in) :: level
-  !   integer(kind=ik) :: i_level, n_level, max_tclevel
-  !   integer(kind=tsize) :: tcd2id
-
-  !   ! Set defaults for dimension, level and max_level
-  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-  !   n_level = max_tclevel; if (present(level)) n_level = level
-  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
-
-  !   ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
-  !   tcd2id = treecode
-
-  !   ! encode tree_id at start of array
-  !   if (present(tree_ID)) then
-  !     ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be:
-  !     ! if tree_ID > 10**(int(log10(2**bitsize(treecode)), kind=ik) - max_tclevel)
-  !     !   write(*,'("Error - tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0)') tre_ID, max_tclevel
-  !     ! end if
-
-  !     ! tree_ID start with 0
-  !     tcd2id = tcd2id +  int(tree_ID-1, kind=tsize) * 10_tsize**(max_tclevel)
-  !   endif
-
-  !   ! ensure unique level description, as 2130 with level 4 is equal to 213(0) with level 3 as in treecode it is right-zero-padded
-  !   ! add 1 for every level which is set from left to right, which results in 3241 which is different from 324(0)
-  !   do i_level = 1, n_level
-  !     tcd2id = tcd2id + 10_tsize ** (max_tclevel - i_level)
-  !   enddo
-
-  ! end function
-  ! !===============================================================================
-
-  ! !===============================================================================
-  ! !> \brief Make unique treecode-identifier from numerical binary treecode, level and tree_id
-  ! !> \details Level is required, as mothers share the same treecode with sister-0.
-  ! !! 5 extra bits are used to encode all available levels (31 max for dim=2), other free bits on left end are used to encode tree_id
-  ! !> A 2D-example with tree_id=5 for tree_ids up to 15, level=3 and treecode = 3100 = 11-01-00-00:
-  ! !> 0101-00011-11010000
-  ! function tcb2id(treecode, dim, tree_ID, level, max_level)
-  !   implicit none
-  !   !> Treecode in numerical decimal representation
-  !   integer(kind=tsize), intent(in) :: treecode
-  !   !> Tree ID, optional and elsewise set as 0
-  !   integer(kind=ik), optional, intent(in) :: tree_ID
-  !   !> Maximum level to be encoded, should be params%Jmax, defaults to maxdigits
-  !   integer(kind=ik), optional, intent(in) :: max_level
-  !   !> Level at which the block is situated, defaults to max_level.
-  !   !> If not set grids with overlapping blocks of different levels are not unique anymore
-  !   integer(kind=ik), optional, intent(in) :: level
-  !   !> Dimension in order to get correct maximum TC length, 2 or 3 and defaults to 3
-  !   integer(kind=ik), optional, intent(in) :: dim
-  !   integer(kind=ik) :: i_level, n_level, max_tclevel, n_dim
-  !   integer(kind=tsize) :: tcb2id
-
-  !   ! Set defaults for dimension, level and max_level
-  !   n_dim = 3; if (present(dim)) n_dim = dim
-  !   max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
-  !   n_level = 0; if (present(level)) n_level = level  ! level here to 0 as it is then not encoded
-  !   if (n_level < 0) n_level = max_tclevel + n_level + 1
-
-  !   ! this might be negative for unset blocks, minus sign describes unset blocks but tree_id can still be extracted
-  !   tcb2id = treecode
-
-  !   ! encode tree_id at start of array
-  !   if (present(tree_ID)) then
-  !     ! ! we simply believe here that we can encode all tree_IDs and ignore a check, but it should be the following
-  !     ! ! the -5 comes from the levels we want to encode
-  !     ! if tree_ID-1 > 2**(bitsize(treecode) - n_dim*max_tclevel - 5)
-  !     !   write(*,'("Error - Tree_ID ", i0, " cannot be uniquly encoded with maximum level ", i0, " in dimension ", i0)') tree_ID, max_tclevel, dim
-  !     ! end if
-
-  !     ! tree_ID start with 0
-  !     tcb2id = tcb2id + ishft(int(tree_ID-1, kind=tsize), n_dim*max_tclevel + 5)
-  !   endif
-
-  !   ! encode level in 5 bits left of treecode, if not set it is kept as zero
-  !   tcb2id = tcb2id + ishft(int(n_level, kind=tsize), n_dim*max_tclevel)
-
-  ! end function
-  ! !===============================================================================
+  end subroutine get_block_spacing_origin_b
 
   !===============================================================================
   !> \brief get digit at specific index and return digit
@@ -612,11 +443,11 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> XYZ, values are 1 for dir +, 9 for dir - and 0 for nothing
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
-    integer(kind=ik)                    :: i, n_dim, n_level, max_tclevel
-    integer(kind=tsize)                    :: dir_temp, dir_now
+    integer(kind=ik)                    :: i_dim, n_dim, n_level, max_tclevel
+    integer(kind=tsize)                 :: dir_now
 
     ! Set defaults for dimension, level and max_level
     n_dim = 3; if (present(dim)) n_dim = dim
@@ -626,10 +457,17 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    dir_temp = direction
-    do while (dir_temp /= 0)
+    do i_dim = 1,3
       tc1 = treecode_neighbor
-      call pop(dir_temp, dir_now)
+      dir_now = mod(direction/(10**(3-i_dim)),10)
+
+      if (dir_now == 0) then
+        cycle  ! do nothing and cycle
+      elseif (dir_now == 9) then
+        dir_now = 0
+      endif
+      dir_now = dir_now + 2*(i_dim-1) + 1
+      ! dir_now is now between 1 and 6, being index of [+x, -x, +y, -y, +z, -z]
       call adjacent_faces_b(tc1, treecode_neighbor, dir_now, level=n_level, dim=n_dim, max_level=max_tclevel)
     end do
   end subroutine
@@ -639,33 +477,14 @@ end subroutine get_block_spacing_origin_b
   !> \author JB
   !> \brief Obtain neighbour in 3D for given direction with numerical binary treecode
   !> \details Use math representation and loop over digits
-  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
-  !> for imagination:
-  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-  !!                   - edge: boundary between two sides - use sides numbers for coding
-  !!                   - corner: between three sides - so use all three sides numbers
-  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
-  !!                     so use this corner code in second part of neighbor code
-  !!
-  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
-  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
-  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-  !! corner: '123/___', '134/___', '145/___', '152/___' \n
-  !!         '623/___', '634/___', '645/___', '652/___' \n
-  !! \n
-  !! complete neighbor code array, 74 possible neighbor relations \n
-  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  !> Each digit in variable direction represents one of the dimensions. Digits can take following values:
+  !!    - 9, we look in negative direction in this dimension
+  !!    - 1, we look in positive direction in this dimension
+  !!    - 0, this dimension does not change
+  !! Dependend on the number of 0s, we either look at a face, edge or corner
   ! ********************************************************************************************
   subroutine adjacent_faces_b( treecode, treecode_neighbor, direction, level, dim, max_level)
     implicit none
@@ -694,23 +513,23 @@ end subroutine get_block_spacing_origin_b
     ! We need direction and level from each direction
     select case(direction)
       ! At first we assign the main cardinal directions
-      case(1)  ! T - top side z+1
-        dir_sign = 1
-        dir_fac = 4
-      case(2)  ! W - front side y-1
+      case(1)  ! N - left side x-1
         dir_sign = -1
-        dir_fac = 1
-      case(3)  ! S - right side x+1
+        dir_fac = 2
+      case(2)  ! S - right side x+1
         dir_sign = 1
         dir_fac = 2
+      case(3)  ! W - front side y-1
+        dir_sign = -1
+        dir_fac = 1
       case(4)  ! E - back side y+1
         dir_sign = 1
         dir_fac = 1
-      case(5)  ! N - left side x-1
+      case(5)  ! B - bottom side z-1
         dir_sign = -1
-        dir_fac = 2
-      case(6)  ! B - bottom side z-1
-        dir_sign = -1
+        dir_fac = 4
+      case(6)  ! T - top side z+1
+        dir_sign = 1
         dir_fac = 4
       case default
         call abort(118118, "Lord vader, the treelib does not know the direction")
@@ -759,11 +578,11 @@ end subroutine get_block_spacing_origin_b
     !> Numerical treecoude out
     integer(kind=tsize), intent(out)    :: treecode_neighbor
     !> direction for neighbor search - number where each digit represents a cardinal direction
-    !> 652 -> first 6 (bottom, z-1), then 5 (north, x-1) then 2 (front, y-1) 
+    !> XYZ, values are 1 for dir +, 9 for dir - and 0 for nothing
     integer(kind=ik), intent(in)        :: direction
     integer(kind=tsize)                 :: tc1
-    integer(kind=ik)                    :: i, n_level, max_tclevel
-    integer(kind=tsize)                    :: dir_temp, dir_now
+    integer(kind=ik)                    :: i_dim, n_level, max_tclevel
+    integer(kind=tsize)                 :: dir_now
 
     ! Set defaults for dimension, level and max_level
     max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
@@ -772,10 +591,17 @@ end subroutine get_block_spacing_origin_b
 
     treecode_neighbor = treecode
     ! loop over all letters in direction and call the cardinal directions
-    dir_temp = direction
-    do while (dir_temp /= 0)
+    do i_dim = 1,3
       tc1 = treecode_neighbor
-      call pop(dir_temp, dir_now)
+      dir_now = mod(direction/(10**(3-i_dim)),10)
+
+      if (dir_now == 0) then
+        cycle  ! do nothing and cycle
+      elseif (dir_now == 9) then
+        dir_now = 0
+      endif
+      dir_now = dir_now + 2*(i_dim-1) + 1
+      ! dir_now is now between 1 and 6, being index of [+x, -x, +y, -y, +z, -z]
       call adjacent_faces_d(tc1, treecode_neighbor, dir_now, level=n_level, max_level=max_tclevel)
     end do
   end subroutine
@@ -785,33 +611,14 @@ end subroutine get_block_spacing_origin_b
   !> \author JB
   !> \brief Obtain neighbour in 3D for given direction with numerical decimal treecode
   !> \details Use math representation and loop over digits
-  !> For 3D the faces-direction is the primary, corners and edges can be obtained by combinations
   !  --------------------------------------------------------------------------------------------
   !> neighbor codes: \n
   !  ---------------
-  !> for imagination:
-  !!                   - 6-sided dice with '1'-side on top, '6'-side on bottom, '2'-side in front
-  !!                   - edge: boundary between two sides - use sides numbers for coding
-  !!                   - corner: between three sides - so use all three sides numbers
-  !!                   - block on higher/lower level: block shares face/edge and one unique corner,
-  !!                     so use this corner code in second part of neighbor code
-  !!
-  !! faces:  '__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___' \n
-  !! edges:  '_12/___', '_13/___', '_14/___', '_15/___' \n
-  !!         '_62/___', '_63/___', '_64/___', '_65/___' \n
-  !!         '_23/___', '_25/___', '_43/___', '_45/___' \n
-  !! corner: '123/___', '134/___', '145/___', '152/___' \n
-  !!         '623/___', '634/___', '645/___', '652/___' \n
-  !! \n
-  !! complete neighbor code array, 74 possible neighbor relations \n
-  !! neighbors = (/'__1/___', '__2/___', '__3/___', '__4/___', '__5/___', '__6/___', '_12/___', '_13/___', '_14/___', '_15/___',
-  !!               '_62/___', '_63/___', '_64/___', '_65/___', '_23/___', '_25/___', '_43/___', '_45/___', '123/___', '134/___',
-  !!               '145/___', '152/___', '623/___', '634/___', '645/___', '652/___', '__1/123', '__1/134', '__1/145', '__1/152',
-  !!               '__2/123', '__2/623', '__2/152', '__2/652', '__3/123', '__3/623', '__3/134', '__3/634', '__4/134', '__4/634',
-  !!               '__4/145', '__4/645', '__5/145', '__5/645', '__5/152', '__5/652', '__6/623', '__6/634', '__6/645', '__6/652',
-  !!               '_12/123', '_12/152', '_13/123', '_13/134', '_14/134', '_14/145', '_15/145', '_15/152', '_62/623', '_62/652',
-  !!               '_63/623', '_63/634', '_64/634', '_64/645', '_65/645', '_65/652', '_23/123', '_23/623', '_25/152', '_25/652',
-  !!               '_43/134', '_43/634', '_45/145', '_45/645' /) \n
+  !> Each digit in variable direction represents one of the dimensions. Digits can take following values:
+  !!    - 9, we look in negative direction in this dimension
+  !!    - 1, we look in positive direction in this dimension
+  !!    - 0, this dimension does not change
+  !! Dependend on the number of 0s, we either look at a face, edge or corner
   ! ********************************************************************************************
   subroutine adjacent_faces_d( treecode, treecode_neighbor, direction, level, max_level)
     implicit none
@@ -836,23 +643,23 @@ end subroutine get_block_spacing_origin_b
     ! We need direction and level from each direction
     select case(direction)
       ! At first we assign the main cardinal directions
-      case(1)  ! T - top side z+1
-        dir_sign = 1
-        dir_fac = 4
-      case(2)  ! W - front side y-1
+      case(1)  ! N - left side x-1
         dir_sign = -1
-        dir_fac = 1
-      case(3)  ! S - right side x+1
+        dir_fac = 2
+      case(2)  ! S - right side x+1
         dir_sign = 1
         dir_fac = 2
+      case(3)  ! W - front side y-1
+        dir_sign = -1
+        dir_fac = 1
       case(4)  ! E - back side y+1
         dir_sign = 1
         dir_fac = 1
-      case(5)  ! N - left side x-1
+      case(5)  ! B - bottom side z-1
         dir_sign = -1
-        dir_fac = 2
-      case(6)  ! B - bottom side z-1
-        dir_sign = -1
+        dir_fac = 4
+      case(6)  ! T - top side z+1
+        dir_sign = 1
         dir_fac = 4
       case default
         call abort(118118, "Lord vader, the treelib does not know the direction")

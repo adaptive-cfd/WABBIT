@@ -53,7 +53,7 @@ subroutine operator_reconstruction(params)
     allocate(params%butcher_tableau(1,1))
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
-    params%number_blocks = 8*lgt_n(tree_ID) ! to allow refinement
+    params%number_blocks = ceiling(8.0_rk*lgt_n(tree_ID) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) ! to allow refinement and adapt_tree
 
     ! Note:
     ! When comparing with the basic hand-made matlab operator script, keep in mind

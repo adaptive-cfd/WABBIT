@@ -41,7 +41,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
 
     u = 0.0_rk
 
-    if (.not. params_acm%initialized) write(*,*) "WARNING: INICOND_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: INICOND_ACM called but ACM not initialized"
 
     if (params_acm%dim==2 .and. size(u,4) /= params_acm%dim + 1 + params_acm%N_scalars) then
         call abort(23091801,"ACM: state vector has not the right number of components")

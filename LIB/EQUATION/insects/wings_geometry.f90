@@ -3,6 +3,7 @@
 ! and their solid body velocity field us. Note that us contains both contributions from
 ! body and wing motion.
 subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delete)
+
   implicit none
 
   real(kind=rk), intent(in)    :: time
@@ -21,7 +22,6 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
       write(*,*) "mask:", shape(mask), "mask_color:", shape(mask_color), "us:", shape(us)
       call abort (08021902,"Insects: arrays have wrong size..")
   endif
-
 
   if (delete) then
       if (grid_time_dependent) then

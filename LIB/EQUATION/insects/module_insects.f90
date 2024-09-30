@@ -83,9 +83,9 @@ module module_insects
   ! For both wings such a datatype is contained in the insect.
   type wingkinematics
     ! Fourier coefficients
-    real(kind=rk) :: a0_alpha=0.d0, a0_phi=0.d0, a0_theta=0.d0
-    real(kind=rk), dimension(1:nfft_max) :: ai_phi=0.d0, bi_phi=0.d0, ai_theta=0.d0, &
-      bi_theta=0.d0, ai_alpha=0.d0, bi_alpha=0.d0
+    real(kind=rk) :: a0_alpha=0.0_rk, a0_phi=0.0_rk, a0_theta=0.0_rk
+    real(kind=rk), dimension(1:nfft_max) :: ai_phi=0.0_rk, bi_phi=0.0_rk, ai_theta=0.0_rk, &
+      bi_theta=0.0_rk, ai_alpha=0.0_rk, bi_alpha=0.0_rk
     integer :: nfft_phi=0, nfft_alpha=0, nfft_theta=0
     ! coefficients are read only once from file (or set differently)
     logical :: initialized = .false.
@@ -93,10 +93,10 @@ module module_insects
     character(len=clong) :: infile_convention="", infile_type="", infile_units="", infile=""
     ! variables for kineloader (which uses non-periodic hermite interpolation)
     integer :: nk=0
-    real(kind=rk), dimension (1:nhrmt_max) :: vec_t=0.d0, &
-      vec_phi=0.d0,vec_alpha=0.d0,vec_theta=0.d0,vec_pitch=0.d0,vec_vert=0.d0,vec_horz=0.d0,  &
-      vec_phi_dt=0.d0,vec_alpha_dt=0.d0,vec_theta_dt=0.d0,vec_pitch_dt=0.d0,vec_vert_dt=0.d0, &
-      vec_horz_dt=0.d0
+    real(kind=rk), dimension (1:nhrmt_max) :: vec_t=0.0_rk, &
+      vec_phi=0.0_rk,vec_alpha=0.0_rk,vec_theta=0.0_rk,vec_pitch=0.0_rk,vec_vert=0.0_rk,vec_horz=0.0_rk,  &
+      vec_phi_dt=0.0_rk,vec_alpha_dt=0.0_rk,vec_theta_dt=0.0_rk,vec_pitch_dt=0.0_rk,vec_vert_dt=0.0_rk, &
+      vec_horz_dt=0.0_rk
   end type
 
 
@@ -108,52 +108,52 @@ module module_insects
     ! Body motion state, wing motion state and characteristic points on insect
     !-------------------------------------------------------------
     ! position of logical center, and translational velocity
-    real(kind=rk), dimension(1:3) :: xc_body_g=0.d0, vc_body_g=0.d0
+    real(kind=rk), dimension(1:3) :: xc_body_g=0.0_rk, vc_body_g=0.0_rk
     ! initial or tethered position, velocity and yawpitchroll angles:
-    real(kind=rk), dimension(1:3) :: x0=0.d0, v0=0.d0, yawpitchroll_0=0.d0
+    real(kind=rk), dimension(1:3) :: x0=0.0_rk, v0=0.0_rk, yawpitchroll_0=0.0_rk
     ! first harmonic components of the yawpitchroll angles
-    real(kind=rk), dimension(1:3) :: yawpitchroll_a1=0.d0, yawpitchroll_b1=0.d0
+    real(kind=rk), dimension(1:3) :: yawpitchroll_a1=0.0_rk, yawpitchroll_b1=0.0_rk
     ! roll pitch yaw angles and their time derivatives
-    real(kind=rk) :: psi=0.d0, beta=0.d0, gamma=0.d0, psi_dt=0.d0, beta_dt=0.d0, gamma_dt=0.d0, eta0=0.d0
+    real(kind=rk) :: psi=0.0_rk, beta=0.0_rk, gamma=0.0_rk, psi_dt=0.0_rk, beta_dt=0.0_rk, gamma_dt=0.0_rk, eta0=0.0_rk
     ! body pitch angle, if it is constant (used in forward flight and hovering)
-    real(kind=rk) :: body_pitch_const=0.d0
+    real(kind=rk) :: body_pitch_const=0.0_rk
     ! angles of the wings (left and right, second left and second right)
-    real(kind=rk) :: phi_r=0.d0, alpha_r=0.d0, theta_r=0.d0, phi_dt_r=0.d0, alpha_dt_r=0.d0, theta_dt_r=0.d0
-    real(kind=rk) :: phi_l=0.d0, alpha_l=0.d0, theta_l=0.d0, phi_dt_l=0.d0, alpha_dt_l=0.d0, theta_dt_l=0.d0
-    real(kind=rk) :: phi_r2=0.d0, alpha_r2=0.d0, theta_r2=0.d0, phi_dt_r2=0.d0, alpha_dt_r2=0.d0, theta_dt_r2=0.d0
-    real(kind=rk) :: phi_l2=0.d0, alpha_l2=0.d0, theta_l2=0.d0, phi_dt_l2=0.d0, alpha_dt_l2=0.d0, theta_dt_l2=0.d0
+    real(kind=rk) :: phi_r=0.0_rk, alpha_r=0.0_rk, theta_r=0.0_rk, phi_dt_r=0.0_rk, alpha_dt_r=0.0_rk, theta_dt_r=0.0_rk
+    real(kind=rk) :: phi_l=0.0_rk, alpha_l=0.0_rk, theta_l=0.0_rk, phi_dt_l=0.0_rk, alpha_dt_l=0.0_rk, theta_dt_l=0.0_rk
+    real(kind=rk) :: phi_r2=0.0_rk, alpha_r2=0.0_rk, theta_r2=0.0_rk, phi_dt_r2=0.0_rk, alpha_dt_r2=0.0_rk, theta_dt_r2=0.0_rk
+    real(kind=rk) :: phi_l2=0.0_rk, alpha_l2=0.0_rk, theta_l2=0.0_rk, phi_dt_l2=0.0_rk, alpha_dt_l2=0.0_rk, theta_dt_l2=0.0_rk
     ! stroke plane angle
-    real(kind=rk) :: eta_stroke=0.d0
+    real(kind=rk) :: eta_stroke=0.0_rk
     ! is the body motion state described be the STATE vector? This is the case if the
     ! free-flight solver is used, and if its results are read in postprocessing or
     ! if it used used to prescribe the body motion state from a different simulation
     logical :: quaternion_solver_used = .false.
     ! angular velocity vectors (body, left and right wings, 2nd left and 2nd right wings)
-    real(kind=rk), dimension(1:3) :: rot_body_b=0.d0, rot_body_g=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_w=0.d0, rot_rel_wing_r_w=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_b=0.d0, rot_rel_wing_r_b=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_g=0.d0, rot_rel_wing_r_g=0.d0
-    real(kind=rk), dimension(1:3) :: rot_abs_wing_l_g=0.d0, rot_abs_wing_r_g=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_w=0.d0, rot_rel_wing_r2_w=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_b=0.d0, rot_rel_wing_r2_b=0.d0
-    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_g=0.d0, rot_rel_wing_r2_g=0.d0
-    real(kind=rk), dimension(1:3) :: rot_abs_wing_l2_g=0.d0, rot_abs_wing_r2_g=0.d0
+    real(kind=rk), dimension(1:3) :: rot_body_b=0.0_rk, rot_body_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_w=0.0_rk, rot_rel_wing_r_w=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_b=0.0_rk, rot_rel_wing_r_b=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l_g=0.0_rk, rot_rel_wing_r_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_abs_wing_l_g=0.0_rk, rot_abs_wing_r_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_w=0.0_rk, rot_rel_wing_r2_w=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_b=0.0_rk, rot_rel_wing_r2_b=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_g=0.0_rk, rot_rel_wing_r2_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_abs_wing_l2_g=0.0_rk, rot_abs_wing_r2_g=0.0_rk
     ! angular acceleration vectors (left and right wings, 2nd left and 2nd right wings)
-    real(kind=rk), dimension(1:3) :: rot_dt_wing_l_w=0.d0, rot_dt_wing_r_w=0.d0
-    real(kind=rk), dimension(1:3) :: rot_dt_wing_l_g=0.d0, rot_dt_wing_r_g=0.d0
-    real(kind=rk), dimension(1:3) :: rot_dt_wing_l2_w=0.d0, rot_dt_wing_r2_w=0.d0
-    real(kind=rk), dimension(1:3) :: rot_dt_wing_l2_g=0.d0, rot_dt_wing_r2_g=0.d0
+    real(kind=rk), dimension(1:3) :: rot_dt_wing_l_w=0.0_rk, rot_dt_wing_r_w=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_dt_wing_l_g=0.0_rk, rot_dt_wing_r_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_dt_wing_l2_w=0.0_rk, rot_dt_wing_r2_w=0.0_rk
+    real(kind=rk), dimension(1:3) :: rot_dt_wing_l2_g=0.0_rk, rot_dt_wing_r2_g=0.0_rk
     ! Vector from body centre to pivot points in global reference frame
-    real(kind=rk), dimension(1:3) :: x_pivot_l_g=0.d0, x_pivot_r_g=0.d0
-    real(kind=rk), dimension(1:3) :: x_pivot_l2_g=0.d0, x_pivot_r2_g=0.d0
+    real(kind=rk), dimension(1:3) :: x_pivot_l_g=0.0_rk, x_pivot_r_g=0.0_rk
+    real(kind=rk), dimension(1:3) :: x_pivot_l2_g=0.0_rk, x_pivot_r2_g=0.0_rk
     ! vectors desribing the positoions of insect's key elements
     ! in the body coordinate system
-    real(kind=rk), dimension(1:3) :: x_head=0.d0,x_eye_r=0.d0,x_eye_l=0.d0,x_pivot_l_b=0.d0,x_pivot_r_b=0.d0
-    real(kind=rk), dimension(1:3) :: x_pivot_l2_b=0.d0,x_pivot_r2_b=0.d0
+    real(kind=rk), dimension(1:3) :: x_head=0.0_rk,x_eye_r=0.0_rk,x_eye_l=0.0_rk,x_pivot_l_b=0.0_rk,x_pivot_r_b=0.0_rk
+    real(kind=rk), dimension(1:3) :: x_pivot_l2_b=0.0_rk,x_pivot_r2_b=0.0_rk
     ! moments of inertia in the body reference frame
-    real(kind=rk) :: Jroll_body=0.d0, Jyaw_body=0.d0, Jpitch_body=0.d0
+    real(kind=rk) :: Jroll_body=0.0_rk, Jyaw_body=0.0_rk, Jpitch_body=0.0_rk
     ! total mass of insect:
-    real(kind=rk) :: mass, gravity=0.d0, gravity_y=0.d0, gravity_x=0.d0
+    real(kind=rk) :: mass, gravity=0.0_rk, gravity_y=0.0_rk, gravity_x=0.0_rk
     ! variables to decide whether to draw the body or not.
     character(len=clong) :: body_moves="yes"
     character(len=clong) :: BodySuperSTLfile="none.superstl"
@@ -163,9 +163,9 @@ module module_insects
     !-------------------------------------------------------------
     ! for free flight solver
     !-------------------------------------------------------------
-    real(kind=rk) :: time=0.d0
+    real(kind=rk) :: time=0.0_rk
     real(kind=rk), allocatable :: RHS(:,:)
-    real(kind=rk), dimension(1:20) :: STATE=0.d0
+    real(kind=rk), dimension(1:20) :: STATE=0.0_rk
     ! STATE(1) : x-position of body
     ! STATE(2) : y-position of body
     ! STATE(3) : z-position of body
@@ -186,15 +186,15 @@ module module_insects
     ! STATE(18) : x-angular velocity of left wing
     ! STATE(19) : y-angular velocity of left wing
     ! STATE(20) : z-angular velocity of left wing
-    real(kind=rk), dimension(1:6) :: DoF_on_off=0.d0
+    real(kind=rk), dimension(1:6) :: DoF_on_off=0.0_rk
     character(len=clong) :: startup_conditioner=""
     !-------------------------------------------------------------
     ! for wing fsi solver
     !-------------------------------------------------------------
     character(len=clong) :: wing_fsi="no"
-    real(kind=rk), dimension(1:3) :: torque_muscle_l_w=0.d0, torque_muscle_r_w=0.d0
-    real(kind=rk), dimension(1:3) :: torque_muscle_l_b=0.d0, torque_muscle_r_b=0.d0
-    real(kind=rk), dimension(1:3) :: init_alpha_phi_theta=0.d0
+    real(kind=rk), dimension(1:3) :: torque_muscle_l_w=0.0_rk, torque_muscle_r_w=0.0_rk
+    real(kind=rk), dimension(1:3) :: torque_muscle_l_b=0.0_rk, torque_muscle_r_b=0.0_rk
+    real(kind=rk), dimension(1:3) :: init_alpha_phi_theta=0.0_rk
     !-------------------------------------------------------------
     ! wing shape parameters
     !-------------------------------------------------------------
@@ -202,23 +202,23 @@ module module_insects
     ! R = a0/2 + SUM ( ai cos(2pi*i) + bi sin(2pi*i)  )
     ! to avoid compatibility issues, the array is of fixed size, although only
     ! the first nftt_wings entries will be used
-    real(kind=rk), dimension(1:nfft_max,1:4) :: ai_wings=0.d0, bi_wings=0.d0
-    real(kind=rk), dimension(1:4) :: a0_wings=0.d0
+    real(kind=rk), dimension(1:nfft_max,1:4) :: ai_wings=0.0_rk, bi_wings=0.0_rk
+    real(kind=rk), dimension(1:4) :: a0_wings=0.0_rk
     ! fill the R0(theta) array once, then only table-lookup instead of Fseries
-    real(kind=rk), dimension(1:25000,1:4) :: R0_table=0.d0
+    real(kind=rk), dimension(1:25000,1:4) :: R0_table=0.0_rk
     ! describes the origin of the wings system
-    real(kind=rk), dimension(1:4) :: xc=0.d0, yc=0.d0
+    real(kind=rk), dimension(1:4) :: xc=0.0_rk, yc=0.0_rk
     ! number of fft coefficients for wing geometry
     integer, dimension(1:4) :: nfft_wings=0
     logical, dimension(1:4) :: wingsetup_done = .false.
     logical, dimension(1:4) :: wings_radius_table_ready = .false.
     real(kind=rk), dimension(:), allocatable :: theta_i, R_i
     ! wing bounding box (xmin, xmax, ymin, ymax, zmin, zmax)
-    real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.d0
+    real(kind=rk) :: wing_bounding_box(1:6,1:4) = 0.0_rk
     ! wing inertia
-    real(kind=rk) :: Jxx=0.d0,Jyy=0.d0,Jzz=0.d0,Jxy=0.d0
+    real(kind=rk) :: Jxx=0.0_rk,Jyy=0.0_rk,Jzz=0.0_rk,Jxy=0.0_rk
     ! wing inertia of the second pair of wings
-    real(kind=rk) :: Jxx2=0.d0,Jyy2=0.d0,Jzz2=0.d0,Jxy2=0.d0
+    real(kind=rk) :: Jxx2=0.0_rk,Jyy2=0.0_rk,Jzz2=0.0_rk,Jxy2=0.0_rk
     character(len=clong) :: wing_thickness_distribution(1:4) = "constant"
     character(len=clong) :: pointcloudfile = "none"
     character(len=clong) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
@@ -265,13 +265,13 @@ module module_insects
     character(len=clong) :: infile="", LeftWing="", RightWing=""
     character(len=clong) :: infile2="", LeftWing2="", RightWing2=""
     ! parameters for body:
-    real(kind=rk) :: L_body=0.d0, b_body=0.d0, R_head=0.d0, R_eye=0.d0
+    real(kind=rk) :: L_body=0.0_rk, b_body=0.0_rk, R_head=0.0_rk, R_eye=0.0_rk
     ! parameters for wing shape:
-    real(kind=rk) :: b_top=0.d0, b_bot=0.d0, L_span=0.d0, WingThickness=0.d0
+    real(kind=rk) :: b_top=0.0_rk, b_bot=0.0_rk, L_span=0.0_rk, WingThickness=0.0_rk
     ! this is a safety distance for smoothing:
-    real(kind=rk) :: safety=0.d0, smooth=0.d0, C_smooth=1.0d0, dx_reference=0.0d0, C_shell_thickness=5.0d0
+    real(kind=rk) :: safety=0.0_rk, smooth=0.0_rk, C_smooth=1.0d0, dx_reference=0.0d0, C_shell_thickness=5.0d0
     ! parameter for hovering:
-    real(kind=rk) :: distance_from_sponge=0.d0
+    real(kind=rk) :: distance_from_sponge=0.0_rk
     ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
     type(Integrals), dimension(1:5) :: PartIntegrals
 
@@ -410,6 +410,8 @@ contains
       call body_rotation_matrix( Insect, Insect%M_body )
       call wing_right_rotation_matrix( Insect, Insect%M_wing_r )
       call wing_left_rotation_matrix( Insect, Insect%M_wing_l )
+  !??? functions can be merged if alpha, theta and phi are passed as arguments
+  !??? can also be merged in update_rotation_matrices
       if (Insect%second_wing_pair) then
           call wing_right2_rotation_matrix( Insect, Insect%M_wing_r2 )
           call wing_left2_rotation_matrix( Insect, Insect%M_wing_l2 )
@@ -558,7 +560,7 @@ contains
       elseif (((t-h)<x).and.(x<(t+h))) then
           steps = 0.5d0*(1.d0+dcos((x-t+h)*pi/(2.d0*h)) )
       else
-          steps = 0.d0
+          steps = 0.0_rk
       endif
 
   end function
@@ -1096,8 +1098,8 @@ contains
     dt = 1.0d-8
     Insect2 = Insect
 
-    Insect%rot_dt_wing_l_w = 0.d0
-    Insect%rot_dt_wing_r_w = 0.d0
+    Insect%rot_dt_wing_l_w = 0.0_rk
+    Insect%rot_dt_wing_r_w = 0.0_rk
 
     ! fetch motion state at time+dt
     call BodyMotion (time+dt, Insect2)
@@ -1156,7 +1158,7 @@ contains
     ! endif
     !
     ! if (root) then
-    !   t = 0.d0
+    !   t = 0.0_rk
     !   open  (17,file='test.t',status='replace')
     !   do while (t<=6.d0)
     !     call FlappingMotion_left ( t, Insect)
@@ -1215,19 +1217,19 @@ contains
           ! the body is at rest, so we will not draw it. Delete the wings, as they move.
           where (mask_color==color_l .or. mask_color==color_r .or. &
             mask_color==color_l2 .or. mask_color==color_r2)
-              mask = 0.d0
+              mask = 0.0_rk
               mask_color = 0
           end where
           ! as the body rests it has no solid body velocity, which means we can safely
           ! reset the velocity everywhere (this step is actually unnessesary, but for
           ! safety we do it as well)
-          us = 0.d0
+          us = 0.0_rk
       else
           ! the body of the insect moves, so we will construct the entire insect in this
           ! (and any other) call, and therefore we can safely reset the entire mask to zeros.
-          mask = 0.d0
+          mask = 0.0_rk
           mask_color = 0
-          us = 0.d0
+          us = 0.0_rk
       endif
 
       cleaned_already_once = .true.
@@ -1392,12 +1394,12 @@ contains
         ! for the flapping motion write to this object, and we want to prevent any
         ! unwanted side effects
         !Insect_copy = Insect ! save the insect state
-        time = 0.d0
+        time = 0.0_rk
         dt = 1.0d-3
-        phil_min = 0.d0
-        phil_max = 0.d0
-        phir_min = 0.d0
-        phir_max = 0.d0
+        phil_min = 0.0_rk
+        phil_max = 0.0_rk
+        phir_min = 0.0_rk
+        phir_max = 0.0_rk
         ! we use only one stroke ( the first one )
         do while (time < 1.d0)
           wingID = 1
@@ -1468,7 +1470,7 @@ contains
 
       ! we now have data1(i-1,1) <= time < data1(i,1)
       ! use linear interpolation
-      Insect%STATE = 0.d0
+      Insect%STATE = 0.0_rk
       Insect%STATE(1:13) = data1(i-1,2:14) + (time - data1(i-1,1)) * (data1(i,2:14)-data1(i-1,2:14)) / (data1(i,1)-data1(i-1,1))
 
       if (root .and. verbose) then

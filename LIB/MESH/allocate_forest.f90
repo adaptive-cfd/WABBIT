@@ -175,7 +175,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         ! values from MPI - reference at module_mpi%init_ghost_nodes
         mem_per_block = mem_per_block &
         + 2.0 * real(N_MAX_COMPONENTS) * real(product(Bs(1:dim)+2*g) -product(Bs(1:dim)))  &  ! real buffer ghosts, 1send 1recv
-        + 3.0 * real(max_neighbors_used) * 5.0 / 2.0 &  ! int buffer (4byte hence /2), sending 6 values each, 3 buffers exist
+        + real(max_neighbors_used) * (7.0+5.0+5.0) / 2.0 &  ! int buffer (4byte hence /2), sending for 3 buffers (7,4/5,4/5) values each
         + 2.0 * params%number_procs ! send recv buffers include one number for how many patches are send per cpu
 
         ! hvy_neighbor, hvy_family, lgt_block, lgt_sortednumlist, lgt_active

@@ -145,12 +145,13 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    character(len=*)          :: sync_case                     !< String representing which kind of syncing we want to do
+    !> String representing which kind of syncing we want to do, varies between different sync cases (betwen CMF neighbors) and restrictions (tree, level or ref)
+    character(len=*)          :: sync_case
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: s_val
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
@@ -198,7 +199,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
+    if (index(sync_case, "full") > 0) call reset_ghost_nodes( params, hvy_block, tree_ID)
 
 #endif
 
@@ -263,9 +264,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     integer(kind=ik), intent(out)   :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
     integer(kind=ik), intent(in)    :: istage              !< current stage out of three
-    character(len=*)                :: sync_case           !< String representing which kind of syncing we want to do
+    !> String representing which kind of syncing we want to do, varies between different sync cases (betwen CMF neighbors) and restrictions (tree, level or ref)
+    character(len=*)                :: sync_case
 
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: s_val
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 

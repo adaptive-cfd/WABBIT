@@ -26,7 +26,7 @@ module module_MPI
     ! send/receive buffer, integer and real
     ! allocate in init substep not in synchronize subroutine, to avoid slow down when using
     ! large numbers of processes and blocks per process, when allocating on every call to the routine
-    integer(kind=ik), PARAMETER   :: S_META_FULL = 7  ! how many metadata entries we collect in the logik-loop
+    integer(kind=ik), PARAMETER   :: S_META_FULL = 7  ! how many metadata entries we collect in the logic-loop
 #ifdef DEV
     integer(kind=ik), PARAMETER   :: S_META_SEND = 5  ! how many metadata entries will be send, plus rank
 #else
@@ -158,16 +158,13 @@ subroutine init_ghost_nodes( params )
         ! synchronize buffer length
         ! assume: all blocks are used, all blocks have external neighbors,
         ! max number of active neighbors per stage: 2D = 12+8+8, 3D = 56+24+24, being on lvl J+1,J,J-1
+        ! per neighborhood relation, we save S_META_FULL and send S_META_SEND integers as metadata in the int_buffer
         if ( params%dim == 3 ) then
             !---3d---3d---
-            ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 56+24+24 neighbors ACTIVE per block per stage for full tree grid
-            buffer_N_int = number_blocks * (56+24+24) * S_META_SEND
+            buffer_N_int = number_blocks * (56+24+24)
         else
             !---2d---2d---
-            ! per neighborhood relation, we send 6 integers as metadata in the int_buffer
-            ! at most, we can have 12+8+8 neighbors ACTIVE per block per stage for full tree grid
-            buffer_N_int = number_blocks * (12+8+8) * S_META_SEND
+            buffer_N_int = number_blocks * (12+8+8)
         end if
 
         ! size of ghost nodes buffer. Note this contains only the ghost nodes layer
@@ -201,9 +198,9 @@ subroutine init_ghost_nodes( params )
         ! wait now so that if allocation fails, we get at least the above info
         call MPI_barrier( WABBIT_COMM, status(1))
 
-        allocate( meta_send_all(1:buffer_N_int), stat=status(1) )
-        allocate( rData_sendBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(3) )
-        allocate( rData_recvBuffer(1:buffer_N+buffer_N_int+Ncpu), stat=status(4) )
+        allocate( meta_send_all(1:buffer_N_int*S_META_FULL), stat=status(1) )
+        allocate( rData_sendBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(3) )
+        allocate( rData_recvBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(4) )
         memory_this = (product(real(shape(meta_send_all)))+product(real(shape(rData_sendBuffer)))+product(real(shape(rData_recvBuffer))))*8.0e-9
         memory_total = memory_total + memory_this
 

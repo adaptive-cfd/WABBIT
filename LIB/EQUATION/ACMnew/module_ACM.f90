@@ -433,19 +433,23 @@ end subroutine
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
     if (params_acm%geometry == "lamballais") then
         ! read us field
-        call count_lines_in_ascii_file(params_acm%file_usx, num_lines, 0)
+        call count_lines_in_ascii_file_mpi(params_acm%file_usx, num_lines, 0)
         ! avoid maxcolumns restriction (read in a single long column and reshape)
         allocate(buffer_array(1:num_lines,1:1))
-        call read_array_from_ascii_file(params_acm%file_usx, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usx, buffer_array, 0)
+
+        if (num_lines /= nx_max**2) then
+            call abort(2410011, "Lamballais: you seem to read the wrong field (size mismatch?!)")
+        endif
 
         allocate(params_acm%u_lamballais(0:nx_max-1, 0:nx_max-1, 1:3))
         ! reshape
         params_acm%u_lamballais(:,:,1) = reshape(buffer_array, (/nx_max, nx_max/))
 
-        call read_array_from_ascii_file(params_acm%file_usy, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usy, buffer_array, 0)
         params_acm%u_lamballais(:,:,2) = reshape(buffer_array, (/nx_max, nx_max/))
 
-        call read_array_from_ascii_file(params_acm%file_usp, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usp, buffer_array, 0)
         params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
     endif
 

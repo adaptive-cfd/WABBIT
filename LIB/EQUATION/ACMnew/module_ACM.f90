@@ -432,11 +432,16 @@ end subroutine
     ! read lamballais reference fields, see
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
     if (params_acm%geometry == "lamballais") then
+        if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
+        
         ! read us field
         call count_lines_in_ascii_file_mpi(params_acm%file_usx, num_lines, 0)
         ! avoid maxcolumns restriction (read in a single long column and reshape)
         allocate(buffer_array(1:num_lines,1:1))
         call read_array_from_ascii_file_mpi(params_acm%file_usx, buffer_array, 0)
+
+        write(*,*) "lamballais num_lines", num_lines, nx_max
+
 
         if (num_lines /= nx_max**2) then
             call abort(2410011, "Lamballais: you seem to read the wrong field (size mismatch?!)")

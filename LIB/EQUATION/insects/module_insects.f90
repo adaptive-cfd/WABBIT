@@ -632,8 +632,8 @@ contains
     ! relative angular velocity, in global system
     omrel = Insect%rot_rel_wing_l_g
 
-    ! compute moment with respect to the pivot point
-    ! initialize it as the moment with respect to insect's centre point
+    ! the aerodyn moment is computed in global system and readily w.r.t. insects hinge
+    ! points (in statistics_ACM.f90)
     momrel = Insect%PartIntegrals(color_l)%Torque + &
              Insect%PartIntegrals(color_l)%Torque_unst
 
@@ -646,8 +646,8 @@ contains
     ! relative angular velocity, in global system
     omrel = Insect%rot_rel_wing_r_g
 
-    ! compute moment with respect to the pivot point
-    ! initialize it as the moment with respect to insect's centre point
+    ! the aerodyn moment is computed in global system and readily w.r.t. insects hinge
+    ! points (in statistics_ACM.f90)
     momrel = Insect%PartIntegrals(color_r)%Torque + &
              Insect%PartIntegrals(color_r)%Torque_unst
 
@@ -672,8 +672,6 @@ contains
         ! relative angular velocity, in global system
         omrel = Insect%rot_rel_wing_l2_g
 
-        ! compute moment with respect to the pivot point
-        ! initialize it as the moment with respect to insect's centre point
         momrel = Insect%PartIntegrals(color_l2)%Torque + &
                  Insect%PartIntegrals(color_l2)%Torque_unst
 
@@ -684,8 +682,6 @@ contains
         ! relative angular velocity, in global system
         omrel = Insect%rot_rel_wing_r2_g
 
-        ! compute moment with respect to the pivot point
-        ! initialize it as the moment with respect to insect's centre point
         momrel = Insect%PartIntegrals(color_r2)%Torque + &
                  Insect%PartIntegrals(color_r2)%Torque_unst
 

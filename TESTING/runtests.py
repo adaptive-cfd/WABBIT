@@ -89,6 +89,11 @@ tests = [
         {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_bumblebee", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_emundus_4wings", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_muscaComplete", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_dipteraFourier", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_dipteraHermite", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_dipteraBodyRotation", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_paratuposaComplete", "wavelet":"CDF22", "dim":3},
 
         f"---{group_names[8]}---",  # group identifier
         {"test_name":"denoise", "wavelet":"CDF42", "dim":2},
@@ -166,7 +171,7 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
         elif self.test_name == "acm":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"acm_cyl_adaptive_{self.wavelet}")
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", f"{self.test_name}_{self.wavelet}")
         elif self.test_name == "denoise":
             self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"denoise_{self.wavelet}")
@@ -270,7 +275,7 @@ class WabbitTest:
             os.chdir(self.test_dir)
             return result1
         # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete"]:
             ini_file = os.path.join("..", "PARAMS_dry_run.ini")  # relative to tmp_dir
 
             # change to directory to tmp
@@ -279,7 +284,7 @@ class WabbitTest:
             os.chdir(tmp_dir)
 
             save_us = ""
-            if self.test_name in ["dry_emundus_4wings"]:
+            if self.test_name in ["dry_emundus_4wings", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", "dry_paratuposaComplete"]:
                 save_us = "--save-us"
 
             # run simmulation
@@ -347,7 +352,7 @@ class WabbitTest:
             log_file = os.path.join(self.test_dir, "blob-convection.log")
         elif self.test_name == "acm":
             log_file = os.path.join(self.test_dir, "acm_cyl.log")
-        elif self.test_name in ["dry_fractal_tree", "dry_bumblebee", "dry_emundus_4wings"]:
+        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_bumblebee", "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete"]:
             log_file = os.path.join(self.test_dir, "dry_run.log")
         elif self.test_name == "denoise":
             log_file = os.path.join(self.test_dir, "denoise.log")

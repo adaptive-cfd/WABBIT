@@ -53,71 +53,71 @@ subroutine BodyMotion(time, Insect)
         read (dummy,*) gamma
 
         Insect%body_moves = "no"
-        psi_dt   = 0.d0
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
-        vc = (/0.d0, 0.d0, 0.d0/) ! tethered: no velocity
+        psi_dt   = 0.0_rk
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
+        vc = (/0.0_rk, 0.0_rk, 0.0_rk/) ! tethered: no velocity
 
         if(root) write(*,'("x=",g12.4,"y=",g12.4,"z=",g12.4)') xc
         if(root) write(*,'("psi=",g12.4,"beta=",g12.4,"gamma=",g12.4)') psi,beta,gamma
 
     case ("yawpitchroll")
-        psi      = 30.d0*pi/180.d0*sin(2.d0*pi*time)
-        beta     = 30.d0*pi/180.d0*sin(2.d0*pi*time) ! pitch
-        gamma    = 30.d0*pi/180.d0*sin(2.d0*pi*time)
-        psi_dt   = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
-        beta_dt  = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
-        gamma_dt = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
+        psi      = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time)
+        beta     = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time) ! pitch
+        gamma    = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time)
+        psi_dt   = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
+        beta_dt  = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
+        gamma_dt = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
         xc = Insect%x0 + time*Insect%v0
         vc = Insect%v0
         Insect%body_moves = "yes"
 
     case ("buffeting")
-        psi      = -7.d0*pi/180.d0*sin(2.d0*pi*(23d0/152.d0)*time) ! roll
-        beta     = -24.5d0*pi/180.d0 ! pitch
-        gamma    = 180.d0*pi/180.d0 ! yaw
-        psi_dt   = -7.d0*pi/180.d0*cos(2.d0*pi*(23.d0/152.d0)*time)*2.d0*pi*(23.d0/152.d0)
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
+        psi      = -7._rk*pi/180.0_rk*sin(2.0_rk*pi*(23_rk/152.0_rk)*time) ! roll
+        beta     = -24.5_rk*pi/180.0_rk ! pitch
+        gamma    = 180.0_rk*pi/180.0_rk ! yaw
+        psi_dt   = -7._rk*pi/180.0_rk*cos(2.0_rk*pi*(23._rk/152.0_rk)*time)*2.0_rk*pi*(23._rk/152.0_rk)
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
         xc = Insect%x0
-        xc(2) = xc(2) - 0.45d0/13.2d0*sin(2.d0*pi*(23.d0/152.d0)*time)
-        vc = (/0.0d0, -0.45d0/13.2d0*cos(2.d0*pi*(23.d0/152.d0)*time)*2.d0*pi*(23.d0/152.d0), 0.0d0/)
+        xc(2) = xc(2) - 0.45_rk/13.2_rk*sin(2.0_rk*pi*(23._rk/152.0_rk)*time)
+        vc = (/0.0_rk, -0.45_rk/13.2_rk*cos(2.0_rk*pi*(23._rk/152.0_rk)*time)*2.0_rk*pi*(23._rk/152.0_rk), 0.0_rk/)
         Insect%body_moves = "yes"
 
     case ("casting")
-        psi      = -20.d0*pi/180.d0*sin(2.d0*pi*(2d0/152.d0)*time) ! roll
-        beta     = -24.5d0*pi/180.d0 ! pitch
-        gamma    = 180.d0*pi/180.d0 ! yaw
-        psi_dt   = -20.d0*pi/180.d0*cos(2.d0*pi*(2.d0/152.d0)*time)*2.d0*pi*(2.d0/152.d0)
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
+        psi      = -20.0_rk*pi/180.0_rk*sin(2.0_rk*pi*(2_rk/152.0_rk)*time) ! roll
+        beta     = -24.5_rk*pi/180.0_rk ! pitch
+        gamma    = 180.0_rk*pi/180.0_rk ! yaw
+        psi_dt   = -20.0_rk*pi/180.0_rk*cos(2.0_rk*pi*(2.0_rk/152.0_rk)*time)*2.0_rk*pi*(2.0_rk/152.0_rk)
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
         xc = Insect%x0
-        xc(2) = xc(2) + 22.d0/13.2d0*sin(2.d0*pi*(2.d0/152.d0)*time)
-        vc = (/0.0d0, 22.d0/13.2d0*cos(2.d0*pi*(2.d0/152.d0)*time)*2.d0*pi*(2.d0/152.d0), 0.0d0/)
+        xc(2) = xc(2) + 22.0_rk/13.2_rk*sin(2.0_rk*pi*(2.0_rk/152.0_rk)*time)
+        vc = (/0.0_rk, 22.0_rk/13.2_rk*cos(2.0_rk*pi*(2.0_rk/152.0_rk)*time)*2.0_rk*pi*(2.0_rk/152.0_rk), 0.0_rk/)
         Insect%body_moves = "yes"
 
     case ("roll_param")
         ! Roll motion for aerodynamic power analysis
         ! Bumblebee model, wingbeat frequency 152 Hz, roll frequency 25 Hz, pitch angle 24.5 deg nose up
-        !    psi      = -60.d0  *pi/180.d0*sin(2.d0*pi*(25d0/152.d0)*time) ! roll
-        psi      = -60.d0  *pi/180.d0*sin(2.d0*pi*(6.25d0/152.d0)*time) ! roll
-        beta     = -24.5d0*pi/180.d0 ! pitch
-        gamma    = 180.d0*pi/180.d0 ! yaw
-        !    psi_dt   = -60.d0  *pi/180.d0*cos(2.d0*pi*(25.d0/152.d0)*time)*2.d0*pi*(25.d0/152.d0)
-        psi_dt   = -60.d0  *pi/180.d0*cos(2.d0*pi*(6.25d0/152.d0)*time)*2.d0*pi*(6.25d0/152.d0)
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
+        !    psi      = -60.0_rk  *pi/180.0_rk*sin(2.0_rk*pi*(25_rk/152.0_rk)*time) ! roll
+        psi      = -60.0_rk  *pi/180.0_rk*sin(2.0_rk*pi*(6.25_rk/152.0_rk)*time) ! roll
+        beta     = -24.5_rk*pi/180.0_rk ! pitch
+        gamma    = 180.0_rk*pi/180.0_rk ! yaw
+        !    psi_dt   = -60.0_rk  *pi/180.0_rk*cos(2.0_rk*pi*(25._rk/152.0_rk)*time)*2.0_rk*pi*(25._rk/152.0_rk)
+        psi_dt   = -60.0_rk  *pi/180.0_rk*cos(2.0_rk*pi*(6.25_rk/152.0_rk)*time)*2.0_rk*pi*(6.25_rk/152.0_rk)
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
     case ("roll")
-        psi      = 30.d0*pi/180.d0*sin(2.d0*pi*time)
-        beta     = 0.d0 ! pitch
-        gamma    = 0.d0 ! yaw
-        psi_dt   = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
+        psi      = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time)
+        beta     = 0.0_rk ! pitch
+        gamma    = 0.0_rk ! yaw
+        psi_dt   = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
@@ -125,48 +125,48 @@ subroutine BodyMotion(time, Insect)
     case ("pitch_param")
         ! Pitch motion for aerodynamic power analysis
         psi      = Insect%yawpitchroll_0(3) ! roll
-        !beta     = Insect%yawpitchroll_0(2) +  15.d0  *pi/180.d0*cos(2.d0*pi*time) ! pitch
-        beta     = Insect%yawpitchroll_0(2) + 5.39d0*pi/180.d0*cos(2.d0*pi*time) + 12.75d0*pi/180.d0*sin(2.d0*pi*time) ! pitch - Paratuposa #5
+        !beta     = Insect%yawpitchroll_0(2) +  15._rk  *pi/180.0_rk*cos(2.0_rk*pi*time) ! pitch
+        beta     = Insect%yawpitchroll_0(2) + 5.39_rk*pi/180.0_rk*cos(2.0_rk*pi*time) + 12.75_rk*pi/180.0_rk*sin(2.0_rk*pi*time) ! pitch - Paratuposa #5
         gamma    = Insect%yawpitchroll_0(1) ! yaw
-        psi_dt   = 0.d0
-        !beta_dt  = - 15.d0  *pi/180.d0*sin(2.d0*pi*time)*2.d0*pi
-        beta_dt  = ( - 5.39d0*sin(2.d0*pi*time) + 12.75d0*cos(2.d0*pi*time) )*2.d0*pi*pi/180.d0 ! Paratuposa #5
+        psi_dt   = 0.0_rk
+        !beta_dt  = - 15._rk  *pi/180.0_rk*sin(2.0_rk*pi*time)*2.0_rk*pi
+        beta_dt  = ( - 5.39_rk*sin(2.0_rk*pi*time) + 12.75_rk*cos(2.0_rk*pi*time) )*2.0_rk*pi*pi/180.0_rk ! Paratuposa #5
 
-        gamma_dt = 0.d0
+        gamma_dt = 0.0_rk
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
     case ("pitch")
-        psi      = 0.d0
-        beta     = 30.d0*pi/180.d0*sin(2.d0*pi*time)
-        gamma    = 0.d0 ! yaw
-        psi_dt   = 0.d0
-        beta_dt  = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
-        gamma_dt = 0.d0
+        psi      = 0.0_rk
+        beta     = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time)
+        gamma    = 0.0_rk ! yaw
+        psi_dt   = 0.0_rk
+        beta_dt  = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
+        gamma_dt = 0.0_rk
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
     case ("yaw")
-        psi      = 0.d0
-        beta     = 0.d0
-        gamma    = 30.d0*pi/180.d0*sin(2.d0*pi*time)
-        psi_dt   = 0.d0
-        beta_dt  = 0.d0
-        gamma_dt = 30.d0*pi/180.d0*cos(2.d0*pi*time)*2.d0*pi
+        psi      = 0.0_rk
+        beta     = 0.0_rk
+        gamma    = 30.0_rk*pi/180.0_rk*sin(2.0_rk*pi*time)
+        psi_dt   = 0.0_rk
+        beta_dt  = 0.0_rk
+        gamma_dt = 30.0_rk*pi/180.0_rk*cos(2.0_rk*pi*time)*2.0_rk*pi
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
 
     case ("yawpitchroll_param")
         ! Harmonic yaw, pitch and roll oscillation
-        psi      = Insect%yawpitchroll_0(3) + Insect%yawpitchroll_a1(3)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(3)*sin(2.d0*pi*time) ! roll
-        beta     = Insect%yawpitchroll_0(2) + Insect%yawpitchroll_a1(2)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(2)*sin(2.d0*pi*time) ! pitch
-        gamma    = Insect%yawpitchroll_0(1) + Insect%yawpitchroll_a1(1)*cos(2.d0*pi*time) + Insect%yawpitchroll_b1(1)*sin(2.d0*pi*time) ! yaw
-        psi_dt   = ( - Insect%yawpitchroll_a1(3)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(3)*cos(2.d0*pi*time) )*2.d0*pi
-        beta_dt  = ( - Insect%yawpitchroll_a1(2)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(2)*cos(2.d0*pi*time) )*2.d0*pi
-        gamma_dt = ( - Insect%yawpitchroll_a1(1)*sin(2.d0*pi*time) + Insect%yawpitchroll_b1(1)*cos(2.d0*pi*time) )*2.d0*pi
+        psi      = Insect%yawpitchroll_0(3) + Insect%yawpitchroll_a1(3)*cos(2.0_rk*pi*time) + Insect%yawpitchroll_b1(3)*sin(2.0_rk*pi*time) ! roll
+        beta     = Insect%yawpitchroll_0(2) + Insect%yawpitchroll_a1(2)*cos(2.0_rk*pi*time) + Insect%yawpitchroll_b1(2)*sin(2.0_rk*pi*time) ! pitch
+        gamma    = Insect%yawpitchroll_0(1) + Insect%yawpitchroll_a1(1)*cos(2.0_rk*pi*time) + Insect%yawpitchroll_b1(1)*sin(2.0_rk*pi*time) ! yaw
+        psi_dt   = ( - Insect%yawpitchroll_a1(3)*sin(2.0_rk*pi*time) + Insect%yawpitchroll_b1(3)*cos(2.0_rk*pi*time) )*2.0_rk*pi
+        beta_dt  = ( - Insect%yawpitchroll_a1(2)*sin(2.0_rk*pi*time) + Insect%yawpitchroll_b1(2)*cos(2.0_rk*pi*time) )*2.0_rk*pi
+        gamma_dt = ( - Insect%yawpitchroll_a1(1)*sin(2.0_rk*pi*time) + Insect%yawpitchroll_b1(1)*cos(2.0_rk*pi*time) )*2.0_rk*pi
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "yes"
@@ -175,9 +175,9 @@ subroutine BodyMotion(time, Insect)
         psi      = Insect%yawpitchroll_0(3) ! roll
         beta     = Insect%yawpitchroll_0(2) ! pitch
         gamma    = Insect%yawpitchroll_0(1) ! yaw
-        psi_dt   = 0.d0  ! tethered: angles const
-        beta_dt  = 0.d0
-        gamma_dt = 0.d0
+        psi_dt   = 0.0_rk  ! tethered: angles const
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
         xc = Insect%x0
         vc = (/0.0, 0.0, 0.0/) ! tethered: no velocity
         Insect%body_moves = "no" ! tethered: body does not move
@@ -210,14 +210,9 @@ subroutine BodyMotion(time, Insect)
         gamma    = atan2(2*(ep(1)*ep(2) + ep(0)*ep(3)), ep(0)*ep(0) + ep(1)*ep(1) - ep(2)*ep(2) - ep(3)*ep(3))
 
         ! these values cannot easily be computed, but they are not really necessary
-        psi_dt   = 0.0d0
-        beta_dt  = 0.0d0
-        gamma_dt = 0.0d0
-
-        ! if (Insect%wing_fsi /= "yes") then
-        !     ! output on screen
-        !     if(root) write(*,'("free--flight: ",f12.4,2x,9(es12.4,1x))') time, xc, vc, Insect%rot_body_b
-        ! endif
+        psi_dt   = 0.0_rk
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
 
     case default
         if (Insect%BodyMotion(1:11) == "from_file::") then
@@ -243,9 +238,9 @@ subroutine BodyMotion(time, Insect)
             gamma    = atan2(2*(ep(1)*ep(2) + ep(0)*ep(3)), ep(0)*ep(0) + ep(1)*ep(1) - ep(2)*ep(2) - ep(3)*ep(3))
 
             ! these values cannot easily be computed, but they are not really necessary
-            psi_dt   = 0.0d0
-            beta_dt  = 0.0d0
-            gamma_dt = 0.0d0
+            psi_dt   = 0.0_rk
+            beta_dt  = 0.0_rk
+            gamma_dt = 0.0_rk
 
         else
             call abort(220918, "body_motion.f90::BodyMotion: motion case &
@@ -256,7 +251,7 @@ subroutine BodyMotion(time, Insect)
 
 
 
-    if ((root).and.(maxval(vc)>0.0d0).and.(Insect%body_moves=="no")) then
+    if ((root).and.(maxval(vc)>0.0_rk).and.(Insect%body_moves=="no")) then
         write(*,*) "error in body_motion.f90: I found maxval(vc)>0 but the body_moves"
         write(*,*) "flag is set to no, which means we will draw the body only once"
         write(*,*) "This is probably not intented - you should look into it."

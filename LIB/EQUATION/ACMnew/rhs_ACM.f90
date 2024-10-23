@@ -536,7 +536,12 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                       + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
 
                 div_U = u_dx + v_dy
-
+! mask (chi) (:,:,1)
+                ! usx (:,:,2)
+                ! usy (:,:,3)
+                ! usz (:,:,4)
+                ! color (.;.5)
+                ! sponge (:,:,6)
                 penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
                 penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
@@ -709,6 +714,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! --------------------------------------------------------------------------
     ! sponge term.
     ! --------------------------------------------------------------------------
+    ! HACK
     if (.not. params_acm%geometry == "lamballais") then
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse

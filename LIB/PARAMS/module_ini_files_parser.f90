@@ -521,7 +521,7 @@ module module_ini_files_parser
                     params_vector = defaultvalue
                 else
                     ! return zeros
-                    params_vector = 0.d0
+                    params_vector = 0.0_rk
                     write (value,formatstring) params_vector
                     value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
                 endif

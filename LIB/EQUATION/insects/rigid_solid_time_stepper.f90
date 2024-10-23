@@ -37,10 +37,10 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     real(kind=rk) :: omx,omy,omz, Jxx,Jyy,Jzz
     real(kind=rk), dimension(0:3) :: ep
     real(kind=rk), dimension(1:3) :: ROT, torque_body
-    real(kind=rk), dimension(1:3,1:3) :: M_body, M_wing_l
+    real(kind=rk), dimension(1:3,1:3) :: M_g2b, M_b2w_l
 
     ! initialization
-    rhs = 0.d0
+    rhs = 0.0_rk
 
     if (Insect%BodyMotion /= "free_flight") then
         call abort(900,"Insect%BodyMotion"//trim(adjustl(Insect%BodyMotion))//" but using free-flight?")
@@ -55,10 +55,10 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     ! extract rotation (unit) quaternion from state vector, and create the rotation
     ! matrix from it.
     ep = Insect%STATE(7:10)
-    call rotation_matrix_from_quaternion( ep, M_body )
+    call rotation_matrix_from_quaternion( ep, M_g2b )
     ! The equations of motion for the rotation are written in the body reference
     ! frame, thus the fluid torque has to be transformed to the body system
-    torque_body = matmul( M_body, torque_g )
+    torque_body = matmul( M_g2b, torque_g )
 
     ! extract angular velocity vector from state vector
     ! note this is actually rot_body_b
@@ -66,9 +66,9 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
 
     ! startup conditioner (to avoid problems with impulsively started motion)
     if (Insect%startup_conditioner=="yes") then
-        s = startup_conditioner(time, 0.1d0, 0.5d0)
+        s = startup_conditioner(time, 0.1_rk, 0.5_rk)
     else
-        s = 1.d0
+        s = 1._rk
     endif
 
     !-----------------------------------------------------------------------------
@@ -103,10 +103,10 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     rhs(5) = s*force_g(2)/m + Insect%gravity_y
     rhs(6) = s*force_g(3)/m + Insect%gravity
     ! integrate quaternion attitudes
-    rhs(7)  = 0.5d0*(-ep(1)*ROT(1)-ep(2)*ROT(2)-ep(3)*ROT(3))
-    rhs(8)  = 0.5d0*(+ep(0)*ROT(1)-ep(3)*ROT(2)+ep(2)*ROT(3))
-    rhs(9)  = 0.5d0*(+ep(3)*ROT(1)+ep(0)*ROT(2)-ep(1)*ROT(3))
-    rhs(10) = 0.5d0*(-ep(2)*ROT(1)+ep(1)*ROT(2)+ep(0)*ROT(3))
+    rhs(7)  = 0.5_rk*(-ep(1)*ROT(1)-ep(2)*ROT(2)-ep(3)*ROT(3))
+    rhs(8)  = 0.5_rk*(+ep(0)*ROT(1)-ep(3)*ROT(2)+ep(2)*ROT(3))
+    rhs(9)  = 0.5_rk*(+ep(3)*ROT(1)+ep(0)*ROT(2)-ep(1)*ROT(3))
+    rhs(10) = 0.5_rk*(-ep(2)*ROT(1)+ep(1)*ROT(2)+ep(0)*ROT(3))
     ! integrate angular velocities
     rhs(11) = ( (Jy-Jz)*ROT(2)*ROT(3) + s*torque_body(1) )/Jx
     rhs(12) = ( (Jz-Jx)*ROT(3)*ROT(1) + s*torque_body(2) )/Jy
@@ -129,74 +129,6 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
         call append_t_file('forces_rk.t', (/time, rhs(3), rhs(6), force_g(3)/))
     endif
 
-    !**********************************
-    !** Wing fsi model               **
-    !**********************************
-    ! wing fsi solver is used. we therefore have to solve 7 equations for the left
-    ! wing, which are the quaternion components and the angular velocity
-    ! if (Insect%wing_fsi == "yes") then
-    !     ! the wing fsi model must assume resting body: if not, we have a more complicated
-    !     ! multi-body problem to solve
-    !     if (maxval(Insect%DoF_on_off) == 1) then
-    !         call abort(1313,"you must not use wing fsi AND body fsi at the same time")
-    !     endif
-    !     ! for the model, we indeed need the wing inertia..
-    !     if (maxval( (/Insect%Jxx,Insect%Jyy,Insect%Jzz,Insect%Jxy/) ) < 1.0d-8) then
-    !         call abort(1314,"you forgot to set wing inertia tensor...")
-    !     endif
-    !
-    !     Insect%STATE(19:20) =Insect%STATE(19:20) *0.d0
-    !
-    !     ! define abbreviations for simplicity
-    !     Jxx = Insect%Jxx
-    !     Jyy = Insect%Jyy
-    !     Jzz = Insect%Jzz
-    !     Jxy = Insect%Jxy
-    !     ep = Insect%STATE(14:17)
-    !
-    !     call body_rotation_matrix( Insect, M_body )
-    !     call wing_left_rotation_matrix( Insect, M_wing_l )
-    !     ! get the current muscle moment
-    !     call muscle_moment(time, Insect)
-    !
-    !     ! aero parts
-    !     T_wing_g = Insect%PartIntegrals(2)%Torque(1:3)
-    !     T_wing_w = matmul(M_wing_l,matmul(M_body,T_wing_g)) + Insect%torque_muscle_l_b
-    !     ! T_wing_w = matmul(M_wing_l,matmul(M_body,T_wing_g)) + matmul(M_wing_l, Insect%torque_muscle_l_b)
-    !
-    !     ! T_wing_w = T_wing_w +  Insect%torque_muscle_l_b
-    !
-    !     ! total torque in wing system with startup conditioner 's'
-    !     Tx = T_wing_w(1) * s
-    !     Ty = T_wing_w(2) * s
-    !     Tz = T_wing_w(3) * s
-    !
-    !     ! angular velocity components
-    !     omx = Insect%STATE(18)
-    !     omy = Insect%STATE(19)
-    !     omz = Insect%STATE(20)
-    !
-    !     Insect%RHS_this(14) = (-ep(1)*omx-ep(2)*omy-ep(3)*omz)/2.d0   ! 1st quaternion component
-    !     Insect%RHS_this(15) = (+ep(0)*omx-ep(3)*omy+ep(2)*omz)/2.d0   ! 2nd quaternion component
-    !     Insect%RHS_this(16) = (+ep(3)*omx+ep(0)*omy-ep(1)*omz)/2.d0   ! 3rd quaternion component
-    !     Insect%RHS_this(17) = (-ep(2)*omx+ep(1)*omy+ep(0)*omz)/2.d0   ! 4th quaternion component
-    !
-    !     ! x-component ang. velocity
-    !     Insect%RHS_this(18) = Jxy*(Ty-omz*(Jxx*omx+Jxy*omy)+Jzz*omx*omy) -(Jyy*(Tx+omz*(Jxy*omx+Jyy*omy)-Jzz*omy*omz))
-    !     Insect%RHS_this(18) = Insect%RHS_this(18) / (Jxy**2-Jxx*Jyy)
-    !     ! y-component ang. velocity
-    !     Insect%RHS_this(19) = Jxy*(Tx+omz*(Jyy*omy+Jxy*omx)-Jzz*omy*omz) -(Jxx*(Ty-omz*(Jxy*omy+Jxx*omx)+Jzz*omx*omz))
-    !     Insect%RHS_this(19) = Insect%RHS_this(19) / (Jxy**2-Jxx*Jyy)
-    !     ! z-component ang. velocity
-    !     Insect%RHS_this(20) = (Tz+omy*(Jxx*omx+Jxy*omy)-omx*(Jxy*omx+Jyy*omy))/Jzz
-    !
-    !     if (root) then
-    !         write(*,'("t=",f8.4,2x,3(es12.4,1x),"// ",3(es12.4,1x),"// ",3(es12.4,1x),&
-    !         &" alpha=",f6.2," phi=",f6.2," theta=",f6.2)') &
-    !         time, T_wing_w, Insect%torque_muscle_l_b, Insect%STATE(18:20), &
-    !         rad2deg(Insect%alpha_l), rad2deg(Insect%phi_l), rad2deg(Insect%theta_l)
-    !     endif
-    ! endif
 end subroutine
 
 
@@ -213,7 +145,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup)
     real(kind=rk), dimension(0:3) :: ep
 
     Insect%time = time
-    Insect%STATE = 0.d0
+    Insect%STATE = 0.0_rk
     n_header = 0
 
     if (root) write(*,'(A)') "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
@@ -277,12 +209,12 @@ subroutine rigid_solid_init(time, Insect, resume_backup)
         Insect%psi   = Insect%yawpitchroll_0(3)
         Insect%xc_body_g = Insect%x0
         Insect%vc_body_g = Insect%v0
-        Insect%rot_body_b = 0.d0
+        Insect%rot_body_b = 0.0_rk
 
         ! create initial value for attitude quaternion
-        yaw   =  Insect%gamma / 2.d0
-        pitch =  Insect%beta  / 2.d0
-        roll  =  Insect%psi   / 2.d0
+        yaw   =  Insect%gamma / 2.0_rk
+        pitch =  Insect%beta  / 2.0_rk
+        roll  =  Insect%psi   / 2.0_rk
         Insect%STATE(7) = cos(roll)*cos(pitch)*cos(yaw) + sin(roll)*sin(pitch)*sin(yaw)
         Insect%STATE(8) = sin(roll)*cos(pitch)*cos(yaw) - cos(roll)*sin(pitch)*sin(yaw)
         Insect%STATE(9) = cos(roll)*sin(pitch)*cos(yaw) + sin(roll)*cos(pitch)*sin(yaw)
@@ -291,31 +223,6 @@ subroutine rigid_solid_init(time, Insect, resume_backup)
         Insect%STATE(1:3) = Insect%xc_body_g
         Insect%STATE(4:6) = Insect%vc_body_g
         Insect%STATE(11:13) = Insect%rot_body_b
-
-        !**********************************
-        !** Wing fsi model               **
-        !**********************************
-        ! if in use, inititalize the wing-fsi solver here. The tasks are similar to the
-        ! free flight solver:
-        ! (a) initialize the quaternion state from the initial values of the wing angles
-        ! (c) initialize angular velocity and acceleration (maybe zero?)
-        ! (d) if applicable, read muscle moment in body system from file
-        if ( Insect%wing_fsi == "yes" ) then
-            ! the intial angles are read from the parameter file. note division by 2 is
-            ! because of the quaternion, it does not divide the desired angle by two.
-            a = deg2rad( Insect%init_alpha_phi_theta(1) ) / 2.d0  ! alpha
-            p = deg2rad( Insect%init_alpha_phi_theta(2) ) / 2.d0  ! phi
-            t = deg2rad( Insect%init_alpha_phi_theta(3) ) / 2.d0  ! theta
-
-            Insect%STATE(14) = cos(a)*cos(t)*cos(p) + sin(a)*sin(t)*sin(p)  ! 1st quaternion component
-            Insect%STATE(15) = cos(a)*cos(t)*sin(p) - sin(a)*cos(p)*sin(t)  ! 2nd quaternion component
-            Insect%STATE(16) =-cos(a)*sin(t)*sin(p) + cos(t)*cos(p)*sin(a)  ! 3rd quaternion component
-            Insect%STATE(17) = cos(a)*cos(p)*sin(t) + sin(a)*cos(t)*sin(p)  ! 4th quaternion component
-
-            Insect%STATE(18) = 0.d0    ! x-component ang. velocity
-            Insect%STATE(19) = 0.d0    ! x-component ang. velocity
-            Insect%STATE(20) = 0.d0    ! x-component ang. velocity
-        endif
     endif ! of backup/no backup if
 
 

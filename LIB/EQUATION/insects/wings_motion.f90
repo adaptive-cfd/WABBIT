@@ -12,30 +12,9 @@ subroutine FlappingMotionWrap ( time, Insect, wingID )
 
   select case ( wingID )
   case (1) !("left")
-    if (Insect%wing_fsi == "yes") then
-      !**********************************
-      !** Wing fsi model               **
-      !**********************************
-      ! the angles that we return here as postprocessing quantities for better
-      ! interpretation of the output. they are NOT used to compute the wing rotation
-      ! matrix, which is instead computed from the wing quaternion
-      ep = Insect%STATE(14:17)
-      Insect%phi_l   = atan2( 2.d0*ep(2)*ep(3)+2.d0*ep(0)*ep(1), ep(2)**2-ep(3)**2+ep(0)**2-ep(1)**2)
-      Insect%alpha_l = atan2(2.d0*ep(1)*ep(3)+2.d0*ep(0)*ep(2) , ep(1)**2+ep(0)**2-ep(3)**2-ep(2)**2 )
-      Insect%theta_l = -asin(2.d0*(ep(1)*ep(2)-ep(0)*ep(3)))
-      ! the time derivatives are not necessary and set to zero (the angular velocity
-      ! is computed dynamically from the eqns of motion)
-      Insect%phi_dt_l = 0.d0
-      Insect%alpha_dt_l = 0.d0
-      Insect%theta_dt_l = 0.d0
-    else
-      ! conventional model: all angles are prescribed (by fourier/hermite or others)
-      ! and can be evaluated for any time t. here, we return the 3 angles as well
-      ! as their time derivatives
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_left, &
       Insect%phi_l, Insect%alpha_l, Insect%theta_l, Insect%phi_dt_l,&
       Insect%alpha_dt_l, Insect%theta_dt_l, Insect%kine_wing_l )
-    endif
 
   case (2) !("right")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_right, &
@@ -163,17 +142,17 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       !------------------------------------------------------------------------------------
       
       call read_param_mpi(kinefile,"kinematics","nfft_phi",kine%nfft_phi,0)
-      call read_param_mpi(kinefile,"kinematics","a0_phi",kine%a0_phi,0.d0)
+      call read_param_mpi(kinefile,"kinematics","a0_phi",kine%a0_phi,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_phi",kine%ai_phi(1:kine%nfft_phi))
       call read_param_mpi(kinefile,"kinematics","bi_phi",kine%bi_phi(1:kine%nfft_phi))
       
       call read_param_mpi(kinefile,"kinematics","nfft_alpha",kine%nfft_alpha,0)
-      call read_param_mpi(kinefile,"kinematics","a0_alpha",kine%a0_alpha,0.d0)
+      call read_param_mpi(kinefile,"kinematics","a0_alpha",kine%a0_alpha,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_alpha",kine%ai_alpha(1:kine%nfft_alpha))
       call read_param_mpi(kinefile,"kinematics","bi_alpha",kine%bi_alpha(1:kine%nfft_alpha))
       
       call read_param_mpi(kinefile,"kinematics","nfft_theta",kine%nfft_theta,0)
-      call read_param_mpi(kinefile,"kinematics","a0_theta",kine%a0_theta,0.d0)
+      call read_param_mpi(kinefile,"kinematics","a0_theta",kine%a0_theta,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_theta",kine%ai_theta(1:kine%nfft_theta))
       call read_param_mpi(kinefile,"kinematics","bi_theta",kine%bi_theta(1:kine%nfft_theta))
 
@@ -273,61 +252,61 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     ttau = 0.4
     ! position angle (is directly given in radian)
     ! we use PHI_DOT = 1 as normalization as well (since we have no frequency in this case)
-    phi = 1.d0*( ttau*dexp(-time/ttau) + time)
-    phi_dt = 1.d0*(1.d0-dexp(-time/ttau))
+    phi = 1._rk*( ttau*dexp(-time/ttau) + time)
+    phi_dt = 1._rk*(1._rk-dexp(-time/ttau))
     ! feathering angle is constant
-    alpha = deg2rad(-45.d0)
-    alpha_dt = 0.d0
+    alpha = deg2rad(-45._rk)
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("revolving-anticlock")
     ! revolving wing kinematics. Similar to "revolving-set1", but phi(0)=0
     ttau = 0.4
     ! position angle (is directly given in radian)
     ! we use PHI_DOT = 2*pi as normalization
-    phi = 2.d0*pi*( ttau*dexp(-time/ttau) - ttau + time)
-    phi_dt = 2.d0*pi*(1.d0-dexp(-time/ttau))
+    phi = 2.0_rk*pi*( ttau*dexp(-time/ttau) - ttau + time)
+    phi_dt = 2.0_rk*pi*(1._rk-dexp(-time/ttau))
     ! feathering angle is constant
-    alpha = deg2rad(-45.d0)
-    alpha_dt = 0.d0
+    alpha = deg2rad(-45._rk)
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("revolving-clock")
     ! revolving wing kinematics. Opposite direction to "revolving-anticlock"
     ttau = 0.4
     ! position angle (is directly given in radian)
     ! we use PHI_DOT = 2*pi as normalization
-    phi = -2.d0*pi*( ttau*dexp(-time/ttau) - ttau + time)
-    phi_dt = -2.d0*pi*(1.d0-dexp(-time/ttau))
+    phi = -2.0_rk*pi*( ttau*dexp(-time/ttau) - ttau + time)
+    phi_dt = -2.0_rk*pi*(1._rk-dexp(-time/ttau))
     ! feathering angle is constant
-    alpha = deg2rad(45.d0)
-    alpha_dt = 0.d0
+    alpha = deg2rad(45._rk)
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("revolving-set2")
     ! revolving wing kinematics, pre-defined set. We fix alpha and increase
     ! phi linearily with a quadratic startup transient until phi=pi/8,
     ! which is reached at time equal to pi/4
     ! we use PHI_DOT = 1 as normalization
-    if (time < pi/4.0d0) then
-      phi = 2.0d0*time**2/pi
-      phi_dt = 4.0d0*time/pi
+    if (time < pi/4.0_rk) then
+      phi = 2.0_rk*time**2/pi
+      phi_dt = 4.0_rk*time/pi
     else
-      phi = time - pi/8.0d0
-      phi_dt = 1.0d0
+      phi = time - pi/8.0_rk
+      phi_dt = 1.0_rk
     endif
     ! feathering angle is constant
     alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign
-    alpha_dt = 0.d0
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("revolving-set3")
     ! revolving wing kinematics, pre-defined set. We fix alpha and increase
@@ -335,19 +314,19 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     ! which is reached at time equal to pi/8
     ! we use PHI_DOT = 1 as normalization
     ! Therefore, the acceleration is twice as fast as in "revolving-set2"
-    if (time < pi/8.0d0) then
-      phi = 4.0d0*time**2/pi
-      phi_dt = 8.0d0*time/pi
+    if (time < pi/8.0_rk) then
+      phi = 4.0_rk*time**2/pi
+      phi_dt = 8.0_rk*time/pi
     else
-      phi = time - pi/16.0d0
-      phi_dt = 1.0d0
+      phi = time - pi/16.0_rk
+      phi_dt = 1.0_rk
     endif
     ! feathering angle is constant
     alpha = - Insect%init_alpha_phi_theta(1) ! Mind the "-" sign
-    alpha_dt = 0.d0
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
 case ("revolving-set3-degree")
     ! revolving wing kinematics, pre-defined set. We fix alpha and increase
@@ -355,19 +334,19 @@ case ("revolving-set3-degree")
     ! which is reached at time equal to pi/8
     ! we use PHI_DOT = 1 as normalization
     ! Therefore, the acceleration is twice as fast as in "revolving-set2"
-    if (time < pi/8.0d0) then
-      phi = 4.0d0*time**2/pi
-      phi_dt = 8.0d0*time/pi
+    if (time < pi/8.0_rk) then
+      phi = 4.0_rk*time**2/pi
+      phi_dt = 8.0_rk*time/pi
     else
-      phi = time - pi/16.0d0
-      phi_dt = 1.0d0
+      phi = time - pi/16.0_rk
+      phi_dt = 1.0_rk
     endif
     ! feathering angle is constant
     alpha = - deg2rad(Insect%init_alpha_phi_theta(1)) ! Mind the "-" sign
-    alpha_dt = 0.d0
+    alpha_dt = 0.0_rk
     ! elevation angle is always zero
-    theta = 0.d0
-    theta_dt = 0.d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("Drosophila_hovering_fry")
     !---------------------------------------------------------------------------
@@ -470,24 +449,24 @@ case ("revolving-set3-degree")
     ! Fourier coefficients provided by Maeda
     ! Diditized from Fry et al.
     !---------------------------------------------------------------------------
-    a_posi = (/  0.22700d0,  1.24020d0,  0.03610d0, -0.00360d0/)
-    b_posi = (/  0.00000d0,  0.08880d0, -0.07000d0,  0.01250d0/)
-    a_elev = (/  0.16125d0,  0.06750d0,  0.14500d0,  0.00540d0/)
-    b_elev = (/  0.00000d0,  0.03670d0,  0.06840d0, -0.03390d0/)
-    a_feth = (/ -0.00864d0, -0.04890d0, -0.02056d0,  0.19649d0/)
-    b_feth = (/  0.00000d0, -1.17586d0, -0.01216d0, -0.17590d0/)
+    a_posi = (/  0.22700_rk,  1.24020_rk,  0.03610_rk, -0.00360_rk/)
+    b_posi = (/  0.00000_rk,  0.08880_rk, -0.07000_rk,  0.01250_rk/)
+    a_elev = (/  0.16125_rk,  0.06750_rk,  0.14500_rk,  0.00540_rk/)
+    b_elev = (/  0.00000_rk,  0.03670_rk,  0.06840_rk, -0.03390_rk/)
+    a_feth = (/ -0.00864_rk, -0.04890_rk, -0.02056_rk,  0.19649_rk/)
+    b_feth = (/  0.00000_rk, -1.17586_rk, -0.01216_rk, -0.17590_rk/)
 
     ! Initialize angles and velocities
-    posi = 0.0d0
-    elev = 0.0d0
-    feth = 0.0d0
-    posi_dt = 0.0d0
-    elev_dt = 0.0d0
-    feth_dt = 0.0d0
+    posi = 0.0_rk
+    elev = 0.0_rk
+    feth = 0.0_rk
+    posi_dt = 0.0_rk
+    elev_dt = 0.0_rk
+    feth_dt = 0.0_rk
 
     do i=0,3 !! Fourier series
       !! time dependent angle
-      angles  = 2.0d0*dble(i)*pi*time
+      angles  = 2.0_rk*dble(i)*pi*time
 
       selectcase( i )
       case( 0 ) ! Fourier 0th order
@@ -496,9 +475,9 @@ case ("revolving-set3-degree")
         dangle_elev = a_elev(1) ! +shift_mean_elev_
         dangle_feth = a_feth(1) ! +shift_mean_feth_
 
-        dangle_posi_dt = 0.0d0
-        dangle_elev_dt = 0.0d0
-        dangle_feth_dt = 0.0d0
+        dangle_posi_dt = 0.0_rk
+        dangle_elev_dt = 0.0_rk
+        dangle_feth_dt = 0.0_rk
 
       case default !! Fourier n-th orders
 
@@ -507,8 +486,8 @@ case ("revolving-set3-degree")
         & i, &                     !! intent(in)
         & a_posi(i+1), & !! intent(in)
         & b_posi(i+1), & !! intent(in)
-        & 0.0d0, &                 !! intent(in)
-        & 0.0d0, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
         & dangle_posi, &      !! intent(out)
         & dangle_posi_dt &   !! intent(out)
         & )
@@ -518,8 +497,8 @@ case ("revolving-set3-degree")
         & i, &                     !! intent(in)
         & a_elev(i+1), & !! intent(in)
         & b_elev(i+1), & !! intent(in)
-        & 0.0d0, &                 !! intent(in)
-        & 0.0d0, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
         & dangle_elev, &      !! intent(out)
         & dangle_elev_dt &   !! intent(out)
         & )
@@ -529,8 +508,8 @@ case ("revolving-set3-degree")
         & i, &                     !! intent(in)
         & a_feth(i+1), & !! intent(in)
         & b_feth(i+1), & !! intent(in)
-        & 0.0d0, &                 !! intent(in)
-        & 0.0d0, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
+        & 0.0_rk, &                 !! intent(in)
         & dangle_feth, &      !! intent(out)
         & dangle_feth_dt &   !! intent(out)
         & )
@@ -571,20 +550,20 @@ case ("revolving-set3-degree")
     ! Corresponds to Fig. 3D in JEB 204, p. 2613
     ! Note that this is feathering angle measured from the vertical.
     ! This is NOT angle of attack
-    bi_alpha_flapper =(/48.807554373967804d0,&
-    0.0d0,11.14661083909663d0,0.0d0,2.242734216805251d0,&
-    0.0d0,-0.6141899985692184d0,0.0d0,-0.7426551158681146d0,&
-    0.0d0,-0.2329560587573768d0,0.0d0,0.038749678276091284d0,&
-    0.0d0,0.07083462320831221d0,0.0d0,0.028982501947490313d0,&
-    0.0d0,-0.0025202918494477244d0,0.0d0,-0.010221019942802941d0,&
-    0.0d0,-0.005614021318470698d0,0.0d0,1.1958884364596903d-6,&
-    0.0d0,0.002186832241254999d0,0.0d0,0.0015347995090793172d0/)
+    bi_alpha_flapper =(/48.807554373967804_rk,&
+    0.0_rk,11.14661083909663_rk,0.0_rk,2.242734216805251_rk,&
+    0.0_rk,-0.6141899985692184_rk,0.0_rk,-0.7426551158681146_rk,&
+    0.0_rk,-0.2329560587573768_rk,0.0_rk,0.038749678276091284_rk,&
+    0.0_rk,0.07083462320831221_rk,0.0_rk,0.028982501947490313_rk,&
+    0.0_rk,-0.0025202918494477244_rk,0.0_rk,-0.010221019942802941_rk,&
+    0.0_rk,-0.005614021318470698_rk,0.0_rk,1.1958884364596903d-6,&
+    0.0_rk,0.002186832241254999_rk,0.0_rk,0.0015347995090793172_rk/)
 
     alpha = 0.0
     alpha_dt = 0.0
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,29
@@ -597,30 +576,30 @@ case ("revolving-set3-degree")
 
     ! Scale to a given value of max angle in gedrees
     ! alphacdeg is 90deg MINUS alpha of JEB 204 (eg alphedeg=90-50 for Fig 3D)
-    alphacdeg = 90.0d0 - 00.0d0
-    alpha = alphacdeg/40.0d0 * alpha
-    alpha_dt = alphacdeg/40.0d0 * alpha_dt
+    alphacdeg = 90.0_rk - 00.0_rk
+    alpha = alphacdeg/40.0_rk * alpha
+    alpha_dt = alphacdeg/40.0_rk * alpha_dt
 
     ! convert in radians
     alpha = deg2rad(alpha)
     alpha_dt = deg2rad(alpha_dt)
 
     ! *** II. position ***
-    ai_phi_flapper =(/72.96795908179631d0,&
-    0.0d0,8.064401876272864d0,0.0d0,2.769062401215844d0,&
-    0.0d0,1.2200252377066352d0,0.0d0,0.5584689705779989d0,&
-    0.0d0,0.2545617536476344d0,0.0d0,0.11829515180579572d0,&
-    0.0d0,0.05754453975774996d0,0.0d0,0.02964141751269772d0,&
-    0.0d0,0.016177705089515895d0,0.0d0,0.009315101869467001d0,&
-    0.0d0,0.005625663922446026d0,0.0d0,0.0035424425357352385d0,&
-    0.0d0,0.0023130422432356247d0,0.0d0,0.001558278163264511d0,&
-    0.0d0,0.001078213692334021d0/)
+    ai_phi_flapper =(/72.96795908179631_rk,&
+    0.0_rk,8.064401876272864_rk,0.0_rk,2.769062401215844_rk,&
+    0.0_rk,1.2200252377066352_rk,0.0_rk,0.5584689705779989_rk,&
+    0.0_rk,0.2545617536476344_rk,0.0_rk,0.11829515180579572_rk,&
+    0.0_rk,0.05754453975774996_rk,0.0_rk,0.02964141751269772_rk,&
+    0.0_rk,0.016177705089515895_rk,0.0_rk,0.009315101869467001_rk,&
+    0.0_rk,0.005625663922446026_rk,0.0_rk,0.0035424425357352385_rk,&
+    0.0_rk,0.0023130422432356247_rk,0.0_rk,0.001558278163264511_rk,&
+    0.0_rk,0.001078213692334021_rk/)
 
     phi = 0.0
     phi_dt = 0.0
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,31
@@ -633,17 +612,17 @@ case ("revolving-set3-degree")
 
     ! Scale to a given value of max angle in gedrees
     ! phicdeg is Phi of JEB 204 (eg twice the max value of triangular wave)
-    phicdeg = 180.0d0
-    phi = phicdeg/180.0d0 * phi
-    phi_dt = phicdeg/180.0d0 * phi_dt
+    phicdeg = 180.0_rk
+    phi = phicdeg/180.0_rk * phi
+    phi_dt = phicdeg/180.0_rk * phi_dt
 
     ! convert in radians
     phi = deg2rad(phi)
     phi_dt = deg2rad(phi_dt)
 
     ! *** III. elevation ***
-    theta = 0.0d0
-    theta_dt = 0.0d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("flapper_dickinson")
     !---------------------------------------------------------------------------
@@ -661,14 +640,14 @@ case ("revolving-set3-degree")
     ! Corresponds to Fig. 3D in Science
     ! Note that this is feathering angle measured from the vertical.
     ! This is NOT angle of attack
-    bi_alpha_flapper =(/48.23094285611071d0,&
-    0.0d0,10.224154661301371d0,0.0d0,2.1623763046726396d0,&
-    0.0d0,0.05049394424178093d0,0.0d0,-0.17550942623071494d0,&
-    0.0d0,-0.06634193748204852d0,0.0d0,-0.008925020495896451d0,&
-    0.0d0,0.0011292567942149407d0,0.0d0,6.471071566666472d-4,&
-    0.0d0,1.0018757795834964d-4,0.0d0,3.0105550216312524d-6,&
-    0.0d0,-1.237567150768195d-6,0.0d0,-1.988004402010933d-7,&
-    0.0d0,-1.10165545174181d-8,0.0d0,2.4135650975460306d-10/)
+    bi_alpha_flapper =(/48.23094285611071_rk,&
+    0.0_rk,10.224154661301371_rk,0.0_rk,2.1623763046726396_rk,&
+    0.0_rk,0.05049394424178093_rk,0.0_rk,-0.17550942623071494_rk,&
+    0.0_rk,-0.06634193748204852_rk,0.0_rk,-0.008925020495896451_rk,&
+    0.0_rk,0.0011292567942149407_rk,0.0_rk,6.471071566666472d-4,&
+    0.0_rk,1.0018757795834964d-4,0.0_rk,3.0105550216312524d-6,&
+    0.0_rk,-1.237567150768195d-6,0.0_rk,-1.988004402010933d-7,&
+    0.0_rk,-1.10165545174181d-8,0.0_rk,2.4135650975460306d-10/)
 
     ! Advanced rotation (+ sign) or delayed rotation (- sign)
     tadv = 0.08
@@ -678,7 +657,7 @@ case ("revolving-set3-degree")
     alpha_dt = 0.0
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,29
@@ -691,30 +670,30 @@ case ("revolving-set3-degree")
 
     ! Scale to a given value of max angle in gedrees
     ! alphacdeg is 90deg MINUS alpha of Science (eg alphedeg=90-40 for Fig 3)
-    alphacdeg = 90.0d0 - 40.0d0
-    alpha = alphacdeg/40.0d0 * alpha
-    alpha_dt = alphacdeg/40.0d0 * alpha_dt
+    alphacdeg = 90.0_rk - 40.0_rk
+    alpha = alphacdeg/40.0_rk * alpha
+    alpha_dt = alphacdeg/40.0_rk * alpha_dt
 
     ! convert in radians
     alpha = deg2rad(alpha)
     alpha_dt = deg2rad(alpha_dt)
 
     ! *** II. position ***
-    ai_phi_flapper =(/63.24528806534019d0,&
-    0.0d0,5.753991800610726d0,0.0d0,1.3887974015525626d0,&
-    0.0d0,0.3889856512386744d0,0.0d0,0.10577402496901325d0,&
-    0.0d0,0.026061339604144987d0,0.0d0,0.005623376646981709d0,&
-    0.0d0,0.001042285996467963d0,0.0d0,1.639611509380189d-4,&
-    0.0d0,2.1716252827442023d-5,0.0d0,2.408190194815521d-6,&
-    0.0d0,2.2268710288534648d-7,0.0d0,1.7118916093759426d-8,&
-    0.0d0,1.0914870312823793d-9,0.0d0,5.76135101855556d-11,&
-    0.0d0,2.513944479978149d-12/)
+    ai_phi_flapper =(/63.24528806534019_rk,&
+    0.0_rk,5.753991800610726_rk,0.0_rk,1.3887974015525626_rk,&
+    0.0_rk,0.3889856512386744_rk,0.0_rk,0.10577402496901325_rk,&
+    0.0_rk,0.026061339604144987_rk,0.0_rk,0.005623376646981709_rk,&
+    0.0_rk,0.001042285996467963_rk,0.0_rk,1.639611509380189d-4,&
+    0.0_rk,2.1716252827442023d-5,0.0_rk,2.408190194815521d-6,&
+    0.0_rk,2.2268710288534648d-7,0.0_rk,1.7118916093759426d-8,&
+    0.0_rk,1.0914870312823793d-9,0.0_rk,5.76135101855556d-11,&
+    0.0_rk,2.513944479978149d-12/)
 
     phi = 0.0
     phi_dt = 0.0
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,31
@@ -727,17 +706,17 @@ case ("revolving-set3-degree")
 
     ! Scale to a given value of max angle in gedrees
     ! phicdeg is Phi of JEB 204 (eg twice the max value of triangular wave)
-    phicdeg = 180.0d0
-    phi = phicdeg/180.0d0 * phi
-    phi_dt = phicdeg/180.0d0 * phi_dt
+    phicdeg = 180.0_rk
+    phi = phicdeg/180.0_rk * phi
+    phi_dt = phicdeg/180.0_rk * phi_dt
 
     ! convert in radians
     phi = deg2rad(phi)
     phi_dt = deg2rad(phi_dt)
 
     ! *** III. elevation ***
-    theta = 0.0d0
-    theta_dt = 0.0d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("flapper_ramamurti")
     !---------------------------------------------------------------------------
@@ -752,38 +731,38 @@ case ("revolving-set3-degree")
     !---------------------------------------------------------------------------
 
     ! Time shift as in JEB
-    t0adv = 0.28175d0
+    t0adv = 0.28175_rk
 
     ! *** I. feathering motion ***
     ! Note that this is feathering angle measured from the vertical.
     ! This is NOT angle of attack
-    !    bi_alpha_flapper =(/48.23094285611071d0,&
-    !      0.0d0,10.224154661301371d0,0.0d0,2.1623763046726396d0,&
-    !      0.0d0,0.05049394424178093d0,0.0d0,-0.17550942623071494d0,&
-    !      0.0d0,-0.06634193748204852d0,0.0d0,-0.008925020495896451d0,&
-    !      0.0d0,0.0011292567942149407d0,0.0d0,6.471071566666472d-4,&
-    !      0.0d0,1.0018757795834964d-4,0.0d0,3.0105550216312524d-6,&
-    !      0.0d0,-1.237567150768195d-6,0.0d0,-1.988004402010933d-7,&
-    !      0.0d0,-1.10165545174181d-8,0.0d0,2.4135650975460306d-10/)
+    !    bi_alpha_flapper =(/48.23094285611071_rk,&
+    !      0.0_rk,10.224154661301371_rk,0.0_rk,2.1623763046726396_rk,&
+    !      0.0_rk,0.05049394424178093_rk,0.0_rk,-0.17550942623071494_rk,&
+    !      0.0_rk,-0.06634193748204852_rk,0.0_rk,-0.008925020495896451_rk,&
+    !      0.0_rk,0.0011292567942149407_rk,0.0_rk,6.471071566666472d-4,&
+    !      0.0_rk,1.0018757795834964d-4,0.0_rk,3.0105550216312524d-6,&
+    !      0.0_rk,-1.237567150768195d-6,0.0_rk,-1.988004402010933d-7,&
+    !      0.0_rk,-1.10165545174181d-8,0.0_rk,2.4135650975460306d-10/)
 
-    bi_alpha_flapper =(/58.5622945117485d0,&
-    0.0d0,9.70856389020196d0,0.0d0,1.06772463979698d0,&
-    0.0d0,-0.127455709998572d0,0.0d0,-0.0553559839123380d0,&
-    0.0d0,-0.00500430568361157d0,0.0d0,0.000181637429802491d0,&
-    0.0d0,5.24470001944736d-05,0.0d0,2.39488192125763d-06,&
-    0.0d0,-1.62462115890220d-08,0.0d0,-3.60732923972996d-09,&
-    0.0d0,-7.58943924434529d-11,0.0d0,-3.17275659750908d-16,&
-    0.0d0,1.50381167957580d-14,0.0d0,1.41146073296091d-16/)
+    bi_alpha_flapper =(/58.5622945117485_rk,&
+    0.0_rk,9.70856389020196_rk,0.0_rk,1.06772463979698_rk,&
+    0.0_rk,-0.127455709998572_rk,0.0_rk,-0.0553559839123380_rk,&
+    0.0_rk,-0.00500430568361157_rk,0.0_rk,0.000181637429802491_rk,&
+    0.0_rk,5.24470001944736d-05,0.0_rk,2.39488192125763d-06,&
+    0.0_rk,-1.62462115890220d-08,0.0_rk,-3.60732923972996d-09,&
+    0.0_rk,-7.58943924434529d-11,0.0_rk,-3.17275659750908d-16,&
+    0.0_rk,1.50381167957580d-14,0.0_rk,1.41146073296091d-16/)
 
     ! Advanced rotation (+ sign) or delayed rotation (- sign)
-    tadv = 0.08d0
-    !tadv = - 0.08d0
+    tadv = 0.08_rk
+    !tadv = - 0.08_rk
 
-    alpha = 0.0d0
-    alpha_dt = 0.0d0
+    alpha = 0.0_rk
+    alpha_dt = 0.0_rk
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,29
@@ -799,32 +778,32 @@ case ("revolving-set3-degree")
     alpha_dt = deg2rad(alpha_dt)
 
     ! *** II. position ***
-    !    ai_phi_flapper =(/63.24528806534019d0,&
-    !      0.0d0,5.753991800610726d0,0.0d0,1.3887974015525626d0,&
-    !      0.0d0,0.3889856512386744d0,0.0d0,0.10577402496901325d0,&
-    !      0.0d0,0.026061339604144987d0,0.0d0,0.005623376646981709d0,&
-    !      0.0d0,0.001042285996467963d0,0.0d0,1.639611509380189d-4,&
-    !      0.0d0,2.1716252827442023d-5,0.0d0,2.408190194815521d-6,&
-    !      0.0d0,2.2268710288534648d-7,0.0d0,1.7118916093759426d-8,&
-    !      0.0d0,1.0914870312823793d-9,0.0d0,5.76135101855556d-11,&
-    !      0.0d0,2.513944479978149d-12/)
+    !    ai_phi_flapper =(/63.24528806534019_rk,&
+    !      0.0_rk,5.753991800610726_rk,0.0_rk,1.3887974015525626_rk,&
+    !      0.0_rk,0.3889856512386744_rk,0.0_rk,0.10577402496901325_rk,&
+    !      0.0_rk,0.026061339604144987_rk,0.0_rk,0.005623376646981709_rk,&
+    !      0.0_rk,0.001042285996467963_rk,0.0_rk,1.639611509380189d-4,&
+    !      0.0_rk,2.1716252827442023d-5,0.0_rk,2.408190194815521d-6,&
+    !      0.0_rk,2.2268710288534648d-7,0.0_rk,1.7118916093759426d-8,&
+    !      0.0_rk,1.0914870312823793d-9,0.0_rk,5.76135101855556d-11,&
+    !      0.0_rk,2.513944479978149d-12/)
 
-    a0_phi = 20.0d0
-    ai_phi_flapper =(/71.1023524748246d0,&
-    0.0d0,6.43355277659369d0,0.0d0,1.53592591540135d0,&
-    0.0d0,0.423188982190934d0,0.0d0,0.112580047175950d0,&
-    0.0d0,0.0269873997935609d0,0.0d0,0.00563410946130459d0,&
-    0.0d0,0.00100469248408058d0,0.0d0,0.000151188714225520d0,&
-    0.0d0,1.90437108218227d-05,0.0d0,1.99627349027768d-06,&
-    0.0d0,1.73399283714958d-07,0.0d0,1.24381425530736d-08,&
-    0.0d0,7.34711932879597d-10,0.0d0,3.56493134534579d-11,&
-    0.0d0,1.41757814786810d-12/)
+    a0_phi = 20.0_rk
+    ai_phi_flapper =(/71.1023524748246_rk,&
+    0.0_rk,6.43355277659369_rk,0.0_rk,1.53592591540135_rk,&
+    0.0_rk,0.423188982190934_rk,0.0_rk,0.112580047175950_rk,&
+    0.0_rk,0.0269873997935609_rk,0.0_rk,0.00563410946130459_rk,&
+    0.0_rk,0.00100469248408058_rk,0.0_rk,0.000151188714225520_rk,&
+    0.0_rk,1.90437108218227d-05,0.0_rk,1.99627349027768d-06,&
+    0.0_rk,1.73399283714958d-07,0.0_rk,1.24381425530736d-08,&
+    0.0_rk,7.34711932879597d-10,0.0_rk,3.56493134534579d-11,&
+    0.0_rk,1.41757814786810d-12/)
 
-    phi = 0.5d0 * a0_phi
-    phi_dt = 0.0d0
+    phi = 0.5_rk * a0_phi
+    phi_dt = 0.0_rk
 
     ! frequency factor
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! Fourier series
     do i=1,31
@@ -840,15 +819,15 @@ case ("revolving-set3-degree")
     phi_dt = deg2rad(phi_dt)
 
     ! *** III. elevation ***
-    theta = 0.0d0
-    theta_dt = 0.0d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
 
 
   case ("suzuki")
 
     ! frequency
-    f = 2.d0*pi
+    f = 2.0_rk*pi
 
     ! amplitudes and other parameters
     phi_max = 80
@@ -868,8 +847,8 @@ case ("revolving-set3-degree")
     alpha_dt = deg2rad(alpha_dt)
 
     ! *** III. elevation ***
-    theta = 0.0d0
-    theta_dt = 0.0d0
+    theta = 0.0_rk
+    theta_dt = 0.0_rk
 
   case ("simplified")
     !---------------------------------------------------------------------------
@@ -880,10 +859,10 @@ case ("revolving-set3-degree")
     !
     ! the pase shift "phase" was my idea
     !---------------------------------------------------------------------------
-    phi_max     = deg2rad(80.d0)  ! phi is up/down angle (flapping)
-    alpha_max   = deg2rad(45.d0)  ! alpha is tethering
-    phase       = 0.d0! 10.d0*pi/180.d0  ! phase shift between flapping and tethering
-    f = 1.d0*2.0*pi
+    phi_max     = deg2rad(80.0_rk)  ! phi is up/down angle (flapping)
+    alpha_max   = deg2rad(45._rk)  ! alpha is tethering
+    phase       = 0.0_rk! 10.0_rk*pi/180.0_rk  ! phase shift between flapping and tethering
+    f = 1._rk*2.0*pi
 
     phi      = phi_max  *dcos(f*time)
     alpha    = alpha_max*dsin(f*(time+phase))
@@ -897,10 +876,10 @@ case ("revolving-set3-degree")
     !---------------------------------------------------------------------------
     ! simplified motion protocoll
     !---------------------------------------------------------------------------
-    phi_max     = deg2rad(60.d0)  ! phi is up/down angle (flapping)
-    alpha_max   = deg2rad(0.d0)  ! alpha is tethering
-    phase       = 0.d0! 10.d0*pi/180.d0  ! phase shift between flapping and tethering
-    f = 1.d0*2.0*pi
+    phi_max     = deg2rad(60.0_rk)  ! phi is up/down angle (flapping)
+    alpha_max   = deg2rad(0.0_rk)  ! alpha is tethering
+    phase       = 0.0_rk! 10.0_rk*pi/180.0_rk  ! phase shift between flapping and tethering
+    f = 1._rk*2.0*pi
 
     phi      = phi_max  *dcos(f*time)
     alpha    = alpha_max*dsin(f*(time+phase))
@@ -912,21 +891,21 @@ case ("revolving-set3-degree")
 
   case ("debug")
     phi      = 0.0
-    alpha    = deg2rad(-45.d0)
+    alpha    = deg2rad(-45._rk)
     theta    = 0.0
     phi_dt   = 0.0
     alpha_dt = 0.0
     theta_dt = 0.0
   case ("debug2")
     phi      = 0.0
-    alpha    = deg2rad(+45.d0)
+    alpha    = deg2rad(+45._rk)
     theta    = 0.0
     phi_dt   = 0.0
     alpha_dt = 0.0
     theta_dt = 0.0
   case ("none")
     phi      = 0.0
-    alpha    = deg2rad(45.d0)
+    alpha    = deg2rad(45._rk)
     theta    = 0.0
     phi_dt   = 0.0
     alpha_dt = 0.0

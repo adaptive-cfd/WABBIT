@@ -23,7 +23,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     if (Insect%smoothing_thickness == "local") then
         Insect%smooth = Insect%C_smooth*maxval(ddx)
-        Insect%safety = 3.5d0*Insect%smooth
+        Insect%safety = 3.5_rk*Insect%smooth
     endif
 
     !*****************************************************************************
@@ -97,7 +97,7 @@ subroutine fractal_tree_init(Insect)
             ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
             ! it does not really matter which one. however, we must be sure that the vector
             ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-            e_r = (/0.d0, 0.d0, 0.d0/)
+            e_r = (/0.0_rk, 0.0_rk, 0.0_rk/)
             do while ( norm2(e_r) <= 1.0d-12 )
                 e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
             enddo

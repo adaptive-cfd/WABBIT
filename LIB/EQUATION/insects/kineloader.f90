@@ -24,15 +24,15 @@ subroutine load_kine_init(kine)
   nk = kine%nk
 
   ! intitalize vectors as zero (note: not all of the space is actually used)
-  kine%vec_t = 0.d0
-  kine%vec_vert = 0.d0
-  kine%vec_horz = 0.d0
-  kine%vec_phi_dt = 0.d0
-  kine%vec_alpha_dt = 0.d0
-  kine%vec_theta_dt = 0.d0
-  kine%vec_pitch_dt = 0.d0
-  kine%vec_vert_dt = 0.d0
-  kine%vec_horz_dt = 0.d0
+  kine%vec_t = 0.0_rk
+  kine%vec_vert = 0.0_rk
+  kine%vec_horz = 0.0_rk
+  kine%vec_phi_dt = 0.0_rk
+  kine%vec_alpha_dt = 0.0_rk
+  kine%vec_theta_dt = 0.0_rk
+  kine%vec_pitch_dt = 0.0_rk
+  kine%vec_vert_dt = 0.0_rk
+  kine%vec_horz_dt = 0.0_rk
 
   if (root) then
     ! read data from file
@@ -116,7 +116,7 @@ subroutine wing_kine_interp(time, kine, phi_i, alpha_i, theta_i, phi_dt_i, alpha
     call abort(1515,"kinematics_loader is not initialized but wing_kine_interp is called")
   endif
 
-  if ((time<0.d0).or.(time>kine%vec_t(kine%nk))) then
+  if ((time<0.0_rk).or.(time>kine%vec_t(kine%nk))) then
     if(root) write(*,'("time=",es15.8)') time
     call abort(1516,"requested time in kineloader out of valid bounds")
   endif
@@ -164,25 +164,25 @@ subroutine hermite1d(n, xphi, phi, dpdx, xi, phi_interp, dpdx_interp)
   endif
 
   x = (xi-xphi(i0))/dx
-  z = 1.0d0-x
+  z = 1.0_rk-x
 
   ! Phi
-  ap0 = 2.0d0*x*x*x-3.0d0*x*x+1.0d0 ! f(x)
-  ap1 = 2.0d0*z*z*z-3.0d0*z*z+1.0d0 ! f(1.0d0-x)
-  ax0 = x*x*x  -2.0d0*x*x + x !g(x)
-  ax1 = -(z*z*z -2.0d0*z*z + z) !-g(1.0d0-x)
+  ap0 = 2.0_rk*x*x*x-3.0_rk*x*x+1.0_rk ! f(x)
+  ap1 = 2.0_rk*z*z*z-3.0_rk*z*z+1.0_rk ! f(1.0_rk-x)
+  ax0 = x*x*x  -2.0_rk*x*x + x !g(x)
+  ax1 = -(z*z*z -2.0_rk*z*z + z) !-g(1.0_rk-x)
   phi_interp = (phi(i0)*ap0+phi(i1)*ap1) + dx*(dpdx(i0)*ax0+dpdx(i1)*ax1)
 
   ! Phi_x
   if ((i0>1).and.(i1<n)) then
-     d2pdx2_i0 = 0.5d0*(dpdx(i1)-dpdx(i0-1))/dx
-     d2pdx2_i1 = 0.5d0*(dpdx(i1+1)-dpdx(i0))/dx
+     d2pdx2_i0 = 0.5_rk*(dpdx(i1)-dpdx(i0-1))/dx
+     d2pdx2_i1 = 0.5_rk*(dpdx(i1+1)-dpdx(i0))/dx
      dpdx_interp=(dpdx(i0)*ap0+dpdx(i1)*ap1)+dx*(d2pdx2_i0*ax0+d2pdx2_i1*ax1)
   else
-     ap0 = 6.0d0*x*x-6.0d0*x !df(x)
-     ap1 = -(6.0d0*z*z-6.0d0*z) !-df(1.0d0-x)
-     ax0 = 3.0d0*x*x-4.0d0*x+1.0d0 !dg(x)
-     ax1 = 3.0d0*z*z-4.0d0*z+1.0d0 ! dg(1.0d0-x)
+     ap0 = 6.0_rk*x*x-6.0_rk*x !df(x)
+     ap1 = -(6.0_rk*z*z-6.0_rk*z) !-df(1.0_rk-x)
+     ax0 = 3.0_rk*x*x-4.0_rk*x+1.0_rk !dg(x)
+     ax1 = 3.0_rk*z*z-4.0_rk*z+1.0_rk ! dg(1.0_rk-x)
      dpdx_interp = (phi(i0)*ap0+phi(i1)*ap1)/dx+(dpdx(i0)*ax0+dpdx(i1)*ax1)
   endif
 

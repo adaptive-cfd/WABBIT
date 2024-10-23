@@ -680,16 +680,16 @@ end subroutine
           "    xc_body_g_x", &
           "    xc_body_g_y", &
           "    xc_body_g_z", &
-          "            psi", &
-          "           beta", &
-          "          gamma", &
-          "     eta_stroke", &
-          "        alpha_l", &
-          "          phi_l", &
-          "        theta_l", &
-          "        alpha_r", &
-          "          phi_r", &
-          "        theta_r", &
+          "      psi (rad)", &
+          "     beta (rad)", &
+          "    gamma (rad)", &
+          "      eta (rad)", &
+          "  alpha_l (rad)", &
+          "    phi_l (rad)", &
+          "  theta_l (rad)", &
+          "  alpha_r (rad)", &
+          "    phi_r (rad)", &
+          "  theta_r (rad)", &
           "  rot_rel_l_w_x", &
           "  rot_rel_l_w_y", &
           "  rot_rel_l_w_z", &
@@ -702,12 +702,12 @@ end subroutine
           "   rot_dt_r_w_x", &
           "   rot_dt_r_w_y", &
           "   rot_dt_r_w_z", &
-          "       alpha_l2", &
-          "         phi_l2", &
-          "       theta_l2", &
-          "       alpha_r2", &
-          "         phi_r2", &
-          "       theta_r2", &
+          " alpha_l2 (rad)", &
+          "   phi_l2 (rad)", &
+          " theta_l2 (rad)", &
+          " alpha_r2 (rad)", &
+          "   phi_r2 (rad)", &
+          " theta_r2 (rad)", &
           " rot_rel_l2_w_x", &
           " rot_rel_l2_w_y", &
           " rot_rel_l2_w_z", &
@@ -726,16 +726,16 @@ end subroutine
           "    xc_body_g_x", &
           "    xc_body_g_y", &
           "    xc_body_g_z", &
-          "            psi", &
-          "           beta", &
-          "          gamma", &
-          "     eta_stroke", &
-          "        alpha_l", &
-          "          phi_l", &
-          "        theta_l", &
-          "        alpha_r", &
-          "          phi_r", &
-          "        theta_r", &
+          "      psi (rad)", &
+          "     beta (rad)", &
+          "    gamma (rad)", &
+          "      eta (rad)", &
+          "  alpha_l (rad)", &
+          "    phi_l (rad)", &
+          "  theta_l (rad)", &
+          "  alpha_r (rad)", &
+          "    phi_r (rad)", &
+          "  theta_r (rad)", &
           "  rot_rel_l_w_x", &
           "  rot_rel_l_w_y", &
           "  rot_rel_l_w_z", &

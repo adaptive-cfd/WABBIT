@@ -16,7 +16,7 @@ module module_insects
       insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
       aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
       BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
-      body_rotation_matrix, wing_rotation_matrix, write_kinematics_file
+      body_rotation_matrix, wing_rotation_matrix
    ! type definitions
    PUBLIC :: wingkinematics, diptera
 
@@ -133,11 +133,9 @@ module module_insects
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l_w=0.0_rk, rot_rel_wing_r_w=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l_b=0.0_rk, rot_rel_wing_r_b=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l_g=0.0_rk, rot_rel_wing_r_g=0.0_rk
-      real(kind=rk), dimension(1:3) :: rot_abs_wing_l_g=0.0_rk, rot_abs_wing_r_g=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_w=0.0_rk, rot_rel_wing_r2_w=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_b=0.0_rk, rot_rel_wing_r2_b=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_rel_wing_l2_g=0.0_rk, rot_rel_wing_r2_g=0.0_rk
-      real(kind=rk), dimension(1:3) :: rot_abs_wing_l2_g=0.0_rk, rot_abs_wing_r2_g=0.0_rk
       ! angular acceleration vectors (left and right wings, 2nd left and 2nd right wings)
       real(kind=rk), dimension(1:3) :: rot_dt_wing_l_w=0.0_rk, rot_dt_wing_r_w=0.0_rk
       real(kind=rk), dimension(1:3) :: rot_dt_wing_l_g=0.0_rk, rot_dt_wing_r_g=0.0_rk
@@ -421,7 +419,7 @@ contains
       ! body angular velocity vector in b/g coordinate system
       call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, Insect%M_g2b )
       ! rel+abs wing angular velocities in the w/b/g coordinate system
-      call wing_angular_velocities ( time, Insect, Insect%M_g2b )
+      call update_all_wing_angular_velocities ( time, Insect )
       ! angular acceleration for wings (required for inertial power)
       call wing_angular_accel( time, Insect )
 
@@ -903,159 +901,81 @@ contains
    end subroutine body_angular_velocity
 
 
+   subroutine compute_wing_angular_velocity( Insect, phi, alpha, theta, phi_dt, alpha_dt, theta_dt, eta_stroke, side, &
+    rot_rel_wing_w, rot_rel_wing_b, rot_rel_wing_g)
+      implicit none
+
+      type(diptera), intent(inout) :: Insect
+      real(kind=rk), intent(in) :: phi, alpha, theta, phi_dt, alpha_dt, theta_dt, eta_stroke
+      character(len=*), intent(in) :: side
+      real(kind=rk), dimension(1:3), intent(out) :: rot_rel_wing_w, rot_rel_wing_b, rot_rel_wing_g
+
+      real(kind=rk), dimension(1:3,1:3) :: M_b2s, M_b2w, M_g2b
+      real(kind=rk), dimension(1:3) :: rot_wing_s
+
+      call stroke_rotation_matrix(M_b2s, eta_stroke, side)
+      call wing_rotation_matrix(M_b2w, alpha, theta, phi, eta_stroke, side)
+      call body_rotation_matrix(Insect, M_g2b)
+
+      if (side == "left") then
+         ! direct definition in stroke reference frame (left)
+         rot_wing_s = (/ phi_dt-sin(theta)*alpha_dt, &
+            cos(phi)*cos(theta)*alpha_dt-sin(phi)*theta_dt, &
+            sin(phi)*cos(theta)*alpha_dt+cos(phi)*theta_dt /)
+
+      elseif (side == 'right') then
+         ! direct definition in stroke reference frame (right)
+         rot_wing_s = (/ -phi_dt-sin(theta)*(-alpha_dt), &
+            cos(-phi)*cos(theta)*(-alpha_dt)-sin(-phi)*theta_dt, &
+            sin(-phi)*cos(theta)*(-alpha_dt)+cos(-phi)*theta_dt /)
+      else
+         ! left or right (left2 and right2 not accepted - just pass the different angles)
+         call abort(10710242, "insect_module: neither right nor left side ? how many sides does an insect have? seven!?")
+
+      endif
+
+      ! bring it to body system
+      rot_rel_wing_b = matmul( transpose(M_b2s), rot_wing_s )
+      ! then the result to wing system
+      rot_rel_wing_w = matmul( M_b2w, rot_rel_wing_b)
+      ! and finally the global one
+      rot_rel_wing_g = matmul( transpose(M_g2b), rot_rel_wing_b )
+
+   end subroutine
 
    !-------------------------------------------------------------------------------
    ! given the angles of each wing (and their time derivatives), compute
-   ! the angular velocity vectors for both wings.
+   ! the angular velocity vectors for all wings.
    ! output:
-   !    Insect%rot_rel_wing_r_w    relative angular velocity of right wing (wing frame)
-   !    Insect%rot_rel_wing_r_b    relative angular velocity of right wing (body frame)
-   !    Insect%rot_rel_wing_r_g    relative angular velocity of right wing (glob frame)
-   !    Insect%rot_abs_wing_r_g    absolute angular velocity of right wing (glob frame)
+   !    Insect%rot_rel_wing_*_w    relative angular velocity of all wings (wing frame)
+   !    Insect%rot_rel_wing_*_b    relative angular velocity of all wings (body frame)
+   !    Insect%rot_rel_wing_*_g    relative angular velocity of all wings (glob frame)
    !-------------------------------------------------------------------------------
-   subroutine wing_angular_velocities ( time, Insect, M_g2b )
+   subroutine update_all_wing_angular_velocities ( time, Insect )
       implicit none
 
       real(kind=rk), intent(in) :: time
-      real(kind=rk), intent(in) :: M_g2b(1:3,1:3)
       type(diptera), intent(inout) :: Insect
 
-      real(kind=rk) :: eta_stroke
-      real(kind=rk) :: phi_r, alpha_r, theta_r, phi_dt_r, alpha_dt_r, theta_dt_r
-      real(kind=rk) :: phi_l, alpha_l, theta_l, phi_dt_l, alpha_dt_l, theta_dt_l
-      real(kind=rk), dimension(1:3) :: rot_l_alpha, rot_l_theta, rot_l_phi, &
-         rot_r_alpha, rot_r_theta, rot_r_phi
-      real(kind=rk), dimension(1:3,1:3) :: M_b2w_l, M_b2w_r, &
-         M1_tmp, M2_tmp, M1_l, M2_l, M3_l, M1_r, M2_r, M3_r, &
-         M_b2s_l, M_b2s_r
+      call compute_wing_angular_velocity( Insect, Insect%phi_r, Insect%alpha_r, Insect%theta_r, Insect%phi_dt_r, &
+      Insect%alpha_dt_r, Insect%theta_dt_r, Insect%eta_stroke, 'right', Insect%rot_rel_wing_r_w, &
+      Insect%rot_rel_wing_r_b, Insect%rot_rel_wing_r_g)
 
-      phi_r      = Insect%phi_r
-      alpha_r    = Insect%alpha_r
-      theta_r    = Insect%theta_r
-      phi_dt_r   = Insect%phi_dt_r
-      alpha_dt_r = Insect%alpha_dt_r
-      theta_dt_r = Insect%theta_dt_r
+      call compute_wing_angular_velocity( Insect, Insect%phi_l, Insect%alpha_l, Insect%theta_l, Insect%phi_dt_l, &
+      Insect%alpha_dt_l, Insect%theta_dt_l, Insect%eta_stroke, 'left', Insect%rot_rel_wing_l_w, &
+      Insect%rot_rel_wing_l_b, Insect%rot_rel_wing_l_g)
 
-      phi_l      = Insect%phi_l
-      alpha_l    = Insect%alpha_l
-      theta_l    = Insect%theta_l
-      phi_dt_l   = Insect%phi_dt_l
-      alpha_dt_l = Insect%alpha_dt_l
-      theta_dt_l = Insect%theta_dt_l
-
-      eta_stroke = Insect%eta_stroke
-
-      !-----------------------------------------------------------------------------
-      ! define the rotation matrices to change between coordinate systems
-      !-----------------------------------------------------------------------------
-      call Ry(M1_tmp,eta_stroke)
-      M_b2s_l = M1_tmp
-
-      call Rx(M1_tmp,pi)
-      call Ry(M2_tmp,eta_stroke)
-      M_b2s_r = matmul(M1_tmp,M2_tmp)
-
-      call Ry(M1_l,alpha_l)
-      call Rz(M2_l,theta_l)   ! Order changed (Dmitry, 7 Nov 2013)
-      call Rx(M3_l,phi_l)
-      M_b2w_l = matmul(M1_l,matmul(M2_l,matmul(M3_l,M_b2s_l)))
-
-      ! note the coordinate system is rotated so we don't need to inverse the sign
-      ! of theta, and the wings still rotate in opposite direction
-      call Ry(M1_r,-alpha_r)
-      call Rz(M2_r,theta_r)   ! Order changed (Dmitry, 7 Nov 2013)
-      call Rx(M3_r,-phi_r)
-      M_b2w_r = matmul(M1_r,matmul(M2_r,matmul(M3_r,M_b2s_r)))
-
-      !-----------------------------------------------------------------------------
-      ! angular velocity vectors (in wing system)
-      !-----------------------------------------------------------------------------
-      rot_l_alpha = (/ 0.0_rk, alpha_dt_l, 0.0_rk /)
-      rot_l_theta = (/ 0.0_rk, 0.0_rk, theta_dt_l /)
-      rot_l_phi   = (/ phi_dt_l, 0.0_rk, 0.0_rk   /)
-      rot_r_alpha = (/ 0.0_rk, -alpha_dt_r, 0.0_rk/)
-      rot_r_theta = (/ 0.0_rk, 0.0_rk, theta_dt_r /)
-      rot_r_phi   = (/ -phi_dt_r, 0.0_rk, 0.0_rk  /)
-
-      ! in the wing coordinate system
-      Insect%rot_rel_wing_l_w = matmul(M_b2w_l, matmul(transpose(M_b2s_l),matmul(transpose(M3_l), &
-         rot_l_phi+matmul(transpose(M2_l),rot_l_theta+matmul(transpose(M1_l), &
-         rot_l_alpha)))))
-
-      Insect%rot_rel_wing_r_w = matmul(M_b2w_r,matmul(transpose(M_b2s_r),matmul(transpose(M3_r), &
-         rot_r_phi+matmul(transpose(M2_r),rot_r_theta+matmul(transpose(M1_r), &
-         rot_r_alpha)))))
-
-      ! direct definition, equivalent to what is above.
-      ! Insect%rot_rel_wing_l_w = (/phi_dt_l*cos(alpha_l)*cos(theta_l)-theta_dt_l*sin(alpha_l),&
-      !   alpha_dt_l-phi_dt_l*sin(theta_l),&
-      !   theta_dt_l*cos(alpha_l)+phi_dt_l*sin(alpha_l)*cos(theta_l)/)
-
-      ! prior to the call of this routine, the routine body_angular_velocity has
-      ! computed the body angular velocity (both g/b frames) so here now we can also
-      ! compute global and absolute wing angular velocities.
-      Insect%rot_rel_wing_l_b = matmul( transpose(M_b2w_l), Insect%rot_rel_wing_l_w )
-      Insect%rot_rel_wing_r_b = matmul( transpose(M_b2w_r), Insect%rot_rel_wing_r_w )
-
-      Insect%rot_rel_wing_l_g = matmul( transpose(M_g2b), Insect%rot_rel_wing_l_b )
-      Insect%rot_rel_wing_r_g = matmul( transpose(M_g2b), Insect%rot_rel_wing_r_b )
-
-      Insect%rot_abs_wing_l_g = Insect%rot_body_g + Insect%rot_rel_wing_l_g
-      Insect%rot_abs_wing_r_g = Insect%rot_body_g + Insect%rot_rel_wing_r_g
-
-      !-----------
       ! if second wing pair is present
-      !-----------
       if (Insect%second_wing_pair) then
-         ! setup the local wing parameters
-         phi_r      = Insect%phi_r2
-         alpha_r    = Insect%alpha_r2
-         theta_r    = Insect%theta_r2
-         phi_dt_r   = Insect%phi_dt_r2
-         alpha_dt_r = Insect%alpha_dt_r2
-         theta_dt_r = Insect%theta_dt_r2
-         phi_l      = Insect%phi_l2
-         alpha_l    = Insect%alpha_l2
-         theta_l    = Insect%theta_l2
-         phi_dt_l   = Insect%phi_dt_l2
-         alpha_dt_l = Insect%alpha_dt_l2
-         theta_dt_l = Insect%theta_dt_l2
-
-         ! second wing pair rotation matrices
-         call Ry(M1_l,alpha_l)
-         call Rz(M2_l,theta_l)
-         call Rx(M3_l,phi_l)
-         M_b2w_l = matmul(M1_l,matmul(M2_l,matmul(M3_l,M_b2s_l)))
-         call Ry(M1_r,-alpha_r)
-         call Rz(M2_r,theta_r)
-         call Rx(M3_r,-phi_r)
-         M_b2w_r = matmul(M1_r,matmul(M2_r,matmul(M3_r,M_b2s_r)))
-
-         ! angular velocity vectors (in wing system)
-         rot_l_alpha = (/ 0.0_rk, alpha_dt_l, 0.0_rk /)
-         rot_l_theta = (/ 0.0_rk, 0.0_rk, theta_dt_l /)
-         rot_l_phi   = (/ phi_dt_l, 0.0_rk, 0.0_rk   /)
-         rot_r_alpha = (/ 0.0_rk, -alpha_dt_r, 0.0_rk/)
-         rot_r_theta = (/ 0.0_rk, 0.0_rk, theta_dt_r /)
-         rot_r_phi   = (/ -phi_dt_r, 0.0_rk, 0.0_rk  /)
-
-         ! in the wing coordinate system
-         Insect%rot_rel_wing_l2_w = matmul(M_b2w_l,matmul(transpose(M_b2s_l),matmul(transpose(M3_l), &
-            rot_l_phi+matmul(transpose(M2_l),rot_l_theta+matmul(transpose(M1_l), &
-            rot_l_alpha)))))
-         Insect%rot_rel_wing_r2_w = matmul(M_b2w_r,matmul(transpose(M_b2s_r),matmul(transpose(M3_r), &
-            rot_r_phi+matmul(transpose(M2_r),rot_r_theta+matmul(transpose(M1_r), &
-            rot_r_alpha)))))
-
-         ! wing angular velocities
-         Insect%rot_rel_wing_l2_b = matmul( transpose(M_b2w_l), Insect%rot_rel_wing_l2_w )
-         Insect%rot_rel_wing_r2_b = matmul( transpose(M_b2w_r), Insect%rot_rel_wing_r2_w )
-         Insect%rot_rel_wing_l2_g = matmul( transpose(M_g2b), Insect%rot_rel_wing_l2_b )
-         Insect%rot_rel_wing_r2_g = matmul( transpose(M_g2b), Insect%rot_rel_wing_r2_b )
-         Insect%rot_abs_wing_l2_g = Insect%rot_body_g + Insect%rot_rel_wing_l2_g
-         Insect%rot_abs_wing_r2_g = Insect%rot_body_g + Insect%rot_rel_wing_r2_g
+        call compute_wing_angular_velocity( Insect, Insect%phi_r2, Insect%alpha_r2, Insect%theta_r2, Insect%phi_dt_r2, &
+        Insect%alpha_dt_r2, Insect%theta_dt_r2, Insect%eta_stroke, 'right', Insect%rot_rel_wing_r2_w, &
+        Insect%rot_rel_wing_r2_b, Insect%rot_rel_wing_r2_g)
+  
+        call compute_wing_angular_velocity( Insect, Insect%phi_l2, Insect%alpha_l2, Insect%theta_l2, Insect%phi_dt_l2, &
+        Insect%alpha_dt_l2, Insect%theta_dt_l2, Insect%eta_stroke, 'left', Insect%rot_rel_wing_l2_w, &
+        Insect%rot_rel_wing_l2_b, Insect%rot_rel_wing_l2_g)
       endif
-   end subroutine wing_angular_velocities
+   end subroutine update_all_wing_angular_velocities
 
 
 
@@ -1097,7 +1017,7 @@ contains
       endif
       call StrokePlane (time+dt, Insect2)
       call body_rotation_matrix( Insect2, M_g2b )
-      call wing_angular_velocities ( time+dt, Insect2, M_g2b )
+      call update_all_wing_angular_velocities ( time+dt, Insect2 )
 
 !??????????????????????????????? why not Insect2 ???!??!
 !??????????????????????????????? why not Insect2 ???!??!
@@ -1212,6 +1132,34 @@ contains
    end subroutine body_rotation_matrix
 
 
+   !-----------------------------------------------------------------------------
+   ! returns the stroke rotation matrix M_b2s for a given wing
+   !-----------------------------------------------------------------------------
+   subroutine stroke_rotation_matrix( M_b2s, eta_stroke, side )
+      implicit none
+
+      real(kind=rk),intent(out) :: M_b2s(1:3,1:3)
+      real(kind=rk), intent(in) :: eta_stroke
+      ! as this is called rarely okay to use string comparison
+      character(len=*), intent(in) :: side ! left or right (left2 and right2 not accepted - just pass the different angles)
+      real(kind=rk), dimension(1:3,1:3) :: M1, M2
+
+
+      if (side == "right") then
+         call Rx(M1, pi)
+         call Ry(M2, eta_stroke)
+         M_b2s = matmul(M1,M2)
+
+      elseif (side == "left") then
+         call Ry(M1, eta_stroke)
+         M_b2s = M1
+
+      else
+         ! left or right (left2 and right2 not accepted - just pass the different angles)
+         call abort(1071024, "insect_module: neither right nor left side ? how many sides does an insect have? seven!?")
+
+      endif
+   end subroutine stroke_rotation_matrix
 
 
    !-----------------------------------------------------------------------------
@@ -1226,12 +1174,9 @@ contains
       character(len=*), intent(in) :: side ! left or right (left2 and right2 not accepted - just pass the different angles)
       real(kind=rk), dimension(1:3,1:3) :: M1, M2, M3, M_b2s
 
+      call stroke_rotation_matrix(M_b2s, eta_stroke, side)
 
       if (side == "right") then
-         call Rx(M1, pi)
-         call Ry(M2, eta_stroke)
-         M_b2s = matmul(M1,M2)
-
          ! note the coordinate system is rotated so we don't need to inverse the sign
          ! of theta, and the wings still rotate in opposite direction
          call Ry(M1, -alpha)
@@ -1240,9 +1185,6 @@ contains
          M_b2w = matmul(M1,matmul(M2,matmul(M3,M_b2s)))
 
       elseif (side == "left") then
-         call Ry(M1,  eta_stroke)
-         M_b2s = M1
-
          call Ry(M1, alpha)
          call Rz(M2, theta)
          call Rx(M3, phi)
@@ -1386,7 +1328,7 @@ contains
       ! body angular velocity vector in b/g coordinate system
       call body_angular_velocity( Insect, Insect%rot_body_b, Insect%rot_body_g, M_g2b )
       ! rel+abs wing angular velocities in the w/b/g coordinate system
-      call wing_angular_velocities ( time, Insect, M_g2b )
+      call update_all_wing_angular_velocities ( time, Insect )
 
       x_tip_w = (/ 1.0_rk, 1.0_rk, 1.0_rk /)
       x_tip_b = matmul( transpose(M_b2w_r), x_tip_w ) + Insect%x_pivot_r_b
@@ -1419,40 +1361,6 @@ contains
       open(14,file='debug_wing_us.t',status='unknown',position='append')
       write (14,'(7(es15.8,1x))') time, x_tip_g, us_tip_g
       close(14)
-
-   end subroutine
-
-   !-----------------------------------------------------------------------------
-   ! write kinematics to disk. Note this cannot be done in the main Draw_Insect anymore
-   ! because in the adaptive code, the routine is called Nblock times per time step,
-   ! while FLUSI calls only once.
-   !-----------------------------------------------------------------------------
-   subroutine write_kinematics_file( time, Insect )
-      implicit none
-      real(kind=pr), intent(in) :: time
-      type(diptera), intent(inout) :: Insect
-
-      if (root) then
-         open  (17, file=Insect%kinematics_file, status='unknown', position='append')
-         if (Insect%second_wing_pair) then
-            write (17,'(44(es15.8,1x))') time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-               Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-               Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-               Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-               Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
-               Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
-               Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
-               Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
-               Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w
-         else
-            write (17,'(26(es15.8,1x))') time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-               Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-               Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-               Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-               Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w
-         endif
-         close (17)
-      endif
 
    end subroutine
 

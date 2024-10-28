@@ -44,7 +44,7 @@ subroutine dense_to_sparse(params)
             write(*,'(A)') "--------------------------------------------------------------"
             write(*,'(A)') "                DENSE TO SPARSE "
             write(*,'(A)') "--------------------------------------------------------------"
-            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail treshold"
+            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail threshold"
             write(*,'(A)') " "
             write(*,'(A)') "Command:"
             write(*,'(A)') "./wabbit-post --dense-to-sparse "

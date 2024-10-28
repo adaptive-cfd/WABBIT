@@ -1,6 +1,6 @@
 ! Initial condition.
 ! Can be read from files (params%input_files), or generated in an interative process.
-subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, iteration, hvy_mask, hvy_tmp)
+subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, iteration, hvy_mask, hvy_tmp, hvy_work)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -16,6 +16,8 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     !> if .false. the code initializes on the coarsest grid, if .true. iterations
     !> are performed and the mesh is refined to gurantee the error eps
     logical, intent(in) :: adapt
+    !> heavy work data array used for adapt_tree
+    real(kind=rk), intent(inout), optional        :: hvy_work(:, :, :, :, :, :)
 
     logical :: tmp
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
@@ -76,9 +78,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
             if (present(hvy_mask) .and. params%threshold_mask) then
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask)
+                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
             else
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
             endif
 
             iter = iter + 1
@@ -160,9 +162,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
                     if (present(hvy_mask) .and. params%threshold_mask) then
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask)
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
                     else
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp)
+                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_work=hvy_work)
                     endif
 
                     iter = iter + 1

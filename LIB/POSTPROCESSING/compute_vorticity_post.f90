@@ -43,7 +43,7 @@ subroutine compute_vorticity_post(params)
     call get_command_argument(1, operator)
     call get_command_argument(2, file_ux)
     ! does the user need help?
-    if (file_ux=='--help' .or. file_ux=='--h') then
+    if (file_ux=='--help' .or. file_ux=='--h' .or. file_ux=='-h') then
         if (params%rank==0) then
             write(*, '(A)') "-----------------------------------------------------------"
             write(*, '(A)') " Wabbit postprocessing: vorticity / divergence / Q-criterion"

@@ -172,7 +172,7 @@ program main
     ! reset the grid: all blocks are inactive and empty (in case the unit tests leave us with some data)
     call reset_tree( params, .true., tree_ID=tree_ID_flow )
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
-    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
+    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
 
     if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
         ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
@@ -201,6 +201,7 @@ program main
     call init_t_file('krylov_err.t', overwrite)
     call init_t_file('balancing.t', overwrite)
     call init_t_file('block_xfer.t', overwrite)
+    call init_t_file('thresholding.t', overwrite)
 
     if (rank==0) then
         call Initialize_runtime_control_file()
@@ -363,10 +364,10 @@ program main
 
                 ! actual coarsening (including the mask function)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask)
+                    hvy_mask=hvy_mask, hvy_work=hvy_work)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)

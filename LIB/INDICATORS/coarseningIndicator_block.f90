@@ -37,7 +37,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     !
     real(kind=rk), intent(inout)        :: norm(1:size(block_data,4))
     logical, intent(in)                 :: input_is_WD                       !< flag if hvy_block is already wavelet decomposed
-    !> Indices of patch if not the whole interior block should be tresholded, used for securityZone
+    !> Indices of patch if not the whole interior block should be thresholded, used for securityZone
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
@@ -53,7 +53,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     Bs = params%Bs
     g = params%g
 
-    ! set the indices we want to treshold
+    ! set the indices we want to threshold
     idx(:, :) = 1
     if (present(indices)) then
         idx(:, :) = indices(:, :)
@@ -102,13 +102,13 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
 
         thresholding_component = params%threshold_state_vector_component
         if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
-            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, eps=norm(1), verbose_check=verbose_check)
+            call threshold_block( params, block_data, thresholding_component, refinement_status, level, input_is_WD, eps=norm, indices=idx, verbose_check=verbose_check)
         else
-            call threshold_block( params, block_data, thresholding_component, refinement_status, norm, level, input_is_WD, indices=idx, verbose_check=verbose_check)
+            call threshold_block( params, block_data, thresholding_component, refinement_status, level, input_is_WD, norm=norm, indices=idx, verbose_check=verbose_check)
         endif
 
         ! timing for debugging - block based so should not be deployed for productive versions
-        ! call toc( "coarseningIndicator_block (treshold_block)", 1000, MPI_Wtime()-t0 )
+        ! call toc( "coarseningIndicator_block (threshold_block)", 1000, MPI_Wtime()-t0 )
     case default
         call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 

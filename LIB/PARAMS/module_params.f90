@@ -54,13 +54,14 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk) :: eps=0.0_rk
         logical :: eps_normalized = .false.
+        integer :: azzalini_iterations = 1
+        logical :: threshold_wc = .false.
         character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
         logical :: useCoarseExtension = .true.
         logical :: useSecurityZone = .true.
         logical :: isLiftedWavelet = .false.
-        logical :: cvs = .false.
         character(len=cshort) :: wavelet="not-initialized"
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE

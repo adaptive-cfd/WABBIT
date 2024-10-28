@@ -116,7 +116,7 @@ end type type_boundary
         integer(kind=ik), dimension(3)              :: Bs
         ! maximal tree level
         integer(kind=ik)                            :: Jmax
-        ! indicator for coarsening "treshold-vorticity", "primary-variables" etc.
+        ! indicator for coarsening "threshold-vorticity", "primary-variables" etc.
         character(len=cshort)                           :: coarsening_indicator="primary-variables"
         ! Courant-Friedrichs-Lewy
         ! dimension

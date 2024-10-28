@@ -80,6 +80,7 @@ subroutine post_wavelet_transform(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
+    params%Jmin = 1
     params%Jmax = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
@@ -92,7 +93,7 @@ subroutine post_wavelet_transform(params)
 
 
     ! for full wavelet operations we need 8/7 for 3D or 4/3 for 2D as blocks, there can be an imbalance thats why we add another factor
-    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.1_rk)
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.2_rk)
 
     if (.not. split_components) then
         params%n_eqn = 1

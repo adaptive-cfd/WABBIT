@@ -13,7 +13,7 @@ subroutine post_denoising_test(params)
     !> parameter struct
     type (type_params), intent(inout)  :: params
     character(len=cshort)  :: file_in, file_out, n_type
-    real(kind=rk)          :: n_s, n_f, n_i, signal_strength(1:1), r1, r2, t_den, std_est, time
+    real(kind=rk)          :: n_s, n_f, n_i, signal_strength(1:1), r1, r2, t_den, std_est(1:1), time
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
@@ -92,6 +92,9 @@ subroutine post_denoising_test(params)
 
     params%eps_normalized = .false.
     params%eps_norm = "L2"
+    params%eps = 1000
+    params%azzalini_iterations = 100
+    params%threshold_wc = .true.
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn) = .true.
     params%coarsening_indicator = "threshold-image-denoise"
@@ -126,7 +129,7 @@ subroutine post_denoising_test(params)
             hvy_id = hvy_active(k, tree_ID_flow)
             do ix = params%g+1, params%Bs(1)+2*params%g
                 do iy = params%g+1, params%Bs(2)+2*params%g
-                    do iz = merge(1, params%g+1, params%dim==2), merge(1, params%Bs(3)+2*params%g, params%dim==2)
+                    do iz = merge(1, params%g+1, params%dim==2), merge(1, params%Bs(3)+params%g, params%dim==2)
                         ! add random data as noise
                         call random_number(r1)
                         if (n_type == "uniform") then

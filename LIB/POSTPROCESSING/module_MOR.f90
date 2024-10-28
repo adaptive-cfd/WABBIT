@@ -52,7 +52,7 @@ contains
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
         integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
         !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
-        !> then the given treshold we discard the corresponding POD MODE.
+        !> then the given threshold we discard the corresponding POD MODE.
         real(kind=rk), optional, intent(in)      :: truncation_error
         !> if true we write out all temporal coefficients and eigenvalues
         !> filenames eigenvalues.txt, acoef.txt
@@ -181,7 +181,7 @@ contains
         real(kind=rk),  intent(in)               :: eigenvalues(:), eigenbasis(:, :)
         integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
         !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
-        !> then the given treshold we discard the corresponding POD MODE.
+        !> then the given threshold we discard the corresponding POD MODE.
         real(kind=rk), optional, intent(in)      :: truncation_error
         !---------------------------------------------------------------
         real(kind=rk)                            ::  max_err, t_elapse, Volume
@@ -1454,7 +1454,7 @@ contains
             integer(kind=ik), intent(inout)     :: dest_tree_ID
             integer(kind=ik), intent(in)        :: iteration, N_modes         !> number of POD modes
             !> Threshold value for truncating POD modes. If the singular value is smaller,
-            !> then the given treshold we discard the corresponding POD MODE.
+            !> then the given threshold we discard the corresponding POD MODE.
             real(kind=rk),  intent(in)          :: a_coefs(:,:)
             !> optional argument for the tree_ID of the first mode:
             !> this can be useful if you have some trees which are stored at beginning

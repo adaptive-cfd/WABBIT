@@ -168,6 +168,11 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
         call append_t_file('eps_norm.t', (/time, norm, params%eps/))
 
         call toc( "coarseningIndicator (norm)", 122, MPI_Wtime()-t0 )
+    elseif ( indicator/="threshold-cvs" .or. indicator/="threshold-image-denoise") then
+        if (.not. present(norm_inout)) then
+            call abort(241003, "CVS and Denoising need to pass the threshold as norm parameter to coarseningIndicator. I cannot find it here though :(")
+        endif
+        norm(1:N_thresholding_components) = norm_inout(1:N_thresholding_components)
     else
         norm = 1.0_rk  ! set to 1
     endif

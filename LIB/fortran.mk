@@ -91,7 +91,7 @@ ifdef MKLROOT
 LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
 else
 # Use custom LAPACK installation
-LDFLAGS += -llapack -lblas -ldl -lm
+LDFLAGS += -L${WABBIT_BLAS_ROOT} -L${WABBIT_LAPACK_ROOT} -llapack -lblas -ldl -lm
 endif
 endif
 
@@ -126,7 +126,7 @@ ifdef MKLROOT
 LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
 else
 # Use custom LAPACK installation
-LDFLAGS += -llapack -lblas -ldl -lm
+LDFLAGS += -L${WABBIT_BLAS_ROOT} -L${WABBIT_LAPACK_ROOT} -llapack -lblas -ldl -lm
 endif
 endif
 

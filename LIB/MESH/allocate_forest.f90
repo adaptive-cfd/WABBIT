@@ -74,7 +74,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     if (params%dim==2) then
         nz = 1
         max_family = 9
-        max_neighbors = 56*2+32 ! 2D has only 32 possibilites but 56 from 3D is used
+        max_neighbors = 56*3 ! 2D has only 32 possibilites but 56 from 3D is used
         max_neighbors_used = 56+24+24 ! lvl J+1,J,J-1 for full tree grid
     else
         max_family = 17

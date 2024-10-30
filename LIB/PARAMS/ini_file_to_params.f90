@@ -234,7 +234,7 @@ subroutine ini_domain(params, FILE )
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
    if (.not. all(params%periodic_BC)) then
-      call abort(160824, "This code version currently suppors only periodic BC in all directions.")
+      write(*, '(A)') "Symmetric BC are currently an experimental feature, you should know what you are doing!"
    endif
 
    params%symmetry_BC = .not. params%periodic_BC

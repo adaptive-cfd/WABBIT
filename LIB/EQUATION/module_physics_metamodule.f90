@@ -27,7 +27,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
+    STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
     !**********************************************************************************************
 
 contains
@@ -531,6 +531,57 @@ contains
         end select
 
     end subroutine INICOND_meta
+
+
+    !> \brief Set boundary conditions for non-periodic boundary patches
+    !> \details For periodic ghost patches we synch the ghost values, for non-periodic however
+    !! we have to set the values at the ghost patches depending on the boundary type. This differs for each physics type
+    subroutine BOUNDCOND_META(physics, time, u, g, x0, dx, n_domain)
+        implicit none
+
+        character(len=*), intent(in) :: physics
+        ! it may happen that some BCs have an explicit time-dependency
+        ! therefore the general call has to pass time
+        real(kind=rk), intent (in) :: time
+
+        ! block data, containg the state vector. In general a 4D field (3 dims+components)
+        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+        ! as you are allowed to compute the RHS only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
+        integer, intent(in) :: g
+
+        ! for each block, you'll need to know where it lies in physical space. The first
+        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+        ! when implementing boundary conditions, it is necessary to know if the local field (block)
+        ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+        ! The n_domain tells you if the local field is adjacent to a domain boundary:
+        ! n_domain(i) can be either 0, 1, -1,
+        !  0: no boundary in the direction +/-e_i
+        !  1: boundary in the direction +e_i
+        ! -1: boundary in the direction - e_i
+        ! currently only acessible in the local stage
+        integer(kind=2), intent(in) :: n_domain(3)
+
+        select case (physics)
+        case ("ACM-new")
+            call BOUNDCOND_ACM( time, u, g, x0, dx, n_domain)
+
+        ! case ("ConvDiff-new")
+        !     call BOUNDCOND_ConvDiff( time, u, g, x0, dx )
+
+        ! case ("navier_stokes")
+        !     call BOUNDCOND_NStokes( time, u, g, x0, dx, n_domain )
+
+        case default
+            call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")
+
+        end select
+
+    end subroutine BOUNDCOND_META
 
 
 

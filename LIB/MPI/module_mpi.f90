@@ -14,6 +14,10 @@ module module_MPI
     ! to the last subroutine.)  -Thomas
     use module_forestMetaData
 
+    ! We need to set the BC into the ghost patches after synching, for now it is done in the synch routine itself so we need access to physics moduel to do that
+    ! JB Todo: Check if this is clever or we should do it otherwise
+    use module_physics_metamodule
+
     implicit none
 
     ! I usually find it helpful to use the private keyword by itself initially, which specifies

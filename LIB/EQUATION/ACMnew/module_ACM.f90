@@ -433,20 +433,29 @@ end subroutine
     ! read lamballais reference fields, see
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
     if (params_acm%geometry == "lamballais") then
+        if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
+        
         ! read us field
-        call count_lines_in_ascii_file(params_acm%file_usx, num_lines, 0)
+        call count_lines_in_ascii_file_mpi(params_acm%file_usx, num_lines, 0)
         ! avoid maxcolumns restriction (read in a single long column and reshape)
         allocate(buffer_array(1:num_lines,1:1))
-        call read_array_from_ascii_file(params_acm%file_usx, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usx, buffer_array, 0)
+
+        write(*,*) "lamballais num_lines", num_lines, nx_max
+
+
+        if (num_lines /= nx_max**2) then
+            call abort(2410011, "Lamballais: you seem to read the wrong field (size mismatch?!)")
+        endif
 
         allocate(params_acm%u_lamballais(0:nx_max-1, 0:nx_max-1, 1:3))
         ! reshape
         params_acm%u_lamballais(:,:,1) = reshape(buffer_array, (/nx_max, nx_max/))
 
-        call read_array_from_ascii_file(params_acm%file_usy, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usy, buffer_array, 0)
         params_acm%u_lamballais(:,:,2) = reshape(buffer_array, (/nx_max, nx_max/))
 
-        call read_array_from_ascii_file(params_acm%file_usp, buffer_array, 0)
+        call read_array_from_ascii_file_mpi(params_acm%file_usp, buffer_array, 0)
         params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
     endif
 
@@ -672,16 +681,16 @@ end subroutine
           "    xc_body_g_x", &
           "    xc_body_g_y", &
           "    xc_body_g_z", &
-          "            psi", &
-          "           beta", &
-          "          gamma", &
-          "     eta_stroke", &
-          "        alpha_l", &
-          "          phi_l", &
-          "        theta_l", &
-          "        alpha_r", &
-          "          phi_r", &
-          "        theta_r", &
+          "      psi (rad)", &
+          "     beta (rad)", &
+          "    gamma (rad)", &
+          "      eta (rad)", &
+          "  alpha_l (rad)", &
+          "    phi_l (rad)", &
+          "  theta_l (rad)", &
+          "  alpha_r (rad)", &
+          "    phi_r (rad)", &
+          "  theta_r (rad)", &
           "  rot_rel_l_w_x", &
           "  rot_rel_l_w_y", &
           "  rot_rel_l_w_z", &
@@ -694,12 +703,12 @@ end subroutine
           "   rot_dt_r_w_x", &
           "   rot_dt_r_w_y", &
           "   rot_dt_r_w_z", &
-          "       alpha_l2", &
-          "         phi_l2", &
-          "       theta_l2", &
-          "       alpha_r2", &
-          "         phi_r2", &
-          "       theta_r2", &
+          " alpha_l2 (rad)", &
+          "   phi_l2 (rad)", &
+          " theta_l2 (rad)", &
+          " alpha_r2 (rad)", &
+          "   phi_r2 (rad)", &
+          " theta_r2 (rad)", &
           " rot_rel_l2_w_x", &
           " rot_rel_l2_w_y", &
           " rot_rel_l2_w_z", &
@@ -718,16 +727,16 @@ end subroutine
           "    xc_body_g_x", &
           "    xc_body_g_y", &
           "    xc_body_g_z", &
-          "            psi", &
-          "           beta", &
-          "          gamma", &
-          "     eta_stroke", &
-          "        alpha_l", &
-          "          phi_l", &
-          "        theta_l", &
-          "        alpha_r", &
-          "          phi_r", &
-          "        theta_r", &
+          "      psi (rad)", &
+          "     beta (rad)", &
+          "    gamma (rad)", &
+          "      eta (rad)", &
+          "  alpha_l (rad)", &
+          "    phi_l (rad)", &
+          "  theta_l (rad)", &
+          "  alpha_r (rad)", &
+          "    phi_r (rad)", &
+          "  theta_r (rad)", &
           "  rot_rel_l_w_x", &
           "  rot_rel_l_w_y", &
           "  rot_rel_l_w_z", &

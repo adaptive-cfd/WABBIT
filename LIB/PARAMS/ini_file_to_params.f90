@@ -377,6 +377,10 @@ subroutine ini_blocks(params, FILE )
    enddo
    deallocate(tmp)
 
+   if (params%Jini > params%Jmax) then
+      call abort(1021024, "You cannot set ini_treelevel > max_treelevel!")
+   endif
+
 end subroutine ini_blocks
 
  !-------------------------------------------------------------------------!!!!

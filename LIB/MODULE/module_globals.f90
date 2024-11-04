@@ -161,7 +161,7 @@ module module_globals
             implicit none
             real(kind=rk), intent(in) :: deg
             real(kind=rk),parameter :: pi2 = 3.1415926535897932384626433832795028841971693993751058209749445923078164d0
-            deg2rad = deg*pi2/180.d0
+            deg2rad = deg*pi2/180.0_rk
             return
         end function
 
@@ -172,7 +172,7 @@ module module_globals
             implicit none
             real(kind=rk), intent(in) :: deg
             real(kind=rk),parameter :: pi2 = 3.1415926535897932384626433832795028841971693993751058209749445923078164d0
-            rad2deg = deg*180.d0/pi2
+            rad2deg = deg*180.0_rk/pi2
             return
         end function
 

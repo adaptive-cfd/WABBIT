@@ -101,8 +101,8 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     call read_param_mpi(PARAMS,"Insects","WingShapeL",Insect%WingShape(1),Insect%WingShape(1))
     call read_param_mpi(PARAMS,"Insects","WingShapeR",Insect%WingShape(2),Insect%WingShape(2))
     ! Rectangular wing parameters
-    call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.d0)
-    call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.d0)
+    call read_param_mpi(PARAMS,"Insects","b_top",Insect%b_top, 0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","b_bot",Insect%b_bot, 0.0_rk)
     ! Kinematics
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_right",Insect%FlappingMotion_right,"none")
     call read_param_mpi(PARAMS,"Insects","FlappingMotion_left",Insect%FlappingMotion_left,"none")
@@ -229,29 +229,29 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
     call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")
     call read_param_mpi(PARAMS,"Insects","RightWing",Insect%RightWing,"yes")
-    call read_param_mpi(PARAMS,"Insects","mass",Insect%mass, 1.d0)
-    call read_param_mpi(PARAMS,"Insects","gravity",Insect%gravity, 0.d0)
-    call read_param_mpi(PARAMS,"Insects","gravity_x",Insect%gravity_x, 0.d0)
-    call read_param_mpi(PARAMS,"Insects","gravity_y",Insect%gravity_y, 0.d0)
-    call read_param_mpi(PARAMS,"Insects","WingThickness",Insect%WingThickness, 4.0d0*dx_reference)
-    call read_param_mpi(PARAMS,"Insects","J_body_yawpitchroll",defaultvec, (/0.d0,0.d0,0.d0/))
+    call read_param_mpi(PARAMS,"Insects","mass",Insect%mass, 1._rk)
+    call read_param_mpi(PARAMS,"Insects","gravity",Insect%gravity, 0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","gravity_x",Insect%gravity_x, 0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","gravity_y",Insect%gravity_y, 0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","WingThickness",Insect%WingThickness, 4.0_rk*dx_reference)
+    call read_param_mpi(PARAMS,"Insects","J_body_yawpitchroll",defaultvec, (/0.0_rk,0.0_rk,0.0_rk/))
     Insect%Jroll_body  = defaultvec(3)
     Insect%Jyaw_body   = defaultvec(1)
     Insect%Jpitch_body = defaultvec(2)
-    call read_param_mpi(PARAMS,"Insects","x0",Insect%x0, (/0.5d0*xl,0.5d0*yl,0.5d0*zl/))
-    call read_param_mpi(PARAMS,"Insects","v0",Insect%v0, (/0.d0, 0.d0, 0.d0/))
+    call read_param_mpi(PARAMS,"Insects","x0",Insect%x0, (/0.5_rk*xl,0.5_rk*yl,0.5_rk*zl/))
+    call read_param_mpi(PARAMS,"Insects","v0",Insect%v0, (/0.0_rk, 0.0_rk, 0.0_rk/))
     call read_param_mpi(PARAMS,"Insects","yawpitchroll_0",Insect%yawpitchroll_0,&
-    (/0.d0, 0.d0, 0.d0/))
+    (/0.0_rk, 0.0_rk, 0.0_rk/))
     call read_param_mpi(PARAMS,"Insects","yawpitchroll_a1",Insect%yawpitchroll_a1,&
-    (/0.d0, 0.d0, 0.d0/))
+    (/0.0_rk, 0.0_rk, 0.0_rk/))
     call read_param_mpi(PARAMS,"Insects","yawpitchroll_b1",Insect%yawpitchroll_b1,&
-    (/0.d0, 0.d0, 0.d0/))
+    (/0.0_rk, 0.0_rk, 0.0_rk/))
     ! convert yawpitchroll to radiants
-    Insect%yawpitchroll_0 = Insect%yawpitchroll_0 * (pi/180.d0)
-    Insect%yawpitchroll_a1 = Insect%yawpitchroll_a1 * (pi/180.d0)
-    Insect%yawpitchroll_b1 = Insect%yawpitchroll_b1 * (pi/180.d0)
-    call read_param_mpi(PARAMS,"Insects","eta0",Insect%eta0, 0.0d0)
-    Insect%eta0 = Insect%eta0*(pi/180.d0)
+    Insect%yawpitchroll_0 = Insect%yawpitchroll_0 * (pi/180.0_rk)
+    Insect%yawpitchroll_a1 = Insect%yawpitchroll_a1 * (pi/180.0_rk)
+    Insect%yawpitchroll_b1 = Insect%yawpitchroll_b1 * (pi/180.0_rk)
+    call read_param_mpi(PARAMS,"Insects","eta0",Insect%eta0, 0.0_rk)
+    Insect%eta0 = Insect%eta0*(pi/180.0_rk)
 
     call read_param_mpi(PARAMS,"Insects","pointcloudfile",Insect%pointcloudfile,"none")
 
@@ -268,28 +268,23 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     if (root) write(*,'(6(f4.2,1x))') Insect%DoF_on_off
 
 
-    ! wing FSI section
-    call read_param_mpi(PARAMS,"Insects","wing_fsi",Insect%wing_fsi,"no")
-    call read_param_mpi(PARAMS, "Insects", "init_alpha_phi_theta", Insect%init_alpha_phi_theta, (/0.d0, 0.d0, 0.d0/) )
-
-
     ! section for additional fractal tree
     call read_param_mpi(PARAMS, "Insects", "fractal_tree", Insect%fractal_tree, .false.)
     call read_param_mpi(PARAMS, "Insects", "fractal_tree_file", Insect%fractal_tree_file, "tree_data.in")
-    call read_param_mpi(PARAMS, "Insects", "fractal_tree_x0", Insect%fractal_tree_x0, (/0.0d0, 0.0d0, 0.0d0/) )
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_x0", Insect%fractal_tree_x0, (/0.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(PARAMS, "Insects", "fractal_tree_scaling", Insect%fractal_tree_scaling, 1.0_rk )
 
 
     ! wing inertia tensor (we currently assume two identical forewings and two identical hindwings)
     ! this allows computing inertial power and wing FSI model
-    call read_param_mpi(PARAMS,"Insects","Jxx",Insect%Jxx,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jyy",Insect%Jyy,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jzz",Insect%Jzz,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jxy",Insect%Jxy,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jxx2",Insect%Jxx2,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jyy2",Insect%Jyy2,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jzz2",Insect%Jzz2,0.d0)
-    call read_param_mpi(PARAMS,"Insects","Jxy2",Insect%Jxy2,0.d0)
+    call read_param_mpi(PARAMS,"Insects","Jxx",Insect%Jxx,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jyy",Insect%Jyy,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jzz",Insect%Jzz,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jxy",Insect%Jxy,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jxx2",Insect%Jxx2,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jyy2",Insect%Jyy2,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jzz2",Insect%Jzz2,0.0_rk)
+    call read_param_mpi(PARAMS,"Insects","Jxy2",Insect%Jxy2,0.0_rk)
 
     call read_param_mpi(PARAMS,"Insects","startup_conditioner",Insect%startup_conditioner,"no")
 
@@ -302,7 +297,7 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
     ! NOTE: 05/2020 Thomas, I changed the default back to local.
     call read_param_mpi(PARAMS,"Insects","smoothing_thickness",Insect%smoothing_thickness,"local")
-    call read_param_mpi(PARAMS,"Insects","C_smooth",Insect%C_smooth,1.0d0)
+    call read_param_mpi(PARAMS,"Insects","C_smooth",Insect%C_smooth,1.0_rk)
     call read_param_mpi(PARAMS,"Insects","BodySuperSTLfile",Insect%BodySuperSTLfile,"none.superstl")
     ! when using CT data, code computes the mask function in a shell around fluid-solid interface.
     ! The tickness of the shell is not a critical parameter, but it affects performance. Thicker shell
@@ -311,17 +306,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     ! Why is the shell thickness dependent on resolution? The cost to generate the mask depends on the number of
     ! triangles and the number of points in the shell. As the latter is coupled to dx and the former is constant
     ! this way the mask generation cost is constant when increasing the resolution.
-    call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness, 3.0d0)
+    call read_param_mpi(PARAMS,"Insects","C_shell_thickness",Insect%C_shell_thickness, 3.0_rk)
 
     Insect%dx_reference = dx_reference
     Insect%smooth = Insect%C_smooth*dx_reference
-    Insect%safety = 3.5d0*Insect%smooth
+    Insect%safety = 3.5_rk*Insect%smooth
 
     ! wing hinges (root points)
-    defaultvec=(/0.d0, +Insect%b_body, 0.d0 /)
+    defaultvec=(/0.0_rk, +Insect%b_body, 0.0_rk /)
     call read_param_mpi(PARAMS,"Insects","x_pivot_l",Insect%x_pivot_l_b, defaultvec)
 
-    defaultvec=(/0.d0, -Insect%b_body, 0.d0 /)
+    defaultvec=(/0.0_rk, -Insect%b_body, 0.0_rk /)
     call read_param_mpi(PARAMS,"Insects","x_pivot_r",Insect%x_pivot_r_b, defaultvec)
 
     ! read data for the second pair of wing hinges

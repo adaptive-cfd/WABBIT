@@ -6,9 +6,9 @@ subroutine Rx (R,angle)
   real(kind=rk), intent (in) :: angle
   real(kind=rk),dimension(1:3,1:3), intent(out) :: R
 
-  R(1,:) = (/ 1.d0, 0.d0, 0.d0/)
-  R(2,:) = (/ 0.d0, cos(angle), sin(angle) /)
-  R(3,:) = (/ 0.d0, -sin(angle), cos(angle) /)
+  R(1,:) = (/ 1.d0, 0.0_rk, 0.0_rk/)
+  R(2,:) = (/ 0.0_rk, cos(angle), sin(angle) /)
+  R(3,:) = (/ 0.0_rk, -sin(angle), cos(angle) /)
 end subroutine
 
 
@@ -17,9 +17,9 @@ subroutine Ry (R,angle)
   real(kind=rk), intent (in) :: angle
   real(kind=rk),dimension(1:3,1:3), intent(out) :: R
 
-  R(1,:) = (/ cos(angle), 0.d0, -sin(angle)/)
-  R(2,:) = (/ 0.d0, 1.d0, 0.d0 /)
-  R(3,:) = (/ +sin(angle), 0.d0, cos(angle) /)
+  R(1,:) = (/ cos(angle), 0.0_rk, -sin(angle)/)
+  R(2,:) = (/ 0.0_rk, 1.d0, 0.0_rk /)
+  R(3,:) = (/ +sin(angle), 0.0_rk, cos(angle) /)
 end subroutine
 
 
@@ -28,9 +28,9 @@ subroutine Rz (R,angle)
   real(kind=rk), intent (in) :: angle
   real(kind=rk),dimension(1:3,1:3), intent(out) :: R
 
-  R(1,:) = (/ cos(angle), +sin(angle), 0.d0/)
-  R(2,:) = (/ -sin(angle), cos(angle), 0.d0/)
-  R(3,:) = (/ 0.d0, 0.d0, 1.d0  /)
+  R(1,:) = (/ cos(angle), +sin(angle), 0.0_rk/)
+  R(2,:) = (/ -sin(angle), cos(angle), 0.0_rk/)
+  R(3,:) = (/ 0.0_rk, 0.0_rk, 1.d0  /)
 end subroutine
 
 ! rotation around arbitrary axis, given by vector u (normalized!!)

@@ -56,12 +56,12 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
 
         do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
             do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
     
-                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
-                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+                ix_global = int( x/dx(1) )
+                iy_global = int( y/dx(2) )
      
                 ! fields are initialized in read_params_ACM
                 ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)

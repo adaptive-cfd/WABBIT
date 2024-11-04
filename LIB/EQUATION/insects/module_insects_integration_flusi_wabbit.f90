@@ -18,21 +18,21 @@ implicit none
 !-----------------------------------------------------------------------------
   ! The derived integral quantities for fluid-structure interactions.
   type Integrals
-     real(kind=rk) :: time = 0.d0
-     real(kind=rk) :: EKin = 0.d0
-     real(kind=rk) :: Dissip = 0.d0
-     real(kind=rk) :: Divergence = 0.d0
-     real(kind=rk) :: Volume = 0.d0
-     real(kind=rk) :: APow = 0.d0
-     real(kind=rk) :: IPow = 0.d0
-     real(kind=rk) :: penalization_power = 0.d0
-     real(kind=rk) :: penalization_power_x = 0.d0
-     real(kind=rk) :: penalization_power_y = 0.d0
-     real(kind=rk) :: penalization_power_z = 0.d0
-     real(kind=rk),dimension(1:3) :: Force = 0.d0
-     real(kind=rk),dimension(1:3) :: Force_unst = 0.d0
-     real(kind=rk),dimension(1:3) :: Torque = 0.d0
-     real(kind=rk),dimension(1:3) :: Torque_unst = 0.d0
+     real(kind=rk) :: time = 0.0_rk
+     real(kind=rk) :: EKin = 0.0_rk
+     real(kind=rk) :: Dissip = 0.0_rk
+     real(kind=rk) :: Divergence = 0.0_rk
+     real(kind=rk) :: Volume = 0.0_rk
+     real(kind=rk) :: APow = 0.0_rk
+     real(kind=rk) :: IPow = 0.0_rk
+     real(kind=rk) :: penalization_power = 0.0_rk
+     real(kind=rk) :: penalization_power_x = 0.0_rk
+     real(kind=rk) :: penalization_power_y = 0.0_rk
+     real(kind=rk) :: penalization_power_z = 0.0_rk
+     real(kind=rk),dimension(1:3) :: Force = 0.0_rk
+     real(kind=rk),dimension(1:3) :: Force_unst = 0.0_rk
+     real(kind=rk),dimension(1:3) :: Torque = 0.0_rk
+     real(kind=rk),dimension(1:3) :: Torque_unst = 0.0_rk
   end type Integrals
 
 

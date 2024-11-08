@@ -17,7 +17,7 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID, time)
 
     ! without adaptivity, this routine makes no sense, as the memory is constant
     ! the run either crashes right away or never
-    if (params%adapt_tree .eqv. .false.) then
+    if (params%adapt_tree .eqv. .false. .or. params%Jmax == params%Jmin) then
         return
     endif
 

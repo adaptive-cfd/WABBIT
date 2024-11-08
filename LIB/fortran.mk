@@ -264,7 +264,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
-	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_forestMetaData.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
+	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_physics_metamodule.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
 	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 sync_ghosts_symmetry_condition.f90 reconstruction_step.f90 \
 	xfer_block_data.f90 block_relations.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

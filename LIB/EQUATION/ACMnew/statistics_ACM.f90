@@ -51,7 +51,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
-    real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block
+    real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're ngeligible in front of the lgt_block array.
     real(kind=rk), allocatable, save :: div(:,:,:)
@@ -515,6 +515,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
+
+            ! turbulent statistics
+            dissipation = 2*params_acm%nu*params_acm%enstrophy
+            u_RMS = sqrt(2*params_acm%e_kin/3)
+            call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin, u_RMS, &
+                (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
+                sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
         end if
 
     case default

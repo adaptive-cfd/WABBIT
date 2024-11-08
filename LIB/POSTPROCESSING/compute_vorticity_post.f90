@@ -339,7 +339,7 @@ subroutine wavelet_test(params)
 
     call ensureGradedness_tree( params, tree_ID )
     call executeCoarsening_tree( params, hvy_block, tree_ID )
-    call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_mesh here
+    call updateMetadata_tree(params, tree_ID) ! because we do not call adapt_tree here
 
     do k = 1, hvy_n(tree_ID)
         hvyID = hvy_active(k,tree_ID)

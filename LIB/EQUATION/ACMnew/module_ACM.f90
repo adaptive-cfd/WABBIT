@@ -639,6 +639,8 @@ end subroutine
       call init_t_file('meanflow.t', overwrite)
       call init_t_file('forces.t', overwrite)
       call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
+      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
+      "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)

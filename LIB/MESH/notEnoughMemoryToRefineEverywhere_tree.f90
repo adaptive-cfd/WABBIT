@@ -17,9 +17,7 @@ logical function notEnoughMemoryToRefineEverywhere_tree(params, tree_ID, time)
 
     ! without adaptivity, this routine makes no sense, as the memory is constant
     ! the run either crashes right away or never
-    if (params%adapt_tree .eqv. .false. .or. params%Jmax == params%Jmin) then
-        return
-    endif
+    if (params%adapt_tree .eqv. .false. .or. params%Jmax == params%Jmin) return
 
     ! this is the available maximum number of active blocks on a single mpirank
     hvy_n_max = nint(0.95_rk * real(params%number_blocks, kind=rk) )

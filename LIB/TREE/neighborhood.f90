@@ -510,13 +510,14 @@ end function
 !> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
 !> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
 !> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
-subroutine write_neighborhood_info(hvy_neighbor, dim)
+subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
     implicit none
 
+    integer(kind=ik), intent(in)  :: lgt_id  !< lgt id of block in question
     integer(kind=ik), intent(in)  :: hvy_neighbor(1:3*56)  !< hvy_neighbor(hvy_id, :)
     integer(kind=ik), intent(in)  :: dim  !< params%dim
     integer(kind=ik) i_n, i_l
-    character(len=200)  :: write_s
+    character(len=400)  :: write_s
     character(len=1) :: lvl_diff(1:3)
     logical :: found_n = .false.
 
@@ -525,7 +526,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
 
     ! sides - indices 01-24
     write_s = ""
-    write(write_s, '(A8)') "Sides:"
+    write(write_s, '(A8, i0, A)') "Sides ", lgt_id, ":"
     do i_n = 1,24  ! every side has 4 possible finer blocks or coarser configurations
         do i_l = 0,2  ! for lvl_diff = 0, -1, 1
             if (hvy_neighbor(i_n + i_l*56) /= -1) then
@@ -555,7 +556,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     ! edges - indices 25-48
     if (any(hvy_neighbor(25:48) /= -1) .or. any(hvy_neighbor(25+56:48+56) /= -1) .or. any(hvy_neighbor(25+2*56:48+2*56) /= -1)) then
         write_s = ""
-        write(write_s, '(A8)') "Edges:"
+        write(write_s, '(A8, i0, A)') "Edges ", lgt_id, ":"
         do i_n = 25,48  ! every side has 2 possible finer blocks or coarser configurations
             do i_l = 0,2  ! for lvl_diff = 0, +1, -1
                 if (hvy_neighbor(i_n + i_l*56) /= -1) then
@@ -598,7 +599,7 @@ subroutine write_neighborhood_info(hvy_neighbor, dim)
     ! corners - indices 49-56
     if (any(hvy_neighbor(49:56) /= -1) .or. any(hvy_neighbor(49+56:56+56) /= -1) .or. any(hvy_neighbor(49+2*56:56+2*56) /= -1)) then
         write_s = ""
-        write(write_s, '(A8)') "Corners:"
+        write(write_s, '(A8, i0, A)') "Corners ", lgt_id, ":"
         do i_n = 49,56  ! every side has 2 possible finer blocks or coarser configurations
             do i_l = 0,2  ! for lvl_diff = 0, -1, 1
                 if (hvy_neighbor(i_n + i_l*56) /= -1) then

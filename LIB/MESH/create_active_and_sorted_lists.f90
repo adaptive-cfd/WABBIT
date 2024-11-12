@@ -439,18 +439,12 @@ end subroutine createActiveSortedLists_tree
 
 
 ! ################################################################################
-!> Updates active lgt/hvy lists from lgt_block data.
-!> Returns active lists for each tree in the forest and lgt_n for each tree.
-!
-!> \details
-!> -------------------------------------------------------------
-!>     code                    | explanation
-!> -------------------------------------------------------------
-!> lgt_active(:,tree_ID)       | active block list of tree
-!> lgt_n(:,tree_ID)            | number of active blocks in tree
-!> -------------------------------------------------------------
+!> \brief Updates active lgt/hvy lists from lgt_block data for ALL TREES in a forest
+!> \details This routine updates active lists for ALL TREES in a forest.
+!> It returns active lists for each tree in the forest and lgt_n for each tree:
+!>    lgt_active(:,tree_ID) - active block list of tree
+!>    lgt_n(:,tree_ID)      - number of active blocks in tree
 !> \author PKrah
-! This routine updates active lists for ALL TREES in a forest
 subroutine createActiveSortedLists_forest(params)
 
     implicit none

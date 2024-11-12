@@ -290,11 +290,11 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     ! As some blocks have been transferred, the active lists are outdated.
     call createActiveSortedLists_tree(params, tree_ID_pruned)
 
-    ! since we have moved some blocks around, not only the active lists are outdated
-    ! but also the neighbor relations. Of course, pruned trees are incomplete, so
-    ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
-    ! it.
-    call updateMetadata_tree(params, tree_ID_full)
+    ! ! since we have moved some blocks around, not only the active lists are outdated
+    ! ! but also the neighbor relations. Of course, pruned trees are incomplete, so
+    ! ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
+    ! ! it.
+    ! call updateMetadata_tree(params, tree_ID_full)
 
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
     ! same mpirank. therefore, the responsible mpirank can just add them together.

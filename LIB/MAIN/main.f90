@@ -270,11 +270,12 @@ program main
             ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-            ! refine the mesh, normally "everywhere"
-            if (params%threshold_mask) then
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, hvy_mask=hvy_mask )
+            ! refine the mesh after refinement_indicator, usually "everywhere" or "significant"
+            ! for "significant", the refinement flags from the last adapt_tree call are reused. This might not be given for the first iteration so we just skip this
+            if (params%refinement_indicator == "significant" .and. iteration == 0) then
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow)
             else
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+                call refine_tree( params, hvy_block, hvy_tmp, params%refinement_indicator, tree_ID=tree_ID_flow )
             endif
         endif
         call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)

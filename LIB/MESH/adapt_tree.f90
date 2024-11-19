@@ -223,6 +223,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    ! ! Testing for de-aliasing - compute energy in JMax blocks before and after decomposition to compute what is dissipated
+    ! call componentWiseNorm_tree(params, hvy_tmp, tree_ID, "L2", norm, norm_case="level", n_val=params%Jmax)
+    ! if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm on JMax  before de-aliasing:", norm(:)
+    ! call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm, norm_case="SC_level", n_val=params%Jmax)
+    ! if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm on JMax-1 after de-aliasing:", norm(:)
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Coarsening / Grid adaption
@@ -290,7 +295,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call respectJmaxJmin_tree( params, tree_ID )
 
         ! unmark blocks that cannot be coarsened due to gradedness and completeness, in one go this should converge to the final grid
-        call ensureGradedness_tree( params, tree_ID, check_daughters=.true.)
+        call ensureGradedness_tree( params, tree_ID, check_daughters=.true., stay_value=REF_UNSIGNIFICANT_STAY)
 
         ! we do not need to move any cell data anymore, any block with -1 can simply be deleted
         do k = 1, lgt_n(tree_ID)
@@ -299,8 +304,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! delete blocks
                 lgt_block(lgt_ID, :) = -1
             endif
-            ! reset all refinement flags
-            lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            ! ! reset all refinement flags
+            ! lgt_block(lgt_ID, IDX_REFINE_STS) = 0
         enddo
 
         ! update grid lists: active list, neighbor relations, etc

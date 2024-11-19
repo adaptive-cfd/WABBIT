@@ -293,7 +293,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     ! ! since we have moved some blocks around, not only the active lists are outdated
     ! ! but also the neighbor relations. Of course, pruned trees are incomplete, so
     ! ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
-    ! ! it.
+    ! ! it. - no! We did not moving on the full tree, synching is not necessary and can create problems (if in full grid formulation )
     ! call updateMetadata_tree(params, tree_ID_full)
 
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the

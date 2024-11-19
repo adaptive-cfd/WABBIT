@@ -517,11 +517,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
 
             ! turbulent statistics
-            dissipation = 2*params_acm%nu*params_acm%enstrophy
-            u_RMS = sqrt(2*params_acm%e_kin/3)
-            call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin, u_RMS, &
-                (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
-                sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
+            if (params_acm%nu /= 0.0_rk) then
+                dissipation = 2*params_acm%nu*params_acm%enstrophy
+                u_RMS = sqrt(2*params_acm%e_kin/3)
+                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin, u_RMS, &
+                    (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
+                    sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
+            endif
         end if
 
     case default

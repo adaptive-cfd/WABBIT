@@ -83,6 +83,7 @@ module module_params
         character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
+        character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
         logical, allocatable :: threshold_state_vector_component(:)

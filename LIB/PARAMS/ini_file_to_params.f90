@@ -149,7 +149,9 @@ subroutine ini_file_to_params( params, filename )
    if ( params%order_discretization == 'FD_4th_central' ) g_RHS_min = 2
    if ( params%order_discretization == 'FD_2th_central' ) g_RHS_min = 1
    if (params%g_RHS < g_RHS_min) then
-      write(*,  '(A, i0, A, i0)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for FD scheme, adapting it from", params%g_RHS, " to ", g_RHS_min
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for FD scheme, adapting it from ", params%g_RHS, " to ", g_RHS_min, " (ignore this if it was not explicitly set)"
+      endif
       params%g_RHS = g_RHS_min
    endif
 
@@ -321,7 +323,9 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
 
    if (params%g_RHS < g_RHS_default) then
-      write(*,  '(A, i0, A, i0)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for Wavelet, adapting it from", params%g_RHS, " to ", g_RHS_default
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for Wavelet, adapting it from ", params%g_RHS, " to ", g_RHS_default, " (ignore this if it was not explicitly set)"
+      endif
       params%g_RHS = g_RHS_default
    endif
 

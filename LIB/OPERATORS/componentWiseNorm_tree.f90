@@ -26,10 +26,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 
     ! for threshold state vector components we do some slicing magic
     ! fortran does not allow logical mask slicing, so we build a mask of indices to slice with
-    if (allocated(mask_i)) then
-        if (size(mask_i) < n_eqn) deallocate(mask_i)
-    endif
-    if (.not. allocated(mask_i)) allocate(mask_i(1:n_eqn))
+    allocate(mask_i(1:n_eqn))
     do l = 1, n_eqn
         mask_i(l) = l
     end do

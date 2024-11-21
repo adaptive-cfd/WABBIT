@@ -39,10 +39,7 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
 
     ! for threshold state vector components we do some slicing magic
     ! fortran does not allow logical mask slicing, so we build a mask of indices to slice with
-    if (allocated(mask_i)) then
-        if (size(mask_i) < nc) deallocate(mask_i)
-    endif
-    if (.not. allocated(mask_i)) allocate(mask_i(1:nc))
+    allocate(mask_i(1:nc))
     do l = 1, nc
         mask_i(l) = l
     end do

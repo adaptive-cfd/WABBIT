@@ -46,7 +46,6 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     integer(kind=ik), dimension(3) :: Bs
     ! chance for block refinement, random number
     real(kind=rk) :: crsn_chance, r, mask_max, mask_min
-    logical :: thresholding_component(1:size(block_data,4))
     real(kind=rk) :: t0  !< timing for debugging
 
     Jmax = params%Jmax
@@ -100,11 +99,10 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         endif
 #endif
 
-        thresholding_component = params%threshold_state_vector_component
         if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
-            call threshold_block( params, block_data, thresholding_component, refinement_status, level, input_is_WD, eps=norm, indices=idx, verbose_check=verbose_check)
+            call threshold_block( params, block_data, refinement_status, level, input_is_WD, eps=norm, indices=idx, verbose_check=verbose_check)
         else
-            call threshold_block( params, block_data, thresholding_component, refinement_status, level, input_is_WD, norm=norm, indices=idx, verbose_check=verbose_check)
+            call threshold_block( params, block_data, refinement_status, level, input_is_WD, norm=norm, indices=idx, verbose_check=verbose_check)
         endif
 
         ! timing for debugging - block based so should not be deployed for productive versions

@@ -86,7 +86,7 @@ module module_params
         character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
-        logical, allocatable :: threshold_state_vector_component(:)
+        integer, allocatable :: threshold_state_vector_component(:)
         ! decide if WABBIT should start from input files
         logical :: read_from_files
         ! files we want to read for inital cond.

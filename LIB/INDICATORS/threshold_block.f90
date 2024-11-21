@@ -1,4 +1,4 @@
-subroutine threshold_block( params, u, thresholding_component, refinement_status, level, input_is_WD, norm, indices, eps, verbose_check)
+subroutine threshold_block( params, u, refinement_status, level, input_is_WD, norm, indices, eps, verbose_check)
     implicit none
 
     !> user defined parameter structure
@@ -6,9 +6,6 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array
     !! When input_is_WD is set they are expected to be already wavelet decomposed in Spaghetti-ordering
     real(kind=rk), intent(inout)        :: u(:, :, :, :)
-    !> it can be useful not to consider all components for thresholding here.
-    !! e.g. to work only on the pressure or vorticity.
-    logical, intent(in)                 :: thresholding_component(:)
     !> main output of this routine is the new satus
     integer(kind=ik), intent(out)       :: refinement_status
     !> If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
@@ -23,9 +20,10 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
     integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
-    integer(kind=ik)                    :: dF, i, j, l, p, idx(2,3), Bs(1:3), g, i_dim, dim, Jmax, nc
+    integer(kind=ik)                    :: dF, l, p_norm, p, idx(2,3), Bs(1:3), g, i_dim, dim, Jmax, nc
     real(kind=rk)                       :: detail( size(u,4) ), eps_use( size(u,4) )
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
+    integer, dimension(:), allocatable  :: mask_i, mask
 
     nc     = size(u, 4)
     Bs     = params%Bs
@@ -38,6 +36,16 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         if (size(u_wc, 4) < nc) deallocate(u_wc)
     endif
     if (.not. allocated(u_wc)) allocate(u_wc(1:size(u, 1), 1:size(u, 2), 1:size(u, 3), 1:nc ) )
+
+    ! for threshold state vector components we do some slicing magic
+    ! fortran does not allow logical mask slicing, so we build a mask of indices to slice with
+    if (allocated(mask_i)) then
+        if (size(mask_i) < nc) deallocate(mask_i)
+    endif
+    if (.not. allocated(mask_i)) allocate(mask_i(1:nc))
+    do l = 1, nc
+        mask_i(l) = l
+    end do
 
     ! set the indices we want to threshold
     idx(:, :) = 1
@@ -86,28 +94,63 @@ subroutine threshold_block( params, u, thresholding_component, refinement_status
         call wavelet_renorm_block(params, u, u_wc, level, indices=indices, verbose_check=verbose_check)
     endif
 
-    ! JB ToDo: This for now goes against the idea of physics types, if we decide type by type the norm, then this has to move into the physics module
-    if (params%physics_type == "ACM_new") then
-        ! velocity is treated together, so we treat the wavelets as a vector and compute the norm into the first vector
-        u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1) = sqrt(sum( &
-            u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:params%dim), dim=4))
-    endif
+    ! some thresholding components want to be treated together, as for example the velocity, so we compute a norm-equivalent if wanted
+    ! every value >1 in thresholding_component are treated as belonging together
+    ! so we could set 2 2 3 3 and actually have those treated as independent vector fields, where we compute the norm
+    ! maybe a bit overkill because usually we only have the velocity, but why not have the capacity that we can build up on
+    do l = 2, maxval(params%threshold_state_vector_component(:))
+        ! convert logical mask to index mask
+        mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
+        detail(mask) = &
+            maxval(sqrt(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), mask)**2))
+
+        ! p_norm = 0
+        ! do p = 1, nc
+        !     ! set value onto which we construct the norm
+        !     if (params%threshold_state_vector_component(p) == l .and. p_norm == 0) then
+        !         p_norm = p
+        !         ! first value is set
+        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = &
+        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) **2
+        !     else
+        !         ! all other values are added on top to where we construct the norm
+        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = &
+        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) + &
+        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)**2
+        !     endif
+        ! enddo
+        ! ! now compute the square root
+        ! u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = sqrt(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm))
+    enddo
 
     do p = 1, nc
-        ! if all details are smaller than C_eps, we can coarsen, check interior WC only
-        detail(p) = maxval( abs(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)) )
+        if (params%threshold_state_vector_component(p) == 1) then
+            ! if all details are smaller than C_eps, we can coarsen, check interior WC only
+            detail(p) = maxval( abs(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)) )
+        endif
     enddo
 
     ! We could disable detail checking for qtys we do not want to consider,
     ! but this is more work and selective thresholding is rarely used
     do p = 1, nc
-        if (.not. thresholding_component(p)) detail(p) = 0.0_rk
+        if (params%threshold_state_vector_component(p) == 0) detail(p) = 0.0_rk
     enddo
 
-    ! acm has wavelets for velocity as a vector, only the first velocity has the norm values so we disable the rest
-    if ((params%eps_norm == "L2" .or. params%eps_norm == "H1") .and. params%physics_type == "ACM_new") then
-        detail(2:params%dim) = 0.0_rk
-    endif
+    ! ! for qtys where we compute norm values we have to disable the rest
+    ! if ((params%eps_norm == "L2" .or. params%eps_norm == "H1") .and. params%physics_type == "ACM_new") then
+    !     do l = 2, maxval(params%threshold_state_vector_component(:))
+    !         p_norm = 0
+    !         do p = 1, nc
+    !             ! the first value is where we constructed the norm
+    !             if (params%threshold_state_vector_component(p) == l .and. p_norm == 0) then
+    !                 p_norm = p
+    !             ! all others get their details deleted
+    !             else
+    !                 detail(p) = 0.0_rk
+    !             endif
+    !         enddo
+    !     enddo
+    ! endif
 
     ! default thresholding level is the one in the parameter struct
     eps_use(:) = params%eps

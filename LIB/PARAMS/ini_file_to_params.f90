@@ -362,19 +362,15 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet &
       .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
 
-   ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
-   ! use? in ACM, it can be good NOT to apply it to the pressure.
+   ! Which components of the state vector (if indicator is "threshold-state-vector") shall we use?
+   ! in ACM, it can be good NOT to apply it to the pressure (=0) or treat the velocity together (>1)
    allocate(tmp(1:params%n_eqn))
    allocate(params%threshold_state_vector_component(1:params%n_eqn))
    ! as default, use ones (all components used for indicator)
    tmp = 1.0_rk
    call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
    do i = 1, params%n_eqn
-      if (tmp(i)>0.0_rk) then
-         params%threshold_state_vector_component(i) = .true.
-      else
-         params%threshold_state_vector_component(i) = .false.
-      endif
+      params%threshold_state_vector_component(i) = nint(tmp(i))
    enddo
    deallocate(tmp)
 

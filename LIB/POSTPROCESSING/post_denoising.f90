@@ -96,7 +96,7 @@ subroutine post_denoising(params)
     params%eps = 1.0e200_rk  ! practicallz disable it
     params%azzalini_iterations = 100
     params%threshold_wc = .true.
-    params%threshold_state_vector_component(1:params%n_eqn) = .true.
+    params%threshold_state_vector_component(1:params%n_eqn) = 1
     if (.not. denoise_energy) then
         params%coarsening_indicator = "threshold-image-denoise"
     else

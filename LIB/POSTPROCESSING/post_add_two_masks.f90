@@ -67,7 +67,7 @@ subroutine post_add_two_masks(params)
     params%n_eqn = 1
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
-    params%threshold_state_vector_component(1:params%n_eqn)=.True.
+    params%threshold_state_vector_component(1:params%n_eqn)=1
 
 
     call get_cmd_arg_str( "--wavelet", params%wavelet, default='CDF40' )

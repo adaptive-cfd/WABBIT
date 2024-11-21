@@ -103,7 +103,7 @@ subroutine post_evaluate_thresholding(params)
     params%symmetry_vector_component(1) = "0"
 
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component = .true.
+    params%threshold_state_vector_component = 1
 
     Bs = params%Bs
     g  = params%g

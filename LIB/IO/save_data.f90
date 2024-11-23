@@ -70,8 +70,9 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         ! to disk in the work array. This way, we can also store derived variables
         ! such as the vorticity. Note in most cases, this copies just the state vector
         ! to work.
+        ! In case that hvy_mask is not used (which means all its sizes are one), we do some fortran magic to avoid errors
         call PREPARE_SAVE_DATA_meta(params%physics_type, time, hvy_block(:,:,:,:,hvy_id), &
-        params%g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), n_domain)
+        params%g, x0, dx, hvy_tmp(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,merge(1, hvy_id, size(hvy_mask,5) == 1)), n_domain)
 
     enddo
 

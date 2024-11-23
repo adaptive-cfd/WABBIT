@@ -1381,16 +1381,15 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! --------------------------------------------------------------------------
     ! HIT linear forcing
     ! --------------------------------------------------------------------------
-    ! if (params_acm%use_HIT_linear_forcing) then
-    !     G_gain = 100.0_rk
-    !     e_kin_set = 0.5_rk * (product(params_acm%domain_size))
-    !     t_l_inf = 1.0_rk ! (2.0_rk/3.0_rk) * e_kin_set /
-    !     A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
-    !
-    !     rhs(:,:,:,1) = rhs(:,:,:,1) + A_forcing*phi(:,:,:,1)
-    !     rhs(:,:,:,2) = rhs(:,:,:,2) + A_forcing*phi(:,:,:,2)
-    !     rhs(:,:,:,3) = rhs(:,:,:,3) + A_forcing*phi(:,:,:,3)
-    ! endif
+    if (params_acm%use_HIT_linear_forcing) then
+        G_gain = 100.0_rk
+        e_kin_set = 0.5_rk * (product(params_acm%domain_size))
+        t_l_inf = 1.0_rk ! (2.0_rk/3.0_rk) * e_kin_set /
+        ! forcing after Bassene konstant energy (2016)
+        A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
+            
+        rhs(:,:,:,1:3) = rhs(:,:,:,1:3) + A_forcing*phi(:,:,:,1:3)
+    endif
 
     ! --------------------------------------------------------------------------
     ! sponge term.

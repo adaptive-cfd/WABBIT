@@ -86,23 +86,6 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
                 sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
             enddo
-
-            ! if (params%physics_type == "ACM_new") then
-            !     ! velocity treated together
-            !     norm(1) = norm(1) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !         sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), 1:params%dim, hvy_id )**2 )
-            !     norm(1:params%dim) = norm(1)  ! transcribe to other velocity components as well
-            !     ! rest - should be only pressure?
-            !     do p = params%dim+1, n_eqn
-            !         norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !         sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
-            !     enddo
-            ! else
-            !     do p = 1, n_eqn
-            !         norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !         sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
-            !     enddo
-            ! endif
         enddo
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -199,24 +182,6 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
                 sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
             enddo
-            
-            ! ! JB ToDo: This for now goes against the idea of physics types, if we decide type by type the norm, then this has to move into the physics module
-            ! if (params%physics_type == "ACM_new") then
-            !     ! velocity treated together
-            !     norm(1) = norm(1) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !         sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), 1:params%dim, hvy_id )**2 )
-            !     norm(1:params%dim) = norm(1)  ! transcribe to other velocity components as well
-            !     ! rest - should be only pressure?
-            !     do p = params%dim+1, n_eqn
-            !         norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !             sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
-            !     enddo
-            ! else
-            !     do p = 1, n_eqn
-            !         norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-            !             sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
-            !     enddo
-            ! endif
         enddo
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)

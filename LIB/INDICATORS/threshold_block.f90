@@ -100,24 +100,6 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
         mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
         detail(mask) = &
             maxval(sqrt(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), mask)**2))
-
-        ! p_norm = 0
-        ! do p = 1, nc
-        !     ! set value onto which we construct the norm
-        !     if (params%threshold_state_vector_component(p) == l .and. p_norm == 0) then
-        !         p_norm = p
-        !         ! first value is set
-        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = &
-        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) **2
-        !     else
-        !         ! all other values are added on top to where we construct the norm
-        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = &
-        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) + &
-        !         u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p)**2
-        !     endif
-        ! enddo
-        ! ! now compute the square root
-        ! u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm) = sqrt(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), p_norm))
     enddo
 
     do p = 1, nc
@@ -132,22 +114,6 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
     do p = 1, nc
         if (params%threshold_state_vector_component(p) == 0) detail(p) = 0.0_rk
     enddo
-
-    ! ! for qtys where we compute norm values we have to disable the rest
-    ! if ((params%eps_norm == "L2" .or. params%eps_norm == "H1") .and. params%physics_type == "ACM_new") then
-    !     do l = 2, maxval(params%threshold_state_vector_component(:))
-    !         p_norm = 0
-    !         do p = 1, nc
-    !             ! the first value is where we constructed the norm
-    !             if (params%threshold_state_vector_component(p) == l .and. p_norm == 0) then
-    !                 p_norm = p
-    !             ! all others get their details deleted
-    !             else
-    !                 detail(p) = 0.0_rk
-    !             endif
-    !         enddo
-    !     enddo
-    ! endif
 
     ! default thresholding level is the one in the parameter struct
     eps_use(:) = params%eps

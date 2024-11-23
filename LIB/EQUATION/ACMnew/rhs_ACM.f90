@@ -75,7 +75,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
         ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
         ! rate at all times, so compute that, if we use the forcing.
-        if (params_acm%use_HIT_linear_forcing) then
+        if (params_acm%HIT_linear_forcing) then
             params_acm%e_kin = 0.0_rk
             params_acm%enstrophy = 0.0_rk
         endif
@@ -108,7 +108,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
         ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
         ! rate at all times, so compute that, if we use the forcing.
-        if (params_acm%use_HIT_linear_forcing) then
+        if (params_acm%HIT_linear_forcing) then
             ! vorticity work array
             if (.not. allocated(vor) ) allocate(vor(1:size(u,1), 1:size(u,2), 1:size(u,3), 1:3 ))
             ! to compute the current dissipation rate
@@ -224,7 +224,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
         ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
         ! rate at all times, so compute that, if we use the forcing.
-        if (params_acm%use_HIT_linear_forcing) then
+        if (params_acm%HIT_linear_forcing) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
@@ -1381,9 +1381,15 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! --------------------------------------------------------------------------
     ! HIT linear forcing
     ! --------------------------------------------------------------------------
-    if (params_acm%use_HIT_linear_forcing) then
+    if (params_acm%HIT_linear_forcing) then
         G_gain = 100.0_rk
-        e_kin_set = 0.5_rk * (product(params_acm%domain_size))
+        ! when the desired global energy is set to < 0 it makes no sense, we just set it to 1 then
+        if (params_acm%HIT_energy < 0.0_rk) then
+            ! e_kin_set = 0.5_rk * (product(params_acm%domain_size))
+            e_kin_set = 1.0_rk
+        else
+            e_kin_set = params_acm%HIT_energy
+        endif
         t_l_inf = 1.0_rk ! (2.0_rk/3.0_rk) * e_kin_set /
         ! forcing after Bassene konstant energy (2016)
         A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)

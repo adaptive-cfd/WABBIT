@@ -75,7 +75,8 @@ module module_acm
 
     ! linear forcing
     logical :: HIT_linear_forcing = .false.
-    real(kind=rk) :: HIT_energy = -1.0_rk
+    real(kind=rk) :: HIT_energy = 1.0_rk
+    real(kind=rk) :: HIT_gain = 100.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -246,7 +247,8 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
     call read_param_mpi(FILE, 'ACM-new', 'HIT_linear_forcing', params_acm%HIT_linear_forcing, .false. )
-    call read_param_mpi(FILE, 'ACM-new', 'HIT_energy', params_acm%HIT_energy, -1.0_rk )
+    call read_param_mpi(FILE, 'ACM-new', 'HIT_energy', params_acm%HIT_energy, 1.0_rk )
+    call read_param_mpi(FILE, 'ACM-new', 'HIT_gain', params_acm%HIT_gain, 100.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
 
 

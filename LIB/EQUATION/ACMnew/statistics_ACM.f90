@@ -146,6 +146,23 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         penal_power_block = 0.0_rk
         scalar_removal_block = 0.0_rk
 
+        ! some preparations that we do not want to compute each time within the loop
+        if (is_insect) then
+            ! point of reference for the moments
+            x0_moment = 0.0_rk
+            ! body moment
+            x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
+            ! left wing
+            x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
+            ! right wing
+            x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
+            ! second left and second right wings
+            if (Insect%second_wing_pair) then
+            x0_moment(1:3, Insect%color_l2) = Insect%x_pivot_l2_g
+            x0_moment(1:3, Insect%color_r2) = Insect%x_pivot_r2_g
+            endif
+        endif
+
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
             ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
@@ -156,58 +173,55 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 div = 0.00_rk
             end where
 
+            ! most integral quantities can be computed with block-wise function calls
+            ! compute mean flow for output in statistics
+            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
+            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 2))
+
+            ! kinetic energy
+            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
+
+            ! maximum of velocity in the field
+            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
+
+            ! maximum/min divergence in velocity field
+            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
+            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
+
+            ! volume of mask (useful to see if it is properly generated)
+            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
+            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6))
+
+            ! some computations need point-wise loops
             do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
+                do ix = g+1, Bs(1)+g
+                    color = int( mask(ix, iy, 1, 5), kind=2 )
 
-                color = int( mask(ix, iy, 1, 5), kind=2 )
+                    chi = mask(ix,iy,1,1) * C_eta_inv
+                    usx = mask(ix,iy,1,2)
+                    usy = mask(ix,iy,1,3)
 
-                chi = mask(ix,iy,1,1) * C_eta_inv
-                usx = mask(ix,iy,1,2)
-                usy = mask(ix,iy,1,3)
+                    ! forces acting on body
+                    force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-usx)*chi
+                    force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
 
-                ! compute mean flow for output in statistics
-                meanflow_block(1) = meanflow_block(1) + u(ix,iy,1,1)
-                meanflow_block(2) = meanflow_block(2) + u(ix,iy,1,2)
+                    ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+                    penal_power_block = penal_power_block + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
 
-                ! volume of mask (useful to see if it is properly generated)
-                tmp_volume = tmp_volume + mask(ix,iy,1,1)
-                tmp_volume2 = tmp_volume2 + mask(ix,iy,1,6)
-
-                ! forces acting on body
-                force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-usx)*chi
-                force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
-
-                ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                penal_power_block = penal_power_block + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
-
-                ! residual velocity in the solid domain
-                residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
-                residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-usy) * mask(ix,iy,1,1))
-
-                ! kinetic energy
-                ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,1,1:2)**2 )
-
-                ! maximum of velocity in the field
-                params_acm%umag = max( params_acm%umag, u(ix,iy,1,1)*u(ix,iy,1,1) + u(ix,iy,1,2)*u(ix,iy,1,2) )
-
-                ! maximum/min divergence in velocity field
-                params_acm%div_max = max( params_acm%div_max, div(ix,iy,1) )
-                params_acm%div_min = min( params_acm%div_min, div(ix,iy,1) )
-            enddo
+                    ! residual velocity in the solid domain
+                    residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
+                    residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-usy) * mask(ix,iy,1,1))
+                enddo
             enddo
 
             ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
             ! sense to keep track of this. however, note that with Neumann BC, that makes no
             ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
             if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        ! should we ever use more than 1 scalar seriously, this has to be adopted
-                        ! because it uses only the 1st one (:,:,1,4)
-                        ! assumes *homogeneous* dirichlet condition
-                        scalar_removal_block = scalar_removal_block + mask(ix,iy,1,1) * u(ix,iy,1,4) * C_eta_inv
-                    enddo
-                enddo
+                ! should we ever use more than 1 scalar seriously, this has to be adopted
+                ! because it uses only the 1st one (:,:,1,4)
+                ! assumes *homogeneous* dirichlet condition
+                scalar_removal_block = scalar_removal_block + sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 4)) * C_eta_inv
             endif
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
@@ -219,29 +233,34 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 div = 0.00_rk
             end where
 
+            ! block-wise function calls for quantities
+            ! compute mean flow for output in statistics
+            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
+            meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
 
+            ! kinetic energy
+            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
+
+            ! maximum of velocity in the field
+            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
+
+            ! maximum/min divergence in velocity field
+            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
+            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
+
+            ! volume of mask (useful to see if it is properly generated)
+            ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
+            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6))
+
+            ! point-wise loop for quantities
             do iz = g+1, Bs(3)+g
                 z = x0(3) + dble(iz-(g+1)) * dx(3)
                 do iy = g+1, Bs(2)+g
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
                     do ix = g+1, Bs(1)+g
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
-
-                        ! compute mean flow for output in statistics
-                        meanflow_block(1:3) = meanflow_block(1:3) + u(ix,iy,iz,1:3)
-                        ekin_block = ekin_block + 0.5_rk*sum( u(ix,iy,iz,1:3)**2 )
-
-                        ! maximum of velocity in the field
-                        params_acm%umag = max( params_acm%umag, u(ix,iy,iz,1)*u(ix,iy,iz,1) + u(ix,iy,iz,2)*u(ix,iy,iz,2) + u(ix,iy,iz,3)*u(ix,iy,iz,3) )
-
-                        ! maximum/min divergence in velocity field
-                        params_acm%div_max = max( params_acm%div_max, div(ix,iy,iz) )
-                        params_acm%div_min = min( params_acm%div_min, div(ix,iy,iz) )
-
-                        ! volume of mask (useful to see if it is properly generated)
-                        ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
-                        tmp_volume = tmp_volume + mask(ix, iy, iz, 1)
-                        tmp_volume2 = tmp_volume2 + mask(ix, iy, iz, 6)
 
                         ! get this points color
                         color = int( mask(ix, iy, iz, 5), kind=2 )
@@ -265,20 +284,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                             ! the wing moments wrt to the hinge points. The latter two are used to compute the
                             ! aerodynamic power. Makes sense only in 3D.
                             if (is_insect) then
-                                ! point of reference for the moments
-                                x0_moment = 0.0_rk
-                                ! body moment
-                                x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
-                                ! left wing
-                                x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
-                                ! right wing
-                                x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
-                                ! second left and second right wings
-                                if (Insect%second_wing_pair) then
-                                  x0_moment(1:3, Insect%color_l2) = Insect%x_pivot_l2_g
-                                  x0_moment(1:3, Insect%color_r2) = Insect%x_pivot_r2_g
-                                endif
-
                                 ! exclude walls, trees, etc...
                                 if (color > 0_2) then
                                     ! moment with color-dependent lever
@@ -312,16 +317,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! sense to keep track of this. however, note that with Neumann BC, that makes no
             ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
             if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            ! should we ever use more than 1 scalar seriously, this has to be adopted
-                            ! because it uses only the 1st one (:,:,:,5)
-                            ! assumes *homogeneous* dirichlet condition
-                            scalar_removal_block = scalar_removal_block + mask(ix,iy,iz,1) * u(ix,iy,iz,5) * C_eta_inv
-                        enddo
-                    enddo
-                enddo
+                ! should we ever use more than 1 scalar seriously, this has to be adopted
+                ! because it uses only the 1st one (:,:,:,5)
+                ! assumes *homogeneous* dirichlet condition
+                scalar_removal_block = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 5)) * C_eta_inv
             endif
 
         endif

@@ -163,7 +163,7 @@ program main
     endif
 
     ! timing
-    call toc( "TOPLEVEL: unit tests", 16, MPI_wtime()-sub_t0 )
+    call toc( "TOPLEVEL: unit tests", 17, MPI_wtime()-sub_t0 )
     sub_t0 = MPI_Wtime()
 
     !---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ program main
 
 
     ! timing
-    call toc( "TOPLEVEL: init_data", 14, MPI_wtime()-sub_t0 )
+    call toc( "TOPLEVEL: init_data", 15, MPI_wtime()-sub_t0 )
 
     ! call abort(197, "Shhhh, Julius is testing!")
 
@@ -336,12 +336,14 @@ program main
             !*******************************************************************
             ! statistics
             !*******************************************************************
+            t4 = MPI_wtime()
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             endif
+            call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
 
             ! if multiple time steps are performed on the same grid, we have to be careful
             ! not to skip past saving time intervals. Therefore, if it is time to save, we
@@ -371,7 +373,7 @@ program main
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
             endif
         endif
-        call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
+        call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
 
         !***********************************************************************

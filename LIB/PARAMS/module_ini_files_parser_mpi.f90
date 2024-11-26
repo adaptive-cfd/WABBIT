@@ -372,16 +372,16 @@ contains
 
 
     !-------------------------------------------------------------------------------
-    ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+    ! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
     ! Displays what it does on stdout (so you can see whats going on)
     ! Input:
     !       PARAMS: the complete *.ini file
     !       section: the section we're looking for
     !       keyword: the keyword we're looking for
-    !       defaultvalue: if the we can't find a vector, we return this and warn
-    !       n: length of vector
+    !       defaultvalue: if the we can't find a matrix, we return this and warn
+    !       n: length of matrix
     ! Output:
-    !       params_vector: this is the parameter you were looking for
+    !       params_matrix: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
     subroutine param_matrix_mpi (PARAMS, section, keyword, matrix, defaultvalue)
         implicit none

@@ -250,7 +250,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
     ! a pruned tree has fewer entries: loop over it instead of the other one?
     ! if you find a block in the full tree -> well then that's good, copy.
-    ! else: the target grid is either refined or coarsened at this position.
+    ! else: We just assume that this block does not exist, as it maybe is on another level, but we don't care
+    !       Why? Well because sometimes we have full grid formulation (mask on JMax and JMax-1)
+    !       and sometimes only leaf grid (mask on JMax only). For the second point the JMax-1 blocks are ignored
 
     ! Step 1: XFER. we look for blocks that exist in both pruned and full tree and
     ! if they are on different mpiranks, we xfer the pruned trees block to the rank
@@ -289,12 +291,6 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
     ! As some blocks have been transferred, the active lists are outdated.
     call createActiveSortedLists_tree(params, tree_ID_pruned)
-
-    ! ! since we have moved some blocks around, not only the active lists are outdated
-    ! ! but also the neighbor relations. Of course, pruned trees are incomplete, so
-    ! ! the neighbor routine will not succeed on them, but on the flow grid, we have to do
-    ! ! it. - no! We did not moving on the full tree, synching is not necessary and can create problems (if in full grid formulation )
-    ! call updateMetadata_tree(params, tree_ID_full)
 
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
     ! same mpirank. therefore, the responsible mpirank can just add them together.
@@ -341,33 +337,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             endif
 
         else
-            ! we did not find it. The grid has changed in the interior of the
-            ! obstacle, and we can set those interior blocks to constant 1. But
-            ! we need to figure out which blocks to set to 1.
-
-            ! we can further assume that all blocks in the pruned tree are the minimum:
-            ! only the interface is very important, interior blocks are dictated by
-            ! gradedness. Hence: assuming that the fluid/solid interface is always
-            ! on the finest level, only a refinement in the interior is possible (and
-            ! not a coarsening) => look for sister blocks on higher levels (refined)
-
-            ! find all sister blocks and add 1 to them. no xfer required.
-            treecode1 = get_tc(lgt_block(lgt_id1, IDX_TC_1 : IDX_TC_2))
-
-            do i = 1, lgt_n(tree_ID_full)
-                lgt_id2 = lgt_active(i, tree_ID_full)
-                treecode2 = get_tc(lgt_block(lgt_id2, IDX_TC_1 : IDX_TC_2))
-
-                if (treecode1 == treecode2) then
-                    ! this is one of the sisters
-                    call lgt2proc( rank_full, lgt_id2, N)
-
-                    if (params%rank == rank_full) then
-                        call lgt2hvy( hvy_id2, lgt_id2, rank_full, N)
-                        hvy_block(:,:,:,:,hvy_id2) = hvy_block(:,:,:,:,hvy_id1)
-                    endif
-                endif
-            enddo
+            ! We did not find it. However, we do not have blocks with flat 1 in our current implentation of a tube around the border
+            ! So, this block might be a mother or daughter block of another border block, in leaf grids it might just not exist at the current moment
+            ! But that is no problem - We just ignore it
         endif
     enddo
 

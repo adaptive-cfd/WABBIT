@@ -754,7 +754,7 @@ module module_ini_files_parser
         !       keyword: the keyword we're looking for
         !       defaultvalue: if the we can't find the parameter, we return this and warn
         ! Output:
-        !       params_int: this is the parameter you were looking for
+        !       params_matrix: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
         subroutine param_matrix(PARAMS, section, keyword, matrix, defaultvalue)
             implicit none
@@ -814,15 +814,19 @@ module module_ini_files_parser
                     ! 9 9 9 9/);
 
                     ! does this line contain the beginning of the keyword we're looking for ?
-                    if (index(line, keyword//'=(/')==1) then
-                        ! yes, it does.
-                        index1 = index( line, '=(/')+3
+                    if (index(line, keyword)==1) then
+                        ! in the rare case that we only want to write a one-line matrix, we also accept that (/ ... /) are not present
+                        if (index(line, '=(/')==0) then
+                            index1 = index( line, '=')+1
+                        else
+                            index1 = index( line, '=(/')+3
+                        endif
                         index2 = len_trim( line )
                         ! remove spaces between (/     and values
                         value = adjustl(line(index1:index2))
 
                         ! first we check how many columns we have, by looping over the first line
-                        ! containing the =(/ substring
+                        ! containing the =(/ or = substring
                         matrixcols = 1
                         do j = 1, len_trim(value)
                             ! count elements in the line by counting the separating spaces
@@ -832,18 +836,22 @@ module module_ini_files_parser
                         enddo
 
 
-                        ! now count lines in array, loop until you find /) substring (or = substring)
-                        matrixlines = 0
-                        do j = i, PARAMS%nlines
-                            matrixlines = matrixlines +1
-                            if (index(PARAMS%PARAMS(j),"/)") /= 0) then
-                                ! we found the terminal line of the matrix statement
-                                exit
-                            elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
-                                ! a = would mean we skipped past the matrix definition to the next variable..
-                                call abort(303020205, "INIFILES ERROR: you try to read relative values without setting dx first.")
-                            end if
-                        end do
+                        ! now count lines in array, loop until you find /) substring (or = substring), or if (//) not present, assume one line
+                        if (index(line, '=(/')==0) then
+                            matrixlines = 1
+                        else
+                            matrixlines = 0
+                            do j = i, PARAMS%nlines
+                                matrixlines = matrixlines +1
+                                if (index(PARAMS%PARAMS(j),"/)") /= 0) then
+                                    ! we found the terminal line of the matrix statement
+                                    exit
+                                elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
+                                    ! a = would mean we skipped past the matrix definition to the next variable..
+                                    call abort(303020205, "INIFILES ERROR: Did not find the correct end of the matrix.")
+                                end if
+                            end do
+                        endif
 
                         allocate( matrix(1:matrixlines,1:matrixcols) )
 
@@ -859,7 +867,12 @@ module module_ini_files_parser
                             if ( j == i ) then
                                 ! first line
                                 index1 = index(line2,"(/")+2
+                                ! handle case when for one line matrix (/ was omitted
+                                if (index(line2,"(/") == 0) index1 = index(line2,"=")+1
                                 index2 = len_trim(line2)
+                                ! handle case when for one line matrix /) was omitted
+                                if (index(line2,";") /= 0) index2 = index(line2,";")-1
+                                if (index(line2,"/)") /= 0) index2 = index(line2,"/)")-1
                             elseif (j == i+matrixlines-1) then
                                 ! last line
                                 index1 = 1
@@ -871,6 +884,7 @@ module module_ini_files_parser
                             endif
                             ! remove leading spaces, then read
                             value = adjustl(line2(index1:index2))
+                            write(*, '(A, A)') "Trying to read: ", value
                             read( value, * ) matrix(j-i+1,:)
                         enddo
 

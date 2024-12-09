@@ -40,7 +40,7 @@ subroutine post_wavelet_transform(params)
     call get_command_argument(2, fname_in)
 
     ! does the user need help?
-    if (operator=='--help' .or. operator=='--h') then
+    if (fname_in=='--help' .or. fname_in=='--h' .or. fname_in=='-h') then
         if (params%rank==0) then
             write(*,'(A)') "-----------------------------------------------------------"
             write(*,'(A)') " Wabbit postprocessing: compute wavelet decomposition or wavelet reconstruction"

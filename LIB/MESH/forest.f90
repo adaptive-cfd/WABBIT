@@ -29,11 +29,6 @@ subroutine prune_tree( params, hvy_block, tree_ID)
                 ! pruning: delete the block from the tree
                 lgt_block(lgt_id, :) = -1_ik
             endif
-            ! if ( (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk)) .and. &
-            ! (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6, hvy_id) > 0.0_rk))) then
-            !     ! pruning: delete the block from the tree
-            !     lgt_block(lgt_id, :) = -1_ik
-            ! endif
         end do
     else
         do k = 1, hvy_n(tree_ID)
@@ -45,11 +40,6 @@ subroutine prune_tree( params, hvy_block, tree_ID)
                 ! pruning: delete the block from the tree
                 lgt_block(lgt_id, :) = -1_ik
             endif
-            ! if ( (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk)) .and. &
-            ! (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6, hvy_id) > 0.0_rk)) ) then
-            !     ! pruning: delete the block from the tree
-            !     lgt_block(lgt_id, :) = -1_ik
-            ! endif
         end do
     endif
 
@@ -248,11 +238,18 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
     call createActiveSortedLists_forest(params)
 
-    ! a pruned tree has fewer entries: loop over it instead of the other one?
-    ! if you find a block in the full tree -> well then that's good, copy.
+    ! a pruned tree has fewer entries: loop over it instead of the fuller (fluid) one!
+    !
+    ! if you find a pruned tree block in the full (fluid) tree -> well then that's good, copy.
     ! else: We just assume that this block does not exist, as it maybe is on another level, but we don't care
     !       Why? Well because sometimes we have full grid formulation (mask on JMax and JMax-1)
-    !       and sometimes only leaf grid (mask on JMax only). For the second point the JMax-1 blocks are ignored
+    !       and sometimes only leaf grid (mask on JMax only). For the second point the JMax-1 blocks are ignored.
+    ! The implication is: we do not use geometries where the fluid grid is COARSENED inside the obstacle. In such a
+    ! case, the pruned tree block is not found on the full fluid tree, but not because the geometry is not relevant,
+    ! rather because the fluid grid is coarsened. In such a case, the block should be set entirely to ones.
+    ! With out STL file generation, a band around the surface (a shell) is created in the mask function - and this
+    ! function here is used for STL files. In this case, coarsening inside the solid shell would require very thick 
+    ! shells (at least four blocks on the finest level).
 
     ! Step 1: XFER. we look for blocks that exist in both pruned and full tree and
     ! if they are on different mpiranks, we xfer the pruned trees block to the rank

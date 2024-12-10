@@ -133,7 +133,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in)        :: s_val
 
     ! loop variables
     integer(kind=ik)                    :: k, sync_case_id, nc, data_rank, n_xfer, lgt_ID, hvy_ID, level_me, ref_me
@@ -231,7 +231,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in)        :: s_val
 
     ! loop variables
     integer(kind=ik)                    :: k, sync_case_id, n_xfer, lgt_ID, hvy_ID, lgt_ID_m, level_m, ref_m, nc

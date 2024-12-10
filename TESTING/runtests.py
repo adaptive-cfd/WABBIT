@@ -84,6 +84,8 @@ tests = [
         f"---{group_names[6]}---",  # group identifier
         {"test_name":"acm", "wavelet":"CDF40", "dim":2},
         {"test_name":"acm", "wavelet":"CDF44", "dim":2},
+        {"test_name":"acm_norm", "wavelet":"CDF44", "dim":2},
+        {"test_name":"acm_significant", "wavelet":"CDF44", "dim":2},
 
         f"---{group_names[7]}---",  # group identifier
         {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
@@ -96,7 +98,8 @@ tests = [
         {"test_name":"dry_paratuposaComplete", "wavelet":"CDF22", "dim":3},
 
         f"---{group_names[8]}---",  # group identifier
-        {"test_name":"denoise", "wavelet":"CDF42", "dim":2},
+        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},
+        {"test_name":"denoise_grey", "wavelet":"CDF42", "dim":2},
     ]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -169,12 +172,12 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets", f"{self.test_name}_{self.wavelet}")
         elif self.test_name in ["blob_equi", "blob_adaptive"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
-        elif self.test_name == "acm":
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"acm_cyl_adaptive_{self.wavelet}")
+        elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", f"{self.test_name}_{self.wavelet}")
-        elif self.test_name == "denoise":
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"denoise_{self.wavelet}")
+        elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"{self.test_name}_{self.wavelet}")
         else:
             print("Unknown test name")
             self.valid = False
@@ -238,17 +241,20 @@ class WabbitTest:
             # change back to test_dir
             os.chdir(self.test_dir)
             return result2
-        elif self.test_name == "denoise":
+        elif "denoise" in self.test_name:
             # change to directory to tmp
             tmp_dir = f"{self.test_dir}/tmp"
             if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
             os.chdir(tmp_dir)
 
+            test_file = self.test_name.split("_")[1]
+
             # define commands, the first creates the file to be denoised and the second actually does the denoising
-            denoise_file = "../../butterfly.png"
-            denoise_h5 = "./butterfly.h5"
-            command1 = f"image2wabbit.py {denoise_file} -o {denoise_h5} --level 5 --bs 16"  # image is already noisy so no extra noise is added
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise {denoise_h5} --wavelet={self.wavelet} --memory={self.memory}"
+            denoise_file = f"../{test_file}.png"
+            denoise_h5 = f"./{test_file}.h5"
+            noise_add = "-n 10"if test_file == "grey" else ""  # grey file gets noise added on top
+            command1 = f"image2wabbit.py {denoise_file} -o {denoise_h5} --level 5 --bs 16 {noise_add}"  # image is already noisy so no extra noise is added
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise --files=\"{denoise_h5}\" --wavelet={self.wavelet} --memory={self.memory}"
                         
             # first, convert image to a valid wabbit file
             result1 = run_command(command1, self.logger)
@@ -257,8 +263,8 @@ class WabbitTest:
             # now, denoise the file
             result2 = run_command(command2, self.logger)
 
-            # remove files which are not used for comparisons
-            os.remove(denoise_h5)
+            # # remove files which are not used for comparisons
+            # os.remove(denoise_h5)
 
             # compare all files present in test_dir
             try:
@@ -305,11 +311,11 @@ class WabbitTest:
             # change back to test_dir
             os.chdir(self.test_dir)
             return result1
-        elif self.test_name in ["blob_equi", "blob_adaptive", "acm"]:
+        elif self.test_name in ["blob_equi", "blob_adaptive", "acm", "acm_norm", "acm_significant"]:
             # lets say where the ini-file is
             if self.test_name in ["blob_equi", "blob_adaptive"]:
                 ini_file = os.path.join("..", "blob-convection.ini")  # relative to tmp_dir
-            elif self.test_name in ["acm"]:
+            elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
                 ini_file = os.path.join("..", "acm_cyl.ini")  # relative to tmp_dir
 
             # change to directory to tmp
@@ -350,12 +356,14 @@ class WabbitTest:
             log_file = os.path.join(self.test_dir, "run.log")
         elif self.test_name in ["blob_equi", "blob_adaptive"]:
             log_file = os.path.join(self.test_dir, "blob-convection.log")
-        elif self.test_name == "acm":
+        elif self.test_name == ["acm", "acm_norm", "acm_significant"]:
             log_file = os.path.join(self.test_dir, "acm_cyl.log")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_bumblebee", "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete"]:
             log_file = os.path.join(self.test_dir, "dry_run.log")
-        elif self.test_name == "denoise":
+        elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
             log_file = os.path.join(self.test_dir, "denoise.log")
+        else:
+            log_file = os.path.join(self.test_dir, "test.log")
         
         open(log_file, 'w').close()  # Clear the log file at the beginning
         # Set up logging for runs, which writes to different log file and with verbose to test log file and stdout as well
@@ -540,10 +548,6 @@ def main():
     # give user some information
     logger_suite.info(f"employed command for parallel exec: {mpi_command}")
     logger_suite.info(f"memory flag for wabbit is: {memory}\n")
-
-    if nprocs != 4:
-        logger_suite.info(f"{fail_color}WARNING{end_color}")
-        logger_suite.info("your tests might fail because the keyvalues for load balancing may differ if you don't use nprocs=4 for testing")
 
     start_time = time.time()
 

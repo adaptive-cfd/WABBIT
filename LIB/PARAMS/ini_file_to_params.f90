@@ -16,7 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min
    integer(kind=ik), dimension(3)                  :: Bs
 
    rank         = params%rank
@@ -145,9 +145,15 @@ subroutine ini_file_to_params( params, filename )
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
-   if ( (params%g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) params%g_RHS = 3
-   if ( (params%g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) params%g_RHS = 2
-   if ( (params%g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) params%g_RHS = 1
+   if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central' ) g_RHS_min = 3
+   if ( params%order_discretization == 'FD_4th_central' ) g_RHS_min = 2
+   if ( params%order_discretization == 'FD_2th_central' ) g_RHS_min = 1
+   if (params%g_RHS < g_RHS_min) then
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for FD scheme, adapting it from ", params%g_RHS, " to ", g_RHS_min, " (ignore this if it was not explicitly set)"
+      endif
+      params%g_RHS = g_RHS_min
+   endif
 
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
@@ -155,7 +161,7 @@ subroutine ini_file_to_params( params, filename )
    ! samples. In 2D, the code generally runs fast and does many time steps, hence
    ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
    if (params%dim == 2) then
-    flush_frequency = 50
+      flush_frequency = 50
    else
       flush_frequency = 10
    endif
@@ -230,7 +236,7 @@ subroutine ini_domain(params, FILE )
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
    if (.not. all(params%periodic_BC)) then
-      call abort(160824, "This code version currently suppors only periodic BC in all directions.")
+      write(*, '(A)') "Symmetric BC are currently an experimental feature, you should know what you are doing!"
    endif
 
    params%symmetry_BC = .not. params%periodic_BC
@@ -251,7 +257,7 @@ subroutine ini_blocks(params, FILE )
    type(inifile) ,intent(inout)     :: FILE
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
-   integer(kind=ik) :: i, g_default, g_rhs_default
+   integer(kind=ik) :: i, g_default, g_RHS_default
    real(kind=rk), dimension(:), allocatable  :: tmp
    logical :: lifted_wavelet
 
@@ -275,13 +281,13 @@ subroutine ini_blocks(params, FILE )
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if (params%wavelet(4:4) == "2") then
       g_default = 2
-      g_rhs_default = 1
+      g_RHS_default = 1
    elseif (params%wavelet(4:4) == "4") then
       g_default = 4
-      g_rhs_default = 2
+      g_RHS_default = 2
    elseif (params%wavelet(4:4) == "6") then
       g_default = 6
-      g_rhs_default = 3
+      g_RHS_default = 3
    else 
       call abort(2320242, "no default specified for this wavelet...")
    endif
@@ -304,17 +310,26 @@ subroutine ini_blocks(params, FILE )
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )
-   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_rhs, g_rhs_default )  ! might be overwritten later if larger is needed
+   call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_RHS, g_RHS_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
+   call read_param_mpi(FILE, 'Blocks', 'azzalini_iterations', params%azzalini_iterations, 1 )
+   call read_param_mpi(FILE, 'Blocks', 'threshold_wc', params%threshold_wc, .false. )
    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
 
-   if (params%g_rhs > params%g) then
+   if (params%g_RHS < g_RHS_default) then
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for Wavelet, adapting it from ", params%g_RHS, " to ", g_RHS_default, " (ignore this if it was not explicitly set)"
+      endif
+      params%g_RHS = g_RHS_default
+   endif
+
+   if (params%g_RHS > params%g) then
       call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
    endif
 
@@ -338,6 +353,7 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'inicond_refinements', params%inicond_refinements, 0 )
    call read_param_mpi(FILE, 'Blocks', 'inicond_grid_from_file', params%inicond_grid_from_file, "no" )
    call read_param_mpi(FILE, 'Blocks', 'block_dist', params%block_distribution, "sfc_hilbert" )
+   call read_param_mpi(FILE, 'Blocks', 'refinement_indicator', params%refinement_indicator, "everywhere" )
    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params%coarsening_indicator, "threshold-state-vector" )
    call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator_inicond', params%coarsening_indicator_inicond, params%coarsening_indicator )
    call read_param_mpi(FILE, 'Blocks', 'threshold_mask', params%threshold_mask, .false. )
@@ -350,19 +366,15 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'useSecurityZone', params%useSecurityZone, lifted_wavelet &
       .or. params%coarsening_indicator == "threshold-cvs" .or. params%coarsening_indicator=="threshold-image-denoise" )
 
-   ! Which components of the state vector (if indicator is "threshold-state-vector") shall we
-   ! use? in ACM, it can be good NOT to apply it to the pressure.
+   ! Which components of the state vector (if indicator is "threshold-state-vector") shall we use?
+   ! in ACM, it can be good NOT to apply it to the pressure (=0) or treat the velocity together (>1)
    allocate(tmp(1:params%n_eqn))
    allocate(params%threshold_state_vector_component(1:params%n_eqn))
    ! as default, use ones (all components used for indicator)
    tmp = 1.0_rk
    call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
    do i = 1, params%n_eqn
-      if (tmp(i)>0.0_rk) then
-         params%threshold_state_vector_component(i) = .true.
-      else
-         params%threshold_state_vector_component(i) = .false.
-      endif
+      params%threshold_state_vector_component(i) = nint(tmp(i))
    enddo
    deallocate(tmp)
 

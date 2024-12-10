@@ -145,19 +145,21 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    character(len=*)          :: sync_case                     !< String representing which kind of syncing we want to do
+    !> String representing which kind of syncing we want to do, varies between different sync cases (betwen CMF neighbors) and restrictions (tree, level or ref)
+    character(len=*)          :: sync_case
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: s_val
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
 
-    integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus
-    real(kind=rk) :: t0, t1, t2
+    integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus, k, hvy_id, lgt_id, i_dim
+    real(kind=rk) :: t0, t1, t2, x0(1:3), dx(1:3), tolerance
     character(len=clong) :: toc_statement
+    integer(kind=2) :: n_domain(1:3)
 
     t0 = MPI_wtime()
 
@@ -198,7 +200,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
+    if (index(sync_case, "full") > 0) call reset_ghost_nodes( params, hvy_block, tree_ID)
 
 #endif
 
@@ -243,6 +245,42 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
 
     call toc( "sync ghosts (TOTAL)", 80, MPI_wtime()-t0 )
 
+
+    !---------------------------------------------------------------------------
+    ! For all blocks that do not have a neighbor at the borders due to non-periodic BC, we have to set the ghost patch values explicitly
+    !---------------------------------------------------------------------------
+    ! loop over my active heavy data
+    if ( .not. All(params%periodic_BC) ) then
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+            ! compute block spacing and origin from treecode
+            ! call get_block_spacing_origin( params, lgt_id, x0, dx )
+            call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+            params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+
+            n_domain(:) = 0
+            ! ! check if block is adjacent to a boundary of the domain, if this is the case we adapt the ghost patches
+            ! call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
+
+            tolerance = 1.0e-3_rk * minval(dx(1:params%dim))
+
+            do i_dim = 1, params%dim
+                if (abs(x0(i_dim)-0.0_rk) < tolerance ) then !x_i == 0
+                    n_domain(i_dim) = -1
+                elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
+                    n_domain(i_dim) = +1
+                endif
+            end do
+
+            ! set the initial condition on this block
+            ! JB ToDo: Add time support in case we have time-dependent BCs
+            call BOUNDCOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), params%g, &
+            x0, dx, n_domain)
+        enddo
+    endif
+
 end subroutine sync_ghosts_generic
 
 
@@ -263,9 +301,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     integer(kind=ik), intent(out)   :: count_send          !< number of ghost patches total to be send, for looping
     !> following are variables that control the logic of where each block sends or receives
     integer(kind=ik), intent(in)    :: istage              !< current stage out of three
-    character(len=*)                :: sync_case           !< String representing which kind of syncing we want to do
+    !> String representing which kind of syncing we want to do, varies between different sync cases (betwen CMF neighbors) and restrictions (tree, level or ref)
+    character(len=*)                :: sync_case
 
-    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
+    !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: s_val
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 

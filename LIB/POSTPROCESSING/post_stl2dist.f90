@@ -103,8 +103,8 @@ subroutine post_stl2dist(params)
     params%n_eqn = 1
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component = .false.
-    params%threshold_state_vector_component(1) = .true.
+    params%threshold_state_vector_component = 0
+    params%threshold_state_vector_component(1) = 1
     ! params%g =
 
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory

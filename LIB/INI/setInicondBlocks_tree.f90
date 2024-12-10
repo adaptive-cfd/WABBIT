@@ -44,9 +44,6 @@ subroutine setInicondBlocks_tree(params, hvy_block, tree_ID)
         ! compute block spacing and origin from treecode
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        ! get block spacing for RHS
-        call get_block_spacing_origin( params, lgt_id, x0, dx )
-
         if ( .not. All(params%periodic_BC) ) then
             ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
             call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )

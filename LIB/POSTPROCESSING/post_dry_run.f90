@@ -106,8 +106,8 @@ subroutine post_dry_run
     params%n_eqn = 6
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component = .false.
-    params%threshold_state_vector_component(1) = .true.
+    params%threshold_state_vector_component = 0
+    params%threshold_state_vector_component(1) = 1
 
     deallocate(params%symmetry_vector_component)
     allocate(params%symmetry_vector_component(1:params%n_eqn))

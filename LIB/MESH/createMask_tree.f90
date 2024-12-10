@@ -121,8 +121,15 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
             ! flow is on finest level: add complete mask on finest level
             ! this is the case when computing the right hand side.
             call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask, tree_ID_flow)
+            ! For adaption with the full tree, we also have the flow map present on JMax-1
+            ! This is, as force-dealiasing overrides the mask importance on JMax, but on JMax-1 we want to respect it, so we have the mask on both levels
+            ! Here we add both blocks therefore and in adaption process being in full tree formulation in will respect both at the same time
+            ! For leaf-grid computations during the time-step we simply ignore the blocks on JMax-1
+            if (params%force_maxlevel_dealiasing) then
+                call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
+            endif
 
-        elseif (Jactive == params%Jmax-1 ) then
+        elseif (Jactive == params%Jmax-1 .and. params%force_maxlevel_dealiasing) then
 
             call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
         else
@@ -278,16 +285,19 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     ! (during saving after coarsening)
     call copy_tree(params, hvy_mask, tree_ID_mask_coarser, tree_ID_mask)
 
-    ! coarsen by one level only.
-    if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
-    call adapt_tree( time, params, hvy_mask, tree_ID_mask_coarser, "everywhere", hvy_tmp)
+    if (params%force_maxlevel_dealiasing) then
+        ! coarsen by one level only - only needed when we force dealiasing
+        if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
+        call adapt_tree( time, params, hvy_mask, tree_ID_mask_coarser, "everywhere", hvy_tmp)
 
-    ! prune both masks
+        ! pruning (Jmax-1)
+        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
+        call prune_tree( params, hvy_mask, tree_ID_mask_coarser)
+    endif
+
+    ! pruning (Jmax)
     if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
     call prune_tree( params, hvy_mask, tree_ID_mask)
-
-    if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
-    call prune_tree( params, hvy_mask, tree_ID_mask_coarser)
 
     if (params%rank==0) then
         write(*,'(80("~"))')

@@ -28,7 +28,8 @@ module module_convdiff_new
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
     real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary, blobs_x0, blobs_y0, blobs_width
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
+    real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
     character(len=cshort) :: discretization,boundary_type
@@ -57,6 +58,7 @@ contains
     integer(kind=ik), intent(in) :: g
 
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+    real(kind=rk), allocatable, dimension(:,:) :: matr_dummy
     ! inifile structure
     type(inifile) :: FILE
     ! read the file, only process 0 should create output on screen
@@ -64,42 +66,61 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_convdiff%N_scalars, 1  )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
+
+    ! nu, and u0 are used for the velocity of the convection, they are per scalar
     allocate( params_convdiff%nu(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0x(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0y(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0z(1:params_convdiff%N_scalars))
 
-    allocate( params_convdiff%x0(1:params_convdiff%N_scalars))
-    allocate( params_convdiff%y0(1:params_convdiff%N_scalars))
-    allocate( params_convdiff%z0(1:params_convdiff%N_scalars))
+    ! x0, y0 and z0 and blob width are used for the initial conditions, they are per scalar and possibly blob in a matrix
+    ! as a matrix, they have to be in form like the butcher tableau
+    allocate( params_convdiff%x0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%y0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%z0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs) )
+    allocate( matr_dummy(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs) )
+    matr_dummy = 0.0_rk
 
+    ! following are string names for which condition to choose
     allocate( params_convdiff%inicond(1:params_convdiff%N_scalars))
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
 
 
-    allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'gamma', params_convdiff%gamma, 0.0_rk ) ! reaction constant
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0x', params_convdiff%u0x )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0y', params_convdiff%u0y )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0z', params_convdiff%u0z )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'tau', params_convdiff%tau , 0.0_rk)
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%x0 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%y0 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%z0 )
 
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'gamma', params_convdiff%gamma, 0.0_rk ) ! reaction constant
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'tau', params_convdiff%tau , 0.0_rk)
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%x0, matr_dummy )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%y0, matr_dummy )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%z0, matr_dummy )
+    matr_dummy = 1.0_rk  ! avoid 0 division by default for blob_width
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width, matr_dummy )
+
+    write(*, '(A, 5(es12.3, 1x))') "x0: ", params_convdiff%x0
+    write(*, '(A, 5(es12.3, 1x))') "y0: ", params_convdiff%y0
+    write(*, '(A, 5(es12.3, 1x))') "z0: ", params_convdiff%z0
+    write(*, '(A, 5(es12.3, 1x))') "blob_width: ", params_convdiff%blob_width
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
-    allocate( params_convdiff%blobs_width(1:params_convdiff%Nblobs) )
-    allocate( params_convdiff%blobs_x0(1:params_convdiff%Nblobs) )
-    allocate( params_convdiff%blobs_y0(1:params_convdiff%Nblobs) )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_width', params_convdiff%blobs_width )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_x0', params_convdiff%blobs_x0 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_y0', params_convdiff%blobs_y0 )
+    ! allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
+    ! allocate( params_convdiff%blobs_width(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_x0(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_y0(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_z0(1:params_convdiff%Nblobs) )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_width', params_convdiff%blobs_width )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%blobs_x0 )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%blobs_y0 )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%blobs_z0 )
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
@@ -134,7 +155,10 @@ contains
 
     call clean_ini_file_mpi( FILE )
 
-    if ( params_convdiff%dim == 2) params_convdiff%u0z=0.0_rk
+    if ( params_convdiff%dim == 2) then
+        params_convdiff%u0z=0.0_rk
+        params_convdiff%z0=0.0_rk
+    endif
   end subroutine READ_PARAMETERS_convdiff
 
 
@@ -317,7 +341,7 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, i, iblob
+    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
@@ -329,70 +353,70 @@ contains
     u = 0.0_rk
 
     do i = 1, params_convdiff%N_scalars
-      c0x = params_convdiff%x0(i)
-      c0y = params_convdiff%y0(i)
-      c0z = params_convdiff%z0(i)
+    c0x = params_convdiff%x0(i,1)
+    c0y = params_convdiff%y0(i,1)
+    c0z = params_convdiff%z0(i,1)
 
-      select case (params_convdiff%inicond(i))
-      case ("noise")
-          do ix = 1, Bs(1)+2*g
-              do iy = 1, Bs(2)+2*g
-                  u(ix,iy,:,i) = rand_nbr()
-              end do
-          end do
+    select case (params_convdiff%inicond(i))
+        case ("noise")
+            do ix = 1, Bs(1)+2*g
+                do iy = 1, Bs(2)+2*g
+                    u(ix,iy,:,i) = rand_nbr()
+                end do
+            end do
 
-      case ("zero")
-          u(:,:,:,i) = 0.0_rk
+        case ("zero")
+            u(:,:,:,i) = 0.0_rk
 
-      case ("const")
-          u(:,:,:,i) = params_convdiff%blob_width(i)
+        case ("const")
+            u(:,:,:,i) = params_convdiff%blob_width(i,1)
 
-      case ("sin")
-          if (params_convdiff%dim==2) then
-              do ix = 1, Bs(1)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1)
-                      y = dble(iy-(g+1)) * dx(2) + x0(2)
+        case ("sin")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-                      u(ix,iy,:,i) = sin(2.0_rk*pi*x)
-                  end do
-              end do
-          else
-              call abort(66273,"this inicond is 2d only..")
-          endif
+                        u(ix,iy,:,i) = sin(2.0_rk*pi*x)
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
 
-      case ("sin+1")
-          if (params_convdiff%dim==2) then
-              do ix = 1, Bs(1)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1)
-                      y = dble(iy-(g+1)) * dx(2) + x0(2)
+        case ("sin+1")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-                      u(ix,iy,:,i) = sin(2.0_rk*pi*x) + 1.0_rk
-                  end do
-              end do
-          else
-              call abort(66273,"this inicond is 2d only..")
-          endif
+                        u(ix,iy,:,i) = sin(2.0_rk*pi*x) + 1.0_rk
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
 
-      case ("cyclogenesis")
-          if (params_convdiff%dim==2) then
-              do ix = 1, Bs(1)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        case ("cyclogenesis")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                      u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i) )
-                  end do
-              end do
-          else
-              call abort(66273,"this inicond is 2d only..")
-          endif
+                        u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i,1) )
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
 
-      case ("circle")
+        case ("circle")
             if (params_convdiff%dim==2) then
                 lambd = 0.005 *maxval(params_convdiff%domain_size)
                 do ix = 1, Bs(1)+2*g
@@ -400,8 +424,8 @@ contains
                         ! compute x,y coordinates from spacing and origin
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
                         y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
-                        u(ix,iy,:,i) = 0.5*(1-dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i,1) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i,1) ) /lambd))
                     end do
                 end do
             else
@@ -416,7 +440,7 @@ contains
                         x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk * params_convdiff%domain_size(1)
                         y = dble(iy-(g+1)) * dx(2) + x0(2)
                         !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
-                        u(ix,iy,:,i) = 0.5*(1-dtanh( (abs(x) - params_convdiff%blob_width(i) ) / delta))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (abs(x) - params_convdiff%blob_width(i,1) ) / delta))
                     end do
                 end do
             else
@@ -424,81 +448,89 @@ contains
             endif
 
 
-     case ("many-blobs")
-        u = 0.0_rk
-         do iblob = 1, params_convdiff%Nblobs
-             do iy = 1, Bs(2)+2*g
-                 do ix = 1, Bs(1)+2*g
-                     ! compute x,y coordinates from spacing and origin
-                     x = dble(ix-(g+1)) * dx(1) + x0(1) - params_convdiff%blobs_x0(iblob)
-                     y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%blobs_y0(iblob)
+        case ("blob")
+            u = 0.0_rk
+            ! loop over all points and compute x,y,z coordinates from spacing and origin
+            do iz = merge(1, g+1, params_convdiff%dim==2), merge(1, Bs(3)+g, params_convdiff%dim==2)
+                z = 0.0_rk
+                if (params_convdiff%dim == 3) z = dble(iz-(g+1)) * dx(3) + x0(3)
+                do iy = 1, Bs(2)+2*g
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    do ix = 1, Bs(1)+2*g
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
 
-                     if (params_convdiff%periodic_BC(1)) then
-                       if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                       if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-                     endif
-                     if (params_convdiff%periodic_BC(2)) then
-                       if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                       if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-                     endif
-                     ! set actual inicond gauss blob
-                     u(ix,iy,:,i) = u(ix,iy,:,i) + dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blobs_width(iblob) )
-                 end do
-             end do
-         enddo
+                        ! set actual inicond gauss blob for each blob
+                        do iblob = 1, params_convdiff%Nblobs
+                            ! if a blob is close to the domain border but has a large width, periodicity effects may impact the flow on the other periodic side
+                            ! in order to incorporate this, we add the periodic effect by adding blobs shifted by domain size
+                            ! as this initial condition is only executed once, this "more expensive" but more exact approach is chosen
+                            do bx = merge(-1, 0, params_convdiff%periodic_BC(1)), merge(1, 0, params_convdiff%periodic_BC(1))
+                                do by = merge(-1, 0, params_convdiff%periodic_BC(2)), merge(1, 0, params_convdiff%periodic_BC(2))
+                                    do bz = merge(-1, 0, params_convdiff%periodic_BC(3) .and. params_convdiff%dim == 3), &
+                                            merge( 1, 0, params_convdiff%periodic_BC(3) .and. params_convdiff%dim == 3)
+                                        u(ix,iy,iz,i) = u(ix,iy,iz,i) + dexp( -((x-params_convdiff%x0(i, iblob)+bx*params_convdiff%domain_size(1))**2 &
+                                            + (y-params_convdiff%y0(i, iblob)+by*params_convdiff%domain_size(2))**2 &
+                                            + (z-params_convdiff%z0(i, iblob)+bz*params_convdiff%domain_size(3))**2) / params_convdiff%blob_width(i,iblob) )
+                                    enddo
+                                enddo
+                            enddo
+                        enddo
+                    end do
+                end do
+            enddo
 
-      case("blob")
-          if (params_convdiff%dim==2) then
-              ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-              do iy = 1, Bs(2)+2*g
-                  do ix = 1, Bs(1)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        ! case("blob")
+        !     if (params_convdiff%dim==2) then
+        !         ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
+        !         do iy = 1, Bs(2)+2*g
+        !             do ix = 1, Bs(1)+2*g
+        !                 ! compute x,y coordinates from spacing and origin
+        !                 x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+        !                 y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
 
-                      if (params_convdiff%periodic_BC(1)) then
-                        if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                        if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-                      endif
-                      if (params_convdiff%periodic_BC(2)) then
-                        if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                        if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-                      endif
-                      ! set actual inicond gauss blob
-                      u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
-                  end do
-              end do
-          else
-              ! create gauss pulse
-              do iz = 1, Bs(3)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      do ix = 1, Bs(1)+2*g
-                          ! compute x,y coordinates from spacing and origin
-                          x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                          y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                          z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
+        !                 if (params_convdiff%periodic_BC(1)) then
+        !                 if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+        !                 if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
+        !                 endif
+        !                 if (params_convdiff%periodic_BC(2)) then
+        !                 if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+        !                 if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
+        !                 endif
+        !                 ! set actual inicond gauss blob
+        !                 u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
+        !             end do
+        !         end do
+        !     else
+        !         ! create gauss pulse
+        !         do iz = 1, Bs(3)+2*g
+        !             do iy = 1, Bs(2)+2*g
+        !                 do ix = 1, Bs(1)+2*g
+        !                     ! compute x,y coordinates from spacing and origin
+        !                     x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+        !                     y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        !                     z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
 
-                          if (params_convdiff%periodic_BC(1)) then
-                            if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                            if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-                          endif
-                          if (params_convdiff%periodic_BC(2)) then
-                            if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                            if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-                          endif
-                          if (params_convdiff%periodic_BC(3)) then
-                            if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
-                            if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
-                          endif
-                          ! set actual inicond gauss blob
-                          u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
-                      end do
-                  end do
-              end do
-          end if
-      case default
-          call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
-      end select
+        !                     if (params_convdiff%periodic_BC(1)) then
+        !                     if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
+        !                     if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
+        !                     endif
+        !                     if (params_convdiff%periodic_BC(2)) then
+        !                     if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
+        !                     if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
+        !                     endif
+        !                     if (params_convdiff%periodic_BC(3)) then
+        !                     if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
+        !                     if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
+        !                     endif
+        !                     ! set actual inicond gauss blob
+        !                     u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
+        !                 end do
+        !             end do
+        !         end do
+        !     end if
+        case default
+            call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
+        end select
 
     enddo
 

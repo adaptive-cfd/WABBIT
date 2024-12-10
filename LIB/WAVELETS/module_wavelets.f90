@@ -1361,7 +1361,7 @@ contains
         g_min = max(g_min, abs(lbound(params%GR, dim=1)))
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
-        ! g_RHS is decided by X in CDFXY
+        ! g_RHS is decided by X in CDFXY or by FD order
         ! g_RHS is also dependent on the wavelet due to how we synch each stage:
         ! the third stage (prediction) needs points from the boundary to correctly interpolate values
         if (present(g_RHS)) then
@@ -1372,6 +1372,9 @@ contains
             elseif (params%wavelet(4:4) == "6") then
                 g_RHS = 3
             endif
+            if ( (g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) g_RHS = 3
+            if ( (g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) g_RHS = 2
+            if ( (g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) g_RHS = 1
         endif
 
         ! compute coarse extension parameters. (see inkscape drawing 1d-ghostnodes-coarseextension-V2.svg)
@@ -1752,6 +1755,113 @@ contains
     end subroutine
 
 
+    !> \brief Renorm the wavelet coefficients of a spaghetti-decomposed block from L_infty to L_infty, L_1, L_2 or dotH_1 norm
+    subroutine wavelet_renorm_block(params, val_block, val_renormed, level_block, level_ref, indices, verbose_check)
+        implicit none
+
+        !> user defined parameter structure
+        type (type_params), intent(in)         :: params
+        !> heavy data for one block (hence 4D) expected in spaghetti-decomposed ordering
+        real(kind=rk), intent(inout)           :: val_block(:, :, :, :)
+        !> renormed data with SC set to 0
+        real(kind=rk), intent(inout)           :: val_renormed(:, :, :, :)
+        !> If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+        !! we pass the level of this block to this routine
+        integer(kind=ik), intent(in)           :: level_block
+        !> If we use L2 or H1 normalization, the threshold eps is level-dependent, hence
+        !! we pass a reference level to this routine, it defaults to params%Jmax
+        integer(kind=ik), intent(in), optional :: level_ref
+        !> Indices of patch if not the whole interior block should be thresholded, used for securityZone
+        integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
+        logical, intent(in), optional          :: verbose_check  !< No matter the value, if this is present we debug
+
+        integer(kind=ik)                       :: idx(2,3), nc, g, Jref, i_dim, Bs(1:3)
+
+        nc     = size(val_block, 4)
+        Bs     = params%Bs
+        g      = params%g
+        Jref   = params%Jmax
+        if (present(level_ref)) Jref = level_ref
+
+        ! set the indices we want to threshold
+        idx(:, :) = 1
+        if (present(indices)) then
+            idx(:, :) = indices(:, :)
+        else  ! full interior block
+            idx(1, 1) = g+1
+            idx(2, 1) = Bs(1)+g
+            idx(1, 2) = g+1
+            idx(2, 2) = Bs(2)+g
+            if (params%dim == 3) then
+                idx(1, 3) = g+1
+                idx(2, 3) = Bs(3)+g
+            endif
+        endif
+
+        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+        !     1 2 3 4 5 6 7 8 9 A B C
+        !     G G G S W S W S W G G G
+        !                 I I I
+        ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
+        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
+        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
+        ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
+        ! also, when the last point is a SC, the last point is only partially included but its WC have to be considered
+        ! this gives problem if the last point is a SC so we need to handle this special case
+        do i_dim = 1, params%dim
+            if (idx(2, i_dim) /= size(val_block, i_dim)) then
+                idx(2, i_dim) = idx(2, i_dim) + modulo(idx(2, i_dim) - idx(1, i_dim) + 1, 2)
+            endif
+        enddo
+
+        ! copy only part we need
+        val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = &
+           val_block(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
+
+        ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
+        val_renormed(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = 0.0_rk
+
+        ! We renorm by multiplying all values by level shifts+1 (SC) and then on the level change all SC-factors to WC-factors (apply WC-factor^2)
+        ! -1 from the fact, that wavelet decomposed values on a block of level J will be decomposed values on level J-1
+        select case(params%eps_norm)
+        case ("Linfty")
+            ! Wavelets are directly infinity normed, so we do nothing
+        case ("L1")
+            ! Wavelets get factor 2^-j per SC and 2^j per WC
+            ! apply level shift
+            val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim))
+            ! change SC to WC factors on this level - factor^2
+            val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 4.0_rk
+            val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 4.0_rk
+            if (params%dim == 3) then
+                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 4.0_rk
+            endif
+        case ("L2")
+            ! Wavelets get factor 2^-j/2 per SC and 2^j/2 per WC
+            ! apply level shift
+            val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim)/2.0_rk)
+            ! change SC to WC factors on this level - factor^2
+            val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk
+            val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk
+            if (params%dim == 3) then
+                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk
+            endif
+        case ("H1")
+            ! Wavelets get factor 2^(2-d)j/(2d) per SC and 2^(d-2)j/(2d) per WC, for d=2 this is equivalent to Linfty, for d=3 to 2^-j/6 (between Linfty and L2)
+            ! JB ToDo - this needs to be checked. It seems very close to Linfty norm
+            if (params%dim == 3) then
+                ! apply level shift
+                val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*(2.0_rk-params%dim))/2.0_rk)
+                ! change SC to WC factors on this level - factor^2
+                val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk**(1/params%dim)
+                val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk**(1/params%dim)
+                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk**(1/params%dim)
+            endif
+        case default
+            call abort(241024, "ERROR:Unknown wavelet normalization!")
+        end select
+    end subroutine
 
 
 

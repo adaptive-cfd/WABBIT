@@ -54,13 +54,14 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk) :: eps=0.0_rk
         logical :: eps_normalized = .false.
+        integer :: azzalini_iterations = 1
+        logical :: threshold_wc = .false.
         character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
         logical :: useCoarseExtension = .true.
         logical :: useSecurityZone = .true.
         logical :: isLiftedWavelet = .false.
-        logical :: cvs = .false.
         character(len=cshort) :: wavelet="not-initialized"
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE
@@ -82,9 +83,10 @@ module module_params
         character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
+        character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
-        logical, allocatable :: threshold_state_vector_component(:)
+        integer, allocatable :: threshold_state_vector_component(:)
         ! decide if WABBIT should start from input files
         logical :: read_from_files
         ! files we want to read for inital cond.

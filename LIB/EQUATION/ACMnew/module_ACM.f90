@@ -27,7 +27,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
+  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
   !**********************************************************************************************
@@ -69,10 +69,14 @@ module module_acm
     logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:
     logical :: use_sponge = .false.
-    logical :: use_HIT_linear_forcing = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0, C_smooth=1.5_rk
     character(len=cshort) :: eps_norm
     logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
+
+    ! linear forcing
+    logical :: HIT_linear_forcing = .false.
+    real(kind=rk) :: HIT_energy = 1.0_rk
+    real(kind=rk) :: HIT_gain = 100.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -132,6 +136,7 @@ contains
 #include "rhs_ACM.f90"
 #include "create_mask.f90"
 #include "inicond_ACM.f90"
+#include "boundcond_ACM.f90"
 #include "sponge.f90"
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
@@ -241,7 +246,9 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
-    call read_param_mpi(FILE, 'ACM-new', 'use_HIT_linear_forcing', params_acm%use_HIT_linear_forcing, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'HIT_linear_forcing', params_acm%HIT_linear_forcing, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'HIT_energy', params_acm%HIT_energy, 1.0_rk )
+    call read_param_mpi(FILE, 'ACM-new', 'HIT_gain', params_acm%HIT_gain, 100.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
 
 
@@ -638,6 +645,8 @@ end subroutine
       call init_t_file('meanflow.t', overwrite)
       call init_t_file('forces.t', overwrite)
       call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
+      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
+      "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)

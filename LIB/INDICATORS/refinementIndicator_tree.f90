@@ -115,6 +115,22 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         ! therefore we have to sync the lgt data
         call synchronize_lgt_data( params, refinement_status_only=.true. )
 
+    case ("significant")
+        ! we assume, that the following refinement flags have been set in the last adapt_tree call and still persist:
+        !                      0 : this block is significant, it definetly needs to refine -> +1
+        ! REF_UNSIGNIFICANT_STAY : this block was only kept to ensure completeness or a graded mesh, we do not need to refine it -> 0
+        !                     -1 : this should not exist, as all blocks with that have been deleted
+
+        ! coarseningIndicator and Securityzone work for coarsening, so -1, we now have to translate this to refinement range
+        do k = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k, tree_ID)
+
+            ! set 0 (significant) to +1 (refine), -1 (non-significant) to 0 (stay as it is)
+            if (lgt_block( lgt_id, IDX_REFINE_STS ) == 0) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+            if (lgt_block( lgt_id, IDX_REFINE_STS ) == REF_UNSIGNIFICANT_STAY) lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+            if (lgt_block( lgt_id, IDX_REFINE_STS ) == -1) call abort(241119, "I am very confused by what is going on here and do not like it!")
+        enddo
+
     case ("everywhere")
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))
         ! set status "refine" for all active blocks, which is just setting the

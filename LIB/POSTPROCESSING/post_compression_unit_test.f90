@@ -91,7 +91,7 @@ subroutine post_compression_unit_test(params)
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
 
-    params%threshold_state_vector_component = .true.
+    params%threshold_state_vector_component = 1
     
     Bs = params%Bs
     g  = params%g

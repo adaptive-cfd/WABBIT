@@ -91,9 +91,14 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
         call wavelet_renorm_block(params, u, u_wc, level, indices=indices, verbose_check=verbose_check)
     endif
 
-    ! some thresholding components want to be treated together, as for example the velocity, so we compute a norm-equivalent if wanted
-    ! every value >1 in thresholding_component are treated as belonging together
-    ! so we could set 2 2 3 3 and actually have those treated as independent vector fields, where we compute the norm
+    ! thresholding of some of the state vector components should be done together, as for example the velocity 
+    ! components ux, uy, uz. This means: we do not threshold ux,uy,uz separately, but treat them as one vector.
+    ! In this code, this is calle a norm-equivalent. The thresholding is guided by the array params%threshold_state_vector_component
+    ! which is set in the params.ini file by the user. If the entry is >1, then this component belongs to a vector and is treated as such
+    ! (as opposed to individual thresholding per component). For example, in ACM, we would use params%threshold_state_vector_component=(/2,2,2,1/)
+    ! if we were to treat the velocity as one vector, and the pressure as a scalar. If we ever have more than one vector (which 
+    ! is not the case currently, 12/2024), we can use integers to distinct between the vector fields. 
+    ! So we could set 2 2 3 3 and actually have those treated as independent vector fields, where we compute the norm.
     ! maybe a bit overkill because usually we only have the velocity, but why not have the capacity that we can build up on
     do l = 2, maxval(params%threshold_state_vector_component(:))
         ! convert logical mask to index mask
@@ -102,6 +107,7 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
             maxval(sqrt(u_wc(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), mask)**2))
     enddo
 
+    ! thresholding of scalar components of state vector (==1)
     do p = 1, nc
         if (params%threshold_state_vector_component(p) == 1) then
             ! if all details are smaller than C_eps, we can coarsen, check interior WC only
@@ -109,23 +115,24 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
         endif
     enddo
 
-    ! We could disable detail checking for qtys we do not want to consider,
-    ! but this is more work and selective thresholding is rarely used
+    ! We could disable detail checking for qtys we do not want to consider, (in the sense of not even computing the WC),
+    ! but this is more work and selective thresholding is rarely used.
     do p = 1, nc
         if (params%threshold_state_vector_component(p) == 0) detail(p) = 0.0_rk
     enddo
 
-    ! default thresholding level is the one in the parameter struct
+    ! default threshold is the one in the parameter struct
     eps_use(:) = params%eps
     ! but if we pass another one, use that.
     if (present(eps)) eps_use(1:nc) = eps(1:nc)
 
-    ! Renorm criteria with norm of the field
+    ! Normalize threshold with the norm of the component. This corresponds to using a relative vs an absolute EPS.
     if (present(norm)) eps_use(1:nc) = eps_use(1:nc) * norm(1:nc)
 
     ! evaluate criterion: if this blocks detail is smaller than the prescribed precision,
-    ! the block is tagged as "wants to coarsen" by setting the tag -1
-    ! note gradedness and completeness may prevent it from actually going through with that
+    ! the block is tagged as "wants to coarsen" by setting the tag -1.
+    ! Note gradedness and completeness may prevent it from actually going through with that.
+    ! Note the most severe detail (= state vector component) sets the flag for the entire block.
     if ( all(detail(:) < eps_use(:))) then
         ! coarsen block, -1
         refinement_status = -1

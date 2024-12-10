@@ -69,7 +69,7 @@ FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
-#FFLAGS += -O3
+FFLAGS += -O3
 FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -pedantic
 FFLAGS += -Wall -Wextra -Wconversion -fbacktrace -ffpe-trap=zero,invalid 
 FFLAGS += -g3 -g -ggdb  # debugging flags

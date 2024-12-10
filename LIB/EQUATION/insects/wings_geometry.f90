@@ -244,7 +244,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   wingID = color_wing-1
 
   if ( ((Insect%wing_file_type(wingID))/="linear") .and. ((Insect%wing_file_type(wingID))/="fourier") .and. ((Insect%wing_file_type(wingID))/="fourierY") ) then
-      call abort(26111902,"draw_wing_fourier is called with non-fourier wing...")
+      call abort(26111902,"draw_wing_fourier is called with a wing that is neither linear/fourier/fourierY ...")
   endif
 
   if (side == "R") then

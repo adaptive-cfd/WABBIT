@@ -27,7 +27,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     real(kind=rk), dimension(3)         :: volume_int                   !> global integral
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
     integer(kind=ik)                    :: k, dF, neqn, lgt_id, hvy_id  ! loop variables
-    integer(kind=ik)                    :: g
+    integer(kind=ik)                    :: g, hvy_id_mask
     integer(kind=ik), dimension(3)      :: Bs
     integer(kind=2)                     :: n_domain(1:3)
     real(kind=rk)                       :: t0, t1
@@ -39,7 +39,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     x0       = 0.0_rk
     dx       = 0.0_rk
     hvy_ID   = 1
-
+ 
     !-------------------------------------------------------------------------
     ! CoarseExtension update of input data
     !-------------------------------------------------------------------------
@@ -61,8 +61,8 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     t1 = MPI_wtime()
     ! performs initializations in the RHS module, such as resetting integrals
     ! for this stage, just pass any block (result does not depend on block), hvy_id=1 and set x0=dx=0
-    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
-         hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "init_stage" )
+    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,1), g, x0, dx, &
+         hvy_rhs(:,:,:,:,1), hvy_mask(:,:,:,:,1), "init_stage" )
 
     !-------------------------------------------------------------------------
     ! 2nd stage: integral_stage. (called for all blocks)
@@ -84,8 +84,17 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
             call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
         endif
 
+        ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
+        ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
+        ! Note: hvy_mask is not used if in this case by the RHS routines...
+        if (size(hvy_mask,5) == 1) then
+            hvy_id_mask = 1
+        else 
+            hvy_id_mask = hvy_id
+        endif
+
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
-        hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "integral_stage", n_domain )
+        hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id_mask), "integral_stage", n_domain )
     enddo
 
 
@@ -94,8 +103,8 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     !-------------------------------------------------------------------------
     ! in rhs module, used ror example for MPI_REDUCES
     ! for this stage, just pass any block (result does not depend on block), hvy_id=1 and set x0=dx=0
-    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx, &
-    hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "post_stage" )
+    call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, 1), g, x0, dx, &
+    hvy_rhs(:,:,:,:,1), hvy_mask(:,:,:,:,1), "post_stage" )
     call toc( "RHS_wrapper::integral-stage", 32, MPI_wtime()-t1 )
 
 
@@ -118,8 +127,17 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
             call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
         endif
 
+        ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
+        ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
+        ! Note: hvy_mask is not used if in this case by the RHS routines...
+        if (size(hvy_mask,5) == 1) then
+            hvy_id_mask = 1
+        else 
+            hvy_id_mask = hvy_id
+        endif
+
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, &
-        x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:, hvy_id), "local_stage", n_domain)
+        x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:,hvy_id_mask), "local_stage", n_domain)
     enddo
     call toc( "RHS_wrapper::local-stage", 33, MPI_wtime()-t1 )
 

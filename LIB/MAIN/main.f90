@@ -258,7 +258,7 @@ program main
         endif
 
         !***********************************************************************
-        ! refine everywhere
+        ! refinement: make sure the solution at t+dt can be resolved on the grid
         !***********************************************************************
         t4 = MPI_wtime()
         if ( params%adapt_tree ) then
@@ -268,8 +268,11 @@ program main
             ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-            ! refine the mesh after refinement_indicator, usually "everywhere" or "significant"
-            ! for "significant", the refinement flags from the last adapt_tree call are reused. This might not be given for the first iteration so we just skip this
+            ! refine the mesh after refinement_indicator, usually "everywhere" or "significant". When using
+            ! "significant", the refinement flags from the last call to adapt_tree call are reused. 
+            ! This might not be given for the first iteration so we just skip this (as adapt_tree was not called yet)
+            ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
+            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
             if (params%refinement_indicator == "significant" .and. iteration == 0) then
                 call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow)
             else

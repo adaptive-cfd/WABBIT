@@ -290,13 +290,14 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
         if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
         call adapt_tree( time, params, hvy_mask, tree_ID_mask_coarser, "everywhere", hvy_tmp)
 
-        ! prune both masks
-        if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
-        call prune_tree( params, hvy_mask, tree_ID_mask)
-
+        ! pruning (Jmax-1)
         if (params%rank==0) write(*,'("Pruning mask tree (on Jmax-1 = ",i3,")")') Jmax-1
         call prune_tree( params, hvy_mask, tree_ID_mask_coarser)
     endif
+
+    ! pruning (Jmax)
+    if (params%rank==0) write(*,'("Pruning mask tree (on Jmax = ",i3,")")') Jmax
+    call prune_tree( params, hvy_mask, tree_ID_mask)
 
     if (params%rank==0) then
         write(*,'(80("~"))')

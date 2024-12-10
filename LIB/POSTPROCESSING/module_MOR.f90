@@ -52,7 +52,7 @@ contains
         real(kind=rk),  intent(inout)            :: hvy_tmp(:, :, :, :, :)
         integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
         !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
-        !> then the given treshold we discard the corresponding POD MODE.
+        !> then the given threshold we discard the corresponding POD MODE.
         real(kind=rk), optional, intent(in)      :: truncation_error
         !> if true we write out all temporal coefficients and eigenvalues
         !> filenames eigenvalues.txt, acoef.txt
@@ -181,7 +181,7 @@ contains
         real(kind=rk),  intent(in)               :: eigenvalues(:), eigenbasis(:, :)
         integer(kind=ik),optional, intent(inout) :: truncation_rank           !> number of POD modes
         !> Threshold value for truncating POD modes. If the singular value is smaller,tree_ID_dest
-        !> then the given treshold we discard the corresponding POD MODE.
+        !> then the given threshold we discard the corresponding POD MODE.
         real(kind=rk), optional, intent(in)      :: truncation_error
         !---------------------------------------------------------------
         real(kind=rk)                            ::  max_err, t_elapse, Volume
@@ -532,7 +532,7 @@ contains
         number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
         params%n_eqn = n_components
         allocate(params%threshold_state_vector_component(params%n_eqn))
-        params%threshold_state_vector_component(1:params%n_eqn)=.True.
+        params%threshold_state_vector_component(1:params%n_eqn)=1
         if (maxmem < 0.0_rk) then
             params%number_blocks = ceiling( 4.0_rk * N_snapshots * number_dense_blocks / params%number_procs * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) )
         endif
@@ -860,7 +860,7 @@ contains
         number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
         params%n_eqn = n_components
         allocate(params%threshold_state_vector_component(params%n_eqn))
-        params%threshold_state_vector_component(1:params%n_eqn)=.True.
+        params%threshold_state_vector_component(1:params%n_eqn)=1
         if (maxmem < 0.0_rk) then
             params%number_blocks = ceiling( 4.0_rk *fsize * number_dense_blocks / params%number_procs )
         endif
@@ -1344,7 +1344,7 @@ contains
             params%forest_size = fsize
             number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
             allocate(params%threshold_state_vector_component(params%n_eqn))
-            params%threshold_state_vector_component=.True.
+            params%threshold_state_vector_component=1
             if (maxmem < 0.0_rk) then
                 params%number_blocks = ceiling( 4.0_rk * fsize * number_dense_blocks / params%number_procs )
             endif
@@ -1454,7 +1454,7 @@ contains
             integer(kind=ik), intent(inout)     :: dest_tree_ID
             integer(kind=ik), intent(in)        :: iteration, N_modes         !> number of POD modes
             !> Threshold value for truncating POD modes. If the singular value is smaller,
-            !> then the given treshold we discard the corresponding POD MODE.
+            !> then the given threshold we discard the corresponding POD MODE.
             real(kind=rk),  intent(in)          :: a_coefs(:,:)
             !> optional argument for the tree_ID of the first mode:
             !> this can be useful if you have some trees which are stored at beginning
@@ -1769,7 +1769,7 @@ contains
             number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
             params%n_eqn = n_components
             allocate(params%threshold_state_vector_component(params%n_eqn))
-            params%threshold_state_vector_component(1:params%n_eqn)=.True.
+            params%threshold_state_vector_component(1:params%n_eqn)=1
             if (maxmem < 0.0_rk) then
                 params%number_blocks = ceiling( 4.0_rk *fsize * number_dense_blocks / params%number_procs )
             endif

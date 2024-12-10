@@ -107,7 +107,7 @@ subroutine adaption_test(params)
 
   number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
   allocate(params%threshold_state_vector_component(params%n_eqn))
-  params%threshold_state_vector_component(1:params%n_eqn)=.True.
+  params%threshold_state_vector_component(1:params%n_eqn)=1
   if (maxmem < 0.0_rk) then
     params%number_blocks = ceiling( 4.0_rk * params%forest_size * number_dense_blocks / params%number_procs * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) )
   endif

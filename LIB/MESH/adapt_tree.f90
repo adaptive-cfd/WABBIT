@@ -35,7 +35,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_maxlevel
     integer(kind=ik), intent(in)        :: tree_ID
     !> Sometimes we want to pass in and out the estimated std - this probably will be made more smart at some point
-    real(kind=rk), optional, intent(inout) :: std_est
+    real(kind=rk), optional, intent(inout) :: std_est(:)
     
     ! loop variables
     integer(kind=ik)                    :: iteration, k, lgt_id
@@ -46,12 +46,13 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     character(len=clong)                :: toc_statement
     integer(kind=tsize)                 :: treecode
 
-    real(kind=rk) :: thresh, thresh_old
+    real(kind=rk) :: thresh(1:params%n_eqn), thresh_old(1:params%n_eqn), thresh_save(1:params%n_eqn+1)
 
     real(kind=rk) :: norm(1:params%n_eqn)
 
     ! testing
-    integer(kind=ik)                    :: ix, iy, n_points
+    integer(kind=ik)                    :: ix, iy
+    real(kind=rk)                       :: n_points
 
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -103,6 +104,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     !      Iterative loop to estimate thresholding
     ! For CVS and image denoising we iteratively estimate the thresholding later need for deletion of WC and actual coarsening
     if (indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") then
+        if (.not. present(hvy_work)) then
+            call abort(241003, "Thresholding for cvs and denoising needs hvy_work to be passed to adapt_tree. I cannot find it though :(")
+        endif
+
         t_loop = MPI_Wtime()
         ! now we are doing CVS loop, start by backing up important data
         do k = 1, hvy_n(tree_ID)
@@ -117,30 +122,36 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call componentWiseNorm_tree(params, hvy_tmp, tree_ID, indicator, norm)
 
         
-        n_points = 2_ik**(params%dim*Jmax_active)*product(params%bs(1:params%dim))
+        ! n_points = 2.0_rk**dble(params%dim*params%Jmax)*dble(product(params%bs(1:params%dim)))
+        n_points = 2.0_rk**dble(params%dim*Jmax_active)*dble(product(params%bs(1:params%dim)))
+        ! write(*, '(A, 2(i0, 1x))') "Points: ", params%Jmax, Jmax_active
         if (indicator == "threshold-cvs") then
             ! compute thresholding according to Eqn (6) in Kadoch et al "On the role of vortical structures for turbulent mixing using direct
             ! numerical simulation and wavelet-based coherent vorticity extraction"
             ! J. Turb.(12)20: 1-17 (2011)
             ! thresh = sqrt( 4/3 Z/N log(N)) where N is the resolution - scales with level?
-            thresh = sqrt( (4.0_rk/3.0_rk) * norm(1)/dble(n_points) * log(dble(n_points)) )
+            do k1 = 1, params%n_eqn
+                thresh(k1) = sqrt( (4.0_rk/3.0_rk) * norm(k1) * log(n_points) )  ! norm already normalized by area/volume
+            enddo
         elseif (indicator == "threshold-image-denoise") then
             ! compute thresholding according to donoho1994 universal threshold T=\sqrt{2log(n)*sigma^2}
-            thresh = sqrt( 2.0_rk * norm(1)/dble(n_points) * log(dble(n_points)))
+            do k1 = 1, params%n_eqn
+                thresh(k1) = sqrt( 2.0_rk * norm(k1) * log(n_points))  ! norm already normalized by area/volume
+            enddo
         else
             ! no iterative loops for others, we probably compute the filter somewhere anyways
-            thresh = -1.0_rk
+            thresh(:) = -1.0_rk
         endif
-        thresh_old = -1.0_rk
+        thresh_old(:) = -1.0_rk
 
-        if (present(std_est)) std_est = sqrt(norm(1)/dble(n_points))
-        ! if (params%rank == 0) then
-        !     write(*, '(2(A, es12.4))') "CVS before loop       thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points))
-        ! endif
+        if (present(std_est)) std_est = sqrt(norm(1))
+        if (params%rank == 0) then
+            write(*, '(2(A, es12.4))') "CVS before loop       thresh= ", thresh, " est std= ", sqrt(norm(1))
+        endif
 
         ! convergence loop
-        do iteration = 1, 100
-            thresh_old = thresh
+        do iteration = 1, max(100, params%azzalini_iterations)
+            thresh_old(:) = thresh(:)
             ! recopy WDed values from backup
             if (iteration > 1) then
                 do k = 1, hvy_n(tree_ID)
@@ -163,37 +174,60 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
             ! compute new threshold, treat whole field as incoherent
             ! for now, we use first variable and compute Q1^2 / 2, luckily this is just the norm squared
-            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, "CVS", norm)
+            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, indicator, norm)
 
             if (indicator == "threshold-cvs") then
                 ! compute thresholding according to Eqn (6) in Kadoch et al "On the role of vortical structures for turbulent mixing using direct
                 ! numerical simulation and wavelet-based coherent vorticity extraction"
                 ! J. Turb.(12)20: 1-17 (2011)
                 ! thresh = sqrt( 4/3 Z/N log(N)) where N is the resolution - scales with level?
-                thresh = sqrt( (4.0_rk/3.0_rk) * norm(1)/dble(n_points) * log(dble(n_points)) )
+                do k1 = 1, params%n_eqn
+                    thresh(k1) = sqrt( (4.0_rk/3.0_rk) * norm(k1) * log(n_points) )  ! norm already normalized by area/volume
+                enddo
             elseif (indicator == "threshold-image-denoise") then
                 ! compute thresholding according to donoho1994 universal threshold T=\sqrt{2log(n)*sigma^2}
-                thresh = sqrt( 2.0_rk * norm(1)/dble(n_points) * log(dble(n_points)))
+                do k1 = 1, params%n_eqn
+                    thresh(k1) = sqrt( 2.0_rk * norm(k1) * log(n_points))  ! norm already normalized by area/volume
+                enddo
             endif
 
-            if (present(std_est)) std_est = sqrt(norm(1)/dble(n_points))
-            ! if (params%rank == 0) then
-            !     write(*, '(A, i2, 3(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points)), " thresh_diff= ", abs(thresh - thresh_old)
-            ! endif
+            if (present(std_est)) std_est(:) = sqrt(norm(:))
+            if (params%rank == 0) then
+                write(*, '(A, i2, 3(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " est std= ", sqrt(norm(1)), " thresh_diff= ", abs(thresh - thresh_old)
+            endif
 
             ! exit early
-            if (indicator == "threshold-image-denoise" .and. abs(thresh - thresh_old) < 1e-12) exit
-            if (indicator == "threshold-cvs" .and. iteration >= 2) exit  ! CVS computes one iteration and then uses new thresholding, totalling to 2 iterations
+            if (indicator == "threshold-image-denoise" .and. abs(maxval(thresh(:) - thresh_old(:))) < 1e-12) exit
+            if (indicator == "threshold-cvs" .and. iteration >= params%azzalini_iterations+1) exit  ! CVS computes one iteration and then uses new thresholding, totalling to 2 iterations
         enddo
 
-        ! if (params%rank == 0) then
-        !     write(*, '(A, i2, 2(A, es12.4))') "CVS convergence it ", iteration, " thresh= ", thresh, " est std= ", sqrt(norm(1)/dble(n_points))
-        ! endif
+        ! HACK: overwrite the thresholding if it is larger than wanted, possibly deleting too many details of the flow
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,:,:,1), tree_ID, indicator, norm)
+        do k1 = 1, params%n_eqn
+            if (thresh(k1) > params%eps * norm(k1)) thresh(k1) = params%eps * norm(k1)
+        enddo
+        if (params%rank == 0) then
+            write(*, '(A, i2, 1(A, es12.4))') "CVS convergence it ", -1, " thresh= ", thresh
+        endif
 
-        call toc( "adapt_tree (treshold iterative loop)", 103, MPI_Wtime()-t_loop )
+        ! debug: print thresholding factors to file
+        ! JB: I don't know how to do it cleverly for now so I save it in a t-file
+        if (params%rank==0) then
+            thresh_save(1) = time
+            thresh_save(2:) = thresh(:)
+            call append_t_file( "thresholding.t", thresh_save(:) )
+            ! write(*, '(A, 10(es10.3, 1x))') "Thresholding factors: ", thresh(:)
+        endif
+
+        call toc( "adapt_tree (threshold iterative loop)", 103, MPI_Wtime()-t_loop )
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    ! ! Testing for de-aliasing - compute energy in JMax blocks before and after decomposition to compute what is dissipated
+    ! call componentWiseNorm_tree(params, hvy_tmp, tree_ID, "L2", norm, norm_case="level", n_val=params%Jmax)
+    ! if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm on JMax  before de-aliasing:", norm(:)
+    ! call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm, norm_case="SC_level", n_val=params%Jmax)
+    ! if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm on JMax-1 after de-aliasing:", norm(:)
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Coarsening / Grid adaption
@@ -208,11 +242,26 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 hvy_block(:, :, : ,1:size(hvy_block, 4), hvy_id) = hvy_work(:, :, :, 1:size(hvy_block, 4), hvy_id, 2)  ! WDed values
             enddo
 
-            ! delete all WC where they are too small
-            call wc_threshold_tree(params, hvy_block, tree_ID, thresh, Jmax_active)
+            if (params%threshold_wc) then
+                ! delete all WC where they are too small - this is the actual thresholding
+                call wc_threshold_tree(params, hvy_block, tree_ID, thresh, Jmax_active)
+            endif
 
-            ! set norm to be thresholded with as thresh norm
-            norm(1) = thresh
+            ! set norm to be used as threshold indicator as threshold
+            norm(:) = thresh(:)
+        endif
+
+        ! JB experimental
+        if (params%threshold_wc) then
+            ! compute norm
+            if (params%eps_normalized) then
+                call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            else
+                norm(:) = 1.0_rk
+            endif
+
+            ! delete all WC where they are too small - this is the actual thresholding
+            call wc_threshold_tree(params, hvy_block, tree_ID, params%eps * norm(:), Jmax_active)
         endif
 
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -246,7 +295,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         call respectJmaxJmin_tree( params, tree_ID )
 
         ! unmark blocks that cannot be coarsened due to gradedness and completeness, in one go this should converge to the final grid
-        call ensureGradedness_tree( params, tree_ID, check_daughters=.true.)
+        call ensureGradedness_tree( params, tree_ID, check_daughters=.true., stay_value=REF_UNSIGNIFICANT_STAY)
 
         ! we do not need to move any cell data anymore, any block with -1 can simply be deleted
         do k = 1, lgt_n(tree_ID)
@@ -255,8 +304,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! delete blocks
                 lgt_block(lgt_ID, :) = -1
             endif
-            ! reset all refinement flags
-            lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            ! ! reset all refinement flags
+            ! lgt_block(lgt_ID, IDX_REFINE_STS) = 0
         enddo
 
         ! update grid lists: active list, neighbor relations, etc
@@ -277,7 +326,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet reconstruction of blocks
     ! Reconstruct all blocks, this is done level-wise and scaling coefficients of daughter blocks are updated along the way
-    ! If no SC or WC are modified (usually for unlifted wavelets and normal tresholding) we can simply copy back all values
+    ! If no SC or WC are modified (usually for unlifted wavelets and normal thresholding) we can simply copy back all values
     t_block = MPI_Wtime()
     if (.not. params%useCoarseExtension .and. indicator /= "threshold-cvs" .and. indicator /= "threshold-image-denoise") then
         do k = 1, hvy_n(tree_ID)
@@ -695,71 +744,45 @@ subroutine wc_threshold_tree(params, hvy_block, tree_ID, thresh, JMax_active)
     !> heavy data array, WDed values in spaghetti form
     real(kind=rk), intent(inout)    :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)    :: tree_ID
-    real(kind=rk), intent(in)       :: thresh      !< Threshold for CVS to be applied to all WC
+    real(kind=rk), intent(in)       :: thresh(:)   !< Threshold for CVS to be applied to all WC
     integer(kind=ik), intent(in)    :: JMax_active !< if not provided it will be computed
 
-    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, level_me
+    integer(kind=ik) :: hvy_ID, lgt_ID, ix, iy, iz, even_odd, i_b, i_p, level_me, nc
     real(kind=rk)    :: level_fac, wc_fac
+    real(kind=rk), allocatable, dimension(:,:,:,:), save :: u_wc
+
+    nc     = params%n_eqn
 
     ! is the first point a SC or WC?
     even_odd = mod(params%g + 1, 2)
+
+    if (allocated(u_wc)) then
+        if (size(u_wc, 4) < nc) deallocate(u_wc)
+    endif
+    if (.not. allocated(u_wc)) allocate(u_wc(1:size(hvy_block, 1), 1:size(hvy_block, 2), 1:size(hvy_block, 3), 1:nc ) )
 
     do i_b = 1, hvy_n(tree_ID)
         hvy_ID = hvy_active(i_b, tree_ID)
         call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
         level_me = lgt_block(lgt_ID, IDX_MESH_LVL)
 
-        wc_fac = 1.0_rk
-        if (params%eps_norm == "L2") then
-            level_fac = ( 2.0_rk**(+dble((level_me-JMax_Active)*params%dim)/2.0_rk) )
-        elseif (params%eps_norm == "H1") then
-            level_fac = ( 2**(-level_me*(params%dim+2.0_rk)*0.5_rk) )
-        else
-            level_fac = 1.0
-        endif
-        
-        if (params%dim == 2) then
-            do iy = 1, params%Bs(2)+2*params%g
-                do ix = 1, params%Bs(1)+2*params%g
-                    ! skip SC
-                    if (mod(ix, 2) == even_odd .and. mod(iy, 2) == even_odd) cycle
+        call wavelet_renorm_block(params, hvy_block(:, :, :, 1:nc, hvy_ID), u_wc, level_me, level_ref=JMax_active)
 
-                    ! WC need to be renormalized
-                    if (params%eps_norm == "L2") then
-                        wc_fac = 0.5_rk  ! 2.0_rk**(-(params%dim)/2.0_rk)
-                        if (mod(ix, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
-                        if (mod(iy, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
-                    endif
-
-                    ! apply thresholding
-                    if (abs(hvy_block(ix, iy, 1, 1, hvy_ID)) < thresh * level_fac * wc_fac) then
-                        hvy_block(ix, iy, 1, 1, hvy_ID) = 0.0
-                    endif
-                enddo
-            enddo
-        else
-            do iz = 1, params%Bs(3)+2*params%g
+        do i_p = 1, params%n_eqn
+            do iz = 1, merge(1, params%Bs(3)+2*params%g, params%dim==2)
                 do iy = 1, params%Bs(2)+2*params%g
                     do ix = 1, params%Bs(1)+2*params%g
-                        ! skip SC
-                        if (mod(ix, 2) == even_odd .and. mod(iy, 2) == even_odd .and. mod(iz, 2) == even_odd) cycle
-
-                        ! WC need to be renormalized
-                        if (params%eps_norm == "L2") then
-                            wc_fac = 1/(sqrt(2.0_rk)*2.0_rk)  ! 2.0_rk**(-(params%dim)/2.0_rk)
-                            if (mod(ix, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
-                            if (mod(iy, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
-                            if (mod(iz, 2) == 1-even_odd) wc_fac = wc_fac * 2.0_rk
-                        endif
+                        ! skip SC, for 3D skip the check in z-direction
+                        if (mod(ix, 2) == even_odd .and. mod(iy, 2) == even_odd .and. mod(iz, 2) == merge(1, even_odd, params%dim==2)) cycle
 
                         ! apply thresholding
-                        if (abs(hvy_block(ix, iy, iz, 1, hvy_ID)) < thresh * level_fac * wc_fac) then
-                            hvy_block(ix, iy, iz, 1, hvy_ID) = 0.0
+                        if (abs(u_wc(ix, iy, iz, i_p)) < thresh(i_p)) then
+                            hvy_block(ix, iy, iz, i_p, hvy_ID) = 0.0
                         endif
                     enddo
                 enddo
             enddo
-        endif
+        enddo
     enddo
 
 end subroutine

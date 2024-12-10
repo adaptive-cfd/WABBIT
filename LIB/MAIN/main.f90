@@ -163,7 +163,7 @@ program main
     endif
 
     ! timing
-    call toc( "TOPLEVEL: unit tests", 16, MPI_wtime()-sub_t0 )
+    call toc( "TOPLEVEL: unit tests", 17, MPI_wtime()-sub_t0 )
     sub_t0 = MPI_Wtime()
 
     !---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ program main
     ! reset the grid: all blocks are inactive and empty (in case the unit tests leave us with some data)
     call reset_tree( params, .true., tree_ID=tree_ID_flow )
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
-    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp )
+    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
 
     if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
         ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
@@ -201,6 +201,7 @@ program main
     call init_t_file('krylov_err.t', overwrite)
     call init_t_file('balancing.t', overwrite)
     call init_t_file('block_xfer.t', overwrite)
+    call init_t_file('thresholding.t', overwrite)
 
     if (rank==0) then
         call Initialize_runtime_control_file()
@@ -221,10 +222,8 @@ program main
 
 
     ! timing
-    call toc( "TOPLEVEL: init_data", 14, MPI_wtime()-sub_t0 )
-
-    ! call abort(197, "Shhhh, Julius is testing!")
-
+    call toc( "TOPLEVEL: init_data", 15, MPI_wtime()-sub_t0 )
+    
     !---------------------------------------------------------------------------
     ! main time loop
     !---------------------------------------------------------------------------
@@ -259,7 +258,7 @@ program main
         endif
 
         !***********************************************************************
-        ! refine everywhere
+        ! refinement: make sure the solution at t+dt can be resolved on the grid
         !***********************************************************************
         t4 = MPI_wtime()
         if ( params%adapt_tree ) then
@@ -269,11 +268,15 @@ program main
             ! Snych'ing becomes much more expensive one the grid is refined.
             call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-            ! refine the mesh, normally "everywhere"
-            if (params%threshold_mask) then
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, hvy_mask=hvy_mask )
+            ! refine the mesh after refinement_indicator, usually "everywhere" or "significant". When using
+            ! "significant", the refinement flags from the last call to adapt_tree call are reused. 
+            ! This might not be given for the first iteration so we just skip this (as adapt_tree was not called yet)
+            ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
+            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
+            if (params%refinement_indicator == "significant" .and. iteration == 0) then
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow)
             else
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow )
+                call refine_tree( params, hvy_block, hvy_tmp, params%refinement_indicator, tree_ID=tree_ID_flow )
             endif
         endif
         call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
@@ -334,12 +337,14 @@ program main
             !*******************************************************************
             ! statistics
             !*******************************************************************
+            t4 = MPI_wtime()
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             endif
+            call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
 
             ! if multiple time steps are performed on the same grid, we have to be careful
             ! not to skip past saving time intervals. Therefore, if it is time to save, we
@@ -363,13 +368,13 @@ program main
 
                 ! actual coarsening (including the mask function)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask)
+                    hvy_mask=hvy_mask, hvy_work=hvy_work)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
             endif
         endif
-        call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
+        call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)
 
         !***********************************************************************

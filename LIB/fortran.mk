@@ -91,7 +91,7 @@ ifdef MKLROOT
 LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
 else
 # Use custom LAPACK installation
-LDFLAGS += -llapack -lblas -ldl -lm
+LDFLAGS += -L${WABBIT_BLAS_ROOT} -L${WABBIT_LAPACK_ROOT} -llapack -lblas -ldl -lm
 endif
 endif
 
@@ -126,7 +126,7 @@ ifdef MKLROOT
 LDFLAGS += -I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -ldl -lm
 else
 # Use custom LAPACK installation
-LDFLAGS += -llapack -lblas -ldl -lm
+LDFLAGS += -L${WABBIT_BLAS_ROOT} -L${WABBIT_LAPACK_ROOT} -llapack -lblas -ldl -lm
 endif
 endif
 
@@ -233,7 +233,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D_wingsection.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_t_files.o $(OBJDIR)/module_timing.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -264,7 +264,7 @@ $(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_pa
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
-	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_forestMetaData.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
+	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_physics_metamodule.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 \
 	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 sync_ghosts_symmetry_condition.f90 reconstruction_step.f90 \
 	xfer_block_data.f90 block_relations.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

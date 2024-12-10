@@ -23,6 +23,9 @@ module module_globals
     ! this refinement flag tells us a block exists, but it is not filled with meaningful entries. Syncing with these blocks is ignored.
     ! it is global as it may be used at different positions
     integer, parameter :: REF_TMP_EMPTY = 10                  ! should be > 0
+    ! this refinement flag tells us, that a block is kept but it's not significant -- merely kept due to gradedness and completeness reasons.
+    ! it is important to communicate between coarsening and refinement in case we only want to refine significant blocks
+    integer, parameter :: REF_UNSIGNIFICANT_STAY = 9          ! should be > 0
     ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
     ! universality dictates that we can also use a different number of components, for example
     ! when syn'ing the mask function (which in many cases has six entries.)

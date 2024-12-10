@@ -295,12 +295,12 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             if (params_convdiff%velocity(i)=="cyclogenesis") then
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i)
-                        y = y / params_convdiff%blob_width(i)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i,1)
+                        y = y / params_convdiff%blob_width(i,1)
                         ! sech(x) = 1.0 / cosh(x)
                         sech = 1.0_rk / cosh(y)
                         ! source term
-                        rhs(ix,iy,1,i) = rhs(ix,iy,1,i) - u0(ix,iy,1,2)*(-sech**2 / params_convdiff%blob_width(i) )
+                        rhs(ix,iy,1,i) = rhs(ix,iy,1,i) - u0(ix,iy,1,2)*(-sech**2 / params_convdiff%blob_width(i,1) )
                     end do
                 end do
             endif
@@ -454,11 +454,11 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
                 ! radius
-                r = dsqrt( (x-params_convdiff%x0(i))**2 + (y-params_convdiff%y0(i))**2 )
+                r = dsqrt( (x-params_convdiff%x0(i,1))**2 + (y-params_convdiff%y0(i,1))**2 )
                 ! tangential velocity
                 ut = 1.0d0 * (1.d0 / (cosh(r))) * (tanh(r))
                 ! angle phi
-                phi = atan2(y-params_convdiff%y0(i),x-params_convdiff%x0(i))
+                phi = atan2(y-params_convdiff%y0(i,1),x-params_convdiff%x0(i,1))
 
                 u0(ix,iy,1) = -sin(phi) * ut
                 u0(ix,iy,2) =  cos(phi) * ut

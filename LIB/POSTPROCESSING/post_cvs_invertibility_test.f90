@@ -73,7 +73,7 @@ subroutine post_cvs_invertibility_test(params)
     params%eps_normalized = .false.
     params%eps_norm = "L2"
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component(1:params%n_eqn) = .true.
+    params%threshold_state_vector_component(1:params%n_eqn) = 1
     params%coarsening_indicator = "threshold-image-denoise"
 
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=4 )

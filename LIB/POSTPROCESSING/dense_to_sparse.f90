@@ -44,7 +44,7 @@ subroutine dense_to_sparse(params)
             write(*,'(A)') "--------------------------------------------------------------"
             write(*,'(A)') "                DENSE TO SPARSE "
             write(*,'(A)') "--------------------------------------------------------------"
-            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail treshold"
+            write(*,'(A)') "postprocessing subroutine sparse a mesh with a given detail threshold"
             write(*,'(A)') " "
             write(*,'(A)') "Command:"
             write(*,'(A)') "./wabbit-post --dense-to-sparse "
@@ -92,7 +92,7 @@ subroutine dense_to_sparse(params)
     allocate(params%field_names(params%n_eqn))
     allocate(file_out(params%n_eqn))
     allocate(params%threshold_state_vector_component(params%n_eqn))
-    params%threshold_state_vector_component = .true.
+    params%threshold_state_vector_component = 1
 
     !-------------------------------------------
     ! check and find common params in all h5-files

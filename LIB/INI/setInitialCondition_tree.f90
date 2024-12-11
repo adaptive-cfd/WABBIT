@@ -19,7 +19,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     !> heavy work data array used for adapt_tree
     real(kind=rk), intent(inout), optional        :: hvy_work(:, :, :, :, :, :)
 
-    logical :: tmp
+    logical :: tmp, error_OOM
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -106,7 +106,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         if (params%inicond_refinements > 0) then
             do k = 1, params%inicond_refinements
                 ! refine entire mesh.
-                call refine_tree( params, hvy_block, hvy_tmp,  "everywhere", tree_ID)
+                call refine_tree( params, hvy_block, hvy_tmp,  "everywhere", tree_ID, error_OOM)
+
+                if (error_OOM) call abort(2512117,"Refinement failed, out of memory. Try with more memory.")
 
                 if (params%rank == 0) then
                     write(*,'(" did ",i2," refinement stage (beyond what is required for the &
@@ -148,8 +150,10 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     !> \todo It would be better to selectively
                     !! go up one level where a refinement indicator tells us to do so, but in the current code
                     !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
-                    !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer.
-                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
+                    !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM  )
+                    if (error_OOM) call abort(2512113,"Refinement failed, out of memory. Try with more memory.")
+
 
                     ! It may seem surprising, but we now have to re-set the inicond on the blocks. if
                     ! not, the detail coefficients for all blocks are zero. In the time stepper, this
@@ -182,7 +186,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%inicond_refinements > 0) then
                 do k = 1, params%inicond_refinements
                     ! refine entire mesh.
-                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID)
+                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM)
+
+                    if (error_OOM) call abort(2512114,"Refinement failed, out of memory. Try with more memory.")
 
                     ! set initial condition
                     call setInicondBlocks_tree(params, hvy_block, tree_ID)

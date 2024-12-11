@@ -26,6 +26,7 @@ subroutine sparse_to_dense(params)
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks, Nb_file
+    logical                                 :: error_OOM
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
@@ -164,7 +165,9 @@ subroutine sparse_to_dense(params)
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
     elseif (operator=="refine-everywhere") then
-        call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID )
+        call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID, error_OOM=error_OOM )
+
+        if (error_OOM) call abort(2512181,"Refinement failed, out of memory. Try with more memory.")
 
     elseif (operator=="coarsen-everywhere") then
         call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )

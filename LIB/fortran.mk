@@ -294,7 +294,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
-	remove_nonperiodic_neighbors.f90 forest.f90 notEnoughMemoryToRefineEverywhere_tree.f90 \
+	remove_nonperiodic_neighbors.f90 forest.f90 \
 	securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

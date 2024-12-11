@@ -67,7 +67,7 @@ program main
     real(kind=rk)                       :: sub_t0, t4, tstart, dt
     ! decide if data is saved or not
     logical                             :: it_is_time_to_save_data=.false., test_failed, keep_running=.true.
-    logical                             :: overwrite
+    logical                             :: overwrite, error_OOM
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -250,13 +250,6 @@ program main
             ! call serve_data_request(hvy_block, hvy_tmp, params)
         endif
 
-        ! check if we still have enough memory left: for very large simulations
-        ! we cannot affort to have them fail without the possibility to resume them
-        if (notEnoughMemoryToRefineEverywhere_tree(params, tree_ID_flow, time)) then
-            ! yippieh, a goto statement. thats soooo 90s.
-            goto 17
-        endif
-
         !***********************************************************************
         ! refinement: make sure the solution at t+dt can be resolved on the grid
         !***********************************************************************
@@ -274,10 +267,13 @@ program main
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
             if (params%refinement_indicator == "significant" .and. iteration == 0) then
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow)
+                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM)
             else
-                call refine_tree( params, hvy_block, hvy_tmp, params%refinement_indicator, tree_ID=tree_ID_flow )
+                call refine_tree( params, hvy_block, hvy_tmp, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM )
             endif
+            ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
+            ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.
+            if (error_OOM) goto 17
         endif
         call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
         Nblocks_rhs = lgt_n(tree_ID_flow)
@@ -292,7 +288,8 @@ program main
         ! before adapting the grid again. this can further reduce the overhead of adaptivity.
         ! Note: the non-linear terms can create finer scales than resolved on the grid. they
         ! are usually filtered by the coarsening/refinement round trip. So if you do more than one time step
-        ! on the grid, consider using a filter.
+        ! on the grid, consider using a filter. The technique of using N_dt_per_grid>1 has been used
+        ! with the highly viscous bristled flyers, where nonlinearity is weakened by viscosity.
         do it = 1, params%N_dt_per_grid
             !*******************************************************************
             ! advance in time (make one time step)
@@ -397,7 +394,9 @@ program main
             write(*, '(" time=",f16.9, " t_wall=",es10.3)', advance='no') time, t2
             write(*, '(" Nb=(",i6,"/",i6,")")', advance='no') Nblocks_rhs, Nblocks
             write(*, '(" J=(",i2,":",i2,"/",i2,":",i2, ")")', advance='no') Jmin1, Jmax1, minActiveLevel_tree(tree_ID_flow), maxActiveLevel_tree(tree_ID_flow)
-            write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint((dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
+            ! the goofy factor (1.0+1.0/(2**params%dim)) is to take into account that if we have this many blocks at the RHS level,
+            ! we still need a few more for the full tree transform (the virtual nodes which are not leafs) 1.25 in 2D and 1.125 in 3D
+            write(*, '(" dt=",es8.1," mem=",i3,"%")', advance='no') dt, nint(((1.0+1.0/(2**params%dim))*dble(Nblocks_rhs+lgt_n(tree_ID_mask))/dble(size(lgt_block,1)))*100.0_rk)
             write(*, '("")')  ! line break
 
              ! prior to 11/04/2019, this file was called timesteps_info.t but it was missing some important

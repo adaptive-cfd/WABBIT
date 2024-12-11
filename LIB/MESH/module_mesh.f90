@@ -63,7 +63,6 @@ contains
 #include "check_lgt_block_synchronization.f90"
 #include "remove_nonperiodic_neighbors.f90"
 #include "forest.f90"
-#include "notEnoughMemoryToRefineEverywhere_tree.f90"
 
 
 ! analytical data used for wavelet compression test

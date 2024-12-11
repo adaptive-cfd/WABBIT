@@ -182,6 +182,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     integer :: k, hvy_id, Bs(1:3), g, Jactive, Jmax, iter, lgt_id, Jmin
     real(kind=rk)                       :: x0(1:3), dx(1:3)
 
+    logical :: error_OOM
     if (params%rank==0) then
         write(*,'(80("~"))')
         write(*,*) "creating time-independent part of mask function NOW"
@@ -220,7 +221,9 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
 
         ! refine the mesh
-        call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_mask )
+        call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_mask, error_OOM)
+
+        if (error_OOM) call abort(2512112,"Refinement failed, out of memory. Try with more memory.")
 
         ! if its mask-anynonzero, then the grid is refined inside the body. however, this is not what we assume
         ! in the add-pruned-tree: blocks on the actual grid are then coarser than in the pruned one, and still all 0

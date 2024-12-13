@@ -101,6 +101,66 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             45.0_rk/1024.0_rk, &
             -5.0_rk/ 512.0_rk, &
             1.0_rk/1024.0_rk/)
+        case('pade-lowpass-3pt')
+            ! pade-type low-pass filter of 2nd order with stencil size of 3
+            ! source: Gaitonde & Visbal (2000) - Pade-Type Higher-Order Boundary Filters for the Navier–Stokes Equations, Table 1 with af=0
+            stencil_size = 3
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/  1.0_rk/4.0_rk, &
+                1.0_rk/2.0_rk-1.0_rk, &
+                1.0_rk/4.0_rk /)
+        case('pade-lowpass-5pt')
+            ! pade-type low-pass filter of 4th order with stencil size of 5
+            ! source: Gaitonde & Visbal (2000) - Pade-Type Higher-Order Boundary Filters for the Navier–Stokes Equations, Table 1 with af=0
+            stencil_size = 5
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/16.0_rk, &
+                1.0_rk/4.0_rk, &
+                5.0_rk/8.0_rk-1.0_rk, &
+                1.0_rk/4.0_rk, &
+                -1.0_rk/16.0_rk /)
+        case('pade-lowpass-7pt')
+            ! pade-type low-pass filter of 6th order with stencil size of 7
+            ! source: Gaitonde & Visbal (2000) - Pade-Type Higher-Order Boundary Filters for the Navier–Stokes Equations, Table 1 with af=0
+            stencil_size = 7
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ 1.0_rk/64.0_rk, &
+                -3.0_rk/32.0_rk, &
+                15.0_rk/64.0_rk, &
+                11.0_rk/16.0_rk-1.0_rk, &
+                15.0_rk/64.0_rk, &
+                -3.0_rk/32.0_rk, &
+                1.0_rk/64.0_rk /)
+        case('pade-lowpass-9pt')
+            ! pade-type low-pass filter of 8th order with stencil size of 9
+            ! source: Gaitonde & Visbal (2000) - Pade-Type Higher-Order Boundary Filters for the Navier–Stokes Equations, Table 1 with af=0
+            stencil_size = 9
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/256.0_rk, &
+                1.0_rk/32.0_rk, &
+                -7.0_rk/64.0_rk, &
+                7.0_rk/32.0_rk, &
+                93.0_rk/128.0_rk-1.0_rk, &
+                7.0_rk/32.0_rk, &
+                -7.0_rk/64.0_rk, &
+                1.0_rk/32.0_rk, &
+                -1.0_rk/256.0_rk /)
+        case('pade-lowpass-11pt')
+            ! pade-type low-pass filter of 10th order with stencil size of 11
+            ! source: Gaitonde & Visbal (2000) - Pade-Type Higher-Order Boundary Filters for the Navier–Stokes Equations, Table 1 with af=0
+            stencil_size = 11
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ 1.0_rk/1024.0_rk, &
+                -5.0_rk/512.0_rk, &
+                45.0_rk/1024.0_rk, &
+                -15.0_rk/128.0_rk, &
+                105.0_rk/512.0_rk, &
+                193.0_rk/256.0_rk-1.0_rk, &
+                105.0_rk/512.0_rk, &
+                -15.0_rk/128.0_rk, &
+                45.0_rk/1024.0_rk, &
+                -5.0_rk/512.0_rk, &
+                1.0_rk/1024.0_rk /)
         end select
 
         stencil(0) = stencil(0) + 1.0_rk

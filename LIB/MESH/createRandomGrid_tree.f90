@@ -11,6 +11,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init, verbos
     logical, intent(in)                 :: verbosity
     integer(kind=ik), intent(in)        :: tree_ID
 
+    logical :: error_OOM 
     integer :: l
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -37,7 +38,9 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init, verbos
         endif
 
         ! randomly refine some blocks
-        call refine_tree( params, hvy_block, hvy_tmp, "random", tree_ID=tree_ID   )
+        call refine_tree( params, hvy_block, hvy_tmp, "random", tree_ID=tree_ID, error_OOM=error_OOM   )
+
+        if (error_OOM) call abort(2512111, "Out of memory, refinement failed. Try with more memory.")
 
         ! randomly coarsen some blocks
         call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "random", hvy_tmp  )

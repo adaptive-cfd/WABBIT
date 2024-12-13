@@ -45,7 +45,7 @@ subroutine get_free_local_light_id( params, mpirank, lgt_free_id, ignore_error, 
     if ( .not. ign_err ) then
         ! error catching: is there no more free blocks on the list?
         if (lgt_free_id == -1) then
-            write(*,'("rank=",i5)') params%rank
+            write(*,'("rank=",i5," total_blocks_perrank=",i5, " avg USED blocks-per-rank=",i5)') params%rank, params%number_blocks, sum(lgt_n(:)) / params%number_procs
             if (present(message)) write(*,*) message
             call abort(1234567, "ERROR: We try to fetch a light free block ID from the list but all blocks are used on this CPU")
         end if

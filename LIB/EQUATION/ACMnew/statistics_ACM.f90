@@ -47,7 +47,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:6), ipowtotal=0.0_rk, apowtotal=0.0_rk
-    real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block, usx, usy, usz, chi
+    real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block, usx, usy, usz, chi, dissipation_block
     real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
@@ -112,6 +112,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%div_min = 0.0_rk
         params_acm%penal_power = 0.0_rk
         params_acm%scalar_removal = 0.0_rk
+        params_acm%dissipation = 0.0_rk
+
         dx_min = 90.0e9_rk
 
         if (is_insect) then
@@ -348,6 +350,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
         end if
 
+        call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)
+        params_acm%dissipation = params_acm%dissipation + dissipation_block
+
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -402,8 +407,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         !-------------------------------------------------------------------------
         ! kinetic enstrophy
-        tmp(1)= params_acm%enstrophy
+        tmp(1) = params_acm%enstrophy
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        tmp(1) = params_acm%dissipation
+        call MPI_ALLREDUCE(tmp(1), params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         tmp(1) = dx_min ! minium spacing of current grid, not smallest possible one.
         call MPI_ALLREDUCE(tmp(1), dx_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
@@ -511,6 +519,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )

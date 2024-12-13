@@ -53,8 +53,8 @@ module module_acm
   type :: type_params_acm
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta, beta
-    logical :: use_free_flight_solver = .false.
+    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, penalization_startup_tau
+    logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk
@@ -276,7 +276,10 @@ end subroutine
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'smooth_mask', params_acm%smooth_mask, .true.)
+    call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
+    call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
+    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.05_rk)
+    call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
     
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
@@ -648,6 +651,7 @@ end subroutine
       call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)
+      call init_t_file('dissipation.t', overwrite)
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)
       ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"

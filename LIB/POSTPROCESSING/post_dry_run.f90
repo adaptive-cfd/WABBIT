@@ -27,7 +27,7 @@ subroutine post_dry_run
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new
     real(kind=rk) :: x0(1:3), dx(1:3)
-    logical :: pruned, help1, help2, save_us, iterate
+    logical :: pruned, help1, help2, save_us, iterate, error_OOM
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -213,7 +213,9 @@ subroutine post_dry_run
                 call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
                 ! refine the mesh, but only where the mask is interesting (not everywhere!)
-                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow )
+                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow, error_OOM )
+
+                if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
                 ! on new grid, create the mask again
                 call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)

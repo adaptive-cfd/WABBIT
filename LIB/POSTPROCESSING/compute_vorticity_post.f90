@@ -650,7 +650,7 @@ subroutine wavelet_test_coarsening(params)
     integer(kind=ik)                   :: nwork, ierr, iter , kk, Jmax, nx,ny,nz,&
     nc, neighborhood, lgtID_neighbor, ii
     integer(kind=tsize)                :: treecode, treecode1, treecode2, treecode3
-    logical :: coarsen, block1, block2, block3
+    logical :: coarsen, block1, block2, block3, error_OOM
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_reconst
     real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
 
@@ -979,7 +979,9 @@ do iter= 1, 1
     ! enddo
     call saveHDF5_tree("coarsening_334.h5", time, iteration, 1, params, hvy_block, tree_ID )
 
-call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID)
+call refine_tree(params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM)
+
+if (error_OOM) call abort(2512112,"Refinement failed, out of memory. Try with more memory.")
 
 call saveHDF5_tree("coarsening_335.h5", time, iteration, 1, params, hvy_block, tree_ID )
 ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_work(:,:,:,:,:,1), hvy_neighbor, hvy_active(:,tree_ID), hvy_n(tree_ID),lgt_n(tree_ID), inputDataSynced=.true. )

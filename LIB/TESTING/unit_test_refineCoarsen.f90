@@ -16,7 +16,7 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     real(kind=rk), allocatable :: norm(:), norm_ref(:)
     integer(kind=tsize)        :: treecode
     character(len=80)                       :: file_dump
-    logical                                 :: apply_verbose
+    logical                                 :: apply_verbose, error_OOM
 
     apply_verbose = .false.
     if (present(verbose)) apply_verbose = verbose
@@ -74,7 +74,9 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
     ! refine
-    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID  )
+    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM )
+
+    if (error_OOM) call abort(2512118,"Refinement failed, out of memory. Try with more memory.")
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
 

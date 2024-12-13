@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
+subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, error_OOM)
     use module_indicators
 
     implicit none
@@ -22,10 +22,12 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)   :: tree_ID
+    logical, intent(out)   :: error_OOM !> Out-of-memory error, causes the main time loop to exit.
+
 
     ! cpu time variables for running time calculation
     real(kind=rk)                  :: t0, t1, t2, t_misc, test(1:size(hvy_block, 4))
-    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id
+    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id, mpierr
     real(kind=rk) :: norm(1:params%n_eqn)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -34,6 +36,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
     ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
     ! to the last subroutine.)  -Thomas
 
+    error_OOM = .false.
 
     ! start time
     t0 = MPI_Wtime()
@@ -41,7 +44,6 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-
     call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
     call toc( "refine_tree (refinementIndicator_tree)", 141, MPI_Wtime()-t1 )
 
@@ -63,6 +65,15 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
     call toc( "refine_tree (ensureGradedness_tree)", 143, MPI_Wtime()-t1 )
 
 
+    ! this (preventive) load balancing step ensures that AFTER the execution of refinement, 
+    ! the load is balanced. Can be done only after flagging for refinement, of course. May not
+    ! be perfectly balanced (+- 2**D blocks, because we can only distribute a block before refinement
+    ! which means 2**D blocks after refinement), but is better than before.
+    ! To ensure perfect balancing, a second step is done after the actual refinement.
+    if (params%refinement_indicator=="significant") then
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true.)
+    endif
+
     !---------------------------------------------------------------------------
     ! check if the refinement step will succeed or if we will run out of memory
     !---------------------------------------------------------------------------
@@ -76,7 +87,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
         call hvy2lgt(lgt_id, hvy_active(k, tree_ID), params%rank, params%number_blocks)
 
         if ( lgt_block(lgt_id, IDX_REFINE_STS) == +1) then
-            ! this block will be refined, so it creates 2**D new blocks but is deleted
+            ! this block will be refined, so it creates 2**D new blocks but it itself deleted
             hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim - 1)
         else
             ! this block will not be refined, so it remains.
@@ -88,14 +99,19 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
     if ( hvy_n_afterRefinement > params%number_blocks ) then
         write(*,'("On rank:",i5," hvy_n=",i5," will refine to ",i5," but limit is ",i5)') &
         params%rank, hvy_n(tree_ID), hvy_n_afterRefinement, params%number_blocks
-
-        call abort (1909181827,"[refine_tree.f90]: The refinement step will fail (not enough memory).")
+        ! return the error. in simulations, this causes us to jump to backup saving. in postprocessing,
+        ! the code shall abort.
+        error_OOM = .true.
     endif
+    ! not all ranks might run OOM (out-of-memory)
+    call MPI_ALLREDUCE(MPI_IN_PLACE, error_OOM, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierr)
+    ! byebye
+    if (error_OOM) return
     !---------------------------------------------------------------------------
 
 
-    !> (d) execute refinement, interpolate the new mesh. All blocks go one level up
-    !! except if they are already on the highest level.
+    !> (d) execute refinement, interpolate the new mesh. Blocks with status=+1 are refined, often
+    !! that means all blocks are refined.
     t1 = MPI_Wtime()
     call refinement_execute_tree( params, hvy_block, tree_ID )
     call toc( "refine_tree (refinement_execute)", 144, MPI_Wtime()-t1 )
@@ -104,14 +120,13 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
     !> (e) as the grid changed now with the refinement, we have to update the list of
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date
-    ! update list of sorted nunmerical treecodes, used for finding blocks
     t2 = MPI_wtime()
     call updateMetadata_tree(params, tree_ID)
     t_misc = MPI_wtime() - t2
 
 
     !> (f) At this point the refinement is done. Since not all blocks are refined, namely only those
-    !! that were not on Jmax, Now, the distribution of blocks may no longer
+    !! that were not on Jmax, now, the load distribution of blocks may no longer
     !! be balanced, so we have to balance load now. EXCEPTION: if the flag force_maxlevel_dealiasing is set
     !! then we force blocks on Jmax to coarsen, even if their details are large. Hence, each refinement
     !! step is a true "everywhere". Then, there is no need for balancing, as all mpiranks automatically
@@ -123,13 +138,6 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID)
         call balanceLoad_tree( params, hvy_block, tree_ID )
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
-
-    
-    ! call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", test, norm_case="level", n_val=params%Jmax)
-    ! if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm on JMax   after  refinement:", test(:)
-
-    ! call coarseExtensionUpdate_tree( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, &
-    ! hvy_active(:,tree_ID), hvy_n(tree_ID), inputDataSynced=.false. )
 
     call toc( "refine_tree (lists+neighbors)", 146, t_misc )
     call toc( "refine_tree (TOTAL)", 140, MPI_wtime()-t0 )

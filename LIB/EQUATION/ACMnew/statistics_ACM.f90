@@ -113,6 +113,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%penal_power = 0.0_rk
         params_acm%scalar_removal = 0.0_rk
         params_acm%dissipation = 0.0_rk
+        params_acm%umag = 0.0_rk
 
         dx_min = 90.0e9_rk
 
@@ -183,7 +184,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
 
-            ! maximum of velocity in the field
+            ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
 
             ! maximum/min divergence in velocity field
@@ -244,7 +245,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
 
-            ! maximum of velocity in the field
+            ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
 
             ! maximum/min divergence in velocity field

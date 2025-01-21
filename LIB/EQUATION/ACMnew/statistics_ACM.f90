@@ -105,6 +105,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
+        params_acm%helicity = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
@@ -348,6 +349,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
         else
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
+            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
         end if
 
         call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)
@@ -409,6 +411,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! kinetic enstrophy
         tmp(1) = params_acm%enstrophy
         call MPI_ALLREDUCE(tmp(1), params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        tmp(1) = params_acm%helicity
+        call MPI_ALLREDUCE(tmp(1), params_acm%helicity, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         tmp(1) = params_acm%dissipation
         call MPI_ALLREDUCE(tmp(1), params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -519,16 +524,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            if (params_acm%dim == 3) then
+                call append_t_file( 'helicity.t', (/time, params_acm%helicity/) )
+            endif
             call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
             call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
             call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
             call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
 
-            ! turbulent statistics
+            ! turbulent statistics - these are normed by the volume!
             if (params_acm%nu > 0.0_rk) then
-                dissipation = 2*params_acm%nu*params_acm%enstrophy
-                u_RMS = sqrt(2*params_acm%e_kin/3)
-                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin, u_RMS, &
+                dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
+                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
             endif

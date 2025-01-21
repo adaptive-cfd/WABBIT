@@ -89,25 +89,38 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor')
+        case('vor', 'vort')
             ! vorticity
             call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
 
-            if (k /= 1) then
-                call abort(19101810,"ACM: if you want to store vor, put it at 1st position of field_names. works only in 2D")
+            if (size(params_acm%names,1) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, atleast two variables need to follow. Easiest is to put it at beginning of field_names. Works only in 2D (known bug)")
             endif
-
             if (params_acm%dim /= 2) then
-                call abort(19101811,"ACM: storing vor is not possible in 3D (known bug)")
+                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' or compute in post (known bug)")
             endif
 
-            if (size(params_acm%names,1) < 3) then
-                call abort(19101811,"ACM: storing vor requires at least 3 fields to be saved (known bug)")
+        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ')
+            ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+            ! for different components y,z we need to copy the desired one to the first position
+            if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (name == 'vorz' .or. name == 'Vorz' .or. name == 'VorZ') then
+                work(:,:,:,k) = work(:,:,:,k+2)
             endif
 
+            if (size(params_acm%names,1) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, atleast two variables need to follow. Easiest is to put it at beginning of field_names. Works only in 3D (known bug)")
+            endif
 
-        case('div')
+            if (params_acm%dim /= 3) then
+                call abort(19101811,"ACM: storing vector vor is not possible in 2D - use 'vor' or compute in post (known bug)")
+            endif
+
+        case('div', 'divu', 'divergence')
             ! div(u)
             call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
 

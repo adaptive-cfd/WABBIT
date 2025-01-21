@@ -220,6 +220,18 @@ program main
         if (abs(params%next_stats_time-time)<=1.0e-10_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
     end if
 
+    !*******************************************************************
+    ! initial statistics (usefull for checking IC)
+    !*******************************************************************
+    t4 = MPI_wtime()
+    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        ! we need to sync ghost nodes for some derived qtys, for sure
+        call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
+
+        call statistics_wrapper(time, 0.0_rk, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+    endif
+    call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
+
 
     ! timing
     call toc( "TOPLEVEL: init_data", 15, MPI_wtime()-sub_t0 )

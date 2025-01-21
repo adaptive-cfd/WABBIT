@@ -111,7 +111,7 @@ subroutine compute_vorticity_post(params)
         params%wavelet="CDF60"
 
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 4 (FD_4th_central) and 2 (FD_2nd_central)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central) and 2 (FD_2nd_central)")
 
     end if
 

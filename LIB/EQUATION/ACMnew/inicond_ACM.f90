@@ -32,7 +32,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     real(kind=rk)    :: x, y, z
-    integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar, ix_global, iy_global
+    integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar, ix_global, iy_global, param_1
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -286,19 +286,47 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         endif
 
     case("taylor_green")
+        ! this condition is 2D only!
         do iy= 1,Bs(2)+2*g
+            y = x0(2) + dble(iy-g-1)*dx(2)
+            call continue_periodic(y,params_acm%domain_size(2))
             do ix= 1, Bs(1)+2*g
                 x = x0(1) + dble(ix-g-1)*dx(1)
-                y = x0(2) + dble(iy-g-1)*dx(2)
 
                 call continue_periodic(x,params_acm%domain_size(1))
-                call continue_periodic(y,params_acm%domain_size(2))
 
                 u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
                 u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
                 u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
             end do
         end do
+    case("mixing_layer")
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    
+                    ! condition from Roussel & Schneider 2010
+                    u(ix,iy,iz,1) = tanh(z)
+                    param_1 = 3  ! maximum number of nodes
+                    u(ix,iy,iz,1) = u(ix,iy,iz,1) + 1/(2.0_rk*param_1*cosh(z)**2.0_rk) * &
+                        (cos(2.0_rk*pi*(x+y)/params_acm%domain_size(1)) + cos(2.0_rk*pi*(x-y)/params_acm%domain_size(1)))
+                    do idir = 1, param_1-1
+                        u(ix,iy,iz,1) = u(ix,iy,iz,1) + 1/(2.0_rk*param_1*cosh(z)**2.0_rk) * &
+                            cos(2**(idir+1)*pi*x/params_acm%domain_size(1))
+                    enddo
+
+                enddo
+            enddo
+        enddo
 
     case default
         call abort(428764, "ACM inicond: "//trim(adjustl(params_acm%inicond))//" is unkown.")

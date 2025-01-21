@@ -106,7 +106,7 @@ module module_acm
     real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation, scalar_removal=0.0_rk
+    real(kind=rk) :: e_kin, enstrophy, helicity, mask_volume, u_residual(1:3), sponge_volume, dissipation, scalar_removal=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -651,6 +651,9 @@ end subroutine
       call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)
+      if (params%dim == 3) then
+        call init_t_file('helicity.t', overwrite)
+      endif
       call init_t_file('dissipation.t', overwrite)
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)

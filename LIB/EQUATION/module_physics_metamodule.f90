@@ -526,7 +526,7 @@ contains
             call INICOND_NStokes( time, u, g, x0, dx, n_domain )
 
         case default
-            call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")
+            call abort(999,"[INICOND (metamodule):] unknown physics. Its getting hard to find qualified personel.")
 
         end select
 
@@ -577,7 +577,7 @@ contains
         !     call BOUNDCOND_NStokes( time, u, g, x0, dx, n_domain )
 
         case default
-            call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")
+            call abort(999,"[BOUNDCOND (metamodule):] unknown physics. Its getting hard to find qualified personel.")
 
         end select
 

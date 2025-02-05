@@ -274,7 +274,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
                 endif
             end do
 
-            ! set the initial condition on this block
+            ! set the boundary condition on this block
             ! JB ToDo: Add time support in case we have time-dependent BCs
             call BOUNDCOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), params%g, &
             x0, dx, n_domain)

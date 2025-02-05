@@ -95,6 +95,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 
     case ("threshold-image-denoise")
         norm = 0.0_rk
+        volume = 0.0_rk
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -113,8 +114,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
-            ! compute integral over the volume
-            volume = volume + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            ! compute integral over the volume for this block
+            volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             do p = 1, n_eqn
                 norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
@@ -140,9 +141,10 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         norm = 0.0_rk
 
         ! Variant 1: compute after enstrophy
+        ! we don't know how this translates to the WC for now
 
         ! Variant 2: compute after energy - kinetic energy and pressure energy
-        norm = 0.0_rk
+        volume = 0.0_rk
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -161,8 +163,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
-            ! compute integral over the volume
-            volume = volume + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            ! compute integral over the volume for this block
+            volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             ! compute norm for thresholding components that are treated on their own
             do p = 1, n_eqn
@@ -240,4 +242,63 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 
     end select
 
+end subroutine
+
+subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, norm_case, n_val)
+    implicit none
+
+    type (type_params), intent(in)      :: params                               !> user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :)                !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: lgt_id                               !> lgt_ID of this block
+    character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
+    real(kind=rk), intent(inout)        :: norm                                 !> the computed norm for each component of the vector
+    !> String representing to choose special norm cases, can be tree (default), level or ref and additionally
+    !! if we add "SC" to the norm case logic, we treat the input as wavelet decomposed and only compute the norms over the SCs
+    character(len=*), intent(in), optional  :: norm_case
+    !> Additional value to be considered for norm logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
+    integer(kind=ik), intent(in), optional  :: n_val
+
+    real(kind=rk)                       :: x0(1:3), dx(1:3), volume
+    integer(kind=ik) :: k, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, level_me, ref_me, norm_case_id
+    logical          :: SC_only
+
+    Bs = params%Bs
+    g = 0
+    g(1:params%dim) = params%g
+
+    if (.not. present(norm_case)) then
+        norm_case_id = 1
+    else
+        ! treat the norm computations as for SC
+        ! with this, we will skip every second point in each direction and multiply the L2norms for the fields by 2^d, as the cells are larger
+        if (index(norm_case, "SC") > 0) then
+            norm_case_id = 2
+        else 
+            norm_case_id = 1
+        endif
+    
+        ! now lets treat the special restrictions, set to the second digit
+        if (index(norm_case, "level") > 0) norm_case_id = norm_case_id + 10*1
+        if (index(norm_case, "ref") > 0) norm_case_id = norm_case_id + 10*2
+    endif
+
+    select case (which_norm)
+    case ("Energy_Prototype")
+        ! prototype for ACM - computes energy of a block (without factor 1/2)
+        ! call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+        ! params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+
+        ! ! compute integral over the volume for this block
+        ! volume = dble(product(params%Bs(1:params%dim)))*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+
+        ! compute energy
+        norm = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), 1:params%dim )**2 )
+
+        ! we have to compute cell weighted values, which for uniform grids is the mean so divide by amount of points
+        norm = norm / dble(product(params%Bs(1:params%dim)))
+    case default
+        write(*,'(A)') which_norm
+        call abort(20030201, "The tree norm you desire is not implemented. How dare you.")
+
+    end select
 end subroutine

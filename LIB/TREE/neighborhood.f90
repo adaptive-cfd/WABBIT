@@ -536,17 +536,17 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
         enddo
         ! print info which sides
         if (i_n == 4 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-x)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-x),"
         elseif (i_n == 8 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+x)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+x),"
         elseif (i_n == 12 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-y)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-y),"
         elseif (i_n == 16 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+y)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+y),"
         elseif (i_n == 20 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-z)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-z),"
         elseif (i_n == 24 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+z)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+z),"
         endif
         if (mod(i_n, 4) == 0) found_n = .false.
     enddo
@@ -566,29 +566,29 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
             enddo
             ! print info which sides
             if (i_n == 26 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y),"
             elseif (i_n == 28 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y),"
             elseif (i_n == 30 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y),"
             elseif (i_n == 32 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y),"
             elseif (i_n == 34 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-z),"
             elseif (i_n == 36 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-z),"
             elseif (i_n == 38 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+z),"
             elseif (i_n == 40 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+z),"
             elseif (i_n == 42 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-y-z),"
             elseif (i_n == 44 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+y-z),"
             elseif (i_n == 46 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-y+z),"
             elseif (i_n == 48 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+y+z),"
             endif
             if (mod(i_n, 2) == 0) found_n = .false.
         enddo
@@ -609,23 +609,23 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
             enddo
             ! print info which sides
             if (i_n == 49 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y-z),"
             elseif (i_n == 50 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y-z),"
             elseif (i_n == 51 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y-z),"
             elseif (i_n == 52 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y-z),"
             elseif (i_n == 53 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y+z),"
             elseif (i_n == 54 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y+z),"
             elseif (i_n == 55 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y+z),"
             elseif (i_n == 56 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y+z),"
             endif
-            if (mod(i_n, 2) == 0) found_n = .false.
+            found_n = .false.
         enddo
         ! now print output
         write(*, '(A)') write_s(1:len_trim(write_s))

@@ -883,12 +883,13 @@ contains
 
     !-------------------------------------------------------------------------------
 
-    subroutine waveletReconstruction_block(params, u)
+    subroutine waveletReconstruction_block(params, u, SC_reconstruct, WC_reconstruct)
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
+        logical, optional, intent(in) :: SC_reconstruct, WC_reconstruct  !< En- or Disable one of the reconstructions, defaults to true
 
-        call WaveReconstruction_dim1( params, u )
+        call WaveReconstruction_dim1( params, u, SC_reconstruct, WC_reconstruct)
     end subroutine
 
     !-------------------------------------------------------------------------------
@@ -1358,7 +1359,8 @@ contains
         g_min = max(g_min, abs(ubound(params%GD, dim=1)))
         g_min = max(g_min, abs(lbound(params%HR, dim=1)))
         g_min = max(g_min, abs(ubound(params%HR, dim=1)))
-        g_min = max(g_min, abs(lbound(params%GR, dim=1)))
+        ! GR does not affect the first point, as it is the limiting factor for g, this is dealt with in the reconstruction to benefit from it
+        g_min = max(g_min, abs(lbound(params%GR, dim=1))-1)
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
         ! g_RHS is decided by X in CDFXY or by FD order
@@ -1436,9 +1438,10 @@ contains
 
         ! conditions for minimum blocksize for lifted wavelets arise from coarse extension and double block-jump
         !    JB: Origin of these minimum block sizes was not yet found but was tested with invertibility test
-        !    CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
+        !    CDF 24, 42: BS_min = 12   ;   CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
         block_min = 0
         if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+            if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") block_min = 12
             if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") block_min = 18
             if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") block_min = 24
             if (params%wavelet(4:5) == "66") block_min = 30
@@ -1649,7 +1652,7 @@ contains
     !        hg gg hg gg hg gg hg gg
     ! Note: in input in spaghetti ordering is synced
     !-----------------------------------------------------------------------------
-    subroutine WaveReconstruction_dim1( params, u_wc )
+    subroutine WaveReconstruction_dim1( params, u_wc, SC_reconstruct, WC_reconstruct)
         implicit none
         type (type_params), intent(in) :: params
         !> Input is in spaghetti ordering (synchronized, ie with ghost nodes)
@@ -1657,6 +1660,14 @@ contains
         real(kind=rk), dimension(:), allocatable, save :: buffer1, buffer2, buffer3
         integer(kind=ik) :: ix, iy, iz, ic, g, Bs(1:3), nx, ny, nz, nc, maxn
         integer(kind=ik) :: io  ! if g is odd the SCs start from the second point
+
+        logical, optional, intent(in) :: SC_reconstruct, WC_reconstruct  !< En- or Disable one of the reconstructions, defaults to true
+        logical :: SC_rec, WC_rec 
+        SC_rec = .true.
+        WC_rec = .true.
+        if (present(SC_reconstruct)) SC_rec = SC_reconstruct
+        if (present(WC_reconstruct)) WC_rec = WC_reconstruct
+
         nx = size(u_wc, 1)
         ny = size(u_wc, 2)
         nz = size(u_wc, 3)
@@ -1671,6 +1682,12 @@ contains
         if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
         if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
 
+        ! For the reconstruction of the wavelets all points are shifted by one one the SC positions
+        ! therefore, if the first point in the ghost layer would be a WC, it is ignored
+        ! This is done to align the WC with the correct positions. However, as the left bound of the GR filter defines the minimum g,
+        ! we apply a trick here, to ignore the first point in order to reduce the ghost point size, because it is always zero
+        ! The respecting buffers are zero-padded in order to account for this shift.
+
         maxn = maxval((/ nx, ny, nz /))
         if (allocated(buffer1)) then
             if (size(buffer1, dim=1)<maxn) deallocate(buffer1)
@@ -1679,78 +1696,108 @@ contains
         if (allocated(buffer2)) then
             if (size(buffer2, dim=1)<=maxn) deallocate(buffer2)
         endif
-        if (.not.allocated(buffer2)) allocate(buffer2(1:maxn))
+        if (.not.allocated(buffer2)) allocate(buffer2(1:maxn+2))
         if (allocated(buffer3)) then
             if (size(buffer3, dim=1)<=maxn) deallocate(buffer3)
         endif
-        if (.not.allocated(buffer3)) allocate(buffer3(1:maxn))
+        if (.not.allocated(buffer3)) allocate(buffer3(1:maxn+2))
+
+        ! if SC should not be reconstructed, we still apply all filters (to have cross-effects) but wipe the SC
+        if (.not. SC_rec) then
+            if (nz==1) then
+                u_wc(1+io:Bs(1)+2*g-io:2, 1+io:Bs(2)+2*g-io:2, 1, 1:nc) = 0.0_rk
+            else
+                u_wc(1+io:Bs(1)+2*g-io:2, 1+io:Bs(2)+2*g-io:2, 1+io:Bs(3)+2*g-io:2, 1:nc) = 0.0_rk
+            endif
+        endif
+
+        ! If only the SC should be reconstructed, then GR is skipped all-together
 
         ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if (WC_rec) then
+            do ic = 1, nc; do iy = 1, ny; do iz = 1, nz
+                ! fill upsampling buffer for low-pass filter: every second point
+                ! apply low-pass filter to upsampled signal
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(1+io:Bs(1)+2*g-io:2, iy, iz, ic) ! SC
+                call filter1dim(params, buffer3(1:nx), buffer1(1:nx), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
-        do ic = 1, nc
-            do iy = 1, ny
-                do iz = 1, nz
-                    ! fill upsampling buffer for low-pass filter: every second point
-                    ! apply low-pass filter to upsampled signal
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(1+io:Bs(1)+2*g-io:2, iy, iz, ic) ! SC
-                    call filter1dim(params, buffer3(1:nx), buffer1(1:nx), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                ! fill upsampling buffer for high-pass filter: every second point
+                ! shifted by one point to account for lbound(GR) possibly being larger than g
+                buffer3 = 0.0_rk
+                buffer3(2+io:1+nx-io:2) = u_wc(2+io:Bs(1)+2*g-io:2, iy, iz, ic) ! WC
+                call filter1dim(params, buffer3(1:nx+2), buffer2(1:nx+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
-                    ! fill upsampling buffer for high-pass filter: every second point
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(2+io:Bs(1)+2*g-io:2, iy, iz, ic) ! WC
-                    call filter1dim(params, buffer3(1:nx), buffer2(1:nx), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g, sampling=1)
-
-                    u_wc(:, iy, iz, ic) = buffer1(1:nx) + buffer2(1:nx)
-                enddo
-            enddo
-        enddo
+                u_wc(:, iy, iz, ic) = buffer1(1:nx) + buffer2(2:nx+1)
+            enddo; enddo; enddo
+        elseif (SC_rec) then
+            do ic = 1, nc; do iy = 1, ny; do iz = 1, nz
+                ! fill upsampling buffer for low-pass filter: every second point
+                ! apply low-pass filter to upsampled signal
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(1+io:Bs(1)+2*g-io:2, iy, iz, ic) ! SC
+                call filter1dim(params, buffer3(1:nx), u_wc(1:nx, iy, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+            enddo; enddo; enddo
+        endif
 
         ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! ignore ghost points for dimensions that were already treated
+        if (WC_rec) then
+            do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iz = 1, nz
+                ! fill upsampling buffer for low-pass filter: every second point
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(ix, 1+io:Bs(2)+2*g-io:2, iz, ic) ! SC
+                ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
+                call filter1dim(params, buffer3(1:ny), buffer1(1:ny), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
-        do ic = 1, nc
-            do ix = (g+1), (Bs(1)+g)  ! ignore ghost points
-                do iz = 1, nz
-                    ! fill upsampling buffer for low-pass filter: every second point
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(ix, 1+io:Bs(2)+2*g-io:2, iz, ic) ! SC
-                    ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
-                    call filter1dim(params, buffer3(1:ny), buffer1(1:ny), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                ! fill upsampling buffer for high-pass filter: every second point
+                ! shifted by one point to account for lbound(GR) possibly being larger than g
+                buffer3 = 0.0_rk
+                buffer3(2+io:1+nx-io:2) = u_wc(ix, 2+io:Bs(2)+2*g-io:2, iz, ic) ! WC
+                ! buffer3(1:ny:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
+                call filter1dim(params, buffer3(1:ny+2), buffer2(1:ny+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
-                    ! fill upsampling buffer for high-pass filter: every second point
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(ix, 2+io:Bs(2)+2*g-io:2, iz, ic) ! WC
-                    ! buffer3(1:ny:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
-                    call filter1dim(params, buffer3(1:ny), buffer2(1:ny), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g, sampling=1)
-
-                    u_wc(ix, :, iz, ic) = buffer1(1:ny) + buffer2(1:ny)
-                enddo
-            enddo
-        enddo
+                u_wc(ix, :, iz, ic) = buffer1(1:ny) + buffer2(2:ny+1)
+            enddo; enddo; enddo
+        elseif (SC_rec) then
+            do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iz = 1, nz
+                ! fill upsampling buffer for low-pass filter: every second point
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(ix, 1+io:Bs(2)+2*g-io:2, iz, ic) ! SC
+                ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
+                call filter1dim(params, buffer3(1:ny), u_wc(ix, 1:ny, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+            enddo; enddo; enddo
+        endif
 
         !!!!!!!!!!!!!!!!!
         if (nz==1) return
         !!!!!!!!!!!!!!!!!
 
         ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! ignore ghost points for dimensions that were already treated
+        if (WC_rec) then
+            do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iy = (g+1), (Bs(2)+g)
+                ! fill upsampling buffer for low-pass filter: every second point
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g-io:2, ic) ! SC
+                call filter1dim(params, buffer3(1:nz), buffer1(1:nz), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
-        do ic = 1, nc
-            do ix = (g+1), (Bs(1)+g)  ! ignore ghost points
-                do iy = (g+1), (Bs(2)+g)  ! ignore ghost points
-                    ! fill upsampling buffer for low-pass filter: every second point
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g-io:2, ic) ! SC
-                    call filter1dim(params, buffer3(1:nz), buffer1(1:nz), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                ! fill upsampling buffer for high-pass filter: every second point
+                ! shifted by one point to account for lbound(GR) possibly being larger than g
+                buffer3 = 0.0_rk
+                buffer3(2+io:1+nx-io:2) = u_wc(ix, iy, 2+io:Bs(3)+2*g-io:2, ic) ! WC
+                call filter1dim(params, buffer3(1:nz+2), buffer2(1:nz+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
-                    ! fill upsampling buffer for high-pass filter: every second point
-                    buffer3 = 0.0_rk
-                    buffer3(1+io:nx-io:2) = u_wc(ix, iy, 2+io:Bs(3)+2*g-io:2, ic) ! WC
-                    call filter1dim(params, buffer3(1:nz), buffer2(1:nz), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g, sampling=1)
-
-                    u_wc(ix, iy, :, ic) = buffer1(1:nz) + buffer2(1:nz)
-                enddo
-            enddo
-        enddo
+                u_wc(ix, iy, :, ic) = buffer1(1:nz) + buffer2(2:nz+1)
+            enddo; enddo; enddo
+        elseif (SC_rec) then
+            do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iy = (g+1), (Bs(2)+g)
+                ! fill upsampling buffer for low-pass filter: every second point
+                buffer3 = 0.0_rk
+                buffer3(1+io:nx-io:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g-io:2, ic) ! SC
+                call filter1dim(params, buffer3(1:nz), u_wc(ix, iy, 1:nz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+            enddo; enddo; enddo
+        endif
 
     end subroutine
 
@@ -1849,14 +1896,16 @@ contains
             endif
         case ("H1")
             ! Wavelets get factor 2^(2-d)j/(2d) per SC and 2^(d-2)j/(2d) per WC, for d=2 this is equivalent to Linfty, for d=3 to 2^-j/6 (between Linfty and L2)
-            ! JB ToDo - this needs to be checked. It seems very close to Linfty norm
+            ! JB ToDo - this needs to be checked, for 2D it is Linfty norm
+            ! JB - for 3D, WC and SC seem not to be inverse of each other, I think it is 2^(d-2)j/(d) per WC and WC = SC**2
+            ! JB - and then another mystery to solve, but the factor between each seems to be 2^(-2/3)
             if (params%dim == 3) then
                 ! apply level shift
-                val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*(2.0_rk-params%dim))/2.0_rk)
+                val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block)*(2.0_rk-params%dim))/2.0_rk)
                 ! change SC to WC factors on this level - factor^2
-                val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk**(1/params%dim)
-                val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk**(1/params%dim)
-                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk**(1/params%dim)
+                val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
+                val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
+                val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
             endif
         case default
             call abort(241024, "ERROR:Unknown wavelet normalization!")

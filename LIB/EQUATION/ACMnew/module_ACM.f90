@@ -651,7 +651,7 @@ end subroutine
       call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)
-      if (params%dim == 3) then
+      if (params_acm%dim == 3) then
         call init_t_file('helicity.t', overwrite)
       endif
       call init_t_file('dissipation.t', overwrite)

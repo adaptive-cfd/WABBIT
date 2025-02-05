@@ -122,6 +122,9 @@ program main_post
     case("--vorticity", "--divergence", "--vor-abs", "--Q", "--copy")
         call compute_vorticity_post(params)
 
+    case("--derivative")
+        call post_derivative(params)
+
     case("--gradient")
         call compute_scalar_field_post(params)
 

@@ -1072,7 +1072,7 @@ contains
         integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
         logical, optional, intent(in) :: append                ! if true, data is appended to file
 
-        integer(kind=ik)           :: Bs(3), g
+        integer(kind=ik), intent(in)           :: Bs(3), g
         integer :: ii, apply_digits
         logical :: toInt, apply_append
         character(len=140) :: formatter

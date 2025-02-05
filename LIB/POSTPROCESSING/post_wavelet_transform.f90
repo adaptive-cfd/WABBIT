@@ -154,14 +154,18 @@ subroutine post_wavelet_transform(params)
 
     case("--wavelet-reconstruct")
         ! we need the saved values from hvy_tmp so currently we cannot use this at all
-        call abort(240909, "Reconstruction currently is not implemented as I don't know what to do with the saved values in hvy_tmp")
-
-        ! this currently only works if we read in the full tree
-        if (.not. full_tree) then
-            call abort(240909, "Reconstruction currently only works when providing the values in full tree format")
+        ! call abort(240909, "Reconstruction currently is not implemented as I don't know what to do with the saved values in hvy_tmp")
+        if (params%rank == 0) then
+            write(*, '(A)') "ATTENTION: Post-reconstruction is experimental, as we do not have the values from hvy_tmp. Please treat with caution and make sure that the in-file is in full-tree format."
         endif
+        ! call abort(240909, "Reconstruction currently is not implemented as I don't know what to do with the saved values in hvy_tmp")
 
         call wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
+
+        if (.not. full_tree) then
+            ! delete all non-leaf blocks with daughters
+            call prune_fulltree2leafs(params, tree_ID)
+        endif
     end select
 
     ! append ending before last underscore or if it doesnt exist before last .
@@ -169,7 +173,10 @@ subroutine post_wavelet_transform(params)
     if (pos_underscore < 0) pos_underscore = index(fname_in, '_', back=.true.)
 
     ! save files - either one for all or one for each component for visiblity
-    if (.not. split_components) then
+    if (operator == "--wavelet-reconstruct") then
+        write(fname_out, '(A, A, A)') fname_in(1:pos_underscore-1), "-R", fname_in(pos_underscore:LEN_TRIM(fname_in))
+        call saveHDF5_tree(fname_out, time, iteration, 1, params, hvy_block, tree_ID )
+    elseif (.not. split_components) then
         write(fname_out, '(A, A, A)') fname_in(1:pos_underscore-1), "-WD", fname_in(pos_underscore:LEN_TRIM(fname_in))
         call saveHDF5_tree(fname_out, time, iteration, 1, params, hvy_block, tree_ID )
     else

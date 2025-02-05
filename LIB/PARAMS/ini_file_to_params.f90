@@ -235,7 +235,7 @@ subroutine ini_domain(params, FILE )
    params%periodic_BC = .true.
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
-   if (.not. all(params%periodic_BC)) then
+   if (params%rank==0 .and. .not. all(params%periodic_BC)) then
       write(*, '(A)') "Symmetric BC are currently an experimental feature, you should know what you are doing!"
    endif
 
@@ -297,13 +297,13 @@ subroutine ini_blocks(params, FILE )
    if (params%wavelet(5:5) == "0") then
       ! g stays the same
    elseif (params%wavelet(5:5) == "2") then
-      g_default = g_default + 1
+      g_default = g_default + 0
    elseif (params%wavelet(5:5) == "4") then
-      g_default = g_default + 3
+      g_default = g_default + 2
    elseif (params%wavelet(5:5) == "6") then
-      g_default = g_default + 5
+      g_default = g_default + 4
    elseif (params%wavelet(5:5) == "8") then
-      g_default = g_default + 7
+      g_default = g_default + 6
    else
       call abort(2320243, "no default specified for this wavelet...")
    endif
@@ -330,7 +330,10 @@ subroutine ini_blocks(params, FILE )
    endif
 
    if (params%g_RHS > params%g) then
-      call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was explicitly set larger than number_ghost_nodes, adapting number_ghost_nodes from ", params%g, " to ", params%g_RHS, " (ignore this if you know what you are doing)"
+      endif
+      params%g = params%g_RHS
    endif
 
    if ( params%Jmax < params%Jmin ) then

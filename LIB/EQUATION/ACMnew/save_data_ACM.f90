@@ -101,7 +101,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
                 call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' or compute in post (known bug)")
             endif
 
-        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ')
+        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
             ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
             call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
@@ -110,6 +110,8 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
                 work(:,:,:,k) = work(:,:,:,k+1)
             elseif (name == 'vorz' .or. name == 'Vorz' .or. name == 'VorZ') then
                 work(:,:,:,k) = work(:,:,:,k+2)
+            elseif (name=='vorabs' .or. name=='Vorabs' .or.name=='VorAbs' .or. name=='vor-abs' .or. name=='Vor-abs' .or. name=='Vor-Abs') then
+                work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
 
             if (size(params_acm%names,1) - k < 2) then

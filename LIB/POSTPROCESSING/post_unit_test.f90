@@ -95,7 +95,7 @@ subroutine post_unit_test(params)
         if (params%wavelet(4:5) == "60") Bs = 14
 
         ! lifted wavelets, +6 per increase in X or Y of CDFXY
-        if (params%wavelet(4:5) == "22") Bs = 8
+        if (params%wavelet(4:5) == "22") Bs = 6
         if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") Bs = 12
         if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") Bs = 18
         if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") Bs = 24

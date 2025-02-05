@@ -133,7 +133,7 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
     ! the block is tagged as "wants to coarsen" by setting the tag -1.
     ! Note gradedness and completeness may prevent it from actually going through with that.
     ! Note the most severe detail (= state vector component) sets the flag for the entire block.
-    if ( all(detail(:) < eps_use(:))) then
+    if ( all(detail(:) <= eps_use(:))) then
         ! coarsen block, -1
         refinement_status = -1
     else

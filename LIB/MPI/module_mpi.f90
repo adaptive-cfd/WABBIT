@@ -203,12 +203,12 @@ subroutine init_ghost_nodes( params )
         call MPI_barrier( WABBIT_COMM, status(1))
 
         allocate( meta_send_all(1:buffer_N_int*S_META_FULL), stat=status(1) )
-        allocate( rData_sendBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(3) )
-        allocate( rData_recvBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(4) )
+        allocate( rData_sendBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(2) )
+        allocate( rData_recvBuffer(1:buffer_N+buffer_N_int*S_META_SEND+Ncpu), stat=status(3) )
         memory_this = (product(real(shape(meta_send_all)))+product(real(shape(rData_sendBuffer)))+product(real(shape(rData_recvBuffer))))*8.0e-9
         memory_total = memory_total + memory_this
 
-        if (maxval(status) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
+        if (maxval(status(1:3)) /= 0) call abort(999999, "Buffer allocation failed. Not enough memory?")
 
         if (rank==0) then
             write(*,'("GHOST-INIT: ALLOCATED ",A19," MEM=",f8.4," GB per rank, shape=",7(i9,1x))') &

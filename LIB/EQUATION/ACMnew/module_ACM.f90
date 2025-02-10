@@ -268,7 +268,6 @@ end subroutine
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
     call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
-    call read_param_mpi(FILE, 'Discretization', 'order_predictor', params_acm%order_predictor, "multiresolution_4th")
 
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")
@@ -310,8 +309,25 @@ end subroutine
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )
-    call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(dble(params_acm%dim)*pi**2) )
+
+    ! default value for CFL_nu (diffusion time step restriction) depends on the scheme and the dimension.
+    ! The defaults are valid only for RK4 (this is the factor 2.79). Note this condition is relevant only for
+    ! small reynolds numbers, as the diffusion is not important for the time step at higher Re.
+    if (params_acm%discretization(4:4) == "2") then
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(4.000_rk*dble(params_acm%dim)) )
+
+    elseif (params_acm%discretization(4:4) == "4") then
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(5.333_rk*dble(params_acm%dim)) )
+
+    elseif (params_acm%discretization(4:4) == "6") then
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(6.0444_rk*dble(params_acm%dim)) )
+
+    else
+        call abort(62371118, "unknown ACM discretization:"//params_acm%discretization )
+    endif
+
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
+
     call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params_acm%nsave_stats, 999999   )
     call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
@@ -531,7 +547,7 @@ end subroutine
     endif
 
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
-    u_eigen = sqrt(u_mag) + sqrt(params_acm%c_0**2 + u_mag )
+    u_eigen = sqrt(u_mag) + sqrt(params_acm%c_0**2 + u_mag)
 
     ! ususal CFL condition
     ! if the characteristic velocity is very small, avoid division by zero

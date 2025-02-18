@@ -10,21 +10,18 @@ $\partial_t \phi = N\left(\phi\right)$
 and $N\left(\phi\right)$ can be defined. This implementation is handled by the "physics-modules". Note the current version of the code does not handle elliptic PDE, such as the Poisson equation that typically arises in incompressible fluid dynamics. Instead, we use a quasi-hyperbolic approximation in that case, the "artificial compressibility method".
 
 ## Installation of WABBIT
-How to get a copy of WABBIT and compile the code:
+In a terminal, use the following `git` command to obtain a copy of the code (or the code repository, to be precise):
 ```
 git clone https://github.com/adaptive-cfd/WABBIT.git
 ```
-Unpack the file and run the compilation and tests with `make`, make sure that all necessary dependencies are loaded:
-```
-make all
-make test
-```
-> :warning: since 15 Aug 2023, the unit testing framework has evolved. It now stores full HDF5 files in the TESTING directory, which makes it easier to visualize the reference data and current results, should they be different. We now calculate the L2 error of the field, if the grid is identical. This new framework requires the [WABBIT Python Tools](https://github.com/adaptive-cfd/python-tools) repository for comparing two WABBIT HDF5 files.
+Change ino the folder (`cd WABBIT`) and compile the code, i.e. create the exectuable binary program file. For this you need a FORTRAN compiler, the standard tool `make`, an MPI implementation (e.g. MPICH) and the HDF5 library installed. If all these prerequistes are met, you can compile by simply typing `make`. After a while, the compilation is finnished, and the directory should contain a file called `wabbit`, which is the binary program file. After this has succeeded, you can test if the code works properly on yur machine using `make test`.
+
+> :warning: since 15 Aug 2023, the unit testing framework has evolved. It now stores full HDF5 files in the TESTING directory, which makes it easier to visualize the reference data and current results, should they be different. We now calculate the L2 error of the field, if the grid is identical. This new framew ork requires the [WABBIT Python Tools](https://github.com/adaptive-cfd/python-tools) repository for comparing two WABBIT HDF5 files.
 
 ### Dependencies
 WABBIT needs several packages installed in order to compile and run, the main dependencies are:
-- [MPI](https://www.open-mpi.org/ "OpenMPI")
-- [HDF5](https://github.com/HDFGroup/hdf5/tags "HDF5")
+- [MPI](https://www.open-mpi.org/ "OpenMPI"). On FEDORA linux machines, this can be installed with `sudo dnf install mpich-devel.x86_64`, on UBUNTU and derived systems this command looks a bit different.
+- [HDF5](https://github.com/HDFGroup/hdf5/tags "HDF5"). It is probably the easiest to install 
 - [BLAS](https://www.netlib.org/blas/ "BLAS") + [LAPACK](https://www.netlib.org/lapack/ "LAPACK")
 - Python-scripts found in the "[python-tools](https://github.com/adaptive-cfd/python-tools)" repository - these scripts are used when we perform WABBIT unit tests
 

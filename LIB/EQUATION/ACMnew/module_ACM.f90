@@ -63,9 +63,7 @@ module module_acm
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
-    ! gamma_p
     real(kind=rk) :: gamma_p
-    ! want to add forcing?
     logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:
     logical :: use_sponge = .false.
@@ -74,7 +72,7 @@ module module_acm
     logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
 
     ! linear forcing
-    logical :: HIT_linear_forcing = .false.
+    logical :: HIT_linear_forcing = .false., skew_symmetry=.false.
     real(kind=rk) :: HIT_energy = 1.0_rk
     real(kind=rk) :: HIT_gain = 100.0_rk
 
@@ -103,10 +101,11 @@ module module_acm
     character(len=cshort) :: scalar_BC_type="neumann"
     character(len=cshort), allocatable :: names(:)
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
-    real(kind=rk) :: mean_flow(1:3), mean_p, umax, umag
+    real(kind=rk) :: mean_flow(1:3)=0.0_rk, mean_p=0.0_rk, umax=0.0_rk, umag=0.0_rk
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin, enstrophy, mask_volume, u_residual(1:3), sponge_volume, dissipation, scalar_removal=0.0_rk
+    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, mask_volume=0.0_rk, u_residual(1:3)=0.0_rk, &
+    sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -250,6 +249,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'HIT_energy', params_acm%HIT_energy, 1.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'HIT_gain', params_acm%HIT_gain, 100.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
+    call read_param_mpi(FILE, 'ACM-new', 'skew_symmetry', params_acm%skew_symmetry, .false. )
 
 
     ! initial condition
@@ -314,13 +314,13 @@ end subroutine
     ! The defaults are valid only for RK4 (this is the factor 2.79). Note this condition is relevant only for
     ! small reynolds numbers, as the diffusion is not important for the time step at higher Re.
     if (params_acm%discretization(4:4) == "2") then
-        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(4.000_rk*dble(params_acm%dim)) )
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.95_rk*2.79_rk/(4.000_rk*dble(params_acm%dim)) )
 
     elseif (params_acm%discretization(4:4) == "4") then
-        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(5.333_rk*dble(params_acm%dim)) )
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.95_rk*2.79_rk/(5.333_rk*dble(params_acm%dim)) )
 
     elseif (params_acm%discretization(4:4) == "6") then
-        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.99_rk*2.79_rk/(6.0444_rk*dble(params_acm%dim)) )
+        call read_param_mpi(FILE, 'Time', 'CFL_nu', params_acm%CFL_nu, 0.95_rk*2.79_rk/(6.0444_rk*dble(params_acm%dim)) )
 
     else
         call abort(62371118, "unknown ACM discretization:"//params_acm%discretization )
@@ -664,6 +664,7 @@ end subroutine
       call init_t_file('meanflow.t', overwrite)
       call init_t_file('forces.t', overwrite)
       call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
+      call init_t_file('ACM_energy.t', overwrite, (/"           time", " p^2/2c0^2+ekin"/))
       call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('enstrophy.t', overwrite)

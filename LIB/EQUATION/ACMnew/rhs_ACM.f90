@@ -119,6 +119,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         do i = 1, size(u,4)
             if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e4_rk) then
                 write(*,'("maxval in u(",i2,") = ", es15.8)') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i)))
+
+                ! done by all ranks but well I hope the cluster can take one for the team
+                open (77, file='ACM_diverged', status='replace')
+                close(77)
+                
                 call abort(0409201933,"ACM fail: very very large values in state vector.")
             endif
         enddo
@@ -307,7 +312,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:)
     !> discretization order
-    character(len=cshort), intent(in)           :: order_discretization
+    character(len=cshort), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
 
@@ -317,7 +322,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
-                     u_dx4, v_dx4, u_dy4, v_dy4
+                     u_dx4, v_dx4, u_dy4, v_dy4, &
+                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz
     ! loop variables
     integer(kind=ik) :: ix, iy, idir
     ! coefficients for Tam&Webb (4th order 1st derivative)
@@ -350,297 +356,309 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     endif
 
     select case(order_discretization)
-    case ("FD_2nd_central")
+    case("FD_2nd_central")
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                u_dx   = (phi(ix+1,iy  ,1) - phi(ix-1,iy  ,1))*dx_inv*0.5_rk
-                u_dy   = (phi(ix  ,iy+1,1) - phi(ix  ,iy-1,1))*dy_inv*0.5_rk
+        if (params_acm%skew_symmetry) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    u_dx   = (phi(ix+1,iy,1) - phi(ix-1,iy,1))*dx_inv*0.5_rk
+                    v_dx   = (phi(ix+1,iy,2) - phi(ix-1,iy,2))*dx_inv*0.5_rk
+                    
+                    u_dy   = (phi(ix,iy+1,1) - phi(ix,iy-1,1))*dy_inv*0.5_rk
+                    v_dy   = (phi(ix,iy+1,2) - phi(ix,iy-1,2))*dy_inv*0.5_rk
 
-                v_dx   = (phi(ix+1,iy  ,2) - phi(ix-1,iy  ,2))*dx_inv*0.5_rk
-                v_dy   = (phi(ix  ,iy+1,2) - phi(ix  ,iy-1,2))*dy_inv*0.5_rk
+                    uu_dx = (phi(ix+1,iy,1)*phi(ix+1,iy,1) - phi(ix-1,iy,1)*phi(ix-1,iy,1))*dx_inv*0.5_rk
+                    uv_dy = (phi(ix,iy+1,1)*phi(ix,iy+1,2) - phi(ix,iy-1,1)*phi(ix,iy-1,2))*dy_inv*0.5_rk
 
-                u_dxdx = (phi(ix-1,iy  ,1) -2.0_rk*phi(ix,iy,1) +phi(ix+1,iy  ,1))*dx2_inv
-                u_dydy = (phi(ix  ,iy-1,1) -2.0_rk*phi(ix,iy,1) +phi(ix  ,iy+1,1))*dy2_inv
+                    vu_dx = (phi(ix+1,iy,2)*phi(ix+1,iy,1) - phi(ix-1,iy,2)*phi(ix-1,iy,1))*dx_inv*0.5_rk
+                    vv_dy = (phi(ix,iy+1,2)*phi(ix,iy+1,2) - phi(ix,iy-1,2)*phi(ix,iy-1,2))*dy_inv*0.5_rk
 
-                v_dxdx = (phi(ix-1,iy  ,2) -2.0_rk*phi(ix,iy,2) +phi(ix+1,iy  ,2))*dx2_inv
-                v_dydy = (phi(ix  ,iy-1,2) -2.0_rk*phi(ix,iy,2) +phi(ix  ,iy+1,2))*dy2_inv
+                    u_dxdx = (phi(ix-1,iy,1) -2.0_rk*phi(ix,iy,1) +phi(ix+1,iy,1))*dx2_inv
+                    v_dxdx = (phi(ix-1,iy,2) -2.0_rk*phi(ix,iy,2) +phi(ix+1,iy,2))*dx2_inv
+                    
+                    u_dydy = (phi(ix,iy-1,1) -2.0_rk*phi(ix,iy,1) +phi(ix,iy+1,1))*dy2_inv
+                    v_dydy = (phi(ix,iy-1,2) -2.0_rk*phi(ix,iy,2) +phi(ix,iy+1,2))*dy2_inv
 
-                p_dx   = (phi(ix+1,iy  ,3) -phi(ix-1,iy  ,3))*dx_inv*0.5_rk
-                p_dy   = (phi(ix  ,iy+1,3) -phi(ix  ,iy-1,3))*dy_inv*0.5_rk
+                    p_dx   = (phi(ix+1,iy,3) -phi(ix-1,iy,3))*dx_inv*0.5_rk
+                    p_dy   = (phi(ix,iy+1,3) -phi(ix,iy-1,3))*dy_inv*0.5_rk
 
-                div_U = u_dx + v_dy
+                    div_U = u_dx + v_dy
 
-                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
-                ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
-                rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
-                rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
-                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                    ! Rhs in skew-symmetric formulation (of nonlinear term)
+                    ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                    rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
+                    rhs(ix,iy,2) = -0.5_rk*(vu_dx + vv_dy   + phi(ix,iy,1)*v_dx + phi(ix,iy,2)*v_dy ) -p_dy + nu*(v_dxdx + v_dydy ) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
             end do
-        end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    u_dx   = (phi(ix+1,iy  ,1) - phi(ix-1,iy  ,1))*dx_inv*0.5_rk
+                    u_dy   = (phi(ix  ,iy+1,1) - phi(ix  ,iy-1,1))*dy_inv*0.5_rk
+
+                    v_dx   = (phi(ix+1,iy  ,2) - phi(ix-1,iy  ,2))*dx_inv*0.5_rk
+                    v_dy   = (phi(ix  ,iy+1,2) - phi(ix  ,iy-1,2))*dy_inv*0.5_rk
+
+                    u_dxdx = (phi(ix-1,iy  ,1) -2.0_rk*phi(ix,iy,1) +phi(ix+1,iy  ,1))*dx2_inv
+                    u_dydy = (phi(ix  ,iy-1,1) -2.0_rk*phi(ix,iy,1) +phi(ix  ,iy+1,1))*dy2_inv
+
+                    v_dxdx = (phi(ix-1,iy  ,2) -2.0_rk*phi(ix,iy,2) +phi(ix+1,iy  ,2))*dx2_inv
+                    v_dydy = (phi(ix  ,iy-1,2) -2.0_rk*phi(ix,iy,2) +phi(ix  ,iy+1,2))*dy2_inv
+
+                    p_dx   = (phi(ix+1,iy  ,3) -phi(ix-1,iy  ,3))*dx_inv*0.5_rk
+                    p_dy   = (phi(ix  ,iy+1,3) -phi(ix  ,iy-1,3))*dy_inv*0.5_rk
+
+                    div_U = u_dx + v_dy
+
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                    ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        endif
 
     case("FD_4th_central_optimized")
         !-----------------------------------------------------------------------
         ! 4th order (Tam&web optimized scheme)
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                ! first derivatives of u, v, p
-                ! Note: a(0) does NOT appear (it is zero...)
-                u_dx = (a_TW4(-3)*phi(ix-3,iy,1) &
-                      + a_TW4(-2)*phi(ix-2,iy,1) &
-                      + a_TW4(-1)*phi(ix-1,iy,1) &
-                      + a_TW4(+1)*phi(ix+1,iy,1) &
-                      + a_TW4(+2)*phi(ix+2,iy,1) &
-                      + a_TW4(+3)*phi(ix+3,iy,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_TW4(-3)*phi(ix-3,iy,1) +a_TW4(-2)*phi(ix-2,iy,1) +a_TW4(-1)*phi(ix-1,iy,1) +a_TW4(+1)*phi(ix+1,iy,1) +a_TW4(+2)*phi(ix+2,iy,1) +a_TW4(+3)*phi(ix+3,iy,1))*dx_inv
+                    p_dx = (a_TW4(-3)*phi(ix-3,iy,3) +a_TW4(-2)*phi(ix-2,iy,3) +a_TW4(-1)*phi(ix-1,iy,3) +a_TW4(+1)*phi(ix+1,iy,3) +a_TW4(+2)*phi(ix+2,iy,3) +a_TW4(+3)*phi(ix+3,iy,3))*dx_inv
+                    v_dx = (a_TW4(-3)*phi(ix-3,iy,2) +a_TW4(-2)*phi(ix-2,iy,2) +a_TW4(-1)*phi(ix-1,iy,2) +a_TW4(+1)*phi(ix+1,iy,2) +a_TW4(+2)*phi(ix+2,iy,2) +a_TW4(+3)*phi(ix+3,iy,2))*dx_inv
 
-                u_dy = (a_TW4(-3)*phi(ix,iy-3,1) &
-                      + a_TW4(-2)*phi(ix,iy-2,1) &
-                      + a_TW4(-1)*phi(ix,iy-1,1) &
-                      + a_TW4(+1)*phi(ix,iy+1,1) &
-                      + a_TW4(+2)*phi(ix,iy+2,1) &
-                      + a_TW4(+3)*phi(ix,iy+3,1))*dy_inv
+                    u_dy = (a_TW4(-3)*phi(ix,iy-3,1) +a_TW4(-2)*phi(ix,iy-2,1) +a_TW4(-1)*phi(ix,iy-1,1) +a_TW4(+1)*phi(ix,iy+1,1) +a_TW4(+2)*phi(ix,iy+2,1) +a_TW4(+3)*phi(ix,iy+3,1))*dy_inv
+                    v_dy = (a_TW4(-3)*phi(ix,iy-3,2) +a_TW4(-2)*phi(ix,iy-2,2) +a_TW4(-1)*phi(ix,iy-1,2) +a_TW4(+1)*phi(ix,iy+1,2) +a_TW4(+2)*phi(ix,iy+2,2) +a_TW4(+3)*phi(ix,iy+3,2))*dy_inv
+                    p_dy = (a_TW4(-3)*phi(ix,iy-3,3) +a_TW4(-2)*phi(ix,iy-2,3) +a_TW4(-1)*phi(ix,iy-1,3) +a_TW4(+1)*phi(ix,iy+1,3) +a_TW4(+2)*phi(ix,iy+2,3) +a_TW4(+3)*phi(ix,iy+3,3))*dy_inv
 
-                v_dx = (a_TW4(-3)*phi(ix-3,iy,2) &
-                      + a_TW4(-2)*phi(ix-2,iy,2) &
-                      + a_TW4(-1)*phi(ix-1,iy,2) &
-                      + a_TW4(+1)*phi(ix+1,iy,2) &
-                      + a_TW4(+2)*phi(ix+2,iy,2) &
-                      + a_TW4(+3)*phi(ix+3,iy,2))*dx_inv
+                    uu_dx = (a_TW4(-3)*phi(ix-3,iy,1)*phi(ix-3,iy,1) +a_TW4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,1) +a_TW4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,1) +a_TW4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,1) +a_TW4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,1) +a_TW4(+3)*phi(ix+3,iy,1)*phi(ix+3,iy,1))*dx_inv
+                    vu_dx = (a_TW4(-3)*phi(ix-3,iy,2)*phi(ix-3,iy,1) +a_TW4(-2)*phi(ix-2,iy,2)*phi(ix-2,iy,1) +a_TW4(-1)*phi(ix-1,iy,2)*phi(ix-1,iy,1) +a_TW4(+1)*phi(ix+1,iy,2)*phi(ix+1,iy,1) +a_TW4(+2)*phi(ix+2,iy,2)*phi(ix+2,iy,1) +a_TW4(+3)*phi(ix+3,iy,2)*phi(ix+3,iy,1))*dx_inv
 
-                v_dy = (a_TW4(-3)*phi(ix,iy-3,2) &
-                      + a_TW4(-2)*phi(ix,iy-2,2) &
-                      + a_TW4(-1)*phi(ix,iy-1,2) &
-                      + a_TW4(+1)*phi(ix,iy+1,2) &
-                      + a_TW4(+2)*phi(ix,iy+2,2) &
-                      + a_TW4(+3)*phi(ix,iy+3,2))*dy_inv
+                    uv_dy = (a_TW4(-3)*phi(ix,iy-3,1)*phi(ix,iy-3,2) +a_TW4(-2)*phi(ix,iy-2,1)*phi(ix,iy-2,2) +a_TW4(-1)*phi(ix,iy-1,1)*phi(ix,iy-1,2) +a_TW4(+1)*phi(ix,iy+1,1)*phi(ix,iy+1,2) +a_TW4(+2)*phi(ix,iy+2,1)*phi(ix,iy+2,2) +a_TW4(+3)*phi(ix,iy+3,1)*phi(ix,iy+3,2))*dy_inv
+                    vv_dy = (a_TW4(-3)*phi(ix,iy-3,2)*phi(ix,iy-3,2) +a_TW4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,2) +a_TW4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,2) +a_TW4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,2) +a_TW4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,2) +a_TW4(+3)*phi(ix,iy+3,2)*phi(ix,iy+3,2))*dy_inv
 
-                p_dx = (a_TW4(-3)*phi(ix-3,iy,3) &
-                      + a_TW4(-2)*phi(ix-2,iy,3) &
-                      + a_TW4(-1)*phi(ix-1,iy,3) &
-                      + a_TW4(+1)*phi(ix+1,iy,3) &
-                      + a_TW4(+2)*phi(ix+2,iy,3) &
-                      + a_TW4(+3)*phi(ix+3,iy,3))*dx_inv
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv
+                    v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) + b_FD4(-1)*phi(ix-1,iy,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix+1,iy,2) + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv
 
-                p_dy = (a_TW4(-3)*phi(ix,iy-3,3) &
-                      + a_TW4(-2)*phi(ix,iy-2,3) &
-                      + a_TW4(-1)*phi(ix,iy-1,3) &
-                      + a_TW4(+1)*phi(ix,iy+1,3) &
-                      + a_TW4(+2)*phi(ix,iy+2,3) &
-                      + a_TW4(+3)*phi(ix,iy+3,3))*dy_inv
+                    u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) + b_FD4(-1)*phi(ix,iy-1,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix,iy+1,1) + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
+                    div_U = u_dx + v_dy
 
-                ! second derivatives of u and v
-                u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) &
-                        + b_FD4(-1)*phi(ix-1,iy,1) &
-                        + b_FD4(0)*phi(ix,iy,1) &
-                        + b_FD4(+1)*phi(ix+1,iy,1) &
-                        + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
-                u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) &
-                        + b_FD4(-1)*phi(ix,iy-1,1) &
-                        + b_FD4(0)*phi(ix,iy,1) &
-                        + b_FD4(+1)*phi(ix,iy+1,1) &
-                        + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
 
-                v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) &
-                        + b_FD4(-1)*phi(ix-1,iy,2) &
-                        + b_FD4(0)*phi(ix,iy,2) &
-                        + b_FD4(+1)*phi(ix+1,iy,2) &
-                        + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv
-
-                v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) &
-                        + b_FD4(-1)*phi(ix,iy-1,2) &
-                        + b_FD4(0)*phi(ix,iy,2) &
-                        + b_FD4(+1)*phi(ix,iy+1,2) &
-                        + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
-
-                div_U = u_dx + v_dy
-
-                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
-
-                rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
-                rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
-                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                    ! Rhs in skew-symmetric formulation (of nonlinear term)
+                    ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                    rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
+                    rhs(ix,iy,2) = -0.5_rk*(vu_dx + vv_dy   + phi(ix,iy,1)*v_dx + phi(ix,iy,2)*v_dy ) -p_dy + nu*(v_dxdx + v_dydy ) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
             end do
-        end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_TW4(-3)*phi(ix-3,iy,1) + a_TW4(-2)*phi(ix-2,iy,1) + a_TW4(-1)*phi(ix-1,iy,1) + a_TW4(+1)*phi(ix+1,iy,1) + a_TW4(+2)*phi(ix+2,iy,1) + a_TW4(+3)*phi(ix+3,iy,1))*dx_inv
+                    p_dx = (a_TW4(-3)*phi(ix-3,iy,3) + a_TW4(-2)*phi(ix-2,iy,3) + a_TW4(-1)*phi(ix-1,iy,3) + a_TW4(+1)*phi(ix+1,iy,3) + a_TW4(+2)*phi(ix+2,iy,3) + a_TW4(+3)*phi(ix+3,iy,3))*dx_inv
+                    v_dx = (a_TW4(-3)*phi(ix-3,iy,2) + a_TW4(-2)*phi(ix-2,iy,2) + a_TW4(-1)*phi(ix-1,iy,2) + a_TW4(+1)*phi(ix+1,iy,2) + a_TW4(+2)*phi(ix+2,iy,2) + a_TW4(+3)*phi(ix+3,iy,2))*dx_inv
+
+                    u_dy = (a_TW4(-3)*phi(ix,iy-3,1) + a_TW4(-2)*phi(ix,iy-2,1) + a_TW4(-1)*phi(ix,iy-1,1) + a_TW4(+1)*phi(ix,iy+1,1) + a_TW4(+2)*phi(ix,iy+2,1) + a_TW4(+3)*phi(ix,iy+3,1))*dy_inv
+                    v_dy = (a_TW4(-3)*phi(ix,iy-3,2) + a_TW4(-2)*phi(ix,iy-2,2) + a_TW4(-1)*phi(ix,iy-1,2) + a_TW4(+1)*phi(ix,iy+1,2) + a_TW4(+2)*phi(ix,iy+2,2) + a_TW4(+3)*phi(ix,iy+3,2))*dy_inv
+                    p_dy = (a_TW4(-3)*phi(ix,iy-3,3) + a_TW4(-2)*phi(ix,iy-2,3) + a_TW4(-1)*phi(ix,iy-1,3) + a_TW4(+1)*phi(ix,iy+1,3) + a_TW4(+2)*phi(ix,iy+2,3) + a_TW4(+3)*phi(ix,iy+3,3))*dy_inv
+
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv
+                    v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) + b_FD4(-1)*phi(ix-1,iy,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix+1,iy,2) + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv
+
+                    u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) + b_FD4(-1)*phi(ix,iy-1,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix,iy+1,1) + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
+                    div_U = u_dx + v_dy
+
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        endif
 
     case("FD_4th_central")
         !-----------------------------------------------------------------------
         ! 4th order (standard)
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                ! first derivatives of u, v, p
-                ! Note: a(0) does NOT appear (it is zero...)
-                u_dx = (a_FD4(-2)*phi(ix-2,iy,1) &
-                      + a_FD4(-1)*phi(ix-1,iy,1) &
-                      + a_FD4(+1)*phi(ix+1,iy,1) &
-                      + a_FD4(+2)*phi(ix+2,iy,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_FD4(-2)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,1))*dx_inv
+                    v_dx = (a_FD4(-2)*phi(ix-2,iy,2) + a_FD4(-1)*phi(ix-1,iy,2) + a_FD4(+1)*phi(ix+1,iy,2) + a_FD4(+2)*phi(ix+2,iy,2))*dx_inv
+                    p_dx = (a_FD4(-2)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,3))*dx_inv
 
-                u_dy = (a_FD4(-2)*phi(ix,iy-2,1) &
-                      + a_FD4(-1)*phi(ix,iy-1,1) &
-                      + a_FD4(+1)*phi(ix,iy+1,1) &
-                      + a_FD4(+2)*phi(ix,iy+2,1))*dy_inv
+                    u_dy = (a_FD4(-2)*phi(ix,iy-2,1) + a_FD4(-1)*phi(ix,iy-1,1) + a_FD4(+1)*phi(ix,iy+1,1) + a_FD4(+2)*phi(ix,iy+2,1))*dy_inv
+                    v_dy = (a_FD4(-2)*phi(ix,iy-2,2) + a_FD4(-1)*phi(ix,iy-1,2) + a_FD4(+1)*phi(ix,iy+1,2) + a_FD4(+2)*phi(ix,iy+2,2))*dy_inv
+                    p_dy = (a_FD4(-2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,3))*dy_inv
 
-                v_dx = (a_FD4(-2)*phi(ix-2,iy,2) &
-                      + a_FD4(-1)*phi(ix-1,iy,2) &
-                      + a_FD4(+1)*phi(ix+1,iy,2) &
-                      + a_FD4(+2)*phi(ix+2,iy,2))*dx_inv
+                    uu_dx = (a_FD4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,1))*dx_inv
+                    uv_dy = (a_FD4(-2)*phi(ix,iy-2,1)*phi(ix,iy-2,2) + a_FD4(-1)*phi(ix,iy-1,1)*phi(ix,iy-1,2) + a_FD4(+1)*phi(ix,iy+1,1)*phi(ix,iy+1,2) + a_FD4(+2)*phi(ix,iy+2,1)*phi(ix,iy+2,2))*dy_inv
 
-                v_dy = (a_FD4(-2)*phi(ix,iy-2,2) &
-                      + a_FD4(-1)*phi(ix,iy-1,2) &
-                      + a_FD4(+1)*phi(ix,iy+1,2) &
-                      + a_FD4(+2)*phi(ix,iy+2,2))*dy_inv
+                    vu_dx = (a_FD4(-2)*phi(ix-2,iy,2)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,2)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,2)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,2)*phi(ix+2,iy,1))*dx_inv
+                    vv_dy = (a_FD4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,2) + a_FD4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,2) + a_FD4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,2) + a_FD4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,2))*dy_inv
 
-                p_dx = (a_FD4(-2)*phi(ix-2,iy,3) &
-                      + a_FD4(-1)*phi(ix-1,iy,3) &
-                      + a_FD4(+1)*phi(ix+1,iy,3) &
-                      + a_FD4(+2)*phi(ix+2,iy,3))*dx_inv
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv
+                    v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) + b_FD4(-1)*phi(ix-1,iy,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix+1,iy,2) + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv
 
-                p_dy = (a_FD4(-2)*phi(ix,iy-2,3) &
-                      + a_FD4(-1)*phi(ix,iy-1,3) &
-                      + a_FD4(+1)*phi(ix,iy+1,3) &
-                      + a_FD4(+2)*phi(ix,iy+2,3))*dy_inv
+                    u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) + b_FD4(-1)*phi(ix,iy-1,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix,iy+1,1) + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
 
-              ! second derivatives of u and v
-              u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) &
-                      + b_FD4(-1)*phi(ix-1,iy,1) &
-                      + b_FD4(0)*phi(ix,iy,1) &
-                      + b_FD4(+1)*phi(ix+1,iy,1) &
-                      + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv
+                    div_U = u_dx + v_dy
+                    ! mask (chi) (:,:,1)
+                    ! usx (:,:,2)
+                    ! usy (:,:,3)
+                    ! usz (:,:,4)
+                    ! color (.;.5)
+                    ! sponge (:,:,6)
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
-              u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) &
-                      + b_FD4(-1)*phi(ix,iy-1,1) &
-                      + b_FD4(0)*phi(ix,iy,1) &
-                      + b_FD4(+1)*phi(ix,iy+1,1) &
-                      + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv
-
-              v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) &
-                      + b_FD4(-1)*phi(ix-1,iy,2) &
-                      + b_FD4(0)*phi(ix,iy,2) &
-                      + b_FD4(+1)*phi(ix+1,iy,2) &
-                      + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv
-
-              v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) &
-                      + b_FD4(-1)*phi(ix,iy-1,2) &
-                      + b_FD4(0)*phi(ix,iy,2) &
-                      + b_FD4(+1)*phi(ix,iy+1,2) &
-                      + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
-
-                div_U = u_dx + v_dy
-! mask (chi) (:,:,1)
-                ! usx (:,:,2)
-                ! usy (:,:,3)
-                ! usz (:,:,4)
-                ! color (.;.5)
-                ! sponge (:,:,6)
-                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
-
-                rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
-                rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
-                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                    ! Rhs in skew-symmetric formulation (of nonlinear term)
+                    ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                    rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
+                    rhs(ix,iy,2) = -0.5_rk*(vu_dx + vv_dy   + phi(ix,iy,1)*v_dx + phi(ix,iy,2)*v_dy ) -p_dy + nu*(v_dxdx + v_dydy ) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
             end do
-        end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_FD4(-2)*phi(ix-2,iy,1) + a_FD4(-1)*phi(ix-1,iy,1) + a_FD4(+1)*phi(ix+1,iy,1) + a_FD4(+2)*phi(ix+2,iy,1))*dx_inv    
+                    v_dx = (a_FD4(-2)*phi(ix-2,iy,2) + a_FD4(-1)*phi(ix-1,iy,2) + a_FD4(+1)*phi(ix+1,iy,2) + a_FD4(+2)*phi(ix+2,iy,2))*dx_inv    
+                    p_dx = (a_FD4(-2)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,3))*dx_inv   
+
+                    u_dy = (a_FD4(-2)*phi(ix,iy-2,1) + a_FD4(-1)*phi(ix,iy-1,1) + a_FD4(+1)*phi(ix,iy+1,1) + a_FD4(+2)*phi(ix,iy+2,1))*dy_inv    
+                    v_dy = (a_FD4(-2)*phi(ix,iy-2,2) + a_FD4(-1)*phi(ix,iy-1,2) + a_FD4(+1)*phi(ix,iy+1,2) + a_FD4(+2)*phi(ix,iy+2,2))*dy_inv    
+                    p_dy = (a_FD4(-2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,3))*dy_inv    
+
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv    
+                    v_dxdx = (b_FD4(-2)*phi(ix-2,iy,2) + b_FD4(-1)*phi(ix-1,iy,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix+1,iy,2) + b_FD4(+2)*phi(ix+2,iy,2))*dx2_inv   
+                    
+                    u_dydy = (b_FD4(-2)*phi(ix,iy-2,1) + b_FD4(-1)*phi(ix,iy-1,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix,iy+1,1) + b_FD4(+2)*phi(ix,iy+2,1))*dy2_inv    
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv    
+                    
+                    div_U = u_dx + v_dy
+
+                    ! mask (chi) (:,:,1)
+                    ! usx (:,:,2)
+                    ! usy (:,:,3)
+                    ! usz (:,:,4)
+                    ! color (.;.5)
+                    ! sponge (:,:,6)
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+    
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        endif
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------
         ! 4th order (standard)
         !-----------------------------------------------------------------------
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                ! first derivatives of u, v, p
-                ! Note: a(0) does NOT appear (it is zero...)
-                u_dx = (a_FD6(-3)*phi(ix-3,iy,1)&
-                       +a_FD6(-2)*phi(ix-2,iy,1) &
-                       +a_FD6(-1)*phi(ix-1,iy,1) &
-                       +a_FD6(+1)*phi(ix+1,iy,1) &
-                       +a_FD6(+2)*phi(ix+2,iy,1) &
-                       +a_FD6(+3)*phi(ix+3,iy,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_FD6(-3)*phi(ix-3,iy,1)+a_FD6(-2)*phi(ix-2,iy,1) +a_FD6(-1)*phi(ix-1,iy,1) +a_FD6(+1)*phi(ix+1,iy,1) +a_FD6(+2)*phi(ix+2,iy,1) +a_FD6(+3)*phi(ix+3,iy,1))*dx_inv
+                    v_dx = (a_FD6(-3)*phi(ix-3,iy,2)+a_FD6(-2)*phi(ix-2,iy,2) +a_FD6(-1)*phi(ix-1,iy,2) +a_FD6(+1)*phi(ix+1,iy,2) +a_FD6(+2)*phi(ix+2,iy,2) +a_FD6(+3)*phi(ix+3,iy,2))*dx_inv
+                    p_dx = (a_FD6(-3)*phi(ix-3,iy,3)+a_FD6(-2)*phi(ix-2,iy,3) +a_FD6(-1)*phi(ix-1,iy,3) +a_FD6(+1)*phi(ix+1,iy,3) +a_FD6(+2)*phi(ix+2,iy,3) +a_FD6(+3)*phi(ix+3,iy,3))*dx_inv
 
-                u_dy = (a_FD6(-3)*phi(ix,iy-3,1)&
-                       +a_FD6(-2)*phi(ix,iy-2,1) &
-                       +a_FD6(-1)*phi(ix,iy-1,1) &
-                       +a_FD6(+1)*phi(ix,iy+1,1) &
-                       +a_FD6(+2)*phi(ix,iy+2,1) &
-                       +a_FD6(+3)*phi(ix,iy+3,1))*dy_inv
+                    u_dy = (a_FD6(-3)*phi(ix,iy-3,1)+a_FD6(-2)*phi(ix,iy-2,1) +a_FD6(-1)*phi(ix,iy-1,1) +a_FD6(+1)*phi(ix,iy+1,1) +a_FD6(+2)*phi(ix,iy+2,1) +a_FD6(+3)*phi(ix,iy+3,1))*dy_inv
+                    v_dy = (a_FD6(-3)*phi(ix,iy-3,2)+a_FD6(-2)*phi(ix,iy-2,2) +a_FD6(-1)*phi(ix,iy-1,2) +a_FD6(+1)*phi(ix,iy+1,2) +a_FD6(+2)*phi(ix,iy+2,2) +a_FD6(+3)*phi(ix,iy+3,2))*dy_inv
+                    p_dy = (a_FD6(-3)*phi(ix,iy-3,3)+a_FD6(-2)*phi(ix,iy-2,3) +a_FD6(-1)*phi(ix,iy-1,3) +a_FD6(+1)*phi(ix,iy+1,3) +a_FD6(+2)*phi(ix,iy+2,3) +a_FD6(+3)*phi(ix,iy+3,3))*dy_inv
 
-                v_dx = (a_FD6(-3)*phi(ix-3,iy,2)&
-                       +a_FD6(-2)*phi(ix-2,iy,2) &
-                       +a_FD6(-1)*phi(ix-1,iy,2) &
-                       +a_FD6(+1)*phi(ix+1,iy,2) &
-                       +a_FD6(+2)*phi(ix+2,iy,2) &
-                       +a_FD6(+3)*phi(ix+3,iy,2))*dx_inv
+                    uu_dx = (a_FD6(-3)*phi(ix-3,iy,1)*phi(ix-3,iy,1) +a_FD6(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,1) +a_FD6(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,1) +a_FD6(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,1) +a_FD6(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,1) +a_FD6(+3)*phi(ix+3,iy,1)*phi(ix+3,iy,1))*dx_inv
+                    vu_dx = (a_FD6(-3)*phi(ix-3,iy,2)*phi(ix-3,iy,1) +a_FD6(-2)*phi(ix-2,iy,2)*phi(ix-2,iy,1) +a_FD6(-1)*phi(ix-1,iy,2)*phi(ix-1,iy,1) +a_FD6(+1)*phi(ix+1,iy,2)*phi(ix+1,iy,1) +a_FD6(+2)*phi(ix+2,iy,2)*phi(ix+2,iy,1) +a_FD6(+3)*phi(ix+3,iy,2)*phi(ix+3,iy,1))*dx_inv
 
-                v_dy = (a_FD6(-3)*phi(ix,iy-3,2)&
-                       +a_FD6(-2)*phi(ix,iy-2,2) &
-                       +a_FD6(-1)*phi(ix,iy-1,2) &
-                       +a_FD6(+1)*phi(ix,iy+1,2) &
-                       +a_FD6(+2)*phi(ix,iy+2,2) &
-                       +a_FD6(+3)*phi(ix,iy+3,2))*dy_inv
+                    uv_dy = (a_FD6(-3)*phi(ix,iy-3,1)*phi(ix,iy-3,2) +a_FD6(-2)*phi(ix,iy-2,1)*phi(ix,iy-2,2) +a_FD6(-1)*phi(ix,iy-1,1)*phi(ix,iy-1,2) +a_FD6(+1)*phi(ix,iy+1,1)*phi(ix,iy+1,2) +a_FD6(+2)*phi(ix,iy+2,1)*phi(ix,iy+2,2) +a_FD6(+3)*phi(ix,iy+3,1)*phi(ix,iy+3,2))*dy_inv
+                    vv_dy = (a_FD6(-3)*phi(ix,iy-3,2)*phi(ix,iy-3,2) +a_FD6(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,2) +a_FD6(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,2) +a_FD6(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,2) +a_FD6(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,2) +a_FD6(+3)*phi(ix,iy+3,2)*phi(ix,iy+3,2))*dy_inv
 
-                p_dx = (a_FD6(-3)*phi(ix-3,iy,3)&
-                       +a_FD6(-2)*phi(ix-2,iy,3) &
-                       +a_FD6(-1)*phi(ix-1,iy,3) &
-                       +a_FD6(+1)*phi(ix+1,iy,3) &
-                       +a_FD6(+2)*phi(ix+2,iy,3) &
-                       +a_FD6(+3)*phi(ix+3,iy,3))*dx_inv
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD6(-3)*phi(ix-3,iy,1) +b_FD6(-2)*phi(ix-2,iy,1) +b_FD6(-1)*phi(ix-1,iy,1) +b_FD6( 0)*phi(ix,iy,1) +b_FD6(+1)*phi(ix+1,iy,1) +b_FD6(+2)*phi(ix+2,iy,1) +b_FD6(+3)*phi(ix+3,iy,1))*dx2_inv
+                    v_dxdx = (b_FD6(-3)*phi(ix-3,iy,2) +b_FD6(-2)*phi(ix-2,iy,2) +b_FD6(-1)*phi(ix-1,iy,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix+1,iy,2) +b_FD6(+2)*phi(ix+2,iy,2) +b_FD6(+3)*phi(ix+3,iy,2))*dx2_inv
+                    
+                    u_dydy = (b_FD6(-3)*phi(ix,iy-3,1) +b_FD6(-2)*phi(ix,iy-2,1) +b_FD6(-1)*phi(ix,iy-1,1) +b_FD6( 0)*phi(ix,iy,1) +b_FD6(+1)*phi(ix,iy+1,1) +b_FD6(+2)*phi(ix,iy+2,1) +b_FD6(+3)*phi(ix,iy+3,1))*dy2_inv
+                    v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
+                    div_U = u_dx + v_dy
 
-                p_dy = (a_FD6(-3)*phi(ix,iy-3,3)&
-                       +a_FD6(-2)*phi(ix,iy-2,3) &
-                       +a_FD6(-1)*phi(ix,iy-1,3) &
-                       +a_FD6(+1)*phi(ix,iy+1,3) &
-                       +a_FD6(+2)*phi(ix,iy+2,3) &
-                       +a_FD6(+3)*phi(ix,iy+3,3))*dy_inv
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
-                       ! second derivatives of u and v
-                u_dxdx = (b_FD6(-3)*phi(ix-3,iy,1) &
-                        + b_FD6(-2)*phi(ix-2,iy,1) &
-                        + b_FD6(-1)*phi(ix-1,iy,1) &
-                        + b_FD6( 0)*phi(ix,iy,1) &
-                        + b_FD6(+1)*phi(ix+1,iy,1) &
-                        + b_FD6(+2)*phi(ix+2,iy,1) &
-                        + b_FD6(+3)*phi(ix+3,iy,1))*dx2_inv
-
-                u_dydy = (b_FD6(-3)*phi(ix,iy-3,1) &
-                        + b_FD6(-2)*phi(ix,iy-2,1) &
-                        + b_FD6(-1)*phi(ix,iy-1,1) &
-                        + b_FD6( 0)*phi(ix,iy,1) &
-                        + b_FD6(+1)*phi(ix,iy+1,1) &
-                        + b_FD6(+2)*phi(ix,iy+2,1) &
-                        + b_FD6(+3)*phi(ix,iy+3,1))*dy2_inv
-
-                v_dxdx = (b_FD6(-3)*phi(ix-3,iy,2) &
-                        + b_FD6(-2)*phi(ix-2,iy,2) &
-                        + b_FD6(-1)*phi(ix-1,iy,2) &
-                        + b_FD6( 0)*phi(ix,iy,2) &
-                        + b_FD6(+1)*phi(ix+1,iy,2) &
-                        + b_FD6(+2)*phi(ix+2,iy,2) &
-                        + b_FD6(+3)*phi(ix+3,iy,2))*dx2_inv
-
-                v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) &
-                        + b_FD6(-2)*phi(ix,iy-2,2) &
-                        + b_FD6(-1)*phi(ix,iy-1,2) &
-                        + b_FD6( 0)*phi(ix,iy,2) &
-                        + b_FD6(+1)*phi(ix,iy+1,2) &
-                        + b_FD6(+2)*phi(ix,iy+2,2) &
-                        + b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
-
-                div_U = u_dx + v_dy
-
-                penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
-
-                rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
-                rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
-                rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                    ! Rhs in skew-symmetric formulation (of nonlinear term)
+                    ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                    rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
+                    rhs(ix,iy,2) = -0.5_rk*(vu_dx + vv_dy   + phi(ix,iy,1)*v_dx + phi(ix,iy,2)*v_dy ) -p_dy + nu*(v_dxdx + v_dydy ) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
             end do
-        end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! first derivatives of u, v, p
+                    ! Note: a(0) does NOT appear (it is zero...)
+                    u_dx = (a_FD6(-3)*phi(ix-3,iy,1)+a_FD6(-2)*phi(ix-2,iy,1) +a_FD6(-1)*phi(ix-1,iy,1) +a_FD6(+1)*phi(ix+1,iy,1) +a_FD6(+2)*phi(ix+2,iy,1) +a_FD6(+3)*phi(ix+3,iy,1))*dx_inv
+                    v_dx = (a_FD6(-3)*phi(ix-3,iy,2)+a_FD6(-2)*phi(ix-2,iy,2) +a_FD6(-1)*phi(ix-1,iy,2) +a_FD6(+1)*phi(ix+1,iy,2) +a_FD6(+2)*phi(ix+2,iy,2) +a_FD6(+3)*phi(ix+3,iy,2))*dx_inv
+                    p_dx = (a_FD6(-3)*phi(ix-3,iy,3)+a_FD6(-2)*phi(ix-2,iy,3) +a_FD6(-1)*phi(ix-1,iy,3) +a_FD6(+1)*phi(ix+1,iy,3) +a_FD6(+2)*phi(ix+2,iy,3) +a_FD6(+3)*phi(ix+3,iy,3))*dx_inv
+
+                    u_dy = (a_FD6(-3)*phi(ix,iy-3,1)+a_FD6(-2)*phi(ix,iy-2,1) +a_FD6(-1)*phi(ix,iy-1,1) +a_FD6(+1)*phi(ix,iy+1,1) +a_FD6(+2)*phi(ix,iy+2,1) +a_FD6(+3)*phi(ix,iy+3,1))*dy_inv
+                    v_dy = (a_FD6(-3)*phi(ix,iy-3,2)+a_FD6(-2)*phi(ix,iy-2,2) +a_FD6(-1)*phi(ix,iy-1,2) +a_FD6(+1)*phi(ix,iy+1,2) +a_FD6(+2)*phi(ix,iy+2,2) +a_FD6(+3)*phi(ix,iy+3,2))*dy_inv
+                    p_dy = (a_FD6(-3)*phi(ix,iy-3,3)+a_FD6(-2)*phi(ix,iy-2,3) +a_FD6(-1)*phi(ix,iy-1,3) +a_FD6(+1)*phi(ix,iy+1,3) +a_FD6(+2)*phi(ix,iy+2,3) +a_FD6(+3)*phi(ix,iy+3,3))*dy_inv
+
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD6(-3)*phi(ix-3,iy,1) +b_FD6(-2)*phi(ix-2,iy,1) +b_FD6(-1)*phi(ix-1,iy,1) +b_FD6( 0)*phi(ix,iy,1) +b_FD6(+1)*phi(ix+1,iy,1) +b_FD6(+2)*phi(ix+2,iy,1) +b_FD6(+3)*phi(ix+3,iy,1))*dx2_inv
+                    v_dxdx = (b_FD6(-3)*phi(ix-3,iy,2) +b_FD6(-2)*phi(ix-2,iy,2) +b_FD6(-1)*phi(ix-1,iy,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix+1,iy,2) +b_FD6(+2)*phi(ix+2,iy,2) +b_FD6(+3)*phi(ix+3,iy,2))*dx2_inv
+                    
+                    u_dydy = (b_FD6(-3)*phi(ix,iy-3,1) +b_FD6(-2)*phi(ix,iy-2,1) +b_FD6(-1)*phi(ix,iy-1,1) +b_FD6( 0)*phi(ix,iy,1) +b_FD6(+1)*phi(ix,iy+1,1) +b_FD6(+2)*phi(ix,iy+2,1) +b_FD6(+3)*phi(ix,iy+3,1))*dy2_inv
+                    v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
+                    div_U = u_dx + v_dy
+
+                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        endif
 
     case default
         call abort(441166, "Discretization unkown "//trim(adjustl(order_discretization))//", you should go play outside. Its nice." )
@@ -720,10 +738,11 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
                      nu, eps, eps_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
-    real(kind=rk) :: div_U, u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
+    real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
-                     p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi
+                     p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
+                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 
@@ -758,557 +777,474 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         !-----------------------------------------------------------------------
         ! 2nd order
         !-----------------------------------------------------------------------
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! first and second derivatives of u,v,w
-                    u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
-                    u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
-                    u_dz = (phi(ix  , iy,   iz+1, 1) - phi(ix,   iy,   iz-1, 1))*dz_inv*0.5_rk
+        if (params_acm%skew_symmetry) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first and second derivatives of u,v,w
+                        u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
+                        u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
+                        u_dz = (phi(ix  , iy,   iz+1, 1) - phi(ix,   iy,   iz-1, 1))*dz_inv*0.5_rk
 
-                    v_dx = (phi(ix+1, iy  , iz  , 2) - phi(ix-1, iy  , iz  , 2))*dx_inv*0.5_rk
-                    v_dy = (phi(ix  , iy+1, iz  , 2) - phi(ix  , iy-1, iz  , 2))*dy_inv*0.5_rk
-                    v_dz = (phi(ix  , iy  , iz+1, 2) - phi(ix  , iy  , iz-1, 2))*dz_inv*0.5_rk
+                        v_dx = (phi(ix+1, iy  , iz  , 2) - phi(ix-1, iy  , iz  , 2))*dx_inv*0.5_rk
+                        v_dy = (phi(ix  , iy+1, iz  , 2) - phi(ix  , iy-1, iz  , 2))*dy_inv*0.5_rk
+                        v_dz = (phi(ix  , iy  , iz+1, 2) - phi(ix  , iy  , iz-1, 2))*dz_inv*0.5_rk
 
-                    w_dx = (phi(ix+1, iy  , iz  , 3) - phi(ix-1, iy  , iz  , 3))*dx_inv*0.5_rk
-                    w_dy = (phi(ix  , iy+1, iz  , 3) - phi(ix  , iy-1, iz  , 3))*dy_inv*0.5_rk
-                    w_dz = (phi(ix  , iy  , iz+1, 3) - phi(ix  , iy  , iz-1, 3))*dz_inv*0.5_rk
+                        w_dx = (phi(ix+1, iy  , iz  , 3) - phi(ix-1, iy  , iz  , 3))*dx_inv*0.5_rk
+                        w_dy = (phi(ix  , iy+1, iz  , 3) - phi(ix  , iy-1, iz  , 3))*dy_inv*0.5_rk
+                        w_dz = (phi(ix  , iy  , iz+1, 3) - phi(ix  , iy  , iz-1, 3))*dz_inv*0.5_rk
 
-                    u_dxdx = (phi(ix-1, iy  , iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix+1, iy  , iz  , 1))*dx2_inv
-                    u_dydy = (phi(ix  , iy-1, iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy+1, iz  , 1))*dy2_inv
-                    u_dzdz = (phi(ix  , iy  , iz-1, 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy  , iz+1, 1))*dz2_inv
+                        uu_dx = (phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) )*dx_inv
+                        uv_dy = (phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) )*dy_inv
+                        uw_dz = (phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) )*dz_inv
 
-                    v_dxdx = (phi(ix-1, iy  , iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix+1, iy  , iz  , 2))*dx2_inv
-                    v_dydy = (phi(ix  , iy-1, iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy+1, iz  , 2))*dy2_inv
-                    v_dzdz = (phi(ix  , iy  , iz-1, 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy  , iz+1, 2))*dz2_inv
+                        vu_dx = (phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) )*dx_inv
+                        vv_dy = (phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) )*dy_inv
+                        vw_dz = (phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) )*dz_inv
 
-                    w_dxdx = (phi(ix-1, iy  , iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix+1, iy  , iz  , 3))*dx2_inv
-                    w_dydy = (phi(ix  , iy-1, iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy+1, iz  , 3))*dy2_inv
-                    w_dzdz = (phi(ix  , iy  , iz-1, 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy  , iz+1, 3))*dz2_inv
+                        wu_dx = (phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) )*dx_inv
+                        wv_dy = (phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) )*dy_inv
+                        ww_dz = (phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) )*dz_inv
 
-                    ! first derivative of p
-                    p_dx = (phi(ix+1, iy  , iz  , 4) -phi(ix-1, iy  , iz  , 4))*dx_inv*0.5_rk
-                    p_dy = (phi(ix  , iy+1, iz  , 4) -phi(ix  , iy-1, iz  , 4))*dy_inv*0.5_rk
-                    p_dz = (phi(ix  , iy  , iz+1, 4) -phi(ix  , iy  , iz-1, 4))*dz_inv*0.5_rk
+                        u_dxdx = (phi(ix-1, iy  , iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix+1, iy  , iz  , 1))*dx2_inv
+                        u_dydy = (phi(ix  , iy-1, iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy+1, iz  , 1))*dy2_inv
+                        u_dzdz = (phi(ix  , iy  , iz-1, 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy  , iz+1, 1))*dz2_inv
 
-                    div_U = u_dx + v_dy + w_dz
+                        v_dxdx = (phi(ix-1, iy  , iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix+1, iy  , iz  , 2))*dx2_inv
+                        v_dydy = (phi(ix  , iy-1, iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy+1, iz  , 2))*dy2_inv
+                        v_dzdz = (phi(ix  , iy  , iz-1, 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy  , iz+1, 2))*dz2_inv
 
-                    u = phi(ix, iy, iz, 1)
-                    v = phi(ix, iy, iz, 2)
-                    w = phi(ix, iy, iz, 3)
-                    p = phi(ix, iy, iz, 4)
+                        w_dxdx = (phi(ix-1, iy  , iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix+1, iy  , iz  , 3))*dx2_inv
+                        w_dydy = (phi(ix  , iy-1, iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy+1, iz  , 3))*dy2_inv
+                        w_dzdz = (phi(ix  , iy  , iz-1, 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy  , iz+1, 3))*dz2_inv
 
-                    chi = mask(ix,iy,iz,1) * eps_inv
-                    penalx = -chi * (u - mask(ix,iy,iz,2))
-                    penaly = -chi * (v - mask(ix,iy,iz,3))
-                    penalz = -chi * (w - mask(ix,iy,iz,4))
+                        ! first derivative of p
+                        p_dx = (phi(ix+1, iy  , iz  , 4) -phi(ix-1, iy  , iz  , 4))*dx_inv*0.5_rk
+                        p_dy = (phi(ix  , iy+1, iz  , 4) -phi(ix  , iy-1, iz  , 4))*dy_inv*0.5_rk
+                        p_dz = (phi(ix  , iy  , iz+1, 4) -phi(ix  , iy  , iz-1, 4))*dz_inv*0.5_rk
 
-                    rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                    rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                    rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
-                    rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        ! Rhs in skew-symmetric formulation (of nonlinear term)
+                        ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
                 end do
             end do
-        end do
+        else
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first and second derivatives of u,v,w
+                        u_dx = (phi(ix+1, iy,   iz  , 1) - phi(ix-1, iy,   iz  , 1))*dx_inv*0.5_rk
+                        u_dy = (phi(ix  , iy+1, iz  , 1) - phi(ix,   iy-1, iz  , 1))*dy_inv*0.5_rk
+                        u_dz = (phi(ix  , iy,   iz+1, 1) - phi(ix,   iy,   iz-1, 1))*dz_inv*0.5_rk
+
+                        v_dx = (phi(ix+1, iy  , iz  , 2) - phi(ix-1, iy  , iz  , 2))*dx_inv*0.5_rk
+                        v_dy = (phi(ix  , iy+1, iz  , 2) - phi(ix  , iy-1, iz  , 2))*dy_inv*0.5_rk
+                        v_dz = (phi(ix  , iy  , iz+1, 2) - phi(ix  , iy  , iz-1, 2))*dz_inv*0.5_rk
+
+                        w_dx = (phi(ix+1, iy  , iz  , 3) - phi(ix-1, iy  , iz  , 3))*dx_inv*0.5_rk
+                        w_dy = (phi(ix  , iy+1, iz  , 3) - phi(ix  , iy-1, iz  , 3))*dy_inv*0.5_rk
+                        w_dz = (phi(ix  , iy  , iz+1, 3) - phi(ix  , iy  , iz-1, 3))*dz_inv*0.5_rk
+
+                        u_dxdx = (phi(ix-1, iy  , iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix+1, iy  , iz  , 1))*dx2_inv
+                        u_dydy = (phi(ix  , iy-1, iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy+1, iz  , 1))*dy2_inv
+                        u_dzdz = (phi(ix  , iy  , iz-1, 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy  , iz+1, 1))*dz2_inv
+
+                        v_dxdx = (phi(ix-1, iy  , iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix+1, iy  , iz  , 2))*dx2_inv
+                        v_dydy = (phi(ix  , iy-1, iz  , 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy+1, iz  , 2))*dy2_inv
+                        v_dzdz = (phi(ix  , iy  , iz-1, 2) -2.0_rk*phi(ix, iy, iz, 2) + phi(ix  , iy  , iz+1, 2))*dz2_inv
+
+                        w_dxdx = (phi(ix-1, iy  , iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix+1, iy  , iz  , 3))*dx2_inv
+                        w_dydy = (phi(ix  , iy-1, iz  , 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy+1, iz  , 3))*dy2_inv
+                        w_dzdz = (phi(ix  , iy  , iz-1, 3) -2.0_rk*phi(ix, iy, iz, 3) + phi(ix  , iy  , iz+1, 3))*dz2_inv
+
+                        ! first derivative of p
+                        p_dx = (phi(ix+1, iy  , iz  , 4) -phi(ix-1, iy  , iz  , 4))*dx_inv*0.5_rk
+                        p_dy = (phi(ix  , iy+1, iz  , 4) -phi(ix  , iy-1, iz  , 4))*dy_inv*0.5_rk
+                        p_dz = (phi(ix  , iy  , iz+1, 4) -phi(ix  , iy  , iz-1, 4))*dz_inv*0.5_rk
+
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        endif
 
     case("FD_4th_central")
         !-----------------------------------------------------------------------
         ! 4th order (standard scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! first derivatives of u, v, p
-                    u_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1) &
-                           +a_FD4(-1)*phi(ix-1,iy,iz,1) &
-                           +a_FD4(+1)*phi(ix+1,iy,iz,1) &
-                           +a_FD4(+2)*phi(ix+2,iy,iz,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,1))*dx_inv
+                        v_dx = (a_FD4(-2)*phi(ix-2,iy,iz,2) +a_FD4(-1)*phi(ix-1,iy,iz,2) +a_FD4(+1)*phi(ix+1,iy,iz,2) +a_FD4(+2)*phi(ix+2,iy,iz,2))*dx_inv
+                        w_dx = (a_FD4(-2)*phi(ix-2,iy,iz,3) +a_FD4(-1)*phi(ix-1,iy,iz,3) +a_FD4(+1)*phi(ix+1,iy,iz,3) +a_FD4(+2)*phi(ix+2,iy,iz,3))*dx_inv
+                        p_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4) +a_FD4(-1)*phi(ix-1,iy,iz,4) +a_FD4(+1)*phi(ix+1,iy,iz,4) +a_FD4(+2)*phi(ix+2,iy,iz,4))*dx_inv
 
-                    u_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1) &
-                           +a_FD4(-1)*phi(ix,iy-1,iz,1) &
-                           +a_FD4(+1)*phi(ix,iy+1,iz,1) &
-                           +a_FD4(+2)*phi(ix,iy+2,iz,1))*dy_inv
+                        u_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1) +a_FD4(-1)*phi(ix,iy-1,iz,1) +a_FD4(+1)*phi(ix,iy+1,iz,1) +a_FD4(+2)*phi(ix,iy+2,iz,1))*dy_inv
+                        v_dy = (a_FD4(-2)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,2))*dy_inv
+                        w_dy = (a_FD4(-2)*phi(ix,iy-2,iz,3) +a_FD4(-1)*phi(ix,iy-1,iz,3) +a_FD4(+1)*phi(ix,iy+1,iz,3) +a_FD4(+2)*phi(ix,iy+2,iz,3))*dy_inv
+                        p_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4) +a_FD4(-1)*phi(ix,iy-1,iz,4) +a_FD4(+1)*phi(ix,iy+1,iz,4) +a_FD4(+2)*phi(ix,iy+2,iz,4))*dy_inv
+                        
+                        u_dz = (a_FD4(-2)*phi(ix,iy,iz-2,1) +a_FD4(-1)*phi(ix,iy,iz-1,1) +a_FD4(+1)*phi(ix,iy,iz+1,1) +a_FD4(+2)*phi(ix,iy,iz+2,1))*dz_inv
+                        v_dz = (a_FD4(-2)*phi(ix,iy,iz-2,2) +a_FD4(-1)*phi(ix,iy,iz-1,2) +a_FD4(+1)*phi(ix,iy,iz+1,2) +a_FD4(+2)*phi(ix,iy,iz+2,2))*dz_inv
+                        w_dz = (a_FD4(-2)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,3))*dz_inv
+                        p_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4) +a_FD4(-1)*phi(ix,iy,iz-1,4) +a_FD4(+1)*phi(ix,iy,iz+1,4) +a_FD4(+2)*phi(ix,iy,iz+2,4))*dz_inv
 
-                    u_dz = (a_FD4(-2)*phi(ix,iy,iz-2,1) &
-                           +a_FD4(-1)*phi(ix,iy,iz-1,1) &
-                           +a_FD4(+1)*phi(ix,iy,iz+1,1) &
-                           +a_FD4(+2)*phi(ix,iy,iz+2,1))*dz_inv
+                        uu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,1)*phi(ix+2,iy,iz,1))*dx_inv
+                        uv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,1)*phi(ix,iy+2,iz,2))*dy_inv
+                        uw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,1)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,1)*phi(ix,iy,iz+2,3))*dz_inv
 
-                    v_dx = (a_FD4(-2)*phi(ix-2,iy,iz,2) &
-                           +a_FD4(-1)*phi(ix-1,iy,iz,2) &
-                           +a_FD4(+1)*phi(ix+1,iy,iz,2) &
-                           +a_FD4(+2)*phi(ix+2,iy,iz,2))*dx_inv
+                        vu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,2)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,2)*phi(ix+2,iy,iz,1))*dx_inv
+                        vv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,2)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,2)*phi(ix,iy+2,iz,2))*dy_inv
+                        vw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,2)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,2)*phi(ix,iy,iz+2,3))*dz_inv
 
-                    v_dy = (a_FD4(-2)*phi(ix,iy-2,iz,2) &
-                           +a_FD4(-1)*phi(ix,iy-1,iz,2) &
-                           +a_FD4(+1)*phi(ix,iy+1,iz,2) &
-                           +a_FD4(+2)*phi(ix,iy+2,iz,2))*dy_inv
+                        wu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,3)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,3)*phi(ix+2,iy,iz,1))*dx_inv
+                        wv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,3)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,3)*phi(ix,iy+2,iz,2))*dy_inv
+                        ww_dz = (a_FD4(-2)*phi(ix,iy,iz-2,3)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,3)*phi(ix,iy,iz+2,3))*dz_inv
 
-                    v_dz = (a_FD4(-2)*phi(ix,iy,iz-2,2) &
-                           +a_FD4(-1)*phi(ix,iy,iz-1,2) &
-                           +a_FD4(+1)*phi(ix,iy,iz+1,2) &
-                           +a_FD4(+2)*phi(ix,iy,iz+2,2))*dz_inv
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1) +b_FD4(-1)*phi(ix-1,iy,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix+1,iy,iz,1) +b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv
+                        v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2) +b_FD4(-1)*phi(ix-1,iy,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix+1,iy,iz,2) +b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv
+                        w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3) +b_FD4(-1)*phi(ix-1,iy,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix+1,iy,iz,3) +b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv
+                        
+                        u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1) +b_FD4(-1)*phi(ix,iy-1,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy+1,iz,1) +b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv
+                        v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2) +b_FD4(-1)*phi(ix,iy-1,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy+1,iz,2) +b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv
+                        w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3) +b_FD4(-1)*phi(ix,iy-1,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy+1,iz,3) +b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv
 
-                    w_dx = (a_FD4(-2)*phi(ix-2,iy,iz,3) &
-                           +a_FD4(-1)*phi(ix-1,iy,iz,3) &
-                           +a_FD4(+1)*phi(ix+1,iy,iz,3) &
-                           +a_FD4(+2)*phi(ix+2,iy,iz,3))*dx_inv
+                        u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1) +b_FD4(-1)*phi(ix,iy,iz-1,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy,iz+1,1) +b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv
+                        v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2) +b_FD4(-1)*phi(ix,iy,iz-1,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy,iz+1,2) +b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv
+                        w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3) +b_FD4(-1)*phi(ix,iy,iz-1,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy,iz+1,3) +b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv
 
-                    w_dy = (a_FD4(-2)*phi(ix,iy-2,iz,3) &
-                           +a_FD4(-1)*phi(ix,iy-1,iz,3) &
-                           +a_FD4(+1)*phi(ix,iy+1,iz,3) &
-                           +a_FD4(+2)*phi(ix,iy+2,iz,3))*dy_inv
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
 
-                    w_dz = (a_FD4(-2)*phi(ix,iy,iz-2,3) &
-                           +a_FD4(-1)*phi(ix,iy,iz-1,3) &
-                           +a_FD4(+1)*phi(ix,iy,iz+1,3) &
-                           +a_FD4(+2)*phi(ix,iy,iz+2,3))*dz_inv
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
 
-                    p_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4) &
-                           +a_FD4(-1)*phi(ix-1,iy,iz,4) &
-                           +a_FD4(+1)*phi(ix+1,iy,iz,4) &
-                           +a_FD4(+2)*phi(ix+2,iy,iz,4))*dx_inv
-
-                    p_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4) &
-                           +a_FD4(-1)*phi(ix,iy-1,iz,4) &
-                           +a_FD4(+1)*phi(ix,iy+1,iz,4) &
-                           +a_FD4(+2)*phi(ix,iy+2,iz,4))*dy_inv
-
-                    p_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4) &
-                           +a_FD4(-1)*phi(ix,iy,iz-1,4) &
-                           +a_FD4(+1)*phi(ix,iy,iz+1,4) &
-                           +a_FD4(+2)*phi(ix,iy,iz+2,4))*dz_inv
-
-                    ! second derivatives of u, v and w
-                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1) &
-                            + b_FD4(-1)*phi(ix-1,iy,iz,1) &
-                            + b_FD4(0)*phi(ix,iy,iz,1) &
-                            + b_FD4(+1)*phi(ix+1,iy,iz,1) &
-                            + b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv
-
-                    u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1) &
-                            + b_FD4(-1)*phi(ix,iy-1,iz,1) &
-                            + b_FD4(0)*phi(ix,iy,iz,1) &
-                            + b_FD4(+1)*phi(ix,iy+1,iz,1) &
-                            + b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv
-
-                    u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1) &
-                            + b_FD4(-1)*phi(ix,iy,iz-1,1) &
-                            + b_FD4(0)*phi(ix,iy,iz,1) &
-                            + b_FD4(+1)*phi(ix,iy,iz+1,1) &
-                            + b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv
-
-                    v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2) &
-                            + b_FD4(-1)*phi(ix-1,iy,iz,2) &
-                            + b_FD4(0)*phi(ix,iy,iz,2) &
-                            + b_FD4(+1)*phi(ix+1,iy,iz,2) &
-                            + b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv
-
-                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2) &
-                            + b_FD4(-1)*phi(ix,iy-1,iz,2) &
-                            + b_FD4(0)*phi(ix,iy,iz,2) &
-                            + b_FD4(+1)*phi(ix,iy+1,iz,2) &
-                            + b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv
-
-                    v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2) &
-                            + b_FD4(-1)*phi(ix,iy,iz-1,2) &
-                            + b_FD4(0)*phi(ix,iy,iz,2) &
-                            + b_FD4(+1)*phi(ix,iy,iz+1,2) &
-                            + b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv
-
-                    w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3) &
-                            + b_FD4(-1)*phi(ix-1,iy,iz,3) &
-                            + b_FD4(0)*phi(ix,iy,iz,3) &
-                            + b_FD4(+1)*phi(ix+1,iy,iz,3) &
-                            + b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv
-
-                    w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3) &
-                            + b_FD4(-1)*phi(ix,iy-1,iz,3) &
-                            + b_FD4(0)*phi(ix,iy,iz,3) &
-                            + b_FD4(+1)*phi(ix,iy+1,iz,3) &
-                            + b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv
-
-                    w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3) &
-                            + b_FD4(-1)*phi(ix,iy,iz-1,3) &
-                            + b_FD4(0)*phi(ix,iy,iz,3) &
-                            + b_FD4(+1)*phi(ix,iy,iz+1,3) &
-                            + b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv
-
-                    div_U = u_dx + v_dy + w_dz
-
-                    u = phi(ix, iy, iz, 1)
-                    v = phi(ix, iy, iz, 2)
-                    w = phi(ix, iy, iz, 3)
-                    p = phi(ix, iy, iz, 4)
-
-                    chi = mask(ix,iy,iz,1) * eps_inv
-                    penalx = -chi * (u - mask(ix,iy,iz,2))
-                    penaly = -chi * (v - mask(ix,iy,iz,3))
-                    penalz = -chi * (w - mask(ix,iy,iz,4))
-
-                    rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                    rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                    rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
-                    rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
+                        ! Rhs in skew-symmetric formulation (of nonlinear term)
+                        ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                        rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
                 end do
             end do
-        end do
+        else
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_FD4(-2)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,1))*dx_inv    
+                        v_dx = (a_FD4(-2)*phi(ix-2,iy,iz,2) +a_FD4(-1)*phi(ix-1,iy,iz,2) +a_FD4(+1)*phi(ix+1,iy,iz,2) +a_FD4(+2)*phi(ix+2,iy,iz,2))*dx_inv    
+                        w_dx = (a_FD4(-2)*phi(ix-2,iy,iz,3) +a_FD4(-1)*phi(ix-1,iy,iz,3) +a_FD4(+1)*phi(ix+1,iy,iz,3) +a_FD4(+2)*phi(ix+2,iy,iz,3))*dx_inv    
+                        p_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4) +a_FD4(-1)*phi(ix-1,iy,iz,4) +a_FD4(+1)*phi(ix+1,iy,iz,4) +a_FD4(+2)*phi(ix+2,iy,iz,4))*dx_inv    
+
+                        u_dy = (a_FD4(-2)*phi(ix,iy-2,iz,1) +a_FD4(-1)*phi(ix,iy-1,iz,1) +a_FD4(+1)*phi(ix,iy+1,iz,1) +a_FD4(+2)*phi(ix,iy+2,iz,1))*dy_inv    
+                        v_dy = (a_FD4(-2)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,2))*dy_inv    
+                        w_dy = (a_FD4(-2)*phi(ix,iy-2,iz,3) +a_FD4(-1)*phi(ix,iy-1,iz,3) +a_FD4(+1)*phi(ix,iy+1,iz,3) +a_FD4(+2)*phi(ix,iy+2,iz,3))*dy_inv    
+                        p_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4) +a_FD4(-1)*phi(ix,iy-1,iz,4) +a_FD4(+1)*phi(ix,iy+1,iz,4) +a_FD4(+2)*phi(ix,iy+2,iz,4))*dy_inv    
+
+                        u_dz = (a_FD4(-2)*phi(ix,iy,iz-2,1) +a_FD4(-1)*phi(ix,iy,iz-1,1) +a_FD4(+1)*phi(ix,iy,iz+1,1) +a_FD4(+2)*phi(ix,iy,iz+2,1))*dz_inv    
+                        v_dz = (a_FD4(-2)*phi(ix,iy,iz-2,2) +a_FD4(-1)*phi(ix,iy,iz-1,2) +a_FD4(+1)*phi(ix,iy,iz+1,2) +a_FD4(+2)*phi(ix,iy,iz+2,2))*dz_inv    
+                        w_dz = (a_FD4(-2)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,3))*dz_inv    
+                        p_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4) +a_FD4(-1)*phi(ix,iy,iz-1,4) +a_FD4(+1)*phi(ix,iy,iz+1,4) +a_FD4(+2)*phi(ix,iy,iz+2,4))*dz_inv    
+
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1)  + b_FD4(-1)*phi(ix-1,iy,iz,1)  + b_FD4(0)*phi(ix,iy,iz,1)  + b_FD4(+1)*phi(ix+1,iy,iz,1)  + b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv    
+                        v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2)  + b_FD4(-1)*phi(ix-1,iy,iz,2)  + b_FD4(0)*phi(ix,iy,iz,2)  + b_FD4(+1)*phi(ix+1,iy,iz,2)  + b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv    
+                        w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3)  + b_FD4(-1)*phi(ix-1,iy,iz,3)  + b_FD4(0)*phi(ix,iy,iz,3)  + b_FD4(+1)*phi(ix+1,iy,iz,3)  + b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv    
+
+                        u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1)  + b_FD4(-1)*phi(ix,iy-1,iz,1)  + b_FD4(0)*phi(ix,iy,iz,1)  + b_FD4(+1)*phi(ix,iy+1,iz,1)  + b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv    
+                        v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2)  + b_FD4(-1)*phi(ix,iy-1,iz,2)  + b_FD4(0)*phi(ix,iy,iz,2)  + b_FD4(+1)*phi(ix,iy+1,iz,2)  + b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv    
+                        w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3)  + b_FD4(-1)*phi(ix,iy-1,iz,3)  + b_FD4(0)*phi(ix,iy,iz,3)  + b_FD4(+1)*phi(ix,iy+1,iz,3)  + b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv    
+
+                        u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1)  + b_FD4(-1)*phi(ix,iy,iz-1,1)  + b_FD4(0)*phi(ix,iy,iz,1)  + b_FD4(+1)*phi(ix,iy,iz+1,1)  + b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv    
+                        v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2)  + b_FD4(-1)*phi(ix,iy,iz-1,2)  + b_FD4(0)*phi(ix,iy,iz,2)  + b_FD4(+1)*phi(ix,iy,iz+1,2)  + b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv    
+                        w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3)  + b_FD4(-1)*phi(ix,iy,iz-1,3)  + b_FD4(0)*phi(ix,iy,iz,3)  + b_FD4(+1)*phi(ix,iy,iz+1,3)  + b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv    
+    
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+    
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+    
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        endif
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------
         ! 4th order (standard scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! first derivatives of u, v, p
-                    u_dx = (a_FD6(-3)*phi(ix-3,iy,iz,1) &
-                           +a_FD6(-2)*phi(ix-2,iy,iz,1) &
-                           +a_FD6(-1)*phi(ix-1,iy,iz,1) &
-                           +a_FD6(+1)*phi(ix+1,iy,iz,1) &
-                           +a_FD6(+2)*phi(ix+2,iy,iz,1) &
-                           +a_FD6(+3)*phi(ix+3,iy,iz,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_FD6(-3)*phi(ix-3,iy,iz,1) +a_FD6(-2)*phi(ix-2,iy,iz,1) +a_FD6(-1)*phi(ix-1,iy,iz,1) +a_FD6(+1)*phi(ix+1,iy,iz,1) +a_FD6(+2)*phi(ix+2,iy,iz,1) +a_FD6(+3)*phi(ix+3,iy,iz,1))*dx_inv
+                        v_dx = (a_FD6(-3)*phi(ix-3,iy,iz,2) +a_FD6(-2)*phi(ix-2,iy,iz,2) +a_FD6(-1)*phi(ix-1,iy,iz,2) +a_FD6(+1)*phi(ix+1,iy,iz,2) +a_FD6(+2)*phi(ix+2,iy,iz,2) +a_FD6(+3)*phi(ix+3,iy,iz,2))*dx_inv
+                        w_dx = (a_FD6(-3)*phi(ix-3,iy,iz,3) +a_FD6(-2)*phi(ix-2,iy,iz,3) +a_FD6(-1)*phi(ix-1,iy,iz,3) +a_FD6(+1)*phi(ix+1,iy,iz,3) +a_FD6(+2)*phi(ix+2,iy,iz,3) +a_FD6(+3)*phi(ix+3,iy,iz,3))*dx_inv
+                        p_dx = (a_FD6(-3)*phi(ix-3,iy,iz,4) +a_FD6(-2)*phi(ix-2,iy,iz,4) +a_FD6(-1)*phi(ix-1,iy,iz,4) +a_FD6(+1)*phi(ix+1,iy,iz,4) +a_FD6(+2)*phi(ix+2,iy,iz,4) +a_FD6(+3)*phi(ix+3,iy,iz,4))*dx_inv
 
-                    u_dy = (a_FD6(-3)*phi(ix,iy-3,iz,1) &
-                           +a_FD6(-2)*phi(ix,iy-2,iz,1) &
-                           +a_FD6(-1)*phi(ix,iy-1,iz,1) &
-                           +a_FD6(+1)*phi(ix,iy+1,iz,1) &
-                           +a_FD6(+2)*phi(ix,iy+2,iz,1) &
-                           +a_FD6(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        u_dy = (a_FD6(-3)*phi(ix,iy-3,iz,1) +a_FD6(-2)*phi(ix,iy-2,iz,1) +a_FD6(-1)*phi(ix,iy-1,iz,1) +a_FD6(+1)*phi(ix,iy+1,iz,1) +a_FD6(+2)*phi(ix,iy+2,iz,1) +a_FD6(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        v_dy = (a_FD6(-3)*phi(ix,iy-3,iz,2) +a_FD6(-2)*phi(ix,iy-2,iz,2) +a_FD6(-1)*phi(ix,iy-1,iz,2) +a_FD6(+1)*phi(ix,iy+1,iz,2) +a_FD6(+2)*phi(ix,iy+2,iz,2) +a_FD6(+3)*phi(ix,iy+3,iz,2))*dy_inv
+                        w_dy = (a_FD6(-3)*phi(ix,iy-3,iz,3) +a_FD6(-2)*phi(ix,iy-2,iz,3) +a_FD6(-1)*phi(ix,iy-1,iz,3) +a_FD6(+1)*phi(ix,iy+1,iz,3) +a_FD6(+2)*phi(ix,iy+2,iz,3) +a_FD6(+3)*phi(ix,iy+3,iz,3))*dy_inv
+                        p_dy = (a_FD6(-3)*phi(ix,iy-3,iz,4) +a_FD6(-2)*phi(ix,iy-2,iz,4) +a_FD6(-1)*phi(ix,iy-1,iz,4) +a_FD6(+1)*phi(ix,iy+1,iz,4) +a_FD6(+2)*phi(ix,iy+2,iz,4) +a_FD6(+3)*phi(ix,iy+3,iz,4))*dy_inv
+                        
+                        u_dz = (a_FD6(-3)*phi(ix,iy,iz-3,1) +a_FD6(-2)*phi(ix,iy,iz-2,1) +a_FD6(-1)*phi(ix,iy,iz-1,1) +a_FD6(+1)*phi(ix,iy,iz+1,1) +a_FD6(+2)*phi(ix,iy,iz+2,1) +a_FD6(+3)*phi(ix,iy,iz+3,1))*dz_inv
+                        v_dz = (a_FD6(-3)*phi(ix,iy,iz-3,2) +a_FD6(-2)*phi(ix,iy,iz-2,2) +a_FD6(-1)*phi(ix,iy,iz-1,2) +a_FD6(+1)*phi(ix,iy,iz+1,2) +a_FD6(+2)*phi(ix,iy,iz+2,2) +a_FD6(+3)*phi(ix,iy,iz+3,2))*dz_inv
+                        w_dz = (a_FD6(-3)*phi(ix,iy,iz-3,3) +a_FD6(-2)*phi(ix,iy,iz-2,3) +a_FD6(-1)*phi(ix,iy,iz-1,3) +a_FD6(+1)*phi(ix,iy,iz+1,3) +a_FD6(+2)*phi(ix,iy,iz+2,3) +a_FD6(+3)*phi(ix,iy,iz+3,3))*dz_inv
+                        p_dz = (a_FD6(-3)*phi(ix,iy,iz-3,4) +a_FD6(-2)*phi(ix,iy,iz-2,4) +a_FD6(-1)*phi(ix,iy,iz-1,4) +a_FD6(+1)*phi(ix,iy,iz+1,4) +a_FD6(+2)*phi(ix,iy,iz+2,4) +a_FD6(+3)*phi(ix,iy,iz+3,4))*dz_inv
 
-                    u_dz = (a_FD6(-3)*phi(ix,iy,iz-3,1) &
-                           +a_FD6(-2)*phi(ix,iy,iz-2,1) &
-                           +a_FD6(-1)*phi(ix,iy,iz-1,1) &
-                           +a_FD6(+1)*phi(ix,iy,iz+1,1) &
-                           +a_FD6(+2)*phi(ix,iy,iz+2,1) &
-                           +a_FD6(+3)*phi(ix,iy,iz+3,1))*dz_inv
+                        uu_dx = (a_FD6(-3)*phi(ix-3,iy,iz,1)*phi(ix-3,iy,iz,1) +a_FD6(-2)*phi(ix-2,iy,iz,1)*phi(ix-2,iy,iz,1) +a_FD6(-1)*phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) +a_FD6(+1)*phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) +a_FD6(+2)*phi(ix+2,iy,iz,1)*phi(ix+2,iy,iz,1) +a_FD6(+3)*phi(ix+3,iy,iz,1)*phi(ix+3,iy,iz,1))*dx_inv
+                        uv_dy = (a_FD6(-3)*phi(ix,iy-3,iz,1)*phi(ix,iy-3,iz,2) +a_FD6(-2)*phi(ix,iy-2,iz,1)*phi(ix,iy-2,iz,2) +a_FD6(-1)*phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) +a_FD6(+1)*phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) +a_FD6(+2)*phi(ix,iy+2,iz,1)*phi(ix,iy+2,iz,2) +a_FD6(+3)*phi(ix,iy+3,iz,1)*phi(ix,iy+3,iz,2))*dy_inv
+                        uw_dz = (a_FD6(-3)*phi(ix,iy,iz-3,1)*phi(ix,iy,iz-3,3) +a_FD6(-2)*phi(ix,iy,iz-2,1)*phi(ix,iy,iz-2,3) +a_FD6(-1)*phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) +a_FD6(+1)*phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) +a_FD6(+2)*phi(ix,iy,iz+2,1)*phi(ix,iy,iz+2,3) +a_FD6(+3)*phi(ix,iy,iz+3,1)*phi(ix,iy,iz+3,3))*dz_inv
 
-                    v_dx = (a_FD6(-3)*phi(ix-3,iy,iz,2) &
-                           +a_FD6(-2)*phi(ix-2,iy,iz,2) &
-                           +a_FD6(-1)*phi(ix-1,iy,iz,2) &
-                           +a_FD6(+1)*phi(ix+1,iy,iz,2) &
-                           +a_FD6(+2)*phi(ix+2,iy,iz,2) &
-                           +a_FD6(+3)*phi(ix+3,iy,iz,2))*dx_inv
+                        vu_dx = (a_FD6(-3)*phi(ix-3,iy,iz,2)*phi(ix-3,iy,iz,1) +a_FD6(-2)*phi(ix-2,iy,iz,2)*phi(ix-2,iy,iz,1) +a_FD6(-1)*phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) +a_FD6(+1)*phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) +a_FD6(+2)*phi(ix+2,iy,iz,2)*phi(ix+2,iy,iz,1) +a_FD6(+3)*phi(ix+3,iy,iz,2)*phi(ix+3,iy,iz,1))*dx_inv
+                        vv_dy = (a_FD6(-3)*phi(ix,iy-3,iz,2)*phi(ix,iy-3,iz,2) +a_FD6(-2)*phi(ix,iy-2,iz,2)*phi(ix,iy-2,iz,2) +a_FD6(-1)*phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) +a_FD6(+1)*phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) +a_FD6(+2)*phi(ix,iy+2,iz,2)*phi(ix,iy+2,iz,2) +a_FD6(+3)*phi(ix,iy+3,iz,2)*phi(ix,iy+3,iz,2))*dy_inv
+                        vw_dz = (a_FD6(-3)*phi(ix,iy,iz-3,2)*phi(ix,iy,iz-3,3) +a_FD6(-2)*phi(ix,iy,iz-2,2)*phi(ix,iy,iz-2,3) +a_FD6(-1)*phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) +a_FD6(+1)*phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) +a_FD6(+2)*phi(ix,iy,iz+2,2)*phi(ix,iy,iz+2,3) +a_FD6(+3)*phi(ix,iy,iz+3,2)*phi(ix,iy,iz+3,3))*dz_inv
 
-                    v_dy = (a_FD6(-3)*phi(ix,iy-3,iz,2) &
-                           +a_FD6(-2)*phi(ix,iy-2,iz,2) &
-                           +a_FD6(-1)*phi(ix,iy-1,iz,2) &
-                           +a_FD6(+1)*phi(ix,iy+1,iz,2) &
-                           +a_FD6(+2)*phi(ix,iy+2,iz,2) &
-                           +a_FD6(+3)*phi(ix,iy+3,iz,2))*dy_inv
+                        wu_dx = (a_FD6(-3)*phi(ix-3,iy,iz,3)*phi(ix-3,iy,iz,1) +a_FD6(-2)*phi(ix-2,iy,iz,3)*phi(ix-2,iy,iz,1) +a_FD6(-1)*phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) +a_FD6(+1)*phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) +a_FD6(+2)*phi(ix+2,iy,iz,3)*phi(ix+2,iy,iz,1) +a_FD6(+3)*phi(ix+3,iy,iz,3)*phi(ix+3,iy,iz,1))*dx_inv
+                        wv_dy = (a_FD6(-3)*phi(ix,iy-3,iz,3)*phi(ix,iy-3,iz,2) +a_FD6(-2)*phi(ix,iy-2,iz,3)*phi(ix,iy-2,iz,2) +a_FD6(-1)*phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) +a_FD6(+1)*phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) +a_FD6(+2)*phi(ix,iy+2,iz,3)*phi(ix,iy+2,iz,2) +a_FD6(+3)*phi(ix,iy+3,iz,3)*phi(ix,iy+3,iz,2))*dy_inv
+                        ww_dz = (a_FD6(-3)*phi(ix,iy,iz-3,3)*phi(ix,iy,iz-3,3) +a_FD6(-2)*phi(ix,iy,iz-2,3)*phi(ix,iy,iz-2,3) +a_FD6(-1)*phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) +a_FD6(+1)*phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) +a_FD6(+2)*phi(ix,iy,iz+2,3)*phi(ix,iy,iz+2,3) +a_FD6(+3)*phi(ix,iy,iz+3,3)*phi(ix,iy,iz+3,3))*dz_inv
+                        
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,1) +b_FD6(-2)*phi(ix-2,iy,iz,1) +b_FD6(-1)*phi(ix-1,iy,iz,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix+1,iy,iz,1) +b_FD6(+2)*phi(ix+2,iy,iz,1) +b_FD6(+3)*phi(ix+3,iy,iz,1))*dx2_inv
+                        u_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,1) +b_FD6(-2)*phi(ix,iy-2,iz,1) +b_FD6(-1)*phi(ix,iy-1,iz,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix,iy+1,iz,1) +b_FD6(+2)*phi(ix,iy+2,iz,1) +b_FD6(+3)*phi(ix,iy+3,iz,1))*dy2_inv
+                        u_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,1) +b_FD6(-2)*phi(ix,iy,iz-2,1) +b_FD6(-1)*phi(ix,iy,iz-1,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix,iy,iz+1,1) +b_FD6(+2)*phi(ix,iy,iz+2,1) +b_FD6(+3)*phi(ix,iy,iz+3,1))*dz2_inv
+                        v_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,2) +b_FD6(-2)*phi(ix-2,iy,iz,2) +b_FD6(-1)*phi(ix-1,iy,iz,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix+1,iy,iz,2) +b_FD6(+2)*phi(ix+2,iy,iz,2) +b_FD6(+3)*phi(ix+3,iy,iz,2))*dx2_inv
+                        v_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,2) +b_FD6(-2)*phi(ix,iy-2,iz,2) +b_FD6(-1)*phi(ix,iy-1,iz,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix,iy+1,iz,2) +b_FD6(+2)*phi(ix,iy+2,iz,2) +b_FD6(+3)*phi(ix,iy+3,iz,2))*dy2_inv
+                        v_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,2) +b_FD6(-2)*phi(ix,iy,iz-2,2) +b_FD6(-1)*phi(ix,iy,iz-1,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix,iy,iz+1,2) +b_FD6(+2)*phi(ix,iy,iz+2,2) +b_FD6(+3)*phi(ix,iy,iz+3,2))*dz2_inv
+                        w_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,3) +b_FD6(-2)*phi(ix-2,iy,iz,3) +b_FD6(-1)*phi(ix-1,iy,iz,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix+1,iy,iz,3) +b_FD6(+2)*phi(ix+2,iy,iz,3) +b_FD6(+3)*phi(ix+3,iy,iz,3))*dx2_inv
+                        w_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,3) +b_FD6(-2)*phi(ix,iy-2,iz,3) +b_FD6(-1)*phi(ix,iy-1,iz,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix,iy+1,iz,3) +b_FD6(+2)*phi(ix,iy+2,iz,3) +b_FD6(+3)*phi(ix,iy+3,iz,3))*dy2_inv
+                        w_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,3) +b_FD6(-2)*phi(ix,iy,iz-2,3) +b_FD6(-1)*phi(ix,iy,iz-1,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix,iy,iz+1,3) +b_FD6(+2)*phi(ix,iy,iz+2,3) +b_FD6(+3)*phi(ix,iy,iz+3,3))*dz2_inv
+                        
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
 
-                    v_dz = (a_FD6(-3)*phi(ix,iy,iz-3,2) &
-                           +a_FD6(-2)*phi(ix,iy,iz-2,2) &
-                           +a_FD6(-1)*phi(ix,iy,iz-1,2) &
-                           +a_FD6(+1)*phi(ix,iy,iz+1,2) &
-                           +a_FD6(+2)*phi(ix,iy,iz+2,2) &
-                           +a_FD6(+3)*phi(ix,iy,iz+3,2))*dz_inv
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
 
-                    w_dx = (a_FD6(-3)*phi(ix-3,iy,iz,3) &
-                           +a_FD6(-2)*phi(ix-2,iy,iz,3) &
-                           +a_FD6(-1)*phi(ix-1,iy,iz,3) &
-                           +a_FD6(+1)*phi(ix+1,iy,iz,3) &
-                           +a_FD6(+2)*phi(ix+2,iy,iz,3) &
-                           +a_FD6(+3)*phi(ix+3,iy,iz,3))*dx_inv
-
-                    w_dy = (a_FD6(-3)*phi(ix,iy-3,iz,3) &
-                           +a_FD6(-2)*phi(ix,iy-2,iz,3) &
-                           +a_FD6(-1)*phi(ix,iy-1,iz,3) &
-                           +a_FD6(+1)*phi(ix,iy+1,iz,3) &
-                           +a_FD6(+2)*phi(ix,iy+2,iz,3) &
-                           +a_FD6(+3)*phi(ix,iy+3,iz,3))*dy_inv
-
-                    w_dz = (a_FD6(-3)*phi(ix,iy,iz-3,3) &
-                           +a_FD6(-2)*phi(ix,iy,iz-2,3) &
-                           +a_FD6(-1)*phi(ix,iy,iz-1,3) &
-                           +a_FD6(+1)*phi(ix,iy,iz+1,3) &
-                           +a_FD6(+2)*phi(ix,iy,iz+2,3) &
-                           +a_FD6(+3)*phi(ix,iy,iz+3,3))*dz_inv
-
-                    p_dx = (a_FD6(-3)*phi(ix-3,iy,iz,4) &
-                           +a_FD6(-2)*phi(ix-2,iy,iz,4) &
-                           +a_FD6(-1)*phi(ix-1,iy,iz,4) &
-                           +a_FD6(+1)*phi(ix+1,iy,iz,4) &
-                           +a_FD6(+2)*phi(ix+2,iy,iz,4) &
-                           +a_FD6(+3)*phi(ix+3,iy,iz,4))*dx_inv
-
-                    p_dy = (a_FD6(-3)*phi(ix,iy-3,iz,4) &
-                           +a_FD6(-2)*phi(ix,iy-2,iz,4) &
-                           +a_FD6(-1)*phi(ix,iy-1,iz,4) &
-                           +a_FD6(+1)*phi(ix,iy+1,iz,4) &
-                           +a_FD6(+2)*phi(ix,iy+2,iz,4) &
-                           +a_FD6(+3)*phi(ix,iy+3,iz,4))*dy_inv
-
-                    p_dz = (a_FD6(-3)*phi(ix,iy,iz-3,4) &
-                           +a_FD6(-2)*phi(ix,iy,iz-2,4) &
-                           +a_FD6(-1)*phi(ix,iy,iz-1,4) &
-                           +a_FD6(+1)*phi(ix,iy,iz+1,4) &
-                           +a_FD6(+2)*phi(ix,iy,iz+2,4) &
-                           +a_FD6(+3)*phi(ix,iy,iz+3,4))*dz_inv
-
-                    ! second derivatives of u, v and w
-                    u_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,1) &
-                            + b_FD6(-2)*phi(ix-2,iy,iz,1) &
-                            + b_FD6(-1)*phi(ix-1,iy,iz,1) &
-                            + b_FD6(0)*phi(ix,iy,iz,1) &
-                            + b_FD6(+1)*phi(ix+1,iy,iz,1) &
-                            + b_FD6(+2)*phi(ix+2,iy,iz,1) &
-                            + b_FD6(+3)*phi(ix+3,iy,iz,1))*dx2_inv
-
-                    u_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,1) &
-                            + b_FD6(-2)*phi(ix,iy-2,iz,1) &
-                            + b_FD6(-1)*phi(ix,iy-1,iz,1) &
-                            + b_FD6(0)*phi(ix,iy,iz,1) &
-                            + b_FD6(+1)*phi(ix,iy+1,iz,1) &
-                            + b_FD6(+2)*phi(ix,iy+2,iz,1) &
-                            + b_FD6(+3)*phi(ix,iy+3,iz,1))*dy2_inv
-
-                    u_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,1) &
-                            + b_FD6(-2)*phi(ix,iy,iz-2,1) &
-                            + b_FD6(-1)*phi(ix,iy,iz-1,1) &
-                            + b_FD6(0)*phi(ix,iy,iz,1) &
-                            + b_FD6(+1)*phi(ix,iy,iz+1,1) &
-                            + b_FD6(+2)*phi(ix,iy,iz+2,1) &
-                            + b_FD6(+3)*phi(ix,iy,iz+3,1))*dz2_inv
-
-                    v_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,2) &
-                            + b_FD6(-2)*phi(ix-2,iy,iz,2) &
-                            + b_FD6(-1)*phi(ix-1,iy,iz,2) &
-                            + b_FD6(0)*phi(ix,iy,iz,2) &
-                            + b_FD6(+1)*phi(ix+1,iy,iz,2) &
-                            + b_FD6(+2)*phi(ix+2,iy,iz,2) &
-                            + b_FD6(+3)*phi(ix+3,iy,iz,2))*dx2_inv
-
-                    v_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,2) &
-                            + b_FD6(-2)*phi(ix,iy-2,iz,2) &
-                            + b_FD6(-1)*phi(ix,iy-1,iz,2) &
-                            + b_FD6(0)*phi(ix,iy,iz,2) &
-                            + b_FD6(+1)*phi(ix,iy+1,iz,2) &
-                            + b_FD6(+2)*phi(ix,iy+2,iz,2) &
-                            + b_FD6(+3)*phi(ix,iy+3,iz,2))*dy2_inv
-
-                    v_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,2) &
-                            + b_FD6(-2)*phi(ix,iy,iz-2,2) &
-                            + b_FD6(-1)*phi(ix,iy,iz-1,2) &
-                            + b_FD6(0)*phi(ix,iy,iz,2) &
-                            + b_FD6(+1)*phi(ix,iy,iz+1,2) &
-                            + b_FD6(+2)*phi(ix,iy,iz+2,2) &
-                            + b_FD6(+3)*phi(ix,iy,iz+3,2))*dz2_inv
-
-                    w_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,3) &
-                            + b_FD6(-2)*phi(ix-2,iy,iz,3) &
-                            + b_FD6(-1)*phi(ix-1,iy,iz,3) &
-                            + b_FD6(0)*phi(ix,iy,iz,3) &
-                            + b_FD6(+1)*phi(ix+1,iy,iz,3) &
-                            + b_FD6(+2)*phi(ix+2,iy,iz,3) &
-                            + b_FD6(+3)*phi(ix+3,iy,iz,3))*dx2_inv
-
-                    w_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,3) &
-                            + b_FD6(-2)*phi(ix,iy-2,iz,3) &
-                            + b_FD6(-1)*phi(ix,iy-1,iz,3) &
-                            + b_FD6(0)*phi(ix,iy,iz,3) &
-                            + b_FD6(+1)*phi(ix,iy+1,iz,3) &
-                            + b_FD6(+2)*phi(ix,iy+2,iz,3) &
-                            + b_FD6(+3)*phi(ix,iy+3,iz,3))*dy2_inv
-
-                    w_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,3) &
-                            + b_FD6(-2)*phi(ix,iy,iz-2,3) &
-                            + b_FD6(-1)*phi(ix,iy,iz-1,3) &
-                            + b_FD6(0)*phi(ix,iy,iz,3) &
-                            + b_FD6(+1)*phi(ix,iy,iz+1,3) &
-                            + b_FD6(+2)*phi(ix,iy,iz+2,3) &
-                            + b_FD6(+3)*phi(ix,iy,iz+3,3))*dz2_inv
-
-                    div_U = u_dx + v_dy + w_dz
-
-                    u = phi(ix, iy, iz, 1)
-                    v = phi(ix, iy, iz, 2)
-                    w = phi(ix, iy, iz, 3)
-                    p = phi(ix, iy, iz, 4)
-
-                    chi = mask(ix,iy,iz,1) * eps_inv
-                    penalx = -chi * (u - mask(ix,iy,iz,2))
-                    penaly = -chi * (v - mask(ix,iy,iz,3))
-                    penalz = -chi * (w - mask(ix,iy,iz,4))
-
-                    rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                    rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                    rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
-                    rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
+                        ! Rhs in skew-symmetric formulation (of nonlinear term)
+                        ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
                 end do
             end do
-        end do
+        else
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_FD6(-3)*phi(ix-3,iy,iz,1) +a_FD6(-2)*phi(ix-2,iy,iz,1) +a_FD6(-1)*phi(ix-1,iy,iz,1) +a_FD6(+1)*phi(ix+1,iy,iz,1) +a_FD6(+2)*phi(ix+2,iy,iz,1) +a_FD6(+3)*phi(ix+3,iy,iz,1))*dx_inv
+                        v_dx = (a_FD6(-3)*phi(ix-3,iy,iz,2) +a_FD6(-2)*phi(ix-2,iy,iz,2) +a_FD6(-1)*phi(ix-1,iy,iz,2) +a_FD6(+1)*phi(ix+1,iy,iz,2) +a_FD6(+2)*phi(ix+2,iy,iz,2) +a_FD6(+3)*phi(ix+3,iy,iz,2))*dx_inv
+                        w_dx = (a_FD6(-3)*phi(ix-3,iy,iz,3) +a_FD6(-2)*phi(ix-2,iy,iz,3) +a_FD6(-1)*phi(ix-1,iy,iz,3) +a_FD6(+1)*phi(ix+1,iy,iz,3) +a_FD6(+2)*phi(ix+2,iy,iz,3) +a_FD6(+3)*phi(ix+3,iy,iz,3))*dx_inv
+                        p_dx = (a_FD6(-3)*phi(ix-3,iy,iz,4) +a_FD6(-2)*phi(ix-2,iy,iz,4) +a_FD6(-1)*phi(ix-1,iy,iz,4) +a_FD6(+1)*phi(ix+1,iy,iz,4) +a_FD6(+2)*phi(ix+2,iy,iz,4) +a_FD6(+3)*phi(ix+3,iy,iz,4))*dx_inv
+
+                        u_dy = (a_FD6(-3)*phi(ix,iy-3,iz,1) +a_FD6(-2)*phi(ix,iy-2,iz,1) +a_FD6(-1)*phi(ix,iy-1,iz,1) +a_FD6(+1)*phi(ix,iy+1,iz,1) +a_FD6(+2)*phi(ix,iy+2,iz,1) +a_FD6(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        v_dy = (a_FD6(-3)*phi(ix,iy-3,iz,2) +a_FD6(-2)*phi(ix,iy-2,iz,2) +a_FD6(-1)*phi(ix,iy-1,iz,2) +a_FD6(+1)*phi(ix,iy+1,iz,2) +a_FD6(+2)*phi(ix,iy+2,iz,2) +a_FD6(+3)*phi(ix,iy+3,iz,2))*dy_inv
+                        w_dy = (a_FD6(-3)*phi(ix,iy-3,iz,3) +a_FD6(-2)*phi(ix,iy-2,iz,3) +a_FD6(-1)*phi(ix,iy-1,iz,3) +a_FD6(+1)*phi(ix,iy+1,iz,3) +a_FD6(+2)*phi(ix,iy+2,iz,3) +a_FD6(+3)*phi(ix,iy+3,iz,3))*dy_inv
+                        p_dy = (a_FD6(-3)*phi(ix,iy-3,iz,4) +a_FD6(-2)*phi(ix,iy-2,iz,4) +a_FD6(-1)*phi(ix,iy-1,iz,4) +a_FD6(+1)*phi(ix,iy+1,iz,4) +a_FD6(+2)*phi(ix,iy+2,iz,4) +a_FD6(+3)*phi(ix,iy+3,iz,4))*dy_inv
+                        
+                        u_dz = (a_FD6(-3)*phi(ix,iy,iz-3,1) +a_FD6(-2)*phi(ix,iy,iz-2,1) +a_FD6(-1)*phi(ix,iy,iz-1,1) +a_FD6(+1)*phi(ix,iy,iz+1,1) +a_FD6(+2)*phi(ix,iy,iz+2,1) +a_FD6(+3)*phi(ix,iy,iz+3,1))*dz_inv
+                        v_dz = (a_FD6(-3)*phi(ix,iy,iz-3,2) +a_FD6(-2)*phi(ix,iy,iz-2,2) +a_FD6(-1)*phi(ix,iy,iz-1,2) +a_FD6(+1)*phi(ix,iy,iz+1,2) +a_FD6(+2)*phi(ix,iy,iz+2,2) +a_FD6(+3)*phi(ix,iy,iz+3,2))*dz_inv
+                        w_dz = (a_FD6(-3)*phi(ix,iy,iz-3,3) +a_FD6(-2)*phi(ix,iy,iz-2,3) +a_FD6(-1)*phi(ix,iy,iz-1,3) +a_FD6(+1)*phi(ix,iy,iz+1,3) +a_FD6(+2)*phi(ix,iy,iz+2,3) +a_FD6(+3)*phi(ix,iy,iz+3,3))*dz_inv
+                        p_dz = (a_FD6(-3)*phi(ix,iy,iz-3,4) +a_FD6(-2)*phi(ix,iy,iz-2,4) +a_FD6(-1)*phi(ix,iy,iz-1,4) +a_FD6(+1)*phi(ix,iy,iz+1,4) +a_FD6(+2)*phi(ix,iy,iz+2,4) +a_FD6(+3)*phi(ix,iy,iz+3,4))*dz_inv
+                        
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,1) +b_FD6(-2)*phi(ix-2,iy,iz,1) +b_FD6(-1)*phi(ix-1,iy,iz,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix+1,iy,iz,1) +b_FD6(+2)*phi(ix+2,iy,iz,1) +b_FD6(+3)*phi(ix+3,iy,iz,1))*dx2_inv
+                        u_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,1) +b_FD6(-2)*phi(ix,iy-2,iz,1) +b_FD6(-1)*phi(ix,iy-1,iz,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix,iy+1,iz,1) +b_FD6(+2)*phi(ix,iy+2,iz,1) +b_FD6(+3)*phi(ix,iy+3,iz,1))*dy2_inv
+                        u_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,1) +b_FD6(-2)*phi(ix,iy,iz-2,1) +b_FD6(-1)*phi(ix,iy,iz-1,1) +b_FD6(0)*phi(ix,iy,iz,1) +b_FD6(+1)*phi(ix,iy,iz+1,1) +b_FD6(+2)*phi(ix,iy,iz+2,1) +b_FD6(+3)*phi(ix,iy,iz+3,1))*dz2_inv
+                        v_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,2) +b_FD6(-2)*phi(ix-2,iy,iz,2) +b_FD6(-1)*phi(ix-1,iy,iz,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix+1,iy,iz,2) +b_FD6(+2)*phi(ix+2,iy,iz,2) +b_FD6(+3)*phi(ix+3,iy,iz,2))*dx2_inv
+                        v_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,2) +b_FD6(-2)*phi(ix,iy-2,iz,2) +b_FD6(-1)*phi(ix,iy-1,iz,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix,iy+1,iz,2) +b_FD6(+2)*phi(ix,iy+2,iz,2) +b_FD6(+3)*phi(ix,iy+3,iz,2))*dy2_inv
+                        v_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,2) +b_FD6(-2)*phi(ix,iy,iz-2,2) +b_FD6(-1)*phi(ix,iy,iz-1,2) +b_FD6(0)*phi(ix,iy,iz,2) +b_FD6(+1)*phi(ix,iy,iz+1,2) +b_FD6(+2)*phi(ix,iy,iz+2,2) +b_FD6(+3)*phi(ix,iy,iz+3,2))*dz2_inv
+                        w_dxdx = (b_FD6(-3)*phi(ix-3,iy,iz,3) +b_FD6(-2)*phi(ix-2,iy,iz,3) +b_FD6(-1)*phi(ix-1,iy,iz,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix+1,iy,iz,3) +b_FD6(+2)*phi(ix+2,iy,iz,3) +b_FD6(+3)*phi(ix+3,iy,iz,3))*dx2_inv
+                        w_dydy = (b_FD6(-3)*phi(ix,iy-3,iz,3) +b_FD6(-2)*phi(ix,iy-2,iz,3) +b_FD6(-1)*phi(ix,iy-1,iz,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix,iy+1,iz,3) +b_FD6(+2)*phi(ix,iy+2,iz,3) +b_FD6(+3)*phi(ix,iy+3,iz,3))*dy2_inv
+                        w_dzdz = (b_FD6(-3)*phi(ix,iy,iz-3,3) +b_FD6(-2)*phi(ix,iy,iz-2,3) +b_FD6(-1)*phi(ix,iy,iz-1,3) +b_FD6(0)*phi(ix,iy,iz,3) +b_FD6(+1)*phi(ix,iy,iz+1,3) +b_FD6(+2)*phi(ix,iy,iz+2,3) +b_FD6(+3)*phi(ix,iy,iz+3,3))*dz2_inv
+                        
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        endif
 
     case("FD_4th_central_optimized")
         !-----------------------------------------------------------------------
         ! 4th order (tam&web optimized scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! first derivatives of u, v, p
-                    u_dx = (a_TW4(-3)*phi(ix-3,iy,iz,1) &
-                           +a_TW4(-2)*phi(ix-2,iy,iz,1) &
-                           +a_TW4(-1)*phi(ix-1,iy,iz,1) &
-                           +a_TW4(+1)*phi(ix+1,iy,iz,1) &
-                           +a_TW4(+2)*phi(ix+2,iy,iz,1) &
-                           +a_TW4(+3)*phi(ix+3,iy,iz,1))*dx_inv
+        if (params_acm%skew_symmetry) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_TW4(-3)*phi(ix-3,iy,iz,1) +a_TW4(-2)*phi(ix-2,iy,iz,1) +a_TW4(-1)*phi(ix-1,iy,iz,1) +a_TW4(+1)*phi(ix+1,iy,iz,1) +a_TW4(+2)*phi(ix+2,iy,iz,1) +a_TW4(+3)*phi(ix+3,iy,iz,1))*dx_inv
+                        u_dy = (a_TW4(-3)*phi(ix,iy-3,iz,1) +a_TW4(-2)*phi(ix,iy-2,iz,1) +a_TW4(-1)*phi(ix,iy-1,iz,1) +a_TW4(+1)*phi(ix,iy+1,iz,1) +a_TW4(+2)*phi(ix,iy+2,iz,1) +a_TW4(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        u_dz = (a_TW4(-3)*phi(ix,iy,iz-3,1) +a_TW4(-2)*phi(ix,iy,iz-2,1) +a_TW4(-1)*phi(ix,iy,iz-1,1) +a_TW4(+1)*phi(ix,iy,iz+1,1) +a_TW4(+2)*phi(ix,iy,iz+2,1) +a_TW4(+3)*phi(ix,iy,iz+3,1))*dz_inv
+                        v_dx = (a_TW4(-3)*phi(ix-3,iy,iz,2) +a_TW4(-2)*phi(ix-2,iy,iz,2) +a_TW4(-1)*phi(ix-1,iy,iz,2) +a_TW4(+1)*phi(ix+1,iy,iz,2) +a_TW4(+2)*phi(ix+2,iy,iz,2) +a_TW4(+3)*phi(ix+3,iy,iz,2))*dx_inv
+                        v_dy = (a_TW4(-3)*phi(ix,iy-3,iz,2) +a_TW4(-2)*phi(ix,iy-2,iz,2) +a_TW4(-1)*phi(ix,iy-1,iz,2) +a_TW4(+1)*phi(ix,iy+1,iz,2) +a_TW4(+2)*phi(ix,iy+2,iz,2) +a_TW4(+3)*phi(ix,iy+3,iz,2))*dy_inv
+                        v_dz = (a_TW4(-3)*phi(ix,iy,iz-3,2) +a_TW4(-2)*phi(ix,iy,iz-2,2) +a_TW4(-1)*phi(ix,iy,iz-1,2) +a_TW4(+1)*phi(ix,iy,iz+1,2) +a_TW4(+2)*phi(ix,iy,iz+2,2) +a_TW4(+3)*phi(ix,iy,iz+3,2))*dz_inv
+                        w_dx = (a_TW4(-3)*phi(ix-3,iy,iz,3) +a_TW4(-2)*phi(ix-2,iy,iz,3) +a_TW4(-1)*phi(ix-1,iy,iz,3) +a_TW4(+1)*phi(ix+1,iy,iz,3) +a_TW4(+2)*phi(ix+2,iy,iz,3) +a_TW4(+3)*phi(ix+3,iy,iz,3))*dx_inv
+                        w_dy = (a_TW4(-3)*phi(ix,iy-3,iz,3) +a_TW4(-2)*phi(ix,iy-2,iz,3) +a_TW4(-1)*phi(ix,iy-1,iz,3) +a_TW4(+1)*phi(ix,iy+1,iz,3) +a_TW4(+2)*phi(ix,iy+2,iz,3) +a_TW4(+3)*phi(ix,iy+3,iz,3))*dy_inv
+                        w_dz = (a_TW4(-3)*phi(ix,iy,iz-3,3) +a_TW4(-2)*phi(ix,iy,iz-2,3) +a_TW4(-1)*phi(ix,iy,iz-1,3) +a_TW4(+1)*phi(ix,iy,iz+1,3) +a_TW4(+2)*phi(ix,iy,iz+2,3) +a_TW4(+3)*phi(ix,iy,iz+3,3))*dz_inv
+                        p_dx = (a_TW4(-3)*phi(ix-3,iy,iz,4) +a_TW4(-2)*phi(ix-2,iy,iz,4) +a_TW4(-1)*phi(ix-1,iy,iz,4) +a_TW4(+1)*phi(ix+1,iy,iz,4) +a_TW4(+2)*phi(ix+2,iy,iz,4) +a_TW4(+3)*phi(ix+3,iy,iz,4))*dx_inv
+                        p_dy = (a_TW4(-3)*phi(ix,iy-3,iz,4) +a_TW4(-2)*phi(ix,iy-2,iz,4) +a_TW4(-1)*phi(ix,iy-1,iz,4) +a_TW4(+1)*phi(ix,iy+1,iz,4) +a_TW4(+2)*phi(ix,iy+2,iz,4) +a_TW4(+3)*phi(ix,iy+3,iz,4))*dy_inv
+                        p_dz = (a_TW4(-3)*phi(ix,iy,iz-3,4) +a_TW4(-2)*phi(ix,iy,iz-2,4) +a_TW4(-1)*phi(ix,iy,iz-1,4) +a_TW4(+1)*phi(ix,iy,iz+1,4) +a_TW4(+2)*phi(ix,iy,iz+2,4) +a_TW4(+3)*phi(ix,iy,iz+3,4))*dz_inv
+    
+                        uu_dx = (a_TW4(-3)*phi(ix-3,iy,iz,1)*phi(ix-3,iy,iz,1) +a_TW4(-2)*phi(ix-2,iy,iz,1)*phi(ix-2,iy,iz,1) +a_TW4(-1)*phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) +a_TW4(+1)*phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) +a_TW4(+2)*phi(ix+2,iy,iz,1)*phi(ix+2,iy,iz,1) +a_TW4(+3)*phi(ix+3,iy,iz,1)*phi(ix+3,iy,iz,1))*dx_inv
+                        uv_dy = (a_TW4(-3)*phi(ix,iy-3,iz,1)*phi(ix,iy-3,iz,2) +a_TW4(-2)*phi(ix,iy-2,iz,1)*phi(ix,iy-2,iz,2) +a_TW4(-1)*phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) +a_TW4(+1)*phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) +a_TW4(+2)*phi(ix,iy+2,iz,1)*phi(ix,iy+2,iz,2) +a_TW4(+3)*phi(ix,iy+3,iz,1)*phi(ix,iy+3,iz,2))*dy_inv
+                        uw_dz = (a_TW4(-3)*phi(ix,iy,iz-3,1)*phi(ix,iy,iz-3,3) +a_TW4(-2)*phi(ix,iy,iz-2,1)*phi(ix,iy,iz-2,3) +a_TW4(-1)*phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) +a_TW4(+1)*phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) +a_TW4(+2)*phi(ix,iy,iz+2,1)*phi(ix,iy,iz+2,3) +a_TW4(+3)*phi(ix,iy,iz+3,1)*phi(ix,iy,iz+3,3))*dz_inv
 
-                    u_dy = (a_TW4(-3)*phi(ix,iy-3,iz,1) &
-                           +a_TW4(-2)*phi(ix,iy-2,iz,1) &
-                           +a_TW4(-1)*phi(ix,iy-1,iz,1) &
-                           +a_TW4(+1)*phi(ix,iy+1,iz,1) &
-                           +a_TW4(+2)*phi(ix,iy+2,iz,1) &
-                           +a_TW4(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        vu_dx = (a_TW4(-3)*phi(ix-3,iy,iz,2)*phi(ix-3,iy,iz,1) +a_TW4(-2)*phi(ix-2,iy,iz,2)*phi(ix-2,iy,iz,1) +a_TW4(-1)*phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) +a_TW4(+1)*phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) +a_TW4(+2)*phi(ix+2,iy,iz,2)*phi(ix+2,iy,iz,1) +a_TW4(+3)*phi(ix+3,iy,iz,2)*phi(ix+3,iy,iz,1))*dx_inv
+                        vv_dy = (a_TW4(-3)*phi(ix,iy-3,iz,2)*phi(ix,iy-3,iz,2) +a_TW4(-2)*phi(ix,iy-2,iz,2)*phi(ix,iy-2,iz,2) +a_TW4(-1)*phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) +a_TW4(+1)*phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) +a_TW4(+2)*phi(ix,iy+2,iz,2)*phi(ix,iy+2,iz,2) +a_TW4(+3)*phi(ix,iy+3,iz,2)*phi(ix,iy+3,iz,2))*dy_inv
+                        vw_dz = (a_TW4(-3)*phi(ix,iy,iz-3,2)*phi(ix,iy,iz-3,3) +a_TW4(-2)*phi(ix,iy,iz-2,2)*phi(ix,iy,iz-2,3) +a_TW4(-1)*phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) +a_TW4(+1)*phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) +a_TW4(+2)*phi(ix,iy,iz+2,2)*phi(ix,iy,iz+2,3) +a_TW4(+3)*phi(ix,iy,iz+3,2)*phi(ix,iy,iz+3,3))*dz_inv
 
-                    u_dz = (a_TW4(-3)*phi(ix,iy,iz-3,1) &
-                           +a_TW4(-2)*phi(ix,iy,iz-2,1) &
-                           +a_TW4(-1)*phi(ix,iy,iz-1,1) &
-                           +a_TW4(+1)*phi(ix,iy,iz+1,1) &
-                           +a_TW4(+2)*phi(ix,iy,iz+2,1) &
-                           +a_TW4(+3)*phi(ix,iy,iz+3,1))*dz_inv
-
-                    v_dx = (a_TW4(-3)*phi(ix-3,iy,iz,2) &
-                           +a_TW4(-2)*phi(ix-2,iy,iz,2) &
-                           +a_TW4(-1)*phi(ix-1,iy,iz,2) &
-                           +a_TW4(+1)*phi(ix+1,iy,iz,2) &
-                           +a_TW4(+2)*phi(ix+2,iy,iz,2) &
-                           +a_TW4(+3)*phi(ix+3,iy,iz,2))*dx_inv
-
-                    v_dy = (a_TW4(-3)*phi(ix,iy-3,iz,2) &
-                           +a_TW4(-2)*phi(ix,iy-2,iz,2) &
-                           +a_TW4(-1)*phi(ix,iy-1,iz,2) &
-                           +a_TW4(+1)*phi(ix,iy+1,iz,2) &
-                           +a_TW4(+2)*phi(ix,iy+2,iz,2) &
-                           +a_TW4(+3)*phi(ix,iy+3,iz,2))*dy_inv
-
-                    v_dz = (a_TW4(-3)*phi(ix,iy,iz-3,2) &
-                           +a_TW4(-2)*phi(ix,iy,iz-2,2) &
-                           +a_TW4(-1)*phi(ix,iy,iz-1,2) &
-                           +a_TW4(+1)*phi(ix,iy,iz+1,2) &
-                           +a_TW4(+2)*phi(ix,iy,iz+2,2) &
-                           +a_TW4(+3)*phi(ix,iy,iz+3,2))*dz_inv
-
-                    w_dx = (a_TW4(-3)*phi(ix-3,iy,iz,3) &
-                           +a_TW4(-2)*phi(ix-2,iy,iz,3) &
-                           +a_TW4(-1)*phi(ix-1,iy,iz,3) &
-                           +a_TW4(+1)*phi(ix+1,iy,iz,3) &
-                           +a_TW4(+2)*phi(ix+2,iy,iz,3) &
-                           +a_TW4(+3)*phi(ix+3,iy,iz,3))*dx_inv
-
-                    w_dy = (a_TW4(-3)*phi(ix,iy-3,iz,3) &
-                           +a_TW4(-2)*phi(ix,iy-2,iz,3) &
-                           +a_TW4(-1)*phi(ix,iy-1,iz,3) &
-                           +a_TW4(+1)*phi(ix,iy+1,iz,3) &
-                           +a_TW4(+2)*phi(ix,iy+2,iz,3) &
-                           +a_TW4(+3)*phi(ix,iy+3,iz,3))*dy_inv
-
-                    w_dz = (a_TW4(-3)*phi(ix,iy,iz-3,3) &
-                           +a_TW4(-2)*phi(ix,iy,iz-2,3) &
-                           +a_TW4(-1)*phi(ix,iy,iz-1,3) &
-                           +a_TW4(+1)*phi(ix,iy,iz+1,3) &
-                           +a_TW4(+2)*phi(ix,iy,iz+2,3) &
-                           +a_TW4(+3)*phi(ix,iy,iz+3,3))*dz_inv
-
-                    p_dx = (a_TW4(-3)*phi(ix-3,iy,iz,4) &
-                           +a_TW4(-2)*phi(ix-2,iy,iz,4) &
-                           +a_TW4(-1)*phi(ix-1,iy,iz,4) &
-                           +a_TW4(+1)*phi(ix+1,iy,iz,4) &
-                           +a_TW4(+2)*phi(ix+2,iy,iz,4) &
-                           +a_TW4(+3)*phi(ix+3,iy,iz,4))*dx_inv
-
-                    p_dy = (a_TW4(-3)*phi(ix,iy-3,iz,4) &
-                           +a_TW4(-2)*phi(ix,iy-2,iz,4) &
-                           +a_TW4(-1)*phi(ix,iy-1,iz,4) &
-                           +a_TW4(+1)*phi(ix,iy+1,iz,4) &
-                           +a_TW4(+2)*phi(ix,iy+2,iz,4) &
-                           +a_TW4(+3)*phi(ix,iy+3,iz,4))*dy_inv
-
-                    p_dz = (a_TW4(-3)*phi(ix,iy,iz-3,4) &
-                           +a_TW4(-2)*phi(ix,iy,iz-2,4) &
-                           +a_TW4(-1)*phi(ix,iy,iz-1,4) &
-                           +a_TW4(+1)*phi(ix,iy,iz+1,4) &
-                           +a_TW4(+2)*phi(ix,iy,iz+2,4) &
-                           +a_TW4(+3)*phi(ix,iy,iz+3,4))*dz_inv
-
-
-                   ! second derivatives of u, v and w
-                   u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1) &
-                           + b_FD4(-1)*phi(ix-1,iy,iz,1) &
-                           + b_FD4(0)*phi(ix,iy,iz,1) &
-                           + b_FD4(+1)*phi(ix+1,iy,iz,1) &
-                           + b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv
-
-                   u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1) &
-                           + b_FD4(-1)*phi(ix,iy-1,iz,1) &
-                           + b_FD4(0)*phi(ix,iy,iz,1) &
-                           + b_FD4(+1)*phi(ix,iy+1,iz,1) &
-                           + b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv
-
-                   u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1) &
-                           + b_FD4(-1)*phi(ix,iy,iz-1,1) &
-                           + b_FD4(0)*phi(ix,iy,iz,1) &
-                           + b_FD4(+1)*phi(ix,iy,iz+1,1) &
-                           + b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv
-
-                   v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2) &
-                           + b_FD4(-1)*phi(ix-1,iy,iz,2) &
-                           + b_FD4(0)*phi(ix,iy,iz,2) &
-                           + b_FD4(+1)*phi(ix+1,iy,iz,2) &
-                           + b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv
-
-                   v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2) &
-                           + b_FD4(-1)*phi(ix,iy-1,iz,2) &
-                           + b_FD4(0)*phi(ix,iy,iz,2) &
-                           + b_FD4(+1)*phi(ix,iy+1,iz,2) &
-                           + b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv
-
-                   v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2) &
-                           + b_FD4(-1)*phi(ix,iy,iz-1,2) &
-                           + b_FD4(0)*phi(ix,iy,iz,2) &
-                           + b_FD4(+1)*phi(ix,iy,iz+1,2) &
-                           + b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv
-
-                   w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3) &
-                           + b_FD4(-1)*phi(ix-1,iy,iz,3) &
-                           + b_FD4(0)*phi(ix,iy,iz,3) &
-                           + b_FD4(+1)*phi(ix+1,iy,iz,3) &
-                           + b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv
-
-                   w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3) &
-                           + b_FD4(-1)*phi(ix,iy-1,iz,3) &
-                           + b_FD4(0)*phi(ix,iy,iz,3) &
-                           + b_FD4(+1)*phi(ix,iy+1,iz,3) &
-                           + b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv
-
-                   w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3) &
-                           + b_FD4(-1)*phi(ix,iy,iz-1,3) &
-                           + b_FD4(0)*phi(ix,iy,iz,3) &
-                           + b_FD4(+1)*phi(ix,iy,iz+1,3) &
-                           + b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv
-
-                    div_U = u_dx + v_dy + w_dz
-
-                    u = phi(ix, iy, iz, 1)
-                    v = phi(ix, iy, iz, 2)
-                    w = phi(ix, iy, iz, 3)
-                    p = phi(ix, iy, iz, 4)
-
-                    chi = mask(ix,iy,iz,1) * eps_inv
-                    penalx = -chi * (u - mask(ix,iy,iz,2))
-                    penaly = -chi * (v - mask(ix,iy,iz,3))
-                    penalz = -chi * (w - mask(ix,iy,iz,4))
-
-                    rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                    rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                    rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
-                    rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
+                        wu_dx = (a_TW4(-3)*phi(ix-3,iy,iz,3)*phi(ix-3,iy,iz,1) +a_TW4(-2)*phi(ix-2,iy,iz,3)*phi(ix-2,iy,iz,1) +a_TW4(-1)*phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) +a_TW4(+1)*phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) +a_TW4(+2)*phi(ix+2,iy,iz,3)*phi(ix+2,iy,iz,1) +a_TW4(+3)*phi(ix+3,iy,iz,3)*phi(ix+3,iy,iz,1))*dx_inv
+                        wv_dy = (a_TW4(-3)*phi(ix,iy-3,iz,3)*phi(ix,iy-3,iz,2) +a_TW4(-2)*phi(ix,iy-2,iz,3)*phi(ix,iy-2,iz,2) +a_TW4(-1)*phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) +a_TW4(+1)*phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) +a_TW4(+2)*phi(ix,iy+2,iz,3)*phi(ix,iy+2,iz,2) +a_TW4(+3)*phi(ix,iy+3,iz,3)*phi(ix,iy+3,iz,2))*dy_inv
+                        ww_dz = (a_TW4(-3)*phi(ix,iy,iz-3,3)*phi(ix,iy,iz-3,3) +a_TW4(-2)*phi(ix,iy,iz-2,3)*phi(ix,iy,iz-2,3) +a_TW4(-1)*phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) +a_TW4(+1)*phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) +a_TW4(+2)*phi(ix,iy,iz+2,3)*phi(ix,iy,iz+2,3) +a_TW4(+3)*phi(ix,iy,iz+3,3)*phi(ix,iy,iz+3,3))*dz_inv
+                       
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1) +b_FD4(-1)*phi(ix-1,iy,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix+1,iy,iz,1) +b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv
+                        u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1) +b_FD4(-1)*phi(ix,iy-1,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy+1,iz,1) +b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv
+                        u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1) +b_FD4(-1)*phi(ix,iy,iz-1,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy,iz+1,1) +b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv
+                        v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2) +b_FD4(-1)*phi(ix-1,iy,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix+1,iy,iz,2) +b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv
+                        v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2) +b_FD4(-1)*phi(ix,iy-1,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy+1,iz,2) +b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv
+                        v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2) +b_FD4(-1)*phi(ix,iy,iz-1,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy,iz+1,2) +b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv
+                        w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3) +b_FD4(-1)*phi(ix-1,iy,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix+1,iy,iz,3) +b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv
+                        w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3) +b_FD4(-1)*phi(ix,iy-1,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy+1,iz,3) +b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv
+                        w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3) +b_FD4(-1)*phi(ix,iy,iz-1,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy,iz+1,3) +b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv
+    
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+    
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+    
+                        ! Rhs in skew-symmetric formulation (of nonlinear term)
+                        ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
                 end do
             end do
-        end do
+        else
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! first derivatives of u, v, p
+                        u_dx = (a_TW4(-3)*phi(ix-3,iy,iz,1) +a_TW4(-2)*phi(ix-2,iy,iz,1) +a_TW4(-1)*phi(ix-1,iy,iz,1) +a_TW4(+1)*phi(ix+1,iy,iz,1) +a_TW4(+2)*phi(ix+2,iy,iz,1) +a_TW4(+3)*phi(ix+3,iy,iz,1))*dx_inv
+                        u_dy = (a_TW4(-3)*phi(ix,iy-3,iz,1) +a_TW4(-2)*phi(ix,iy-2,iz,1) +a_TW4(-1)*phi(ix,iy-1,iz,1) +a_TW4(+1)*phi(ix,iy+1,iz,1) +a_TW4(+2)*phi(ix,iy+2,iz,1) +a_TW4(+3)*phi(ix,iy+3,iz,1))*dy_inv
+                        u_dz = (a_TW4(-3)*phi(ix,iy,iz-3,1) +a_TW4(-2)*phi(ix,iy,iz-2,1) +a_TW4(-1)*phi(ix,iy,iz-1,1) +a_TW4(+1)*phi(ix,iy,iz+1,1) +a_TW4(+2)*phi(ix,iy,iz+2,1) +a_TW4(+3)*phi(ix,iy,iz+3,1))*dz_inv
+                        v_dx = (a_TW4(-3)*phi(ix-3,iy,iz,2) +a_TW4(-2)*phi(ix-2,iy,iz,2) +a_TW4(-1)*phi(ix-1,iy,iz,2) +a_TW4(+1)*phi(ix+1,iy,iz,2) +a_TW4(+2)*phi(ix+2,iy,iz,2) +a_TW4(+3)*phi(ix+3,iy,iz,2))*dx_inv
+                        v_dy = (a_TW4(-3)*phi(ix,iy-3,iz,2) +a_TW4(-2)*phi(ix,iy-2,iz,2) +a_TW4(-1)*phi(ix,iy-1,iz,2) +a_TW4(+1)*phi(ix,iy+1,iz,2) +a_TW4(+2)*phi(ix,iy+2,iz,2) +a_TW4(+3)*phi(ix,iy+3,iz,2))*dy_inv
+                        v_dz = (a_TW4(-3)*phi(ix,iy,iz-3,2) +a_TW4(-2)*phi(ix,iy,iz-2,2) +a_TW4(-1)*phi(ix,iy,iz-1,2) +a_TW4(+1)*phi(ix,iy,iz+1,2) +a_TW4(+2)*phi(ix,iy,iz+2,2) +a_TW4(+3)*phi(ix,iy,iz+3,2))*dz_inv
+                        w_dx = (a_TW4(-3)*phi(ix-3,iy,iz,3) +a_TW4(-2)*phi(ix-2,iy,iz,3) +a_TW4(-1)*phi(ix-1,iy,iz,3) +a_TW4(+1)*phi(ix+1,iy,iz,3) +a_TW4(+2)*phi(ix+2,iy,iz,3) +a_TW4(+3)*phi(ix+3,iy,iz,3))*dx_inv
+                        w_dy = (a_TW4(-3)*phi(ix,iy-3,iz,3) +a_TW4(-2)*phi(ix,iy-2,iz,3) +a_TW4(-1)*phi(ix,iy-1,iz,3) +a_TW4(+1)*phi(ix,iy+1,iz,3) +a_TW4(+2)*phi(ix,iy+2,iz,3) +a_TW4(+3)*phi(ix,iy+3,iz,3))*dy_inv
+                        w_dz = (a_TW4(-3)*phi(ix,iy,iz-3,3) +a_TW4(-2)*phi(ix,iy,iz-2,3) +a_TW4(-1)*phi(ix,iy,iz-1,3) +a_TW4(+1)*phi(ix,iy,iz+1,3) +a_TW4(+2)*phi(ix,iy,iz+2,3) +a_TW4(+3)*phi(ix,iy,iz+3,3))*dz_inv
+                        p_dx = (a_TW4(-3)*phi(ix-3,iy,iz,4) +a_TW4(-2)*phi(ix-2,iy,iz,4) +a_TW4(-1)*phi(ix-1,iy,iz,4) +a_TW4(+1)*phi(ix+1,iy,iz,4) +a_TW4(+2)*phi(ix+2,iy,iz,4) +a_TW4(+3)*phi(ix+3,iy,iz,4))*dx_inv
+                        p_dy = (a_TW4(-3)*phi(ix,iy-3,iz,4) +a_TW4(-2)*phi(ix,iy-2,iz,4) +a_TW4(-1)*phi(ix,iy-1,iz,4) +a_TW4(+1)*phi(ix,iy+1,iz,4) +a_TW4(+2)*phi(ix,iy+2,iz,4) +a_TW4(+3)*phi(ix,iy+3,iz,4))*dy_inv
+                        p_dz = (a_TW4(-3)*phi(ix,iy,iz-3,4) +a_TW4(-2)*phi(ix,iy,iz-2,4) +a_TW4(-1)*phi(ix,iy,iz-1,4) +a_TW4(+1)*phi(ix,iy,iz+1,4) +a_TW4(+2)*phi(ix,iy,iz+2,4) +a_TW4(+3)*phi(ix,iy,iz+3,4))*dz_inv
+
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1) +b_FD4(-1)*phi(ix-1,iy,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix+1,iy,iz,1) +b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv
+                        u_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,1) +b_FD4(-1)*phi(ix,iy-1,iz,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy+1,iz,1) +b_FD4(+2)*phi(ix,iy+2,iz,1))*dy2_inv
+                        u_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,1) +b_FD4(-1)*phi(ix,iy,iz-1,1) +b_FD4(0)*phi(ix,iy,iz,1) +b_FD4(+1)*phi(ix,iy,iz+1,1) +b_FD4(+2)*phi(ix,iy,iz+2,1))*dz2_inv
+                        v_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,2) +b_FD4(-1)*phi(ix-1,iy,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix+1,iy,iz,2) +b_FD4(+2)*phi(ix+2,iy,iz,2))*dx2_inv
+                        v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2) +b_FD4(-1)*phi(ix,iy-1,iz,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy+1,iz,2) +b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv
+                        v_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,2) +b_FD4(-1)*phi(ix,iy,iz-1,2) +b_FD4(0)*phi(ix,iy,iz,2) +b_FD4(+1)*phi(ix,iy,iz+1,2) +b_FD4(+2)*phi(ix,iy,iz+2,2))*dz2_inv
+                        w_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,3) +b_FD4(-1)*phi(ix-1,iy,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix+1,iy,iz,3) +b_FD4(+2)*phi(ix+2,iy,iz,3))*dx2_inv
+                        w_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,3) +b_FD4(-1)*phi(ix,iy-1,iz,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy+1,iz,3) +b_FD4(+2)*phi(ix,iy+2,iz,3))*dy2_inv
+                        w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3) +b_FD4(-1)*phi(ix,iy,iz-1,3) +b_FD4(0)*phi(ix,iy,iz,3) +b_FD4(+1)*phi(ix,iy,iz+1,3) +b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv
+
+                        u = phi(ix, iy, iz, 1)
+                        v = phi(ix, iy, iz, 2)
+                        w = phi(ix, iy, iz, 3)
+                        p = phi(ix, iy, iz, 4)
+
+                        chi = mask(ix,iy,iz,1) * eps_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        endif
 
     case default
         call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )

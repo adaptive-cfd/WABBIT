@@ -98,7 +98,6 @@ module module_params
 
         ! switch for mesh adaption
         logical :: adapt_tree=.false., adapt_inicond=.false.
-        logical :: out_of_memory = .false.
         ! number of allocated heavy data fields per process
         integer(kind=ik) :: number_blocks = -1_ik
         ! number of allocated data fields in heavy data array, number of fields

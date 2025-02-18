@@ -488,8 +488,11 @@ program main
     ! and has to resume expensive simulations quite often. this process is usually automatized
     ! but for this it is nice to have a quick-to-evaluate criterion to know if a run ended normally
     ! or with an error. So write an empty success file if the run ended normally
-    if (rank==0 .and. .not. params%out_of_memory) then
+    if (rank==0 .and. .not. error_OOM) then
         open (77, file='success', status='replace')
+        close(77)
+    elseif (rank==0 .and. error_OOM) then
+        open (77, file='out_of_memory', status='replace')
         close(77)
     endif
 

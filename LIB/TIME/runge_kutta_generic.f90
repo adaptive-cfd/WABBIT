@@ -27,6 +27,13 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     g    = params%g
     grhs = params%g_rhs
 
+#ifdef DEV
+    if (grhs>g) then
+        write(*,*) "grhs=", grhs, "g=", g
+        call abort(180225,"ERROR: grhs>g")
+    endif
+#endif
+
     if (params%dim==2) then
         z1 = 1
         z2 = 1

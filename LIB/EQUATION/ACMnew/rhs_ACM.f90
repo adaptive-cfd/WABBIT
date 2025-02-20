@@ -835,9 +835,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                         ! Rhs in skew-symmetric formulation (of nonlinear term)
                         ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
-                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
                         rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
                     end do
                 end do
@@ -1076,9 +1076,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                         ! Rhs in skew-symmetric formulation (of nonlinear term)
                         ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
-                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
                         rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
                     end do
                 end do
@@ -1191,9 +1191,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     
                         ! Rhs in skew-symmetric formulation (of nonlinear term)
                         ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
-                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
-                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
                         rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
                     end do
                 end do

@@ -794,17 +794,17 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w_dy = (phi(ix  , iy+1, iz  , 3) - phi(ix  , iy-1, iz  , 3))*dy_inv*0.5_rk
                         w_dz = (phi(ix  , iy  , iz+1, 3) - phi(ix  , iy  , iz-1, 3))*dz_inv*0.5_rk
 
-                        uu_dx = (phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) )*dx_inv
-                        uv_dy = (phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) )*dy_inv
-                        uw_dz = (phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) )*dz_inv
+                        uu_dx = (phi(ix+1,iy,iz,1)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,1)*phi(ix-1,iy,iz,1) )*dx_inv*0.5_rk
+                        uv_dy = (phi(ix,iy+1,iz,1)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,1)*phi(ix,iy-1,iz,2) )*dy_inv*0.5_rk
+                        uw_dz = (phi(ix,iy,iz+1,1)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,1)*phi(ix,iy,iz-1,3) )*dz_inv*0.5_rk
 
-                        vu_dx = (phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) )*dx_inv
-                        vv_dy = (phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) )*dy_inv
-                        vw_dz = (phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) )*dz_inv
+                        vu_dx = (phi(ix+1,iy,iz,2)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,2)*phi(ix-1,iy,iz,1) )*dx_inv*0.5_rk
+                        vv_dy = (phi(ix,iy+1,iz,2)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,2)*phi(ix,iy-1,iz,2) )*dy_inv*0.5_rk
+                        vw_dz = (phi(ix,iy,iz+1,2)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,2)*phi(ix,iy,iz-1,3) )*dz_inv*0.5_rk
 
-                        wu_dx = (phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) )*dx_inv
-                        wv_dy = (phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) )*dy_inv
-                        ww_dz = (phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) )*dz_inv
+                        wu_dx = (phi(ix+1,iy,iz,3)*phi(ix+1,iy,iz,1) -phi(ix-1,iy,iz,3)*phi(ix-1,iy,iz,1) )*dx_inv*0.5_rk
+                        wv_dy = (phi(ix,iy+1,iz,3)*phi(ix,iy+1,iz,2) -phi(ix,iy-1,iz,3)*phi(ix,iy-1,iz,2) )*dy_inv*0.5_rk
+                        ww_dz = (phi(ix,iy,iz+1,3)*phi(ix,iy,iz+1,3) -phi(ix,iy,iz-1,3)*phi(ix,iy,iz-1,3) )*dz_inv*0.5_rk
 
                         u_dxdx = (phi(ix-1, iy  , iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix+1, iy  , iz  , 1))*dx2_inv
                         u_dydy = (phi(ix  , iy-1, iz  , 1) -2.0_rk*phi(ix, iy, iz, 1) + phi(ix  , iy+1, iz  , 1))*dy2_inv

@@ -48,7 +48,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:6), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block, usx, usy, usz, chi, dissipation_block
-    real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3)
+    real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3), ACM_energy_block
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
@@ -114,6 +114,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%penal_power = 0.0_rk
         params_acm%scalar_removal = 0.0_rk
         params_acm%dissipation = 0.0_rk
+        params_acm%umag = 0.0_rk
+        params_acm%ACM_energy = 0.0_rk
 
         dx_min = 90.0e9_rk
 
@@ -148,6 +150,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         tmp_volume2 = 0.0_rk
         penal_power_block = 0.0_rk
         scalar_removal_block = 0.0_rk
+        ACM_energy_block = 0.0_rk
 
         ! some preparations that we do not want to compute each time within the loop
         if (is_insect) then
@@ -184,7 +187,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
 
-            ! maximum of velocity in the field
+            ! acm energy
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/params_acm%c_0**2 + ekin_block
+
+            ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
 
             ! maximum/min divergence in velocity field
@@ -245,7 +251,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
 
-            ! maximum of velocity in the field
+            ! acm energy
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/params_acm%c_0**2 + ekin_block
+
+            ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
 
             ! maximum/min divergence in velocity field
@@ -339,6 +348,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%e_kin         = params_acm%e_kin         + ekin_block * dV
         params_acm%penal_power   = params_acm%penal_power   + penal_power_block * dV
         params_acm%scalar_removal= params_acm%scalar_removal+ scalar_removal_block * dV
+        params_acm%ACM_energy    = params_acm%ACM_energy    + ACM_energy_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
@@ -398,6 +408,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! kinetic energy
         tmp(1) = params_acm%e_kin
         call MPI_ALLREDUCE(tmp(1), params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        tmp(1) = params_acm%ACM_energy
+        call MPI_ALLREDUCE(tmp(1), params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! divergence
@@ -523,6 +536,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call append_t_file( 'scalar_removal.t', (/time, params_acm%scalar_removal/) )
             endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
+            call append_t_file( 'ACM_energy.t', (/time, params_acm%ACM_energy/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
             if (params_acm%dim == 3) then
                 call append_t_file( 'helicity.t', (/time, params_acm%helicity/) )

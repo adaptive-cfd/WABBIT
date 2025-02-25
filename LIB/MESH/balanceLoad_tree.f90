@@ -58,7 +58,6 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
     ! number of blocks
     N = params%number_blocks
 
-
     ! how many blocks to we have to distribute among mpiranks?
     if (balanceForRefinement2) then
         ! we distribute the blocks such that the distribution AFTER 
@@ -74,12 +73,6 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
                 Nblocks_toDistribute = Nblocks_toDistribute + 1
             endif        
         enddo
-
-        ! if (params%rank==0) then
-        ! open(14,file="Nblocks_toDistribute.dat", status='unknown', position='append')
-        ! write(14, *) Nblocks_toDistribute
-        ! close(14)
-        ! endif
     else
         ! without considering refinement, we just distribute the blocks that 
         ! are on the grid right now.

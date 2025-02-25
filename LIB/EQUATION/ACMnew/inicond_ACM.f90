@@ -152,13 +152,13 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         end do
 
         ! noise in uy
-        ! do iz = 1, size(u,3)
-        !     do iy = 1, size(u,2)
-        !         do ix = 1, size(u,1)
-        !             u(ix,iy,iz,2) = u(ix,iy,iz,2) + 1.0e-5_rk * rand_nbr()
-        !         enddo
-        !     enddo
-        ! enddo
+        do iz = 1, size(u,3)
+            do iy = 1, size(u,2)
+                do ix = 1, size(u,1)
+                    u(ix,iy,iz,2) = u(ix,iy,iz,2) + params_acm%beta * rand_nbr()
+                enddo
+            enddo
+        enddo
 
     case("velocity-blob")
         if (params_acm%dim==2) then

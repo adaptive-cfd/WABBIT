@@ -90,7 +90,11 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     ! compute norm of error
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm)
 
-    norm = norm / norm_ref
+    do k = 1, nc
+        if (norm_ref(k) > 1.0e-12) then
+            norm(k) = norm(k) / norm_ref(k)
+        endif
+    enddo
 
     if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm(1)
 

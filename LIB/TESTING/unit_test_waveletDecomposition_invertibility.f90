@@ -46,7 +46,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     ! complete memory.
     if (params%Jmax/=params%Jmin .and. params%Jmax>1) then
         ! perform at min 3 iterations of random refinement/coarsening
-        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin, verbosity=.true., iterations=max(3, params%Jmax-params%Jmin), tree_ID=tree_ID )
+        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin + min((params%Jmax-params%Jmin)/2,1), verbosity=.true., iterations=max(3, params%Jmax-params%Jmin), tree_ID=tree_ID )
     else
         if (params%rank == 0) then
             write(*, '("UNIT TEST: With these grid settings we need to do this test with an equidistand grid on level ", i0, ".")') params%Jmin
@@ -97,7 +97,11 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
         ! this norm is the reference norm, as we compare to this one
         call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_1)
-        norm_1 = abs(norm_1 / norm_ref - 1.0_rk)
+        do k = 1, nc
+            if (norm_ref(k) > 1.0e-12) then
+                norm_1(k) = abs(norm_1(k) / norm_ref(k) - 1.0_rk)
+            endif
+        enddo
 
         ! prepare for test results, any test after the second should pass
         if (i_adapt > 1 .or. grid_is_equidistant) then

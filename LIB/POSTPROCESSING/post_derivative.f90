@@ -74,21 +74,23 @@ subroutine post_derivative(params)
 
     ! decide which order for discretization and predictor is used. Note predictor
     ! is used in ghost nodes sync'ing
-    if (order == "4") then
-        params%order_discretization = "FD_4th_central"
-        params%g = 4_ik
-        params%wavelet="CDF40"
-    elseif (order == "2") then
+    if (order == "2") then
         params%order_discretization = "FD_2nd_central"
+        params%g = 1_ik
+    elseif (order == "4") then
+        params%order_discretization = "FD_4th_central"
         params%g = 2_ik
-        params%wavelet="CDF20"
+    elseif (order == "4op") then
+        params%order_discretization = "FD_4th_central_optimized"
+        params%g = 3_ik
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
-        params%g = 7_ik
-        params%wavelet="CDF60"
+        params%g = 3_ik
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central) and 2 (FD_2nd_central)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central), 4op (FD_4th_central_optimized) and 2 (FD_2nd_central)")
     end if
+    params%wavelet="CDF20"  ! wavelet is not used
+
 
     ! translate der_order and der_dim and check if everything is alright
     if (der_dim == "1") then

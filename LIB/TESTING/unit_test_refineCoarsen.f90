@@ -103,7 +103,11 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
         enddo
     endif
 
-    norm = abs(norm / norm_ref - 1.0_rk)
+    do k = 1, nc
+        if (norm_ref(k) > 1.0e-12) then
+            norm(k) = abs(norm(k) / norm_ref(k) - 1.0_rk)
+        endif
+    enddo
 
     if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in Coarsen(Refine(u)) is: ", norm(1)
 

@@ -147,7 +147,9 @@ subroutine sparse_to_dense(params)
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
-    write(*, '("Number of blocks: ", i0)') params%number_blocks
+    if (params%rank==0) then
+        write(*, '("Number of blocks: ", i0)') params%number_blocks
+    endif
 
     ! read input data
     call readHDF5vct_tree( (/file_in/), params, hvy_block, tree_ID)

@@ -61,7 +61,7 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     ! complete memory.
     ! perform at min 3 iterations of random refinement/coarsening
     l = max(3, params%Jmax-params%Jmin)
-    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin, verbosity=.true., iterations=l, tree_ID=tree_ID )
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin + min((params%Jmax-params%Jmin)/2,1), verbosity=.true., iterations=l, tree_ID=tree_ID )
 
     JmaxA = maxActiveLevel_tree(tree_ID)
     JminA = minActiveLevel_tree(tree_ID)

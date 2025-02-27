@@ -1404,16 +1404,18 @@ contains
         params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
         params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
 
-        ! for unlifted wavelets no SC are copied, however some WC do have to be wiped in case we ned to reconstruct (CVS and image denoising)
-        ! normally, if no WC are altered we can simply recopy the valeus that we had
-        if (.not. params%isLiftedWavelet) then
-            params%Nwcl = params%Nwcl - 2
-            params%Nreconl = params%Nreconl - 2
-            params%Nwcr = params%Nwcr - 2
-            params%Nreconr = params%Nreconr - 2
-        endif
+        ! ! for unlifted wavelets no SC are copied, however some WC do have to be wiped in case we need to reconstruct (CVS and image denoising)
+        ! ! This is, because at a coarse-fine interface the filter to compute the WC stretches over the border, creating the same dilemma as for the CE
+        ! ! normally, if no WC are altered we can simply recopy the values that we had
+        ! if (.not. params%isLiftedWavelet) then
+        !     params%Nwcl = params%Nwcl + 2
+        !     params%Nwcr = params%Nwcr + 2
+        !     params%Nreconl = params%Nreconl + 2
+        !     params%Nreconr = params%Nreconr + 2
+        ! endif
 
         ! for wavelets with regularity higher than the wavelets NWC needs to be increased, the reasing for me is yet unclear
+        ! this was investigated and found using the invertibility test
         if (params%isLiftedWavelet) then
             a = 0
             if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "46") a = 2
@@ -1459,7 +1461,8 @@ contains
             write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
-            write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
+            ! We reconstruct everything, so the reconstruction length is not really important anymore
+            ! write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
             if (block_min /= 0) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
             write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD

@@ -160,6 +160,28 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             enddo
         enddo
 
+    case("jet-x-sin")
+        ! a jet with constant (unit) velocity
+        ! no smoothing is applied
+        do iy = 1, Bs(2)+2*g
+            ! compute x,y coordinates from spacing and origin
+            y = abs(dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk)
+
+            if (y <= 0.25_rk * params_acm%domain_size(2)) then
+                ! ux is =1
+                u(:,iy,:,1) = 1.0
+            endif
+        end do
+
+        ! uy is a sin wave (that triggers the instability)
+        do ix = 1, Bs(2)+2*g
+            ! compute x,y coordinates from spacing and origin
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+            u(ix,:,:,2) = 0.1_rk * sin(2.0_rk*pi*x/params_acm%domain_size(1))
+        end do
+
+
     case("velocity-blob")
         if (params_acm%dim==2) then
             ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.

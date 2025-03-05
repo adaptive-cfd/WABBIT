@@ -743,7 +743,8 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
-                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz
+                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
+                     C_sponge_inv
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 

@@ -174,7 +174,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         end do
 
         ! uy is a sin wave (that triggers the instability)
-        do ix = 1, Bs(2)+2*g
+        do ix = 1, Bs(1)+2*g
             ! compute x,y coordinates from spacing and origin
             x = dble(ix-(g+1)) * dx(1) + x0(1)
 

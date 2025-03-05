@@ -431,21 +431,21 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         ! block only needs information from medium and fine neighbors as CE will cut dependency to coarse neighbors
         t_block = MPI_Wtime()
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
-        ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
-        if (params%isLiftedWavelet) then
-            call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
-            call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
+        ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
+        ! if (params%isLiftedWavelet) then
+        !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+        !     call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
 
-            write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
-            call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
-        ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
-        else
+        !     write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
+        !     call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
+        ! ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
+        ! else
             call sync_TMP_from_all( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
             call toc( "decompose_tree (sync TMP <- all)", 111, MPI_Wtime()-t_block )
 
             write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- all)"
             call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )
-        endif
+        ! endif
 
         ! Wavelet-transform all blocks which are untreated
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form for these blocks

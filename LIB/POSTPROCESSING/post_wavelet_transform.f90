@@ -107,7 +107,9 @@ subroutine post_wavelet_transform(params)
     ! read input data
     call readHDF5vct_tree( (/ fname_in /), params, hvy_block, tree_ID)
 
-    call sync_ghosts_tree( params, hvy_block, tree_ID)
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+
+    !call sync_ghosts_tree( params, hvy_block, tree_ID)
 
     ! decompose or reconstruct
     select case(operator)

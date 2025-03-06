@@ -97,7 +97,7 @@ subroutine compute_vorticity_post(params)
     ! is used in ghost nodes sync'ing
     if (order == "2") then
         params%order_discretization = "FD_2nd_central"
-        params%g = 1_ik
+        params%g = 2_ik
     elseif (order == "4") then
         params%order_discretization = "FD_4th_central"
         params%g = 2_ik

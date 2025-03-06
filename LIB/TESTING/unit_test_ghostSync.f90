@@ -11,7 +11,7 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     logical, intent(in)               :: abort_on_fail
     logical, optional, intent(in)     :: verbose
 
-    integer(kind=ik)                  :: k, l, lgt_id, hvy_id
+    integer(kind=ik)                  :: k, it_random, lgt_id, hvy_id, l_init
     integer(kind=ik)                  :: rank, number_procs
     real(kind=rk)                     :: ddx(1:3), xx0(1:3)
     integer(kind=ik)                  :: g, number_blocks, ix, iy, iz, JmaxA, JminA
@@ -60,8 +60,9 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     ! perform at min 3 iterations of random refinement/coarsening
-    l = max(3, params%Jmax-params%Jmin)
-    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin + min((params%Jmax-params%Jmin)/2,1), verbosity=.true., iterations=l, tree_ID=tree_ID )
+    it_random = max(4, params%Jmax-params%Jmin)
+    l_init = max(min(3, params%Jmax), params%Jmin)  ! init on level 3 but adhere to Jmin Jmax restrictions
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=l_init, verbosity=.true., iterations=it_random, tree_ID=tree_ID )
 
     JmaxA = maxActiveLevel_tree(tree_ID)
     JminA = minActiveLevel_tree(tree_ID)

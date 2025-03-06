@@ -10,7 +10,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     integer(kind=ik), intent(in)            :: tree_ID
     logical, optional, intent(in)           :: verbose
 
-    integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt
+    integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt, it_random, l_init
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), allocatable :: norm_1(:), norm_ref(:), norm_2(:)
@@ -45,8 +45,10 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     if (params%Jmax/=params%Jmin .and. params%Jmax>1) then
-        ! perform at min 3 iterations of random refinement/coarsening
-        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin + min((params%Jmax-params%Jmin)/2,1), verbosity=.true., iterations=max(3, params%Jmax-params%Jmin), tree_ID=tree_ID )
+        ! perform random refinement/coarsening
+        it_random = max(4, params%Jmax-params%Jmin)
+        l_init = max(min(3, params%Jmax), params%Jmin)  ! init on level 3 but adhere to Jmin Jmax restrictions
+        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=l_init, verbosity=.true., iterations=it_random, tree_ID=tree_ID )
     else
         if (params%rank == 0) then
             write(*, '("UNIT TEST: With these grid settings we need to do this test with an equidistand grid on level ", i0, ".")') params%Jmin

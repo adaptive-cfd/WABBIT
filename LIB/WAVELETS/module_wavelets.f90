@@ -1438,22 +1438,6 @@ contains
             endif
         endif
 
-        ! ! conditions for minimum blocksize for lifted wavelets arise from coarse extension and double block-jump
-        ! !    JB: Origin of these minimum block sizes was not yet found but was tested with invertibility test
-        ! !    CDF 24, 42: BS_min = 12   ;   CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
-        ! block_min = 0
-        ! if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
-        !     if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") block_min = 12
-        !     if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") block_min = 18
-        !     if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") block_min = 24
-        !     if (params%wavelet(4:5) == "66") block_min = 30
-
-        !     if (any(params%Bs(:params%dim) < block_min)) then
-        !         write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
-        !         call abort(8888881, "The selected wavelet requires larger blocksizes for coarse extensions.")
-        !     endif
-        ! endif
-
         if (params%rank==0 .and. verbose1) then
             write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
             write(*, '("──╯ │ ╭────╯ │ ╭───   Wavelet-setup   ───╯ │ ╭───────╯   │   ╭───────╯ │ ╭──────")')
@@ -1461,14 +1445,23 @@ contains
             write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
             write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
             write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
-            ! We reconstruct everything, so the reconstruction length is not really important anymore
-            ! write(*,'(A55, i4, i4)') "During coarse extension, we will reconstruct u (L,R):", params%Nreconl, params%Nreconr
-            if (block_min /= 0) write(*,'(A55, i4)') "From coarse extension we have a minimum blocksize of:", block_min
+
+            ! For the leaf-first loop, we need 3*h as minimum blocksize, as we have an upwards dependency for the leaf-decomposition
+            ! So, for lower BS we do level-wise loop (which performs worse) and if the BS is high enough, we do the more optimized leaf-first level-wise loop
+            block_min = 0
+            if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+                block_min = 3* max(abs(lbound(params%HD, dim=1)), abs(ubound(params%HD, dim=1)))
+                if (any(params%Bs(:params%dim) < block_min)) then
+                    write(*, '(A, i3, A, i3, A)') 'Bs=', minval(params%Bs(1:params%dim)), " < 3*h=", block_min,", not using optimized wavelet decomposition algorithm"
+                else
+                    write(*, '(A, i3, A, i3, A)') 'Bs=', minval(params%Bs(1:params%dim)), " >= 3*h=", block_min,", using optimized wavelet decomposition algorithm"
+                endif
+            endif
             write(*,'(2A)') "The predictor is: ", trim(adjustl(params%order_predictor))
-            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
-            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
-            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
-            write(*,'(A,"[",i2,":",i1,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
+            write(*,'(A,"[",i3,":",i2,"]=",14(es12.4,1x))') "HD", lbound(params%HD, dim=1), ubound(params%HD, dim=1), params%HD
+            write(*,'(A,"[",i3,":",i2,"]=",14(es12.4,1x))') "GD", lbound(params%GD, dim=1), ubound(params%GD, dim=1), params%GD
+            write(*,'(A,"[",i3,":",i2,"]=",14(es12.4,1x))') "HR", lbound(params%HR, dim=1), ubound(params%HR, dim=1), params%HR
+            write(*,'(A,"[",i3,":",i2,"]=",14(es12.4,1x))') "GR", lbound(params%GR, dim=1), ubound(params%GR, dim=1), params%GR
             write(*, '(20("╭─╮ "))')
             write(*, '(20("╯ ╰─"))')
             ! this code has been used to plot our wavelets in PYTHON.

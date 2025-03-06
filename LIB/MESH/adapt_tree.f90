@@ -276,14 +276,19 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
     integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: toc_statement
-    logical              :: iterate
+    logical              :: iterate, use_leaf_first
 
-    ! In order to start with leaf-wise investigation, these will receive the correct ref flag, being -1
+    ! we can only use the more parallel optimized leaf-first option with a specific minimum blocksize, so we test that here
+    use_leaf_first = all(params%Bs(1:params%dim) >= 3* max(abs(lbound(params%HD, dim=1)), abs(ubound(params%HD, dim=1))))
+
+    ! In order to start investigation, we set correct ref flag, being -1
+    !    leaf-first : all blocks
+    !    level-wise : only blocks on highest level
     level       = maxActiveLevel_tree(tree_ID)
     do k = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k, tree_ID)
         level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-        if (level_me == level) then
+        if (level_me == level .or. use_leaf_first) then
             lgt_block(lgt_ID, IDX_REFINE_STS) = -1
         endif
     end do
@@ -396,9 +401,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
             if (lgt_block(lgt_ID, IDX_REFINE_STS) == -1) then
                 lgt_block(lgt_ID, IDX_REFINE_STS) = 0
             endif
-            ! update all updated mother blocks which are empty (leaf-blocks will never be updated) and set their refinement flag to -1
-            ! if (lgt_block(lgt_ID, IDX_REFINE_STS) == REF_TMP_EMPTY .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
-            if (lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
+            ! update all updated mother blocks which are empty (leaf-blocks will never be updated for leaf-first optimization) and set their refinement flag to -1
+            if ((lgt_block(lgt_ID, IDX_REFINE_STS) == REF_TMP_EMPTY .or. .not. use_leaf_first) .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
                 lgt_block(lgt_ID, IDX_REFINE_STS) = -1
             endif
         end do

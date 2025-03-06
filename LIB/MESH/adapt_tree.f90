@@ -279,9 +279,13 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
     logical              :: iterate
 
     ! In order to start with leaf-wise investigation, these will receive the correct ref flag, being -1
+    level       = maxActiveLevel_tree(tree_ID)
     do k = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k, tree_ID)
-        lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+        level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+        if (level_me == level) then
+            lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+        endif
     end do
     ! do backup here so we need less logic in synching neighbors
     do k = 1, hvy_n(tree_ID)
@@ -393,7 +397,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
                 lgt_block(lgt_ID, IDX_REFINE_STS) = 0
             endif
             ! update all updated mother blocks which are empty (leaf-blocks will never be updated) and set their refinement flag to -1
-            if (lgt_block(lgt_ID, IDX_REFINE_STS) == REF_TMP_EMPTY .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
+            ! if (lgt_block(lgt_ID, IDX_REFINE_STS) == REF_TMP_EMPTY .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
+            if (lgt_block( lgt_ID, IDX_MESH_LVL ) == level-1) then
                 lgt_block(lgt_ID, IDX_REFINE_STS) = -1
             endif
         end do

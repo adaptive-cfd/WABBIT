@@ -1438,21 +1438,21 @@ contains
             endif
         endif
 
-        ! conditions for minimum blocksize for lifted wavelets arise from coarse extension and double block-jump
-        !    JB: Origin of these minimum block sizes was not yet found but was tested with invertibility test
-        !    CDF 24, 42: BS_min = 12   ;   CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
-        block_min = 0
-        if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
-            if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") block_min = 12
-            if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") block_min = 18
-            if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") block_min = 24
-            if (params%wavelet(4:5) == "66") block_min = 30
+        ! ! conditions for minimum blocksize for lifted wavelets arise from coarse extension and double block-jump
+        ! !    JB: Origin of these minimum block sizes was not yet found but was tested with invertibility test
+        ! !    CDF 24, 42: BS_min = 12   ;   CDF 26, 44, 62: BS_min = 18   ;   CDF 28, 46, 64: BS_min = 24   ;   CDF 66: BS_min = 30
+        ! block_min = 0
+        ! if (params%isLiftedWavelet .and. maxval(params%Bs(:)) /= 0) then
+        !     if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") block_min = 12
+        !     if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") block_min = 18
+        !     if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") block_min = 24
+        !     if (params%wavelet(4:5) == "66") block_min = 30
 
-            if (any(params%Bs(:params%dim) < block_min)) then
-                write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
-                call abort(8888881, "The selected wavelet requires larger blocksizes for coarse extensions.")
-            endif
-        endif
+        !     if (any(params%Bs(:params%dim) < block_min)) then
+        !         write(*,'(A, A, 3(i3), A, i3)') trim(adjustl(params%wavelet)), " Bs=", params%Bs(:), " < block_min=", block_min
+        !         call abort(8888881, "The selected wavelet requires larger blocksizes for coarse extensions.")
+        !     endif
+        ! endif
 
         if (params%rank==0 .and. verbose1) then
             write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')

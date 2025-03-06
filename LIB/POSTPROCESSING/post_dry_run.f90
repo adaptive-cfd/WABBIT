@@ -27,7 +27,7 @@ subroutine post_dry_run
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new
     real(kind=rk) :: x0(1:3), dx(1:3)
-    logical :: pruned, help1, help2, save_us, iterate, error_OOM
+    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -89,6 +89,7 @@ subroutine post_dry_run
     call ini_file_to_params( params, filename )
 
     call get_cmd_arg( "--pruned", pruned, default=.false. )
+    call get_cmd_arg( "--save-color", save_color, default=.false. )
     call get_cmd_arg( "--save-us", save_us, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
@@ -278,6 +279,11 @@ subroutine post_dry_run
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
+            if (save_color) then
+                write( fname,'(a, "_", i12.12, ".h5")') "color", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+            endif
+
             time = time + params%write_time
         end do
 
@@ -312,6 +318,11 @@ subroutine post_dry_run
 
                 write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+            endif
+
+            if (save_color) then
+                write( fname,'(a, "_", i12.12, ".h5")') "color", nint(time * 1.0e6_rk)
+                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
         enddo
         close (14)

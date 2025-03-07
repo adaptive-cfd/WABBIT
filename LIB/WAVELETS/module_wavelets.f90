@@ -1191,6 +1191,9 @@ contains
             !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             ! Not fully tested -- do not use in production runs. (see below)
+            ! Issue #1: the function refine_block uses the direct interpolation (polynomial), and not zero padding in wavelet space.
+            !           consequently, the coarsen(refine(u)) unit test will fail.
+            ! Issue #2: Coarse extension is to be clarified with coiflet -> copying of SC near interface may make less sense than for CDF ?
             allocate(params%HD(-4:7))
             allocate(params%GD(-6:5))
 

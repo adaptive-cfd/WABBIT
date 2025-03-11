@@ -2,6 +2,7 @@
 ! main level wrapper for setting the initial condition on a block
 !-----------------------------------------------------------------------------
 subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
+    use module_helpers
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -173,6 +174,24 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             endif
         end do
 
+        ! uy is a sin wave (that triggers the instability)
+        do ix = 1, Bs(1)+2*g
+            ! compute x,y coordinates from spacing and origin
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+            u(ix,:,:,2) = 0.1_rk * sin(2.0_rk*pi*x/params_acm%domain_size(1))
+        end do
+
+    case("jet-x-sin-smooth")
+        ! a jet with constant (unit) velocity
+        ! with smoothing applied
+        do iy = 1, Bs(2)+2*g
+            ! compute x,y coordinates from spacing and origin
+            y = abs(dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk)
+
+            u(:,iy,:,1) = smoothstep( abs(y), 0.25_rk * params_acm%domain_size(2), params_acm%beta*dx(2) )
+        end do
+        
         ! uy is a sin wave (that triggers the instability)
         do ix = 1, Bs(1)+2*g
             ! compute x,y coordinates from spacing and origin

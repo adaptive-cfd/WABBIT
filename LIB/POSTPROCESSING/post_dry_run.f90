@@ -118,6 +118,12 @@ subroutine post_dry_run
     ! level used in the simulation. This is where the RHS is computed. If the dealiasing
     ! switch is .true., blocks on Jmx are then forced to be coarsened to Jmax-1
     params%force_maxlevel_dealiasing = .false.
+    ! output this to user, because elsewise it might be confusing. This overwrites the PARAMS-file but is not output to the log-file elsewise
+    if (params%force_maxlevel_dealiasing) then
+        if (params%rank==0) write(*,'(A)') "Force maxlevel dealiasing set to TRUE"
+    else
+        if (params%rank==0) write(*,'(A)') "Force maxlevel dealiasing set to FALSE"
+    endif
 
     params%eps = 1.0e-6
     params%coarsening_indicator = "threshold-state-vector"

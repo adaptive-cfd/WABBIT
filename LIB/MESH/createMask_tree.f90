@@ -129,11 +129,16 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
                 call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
             endif
 
-        elseif (Jactive == params%Jmax-1 .and. params%force_maxlevel_dealiasing) then
-
-            call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
+        elseif (Jactive == params%Jmax-1) then
+            if (params%force_maxlevel_dealiasing) then
+                call add_pruned_to_full_tree( params, hvy_mask, tree_ID_mask_coarser, tree_ID_flow)
+            else
+                ! when building up mask from JMin for dry run, we might run into this case, it is no error there
+                ! however, when encountered in productive runs, this is grave, as we should always be able to add the time-independent part
+                if (params%rank==0) write(*,'(A)') "WARNING: Mask on Jmax-1 but time independent part on Jmax - skipping adding the time independent part. (Ignore this for dry runs)"
+            endif
         else
-            write(*,*) "WARING: mask generation fails (flow grid neither on Jmax nor Jmax-1)"
+            if (params%rank==0) write(*,'(A, i0)') "WARNING: mask generation with time independent part fails (flow grid neither on Jmax nor Jmax-1 but on level ", Jactive," )"
         endif
     endif
 

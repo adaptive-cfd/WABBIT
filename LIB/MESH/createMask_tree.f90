@@ -48,14 +48,14 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! fine, either on Jmax or Jmax-1. If this condition is not met, generate the
     ! entire mask.
     ! A closer look on the conditions:
-    ! (1) Jactive < Jmax-1
-    !     If the highest level Jactive on the current grid is not at least Jmax-1, we cannot use the
-    !     pruned trees here, because we have the time-independent part prepared only on Jmax and Jmax-1.
+    ! (1) Jactive < Jmax or Jmax-1 (for force_maxlevel_dealiasing)
+    !     If the highest level Jactive on the current grid is not at least Jmax(-1), we cannot use the
+    !     pruned trees here, because we have the time-independent part prepared only on Jmax (and Jmax-1).
     !     NOTE: unfortunately the inverse is not true: if Jactive==Jmax, it does in fact NOT necessarily mean that we can
     !     use pruned trees.
     ! (2) params%threshold_mask .eqv. .false.
     !     If the mask is not considered for thresholding, there is no guarantee that the fluid-solid interface
-    !     is either on Jmax or Jmax-1. While it may still be the case, it will not always be like this. Therefore
+    !     is either on Jmax (or Jmax-1). While it may still be the case, it will not always be like this. Therefore
     !     if mask thresholding is not used, always generate the entire mask (and be done with the routine)
     !     NOTE: expensive mask functions should always use mask_thresholding.
     ! (3) force_all
@@ -63,7 +63,7 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     !     In this case, we force the code to generate all parts of the mask. NB: as of 08/2022, even in the
     !     initial condition, pruned trees are used.
     !-----------------------------------------------------------------------
-    if ((Jactive < Jmax-1) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
+    if (((Jactive < Jmax-1 .and. params%force_maxlevel_dealiasing) .or. Jactive < Jmax) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
         ! generate complete mask (may be expensive)
         call createCompleteMaskDirect_tree(params, time, hvy_mask)
 
@@ -289,11 +289,11 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
     ! do not change)
     call sync_ghosts_tree( params, hvy_mask, tree_ID_mask )
 
-    ! we need the mask function both on Jmax (during the RHS) and Jmax-1
-    ! (during saving after coarsening)
-    call copy_tree(params, hvy_mask, tree_ID_mask_coarser, tree_ID_mask)
-
     if (params%force_maxlevel_dealiasing) then
+        ! we need the mask function both on Jmax (during the RHS) and Jmax-1
+        ! (during saving after coarsening for force_maxlevel_dealiasing)
+        call copy_tree(params, hvy_mask, tree_ID_mask_coarser, tree_ID_mask)
+
         ! coarsen by one level only - only needed when we force dealiasing
         if (params%rank==0) write(*,*) "Coarsening the mask by one level (to Jmax-1)"
         call adapt_tree( time, params, hvy_mask, tree_ID_mask_coarser, "everywhere", hvy_tmp)

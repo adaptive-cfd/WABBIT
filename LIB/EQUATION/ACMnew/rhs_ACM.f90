@@ -71,8 +71,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     ! R^-2 (3D), but even in 3D it can still require resolution of the shock wave that can be expensive.
     if (params_acm%soft_penalization_startup) then
         if (time < params_acm%penalization_startup_tau) then
-            params_acm%C_eta = params_acm%C_eta_start + &
-            (params_acm%C_eta_const-params_acm%C_eta_start)*(time/params_acm%penalization_startup_tau)
+            ! the formulation with EXP seems to be more efficient in damping the initial shock wave; 2D tests showed that nicely.
+            ! The new defaults are C_eta_start = 1.0  and  penalization_startup_tau=0.20. Note relatively long before this time the penalization
+            ! is (almost) completely activated because of the exponential decay
+            params_acm%C_eta = params_acm%C_eta_const + params_acm%C_eta_start*exp(-20.0*time/params_acm%penalization_startup_tau)
         else
             ! constant value of C_eta after the startup phase
             params_acm%C_eta = params_acm%C_eta_const    

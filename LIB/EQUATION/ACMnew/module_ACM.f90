@@ -274,10 +274,11 @@ end subroutine
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
+    ! store the same value in two variables
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.05_rk)
+    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)
     call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
     

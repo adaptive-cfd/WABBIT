@@ -25,7 +25,7 @@ subroutine post_dry_run
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
     real(kind=rk) :: x0(1:3), dx(1:3)
     logical :: pruned, help1, help2, save_us, iterate, error_OOM
     type(inifile) :: FILE
@@ -208,6 +208,7 @@ subroutine post_dry_run
 
             ! refine the grid near the interface and re-generate the mask function.
             iterate = .true.
+            iteration = 0
             do while (iterate)
                 lgt_n_old = lgt_n(tree_ID_flow)
 
@@ -240,8 +241,8 @@ subroutine post_dry_run
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
 
                 if (params%rank==0) then
-                    write(*,'("Did one iteration for mask generation. Mask computed on ",i6," blocks.&
-                    & After coarsening: Jmax=",i2, " Nb=",i7)') Nmask, Jnow, lgt_n(tree_ID_flow)
+                    write(*,'("Did iteration ", i0," for mask generation. Mask computed on ",i6," blocks.&
+                    & After coarsening: Jmax=",i2, " Nb=",i7)') iteration, Nmask, Jnow, lgt_n(tree_ID_flow)
                 endif
 
                 ! We're done once the mask is created on the final level. Relevant only if the start grid is not
@@ -250,6 +251,7 @@ subroutine post_dry_run
                 ! function, which can lead to not all parts of the grid being properly generated. If *none* of the
                 ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
                 if ((Jnow==Jmax) .and. (lgt_n_new==lgt_n_old)) iterate = .false.
+                iteration = iteration + 1
             enddo
 
             ! on new grid, create the mask again

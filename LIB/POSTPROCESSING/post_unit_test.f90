@@ -129,6 +129,11 @@ subroutine post_unit_test(params)
     params%threshold_state_vector_component(1:params%n_eqn) = 1
     params%coarsening_indicator = "threshold-state-vector"
 
+    params%useCoarseExtension = params%isLiftedWavelet
+    params%useSecurityZone = params%isLiftedWavelet
+    ! params%useCoarseExtension = .true.
+    ! params%useSecurityZone = .true.
+
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, neqn_hvy_tmp=1, nrhs_slots1=1 )
 
     select case(operator)

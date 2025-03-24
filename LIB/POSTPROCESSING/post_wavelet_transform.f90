@@ -88,12 +88,15 @@ subroutine post_wavelet_transform(params)
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
 
+    params%useCoarseExtension = params%isLiftedWavelet
+    params%useSecurityZone = params%isLiftedWavelet
+
     Bs = params%Bs
     g  = params%g
 
 
-    ! for full wavelet operations we need 8/7 for 3D or 4/3 for 2D as blocks, there can be an imbalance thats why we add another factor
-    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.2_rk)
+    ! for full wavelet operations we need 8/7 for 3D or 4/3 for 2D as blocks, there can be an imbalance thats why we add another factor and for low block amounts we just add a few
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.2_rk)+4
 
     if (.not. split_components) then
         params%n_eqn = 1

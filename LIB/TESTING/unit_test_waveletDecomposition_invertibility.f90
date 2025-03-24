@@ -20,7 +20,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
 
     apply_verbose = .false.
     if (present(verbose)) apply_verbose = verbose
-    block_dump_max = 0
+    block_dump_max = 10
 
     if (params%rank == 0) then
         write(*, '("")')  ! newline
@@ -56,6 +56,8 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID )
     endif
 
+    ! call createGrid_simple_adaptive(params, hvy_block, tree_ID)
+
     ! sometimes by chance or on purpose the resulting grid is equidistant, then every adaption should not alter the data
     grid_is_equidistant = maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)
 
@@ -77,7 +79,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
                 hvy_id = hvy_active(k,tree_ID)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-                write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+                write(file_dump, '(A, i0, A, i0, A)') "block_dumped_it0_tc=", treecode, ".t"
                 open(unit=32, file=file_dump, status='unknown', position='append')
                 write(32, '(A)') ""  ! new line
                 write(32, '(A)') "Beginning:"
@@ -96,7 +98,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         ! this norm is the reference norm, as we compare to this one
         call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
-        call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+        call adapt_tree( dble(i_adapt), params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
         ! this norm is the reference norm, as we compare to this one
         call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_1)
         do k = 1, nc
@@ -118,7 +120,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
                     hvy_id = hvy_active(k,tree_ID)
                     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                     treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-                    write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+                    write(file_dump, '(A, i0, A,i0, A, i0, A)') "block_dumped_it", i_adapt,"_tc=", treecode, ".t"
                     open(unit=32, file=file_dump, status='unknown', position='append')
                     write(32, '(A)') ""  ! new line
                     write(32, '(A)') "After adapt:"
@@ -135,6 +137,8 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
             write(*,'(A, i0, A, es15.8)') "UNIT TEST: Relative L2 error between before and after adaption no ", i_adapt, " : ", norm_1(1)
         endif
     enddo
+
+    call summarize_profiling( WABBIT_COMM )
 
     ! report to terminal / log and abort if critical
     if (params%rank==0) then

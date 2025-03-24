@@ -200,7 +200,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    if (index(sync_case, "full") > 0) call reset_ghost_nodes( params, hvy_block, tree_ID)
+    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
 #endif
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),

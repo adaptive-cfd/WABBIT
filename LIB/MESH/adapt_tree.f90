@@ -225,7 +225,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     if (.not. params%useCoarseExtension .and. indicator /= "threshold-cvs" .and. indicator /= "threshold-image-denoise") then
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)
-            hvy_block(:, :, : ,1:size(hvy_block, 4), hvy_id) = hvy_tmp(:, :, : ,1:size(hvy_block, 4), hvy_id)  ! WDed values
+            hvy_block(:, :, : ,1:size(hvy_block, 4), hvy_id) = hvy_tmp(:, :, : ,1:size(hvy_block, 4), hvy_id)  ! restore original values
         enddo
     else
         ! In a special case reconstruction can be skipped as it has already been thone, therefore the if-condition
@@ -336,8 +336,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
         ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         ! if (params%isLiftedWavelet) then
-        !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
-        !     call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
+            ! call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+            ! call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
 
         !     write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
         !     call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )

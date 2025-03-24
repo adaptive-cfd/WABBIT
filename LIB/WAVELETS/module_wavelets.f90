@@ -335,8 +335,8 @@ contains
         Bs = params%Bs
 
         if ((abs(fl_l) > g).or.(fl_r>g)) then
-            write(*,*) fl_l, fl_r, "but g=", g
-            call abort(202302209, "For applying the filter, not enough ghost nodes")
+            write(*,'(A, i0, A, i0, A, i0)') "Filter size: ", fl_l, " / ", fl_r, ", but g= ", g
+            call abort(202302208, "For applying the filter, not enough ghost nodes")
         endif
 
         s = 1
@@ -462,7 +462,7 @@ contains
         Bs = params%Bs
 
         if ((abs(fl_l) > g).or.(fl_r>g)) then
-            write(*,*) fl_l, fl_r, "but g=", g
+            write(*,'(A, i0, A, i0, A, i0)') "Filter size: ", fl_l, " / ", fl_r, ", but g= ", g
             call abort(202302209, "For applying the filter, not enough ghost nodes")
         endif
 
@@ -565,7 +565,7 @@ contains
             coefs_filter = params%GR
 
         case default
-            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+            call abort(202302201, "Unknown wavelet filter (x-dir), must be one of HD GD HR GR")
 
         end select
 
@@ -615,7 +615,7 @@ contains
             coefs_filter = params%GR
 
         case default
-            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+            call abort(202302201, "Unknown wavelet filter (y-dir), must be one of HD GD HR GR")
 
         end select
 
@@ -671,7 +671,7 @@ contains
             return
 
         case default
-            call abort(202302201, "Unknown wavelet filter, must be one of HD GD HR GR")
+            call abort(202302201, "Unknown wavelet filter (z-dir), must be one of HD GD HR GR")
 
         end select
 
@@ -1443,8 +1443,10 @@ contains
             write(*, '("──╯ │ ╭────╯ │ ╭───   Wavelet-setup   ───╯ │ ╭───────╯   │   ╭───────╯ │ ╭──────")')
             write(*, '("    ╰─╯      ╰─╯                           ╰─╯           ╰───╯         ╰─╯      ")')
             write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
-            write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
-            write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
+            if (params%useCoarseExtension) then
+                write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
+                write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
+            endif
 
             ! For the leaf-first loop, we need 3*h as minimum blocksize, as we have an upwards dependency for the leaf-decomposition
             ! So, for lower BS we do level-wise loop (which performs worse) and if the BS is high enough, we do the more optimized leaf-first level-wise loop

@@ -313,7 +313,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     implicit none
 
     character(len=*), intent(in)   :: fnames(1:)      !< list of files to be read (=number of vector components)
-    type (type_params), intent(in) :: params          !< user defined parameter structure
+    type (type_params), intent(inout) :: params          !< user defined parameter structure
     integer(kind=ik), intent(in)   :: tree_ID         !< index of the tree you want to save the data in
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - data are stored herein
 
@@ -326,7 +326,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     integer(kind=ik) :: N_files         !< number of files to read in this tree (=number of vector components)
     integer(kind=ik) :: NblocksFile
-    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(3), g, dF, i
+    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(3), g, dF, i, level_min, Jmin_set, hvy_id, lgt_id, lgt_n_old
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
@@ -655,6 +655,19 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! be synced. However, the light data has to.
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
+    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
+    ! this code block checks this and temporally lowers Jmin, so that we can actually find all neighbours and do the refinement
+    level_min = minActiveLevel_tree(tree_ID, use_active_list=.false.)
+    if (level_min < params%Jmin) then
+        if (params%rank==0) then
+            write(*, '(A, i0, A, i0, A)') "READING: Minimum level of input data L=", level_min, " < Jmin=", params%Jmin, '. Refining input data to Jmin.'
+        endif
+        Jmin_set = params%Jmin
+        params%Jmin = level_min
+    else
+        Jmin_set = -1
+    endif
+
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
@@ -665,6 +678,33 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         endif
     else
         call sync_ghosts_tree(params, hvy_block, tree_ID )
+    endif
+
+    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
+    ! this goes from the lowest level to the desired Jmin and refines blocks along the way
+    if (Jmin_set /=-1) then
+        lgt_n_old = lgt_n(tree_ID)
+        do i = params%Jmin, Jmin_set-1
+            ! mark blocks on level i to refine
+            do k = 1, hvy_n(tree_ID)
+                hvy_ID = hvy_active(k, tree_ID)
+                call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+                if (lgt_block( lgt_id, IDX_MESH_LVL ) == i) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+            enddo
+            ! sync refinement status
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! refine the blocks
+            call refinement_execute_tree( params, hvy_block, tree_ID )
+            ! update metadata (refinement execute already syncs lgt data)
+            call updateMetadata_tree(params, tree_ID)
+            ! ! sync ghosts - this should not be needed, as refinement fills ghost layer as well
+            ! call sync_ghosts_tree(params, hvy_block, tree_ID )
+        enddo
+        params%Jmin=Jmin_set
+
+        if (params%rank == 0) then
+            write(*, '(A,i0,A,i0)') "READING: Refined mesh to comply to Jmin. Nblocks before: ", lgt_n_old, ", Nblocks after: ", lgt_n(tree_id)
+        endif
     endif
 
     ! it is useful to print out the information on active levels in the file

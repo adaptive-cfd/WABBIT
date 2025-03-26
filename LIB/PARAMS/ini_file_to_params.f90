@@ -16,7 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R
    integer(kind=ik), dimension(3)                  :: Bs
 
    rank         = params%rank
@@ -141,6 +141,26 @@ subroutine ini_file_to_params( params, filename )
    if ( (params%g < 1) .and. (params%order_discretization == 'FD_2th_central') ) then
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
+
+   ! If NWC of CE is smaller than the size of the FD-stencils, this can create strong divergence peaks.
+   ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
+   ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
+   if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
+   if ( params%order_discretization == 'FD_4th_central' ) i = 4
+   if ( params%order_discretization == 'FD_2th_central') i = 2
+   diff_L = max(i - params%Nwcl, 0)
+   diff_R = max(i - params%Nwcr, 0)
+   params%Nwcl = params%Nwcl + diff_L
+   params%Nwcr = params%Nwcr + diff_R
+   params%Nreconl = params%Nreconl + diff_L
+   params%Nreconr = params%Nreconr + diff_R
+   if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
+      write(*, '(A)') "Increased Nwc to consider FD-stencil size by ", diff_L, " / ", diff_R
+   endif
+   ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
+   if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then
+      write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
+   endif
 
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:

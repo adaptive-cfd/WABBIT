@@ -31,6 +31,7 @@ subroutine sparse_to_dense(params)
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
 
+    call get_command_argument(1, operator)
     call get_command_argument(2, file_in)
     call get_command_argument(3, file_out)
 
@@ -42,12 +43,11 @@ subroutine sparse_to_dense(params)
             write(*,'(A)') "postprocessing subroutine to refine/coarse mesh to a uniform"
             write(*,'(A)') "grid (up and downsampling ensured)."
             write(*,'(A)') ""
-            write(*,'(A)') "Command:"
+            write(*,'(A)') "Commands:"
             write(*,'(A)') ""
             write(*,'(A)') "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
-            write(*,'(A)') ""
-            write(*,'(A)') "-------------------------------------------------------------"
-            write(*,'(A)') "./wabbit-post --sparse-to-dense --operator=refine-everywhere source.h5 target.h5 --wavelet=CDF44"
+            write(*,'(A)') "./wabbit-post --refine-everywhere source.h5 target.h5 --wavelet=CDF44" 
+            write(*,'(A)') "./wabbit-post --coarsen-everywhere source.h5 target.h5 --wavelet=CDF44" 
             write(*,'(A)') ""
             write(*,'(A)') "-------------------------------------------------------------"
             write(*,'(A)') "Parameters: "
@@ -75,7 +75,6 @@ subroutine sparse_to_dense(params)
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
     call get_cmd_arg( "--J_target", level, default=tc_length )
-    call get_cmd_arg( "--operator", operator, default="sparse-to-dense")
     call get_cmd_arg( "--time", time_given, default=-1.0_rk)
 
     ! initialize wavelet transform
@@ -118,17 +117,29 @@ subroutine sparse_to_dense(params)
 
     ! set max_treelevel for allocation of hvy_block
     params%Jmax = max(level, tc_length)
+
+    ! if we use this module to refine a grid, then we allow for one more level of refinement.
+    ! NB: this is often useless, as in the case of dealiasing (force_maxlevel_dealiasing=1), 
+    ! WABBIT computes on Jmax but saves data on Jmax-1. In this case tc_length (tree code length)
+    ! in the file is already at Jmax, even though no block is actually saved on Jmax. Still, if dealiasing
+    ! is not used (e.g. when using skew-symmetry), it probably makes more sense to define "refine-everywhere" 
+    ! as the literal refinement of all blocks (so even on Jmax blocks are refined). This is achieved with the below
+    ! increment of 1.
+    if (operator == "--refine-everywhere") then
+        params%Jmax = params%Jmax  + 1
+    endif
+
     params%Jmin = 1
     params%Bs = Bs
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
 
-    if (operator=="sparse-to-dense") then
+    if (operator=="--sparse-to-dense") then
         params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
-    elseif (operator=="refine-everywhere") then
+    elseif (operator=="--refine-everywhere") then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
-    elseif (operator=="coarsen-everywhere") then
+    elseif (operator=="--coarsen-everywhere") then
         params%number_blocks = ceiling(lgt_n(tree_ID) / dble(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) + 7_ik
     endif
 
@@ -161,15 +172,15 @@ subroutine sparse_to_dense(params)
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
 
-    if (operator=="sparse-to-dense") then
+    if (operator=="--sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
-    elseif (operator=="refine-everywhere") then
+    elseif (operator=="--refine-everywhere") then
         call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID, error_OOM=error_OOM )
 
         if (error_OOM) call abort(2512181,"Refinement failed, out of memory. Try with more memory.")
 
-    elseif (operator=="coarsen-everywhere") then
+    elseif (operator=="--coarsen-everywhere") then
         call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )
 
     ! elseif (operator=="refine-single-block") then
@@ -199,13 +210,13 @@ subroutine sparse_to_dense(params)
     call saveHDF5_tree(file_out, time, iteration, 1, params, hvy_block, tree_ID)
 
     if (params%rank==0 ) then
-        if (operator=="sparse-to-dense") then
+        if (operator=="--sparse-to-dense") then
             write(*,'("Wrote data of input-file: ", A," now on uniform grid (level",i3, ") to file: ",A)') &
             trim(adjustl(file_in)), level, trim(adjustl(file_out))
             write(*,'("Minlevel:", i3," Maxlevel:", i3, " (should be identical)")') &
             minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
         else
-            write(*,'("Wrote data of input-file: ", A," to file: ", A, " - Minlevel:", i3," Maxlevel:", i3)') &
+            write(*,'("Wrote data of input-file: ", A," to output file: ", A, " - Minlevel:", i3," Maxlevel:", i3)') &
             trim(adjustl(file_in)), trim(adjustl(file_out)), minActiveLevel_tree( tree_ID ), maxActiveLevel_tree( tree_ID )
         endif
     end if

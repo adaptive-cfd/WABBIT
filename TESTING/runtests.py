@@ -200,14 +200,17 @@ class WabbitTest:
                 return result1
             result2 = run_command(command2, self.logger)
             return result2
+        
         elif self.test_name == "ghost_nodes":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --ghost-nodes-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             result = run_command(command, self.logger)
             return result
+        
         elif self.test_name == "invertibility":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-invertibility-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             result = run_command(command, self.logger)
             return result
+        
         elif self.test_name == "adaptive":
             in_file = os.path.join("..", "..", "vor_000020000000.h5")  # relative to tmp_dir
             
@@ -218,8 +221,8 @@ class WabbitTest:
 
             # run commands
             file1, file2 = "vor_00100.h5", "vor_00200.h5"
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --operator=refine-everywhere --time=1.0"
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --operator=coarsen-everywhere --time=2.0"
+            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-everywhere \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --time=1.0"
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --coarsen-everywhere \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --time=2.0"
             result1 = run_command(command1, self.logger)
             if result1.returncode != 0:
                 return result1

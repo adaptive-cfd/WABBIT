@@ -122,7 +122,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e4_rk) then
                 write(*,'("maxval in u(",i2,") = ", es15.8)') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i)))
 
-                ! done by all ranks but well I hope the cluster can take one for the team
+                ! done by all ranks but well I hope the cluster can take one for the team.
+                ! This (empty) file is for scripting purposes on the supercomputers.
                 open (77, file='ACM_diverged', status='replace')
                 close(77)
                 
@@ -326,7 +327,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     C_sponge_inv
+                     C_sponge_inv, &
+                     up_dx, vp_dy
     ! loop variables
     integer(kind=ik) :: ix, iy, idir
     ! coefficients for Tam&Webb (4th order 1st derivative)
@@ -357,6 +359,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars) then
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
+
 
     select case(order_discretization)
     case("FD_2nd_central")
@@ -591,6 +594,45 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
             end do
         endif
 
+        select case(params_acm%p_eqn_model)
+        case ('acm')
+            ! do nothing, is the eqn computed above without additional terms
+        case ('diffusive')
+            ! add p diffusion []
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    p_dxdx = (b_FD4(-2)*phi(ix-2,iy,3) + b_FD4(-1)*phi(ix-1,iy,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix+1,iy,3) + b_FD4(+2)*phi(ix+2,iy,3))*dx2_inv
+                    p_dydy = (b_FD4(-2)*phi(ix,iy-2,3) + b_FD4(-1)*phi(ix,iy-1,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix,iy+1,3) + b_FD4(+2)*phi(ix,iy+2,3))*dy2_inv
+    
+                    rhs(ix,iy,3) = rhs(ix,iy,3) + params_acm%nu_p*(p_dxdx+p_dydy)
+                enddo
+            enddo   
+        case ('EDAC')
+            ! add EDAC term AND diffusion [Clausen, Entropically damped form of artificial compressibility for explicit simulation of incompressible flow, 2013]
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    p_dxdx = (b_FD4(-2)*phi(ix-2,iy,3) + b_FD4(-1)*phi(ix-1,iy,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix+1,iy,3) + b_FD4(+2)*phi(ix+2,iy,3))*dx2_inv
+                    p_dydy = (b_FD4(-2)*phi(ix,iy-2,3) + b_FD4(-1)*phi(ix,iy-1,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix,iy+1,3) + b_FD4(+2)*phi(ix,iy+2,3))*dy2_inv
+    
+                    up_dx = (a_FD4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,3))*dx_inv
+                    vp_dy = (a_FD4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,3))*dy_inv
+
+                    rhs(ix,iy,3) = rhs(ix,iy,3) + params_acm%nu_p*(p_dxdx+p_dydy) - up_dx - vp_dy
+                enddo
+            enddo   
+        case ('convective')
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    up_dx = (a_FD4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,3))*dx_inv
+                    vp_dy = (a_FD4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,3))*dy_inv
+
+                    rhs(ix,iy,3) = rhs(ix,iy,3) - up_dx - vp_dy
+                enddo
+            enddo    
+        case default
+            call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
+        end select    
+
     case("FD_6th_central")
         !-----------------------------------------------------------------------
         ! 4th order (standard)
@@ -706,6 +748,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     endif
 
 
+
+
 end subroutine RHS_2D_acm
 
 
@@ -746,7 +790,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     C_sponge_inv
+                     C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 
@@ -1019,6 +1063,56 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 end do
             end do
         endif
+
+        select case(params_acm%p_eqn_model)
+        case ('acm')
+            ! do nothing, is the eqn computed above without additional terms
+        case ('diffusive')
+            ! add p diffusion []
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+
+                        p_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,4) +b_FD4(-1)*phi(ix-1,iy,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix+1,iy,iz,4) +b_FD4(+2)*phi(ix+2,iy,iz,4))*dx2_inv
+                        p_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,4) +b_FD4(-1)*phi(ix,iy-1,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy+1,iz,4) +b_FD4(+2)*phi(ix,iy+2,iz,4))*dy2_inv
+                        p_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,4) +b_FD4(-1)*phi(ix,iy,iz-1,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy,iz+1,4) +b_FD4(+2)*phi(ix,iy,iz+2,4))*dz2_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) + params_acm%nu_p*(p_dxdx + p_dydy + p_dzdz)
+                    enddo
+                enddo   
+            enddo   
+        case ('EDAC')
+            ! add EDAC term AND diffusion [Clausen, Entropically damped form of artificial compressibility for explicit simulation of incompressible flow, 2013]
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        p_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,4) +b_FD4(-1)*phi(ix-1,iy,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix+1,iy,iz,4) +b_FD4(+2)*phi(ix+2,iy,iz,4))*dx2_inv
+                        p_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,4) +b_FD4(-1)*phi(ix,iy-1,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy+1,iz,4) +b_FD4(+2)*phi(ix,iy+2,iz,4))*dy2_inv
+                        p_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,4) +b_FD4(-1)*phi(ix,iy,iz-1,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy,iz+1,4) +b_FD4(+2)*phi(ix,iy,iz+2,4))*dz2_inv
+
+                        pu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,4)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,4)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,4)*phi(ix+2,iy,iz,1))*dx_inv
+                        pv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,4)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,4)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,4)*phi(ix,iy+2,iz,2))*dy_inv
+                        pw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,4)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,4)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,4)*phi(ix,iy,iz+2,3))*dz_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) + params_acm%nu_p*(p_dxdx + p_dydy + p_dzdz) - (pu_dx+pv_dy+pw_dz)
+                    enddo
+                enddo   
+            enddo   
+        case ('convective')
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        pu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,4)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,4)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,4)*phi(ix+2,iy,iz,1))*dx_inv
+                        pv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,4)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,4)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,4)*phi(ix,iy+2,iz,2))*dy_inv
+                        pw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,4)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,4)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,4)*phi(ix,iy,iz+2,3))*dz_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - (pu_dx+pv_dy+pw_dz)
+                    enddo
+                enddo    
+            enddo    
+        case default
+            call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
+        end select   
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------

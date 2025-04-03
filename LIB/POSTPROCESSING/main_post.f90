@@ -92,7 +92,7 @@ program main_post
     case("--average")
         call post_average_snapshots(params)
 
-    case("--sparse-to-dense", "--refine-everywhere")
+    case("--sparse-to-dense", "--refine-everywhere", "--refine-everywhere-forced", "--coarsen-everywhere")
         call sparse_to_dense(params)
 
     case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")

@@ -135,6 +135,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         do k = 1, size(u,4)
             if (maxval(abs(u(:,:,:,k))) > 1.0e4_rk) then
                 write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') k, maxval(abs(u(:,:,:,k)))
+
+                ! done by all ranks but well I hope the cluster can take one for the team
+                ! This (empty) file is for scripting purposes on the supercomputers.
+                open (77, file='ACM_diverged', status='replace')
+                close(77)
+
                 call abort(0409201934,"ACM fail: very very large values in state vector.")
             endif
         enddo

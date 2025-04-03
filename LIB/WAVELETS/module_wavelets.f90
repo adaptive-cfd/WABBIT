@@ -1159,7 +1159,7 @@ contains
         integer(kind=ik), intent(out), optional :: g_wavelet, g_RHS
         logical, intent(in), optional :: verbose
         logical :: verbose1
-        integer(kind=ik) :: i, g_min, a, block_min
+        integer(kind=ik) :: i, g_min, a, block_min, diff_L, diff_R
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
@@ -1450,6 +1450,39 @@ contains
             params%Nreconl = params%Nreconl + a
             params%Nreconr = params%Nreconr + a
         endif
+
+        !--------------------------------------------------------------------------------------------------------
+        ! If NWC of CE is smaller than the size of the FD-stencils, this can create strong divergence peaks.
+        ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
+        ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
+        i = 0
+        if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
+        if ( params%order_discretization == 'FD_4th_central' ) i = 4
+        if ( params%order_discretization == 'FD_2nd_central') i = 2
+
+        diff_L         = max(i - params%Nwcl, 0)
+        params%Nwcl    = params%Nwcl + diff_L
+        params%Nreconl = params%Nreconl + diff_L
+        
+        diff_R         = max(i - params%Nwcr, 0)
+        params%Nwcr    = params%Nwcr + diff_R
+        params%Nreconr = params%Nreconr + diff_R
+
+        if (params%rank==0) then
+            write(*,'(A)') "Wavelet setup uses discretization: "//trim(adjustl(params%order_discretization))
+        endif
+        
+        
+        if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
+           write(*, '(A,i3,1x,i3," L/R")') "Increased Nwc to consider FD-stencil size by ", diff_L, diff_R
+        endif
+
+        ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
+        if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then
+           write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
+        endif
+        !--------------------------------------------------------------------------------------------------------
+
 
         if (present(g_wavelet)) then
             ! if we return the minimal value of ghosts, we assume that you are going to use it
@@ -1891,6 +1924,8 @@ contains
                 val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk**(1/params%dim)
                 val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk**(1/params%dim)
                 val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk**(1/params%dim)
+            ! ELSE
+            !     ???
             endif
         case default
             call abort(241024, "ERROR:Unknown wavelet normalization!")

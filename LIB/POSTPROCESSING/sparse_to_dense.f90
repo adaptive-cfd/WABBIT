@@ -45,14 +45,27 @@ subroutine sparse_to_dense(params)
             write(*,'(A)') ""
             write(*,'(A)') "Commands:"
             write(*,'(A)') ""
+            write(*,'(A)') "Refine a file to an equidistant grid (on J_target):"
             write(*,'(A)') "./wabbit-post --sparse-to-dense source.h5 target.h5 --J_target=4 --wavelet=CDF44"
+            write(*,'(A)') ""
+            write(*,'(A)') "Refine a file by one level, but do not refine blocks that are on Jmax (defined in the H5 file):"
             write(*,'(A)') "./wabbit-post --refine-everywhere source.h5 target.h5 --wavelet=CDF44" 
+            write(*,'(A)') ""
+            write(*,'(A)') "Refine a file by one level, even on jmax:"
+            write(*,'(A)') "./wabbit-post --refine-everywhere-forced source.h5 target.h5 --wavelet=CDF44" 
+            write(*,'(A)') ""
+            write(*,'(A)') "Coarsen a grid by one level:"
             write(*,'(A)') "./wabbit-post --coarsen-everywhere source.h5 target.h5 --wavelet=CDF44" 
             write(*,'(A)') ""
             write(*,'(A)') "-------------------------------------------------------------"
             write(*,'(A)') "Parameters: "
+            write(*,'(A)') ""
+            write(*,'(A)') "  --wavelet=CDF44"
+            write(*,'(A)') "     Choose the wavelet used for coarsening and refinement."
+            write(*,'(A)') ""
             write(*,'(A)') "  --J_target=4"
             write(*,'(A)') "     If --sparse-to-dense is used, this is the level of the equidistant output grid"
+            write(*,'(A)') ""
             write(*,'(A)') "  --time=0.0"
             write(*,'(A)') "     Sets time of output file, helps with visualization in paraview if it differs from input file time"
             write(*,'(A)') ""
@@ -125,7 +138,7 @@ subroutine sparse_to_dense(params)
     ! is not used (e.g. when using skew-symmetry), it probably makes more sense to define "refine-everywhere" 
     ! as the literal refinement of all blocks (so even on Jmax blocks are refined). This is achieved with the below
     ! increment of 1.
-    if (operator == "--refine-everywhere") then
+    if (operator == "--refine-everywhere-forced") then
         params%Jmax = params%Jmax  + 1
     endif
 
@@ -137,7 +150,7 @@ subroutine sparse_to_dense(params)
 
     if (operator=="--sparse-to-dense") then
         params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
-    elseif (operator=="--refine-everywhere") then
+    elseif ((operator=="--refine-everywhere").or.(operator=="--refine-everywhere-forced")) then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="--coarsen-everywhere") then
         params%number_blocks = ceiling(lgt_n(tree_ID) / dble(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) + 7_ik
@@ -175,7 +188,7 @@ subroutine sparse_to_dense(params)
     if (operator=="--sparse-to-dense") then
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
-    elseif (operator=="--refine-everywhere") then
+    elseif ((operator=="--refine-everywhere").or.(operator=="--refine-everywhere-forced")) then
         call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID, error_OOM=error_OOM )
 
         if (error_OOM) call abort(2512181,"Refinement failed, out of memory. Try with more memory.")

@@ -103,11 +103,6 @@ contains
     matr_dummy = 1.0_rk  ! avoid 0 division by default for blob_width
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width, matr_dummy )
 
-    write(*, '(A, 5(es12.3, 1x))') "x0: ", params_convdiff%x0
-    write(*, '(A, 5(es12.3, 1x))') "y0: ", params_convdiff%y0
-    write(*, '(A, 5(es12.3, 1x))') "z0: ", params_convdiff%z0
-    write(*, '(A, 5(es12.3, 1x))') "blob_width: ", params_convdiff%blob_width
-
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 

@@ -20,14 +20,6 @@ subroutine updateNeighbors_tree(params, tree_ID, search_overlapping, verbose_che
 
     N = params%number_blocks
 
-    ! special case:
-    ! if there is only one block => all neighbors are this block
-    ! one block criteria: lgt_n should be one!
-    if ( lgt_n(tree_ID) == 1 ) then
-        hvy_neighbor(1,1:26) = lgt_active(1, tree_ID)
-        return
-    end if
-
     ! loop over active heavy data blocks
     do k = 1, hvy_n(tree_ID)
         ! delete existing neighbors (they are assumed to be outdated when calling this routine)

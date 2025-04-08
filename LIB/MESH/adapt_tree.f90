@@ -71,7 +71,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     level       = Jmax_active ! algorithm starts on maximum *active* level
     norm(:)     = 1.0_rk
 
-    if (Jmin<1) call abort(2202243, "Currently, setting Jmin<1 is not possible")
 
     ignore_coarsening_apply = .false.
     ignore_maxlevel_apply = .false.
@@ -212,6 +211,52 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", copy_sc=.false.)
         endif
+
+        ! this was scrapped after investigating it 25-03-25
+        ! ! when using significant refinement, C-F interfaces may stay intact over long time, due to this we see the instability of the adapted grid + central FD
+        ! ! in order to counteract this, we delete all WC of non-significant blocks on the leaf-layer. This acts as a regularization and like theoretically coarsening then
+        ! ! After all, they are only kept due to the grid itself and not due to significancy, so deleting these WC is in spirit of our coarsening criteria
+        ! if (params%refinement_indicator == "significant") then
+        !     do k = 1, hvy_n(tree_ID)
+        !         hvy_ID = hvy_active(k, tree_ID)
+        !         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+
+        !         ! only leaf blocks that are unsignificant get their WC deleted, all others are untouched
+        !         if (block_is_leaf(params, hvy_ID, check_empty=.false.) .and. lgt_block( lgt_id, IDX_REFINE_STS ) == REF_UNSIGNIFICANT_STAY) then
+
+        !             ! set all WC, we have to skip the SC
+        !             if (params%dim == 2) then
+        !                 hvy_block(params%g+2:params%g+params%bs(1):2, params%g+1:params%g+params%bs(2):2, :, 1:size(hvy_block, 4), hvy_id) = 0.0_rk  ! wipe WX
+        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+2:params%g+params%bs(2):2, :, 1:size(hvy_block, 4), hvy_id) = 0.0_rk  ! wipe WY, WXY
+        !             else
+        !                 hvy_block(params%g+2:params%g+params%bs(1):2, params%g+1:params%g+params%bs(2):2, params%g+1:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WX
+        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+2:params%g+params%bs(2):2, params%g+1:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WY, WXY
+        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+1:params%g+params%bs(2)  , params%g+2:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WZ, WXZ, WYZ, WXYZ
+        !             endif
+
+        !             ! the code above ensures, that all C-F interfaces for non-significant blocks are cleared or refined for significant blocks, however, on JMax we cannot refine any block
+        !             ! to avoid persisting C-F interfaces, neighbors on Jmax-1 will refine even if they are not significant
+        !             if (.not. params%force_maxlevel_dealiasing .and. level_me == params%Jmax-1) then
+        !                 level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+        !                 ! loop over neighbors
+        !                 do k1 = 1, size(hvy_neighbor, 2)
+        !                     ! neighbor exists
+        !                     if ( hvy_neighbor( hvy_ID, k1 ) /= -1 ) then
+        !                         ! if neighbor is on maximum level, this block needs to refine next step to avoid persisting C-F interfaces on Jmax
+        !                         if (lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_MESH_LVL ) == params%Jmax) then
+        !                         ! if (lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_MESH_LVL ) == params%Jmax .and. lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_REFINE_STS ) == 0) then
+        !                             lgt_block( lgt_ID, IDX_REFINE_STS) = 0
+        !                             exit  ! no need to check further
+        !                         endif
+        !                     endif
+        !                 enddo
+        !             endif
+        !         endif
+        !     enddo
+
+        !     ! ref status was changed, so lets resynch
+        !     call synchronize_lgt_data( params, refinement_status_only=.true.)
+        ! endif
 
         call toc( "adapt_tree (coarsening)", 104, MPI_Wtime()-t_loop )
     endif
@@ -478,7 +523,6 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
     ! to the last subroutine.)  -Thomas
 
     Jmin        = params%Jmin
-    if (Jmin<1) call abort(2202243, "Currently, setting Jmin<1 is not possible")
 
     ! it turns out, when the coefficients are spaghetti-ordered,
     ! we can sync only even numbers of points and save one for odd numbered

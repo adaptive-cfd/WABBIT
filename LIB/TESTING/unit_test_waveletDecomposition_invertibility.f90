@@ -138,7 +138,9 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         endif
     enddo
 
-    call summarize_profiling( WABBIT_COMM )
+    if (apply_verbose) then
+        call summarize_profiling( WABBIT_COMM )
+    endif
 
     ! report to terminal / log and abort if critical
     if (params%rank==0) then

@@ -14,7 +14,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk), allocatable, save    :: new_data(:,:,:,:), data_predict_fine(:,:,:)  ! data fields for interpolation
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level
 
@@ -75,11 +75,11 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
             call get_free_local_light_id( params, rank, lgt_free_id, message="refinement_execute")
-            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_hvy_id, lgt_free_id, rank, N )
         ! last daughter overwrites mother
         else
-            free_heavy_id = hvyID
-            call hvy2lgt( lgt_free_id, free_heavy_id, rank, N )
+            free_hvy_id = hvyID
+            call hvy2lgt( lgt_free_id, free_hvy_id, rank, N )
         endif
 
         treecode = tc_set_digit_at_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
@@ -101,11 +101,11 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! k=0 -> X_l, Y_l; k=1 -> X_l, Y_r; k=2 -> X_r, Y_l; k=3 -> X_r, Y_r;
         do dF = 1, size(hvy_block,4)
             if (dim == 2) then
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, free_heavy_id ) =  new_data( &
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, free_hvy_id ) =  new_data( &
                           (k_daughter/2)*Bs(1) +1 : Bs(1)*(1+      (k_daughter/2)), &
                     modulo(k_daughter,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter,2)), 1, dF)
             else
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) =  new_data( &
+                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_hvy_id ) =  new_data( &
                     modulo(k_daughter/2,2)*Bs(1) +1 : Bs(1)*(1+modulo(k_daughter/2,2)), &
                     modulo(k_daughter  ,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter  ,2)), &
                           (k_daughter/4  )*Bs(3) +1 : Bs(3)*(1+      (k_daughter/4  )), dF)
@@ -133,7 +133,7 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: k, N, dF, k_daughter                 ! loop variables
     integer(kind=ik)                    :: rank, dim, g, data_bounds(2,3)
     integer(kind=ik), dimension(3)      :: Bs
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level, lgtID
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_wd  ! used for data juggling
@@ -163,7 +163,7 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
             call get_free_local_light_id( params, rank, lgt_free_id, message="refinement_execute")
-            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_hvy_id, lgt_free_id, rank, N )
         endif
 
         treecode = tc_set_digit_at_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
@@ -209,7 +209,7 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
 
         end do
         ! transform to spaghetti form as this is what we usually work with
-        call Mallat2Spaghetti_block(params, tmp_wd(:, :, :, 1:size(hvy_block,4)), hvy_block(:, :, :, 1:size(hvy_block,4), free_heavy_id))
+        call Mallat2Spaghetti_block(params, tmp_wd(:, :, :, 1:size(hvy_block,4)), hvy_block(:, :, :, 1:size(hvy_block,4), free_hvy_id))
     end do
 
     ! delete mother
@@ -288,7 +288,7 @@ subroutine refinementExecute_lvl2SpaghettiWD( params, hvy_block, tree_ID, level 
     integer(kind=ik)                    :: rank                                 ! process rank
     integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id 
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id 
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level_me, hvyID
 

@@ -132,16 +132,22 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! 1) Check if we find a neighbor on the SAME LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    ! calculate treecode for neighbor on same level
-    call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=params%Jmax)
-
-    ! check if (hypothetical) neighbor exists and if so find its lgtID
-    call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
-
-    if (exists) then
-        ! we found the neighbor on the same level.
-        hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_neighbor
+    if (level == 0) then
+        ! Check if this block is on level 0. Then all neighbors are itself.
+        hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_block
         if (.not. search_overlapping) return
+    else
+        ! calculate treecode for neighbor on same level
+        call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=params%Jmax)
+
+        ! check if (hypothetical) neighbor exists and if so find its lgtID
+        call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
+
+        if (exists) then
+            ! we found the neighbor on the same level.
+            hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_neighbor
+            if (.not. search_overlapping) return
+        endif
     endif
 
 

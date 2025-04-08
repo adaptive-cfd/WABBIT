@@ -884,7 +884,7 @@ module module_ini_files_parser
                             endif
                             ! remove leading spaces, then read
                             value = adjustl(line2(index1:index2))
-                            write(*, '(A, A)') "Trying to read: ", trim(value)
+                            ! write(*, '(A, A)') "Trying to read: ", trim(value)
                             read( value, * ) matrix(j-i+1,:)
                         enddo
 

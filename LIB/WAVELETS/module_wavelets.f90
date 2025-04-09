@@ -1539,14 +1539,27 @@ contains
         integer(kind=ik) :: N, i, j
 
         N = size(u)
-        u_filtered = 0.0_rk
 
-        ! apply filter f to periodic signal u, i.e. convolute with filter
+        ! ! apply filter f to periodic signal u, i.e. convolute with filter
+
+        ! classical pointwise
+        ! u_filtered = 0.0_rk
+        ! do i =  1+skip_g, N-skip_g, sampling
+        !     do j = fl_l, fl_r
+        !         u_filtered(i) = u_filtered(i) + u(i+j) * filter(j)
+        !     enddo
+        ! enddo
+
+        ! vectorized filter
         do i =  1+skip_g, N-skip_g, sampling
-            do j = fl_l, fl_r
-                u_filtered(i) = u_filtered(i) + u(i+j) * filter(j)
-            enddo
+            u_filtered(i) = sum(u(i+fl_l:i+fl_r) * filter(:))
         enddo
+
+        ! ! vectorize filter application
+        ! u_filtered = 0.0_rk
+        ! do j = fl_l, fl_r
+        !     u_filtered(1+skip_g: N-skip_g: sampling) = u_filtered(1+skip_g: N-skip_g: sampling) + u(1+skip_g+j: N-skip_g+j: sampling) * filter(j)
+        ! enddo
     end subroutine
 
 

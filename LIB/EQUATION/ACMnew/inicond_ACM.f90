@@ -455,6 +455,33 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                 enddo
             enddo
         enddo
+    case("mixing_layer_rollup3")
+        ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is periodic in all directions with 2 shear layers
+        ! compares to Yasuda2023 and AbdulGafoor2024
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+                z = z - params_acm%domain_size(3)/2.0_rk
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                y = y - params_acm%domain_size(2)/2.0_rk
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    x = x - params_acm%domain_size(1)/2.0_rk
+
+                    ! tanh profile with specific thickness L/(4*7), but we have two of them to have periodicity
+                    u(ix,iy,iz,1) = -1.0_rk - tanh((y - params_acm%domain_size(2)/4.0_rk)*80.0_rk/params_acm%domain_size(2)*2.0_rk) + &
+                        tanh((y + params_acm%domain_size(2)/4.0_rk)*80.0_rk/params_acm%domain_size(2)*2.0_rk)    
+                    u(ix,iy,iz,2) = 0.05_rk * sin((x - params_acm%domain_size(2)/4.0_rk)*2.0_rk*pi)
+
+                enddo
+            enddo
+        enddo
 
     case default
         call abort(428764, "ACM inicond: "//trim(adjustl(params_acm%inicond))//" is unkown.")

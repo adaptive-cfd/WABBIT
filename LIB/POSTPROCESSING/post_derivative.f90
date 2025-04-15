@@ -76,7 +76,7 @@ subroutine post_derivative(params)
     ! is used in ghost nodes sync'ing
     if (order == "2") then
         params%order_discretization = "FD_2nd_central"
-        params%g = 1_ik
+        params%g = 2_ik
     elseif (order == "4") then
         params%order_discretization = "FD_4th_central"
         params%g = 2_ik
@@ -99,15 +99,23 @@ subroutine post_derivative(params)
         der_dim_i = 2
     elseif (der_dim == "3" .and. params%dim==3) then
         der_dim_i = 3
+    elseif (der_dim == "12") then
+        der_dim_i = 12
+    elseif (der_dim == "13" .and. params%dim==3) then
+        der_dim_i = 13
+    elseif (der_dim == "23" .and. params%dim==3) then
+        der_dim_i = 23
     else
-        call abort(250124, "Cannot compute derivative in this direction, choose between 1 for x-, 2 for y- and 3 for z-direction (3 only for 3D)")
+        call abort(250124, "Cannot compute derivative in this direction, choose between 1 for x-, 2 for y- and 3 for z-direction (3 only for 3D), 12,13,23 for cross derivatives")
     endif
     if (der_order == "1") then
         der_order_i = 1
     elseif (der_order == "2") then
         der_order_i = 2
+    elseif (der_order == "11") then
+        der_order_i = 11
     else
-        call abort(250124, "Cannot compute this derivative, choose between 1 for first order and 2 for second order derivative")
+        call abort(250124, "Cannot compute this derivative, choose between 1 for first order and 2 for second order derivative, 11 for cross derivatives")
     endif
 
     params%Jmax = tc_length
@@ -161,6 +169,9 @@ subroutine post_derivative(params)
     if (der_order_i == 2 .and. der_dim_i == 1) write( fname,'(a, "_", i12.12, ".h5")') 'dxdx', nint(time * 1.0e6_rk)
     if (der_order_i == 2 .and. der_dim_i == 2) write( fname,'(a, "_", i12.12, ".h5")') 'dydy', nint(time * 1.0e6_rk)
     if (der_order_i == 2 .and. der_dim_i == 3) write( fname,'(a, "_", i12.12, ".h5")') 'dzdz', nint(time * 1.0e6_rk)
+    if (der_order_i == 11 .and. der_dim_i == 12) write( fname,'(a, "_", i12.12, ".h5")') 'dxdy', nint(time * 1.0e6_rk)
+    if (der_order_i == 11 .and. der_dim_i == 13) write( fname,'(a, "_", i12.12, ".h5")') 'dxdz', nint(time * 1.0e6_rk)
+    if (der_order_i == 11 .and. der_dim_i == 23) write( fname,'(a, "_", i12.12, ".h5")') 'dzdz', nint(time * 1.0e6_rk)
 
     call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 

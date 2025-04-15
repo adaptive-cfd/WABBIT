@@ -155,7 +155,7 @@ subroutine ini_file_to_params( params, filename )
    params%Nreconl = params%Nreconl + diff_L
    params%Nreconr = params%Nreconr + diff_R
    if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
-      write(*, '(A)') "Increased Nwc to consider FD-stencil size by ", diff_L, " / ", diff_R
+      write(*, '(A, i0, A, i0)') "Increased Nwc to consider FD-stencil size by (L/R) : ", diff_L, " / ", diff_R
    endif
    ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
    if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then

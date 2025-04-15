@@ -1065,16 +1065,17 @@ contains
 
 
     ! for debugging, prints block with border for interior and ghost points to see whats going on inside
-    subroutine dump_block_fancy(u, file, Bs, g, to_int, digits, append)
+    subroutine dump_block_fancy(u, file, Bs, g, to_int, digits, print_ghosts, append)
         real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block
         character(len=*), intent(in) :: file                   ! file name
         logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        logical, optional, intent(in) :: print_ghosts          ! if false, only interior points are printed
         integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
         logical, optional, intent(in) :: append                ! if true, data is appended to file
 
         integer(kind=ik), intent(in)           :: Bs(3), g
         integer :: ii, apply_digits
-        logical :: toInt, apply_append
+        logical :: toInt, apply_append, apply_print_ghosts
         character(len=140) :: formatter
 
         toInt = .false.
@@ -1088,6 +1089,8 @@ contains
         if (present(digits)) apply_digits = digits
         apply_append = .false.
         if (present(append)) apply_append = append
+        apply_print_ghosts = .false.
+        if (present(print_ghosts)) apply_print_ghosts = print_ghosts
 
         if (.not. apply_append) then
             ! write(*,*) "Dumping block to "//file
@@ -1096,48 +1099,61 @@ contains
             open(unit=32, file=file, status='unknown', position='append')
             write(32, '(A)') ""  ! empty line
         endif
-        ! print ghost block lines
-        do ii = Bs(2)+2*g, Bs(2)+g+1, -1  ! print bottom to top to have y-direction that is intuitive
+        if (apply_print_ghosts) then
+            ! print ghost block lines
+            do ii = Bs(2)+2*g, Bs(2)+g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(",i0,"(i",i0,","",""),""   "",",i0,"(i", i0, ","",""),""   "",",i0,"(i",i0,","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
+            ! print divider
             if (toInt) then
-                write(formatter, '("(",i0,"(i",i0,","",""),""   "",",i0,"(i", i0, ","",""),""   "",",i0,"(i",i0,","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
-                write(32, formatter) nint(u(:, ii, 1, 1))
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
             else
-                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
-                write(32, formatter) u(:, ii, 1, 1)
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
             endif
-        enddo
-        ! print divider
-        if (toInt) then
-            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+            ! print interior block lines with divider for left and right ghost points
+            do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
+            ! print divider
+            if (toInt) then
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+            else
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+            endif
+            ! print ghost block lines
+            do ii = g, 1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
         else
-            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+            ! print only interior block lines without ghost points
+            do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(",i0, "(i", i0, ","",""))")') Bs(1), apply_digits
+                    write(32, formatter) nint(u(g+1:g+Bs(1), ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""))")') Bs(1), apply_digits+7, apply_digits
+                    write(32, formatter) u(g+1:g+Bs(1), ii, 1, 1)
+                endif
+            enddo
         endif
-        ! print interior block lines with divider for left and right ghost points
-        do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
-            if (toInt) then
-                write(formatter, '("(", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
-                write(32, formatter) nint(u(:, ii, 1, 1))
-            else
-                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
-                write(32, formatter) u(:, ii, 1, 1)
-            endif
-        enddo
-        ! print divider
-        if (toInt) then
-            write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
-        else
-            write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
-        endif
-        ! print ghost block lines
-        do ii = g, 1, -1  ! print bottom to top to have y-direction that is intuitive
-            if (toInt) then
-                write(formatter, '("(", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
-                write(32, formatter) nint(u(:, ii, 1, 1))
-            else
-                write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
-                write(32, formatter) u(:, ii, 1, 1)
-            endif
-        enddo
         close(32)
     end subroutine
 

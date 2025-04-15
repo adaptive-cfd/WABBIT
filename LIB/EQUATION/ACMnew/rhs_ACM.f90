@@ -333,8 +333,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     real(kind=rk), dimension(3) :: forcing
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta, C_eta_inv, gamma
-    real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
+    real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, u_dxdy, v_dx, v_dy, v_dxdx, v_dxdy, &
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, bulk_viscosity, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      C_sponge_inv, &
@@ -356,6 +356,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     c_0         = params_acm%c_0
     nu          = params_acm%nu
     nu_p        = params_acm%nu_p
+    bulk_viscosity        = params_acm%bulk_viscosity
     C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
@@ -638,7 +639,40 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                     rhs(ix,iy,3) = rhs(ix,iy,3) - up_dx - vp_dy
                 enddo
-            enddo    
+            enddo
+        case ('bulk_viscosity')
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv    
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv 
+                    ! cross derivatives, using hardcoded cross stencils, coefficients applied for each depth, for the signs we have NE+ SE- NW- SW+
+                    ! This will look like this:
+                    !   -       +
+                    !     -   +
+                    !       o
+                    !     +   -
+                    !   +       -
+                    ! ! ! second order: stencil is 1: 1/4
+                    ! u_dxdy = (  1.0_rk/4.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)))*dx_inv*dy_inv 
+                    ! v_dxdy = (  1.0_rk/4.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)))*dx_inv*dy_inv
+                    ! fourth order: stencil is 1: 1/3, 2:1/48
+                    u_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)))*dx_inv*dy_inv 
+                    v_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)))*dx_inv*dy_inv
+                    ! ! sixth order: stencil is 1: 3/8, 2: -3/80, 1/360
+                    ! u_dxdy = (  3.0_rk/8.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)) + \
+                    !           -1.0_rk/80.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)) + \
+                    !           1.0_rk/360.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)))*dx_inv*dy_inv 
+                    ! v_dxdy = (  3.0_rk/8.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)) + \
+                    !           -1.0_rk/80.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)) + \
+                    !           1.0_rk/360.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)))*dx_inv*dy_inv
+
+                    rhs(ix,iy,1) = rhs(ix,iy,1) + bulk_viscosity * (u_dxdx + v_dxdy)
+                    rhs(ix,iy,2) = rhs(ix,iy,2) + bulk_viscosity * (v_dydy + u_dxdy)
+                enddo
+            enddo
         case default
             call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
         end select    
@@ -795,9 +829,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
                      nu, C_eta, C_eta_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
-    real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
-                     v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
-                     w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
+    real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
+                     v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
+                     w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, w_dxdz, w_dydz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz
@@ -1119,7 +1153,40 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - (pu_dx+pv_dy+pw_dz)
                     enddo
                 enddo    
-            enddo    
+            enddo
+        case ('bulk_viscosity')
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1)  + b_FD4(-1)*phi(ix-1,iy,iz,1)  + b_FD4(0)*phi(ix,iy,iz,1)  + b_FD4(+1)*phi(ix+1,iy,iz,1)  + b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv  
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2)  + b_FD4(-1)*phi(ix,iy-1,iz,2)  + b_FD4(0)*phi(ix,iy,iz,2)  + b_FD4(+1)*phi(ix,iy+1,iz,2)  + b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv    
+                    w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3)  + b_FD4(-1)*phi(ix,iy,iz-1,3)  + b_FD4(0)*phi(ix,iy,iz,3)  + b_FD4(+1)*phi(ix,iy,iz+1,3)  + b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv    
+                    ! cross derivatives, using hardcoded cross stencils, coefficients applied for each depth, for the signs we have NE+ SE- NW- SW+
+                    ! This will look like this:
+                    !   -       +
+                    !     -   +
+                    !       o
+                    !     +   -
+                    !   +       -
+                    ! fourth order: stencil is 1: 1/3, 2:1/48
+                    u_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,iz  ,1) - phi(ix+1,iy-1,iz  ,1) - phi(ix-1,iy+1,iz  ,1) + phi(ix-1,iy-1,iz  ,1)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,iz  ,1) - phi(ix+2,iy-2,iz  ,1) - phi(ix-2,iy+2,iz  ,1) + phi(ix-2,iy-2,iz  ,1)))*dx_inv*dy_inv 
+                    u_dxdz = (  1.0_rk/3.0_rk*(phi(ix+1,iy  ,iz+1,1) - phi(ix+1,iy  ,iz-1,1) - phi(ix-1,iy  ,iz+1,1) + phi(ix-1,iy  ,iz-1,1)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy  ,iz+2,1) - phi(ix+2,iy  ,iz-2,1) - phi(ix-2,iy  ,iz+2,1) + phi(ix-2,iy  ,iz-2,1)))*dx_inv*dz_inv
+                    v_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,iz  ,2) - phi(ix+1,iy-1,iz  ,2) - phi(ix-1,iy+1,iz  ,2) + phi(ix-1,iy-1,iz  ,2)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,iz  ,2) - phi(ix+2,iy-2,iz  ,2) - phi(ix-2,iy+2,iz  ,2) + phi(ix-2,iy-2,iz  ,2)))*dx_inv*dy_inv
+                    v_dydz = (  1.0_rk/3.0_rk*(phi(ix  ,iy+1,iz+1,2) - phi(ix  ,iy-1,iz+1,2) - phi(ix  ,iy+1,iz-1,2) + phi(ix  ,iy-1,iz-1,2)) + \
+                              -1.0_rk/48.0_rk*(phi(ix  ,iy+2,iz+2,2) - phi(ix  ,iy-2,iz+2,2) - phi(ix  ,iy+2,iz-2,2) + phi(ix  ,iy-2,iz-2,2)))*dy_inv*dz_inv
+                    w_dxdz = (  1.0_rk/3.0_rk*(phi(ix+1,iy  ,iz+1,3) - phi(ix+1,iy  ,iz-1,3) - phi(ix-1,iy  ,iz+1,3) + phi(ix-1,iy  ,iz-1,3)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy  ,iz+1,3) - phi(ix+2,iy  ,iz-2,3) - phi(ix-2,iy  ,iz+2,3) + phi(ix-2,iy  ,iz-2,3)))*dx_inv*dz_inv
+                    w_dydz = (  1.0_rk/3.0_rk*(phi(ix  ,iy+1,iz+1,3) - phi(ix  ,iy-1,iz+1,3) - phi(ix  ,iy+1,iz-2,3) + phi(ix  ,iy-1,iz-1,3)) + \
+                              -1.0_rk/48.0_rk*(phi(ix  ,iy+2,iz+1,3) - phi(ix  ,iy-2,iz+2,3) - phi(ix  ,iy+2,iz-2,3) + phi(ix  ,iy-2,iz-2,3)))*dy_inv*dz_inv
+                    
+                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) + params_acm%bulk_viscosity * (u_dxdx + v_dxdy + w_dxdz)
+                    rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) + params_acm%bulk_viscosity * (v_dydy + u_dxdy + w_dydz)
+                    rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) + params_acm%bulk_viscosity * (w_dzdz + u_dxdz + v_dydz)
+                enddo
+            enddo
         case default
             call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
         end select   

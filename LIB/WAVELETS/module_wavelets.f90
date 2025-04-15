@@ -1990,17 +1990,9 @@ contains
                 ! apply level shift
                 val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block)*(2.0_rk-params%dim))/2.0_rk)
                 ! change SC to WC factors on this level - factor^2
-<<<<<<< HEAD
                 val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
                 val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
                 val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
-=======
-                val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk**(1/params%dim)
-                val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk**(1/params%dim)
-                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk**(1/params%dim)
-            ! ELSE
-            !     ???
->>>>>>> 57a4ecb6adde60e0602bca499cb5bcde7f10a53e
             endif
         case default
             call abort(241024, "ERROR:Unknown wavelet normalization!")

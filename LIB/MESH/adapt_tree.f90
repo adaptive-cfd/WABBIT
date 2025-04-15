@@ -595,20 +595,24 @@ end subroutine
 !> \details This functions inits all mother blocks from a leaf-only grid down to JMin.
 !! This will be used for wavelet_decompose_full_tree in order to prepare the grid, which it then fills with values.
 !! The benefit is, that the grid topology needs to be updated only once instead of once every loop cycle.
-subroutine init_full_tree(params, tree_ID, verbose_check)
+subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in), optional :: set_ref     !< if not set, ref will be set to REF_TMP_EMPTY, else to this number
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
-    integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit
+    integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit, refset
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: toc_statement
     logical              :: iterate
     ! list of block ids, proc ranks
     integer(kind=ik)                    :: lgt_daughters(1:8), rank_daughters(1:8)
     integer(kind=tsize)                 :: treecode
+
+    refset = REF_TMP_EMPTY
+    if (present(set_ref)) refset = set_ref
 
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
@@ -647,7 +651,7 @@ subroutine init_full_tree(params, tree_ID, verbose_check)
                     call set_tc(lgt_block( lgt_merge_id, IDX_TC_1:IDX_TC_2), tc_clear_until_level_b(treecode, &
                         dim=params%dim, level=level_b-1, max_level=params%Jmax))
                     lgt_block( lgt_merge_id, IDX_MESH_LVL ) = level_b-1
-                    lgt_block( lgt_merge_id, IDX_REFINE_STS ) = REF_TMP_EMPTY
+                    lgt_block( lgt_merge_id, IDX_REFINE_STS ) = refset
                     lgt_block( lgt_merge_id, IDX_TREE_ID ) = tree_ID
                     ! make sure family array for mother block is cleared
                     hvy_family(hvy_merge_id, :) = -1

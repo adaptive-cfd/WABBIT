@@ -42,7 +42,7 @@ program main_post
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     call get_command_argument( 1, mode )
-    if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
+    if (rank==0) write(*,'("Starting postprocessing in ", a20, " mode")') mode
 
     select case(mode)
     case ("--extract-slice")
@@ -92,7 +92,7 @@ program main_post
     case("--average")
         call post_average_snapshots(params)
 
-    case("--sparse-to-dense", "--refine-everywhere")
+    case("--sparse-to-dense", "--refine-everywhere", "--refine-everywhere-forced", "--coarsen-everywhere")
         call sparse_to_dense(params)
 
     case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")
@@ -168,6 +168,12 @@ program main_post
 
     case ("--cvs-invertibility-test")
         call post_cvs_invertibility_test(params)
+
+    case ("--post-diffuse-velocity")
+        call post_diffuse_velocity(params)
+
+    case ("--proto-GS-multigrid")
+        call proto_GS_multigrid(params)
         
     case default
 

@@ -381,8 +381,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         g_this = max(ubound(params%HD,1),ubound(params%GD,1))
         ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         ! if (params%isLiftedWavelet) then
-            ! call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
-            ! call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
+        !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
+        !     call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block )
 
         !     write(toc_statement, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
         !     call toc( toc_statement, 1100+iteration, MPI_Wtime()-t_block )

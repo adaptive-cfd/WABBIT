@@ -135,7 +135,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
     ! This is the first coarse extension before removing blocks
     ! As every block is assumed to be WDed here we can do it on the whole tree
     t0 = MPI_Wtime()
-    if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+    if (params%useCoarseExtension) then
         call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree")
     endif
     call toc( "coarseExtensionUpdate_tree (coarse_extension_modify)", 155, MPI_Wtime()-t0 )
@@ -153,7 +153,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
     ! This uses the fact that values refined on the coarse grid points with wc=0 are the copied SC values
     ! We do this in order tu bundle up the synchronizations in the step before as the modification is really cheap
     t0 = MPI_Wtime()
-    if (params%useCoarseExtension .and. params%isLiftedWavelet) then
+    if (params%useCoarseExtension) then
         call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", copy_sc=.false.)
     endif
     call toc( "coarseExtensionUpdate_tree (coarse_extension_modify)", 155, MPI_Wtime()-t0 )

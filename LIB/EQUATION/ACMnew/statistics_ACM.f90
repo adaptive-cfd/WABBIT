@@ -135,6 +135,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         do k = 1, size(u,4)
             if (maxval(abs(u(:,:,:,k))) > 1.0e4_rk) then
                 write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') k, maxval(abs(u(:,:,:,k)))
+
+                ! done by all ranks but well I hope the cluster can take one for the team
+                ! This (empty) file is for scripting purposes on the supercomputers.
+                open (77, file='ACM_diverged', status='replace')
+                close(77)
+
                 call abort(0409201934,"ACM fail: very very large values in state vector.")
             endif
         enddo
@@ -546,6 +552,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
             endif
+
+            ! this file is to simply keep track of simulations, should they be restarted with different parameters.
+            ! We just keep track of the most important and most frequently changed parameters.
+            call append_t_file( 'parameters.t', (/time, params_acm%C_0, params_acm%C_eta, params_acm%C_sponge, params_acm%nu/) )
         end if
 
     case default

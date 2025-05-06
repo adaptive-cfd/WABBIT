@@ -71,8 +71,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     ! R^-2 (3D), but even in 3D it can still require resolution of the shock wave that can be expensive.
     if (params_acm%soft_penalization_startup) then
         if (time < params_acm%penalization_startup_tau) then
-            params_acm%C_eta = params_acm%C_eta_start + &
-            (params_acm%C_eta_const-params_acm%C_eta_start)*(time/params_acm%penalization_startup_tau)
+            ! the formulation with EXP seems to be more efficient in damping the initial shock wave; 2D tests showed that nicely.
+            ! The new defaults are C_eta_start = 1.0  and  penalization_startup_tau=0.20. Note relatively long before this time the penalization
+            ! is (almost) completely activated because of the exponential decay
+            params_acm%C_eta = params_acm%C_eta_const + params_acm%C_eta_start*exp(-20.0*time/params_acm%penalization_startup_tau)
         else
             ! constant value of C_eta after the startup phase
             params_acm%C_eta = params_acm%C_eta_const    
@@ -120,7 +122,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e4_rk) then
                 write(*,'("maxval in u(",i2,") = ", es15.8)') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i)))
 
-                ! done by all ranks but well I hope the cluster can take one for the team
+                ! done by all ranks but well I hope the cluster can take one for the team.
+                ! This (empty) file is for scripting purposes on the supercomputers.
                 open (77, file='ACM_diverged', status='replace')
                 close(77)
                 
@@ -294,6 +297,7 @@ end subroutine RHS_ACM
 
 
 subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+
     implicit none
 
     !> grid parameter
@@ -318,11 +322,13 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
     !>
-    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, eps, eps_inv, gamma
+    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta, C_eta_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
-                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz
+                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
+                     C_sponge_inv, &
+                     up_dx, vp_dy
     ! loop variables
     integer(kind=ik) :: ix, iy, idir
     ! coefficients for Tam&Webb (4th order 1st derivative)
@@ -340,7 +346,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     c_0         = params_acm%c_0
     nu          = params_acm%nu
     nu_p        = params_acm%nu_p
-    eps         = params_acm%C_eta
+    C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
     dx_inv = 1.0_rk / dx(1)
@@ -348,11 +354,12 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 
-    eps_inv = 1.0_rk / eps
+    C_eta_inv = 1.0_rk / C_eta
 
     if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars) then
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
+
 
     select case(order_discretization)
     case("FD_2nd_central")
@@ -385,8 +392,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -415,8 +422,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
@@ -457,8 +464,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -492,8 +499,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -539,8 +546,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     ! usz (:,:,4)
                     ! color (.;.5)
                     ! sponge (:,:,6)
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -577,8 +584,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     ! usz (:,:,4)
                     ! color (.;.5)
                     ! sponge (:,:,6)
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
     
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -586,6 +593,45 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 end do
             end do
         endif
+
+        select case(params_acm%p_eqn_model)
+        case ('acm')
+            ! do nothing, is the eqn computed above without additional terms
+        case ('diffusive')
+            ! add p diffusion []
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    p_dxdx = (b_FD4(-2)*phi(ix-2,iy,3) + b_FD4(-1)*phi(ix-1,iy,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix+1,iy,3) + b_FD4(+2)*phi(ix+2,iy,3))*dx2_inv
+                    p_dydy = (b_FD4(-2)*phi(ix,iy-2,3) + b_FD4(-1)*phi(ix,iy-1,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix,iy+1,3) + b_FD4(+2)*phi(ix,iy+2,3))*dy2_inv
+    
+                    rhs(ix,iy,3) = rhs(ix,iy,3) + params_acm%nu_p*(p_dxdx+p_dydy)
+                enddo
+            enddo   
+        case ('EDAC')
+            ! add EDAC term AND diffusion [Clausen, Entropically damped form of artificial compressibility for explicit simulation of incompressible flow, 2013]
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    p_dxdx = (b_FD4(-2)*phi(ix-2,iy,3) + b_FD4(-1)*phi(ix-1,iy,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix+1,iy,3) + b_FD4(+2)*phi(ix+2,iy,3))*dx2_inv
+                    p_dydy = (b_FD4(-2)*phi(ix,iy-2,3) + b_FD4(-1)*phi(ix,iy-1,3) + b_FD4(0)*phi(ix,iy,3) + b_FD4(+1)*phi(ix,iy+1,3) + b_FD4(+2)*phi(ix,iy+2,3))*dy2_inv
+    
+                    up_dx = (a_FD4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,3))*dx_inv
+                    vp_dy = (a_FD4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,3))*dy_inv
+
+                    rhs(ix,iy,3) = rhs(ix,iy,3) + params_acm%nu_p*(p_dxdx+p_dydy) - up_dx - vp_dy
+                enddo
+            enddo   
+        case ('convective')
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    up_dx = (a_FD4(-2)*phi(ix-2,iy,1)*phi(ix-2,iy,3) + a_FD4(-1)*phi(ix-1,iy,1)*phi(ix-1,iy,3) + a_FD4(+1)*phi(ix+1,iy,1)*phi(ix+1,iy,3) + a_FD4(+2)*phi(ix+2,iy,1)*phi(ix+2,iy,3))*dx_inv
+                    vp_dy = (a_FD4(-2)*phi(ix,iy-2,2)*phi(ix,iy-2,3) + a_FD4(-1)*phi(ix,iy-1,2)*phi(ix,iy-1,3) + a_FD4(+1)*phi(ix,iy+1,2)*phi(ix,iy+1,3) + a_FD4(+2)*phi(ix,iy+2,2)*phi(ix,iy+2,3))*dy_inv
+
+                    rhs(ix,iy,3) = rhs(ix,iy,3) - up_dx - vp_dy
+                enddo
+            enddo    
+        case default
+            call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
+        end select    
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------
@@ -618,8 +664,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -649,8 +695,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * eps_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -671,13 +717,13 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     if (.not.(params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local")) then
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse
-            eps_inv = 1.0_rk / params_acm%C_sponge
+            C_sponge_inv = 1.0_rk / params_acm%C_sponge
 
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
-                    spo = mask(ix,iy,6) * eps_inv
+                    spo = mask(ix,iy,6) * C_sponge_inv
 
                     rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
@@ -691,15 +737,17 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
 
         ! use same C_eta as object, not the sponge value
-        eps_inv = 1.0_rk / params_acm%C_eta_ring
+        C_sponge_inv = 1.0_rk / params_acm%C_eta_ring
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
                 ! mask(:,:,4) contains p_ref forcing in the ring
                 ! rhs_p      = rhsp         - chi_ring     *( p          - p_lamballais) / C_eta
-                rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4))*eps_inv
+                rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4))*C_sponge_inv
             enddo
         enddo
     endif
+
+
 
 
 end subroutine RHS_2D_acm
@@ -735,13 +783,14 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, eps, eps_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
+                     nu, C_eta, C_eta_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
-                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz
+                     uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
+                     C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 
@@ -758,7 +807,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! set parameters for readability
     c_0         = params_acm%c_0
     nu          = params_acm%nu
-    eps         = params_acm%C_eta
+    C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
     dx_inv = 1.0_rk / dx(1)
@@ -769,7 +818,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     dy2_inv = 1.0_rk / (dx(2)**2)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
-    eps_inv = 1.0_rk / eps
+    C_eta_inv = 1.0_rk / C_eta
 
     select case(order_discretization)
     case("FD_2nd_central")
@@ -827,7 +876,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -880,7 +929,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -949,7 +998,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1001,7 +1050,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
     
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1014,6 +1063,56 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                 end do
             end do
         endif
+
+        select case(params_acm%p_eqn_model)
+        case ('acm')
+            ! do nothing, is the eqn computed above without additional terms
+        case ('diffusive')
+            ! add p diffusion []
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+
+                        p_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,4) +b_FD4(-1)*phi(ix-1,iy,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix+1,iy,iz,4) +b_FD4(+2)*phi(ix+2,iy,iz,4))*dx2_inv
+                        p_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,4) +b_FD4(-1)*phi(ix,iy-1,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy+1,iz,4) +b_FD4(+2)*phi(ix,iy+2,iz,4))*dy2_inv
+                        p_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,4) +b_FD4(-1)*phi(ix,iy,iz-1,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy,iz+1,4) +b_FD4(+2)*phi(ix,iy,iz+2,4))*dz2_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) + params_acm%nu_p*(p_dxdx + p_dydy + p_dzdz)
+                    enddo
+                enddo   
+            enddo   
+        case ('EDAC')
+            ! add EDAC term AND diffusion [Clausen, Entropically damped form of artificial compressibility for explicit simulation of incompressible flow, 2013]
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        p_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,4) +b_FD4(-1)*phi(ix-1,iy,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix+1,iy,iz,4) +b_FD4(+2)*phi(ix+2,iy,iz,4))*dx2_inv
+                        p_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,4) +b_FD4(-1)*phi(ix,iy-1,iz,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy+1,iz,4) +b_FD4(+2)*phi(ix,iy+2,iz,4))*dy2_inv
+                        p_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,4) +b_FD4(-1)*phi(ix,iy,iz-1,4) +b_FD4(0)*phi(ix,iy,iz,4) +b_FD4(+1)*phi(ix,iy,iz+1,4) +b_FD4(+2)*phi(ix,iy,iz+2,4))*dz2_inv
+
+                        pu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,4)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,4)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,4)*phi(ix+2,iy,iz,1))*dx_inv
+                        pv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,4)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,4)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,4)*phi(ix,iy+2,iz,2))*dy_inv
+                        pw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,4)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,4)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,4)*phi(ix,iy,iz+2,3))*dz_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) + params_acm%nu_p*(p_dxdx + p_dydy + p_dzdz) - (pu_dx+pv_dy+pw_dz)
+                    enddo
+                enddo   
+            enddo   
+        case ('convective')
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        pu_dx = (a_FD4(-2)*phi(ix-2,iy,iz,4)*phi(ix-2,iy,iz,1) +a_FD4(-1)*phi(ix-1,iy,iz,4)*phi(ix-1,iy,iz,1) +a_FD4(+1)*phi(ix+1,iy,iz,4)*phi(ix+1,iy,iz,1) +a_FD4(+2)*phi(ix+2,iy,iz,4)*phi(ix+2,iy,iz,1))*dx_inv
+                        pv_dy = (a_FD4(-2)*phi(ix,iy-2,iz,4)*phi(ix,iy-2,iz,2) +a_FD4(-1)*phi(ix,iy-1,iz,4)*phi(ix,iy-1,iz,2) +a_FD4(+1)*phi(ix,iy+1,iz,4)*phi(ix,iy+1,iz,2) +a_FD4(+2)*phi(ix,iy+2,iz,4)*phi(ix,iy+2,iz,2))*dy_inv
+                        pw_dz = (a_FD4(-2)*phi(ix,iy,iz-2,4)*phi(ix,iy,iz-2,3) +a_FD4(-1)*phi(ix,iy,iz-1,4)*phi(ix,iy,iz-1,3) +a_FD4(+1)*phi(ix,iy,iz+1,4)*phi(ix,iy,iz+1,3) +a_FD4(+2)*phi(ix,iy,iz+2,4)*phi(ix,iy,iz+2,3))*dz_inv
+
+                        rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - (pu_dx+pv_dy+pw_dz)
+                    enddo
+                enddo    
+            enddo    
+        case default
+            call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
+        end select   
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------
@@ -1068,7 +1167,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1118,7 +1217,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1183,7 +1282,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
     
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1231,7 +1330,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * eps_inv
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1268,7 +1367,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
         ! avoid division by multiplying with inverse
-        eps_inv = 1.0_rk / params_acm%C_sponge
+        C_sponge_inv = 1.0_rk / params_acm%C_sponge
 
         do iz = g+1, Bs(3)+g
             do iy = g+1, Bs(2)+g
@@ -1276,7 +1375,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in hvy_mask
-                    spo = mask(ix,iy,iz,6) * eps_inv
+                    spo = mask(ix,iy,iz,6) * C_sponge_inv
 
                     rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * spo

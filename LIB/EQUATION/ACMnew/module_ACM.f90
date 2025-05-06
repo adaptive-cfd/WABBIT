@@ -95,7 +95,7 @@ module module_acm
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
     character(len=cshort) :: sponge_type=""
-    character(len=cshort) :: nonlinear_formulation="convective" ! or "divergence"
+    character(len=cshort) :: p_eqn_model="acm"
     character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: wingsection_inifiles(1:2)
     character(len=cshort) :: scalar_BC_type="neumann"
@@ -248,7 +248,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'HIT_linear_forcing', params_acm%HIT_linear_forcing, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'HIT_energy', params_acm%HIT_energy, 1.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'HIT_gain', params_acm%HIT_gain, 100.0_rk )
-    call read_param_mpi(FILE, 'ACM-new', 'nonlinear_formulation', params_acm%nonlinear_formulation, "convective" )
+    call read_param_mpi(FILE, 'ACM-new', 'p_eqn_model', params_acm%p_eqn_model, "acm" )
     call read_param_mpi(FILE, 'ACM-new', 'skew_symmetry', params_acm%skew_symmetry, .false. )
 
 
@@ -274,11 +274,12 @@ end subroutine
 
     ! penalization:
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
+    ! store the same value in two variables
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)
-    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.05_rk)
+    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)
     call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
     

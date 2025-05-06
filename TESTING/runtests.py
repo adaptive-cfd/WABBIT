@@ -200,14 +200,17 @@ class WabbitTest:
                 return result1
             result2 = run_command(command2, self.logger)
             return result2
+        
         elif self.test_name == "ghost_nodes":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --ghost-nodes-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             result = run_command(command, self.logger)
             return result
+        
         elif self.test_name == "invertibility":
             command = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-invertibility-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
             result = run_command(command, self.logger)
             return result
+        
         elif self.test_name == "adaptive":
             in_file = os.path.join("..", "..", "vor_000020000000.h5")  # relative to tmp_dir
             
@@ -218,8 +221,8 @@ class WabbitTest:
 
             # run commands
             file1, file2 = "vor_00100.h5", "vor_00200.h5"
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --operator=refine-everywhere --time=1.0"
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --sparse-to-dense \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --operator=coarsen-everywhere --time=2.0"
+            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-everywhere \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --time=1.0"
+            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --coarsen-everywhere \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --time=2.0"
             result1 = run_command(command1, self.logger)
             if result1.returncode != 0:
                 return result1
@@ -349,27 +352,27 @@ class WabbitTest:
     # I want to log at the same time to the console and possibly files as well, so I solve this with the logging module which handles the streams
     # for a new test the log-file location needs to be specified
     def init_logging(self, verbose=False, suite_log_handler=None, stdout_handler=None):
-        log_file = None
+        self.log_file = None
         if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
-            log_file = os.path.join(self.test_dir, f"{self.test_name}_{self.dim}D_{self.wavelet}.log")
+            self.log_file = os.path.join(self.test_dir, f"{self.test_name}_{self.dim}D_{self.wavelet}.log")
         elif self.test_name == "adaptive":
-            log_file = os.path.join(self.test_dir, "run.log")
+            self.log_file = os.path.join(self.test_dir, "run.log")
         elif self.test_name in ["blob_equi", "blob_adaptive"]:
-            log_file = os.path.join(self.test_dir, "blob-convection.log")
+            self.log_file = os.path.join(self.test_dir, "blob-convection.log")
         elif self.test_name == ["acm", "acm_norm", "acm_significant"]:
-            log_file = os.path.join(self.test_dir, "acm_cyl.log")
+            self.log_file = os.path.join(self.test_dir, "acm_cyl.log")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_bumblebee", "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete"]:
-            log_file = os.path.join(self.test_dir, "dry_run.log")
+            self.log_file = os.path.join(self.test_dir, "dry_run.log")
         elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
-            log_file = os.path.join(self.test_dir, "denoise.log")
+            self.log_file = os.path.join(self.test_dir, "denoise.log")
         else:
-            log_file = os.path.join(self.test_dir, "test.log")
+            self.log_file = os.path.join(self.test_dir, "test.log")
         
-        open(log_file, 'w').close()  # Clear the log file at the beginning
+        open(self.log_file, 'w').close()  # Clear the log file at the beginning
         # Set up logging for runs, which writes to different log file and with verbose to test log file and stdout as well
         self.logger = logging.getLogger("logger_run")
         self.logger.setLevel(logging.INFO)
-        test_log_handler = logging.FileHandler(log_file, mode='a')
+        test_log_handler = logging.FileHandler(self.log_file, mode='a')
         test_log_handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.handlers = []
         self.logger.addHandler(test_log_handler)
@@ -581,21 +584,28 @@ def main():
                 # write output to console, make it a bit fancy
                 if result.returncode == 0:
                     print(f"{pass_color}", end="")  # this only works for console
-                    logger_suite.info(f"\tPass")
+                    logger_suite.info(f"\tPass ")
                     happy_sum += 1
                     summary.append(0)
                 else:
                     print(f"{fail_color}", end="")  # this only works for console
-                    logger_suite.info(f"\tFail")
+                    logger_suite.info(f"\tFail ")
                     sad_sum += 1
                     summary.append(1)
+
                 for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
                 print(f"{end_color}", end="")  # this only works for console                    
                 logger_suite.info(f"\tTime= {ts_end_time:7.3f} s")
+
+                if result.returncode != 0:
+                    # test failed, provide direct link to log file
+                    print(f"{end_color}", end="")  # this only works for console  
+                    logger_suite.info(f"logfile: \t"+test_obj.log_file+"\n")
             else:
                 print(f"{fail_color}", end="")  # this only works for console
-                logger_suite.info(f"\tFail")
-                print(f"{end_color}", end="")  # this only works for console                    
+                logger_suite.info(f"\tFail ")
+                print(f"{end_color}", end="")  # this only works for console   
+
                 for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
                 logger_suite.info(f"\tTest was not executed")
 

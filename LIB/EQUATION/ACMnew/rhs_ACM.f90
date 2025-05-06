@@ -294,7 +294,6 @@ end subroutine RHS_ACM
 
 
 subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
-
     implicit none
 
     !> grid parameter
@@ -669,7 +668,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! sponge term.
     ! --------------------------------------------------------------------------
     ! HACK
-    if (.not. params_acm%geometry == "lamballais") then
+    if (.not.(params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local")) then
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse
             eps_inv = 1.0_rk / params_acm%C_sponge
@@ -692,7 +691,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
 
         ! use same C_eta as object, not the sponge value
-        eps_inv = 1.0_rk / params_acm%C_eta
+        eps_inv = 1.0_rk / params_acm%C_eta_ring
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
                 ! mask(:,:,4) contains p_ref forcing in the ring

@@ -53,7 +53,7 @@ module module_acm
   type :: type_params_acm
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, penalization_startup_tau
+    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
@@ -277,6 +277,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
+    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)
     call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.05_rk)
     call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
@@ -457,7 +458,7 @@ end subroutine
 
     ! read lamballais reference fields, see
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
-    if (params_acm%geometry == "lamballais") then
+    if ((params_acm%geometry == "lamballais").or.(params_acm%geometry=="lamballais-local")) then
         if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
         
         ! read us field

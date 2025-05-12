@@ -260,7 +260,7 @@ end subroutine
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
     if (params_acm%read_from_files) then
         call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
-        timestamp = input_files( index(input_files,'_')+1:index(input_files,'.h5') )
+        timestamp = input_files( scan(input_files,'_', back=.true.)+1:scan(input_files,'.h5', back=.true.)-3)
         read(timestamp,*) params_acm%start_time
         ! note this requires to have timestamp in the filename (so we cannot rename files...)
         params_acm%start_time = params_acm%start_time * 1.0e-6

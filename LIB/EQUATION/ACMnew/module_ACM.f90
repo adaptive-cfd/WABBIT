@@ -60,7 +60,7 @@ module module_acm
     real(kind=rk) :: nu, nu_p=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
     real(kind=rk) :: gamma_p

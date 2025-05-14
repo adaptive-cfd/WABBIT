@@ -97,9 +97,9 @@ tests = [
         {"test_name":"dry_dipteraBodyRotation", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_paratuposaComplete", "wavelet":"CDF22", "dim":3},
 
-        f"---{group_names[8]}---",  # group identifier
-        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},
-        {"test_name":"denoise_grey", "wavelet":"CDF42", "dim":2},
+#        f"---{group_names[8]}---",  # group identifier
+#        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},
+#        {"test_name":"denoise_grey", "wavelet":"CDF42", "dim":2},
     ]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1116,7 +1116,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
     case("FD_6th_central")
         !-----------------------------------------------------------------------
-        ! 4th order (standard scheme)
+        ! 6th order (standard scheme)
         !-----------------------------------------------------------------------
         ! Note: a(0) does NOT appear (it is zero...)
         if (params_acm%skew_symmetry) then
@@ -2004,6 +2004,7 @@ end subroutine RHS_2D_scalar
 ! i.e. \varepsilon = 2 nu (du_i/dx_j) (du_i/dx_j) 
 ! and thus do not make use of the vorticity
 subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
+    use module_globals
     implicit none
 
     !> grid parameter
@@ -2015,13 +2016,9 @@ subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
     real(kind=rk), intent(inout) :: u(:,:,:,:)
     real(kind=rk), intent(inout) :: dissipation_rate
 
-    !> derivatives
-    real(kind=rk) :: ux_dx, ux_dy, ux_dz
-    real(kind=rk) :: uy_dx, uy_dy, uy_dz
-    real(kind=rk) :: uz_dx, uz_dy, uz_dz
-
     !> inverse of dx, dy, dz
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, u_dxdx, u_dydy, u_dzdz, &
+    v_dxdx, v_dydy, v_dzdz, w_dxdx, w_dydy, w_dzdz
     ! loop variables
     integer(kind=ik) :: ix, iy, iz
     ! coefficients for Tam&Webb (4th order 1st derivative)
@@ -2037,11 +2034,13 @@ subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: vorticity_ACM_block called but ACM not initialized"
 
+    ! Dissipation rate is u_j*laplace(u_j) (einstein summation convention)
+
     dissipation_rate = 0.0_rk
 
     if ( params_acm%dim == 2) then
-        dx_inv = 1.0_rk / dx(1)
-        dy_inv = 1.0_rk / dx(2)
+        dx2_inv = 1.0_rk / dx(1)**2
+        dy2_inv = 1.0_rk / dx(2)**2
 
         iz = 1
 
@@ -2049,181 +2048,93 @@ subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
         case("FD_2nd_central")
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
-                    ux_dx = (u(ix+1,iy,iz,1) - u(ix-1,iy,iz,1))*dx_inv*0.5_rk
-                    ux_dy = (u(ix,iy+1,iz,1) - u(ix,iy-1,iz,1))*dx_inv*0.5_rk
+                    u_dxdx = (u(ix-1,iy,iz,1) -2.0_rk*u(ix,iy,iz,1) +u(ix+1,iy,iz,1))*dx2_inv
+                    v_dxdx = (u(ix-1,iy,iz,2) -2.0_rk*u(ix,iy,iz,2) +u(ix+1,iy,iz,2))*dx2_inv
+                    
+                    u_dydy = (u(ix,iy-1,iz,1) -2.0_rk*u(ix,iy,iz,1) +u(ix,iy+1,iz,1))*dy2_inv
+                    v_dydy = (u(ix,iy-1,iz,2) -2.0_rk*u(ix,iy,iz,2) +u(ix,iy+1,iz,2))*dy2_inv
 
-                    uy_dx = (u(ix+1,iy,iz,2) - u(ix-1,iy,iz,2))*dy_inv*0.5_rk
-                    uy_dy = (u(ix,iy+1,iz,2) - u(ix,iy-1,iz,2))*dy_inv*0.5_rk
-
-                    dissipation_rate = dissipation_rate + ux_dx**2 + ux_dy**2 + uy_dx**2 + uy_dy**2
+                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
                 end do
             end do
 
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_central_optimized") ! same 2nd derivatives used
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
-                    ux_dx = ( a_FD4(-2)*u(ix-2,iy,iz,1) &
-                            + a_FD4(-1)*u(ix-1,iy,iz,1) &
-                            + a_FD4(0) *u(ix,iy,iz,1) &
-                            + a_FD4(+1)*u(ix+1,iy,iz,1) &
-                            + a_FD4(+2)*u(ix+2,iy,iz,1) )*dx_inv
-                            
-                    ux_dy = ( a_FD4(-2)*u(ix,iy-2,iz,1) &
-                            + a_FD4(-1)*u(ix,iy-1,iz,1) &
-                            + a_FD4(0) *u(ix,iy,iz,1) &
-                            + a_FD4(+1)*u(ix,iy+1,iz,1) &
-                            + a_FD4(+2)*u(ix,iy+2,iz,1) )*dy_inv
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,1) + b_FD4(-1)*u(ix-1,iy,iz,1) + b_FD4(0)*u(ix,iy,iz,1) + b_FD4(+1)*u(ix+1,iy,iz,1) + b_FD4(+2)*u(ix+2,iy,iz,1))*dx2_inv
+                    v_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,2) + b_FD4(-1)*u(ix-1,iy,iz,2) + b_FD4(0)*u(ix,iy,iz,2) + b_FD4(+1)*u(ix+1,iy,iz,2) + b_FD4(+2)*u(ix+2,iy,iz,2))*dx2_inv
 
-                    uy_dx = ( a_FD4(-2)*u(ix-2,iy,iz,2) &
-                            + a_FD4(-1)*u(ix-1,iy,iz,2) &
-                            + a_FD4(0) *u(ix,iy,iz,2) &
-                            + a_FD4(+1)*u(ix+1,iy,iz,2) &
-                            + a_FD4(+2)*u(ix+2,iy,iz,2) )*dx_inv
-                            
-                    uy_dy = ( a_FD4(-2)*u(ix,iy-2,iz,2) &
-                            + a_FD4(-1)*u(ix,iy-1,iz,2) &
-                            + a_FD4(0) *u(ix,iy,iz,2) &
-                            + a_FD4(+1)*u(ix,iy+1,iz,2) &
-                            + a_FD4(+2)*u(ix,iy+2,iz,2) )*dy_inv
-
-                    dissipation_rate = dissipation_rate + ux_dx**2 + ux_dy**2 + uy_dx**2 + uy_dy**2
+                    u_dydy = (b_FD4(-2)*u(ix,iy-2,iz,1) + b_FD4(-1)*u(ix,iy-1,iz,1) + b_FD4(0)*u(ix,iy,iz,1) + b_FD4(+1)*u(ix,iy+1,iz,1) + b_FD4(+2)*u(ix,iy+2,iz,1))*dy2_inv
+                    v_dydy = (b_FD4(-2)*u(ix,iy-2,iz,2) + b_FD4(-1)*u(ix,iy-1,iz,2) + b_FD4(0)*u(ix,iy,iz,2) + b_FD4(+1)*u(ix,iy+1,iz,2) + b_FD4(+2)*u(ix,iy+2,iz,2))*dy2_inv
+ 
+                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
                 end do
             end do
 
         case("FD_6th_central")
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
-                    ux_dx = (a_FD6(-3)*u(ix-3,iy,iz,1) &
-                            + a_FD6(-2)*u(ix-2,iy,iz,1) &
-                            + a_FD6(-1)*u(ix-1,iy,iz,1) &
-                            + a_FD6(0) *u(ix,iy,iz,1) &
-                            + a_FD6(+1)*u(ix+1,iy,iz,1) &
-                            + a_FD6(+2)*u(ix+2,iy,iz,1) &
-                            + a_FD6(+3)*u(ix+3,iy,iz,1))*dx_inv
-
-                    ux_dy = (a_FD6(-3)*u(ix,iy-3,iz,1) &
-                            + a_FD6(-2)*u(ix,iy-2,iz,1) &
-                            + a_FD6(-1)*u(ix,iy-1,iz,1) &
-                            + a_FD6(0) *u(ix,iy,iz,1) &
-                            + a_FD6(+1)*u(ix,iy+1,iz,1) &
-                            + a_FD6(+2)*u(ix,iy+2,iz,1) &
-                            + a_FD6(+3)*u(ix,iy+3,iz,1))*dy_inv
-
-                    uy_dx = (a_FD6(-3)*u(ix-3,iy,iz,2) &
-                            + a_FD6(-2)*u(ix-2,iy,iz,2) &
-                            + a_FD6(-1)*u(ix-1,iy,iz,2) &
-                            + a_FD6(0) *u(ix,iy,iz,2) &
-                            + a_FD6(+1)*u(ix+1,iy,iz,2) &
-                            + a_FD6(+2)*u(ix+2,iy,iz,2) &
-                            + a_FD6(+3)*u(ix+3,iy,iz,2))*dx_inv
-
-                    uy_dy = (a_FD6(-3)*u(ix,iy-3,iz,2) &
-                            + a_FD6(-2)*u(ix,iy-2,iz,2) &
-                            + a_FD6(-1)*u(ix,iy-1,iz,2) &
-                            + a_FD6(0) *u(ix,iy,iz,2) &
-                            + a_FD6(+1)*u(ix,iy+1,iz,2) &
-                            + a_FD6(+2)*u(ix,iy+2,iz,2) &
-                            + a_FD6(+3)*u(ix,iy+3,iz,2))*dy_inv
-
-                    dissipation_rate = dissipation_rate + ux_dx**2 + ux_dy**2 + uy_dx**2 + uy_dy**2
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,1) +b_FD6(-2)*u(ix-2,iy,iz,1) +b_FD6(-1)*u(ix-1,iy,iz,1) +b_FD6( 0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix+1,iy,iz,1) +b_FD6(+2)*u(ix+2,iy,iz,1) +b_FD6(+3)*u(ix+3,iy,iz,1))*dx2_inv
+                    v_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,2) +b_FD6(-2)*u(ix-2,iy,iz,2) +b_FD6(-1)*u(ix-1,iy,iz,2) +b_FD6( 0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix+1,iy,iz,2) +b_FD6(+2)*u(ix+2,iy,iz,2) +b_FD6(+3)*u(ix+3,iy,iz,2))*dx2_inv
+                    
+                    u_dydy = (b_FD6(-3)*u(ix,iy-3,iz,1) +b_FD6(-2)*u(ix,iy-2,iz,1) +b_FD6(-1)*u(ix,iy-1,iz,1) +b_FD6( 0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy+1,iz,1) +b_FD6(+2)*u(ix,iy+2,iz,1) +b_FD6(+3)*u(ix,iy+3,iz,1))*dy2_inv
+                    v_dydy = (b_FD6(-3)*u(ix,iy-3,iz,2) +b_FD6(-2)*u(ix,iy-2,iz,2) +b_FD6(-1)*u(ix,iy-1,iz,2) +b_FD6( 0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy+1,iz,2) +b_FD6(+2)*u(ix,iy+2,iz,2) +b_FD6(+3)*u(ix,iy+3,iz,2))*dy2_inv
+      
+                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
                 end do
             end do
 
-        case("FD_4th_central_optimized")
-            call abort(2362976, "dissipation rate with FD_4th_central_optimized not yet done.")
-
         case default
-            call abort(1902201, "unknown order_discretization in ACM vorticity")
+            call abort(1902201, "unknown order_discretization in ACM dissipation rate")
         end select
 
     else
-        dx_inv = 1.0_rk / dx(1)
-        dy_inv = 1.0_rk / dx(2)
-        dz_inv = 1.0_rk / dx(3)
+        dx2_inv = 1.0_rk / dx(1)**2
+        dy2_inv = 1.0_rk / dx(2)**2
+        dz2_inv = 1.0_rk / dx(3)**2
 
         select case(params_acm%discretization)
         case("FD_2nd_central")
             do iz = g+1, Bs(3)+g
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        ux_dx = (u(ix+1,iy,iz,1) - u(ix-1,iy,iz,1))*dx_inv*0.5_rk
-                        ux_dy = (u(ix,iy+1,iz,1) - u(ix,iy-1,iz,1))*dx_inv*0.5_rk
-                        ux_dz = (u(ix,iy,iz+1,1) - u(ix,iy,iz-1,1))*dx_inv*0.5_rk
+                        u_dxdx = (u(ix-1, iy  , iz  , 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix+1, iy  , iz  , 1))*dx2_inv
+                        u_dydy = (u(ix  , iy-1, iz  , 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix  , iy+1, iz  , 1))*dy2_inv
+                        u_dzdz = (u(ix  , iy  , iz-1, 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix  , iy  , iz+1, 1))*dz2_inv
 
-                        uy_dx = (u(ix+1,iy,iz,2) - u(ix-1,iy,iz,2))*dy_inv*0.5_rk
-                        uy_dy = (u(ix,iy+1,iz,2) - u(ix,iy-1,iz,2))*dy_inv*0.5_rk
-                        uy_dz = (u(ix,iy,iz+1,2) - u(ix,iy,iz-1,2))*dy_inv*0.5_rk
+                        v_dxdx = (u(ix-1, iy  , iz  , 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix+1, iy  , iz  , 2))*dx2_inv
+                        v_dydy = (u(ix  , iy-1, iz  , 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix  , iy+1, iz  , 2))*dy2_inv
+                        v_dzdz = (u(ix  , iy  , iz-1, 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix  , iy  , iz+1, 2))*dz2_inv
 
-                        uz_dx = (u(ix+1,iy,iz,3) - u(ix-1,iy,iz,3))*dz_inv*0.5_rk
-                        uz_dy = (u(ix,iy+1,iz,3) - u(ix,iy-1,iz,3))*dz_inv*0.5_rk
-                        uz_dz = (u(ix,iy,iz+1,3) - u(ix,iy,iz-1,3))*dz_inv*0.5_rk
+                        w_dxdx = (u(ix-1, iy  , iz  , 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix+1, iy  , iz  , 3))*dx2_inv
+                        w_dydy = (u(ix  , iy-1, iz  , 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix  , iy+1, iz  , 3))*dy2_inv
+                        w_dzdz = (u(ix  , iy  , iz-1, 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix  , iy  , iz+1, 3))*dz2_inv
 
-                        dissipation_rate = dissipation_rate + &
-                        ux_dx**2 + ux_dy**2 + ux_dz**2 + uy_dx**2 + uy_dy**2 + uy_dz**2 + uz_dx**2 + uz_dy**2 + uz_dz**2
+                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
                     end do
                 end do
             end do
 
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_central_optimized") ! same 2nd derivatives used
             do iz = g+1, Bs(3)+g
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        ux_dx = ( a_FD4(-2)*u(ix-2,iy,iz,1) &
-                                + a_FD4(-1)*u(ix-1,iy,iz,1) &
-                                + a_FD4(0) *u(ix,iy,iz,1) &
-                                + a_FD4(+1)*u(ix+1,iy,iz,1) &
-                                + a_FD4(+2)*u(ix+2,iy,iz,1) )*dx_inv
-                                
-                        ux_dy = ( a_FD4(-2)*u(ix,iy-2,iz,1) &
-                                + a_FD4(-1)*u(ix,iy-1,iz,1) &
-                                + a_FD4(0) *u(ix,iy,iz,1) &
-                                + a_FD4(+1)*u(ix,iy+1,iz,1) &
-                                + a_FD4(+2)*u(ix,iy+2,iz,1) )*dy_inv
-
-                        ux_dz = ( a_FD4(-2)*u(ix,iy,iz-2,1) &
-                                + a_FD4(-1)*u(ix,iy,iz-1,1) &
-                                + a_FD4(0) *u(ix,iy,iz,1) &
-                                + a_FD4(+1)*u(ix,iy,iz+1,1) &
-                                + a_FD4(+2)*u(ix,iy,iz+2,1) )*dz_inv
-
-                        uy_dx = ( a_FD4(-2)*u(ix-2,iy,iz,2) &
-                                + a_FD4(-1)*u(ix-1,iy,iz,2) &
-                                + a_FD4(0) *u(ix,iy,iz,2) &
-                                + a_FD4(+1)*u(ix+1,iy,iz,2) &
-                                + a_FD4(+2)*u(ix+2,iy,iz,2) )*dx_inv
-                                
-                        uy_dy = ( a_FD4(-2)*u(ix,iy-2,iz,2) &
-                                + a_FD4(-1)*u(ix,iy-1,iz,2) &
-                                + a_FD4(0) *u(ix,iy,iz,2) &
-                                + a_FD4(+1)*u(ix,iy+1,iz,2) &
-                                + a_FD4(+2)*u(ix,iy+2,iz,2) )*dy_inv
-
-                        uy_dz = ( a_FD4(-2)*u(ix,iy,iz-2,2) &
-                                + a_FD4(-1)*u(ix,iy,iz-1,2) &
-                                + a_FD4(0) *u(ix,iy,iz,2) &
-                                + a_FD4(+1)*u(ix,iy,iz+1,2) &
-                                + a_FD4(+2)*u(ix,iy,iz+2,2) )*dz_inv
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,1) +b_FD4(-1)*u(ix-1,iy,iz,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix+1,iy,iz,1) +b_FD4(+2)*u(ix+2,iy,iz,1))*dx2_inv
+                        v_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,2) +b_FD4(-1)*u(ix-1,iy,iz,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix+1,iy,iz,2) +b_FD4(+2)*u(ix+2,iy,iz,2))*dx2_inv
+                        w_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,3) +b_FD4(-1)*u(ix-1,iy,iz,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix+1,iy,iz,3) +b_FD4(+2)*u(ix+2,iy,iz,3))*dx2_inv
                         
-                        uz_dx = ( a_FD4(-2)*u(ix-2,iy,iz,3) &
-                                + a_FD4(-1)*u(ix-1,iy,iz,3) &
-                                + a_FD4(0) *u(ix,iy,iz,3) &
-                                + a_FD4(+1)*u(ix+1,iy,iz,3) &
-                                + a_FD4(+2)*u(ix+2,iy,iz,3) )*dx_inv
-                                
-                        uz_dy = ( a_FD4(-2)*u(ix,iy-2,iz,3) &
-                                + a_FD4(-1)*u(ix,iy-1,iz,3) &
-                                + a_FD4(0) *u(ix,iy,iz,3) &
-                                + a_FD4(+1)*u(ix,iy+1,iz,3) &
-                                + a_FD4(+2)*u(ix,iy+2,iz,3) )*dy_inv
+                        u_dydy = (b_FD4(-2)*u(ix,iy-2,iz,1) +b_FD4(-1)*u(ix,iy-1,iz,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix,iy+1,iz,1) +b_FD4(+2)*u(ix,iy+2,iz,1))*dy2_inv
+                        v_dydy = (b_FD4(-2)*u(ix,iy-2,iz,2) +b_FD4(-1)*u(ix,iy-1,iz,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix,iy+1,iz,2) +b_FD4(+2)*u(ix,iy+2,iz,2))*dy2_inv
+                        w_dydy = (b_FD4(-2)*u(ix,iy-2,iz,3) +b_FD4(-1)*u(ix,iy-1,iz,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix,iy+1,iz,3) +b_FD4(+2)*u(ix,iy+2,iz,3))*dy2_inv
 
-                        uz_dz = ( a_FD4(-2)*u(ix,iy,iz-2,3) &
-                                + a_FD4(-1)*u(ix,iy,iz-1,3) &
-                                + a_FD4(0) *u(ix,iy,iz,3) &
-                                + a_FD4(+1)*u(ix,iy,iz+1,3) &
-                                + a_FD4(+2)*u(ix,iy,iz+2,3) )*dz_inv
+                        u_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,1) +b_FD4(-1)*u(ix,iy,iz-1,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix,iy,iz+1,1) +b_FD4(+2)*u(ix,iy,iz+2,1))*dz2_inv
+                        v_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,2) +b_FD4(-1)*u(ix,iy,iz-1,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix,iy,iz+1,2) +b_FD4(+2)*u(ix,iy,iz+2,2))*dz2_inv
+                        w_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,3) +b_FD4(-1)*u(ix,iy,iz-1,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix,iy,iz+1,3) +b_FD4(+2)*u(ix,iy,iz+2,3))*dz2_inv
 
-                        dissipation_rate = dissipation_rate + &
-                        ux_dx**2 + ux_dy**2 + ux_dz**2 + uy_dx**2 + uy_dy**2 + uy_dz**2 + uz_dx**2 + uz_dy**2 + uz_dz**2
+                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
                     end do
                 end do
             end do
@@ -2232,90 +2143,26 @@ subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
             do iz = g+1, Bs(3)+g
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        ux_dx = (a_FD6(-3)*u(ix-3,iy,iz,1) &
-                              + a_FD6(-2)*u(ix-2,iy,iz,1) &
-                              + a_FD6(-1)*u(ix-1,iy,iz,1) &
-                              + a_FD6(0) *u(ix,iy,iz,1) &
-                              + a_FD6(+1)*u(ix+1,iy,iz,1) &
-                              + a_FD6(+2)*u(ix+2,iy,iz,1) &
-                              + a_FD6(+3)*u(ix+3,iy,iz,1))*dx_inv
+                        ! second derivatives of u, v and w
+                        u_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,1) +b_FD6(-2)*u(ix-2,iy,iz,1) +b_FD6(-1)*u(ix-1,iy,iz,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix+1,iy,iz,1) +b_FD6(+2)*u(ix+2,iy,iz,1) +b_FD6(+3)*u(ix+3,iy,iz,1))*dx2_inv
+                        u_dydy = (b_FD6(-3)*u(ix,iy-3,iz,1) +b_FD6(-2)*u(ix,iy-2,iz,1) +b_FD6(-1)*u(ix,iy-1,iz,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy+1,iz,1) +b_FD6(+2)*u(ix,iy+2,iz,1) +b_FD6(+3)*u(ix,iy+3,iz,1))*dy2_inv
+                        u_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,1) +b_FD6(-2)*u(ix,iy,iz-2,1) +b_FD6(-1)*u(ix,iy,iz-1,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy,iz+1,1) +b_FD6(+2)*u(ix,iy,iz+2,1) +b_FD6(+3)*u(ix,iy,iz+3,1))*dz2_inv
 
-                        ux_dy = (a_FD6(-3)*u(ix,iy-3,iz,1) &
-                              + a_FD6(-2)*u(ix,iy-2,iz,1) &
-                              + a_FD6(-1)*u(ix,iy-1,iz,1) &
-                              + a_FD6(0) *u(ix,iy,iz,1) &
-                              + a_FD6(+1)*u(ix,iy+1,iz,1) &
-                              + a_FD6(+2)*u(ix,iy+2,iz,1) &
-                              + a_FD6(+3)*u(ix,iy+3,iz,1))*dy_inv
+                        v_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,2) +b_FD6(-2)*u(ix-2,iy,iz,2) +b_FD6(-1)*u(ix-1,iy,iz,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix+1,iy,iz,2) +b_FD6(+2)*u(ix+2,iy,iz,2) +b_FD6(+3)*u(ix+3,iy,iz,2))*dx2_inv
+                        v_dydy = (b_FD6(-3)*u(ix,iy-3,iz,2) +b_FD6(-2)*u(ix,iy-2,iz,2) +b_FD6(-1)*u(ix,iy-1,iz,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy+1,iz,2) +b_FD6(+2)*u(ix,iy+2,iz,2) +b_FD6(+3)*u(ix,iy+3,iz,2))*dy2_inv
+                        v_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,2) +b_FD6(-2)*u(ix,iy,iz-2,2) +b_FD6(-1)*u(ix,iy,iz-1,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy,iz+1,2) +b_FD6(+2)*u(ix,iy,iz+2,2) +b_FD6(+3)*u(ix,iy,iz+3,2))*dz2_inv
+                        
+                        w_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,3) +b_FD6(-2)*u(ix-2,iy,iz,3) +b_FD6(-1)*u(ix-1,iy,iz,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix+1,iy,iz,3) +b_FD6(+2)*u(ix+2,iy,iz,3) +b_FD6(+3)*u(ix+3,iy,iz,3))*dx2_inv
+                        w_dydy = (b_FD6(-3)*u(ix,iy-3,iz,3) +b_FD6(-2)*u(ix,iy-2,iz,3) +b_FD6(-1)*u(ix,iy-1,iz,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix,iy+1,iz,3) +b_FD6(+2)*u(ix,iy+2,iz,3) +b_FD6(+3)*u(ix,iy+3,iz,3))*dy2_inv
+                        w_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,3) +b_FD6(-2)*u(ix,iy,iz-2,3) +b_FD6(-1)*u(ix,iy,iz-1,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix,iy,iz+1,3) +b_FD6(+2)*u(ix,iy,iz+2,3) +b_FD6(+3)*u(ix,iy,iz+3,3))*dz2_inv
 
-                        ux_dz = (a_FD6(-3)*u(ix,iy,iz-3,1) &
-                              + a_FD6(-2)*u(ix,iy,iz-2,1) &
-                              + a_FD6(-1)*u(ix,iy,iz-1,1) &
-                              + a_FD6(0) *u(ix,iy,iz,1) &
-                              + a_FD6(+1)*u(ix,iy,iz+1,1) &
-                              + a_FD6(+2)*u(ix,iy,iz+2,1) &
-                              + a_FD6(+3)*u(ix,iy,iz+3,1))*dz_inv
-
-                        uy_dx = (a_FD6(-3)*u(ix-3,iy,iz,2) &
-                              + a_FD6(-2)*u(ix-2,iy,iz,2) &
-                              + a_FD6(-1)*u(ix-1,iy,iz,2) &
-                              + a_FD6(0) *u(ix,iy,iz,2) &
-                              + a_FD6(+1)*u(ix+1,iy,iz,2) &
-                              + a_FD6(+2)*u(ix+2,iy,iz,2) &
-                              + a_FD6(+3)*u(ix+3,iy,iz,2))*dx_inv
-
-                        uy_dy = (a_FD6(-3)*u(ix,iy-3,iz,2) &
-                              + a_FD6(-2)*u(ix,iy-2,iz,2) &
-                              + a_FD6(-1)*u(ix,iy-1,iz,2) &
-                              + a_FD6(0) *u(ix,iy,iz,2) &
-                              + a_FD6(+1)*u(ix,iy+1,iz,2) &
-                              + a_FD6(+2)*u(ix,iy+2,iz,2) &
-                              + a_FD6(+3)*u(ix,iy+3,iz,2))*dy_inv
-
-                        uy_dz = (a_FD6(-3)*u(ix,iy,iz-3,2) &
-                              + a_FD6(-2)*u(ix,iy,iz-2,2) &
-                              + a_FD6(-1)*u(ix,iy,iz-1,2) &
-                              + a_FD6(0) *u(ix,iy,iz,2) &
-                              + a_FD6(+1)*u(ix,iy,iz+1,2) &
-                              + a_FD6(+2)*u(ix,iy,iz+2,2) &
-                              + a_FD6(+3)*u(ix,iy,iz+3,2))*dz_inv
-
-                        uz_dx = (a_FD6(-3)*u(ix-3,iy,iz,3) &
-                              + a_FD6(-2)*u(ix-2,iy,iz,3) &
-                              + a_FD6(-1)*u(ix-1,iy,iz,3) &
-                              + a_FD6(0) *u(ix,iy,iz,3) &
-                              + a_FD6(+1)*u(ix+1,iy,iz,3) &
-                              + a_FD6(+2)*u(ix+2,iy,iz,3) &
-                              + a_FD6(+3)*u(ix+3,iy,iz,3))*dx_inv
-
-                        uz_dy = (a_FD6(-3)*u(ix,iy-3,iz,3) &
-                              + a_FD6(-2)*u(ix,iy-2,iz,3) &
-                              + a_FD6(-1)*u(ix,iy-1,iz,3) &
-                              + a_FD6(0) *u(ix,iy,iz,3) &
-                              + a_FD6(+1)*u(ix,iy+1,iz,3) &
-                              + a_FD6(+2)*u(ix,iy+2,iz,3) &
-                              + a_FD6(+3)*u(ix,iy+3,iz,3))*dy_inv
-
-                        uz_dz = (a_FD6(-3)*u(ix,iy,iz-3,3) &
-                              + a_FD6(-2)*u(ix,iy,iz-2,3) &
-                              + a_FD6(-1)*u(ix,iy,iz-1,3) &
-                              + a_FD6(0) *u(ix,iy,iz,3) &
-                              + a_FD6(+1)*u(ix,iy,iz+1,3) &
-                              + a_FD6(+2)*u(ix,iy,iz+2,3) &
-                              + a_FD6(+3)*u(ix,iy,iz+3,3))*dz_inv
-
-
-                        dissipation_rate = dissipation_rate + &
-                            ux_dx**2 + ux_dy**2 + ux_dz**2 + uy_dx**2 + uy_dy**2 + uy_dz**2 + uz_dx**2 + uz_dy**2 + uz_dz**2
+                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
                     end do
                 end do
             end do
 
-        case("FD_4th_central_optimized")
-            call abort(2362976, "dissipation rate with FD_4th_central_optimized not yet done.")
-
         case default
-            call abort(1902201, "unknown order_discretization in ACM vorticity")
+            call abort(1902201, "unknown order_discretization in ACM dissipation rate")
         end select
 
     endif

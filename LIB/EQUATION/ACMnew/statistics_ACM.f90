@@ -47,8 +47,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3,0:6), ipowtotal=0.0_rk, apowtotal=0.0_rk
-    real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block, usx, usy, usz, chi, dissipation_block
-    real(kind=rk) :: C_eta_inv, dV, x, y, z, penal(1:3), ACM_energy_block
+    real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
+    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
@@ -73,7 +73,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    C_eta_inv = 1.0_rk / params_acm%C_eta
+    C_eta_inv    = 1.0_rk / params_acm%C_eta
+    C_sponge_inv = 1.0_rk / params_acm%C_sponge
+    C_0          = params_acm%C_0
 
     if (params_acm%dim==3) then
         if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
@@ -192,8 +194,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
 
-            ! acm energy
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/params_acm%c_0**2 + ekin_block
+            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
+            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/C_0**2 + ekin_block
 
             ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
@@ -220,7 +223,13 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
 
                     ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                    penal_power_block = penal_power_block + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
+                    ! energy input from solid:
+                    penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
+                    ! dissipation inside solid:
+                    penal_power_block(2) = penal_power_block(2) + ( (u(ix,iy,1,1)-usx)**2 + (u(ix,iy,1,2)-usy)**2) *chi
+                    ! sponge input:
+                    penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,1,1)*(u(ix,iy,1,1)-params_acm%u_mean_set(1)) + u(ix,iy,1,2)*(u(ix,iy,1,2)-params_acm%u_mean_set(2))) *mask(ix,iy,1,6)
+
 
                     ! residual velocity in the solid domain
                     residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
@@ -256,8 +265,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
 
-            ! acm energy
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/params_acm%c_0**2 + ekin_block
+            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
+            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/C_0**2 + ekin_block
 
             ! square of maximum of velocity in the field
             params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
@@ -279,21 +289,32 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                     do ix = g+1, Bs(1)+g
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
-                        ! get this points color
-                        color = int( mask(ix, iy, iz, 5), kind=2 )
+                        chi        = mask(ix,iy,iz,1) * C_eta_inv
+                        usx        = mask(ix,iy,iz,2)
+                        usy        = mask(ix,iy,iz,3)
+                        usz        = mask(ix,iy,iz,4)
+                        color      = int( mask(ix, iy, iz, 5), kind=2 )
+                        chi_sponge = mask(ix,iy,iz,6) * C_sponge_inv
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
-                        usx = mask(ix,iy,iz,2)
-                        usy = mask(ix,iy,iz,3)
-                        usz = mask(ix,iy,iz,4)
+                        ! penalization term
+                        penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
+                        ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+                        ! NOTE: as this is qty used to show the global energy budget, it includes ALL mask colors (even color=0,
+                        ! which is omitted for the forces data).
+                        ! 1/ energy input from solid:
+                        penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,iz,1)-usx) + usy*(u(ix,iy,iz,2)-usy) + usz*(u(ix,iy,iz,3)-usz))*chi
+                        ! 2/ dissipation inside solid:
+                        penal_power_block(2) = penal_power_block(2) + ((u(ix,iy,iz,1)-usx)**2 + (u(ix,iy,iz,2)-usy)**2 + (u(ix,iy,iz,3)-usz)**2)*chi
+                        ! 3/ sponge input:
+                        ! attention division by C_sponge C0**2 because of the way the energy eqn is derived (it is divided by C_0**2
+                        ! such that dp/dt 1/C0**2 is on the right side)
+                        penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,iz,1)*(u(ix,iy,iz,1)-params_acm%u_mean_set(1)) &
+                                                                      + u(ix,iy,iz,2)*(u(ix,iy,iz,2)-params_acm%u_mean_set(2)) &
+                                                                      + u(ix,iy,iz,3)*(u(ix,iy,iz,3)-params_acm%u_mean_set(3)) &
+                                                                      + u(ix,iy,iz,4)*(u(ix,iy,iz,4)-0.0_rk)/C_0**2 ) *chi_sponge 
+                        ! exclude color 0 for force computation
                         if (color>0_2 .and. color < 6_2) then
-                            ! penalization term
-                            penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
-
-                            ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                            penal_power_block = penal_power_block + (usx*(u(ix,iy,iz,1)-usx) + usy*(u(ix,iy,iz,2)-usy) + usz*(u(ix,iy,iz,3)-usz))*chi
-
                             ! forces acting on this color
                             force_block(1:3, color) = force_block(1:3, color) - penal
 
@@ -399,7 +420,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! volume of mask (useful to see if it is properly generated)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! scalar removal

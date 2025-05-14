@@ -412,13 +412,11 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
                 elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! inner part of ring
                     xi = -1.0_rk*(r-params_acm%R1) / epsilon
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
-                else 
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
                     ! outer part of ring
                     xi = (r-params_acm%R2) / epsilon
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
 
                 endif
 
@@ -456,8 +454,7 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
 
                 elseif ((r >= params_acm%R1).and.(r <= params_acm%R2)) then
                     ! ring
-                    mask(ix,iy,1) = 1.0_rk
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
+                    mask(ix,iy,6) = 1.0_rk
 
                 endif
 
@@ -497,12 +494,10 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
 
                 elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! inner part of ring
-                    mask(ix,iy,1) = smoothstep( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
-                else 
+                    mask(ix,iy,6) = smoothstep( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then                
                     ! outer part of ring
-                    mask(ix,iy,1) = smoothstep(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
-                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
+                    mask(ix,iy,6) = smoothstep(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
 
                 endif
 
@@ -596,13 +591,11 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
                 elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! inner part of ring
                     xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
-                else 
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
                     ! outer part of ring
                     xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
 
                 endif
 
@@ -641,23 +634,16 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
                     !*************************************
                     ! CHANGED
                     !*************************************
-                elseif ( (r > params_acm%R0).and.(r < 0.5_rk*(params_acm%R0+params_acm%R1)) ) then
-                    !(r > params_acm%R0 .and. r < params_acm%R1) then
-                        ! zero mask in gap between cylinder and ring
-                        mask(ix,iy,1) = 0.0_rk
-
                 elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then 
                     ! inner part of ring
                     xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
-                else 
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                
                     ! outer part of ring
                     xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
-
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
                 endif
 
 
@@ -699,23 +685,16 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
                     !*************************************
                     ! CHANGED
                     !*************************************
-                elseif ( (r > params_acm%R0).and.(r < 0.5_rk*(params_acm%R0+params_acm%R1)) ) then
-                    !(r > params_acm%R0 .and. r < params_acm%R1) then
-                        ! zero mask in gap between cylinder and ring
-                        mask(ix,iy,1) = 0.0_rk
-
                 elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then
                     ! inner part of ring
                     xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1)! copy to sponge
-                else 
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                
                     ! outer part of ring
                     xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                    mask(ix,iy,6) = mask(ix,iy,1) ! copy to sponge
-
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
                 endif
                 
 

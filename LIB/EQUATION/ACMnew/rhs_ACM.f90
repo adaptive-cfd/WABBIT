@@ -714,7 +714,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     ! sponge term.
     ! --------------------------------------------------------------------------
     ! HACK
-    if (.not.(params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local")) then
+    if (.not.((params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local"))) then 
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse
             C_sponge_inv = 1.0_rk / params_acm%C_sponge
@@ -736,12 +736,19 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
         ! ring stored in sponge mask array
         ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
 
-        ! use same C_eta as object, not the sponge value
+        ! use same C_eta_ring as object, not the sponge value. Note C_eta_ring=C_eta usually, but in the local variation
+        ! case we can set the inner cylinder and the outer ring with two different C_eta values. The default is C_eta_ring=C_eta simply.
+        ! The whole ring (ux,uy,p) is penalized here and not inside the RHS function using mask(:,:,1) (the obstacle mask).
         C_sponge_inv = 1.0_rk / params_acm%C_eta_ring
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
                 ! mask(:,:,4) contains p_ref forcing in the ring
                 ! rhs_p      = rhsp         - chi_ring     *( p          - p_lamballais) / C_eta
+                ! ux
+                rhs(ix,iy,1) = rhs(ix,iy,1) - mask(ix,iy,6)*(phi(ix,iy,1)-mask(ix,iy,2))*C_sponge_inv
+                ! uy
+                rhs(ix,iy,2) = rhs(ix,iy,2) - mask(ix,iy,6)*(phi(ix,iy,2)-mask(ix,iy,3))*C_sponge_inv
+                ! pressure
                 rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4))*C_sponge_inv
             enddo
         enddo

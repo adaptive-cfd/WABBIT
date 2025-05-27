@@ -9,10 +9,11 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     real(kind=rk), intent(out)              :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)            :: tree_ID
 
-    integer(kind=ik)                        :: k, hvy_id
+    integer(kind=ik)                        :: k, hvy_id, lgt_id
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), allocatable :: norm(:), norm_ref(:), wc(:,:,:,:,:)
+    character(len=cshort)                   :: debug_name
 
     if (params%rank == 0) then
         write(*, '("")')  ! newline
@@ -51,12 +52,20 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+        ! store original values
         hvy_tmp(:,:,:,1:nc,hvy_id) = hvy_block(:,:,:,1:nc,hvy_id)
+
+        ! ! debug before WD
+        ! write(debug_name, '(A,i0,A)') 'block_00_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        ! call dump_block_fancy(hvy_block(:,:,:,1:nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+
+        ! Wavelet decomposition
         call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
-
 
     !---------------------------------------------------------------------------
     ! testing of conversion routines on FWT transformed data
@@ -82,7 +91,19 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+        ! ! debug before WR
+        ! write(debug_name, '(A,i0,A)') 'block_WD_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        ! call dump_block_fancy(hvy_block(:,:,:,1:nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+
+        ! Wavelet reconstruction
         call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_id))
+
+        ! ! debug after WR
+        ! write(debug_name, '(A,i0,A)') 'block_WR_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        ! call dump_block_fancy(hvy_block(:,:,:,1:nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+
         ! error IWT(FWT(u)) - u
         hvy_block(:,:,:,1:nc,hvy_id) = hvy_block(:,:,:,1:nc,hvy_id) - hvy_tmp(:,:,:,1:nc,hvy_id)
     end do
@@ -99,6 +120,12 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     if (params%rank==0) write(*,'(A, es15.8)') "UNIT TEST: Relative L2 error in IWT(FWT(u)) is: ", norm(1)
 
     if (norm(1)>1.0e-14_rk) then
+        ! do k = 1, hvy_n(tree_ID)
+        !     hvy_id = hvy_active(k,tree_ID)
+        !     call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        !     write(debug_name, '(A,i0,A)') 'block_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        !     call dump_block_fancy(hvy_block(:,:,:,1:nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+        ! end do
         call abort(230306608, "Error! IWT(FWT(U)) /= U! Call the police! Danger!!" )
     else
         if (params%rank==0) then

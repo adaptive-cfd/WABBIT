@@ -15,6 +15,9 @@ module module_mesh
     use module_operators
     ! used in executeCoarsening_tree
     use module_helpers
+    ! used for multigrid solver
+    use module_fft
+    use module_poisson
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
     use module_physics_metamodule
@@ -63,6 +66,7 @@ contains
 #include "check_lgt_block_synchronization.f90"
 #include "remove_nonperiodic_neighbors.f90"
 #include "forest.f90"
+#include "multigrid_vcycle.f90"
 
 
 ! analytical data used for wavelet compression test

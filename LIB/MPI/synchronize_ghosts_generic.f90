@@ -1,5 +1,29 @@
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
+subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus)
+    implicit none
+
+    type (type_params), intent(in) :: params
+    real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
+    integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
+    integer(kind=ik), intent(in)   :: level                         !< level value to be checked against
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
+
+    integer(kind=ik) :: gminus, gplus
+    gminus = params%g
+    gplus = params%g
+    ! if we sync a different number of ghost nodes
+    if (present(g_minus)) gminus = g_minus
+    if (present(g_plus))   gplus = g_plus
+
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="Monly_level", &
+        s_val=level)
+
+end subroutine sync_level_from_M
+
+
+!> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
+!> Used before wavelet decomposition
 subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
     implicit none
 
@@ -18,7 +42,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_mi
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoF_ref", &
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="MoF_ref", &
         s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_MF
@@ -45,7 +69,7 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_m
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
 
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_ref", &
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="full_ref", &
         s_val=ref_check, hvy_tmp=hvy_tmp)
 
 end subroutine sync_TMP_from_all
@@ -73,10 +97,10 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
 
     ! if we passed on the level then sync is level-wise
     if (present(level)) then
-        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC_level", &
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC_level", &
             s_val=level, hvy_tmp=hvy_tmp)
     else
-        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="MoC", &
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC", &
             hvy_tmp=hvy_tmp)
     endif
 
@@ -84,23 +108,27 @@ end subroutine sync_SCWC_from_MC
 
 
 !> Wrapper to synch all ghost-point patches
-subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus)
+subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus, ignore_Filter)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< set specific ghost node sizes to be synced
+    logical, optional, intent(in) :: ignore_Filter                  !< ignore restriction filter, defaults to false
 
     integer(kind=ik) :: gminus, gplus
+    logical :: do_ignore_Filter
     gminus = params%g
     gplus = params%g
     ! if we sync a different number of ghost nodes
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
+    do_ignore_Filter = .false.
+    if (present(ignore_Filter)) do_ignore_Filter = ignore_Filter
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full")
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full", spaghetti_form=.false., ignore_Filter=do_ignore_Filter)
 
 end subroutine sync_ghosts_tree
 
@@ -110,6 +138,9 @@ end subroutine sync_ghosts_tree
 !! anyways (being near the coarse/fine interface, the appropriate filter cannot be applied).
 !! Therefore, for reasons of consistency and performance, we can ignore the filter in ghost nodes
 !! sync'ing. This corresponds to using non-lifted wavelets.
+!
+!  One might ask, why for RHS with only +-shaped stencils we still synch the diagonals (edges/corners) as well?
+!  This is, because within the synching we apply the coarsening and interpolation filters at the interfaces, which need the other stencils as well!
 subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     implicit none
 
@@ -126,7 +157,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", ignore_Filter=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", spaghetti_form=.false., ignore_Filter=.true.)
 
 end subroutine
 
@@ -135,7 +166,7 @@ end subroutine
 !! It is a generic function with many flags, streamlining all synching process \n
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
-subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
+subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti_form, &
     g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -147,6 +178,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     !> String representing which kind of syncing we want to do, varies between different sync cases (betwen CMF neighbors) and restrictions (tree, level or ref)
     character(len=*)          :: sync_case
+    logical, intent(in)       :: spaghetti_form                 !< If set to true, then data is in spaghetti form of SC WC
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
@@ -237,48 +269,22 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, &
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )
-        write(toc_statement, '(A, i0, A)') "sync ghosts (stage ", istage, " TOTAL)"
-        call toc( toc_statement, 82+istage, MPI_wtime()-t1 )
 
-    end do ! loop over stages 1,2
+        !***************************************************************************
+        ! (iii) Setting of BCs
+        !***************************************************************************
+        t2 = MPI_wtime()
+        ! For all blocks that do not have a neighbor at the borders due to non-periodic BC, we have to set the ghost patch values explicitly
+        ! After stage 2 and 3 we only need to update the edges with mirrored values from ghost layers, as the faces are already set
+        call bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_val=s_val, edges_only=istage>=2)
+        call toc( "sync ghosts (bound_cond_generic)", 83, MPI_wtime()-t2 )
+
+        write(toc_statement, '(A, i0, A)') "sync ghosts (stage ", istage, " TOTAL)"
+        call toc( toc_statement, 83+istage, MPI_wtime()-t1 )
+
+    end do ! loop over stages 1,2,3
 
     call toc( "sync ghosts (TOTAL)", 80, MPI_wtime()-t0 )
-
-
-    !---------------------------------------------------------------------------
-    ! For all blocks that do not have a neighbor at the borders due to non-periodic BC, we have to set the ghost patch values explicitly
-    !---------------------------------------------------------------------------
-    ! loop over my active heavy data
-    if ( .not. All(params%periodic_BC) ) then
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-
-            ! compute block spacing and origin from treecode
-            ! call get_block_spacing_origin( params, lgt_id, x0, dx )
-            call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
-            params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
-
-            n_domain(:) = 0
-            ! ! check if block is adjacent to a boundary of the domain, if this is the case we adapt the ghost patches
-            ! call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
-
-            tolerance = 1.0e-3_rk * minval(dx(1:params%dim))
-
-            do i_dim = 1, params%dim
-                if (abs(x0(i_dim)-0.0_rk) < tolerance ) then !x_i == 0
-                    n_domain(i_dim) = -1
-                elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
-                    n_domain(i_dim) = +1
-                endif
-            end do
-
-            ! set the boundary condition on this block
-            ! JB ToDo: Add time support in case we have time-dependent BCs
-            call BOUNDCOND_meta(params%physics_type, 0.0_rk, hvy_block(:,:,:,:,hvy_id), params%g, &
-            x0, dx, n_domain)
-        enddo
-    endif
 
 end subroutine sync_ghosts_generic
 
@@ -334,6 +340,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     if (index(sync_case, "full_leaf") > 0) sync_id = 2
     if (index(sync_case, "MoC") > 0) sync_id = 3
     if (index(sync_case, "MoF") > 0) sync_id = 4
+    if (index(sync_case, "Monly") > 0) sync_id = 5
 
     ! now lets treat the special restrictions, set to the second digit
     if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
@@ -437,6 +444,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                         if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
                             b_send = .false.
                         endif
+                ! neighbor wants to receive medium -> send to M, ids correspond to M
+                elseif (mod(sync_id,10) == 5 .and. &
+                    ((istage == 1 .and. lvl_diff==0))) then
+                        b_send = .true.
                 endif
 
                 ! special cases, first ref check and then level check, situated in second digit
@@ -552,6 +563,10 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                             elseif (lvl_diff/=0 .and. block_has_valid_neighbor(params, hvy_ID, i_n, 0)) then
                                 b_recv = .false.
                             endif
+                    ! I want to receive medium,ids correspond to M
+                    elseif (mod(sync_id,10) == 5 .and. &
+                        ((istage == 1 .and. lvl_diff==0))) then
+                            b_recv = .true.
                     endif
 
                     ! special cases, first ref check and then level check

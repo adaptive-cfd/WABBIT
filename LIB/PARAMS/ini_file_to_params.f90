@@ -300,13 +300,13 @@ subroutine ini_blocks(params, FILE )
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if (params%wavelet(4:4) == "2") then
-      g_default = 2
+      g_default = 1
       g_RHS_default = 1
    elseif (params%wavelet(4:4) == "4") then
-      g_default = 4
+      g_default = 3
       g_RHS_default = 2
    elseif (params%wavelet(4:4) == "6") then
-      g_default = 6
+      g_default = 5
       g_RHS_default = 3
    else 
       call abort(2320242, "no default specified for this wavelet...")
@@ -317,13 +317,13 @@ subroutine ini_blocks(params, FILE )
    if (params%wavelet(5:5) == "0") then
       ! g stays the same
    elseif (params%wavelet(5:5) == "2") then
-      g_default = g_default + 0
+      g_default = g_default + 1
    elseif (params%wavelet(5:5) == "4") then
-      g_default = g_default + 2
+      g_default = g_default + 3
    elseif (params%wavelet(5:5) == "6") then
-      g_default = g_default + 4
+      g_default = g_default + 5
    elseif (params%wavelet(5:5) == "8") then
-      g_default = g_default + 6
+      g_default = g_default + 7
    else
       call abort(2320243, "no default specified for this wavelet...")
    endif

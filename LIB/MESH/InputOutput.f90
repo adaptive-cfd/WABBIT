@@ -186,6 +186,12 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
                     coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
                 endif
+                ! ! Hack for paraview so that we see all values in a visualization
+                ! if (saveGhosts) then
+                !     coords_spacing(1,l) = ddx(3)*dble(Bs(1))/dble(Bs(1)+2*g)
+                !     coords_spacing(2,l) = ddx(2)*dble(Bs(2))/dble(Bs(2)+2*g)
+                !     coords_spacing(3,l) = ddx(1)*dble(Bs(3))/dble(Bs(3)+2*g)
+                ! endif
             else
                 ! 2D
                 if (saveGhosts) then
@@ -206,6 +212,11 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                     coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
                 endif
+                ! ! Hack for paraview so that we see all values in a visualization
+                ! if (saveGhosts) then
+                !     coords_spacing(1,l) = ddx(2)*dble(Bs(1))/dble(Bs(1)+2*g)
+                !     coords_spacing(2,l) = ddx(1)*dble(Bs(2))/dble(Bs(2)+2*g)
+                ! endif
             endif
 
             ! copy numerical treecode
@@ -256,10 +267,9 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     call write_attribute(file_id, "blocks", "version", (/20240410/)) ! this is used to distinguish wabbit file formats
     if (saveGhosts) then
         ! we could split this up into bs and g but for now to work with visualization scripts I keep it at that
-        call write_attribute(file_id, "blocks", "block-size", Bs(:)+2*g)
-    else
-        call write_attribute(file_id, "blocks", "block-size", Bs)
+        Bs(1:params%dim) = Bs(1:params%dim) + 2*g
     endif
+    call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))

@@ -54,9 +54,6 @@ program main_post
     case ("--wavelet-decompose", "--wavelet-reconstruct")
         call post_wavelet_transform(params)
 
-    case ("--wavelet-vs-rhs")
-        call waveletVsRHS_timingTest(params)
-
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
 
@@ -113,12 +110,6 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--wavelettest")
-        call wavelet_test(params)
-
-    case("--wavelet-coarsening")
-        call wavelet_test_coarsening(params)
-
     case("--vorticity", "--divergence", "--vor-abs", "--Q", "--copy")
         call compute_vorticity_post(params)
 
@@ -168,9 +159,6 @@ program main_post
 
     case ("--cvs-invertibility-test")
         call post_cvs_invertibility_test(params)
-
-    case ("--post-diffuse-velocity")
-        call post_diffuse_velocity(params)
 
     case ("--proto-GS-multigrid")
         call proto_GS_multigrid(params)

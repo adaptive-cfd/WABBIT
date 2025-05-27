@@ -61,7 +61,7 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                     u_out(ix,iy,iz) = (u(ix, iy, iz+1) - u(ix, iy, iz-1)) * dx_inv * 0.5_rk
                 end do; end do; end do
             end select
-        case(2) ! first order derivative
+        case(2) ! second order derivative
             select case(derivative_dim)
             case(1) ! derivative in x-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
@@ -69,11 +69,26 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                 end do; end do; end do
             case(2) ! derivative in y-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix  , iy+1, iz  ) -2.0_rk*u(ix, iy, iz) + u(ix  , iy+1, iz  ))*dx2_inv
+                    u_out(ix,iy,iz) = (u(ix  , iy+1, iz  ) -2.0_rk*u(ix, iy, iz) + u(ix  , iy+1, iz  ))*dy2_inv
                 end do; end do; end do
             case(3) ! derivative in z-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
                     u_out(ix,iy,iz) = (u(ix  , iy  , iz-1) -2.0_rk*u(ix, iy, iz) + u(ix  , iy  , iz+1))*dz2_inv
+                end do; end do; end do
+            end select
+        case(11) ! cross derivatives
+            select case(derivative_dim)
+            case(12) ! derivative in xy-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix+1, iy+1, iz  ) - u(ix-1, iy+1, iz  ) - u(ix+1, iy-1, iz  ) + u(ix-1, iy-1, iz  ))*dx_inv*dy_inv
+                end do; end do; end do
+            case(13) ! derivative in xz-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix+1, iy  , iz+1) - u(ix-1, iy  , iz+1) - u(ix+1, iy  , iz-1) + u(ix-1, iy  , iz-1))*dx_inv*dz_inv
+                end do; end do; end do
+            case(23) ! derivative in yz-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix  , iy+1, iz+1) - u(ix  , iy-1, iz+1) - u(ix  , iy+1, iz-1) + u(ix  , iy-1, iz-1))*dy_inv*dz_inv
                 end do; end do; end do
             end select
         end select
@@ -94,7 +109,7 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                     u_out(ix,iy,iz) = (a_FD4(-2)*u(ix,iy,iz-2) +a_FD4(-1)*u(ix,iy,iz-1) +a_FD4(+1)*u(ix,iy,iz+1) +a_FD4(+2)*u(ix,iy,iz+2))*dz_inv
                 end do; end do; end do
             end select
-        case(2) ! first order derivative
+        case(2) ! second order derivative
             select case(derivative_dim)
             case(1) ! derivative in x-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
@@ -119,6 +134,24 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                             + b_FD4(0)*u(ix,iy,iz) &
                             + b_FD4(+1)*u(ix,iy,iz+1) &
                             + b_FD4(+2)*u(ix,iy,iz+2))*dz2_inv
+                end do; end do; end do
+            end select
+        case(11) ! cross derivatives
+            select case(derivative_dim)
+            case(12) ! derivative in xy-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix+1, iy+1, iz  ) - u(ix-1, iy+1, iz  ) - u(ix+1, iy-1, iz  ) + u(ix-1, iy-1, iz  )) + \
+                                     -1.0_rk/48.0_rk*(u(ix+2, iy+2, iz  ) - u(ix-2, iy+2, iz  ) - u(ix+2, iy-2, iz  ) + u(ix-2, iy-2, iz  )))*dx_inv*dy_inv
+                end do; end do; end do
+            case(13) ! derivative in xz-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix+1, iy  , iz+1) - u(ix-1, iy  , iz+1) - u(ix+1, iy  , iz-1) + u(ix-1, iy  , iz-1)) + \
+                                     -1.0_rk/48.0_rk*(u(ix+2, iy  , iz+2) - u(ix-2, iy  , iz+2) - u(ix+2, iy  , iz-2) + u(ix-2, iy  , iz-2)))*dx_inv*dz_inv
+                end do; end do; end do
+            case(23) ! derivative in yz-direction
+                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
+                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix  , iy+1, iz+1) - u(ix  , iy-1, iz+1) - u(ix  , iy+1, iz-1) + u(ix  , iy-1, iz-1)) + \
+                                     -1.0_rk/48.0_rk*(u(ix  , iy+2, iz+2) - u(ix  , iy-2, iz+2) - u(ix  , iy+2, iz-2) + u(ix  , iy-2, iz-2)))*dy_inv*dz_inv
                 end do; end do; end do
             end select
         end select
@@ -154,7 +187,7 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                            +a_FD6(+3)*u(ix,iy,iz+3))*dz_inv
                 end do; end do; end do
             end select
-        case(2) ! first order derivative
+        case(2) ! second order derivative
             select case(derivative_dim)
             case(1) ! derivative in x-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
@@ -220,7 +253,7 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
                            +a_TW4(+3)*u(ix,iy,iz+3))*dz_inv
                 end do; end do; end do
             end select
-        case(2) ! first order derivative
+        case(2) ! second order derivative
             select case(derivative_dim)
             case(1) ! derivative in x-direction
                 do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)

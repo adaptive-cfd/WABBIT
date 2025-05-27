@@ -88,10 +88,10 @@ module module_MPI
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
 
-    PUBLIC :: sync_ghosts_tree, sync_ghosts_RHS_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC
+    PUBLIC :: sync_ghosts_tree, sync_ghosts_RHS_tree, sync_TMP_from_MF, sync_TMP_from_all, sync_SCWC_from_MC, sync_level_from_M
     PUBLIC :: blocks_per_mpirank, synchronize_lgt_data, reset_ghost_nodes, init_ghost_nodes, move_mallat_patch_block, family_setup_patches, xfer_ensure_correct_buffer_size
     PUBLIC :: coarse_extension_modify, coarse_extension_reconstruct_tree, xfer_block_data, prepare_update_family_metadata
-    PUBLIC :: block_has_valid_neighbor, block_is_root, block_is_leaf
+    PUBLIC :: block_has_valid_neighbor, block_is_root, block_is_leaf, bound_cond_generic
 
 
 contains
@@ -105,6 +105,7 @@ contains
 #include "reconstruction_step.f90"
 #include "xfer_block_data.f90"
 #include "block_relations.f90"
+#include "bound_cond_generic.f90"
 
 !! initialize ghost nodes module. allocate buffers and create data bounds array,
 !! which we use to rapidly identify a ghost nodes layer

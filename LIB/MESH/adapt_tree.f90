@@ -42,7 +42,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     real(kind=rk)                       :: t_block, t_all, t_loop
     integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id
     logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, iterate, toBeManipulated
-    integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this, g_spaghetti
+    integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this
     character(len=clong)                :: toc_statement
     integer(kind=tsize)                 :: treecode
 
@@ -76,10 +76,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ignore_maxlevel_apply = .false.
     if (present(ignore_coarsening)) ignore_coarsening_apply = ignore_coarsening
     if (present(ignore_maxlevel)) ignore_maxlevel_apply = ignore_maxlevel
-
-    ! it turns out, when the coefficients are spaghetti-ordered,
-    ! we can sync only even numbers of points and save one for odd numbered
-    g_spaghetti = params%g/2*2
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -210,6 +206,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! As all decompositions have been correct, we do not need to copy the SC and only delete the WC in order to keep the interfaces clean
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="tree", copy_sc=.false.)
+
+            ! After CE we need to update bound cond for symmetry
+            call bound_cond_generic(params, hvy_block, tree_ID, "tree", .true., edges_only=.false.)
         endif
 
         ! this was scrapped after investigating it 25-03-25
@@ -307,7 +306,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -316,12 +315,30 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
     integer(kind=ik), intent(in)        :: tree_ID
     !> heavy tmp data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    logical, intent(in), optional       :: init_full_tree_grid  !< if false, grid is already in full tree format, defaults to true
+    logical, intent(in), optional       :: compute_SC_only  !< only apply scaling function filter, defaults to false
+    real(kind=rk), optional :: scaling_filter(:)  !< filter to be used for the SC, only used with compute_SC_only=T, defaults to params%HD
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
     integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: toc_statement
-    logical              :: iterate, use_leaf_first
+    logical              :: iterate, use_leaf_first, initFullTreeGrid, computeSCOnly
+    real(kind=rk), dimension(:), allocatable :: scalingFilter
+
+    initFullTreeGrid = .true.
+    if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
+    computeSCOnly = .false.
+    if (present(compute_SC_only)) computeSCOnly = compute_SC_only
+    if (present(scaling_filter)) then
+        ! passed filters might not have correct dimensions, so we set it here
+        k = (ubound(scaling_filter, dim=1)-lbound(scaling_filter, dim=1))/2
+        allocate(scalingFilter(-k:k))
+        scalingFilter(:) = scaling_filter(:)
+    else
+        allocate(scalingFilter(lbound(params%HD, dim=1):ubound(params%HD, dim=1)))
+        scalingFilter(:) = params%HD(:)
+    endif
 
     ! we can only use the more parallel optimized leaf-first option with a specific minimum blocksize, so we test that here
     use_leaf_first = all(params%Bs(1:params%dim) >= 3* max(abs(lbound(params%HD, dim=1)), abs(ubound(params%HD, dim=1))))
@@ -330,24 +347,43 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
     !    leaf-first : all blocks
     !    level-wise : only blocks on highest level
     level       = maxActiveLevel_tree(tree_ID)
-    do k = 1, lgt_n(tree_ID)
-        lgt_ID = lgt_active(k, tree_ID)
-        level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-        if (level_me == level .or. use_leaf_first) then
-            lgt_block(lgt_ID, IDX_REFINE_STS) = -1
-        endif
-    end do
-    ! do backup here so we need less logic in synching neighbors
-    do k = 1, hvy_n(tree_ID)
-        hvy_ID = hvy_active(k, tree_ID)
-        hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
-    enddo
+    if (initFullTreeGrid) then
+        do k = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k, tree_ID)
+            level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+            if (level_me == level .or. use_leaf_first) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+            endif
+        end do
+        ! do backup here so we need less logic in synching neighbors
+        do k = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k, tree_ID)
+            hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+        enddo
 
-    ! at first, initialize all mothers without any values yet
-    t_block = MPI_Wtime()
-    call init_full_tree(params, tree_ID)
-    call toc( "decompose_tree (init_mothers_tree)", 110, MPI_Wtime()-t_block )
-    ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status -1
+        ! at first, initialize all mothers without any values yet
+        t_block = MPI_Wtime()
+        call init_full_tree(params, tree_ID)
+        call toc( "decompose_tree (init_mothers_tree)", 110, MPI_Wtime()-t_block )
+        ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status -1
+    else
+        do k = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k, tree_ID)
+            call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+            level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+            if (level_me == level .or. (use_leaf_first .and. block_is_leaf(params, hvy_ID))) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+            else
+                lgt_block(lgt_ID, IDX_REFINE_STS) = REF_TMP_EMPTY
+            endif
+            ! do backup here so we need less logic in synching neighbors
+            if (block_is_leaf(params, hvy_ID)) then
+                hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+            endif
+        end do
+        ! we need to synch lgt data as loop to check for leaf-blocks is 
+        call synchronize_lgt_data( params, refinement_status_only=.true.)
+    endif
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      leaf-decompose level-update loop
@@ -378,7 +414,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         ! synchronize ghost nodes - required to apply wavelet filters
         ! block only needs information from medium and fine neighbors as CE will cut dependency to coarse neighbors
         t_block = MPI_Wtime()
-        g_this = max(ubound(params%HD,1),ubound(params%GD,1))
+        g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1)-1)
         ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         ! if (params%isLiftedWavelet) then
         !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
@@ -413,7 +449,11 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
                 ! Compute wavelet decomposition
                 ! For Jmax if dealiasing, just compute H filter
                 ! Data SC/WC now in Spaghetti order
-                if (level_me == params%Jmax .and. params%force_maxlevel_dealiasing) then
+                if (computeSCOnly) then
+                    ! if we only want to compute the SC, we need to apply the filter to the data
+                    call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), scalingFilter, &
+                        lbound(scalingFilter, dim=1), ubound(scalingFilter, dim=1), do_restriction=.true.)
+                elseif (level_me == params%Jmax .and. params%force_maxlevel_dealiasing) then
                     call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), params%HD, &
                         lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
                 else
@@ -433,6 +473,9 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
         ! As no blocks are deleted, modifying newly decomposed blocks is sufficient, they are non-leafs anyways and will be skipped
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="ref", s_val=-1)
+
+            ! After CE we need to update bound cond for symmetry
+            call bound_cond_generic(params, hvy_block, tree_ID, "ref", .false., s_val=-1, edges_only=.false.)
         endif
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -476,18 +519,18 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, verb
             write(*, '(A, i0, A, i0, A)') "Loop ", iteration, " with ", lgt_n(tree_ID), " blocks"
         endif
 
-        ! ! for debugging purposes
+        ! ! for debugging purposes - savin does a sync if any ghost values are NaN
         ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', iteration, "000000.h5"
-        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_block, tree_ID )
+        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_block, tree_ID)
         ! write( toc_statement,'(A, i6.6, A)') 'TestN_', iteration, "000000.h5"
-        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_tmp, tree_ID )
+        ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_tmp, tree_ID)
     end do
 
-    ! ! for debugging purposes
+    ! ! for debugging purposes - savin does a sync if any ghost values are NaN
     ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_block, tree_ID )
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_block, tree_ID)
     ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_tmp, tree_ID )
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_tmp, tree_ID)
 end subroutine
 
 
@@ -526,7 +569,8 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
 
     ! it turns out, when the coefficients are spaghetti-ordered,
     ! we can sync only even numbers of points and save one for odd numbered
-    g_spaghetti = params%g/2*2
+    ! g_spaghetti = params%g/2*2
+    g_spaghetti = params%g
 
     Jmax_active = maxActiveLevel_tree(tree_ID)
     iteration = 0
@@ -551,6 +595,9 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
         !    2. interior WC are deleted so that the SC copy for syncing later is exact with the original values, we assume those WC are not significant
         if (params%useCoarseExtension) then
             call coarse_extension_modify(params, hvy_block, hvy_tmp, tree_ID, CE_case="level", s_val=level, copy_sc=.false.)
+
+            ! After CE we need to update bound cond for symmetry
+            call bound_cond_generic(params, hvy_block, tree_ID, "level", .true., s_val=level, edges_only=.false.)
         endif
 
         ! Wavelet-reconstruct blocks on level
@@ -566,6 +613,8 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
                 call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_ID))
 
                 ! make copy of data in hvy_tmp as we sync from coarser neighbors using that and I do not want to write another logic currently
+                ! One might be concerned if we sync from hvy_tmp and do prediction/interpolation, as it does not have it's ghost layers synced
+                ! however, we discard all interpolated values with the CE so we cleverly circumvent problems there
                 hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
             endif
         end do
@@ -587,6 +636,12 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
 
         iteration = iteration + 1
     enddo
+
+    ! ! for debugging purposes - savin does a sync if any ghost values are NaN
+    ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_block, tree_ID)
+    ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_tmp, tree_ID)
 end subroutine
 
 
@@ -923,8 +978,8 @@ subroutine cvs_thresholding_local(params, hvy_block, hvy_tmp, hvy_work, indicato
 
     ! ! debug what the wavelet reconstruction does
     ! call saveHDF5_tree("test-WCR.h5", 0.0_rk, 0, 1, params, hvy_block, tree_ID )
-    ! call saveHDF5_tree("test-normal.h5", 0.0_rk, 0, 1, params, hvy_work(:, :, :, 1:size(hvy_block, 4), :, 1), tree_ID )
-    ! call saveHDF5_tree("test-WD.h5", 0.0_rk, 0, 1, params, hvy_work(:, :, :, 1:size(hvy_block, 4), :, 2), tree_ID )
+    ! call saveHDF5_tree("test-normal.h5", 0.0_rk, 0, 1, params, hvy_work(:, :, :, 1:size(hvy_block, 4), :, 1), tree_ID, no_sync=.true.)
+    ! call saveHDF5_tree("test-WD.h5", 0.0_rk, 0, 1, params, hvy_work(:, :, :, 1:size(hvy_block, 4), :, 2), tree_ID, no_sync=.true.)
     ! ! return
 
     n_points = dble(product(params%bs(1:params%dim)))  ! block-wise, so all points for one block

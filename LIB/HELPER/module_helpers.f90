@@ -1089,7 +1089,7 @@ contains
         if (present(digits)) apply_digits = digits
         apply_append = .false.
         if (present(append)) apply_append = append
-        apply_print_ghosts = .false.
+        apply_print_ghosts = .true.
         if (present(print_ghosts)) apply_print_ghosts = print_ghosts
 
         if (.not. apply_append) then

@@ -8,43 +8,8 @@ contains
 
 #include "conversion_routines.f90"
 
-    ! coarsen the block by one level
-    subroutine restriction_2D(fine, coarse)
-        implicit none
 
-        real(kind=rk), dimension(:,:), intent(in) :: fine
-        real(kind=rk), dimension(:,:), intent(out) :: coarse
-        integer(kind=ik), dimension(2) :: nfine, ncoarse
-
-        ncoarse(1) = size(coarse,1)
-        ncoarse(2) = size(coarse,2)
-        nfine(1)   = size(fine,1)
-        nfine(2)   = size(fine,2)
-
-#ifdef DEV
-        if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2)) then
-            write(*,*) shape(coarse), ":", shape(fine)
-            call abort(888191,"ERROR: restriction_2D: arrays wrongly sized..")
-        endif
-#endif
-
-        coarse(:, :) = fine(1:nfine(1):2, 1:nfine(2):2)
-
-    end subroutine
-
-    ! ! Version without vectors
-    ! subroutine restriction_prefilter(params, u, u_filtered)
-    !     implicit none
-    !     type(type_params), intent(in) :: params
-    !     real(kind=rk), dimension(:,:,:), intent(in) :: u
-    !     real(kind=rk), dimension(:,:,:), intent(out) :: u_filtered
-
-    !     if (.not. allocated(params%HD)) call abort(71717172, "wavelet not setup")
-
-    !     call blockFilterXYZ(params, u, u_filtered, params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1))
-    ! end subroutine
-
-
+    ! this function is only used in merge_blocks, we could remove it
     subroutine restriction_prefilter_vct(params, u, u_filtered)
         implicit none
         type(type_params), intent(in) :: params
@@ -72,31 +37,6 @@ contains
         end do
 
     end function
-
-
-    ! coarsen the block by one level
-    subroutine restriction_3D(fine, coarse)
-        implicit none
-
-        real(kind=rk), dimension(:,:,:), intent(in)  :: fine
-        real(kind=rk), dimension(:,:,:), intent(out) :: coarse
-        integer(kind=ik), dimension(3) :: nfine, ncoarse
-
-        ncoarse(1) = size(coarse,1)
-        ncoarse(2) = size(coarse,2)
-        ncoarse(3) = size(coarse,3)
-        nfine(1) = size(fine,1)
-        nfine(2) = size(fine,2)
-        nfine(3) = size(fine,3)
-
-#ifdef DEV
-        if ( 2*ncoarse(1)-1 /= nfine(1) .or. 2*ncoarse(2)-1 /= nfine(2) .or. 2*ncoarse(3)-1 /= nfine(3) ) then
-            call abort(888192,"ERROR: restriction_3D: arrays wrongly sized..")
-        endif
-#endif
-
-        coarse(:, :, :) = fine(1:nfine(1):2,1:nfine(2):2,1:nfine(3):2)
-    end subroutine
     
 
 
@@ -129,6 +69,10 @@ contains
     ! we require as many multiplications as the filter HR, which contains zeros.
     ! This routine is thus more efficient (it skips odd points entirely and does not multiply by zero).
     ! As it is called for every ghost nodes patch (not just to upsample entire blocks), it is performance-critical.
+    !
+    ! inplace usage for a block:
+    ! all prediction(hvy_block(1:params%Bs(1)+2*params%g:2,1:params%Bs(2)+2*params%g:2,:,ic,hvy_id), &
+    !                hvy_block(1:params%Bs(1)+2*params%g-1,1:params%Bs(2)+2*params%g-1,:,ic,hvy_id), params%order_predictor)
     subroutine prediction(coarse, fine, order_predictor)
         implicit none
 
@@ -175,47 +119,70 @@ contains
         endif
 #endif
 
+        ! prepare grid, set all values to zero or only those that will be overwritte (for inplace usage)
+        ! as only edge points would be set to 0 that should not be used and the rest is overwritten, we do not need to do it
+        ! but sometimes we init them as NaN and NaN is not fun so let's set them anyways
+        fine(2:nxfine:2, :, :) = 0.0_rk
+        fine(:, 2:nyfine:2, :) = 0.0_rk
+        fine(:, :, 2:nzfine:2) = 0.0_rk
+        ! fine = 0.0_rk
+
         ! fill matching points: the coarse and fine grid share a lot of points (as the
         ! fine grid results from insertion of one point between each coarse point).
         ! Sometimes called checkerboard copying
-        fine = 0.0_rk
         fine(1:nxfine:2, 1:nyfine:2, 1:nzfine:2) = coarse(:, :, :)
 
+        ! matrix operation version
+        ! x-interpolation
+        do shift = 1, size(c,1)
+            shift_fine = -size(c,1)+(2*shift-1)
+            fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) = fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) + c(shift)*fine(2*N+shift_fine:nxfine-(2*N-1)+shift_fine:2,1:nyfine:2,1:nzfine:2)
+        end do
+        ! y-interpolation
+        do shift = 1, size(c,1)
+            shift_fine = -size(c,1)+(2*shift-1)
+            fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) = fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) + c(shift)*fine(:,2*N+shift_fine:nyfine-(2*N-1)+shift_fine:2,1:nzfine:2)
+        end do
+        ! z-interpolation
+        do shift = 1, size(c,1)
+            shift_fine = -size(c,1)+(2*shift-1)
+            fine(:,:,2*N:nzfine-(2*N-1):2) = fine(:,:,2*N:nzfine-(2*N-1):2) + c(shift)*fine(:,:,2*N+shift_fine:nzfine-(2*N-1)+shift_fine:2)
+        end do
 
-        do izfine = 1, nzfine, 2
-            ! in the z=const planes, we execute the 2D code.
-            do ixfine= 2*N, nxfine-(2*N-1), 2
-                do iyfine =  1, nyfine, 2
-                    ! note in this implementation, interp coeffs run
-                    ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
-                    do shift = 1, size(c,1)
-                        shift_fine = -size(c,1)+(2*shift-1)
-                        fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine+shift_fine,iyfine,izfine)
-                    end do
-                end do
-            end do
+        ! do izfine = 1, nzfine, 2
+        !     ! in the z=const planes, we execute the 2D code.
+        !     do ixfine= 2*N, nxfine-(2*N-1), 2
+        !         do iyfine =  1, nyfine, 2
+        !             ! note in this implementation, interp coeffs run
+        !             ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+        !             do shift = 1, size(c,1)
+        !                 shift_fine = -size(c,1)+(2*shift-1)
+        !                 fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine+shift_fine,iyfine,izfine)
+        !             end do
+        !         end do
+        !     end do
 
-            do ixfine = 1, nxfine, 1
-                do iyfine =  2*N, nyfine-(2*N-1), 2
-                    ! note in this implementation, interp coeffs run
-                    ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
-                    do shift = 1, size(c,1)
-                        shift_fine = -size(c,1)+(2*shift-1)
-                        fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine, iyfine+shift_fine,izfine)
-                    end do
-                end do
-            end do
-        enddo
+        !     do ixfine = 1, nxfine, 1
+        !         do iyfine =  2*N, nyfine-(2*N-1), 2
+        !             ! note in this implementation, interp coeffs run
+        !             ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+        !             do shift = 1, size(c,1)
+        !                 shift_fine = -size(c,1)+(2*shift-1)
+        !                 fine(ixfine,iyfine,izfine) = fine(ixfine,iyfine,izfine) + c(shift)*fine(ixfine, iyfine+shift_fine,izfine)
+        !             end do
+        !         end do
+        !     end do
+        ! enddo
 
-        ! finally, only 1D interpolation along z is missing.
-        do izfine =  2*N, nzfine-(2*N-1), 2
-            ! note in this implementation, interp coeffs run
-            ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
-            do shift = 1, size(c,1)
-                shift_fine = -size(c,1)+(2*shift-1)
-                fine(:,:,izfine) = fine(:,:,izfine) + c(shift)*fine(:,:,izfine+shift_fine)
-            end do
-        enddo
+        ! ! finally, only 1D interpolation along z is missing.
+        ! do izfine =  2*N, nzfine-(2*N-1), 2
+        !     ! note in this implementation, interp coeffs run
+        !     ! c(1:2), c(1:4), c(1:6) for 2nd, 4th, 6th order respectively
+        !     do shift = 1, size(c,1)
+        !         shift_fine = -size(c,1)+(2*shift-1)
+        !         fine(:,:,izfine) = fine(:,:,izfine) + c(shift)*fine(:,:,izfine+shift_fine)
+        !     end do
+        ! enddo
 
     end subroutine
 
@@ -1166,6 +1133,7 @@ contains
         if (allocated(params%GD)) deallocate(params%GD)
         if (allocated(params%HR)) deallocate(params%HR)
         if (allocated(params%GR)) deallocate(params%GR)
+        if (allocated(params%MGR)) deallocate(params%MGR)
 
         verbose1 = .true.
         if (present(verbose)) verbose1 = verbose
@@ -1236,22 +1204,33 @@ contains
                 if (params%wavelet(5:5) .eq. "0") then
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
+                    ! multigrid restriction - second order central average for lowpass filtering                  
+                    allocate( params%MGR(-1:1) )
+                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
                 elseif (params%wavelet(5:5) == "2") then
                     allocate( params%HD(-2:2) )
                     params%HD = (/-1.0_rk, +2.0_rk, +6.0_rk, +2.0_rk, -1.0_rk/) / 8.0_rk
+                    allocate( params%MGR(-2:2) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     allocate( params%HD(-4:4) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
+                    allocate( params%MGR(-4:4) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "6") then
                     allocate( params%HD(-6:6) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
+                    allocate( params%MGR(-6:6) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "8") then
                     allocate( params%HD(-8:8) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
                         10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
+                    allocate( params%MGR(-8:8) )
+                    params%MGR(:) = params%HD(:)
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
                 endif
@@ -1265,6 +1244,25 @@ contains
                 if (params%wavelet(5:5) == "0") then
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
+                    ! multigrid restriction - second order central average for lowpass filtering                  
+                    allocate( params%MGR(-1:1) )
+                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+
+                    ! hack - second order cell average
+                    ! allocate( params%MGR(0:1) )
+                    ! params%MGR = (/0.5_rk, 0.5_rk/)
+
+                    ! ! hack - second order central average
+                    ! allocate( params%MGR(-1:1) )
+                    ! params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+
+                    ! ! hack - fourth order cell average
+                    ! allocate( params%MGR(-1:2) )
+                    ! params%MGR = (/-1.0_rk/6.0_rk, 2.0_rk/3.0_rk, 2.0_rk/3.0_rk, -1.0_rk/6.0_rk/)
+
+                    ! ! hack - fourth order cell average
+                    ! allocate( params%MGR(-2:2) )
+                    ! params%MGR = (/1.0_rk/16.0_rk, 1.0_rk/4.0_rk, 3.0_rk/8.0_rk, 1.0_rk/4.0_rk, 1.0_rk/16.0_rk/)
                 elseif (params%wavelet(5:5) == "2") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
@@ -1274,6 +1272,8 @@ contains
                            23.0_rk*2.0_rk**(-5.0_rk), 2.0_rk**(-2.0_rk), &
                                   -2.0_rk**(-3.0_rk), 0.0_rk, &
                                    2.0_rk**(-6.0_rk) /)
+                    allocate( params%MGR(-4:4) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
@@ -1285,6 +1285,8 @@ contains
                            -63.0_rk*2.0_rk**(-9.0_rk),        -2.0_rk**(-5.0_rk), &
                              9.0_rk*2.0_rk**(-8.0_rk),         0.0_rk, &
                                    -2.0_rk**(-9.0_rk)/)
+                    allocate( params%MGR(-6:6) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "6") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
@@ -1298,6 +1300,8 @@ contains
                                  189.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
                                  -35.0_rk*2.0_rk**(-12.0_rk),          0.0_rk, &
                                    9.0_rk*2.0_rk**(-14.0_rk) /)  
+                    allocate( params%MGR(-8:8) )
+                    params%MGR(:) = params%HD(:)
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )      
                 endif
@@ -1310,6 +1314,9 @@ contains
                 if (params%wavelet(5:5) == "0") then
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
+                    ! multigrid restriction - second order central average for lowpass filtering                  
+                    allocate( params%MGR(-1:1) )
+                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
                 elseif (params%wavelet(5:5) == "2") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
@@ -1321,6 +1328,8 @@ contains
                                  -125.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
                                    11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
                                    -3.0_rk*2.0_rk**(-10.0_rk)/)
+                    allocate( params%MGR(-6:6) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=4
@@ -1334,6 +1343,8 @@ contains
                                   87.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
                                  -13.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
                                    3.0_rk*2.0_rk**(-13.0_rk) /)  
+                    allocate( params%MGR(-8:8) )
+                    params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "6") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=6
@@ -1349,6 +1360,8 @@ contains
                                 -1525.0_rk*2.0_rk**(-17.0_rk),          0.0_rk, &
                                    75.0_rk*2.0_rk**(-16.0_rk),          0.0_rk, &
                                    -9.0_rk*2.0_rk**(-17.0_rk) /)
+                    allocate( params%MGR(-10:10) )
+                    params%MGR(:) = params%HD(:)
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
                 endif    
@@ -1393,7 +1406,8 @@ contains
         g_min = max(g_min, abs(lbound(params%HD, dim=1)))
         g_min = max(g_min, abs(ubound(params%HD, dim=1)))
         g_min = max(g_min, abs(lbound(params%GD, dim=1)))
-        g_min = max(g_min, abs(ubound(params%GD, dim=1)))
+        ! GD right side is not applied on the rightmost point due to restriction, so we can subtract 1
+        g_min = max(g_min, abs(ubound(params%GD, dim=1))-1)
         g_min = max(g_min, abs(lbound(params%HR, dim=1)))
         g_min = max(g_min, abs(ubound(params%HR, dim=1)))
         ! GR does not affect the first point, as it is the limiting factor for g, this is dealt with in the reconstruction to benefit from it
@@ -1792,9 +1806,9 @@ contains
         ! if SC should not be reconstructed, we still apply all filters (to have cross-effects) but wipe the SC
         if (.not. SC_rec) then
             if (nz==1) then
-                u_wc(1+io:Bs(1)+2*g-io:2, 1+io:Bs(2)+2*g-io:2, 1, 1:nc) = 0.0_rk
+                u_wc(1+io:Bs(1)+2*g:2, 1+io:Bs(2)+2*g:2, 1, 1:nc) = 0.0_rk
             else
-                u_wc(1+io:Bs(1)+2*g-io:2, 1+io:Bs(2)+2*g-io:2, 1+io:Bs(3)+2*g-io:2, 1:nc) = 0.0_rk
+                u_wc(1+io:Bs(1)+2*g:2, 1+io:Bs(2)+2*g:2, 1+io:Bs(3)+2*g:2, 1:nc) = 0.0_rk
             endif
         endif
 
@@ -1806,13 +1820,13 @@ contains
                 ! fill upsampling buffer for low-pass filter: every second point
                 ! apply low-pass filter to upsampled signal
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(1+io:Bs(1)+2*g-io:2, iy, iz, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(1+io:Bs(1)+2*g:2, iy, iz, ic) ! SC
                 call filter1dim(params, buffer3(1:nx), buffer1(1:nx), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
                 ! shifted by one point to account for lbound(GR) possibly being larger than g
                 buffer3 = 0.0_rk
-                buffer3(2+io:1+nx-io:2) = u_wc(2+io:Bs(1)+2*g-io:2, iy, iz, ic) ! WC
+                buffer3(2+io:nx:2) = u_wc(2+io:Bs(1)+2*g:2, iy, iz, ic) ! WC
                 call filter1dim(params, buffer3(1:nx+2), buffer2(1:nx+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
                 u_wc(:, iy, iz, ic) = buffer1(1:nx) + buffer2(2:nx+1)
@@ -1822,7 +1836,7 @@ contains
                 ! fill upsampling buffer for low-pass filter: every second point
                 ! apply low-pass filter to upsampled signal
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(1+io:Bs(1)+2*g-io:2, iy, iz, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(1+io:Bs(1)+2*g:2, iy, iz, ic) ! SC
                 call filter1dim(params, buffer3(1:nx), u_wc(1:nx, iy, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
             enddo; enddo; enddo
         endif
@@ -1833,14 +1847,14 @@ contains
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iz = 1, nz
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(ix, 1+io:Bs(2)+2*g-io:2, iz, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(ix, 1+io:Bs(2)+2*g:2, iz, ic) ! SC
                 ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
                 call filter1dim(params, buffer3(1:ny), buffer1(1:ny), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
                 ! shifted by one point to account for lbound(GR) possibly being larger than g
                 buffer3 = 0.0_rk
-                buffer3(2+io:1+nx-io:2) = u_wc(ix, 2+io:Bs(2)+2*g-io:2, iz, ic) ! WC
+                buffer3(2+io:nx:2) = u_wc(ix, 2+io:Bs(2)+2*g:2, iz, ic) ! WC
                 ! buffer3(1:ny:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
                 call filter1dim(params, buffer3(1:ny+2), buffer2(1:ny+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
@@ -1850,7 +1864,7 @@ contains
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iz = 1, nz
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(ix, 1+io:Bs(2)+2*g-io:2, iz, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(ix, 1+io:Bs(2)+2*g:2, iz, ic) ! SC
                 ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
                 call filter1dim(params, buffer3(1:ny), u_wc(ix, 1:ny, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
             enddo; enddo; enddo
@@ -1866,13 +1880,13 @@ contains
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iy = (g+1), (Bs(2)+g)
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g-io:2, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g:2, ic) ! SC
                 call filter1dim(params, buffer3(1:nz), buffer1(1:nz), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
                 ! shifted by one point to account for lbound(GR) possibly being larger than g
                 buffer3 = 0.0_rk
-                buffer3(2+io:1+nx-io:2) = u_wc(ix, iy, 2+io:Bs(3)+2*g-io:2, ic) ! WC
+                buffer3(2+io:nx:2) = u_wc(ix, iy, 2+io:Bs(3)+2*g:2, ic) ! WC
                 call filter1dim(params, buffer3(1:nz+2), buffer2(1:nz+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
 
                 u_wc(ix, iy, :, ic) = buffer1(1:nz) + buffer2(2:nz+1)
@@ -1881,7 +1895,7 @@ contains
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iy = (g+1), (Bs(2)+g)
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
-                buffer3(1+io:nx-io:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g-io:2, ic) ! SC
+                buffer3(1+io:nx:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g:2, ic) ! SC
                 call filter1dim(params, buffer3(1:nz), u_wc(ix, iy, 1:nz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
             enddo; enddo; enddo
         endif

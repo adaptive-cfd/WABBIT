@@ -536,7 +536,7 @@ contains
     !> \brief Set boundary conditions for non-periodic boundary patches
     !> \details For periodic ghost patches we synch the ghost values, for non-periodic however
     !! we have to set the values at the ghost patches depending on the boundary type. This differs for each physics type
-    subroutine BOUNDCOND_META(physics, time, u, g, x0, dx, n_domain)
+    subroutine BOUNDCOND_META(physics, time, u, g, x0, dx, n_domain, spaghetti_form, edges_only)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -566,9 +566,17 @@ contains
         ! currently only acessible in the local stage
         integer(kind=2), intent(in) :: n_domain(3)
 
+        ! sometimes we sync data that is decomposed in spaghetti form of SC WC, this can alter the way we set the BCs
+        logical , intent(in) :: spaghetti_form
+
+        logical, intent(in), optional  :: edges_only                    !< if true, only set the boundary condition on the edges of the domain, default is false
+        logical :: edgesOnly
+        edgesOnly = .false.
+        if (present(edges_only)) edgesOnly = edges_only
+
         select case (physics)
         case ("ACM-new")
-            call BOUNDCOND_ACM( time, u, g, x0, dx, n_domain)
+            call BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edgesOnly)
 
         ! case ("ConvDiff-new")
         !     call BOUNDCOND_ConvDiff( time, u, g, x0, dx )

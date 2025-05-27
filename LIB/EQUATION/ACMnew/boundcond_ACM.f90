@@ -1,5 +1,5 @@
 !> \brief main level wrapper for setting non-periodic boundary conditions in ghost patches
-subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain )
+subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_only)
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -29,9 +29,17 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain )
     ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
     integer(kind=2), intent(in) :: n_domain(3)
 
+    ! sometimes we sync data that is decomposed in spaghetti form of SC WC, this can alter the way we set the BCs
+    logical , intent(in) :: spaghetti_form
+
+    logical, intent(in), optional  :: edges_only                    !< if true, only set the boundary condition on the edges of the domain, default is false
+
     real(kind=rk)    :: x, y, z
     integer(kind=ik) :: ix, iy, iz, idir, Bs(3), is, dim
-    logical :: disable_antisymmetric
+    logical :: disable_antisymmetric, edgesOnly
+
+    edgesOnly = .false.
+    if (present(edges_only)) edgesOnly = edges_only
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -59,47 +67,60 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain )
     !    | 6th  |        |        | 1/20   | -3/10  | 3/4    |
     !    | 8th  |        | -1/70  | 4/35   | -4/10  | 4/5    |
     !    | 10th | 1/252  | -5/126 | 5/28   | -10/21 | 5/6    |
-    ! Sometimes we sync for decomposed values, so I just double dx so that we always act on SC only
+    ! Sometimes we sync for decomposed values, so I just double dx in that case to sync SC and WC correctly
 
-    ! ATTENTION : This is experimental. It works smoothly for 1 symmetry plance in negative direction however there are some problems:
+    ! ATTENTION : This is experimental. It works smoothly for 1 symmetry plane in negative direction however there are some problems:
     !   - in positive direction something is yet missing, maybe my ansatz with averaging is just not clever or something with the wavelets
     !   - I did not check for several planes of symmetry - maybe there are some corner problems but I don't think so - to be checked!
+
+    ! ToDo: implement edgesOnly so that we copy less values
 
     if (n_domain(1) == -1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(g+1,:,:,is) = 0
+                u(g+1:-1,:,:,is) = 0.0_rk
                 u(g:1:-1,:,:,is) = - u(g+2:2*g+1,:,:,is)
             else  ! symmetric components
+                ! values on symmetry line are untouched
                 u(g:1:-1,:,:,is) = + u(g+2:2*g+1,:,:,is)
             endif
         enddo
     elseif (n_domain(1) == +1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(Bs(1)+g+1,:,:,is) = 0
+                u(Bs(1)+g+1,:,:,is) = 0.0_rk
                 u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = - u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
             else  ! symmetric components
-                u(Bs(1)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(1)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(1)+g-3,:,:,is) + 4.0_rk/35.0_rk * u(Bs(1)+g-5,:,:,is) - 1.0_rk/70.0_rk * u(Bs(1)+g-7,:,:,is))
+                ! for the approximation of the mirror line, we need to use only SC for the spaghetti form
+                if (.not. spaghetti_form) then
+                    u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-2,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-3,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-4,:,:,is))
+                else
+                    u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-3,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-5,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-7,:,:,is))
+                endif
                 u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = + u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
             endif
         enddo
     elseif (n_domain(2) == -1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(:,g+1,:,is) = 0
+                u(:,g+1:-1,:,is) = 0.0_rk
                 u(:,g:1:-1,:,is) = - u(:,g+2:2*g+1,:,is)
             else  ! symmetric components
+                ! values on symmetry line are untouched
                 u(:,g:1:-1,:,is) = + u(:,g+2:2*g+1,:,is)
             endif
         enddo
     elseif (n_domain(2) == +1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(:,Bs(2)+g+1,:,is) = 0
+                u(:,Bs(2)+g+1,:,is) = 0.0_rk
                 u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = - u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
             else  ! symmetric components
-                u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-3,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-5,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-7,:,is))
+                if (.not. spaghetti_form) then
+                    u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-2,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-3,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-4,:,is))
+                else
+                    u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-3,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-5,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-7,:,is))
+                endif
                 u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = + u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
             endif
         enddo
@@ -108,19 +129,24 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain )
         if (n_domain(3) == -1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                    u(:,:,g+1,is) = 0
+                    u(:,:,g+1:-1,is) = 0.0_rk
                     u(:,:,g:1:-1,is) = - u(:,:,g+2:2*g+1,is)
                 else  ! symmetric components
+                    ! values on symmetry line are untouched
                     u(:,:,g:1:-1,is) = + u(:,:,g+2:2*g+1,is)
                 endif
             enddo
         elseif (n_domain(3) == +1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                    u(:,:,Bs(3)+g+1,is) = 0
+                    u(:,:,Bs(3)+g+1,is) = 0.0_rk
                     u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = - u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
                 else  ! symmetric components
-                    u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-3,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-5,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-7,is))
+                    if (.not. spaghetti_form) then
+                        u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-2,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-3,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-4,is))
+                    else
+                        u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-3,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-5,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-7,is))
+                    endif
                     u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = + u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
                 endif
             enddo

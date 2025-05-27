@@ -12,7 +12,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     !> Additional value to be considered for norm logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: n_val
 
-    real(kind=rk)                       :: x0(1:3), dx(1:3), volume
+    real(kind=rk)                       :: x0(1:3), dx(1:3), volume, norm_block
     integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id
     logical          :: SC_only
     integer, dimension(:), allocatable  :: mask_i, mask
@@ -32,6 +32,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     end do
 
     if (.not. present(norm_case)) then
+        ! normal one, we sum up over all leafs
         norm_case_id = 1
     else
         ! treat the norm computations as for SC
@@ -45,34 +46,64 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         ! now lets treat the special restrictions, set to the second digit
         if (index(norm_case, "level") > 0) norm_case_id = norm_case_id + 10*1
         if (index(norm_case, "ref") > 0) norm_case_id = norm_case_id + 10*2
+        if (index(norm_case, "tree") > 0) norm_case_id = norm_case_id + 10*3
+        if (index(norm_case, "leaf") > 0) norm_case_id = norm_case_id + 0  ! this is basically the normal one
+        if (index(norm_case, "root") > 0) norm_case_id = norm_case_id + 10*4  ! only on lowest available layer
     endif
 
     select case (which_norm)
-    case ("L2", "H1")
-        norm = 0.0_rk
+    case ("L2", "H1", "L1", "Linfty", "Mean")
+        if (which_norm == "Linfty") then
+            norm = -1.0_rk
+        else
+            norm = 0.0_rk
+        endif
+        volume = 0.0_rk
+
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
             ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
             ! skip some blocks in case we want to compute the norm over specific parts
-            if (norm_case_ID/10 == 1) then
+            if (norm_case_ID/10 == 0) then
+                ! only sum up over leafs, we sadly don't have access to function block_is_leaf
+                if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
+            elseif (norm_case_ID/10 == 1) then
                 if (level_me /= n_val) cycle
             elseif (norm_case_ID/10 == 2) then
                 if (ref_me /= n_val) cycle
+            elseif (norm_case_ID/10 == 3) then
+                ! nothing happens actually, we go over full tree
+            elseif (norm_case_ID/10 == 4) then
+                ! only sum up over roots, we sadly don't have access to function block_is_root
+                if (hvy_family(hvy_ID, 1) /= -1) cycle
             endif
-
-            ! only sum up over leafs, we sadly don't have access to function block_is_leaf
-            if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+            
+            ! compute integral over the volume for this block, only needed for mean but it is cheap
+            volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
-            ! compute norm for thresholding components that are treated on their own
+            ! compute norm for thresholding components that are treated on their own, here we treat all norms together
             do p = 1, n_eqn
                 if (params%threshold_state_vector_component(p) == 1) then
-                    norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-                    sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
+                    if (which_norm == "L2" .or. which_norm == "H1") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
+                    elseif (which_norm == "L1") then
+                        norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
+                    elseif (which_norm == "Linfty") then
+                        norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
+                    elseif (which_norm == "Mean") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id ) )
+                    endif
+
+                    if (which_norm == "Linfty") then
+                        norm(p) = max(norm(p), norm_block)
+                    else
+                        norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
+                    endif
                 endif
             enddo
 
@@ -83,14 +114,47 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             do l = 2, maxval(params%threshold_state_vector_component(:))
                 ! convert logical mask to index mask
                 mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
-                norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-                sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
+
+                if (which_norm == "L2" .or. which_norm == "H1") then
+                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
+                elseif (which_norm == "L1") then
+                    norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
+                elseif (which_norm == "Linfty") then
+                    norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
+                elseif (which_norm == "Mean") then
+                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id ) )
+                endif
+
+                if (which_norm == "Linfty") then
+                    norm(mask) = max(norm(mask), norm_block)
+                else
+                    norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
+                endif
             enddo
         enddo
 
-        call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        ! norm = sqrt( norm )
-        norm = sqrt( norm )
+        ! last operation to apply norm over all processes
+        ! Linfty is max norm
+        if (which_norm == "Linfty") then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        ! Mean is a special case, we need to divide by the volume
+        elseif (which_norm == "Mean") then
+            if (norm_case_ID/10 == 0) then
+                norm(:) = norm(:) / product(params%domain_size(1:params%dim))
+            else
+                call MPI_ALLREDUCE(MPI_IN_PLACE, volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+                norm(:) = norm(:) / volume
+            endif
+            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        ! All other norms are summed up
+        else
+            call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
+        
+        ! L2 and H1 need to receive square root
+        if (which_norm == "L2" .or. which_norm == "H1") then
+            norm = sqrt( norm )
+        endif
     
 
     case ("threshold-image-denoise")
@@ -102,14 +166,19 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
             ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
             ! skip some blocks in case we want to compute the norm over specific parts
-            if (norm_case_ID/10 == 1) then
+            if (norm_case_ID/10 == 0) then
+                ! only sum up over leafs, we sadly don't have access to function block_is_leaf
+                if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
+            elseif (norm_case_ID/10 == 1) then
                 if (level_me /= n_val) cycle
             elseif (norm_case_ID/10 == 2) then
                 if (ref_me /= n_val) cycle
+            elseif (norm_case_ID/10 == 3) then
+                ! nothing happens actually, we go over full tree
+            elseif (norm_case_ID/10 == 4) then
+                ! only sum up over roots, we sadly don't have access to function block_is_root
+                if (hvy_family(hvy_ID, 1) /= -1) cycle
             endif
-
-            ! only sum up over leafs, we sadly don't have access to function block_is_leaf
-            if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
             
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
@@ -151,14 +220,19 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
             ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
             ! skip some blocks in case we want to compute the norm over specific parts
-            if (norm_case_ID/10 == 1) then
+            if (norm_case_ID/10 == 0) then
+                ! only sum up over leafs, we sadly don't have access to function block_is_leaf
+                if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
+            elseif (norm_case_ID/10 == 1) then
                 if (level_me /= n_val) cycle
             elseif (norm_case_ID/10 == 2) then
                 if (ref_me /= n_val) cycle
+            elseif (norm_case_ID/10 == 3) then
+                ! nothing happens actually, we go over full tree
+            elseif (norm_case_ID/10 == 4) then
+                ! only sum up over roots, we sadly don't have access to function block_is_root
+                if (hvy_family(hvy_ID, 1) /= -1) cycle
             endif
-
-            ! only sum up over leafs, we sadly don't have access to function block_is_leaf
-            if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
@@ -199,42 +273,6 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 norm(p) = norm(p) / volume
             endif
         enddo
-
-    case ("Linfty")
-        norm = -1.0_rk
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-            level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-            ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
-            ! skip some blocks in case we want to compute the norm over specific parts
-            if (norm_case_ID/10 == 1) then
-                if (level_me /= n_val) cycle
-            elseif (norm_case_ID/10 == 2) then
-                if (ref_me /= n_val) cycle
-            endif
-
-            ! only sum up over leafs, we sadly don't have access to function block_is_leaf
-            if (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) cycle
-
-            do p = 1, n_eqn
-                if (params%threshold_state_vector_component(p) == 1) then
-                    norm(p) = max(norm(p), maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id ))) )
-                endif
-            enddo
-
-            ! some thresholding components want to be treated together, as for example the velocity, so we compute a norm-equivalent if wanted
-            ! every value >1 in thresholding_component are treated as belonging together
-            ! so we could set 2 2 3 3 and actually have those treated as independent vector fields, where we compute the norm
-            ! maybe a bit overkill because usually we only have the velocity, but why not have the capacity that we can build up on
-            do l = 2, maxval(params%threshold_state_vector_component(:))
-                ! convert logical mask to index mask
-                mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
-                norm(mask) = max(norm(mask), maxval(sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2, dim=4)) )
-            enddo
-        enddo
-
-        call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
     case default
         write(*,'(A)') which_norm

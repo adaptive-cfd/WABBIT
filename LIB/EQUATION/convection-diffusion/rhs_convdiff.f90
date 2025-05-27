@@ -152,7 +152,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-
     ! set parameters for readability
     N = params_convdiff%N_scalars
     u0 = 0.0_rk
@@ -393,6 +392,16 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                      +  a(+3)*phi(ix,iy+3,iz,i) + a(+2)*phi(ix,iy+2,iz,i) + a(+1)*phi(ix,iy+1,iz,i))*dy_inv
                                 u_dz = (a(-3)*phi(ix,iy,iz-3,i) + a(-2)*phi(ix,iy,iz-2,i) + a(-1)*phi(ix,iy,iz-1,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix,iy,iz+3,i) + a(+2)*phi(ix,iy,iz+2,i) + a(+1)*phi(ix,iy,iz+1,i))*dz_inv
+
+                                ! ! vectorized implementation, simple tests were ~15% slower - codes left to show what was tested
+                                ! u_dx   = sum(a * phi(ix-3:ix+3,iy,iz,1))*dx_inv
+                                ! u_dy   = sum(a * phi(ix,iy-3:iy+3,iz,1))*dy_inv
+                                ! u_dz   = sum(a * phi(ix,iy,iz-3:iz+3,1))*dz_inv
+
+                                ! ! blas implementation, needs to declare "real(kind=rk) :: ddot", tests were 3xslower - codes left to show what was tested
+                                ! u_dx = ddot(7, a, 1, phi(ix-3:ix+3,iy,iz,1), 1)*dx_inv
+                                ! u_dy = ddot(7, a, 1, phi(ix,iy-3:iy+3,iz,1), 1)*dy_inv
+                                ! u_dz = ddot(7, a, 1, phi(ix,iy,iz-3:iz+3,1), 1)*dz_inv
 
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
 

@@ -90,16 +90,16 @@ subroutine post_unit_test(params)
     ! initialize block size dynamically, make it BSmin for every wavelet
     if (Bs == -1) then
         ! unlifted wavelets, +4 per increase in X of CDFX0
-        if (params%wavelet(4:5) == "20") Bs = 6
-        if (params%wavelet(4:5) == "40") Bs = 10
-        if (params%wavelet(4:5) == "60") Bs = 14
+        if (params%wavelet(4:5) == "20") Bs = 4
+        if (params%wavelet(4:5) == "40") Bs = 8
+        if (params%wavelet(4:5) == "60") Bs = 12
 
-        ! lifted wavelets, +6 per increase in X or Y of CDFXY
+        ! lifted wavelets, +4 per increase in X or Y of CDFXY, commented are the sizes were leaf-first decomposition optimization is used, where we have +6
         if (params%wavelet(4:5) == "22") Bs = 6
-        if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") Bs = 12
-        if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") Bs = 18
-        if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") Bs = 24
-        if (params%wavelet(4:5) == "66") Bs = 30
+        if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") Bs = 10  ! 12
+        if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") Bs = 14  ! 18
+        if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") Bs = 18  ! 224
+        if (params%wavelet(4:5) == "66") Bs = 22  ! 30
     endif
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs

@@ -103,7 +103,7 @@ contains
         ! DEV: check if name is also identical. String comparison so not done for deployment
 #ifdef DEV
         if (name_comp_time(k) /= name .and. name_comp_time(k) /= "---") then
-            write(*, '("DEV WARNING: Measurement ", a, " and ", a, " have conflicting unique number ", i0)') name_comp_time(k), name, num
+            write(*, '("DEV WARNING: Measurement ", a, " and ", a, " have conflicting unique number ", i0)') trim(adjustl(name_comp_time(k))), name, num
         endif
 #endif
 

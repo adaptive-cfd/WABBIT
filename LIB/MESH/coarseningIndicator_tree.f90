@@ -238,7 +238,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
         ! Default is wavelet thresholding...
 
         ! if (params%rank == 0) then
-        !     write(*, '(A, 10(es10.3, 2x))') "Norm: ", norm(:)
+        !     write(*, '(A, 10(es10.3, 1x))') "Norm: ", norm(:)
         ! endif
         
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,

@@ -20,7 +20,7 @@
 !> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
 !> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
 !> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
-subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g_m, g_p, lvl_diff)
+subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g_m, g_p, lvl_diff, redundant_shift)
     implicit none
 
     integer(kind=ik), intent(in)             :: g                   !> params%g
@@ -28,15 +28,16 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     integer(kind=ik), intent(in)             :: relation            !> Which relation to apply manipulation
     integer(kind=ik), intent(out)            :: idx(1:2, 1:3)       !> Output of indices, first entry is l/r and second is dim
     integer(kind=ik), intent(in)             :: N_xyz(1:3)          !> Size of blocks including ghost points, should be size(block, i_dim)
-    integer(kind=ik), intent(in)             :: N_s(1:3)             !> Number of points to modify at start, vec with entry for each dimension
-    integer(kind=ik), intent(in)             :: N_e(1:3)             !> Number of points to modify at end, vec with entry for each dimension
-    integer(kind=ik), intent(in), optional   :: g_p(1:3)             !> Ghost points left side, will be skipped
-    integer(kind=ik), intent(in), optional   :: g_m(1:3)             !> Ghost points right side, will be skipped
-    integer(kind=ik), intent(in), optional   :: lvl_diff             !> lvl_diff, special treatment for -1
+    integer(kind=ik), intent(in)             :: N_s(1:3)            !> Number of points to modify at start, vec with entry for each dimension
+    integer(kind=ik), intent(in)             :: N_e(1:3)            !> Number of points to modify at end, vec with entry for each dimension
+    integer(kind=ik), intent(in), optional   :: g_p(1:3)            !> Ghost points left side, will be skipped
+    integer(kind=ik), intent(in), optional   :: g_m(1:3)            !> Ghost points right side, will be skipped
+    integer(kind=ik), intent(in), optional   :: lvl_diff            !> lvl_diff, special treatment for -1
+    integer(kind=ik), intent(in), optional   :: redundant_shift(1:3) !> For Odd BS, we have to shift the same-level boundaries
 
     integer(kind=ik) :: i_dim, lvlDiff, relation_temp
     ! Indexes where to start or finish, short name because elsewise this list gets looong
-    integer(kind=ik) :: I_s(1:3), I_e(1:3), gp(1:3), gm(1:3)
+    integer(kind=ik) :: I_s(1:3), I_e(1:3), gp(1:3), gm(1:3), rs(1:3)
 
     ! for neighborhoods, +56 and +112 describe the level differences, as for CVS multiple neighbors can exist
     ! for patches we provide lvl_diff anyways so let's project it out of the relation
@@ -54,6 +55,10 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     gm = g
     if (present(g_p)) gp(1:3) = g_p(1:3)
     if (present(g_m)) gm(1:3) = g_m(1:3)
+
+    ! set redundant shift
+    rs(1:3) = 0
+    if (present(redundant_shift)) rs(1:3) = redundant_shift(1:3)
 
     ! Only select interior domain, example with g=1
     ! g g g g g           - - - - -
@@ -73,46 +78,58 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     ! g i i i g           - s - - -
     ! g i i i g           - s - - -
     ! g g g g g           - - - - -
-    if (any((/  1, 2, 3, 4,  25,26,29,30,33,34,37,38,  49,51,53,55 /) == relation_temp)) &
-        idx(2, 1) = N_s(1)+gm(1)  ! -x
-    if (any((/  5, 6, 7, 8,  27,28,31,32,35,36,39,40,  50,52,54,56 /) == relation_temp)) &
-        idx(1, 1) = N_xyz(1) - N_e(1)-gp(1) + 1  ! +x
-    if (any((/  9,10,11,12,  25,26,27,28,41,42,45,46,  49,50,53,54 /) == relation_temp)) &
-        idx(2, 2) = N_s(2)+gm(2)  ! -y
-    if (any((/ 13,14,15,16,  29,30,31,32,43,44,47,48,  51,52,55,56 /) == relation_temp)) &
-        idx(1, 2) = N_xyz(2) - N_e(2)-gp(2) + 1  ! +y
-    if (any((/ 17,18,19,20,  33,34,35,36,41,42,43,44,  49,50,51,52 /) == relation_temp)) &
-        idx(2, 3) = N_s(3)+gm(3)  ! -z
-    if (any((/ 21,22,23,24,  37,38,39,40,45,46,47,48,  53,54,55,56 /) == relation_temp)) &
-        idx(1, 3) = N_xyz(3) - N_e(3)-gp(3) + 1  ! +z
+    if (any((/  1, 2, 3, 4,  25,26,29,30,33,34,37,38,  49,51,53,55 /) == relation_temp)) then
+        idx(2, 1) = N_s(1)+gm(1)+rs(1)  ! -x
+        idx(1, 1) = idx(1, 1) + rs(1)
+    endif
+    if (any((/  5, 6, 7, 8,  27,28,31,32,35,36,39,40,  50,52,54,56 /) == relation_temp)) then
+        idx(1, 1) = N_xyz(1) - N_e(1)-gp(1)-rs(1) + 1  ! +x
+        idx(2, 1) = idx(2, 1) - rs(1)
+    endif
+    if (any((/  9,10,11,12,  25,26,27,28,41,42,45,46,  49,50,53,54 /) == relation_temp)) then
+        idx(2, 2) = N_s(2)+gm(2)+rs(2)  ! -y
+        idx(1, 2) = idx(1, 2) + rs(2)
+    endif
+    if (any((/ 13,14,15,16,  29,30,31,32,43,44,47,48,  51,52,55,56 /) == relation_temp)) then
+        idx(1, 2) = N_xyz(2) - N_e(2)-gp(2)-rs(2) + 1  ! +y
+        idx(2, 2) = idx(2, 2) - rs(2)
+    endif
+    if (any((/ 17,18,19,20,  33,34,35,36,41,42,43,44,  49,50,51,52 /) == relation_temp)) then
+        idx(2, 3) = N_s(3)+gm(3)+rs(3)  ! -z
+        idx(1, 3) = idx(1, 3) + rs(3)
+    endif
+    if (any((/ 21,22,23,24,  37,38,39,40,45,46,47,48,  53,54,55,56 /) == relation_temp)) then
+        idx(1, 3) = N_xyz(3) - N_e(3)-gp(3)-rs(3) + 1  ! +z
+        idx(2, 3) = idx(2, 3) - rs(3)
+    endif
 
     ! for leveldiff = -1 we have to restrict some patches to half the length (at edges)
     ! Additionally, the patch stretches further for the receiver corner patch which we send as well
     if (lvlDiff == -1) then
         ! +x border
         if (any(relation_temp == (/ 10,12,14,16,18,20,22,24,  42,44,46,48 /))) then
-            idx(1,1) = N_xyz(1)/2 - N_e(1)+2 ! +x border
+            idx(1,1) = (N_xyz(1))/2 - N_e(1)+2 ! +x border
         endif
         ! -x border
         if (any(relation_temp == (/  9,11,13,15,17,19,21,23,  41,43,45,47 /))) then
-            idx(2,1) = N_xyz(1)/2 + N_s(1)  ! -x border
+            idx(2,1) = (N_xyz(1)+1)/2 + N_s(1)  ! -x border
         endif
         ! +y border
         if (any(relation_temp == (/  2, 4, 6, 8,19,20,23,24,  34,36,38,40 /))) then
-            idx(1,2) = N_xyz(2)/2 - N_e(2)+2 ! +y border
+            idx(1,2) = (N_xyz(2))/2 - N_e(2)+2 ! +y border
         endif
         ! -y border
         if (any(relation_temp == (/  1, 3, 5, 7,17,18,21,22,  33,35,37,39 /))) then
-            idx(2,2) = N_xyz(2)/2 + N_s(2)  ! -y border
+            idx(2,2) = (N_xyz(2)+1)/2 + N_s(2)  ! -y border
         endif
         if (dim == 3) then
             ! +z border
             if (any(relation_temp == (/  3, 4, 7, 8,11,12,15,16,  26,28,30,32 /))) then
-                idx(1,3) = N_xyz(3)/2 - N_e(3)+2 ! +z border
+                idx(1,3) = (N_xyz(3))/2 - N_e(3)+2 ! +z border
             endif
             ! -z border
             if (any(relation_temp == (/  1, 2, 5, 6, 9,10,13,14,  25,27,29,31 /))) then
-                idx(2,3) = N_xyz(3)/2 + N_s(3)  ! -z border
+                idx(2,3) = (N_xyz(3)+1)/2 + N_s(3)  ! -z border
             endif
         endif
     endif
@@ -191,31 +208,37 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
     if (any(relation_temp == (/  1, 2, 3, 4,  25,26,29,30,33,34,37,38,  49,51,53,55 /))) then
         idx(1,1) = g-gMinus+1
         idx(2,1) = g
+        if (mod(Bs(1),2)==1 .and. lvl_diff == -1) idx(2,1) = g+1  ! include redundant point when receiving as coarse receiver with odd block size
     endif
     ! +x border
     if (any(relation_temp == (/  5, 6, 7, 8,  27,28,31,32,35,36,39,40,  50,52,54,56 /))) then
         idx(1,1) = Bs(1)+g+1
         idx(2,1) = Bs(1)+g+gplus
+        if (mod(Bs(1),2)==1 .and. lvl_diff == -1) idx(1,1) = Bs(1)+g  ! include redundant point when receiving as coarse receiver with odd block size
     endif
     ! -y border
     if (any(relation_temp == (/  9,10,11,12,  25,26,27,28,41,42,45,46,  49,50,53,54 /))) then
         idx(1,2) = g-gMinus+1
         idx(2,2) = g
+        if (mod(Bs(2),2)==1 .and. lvl_diff == -1) idx(2,2) = g+1  ! include redundant point when receiving as coarse receiver with odd block size
     endif
     ! +y border
     if (any(relation_temp == (/ 13,14,15,16,  29,30,31,32,43,44,47,48,  51,52,55,56 /))) then
         idx(1,2) = Bs(2)+g+1
         idx(2,2) = Bs(2)+g+gplus
+        if (mod(Bs(2),2)==1 .and. lvl_diff == -1) idx(1,2) = Bs(2)+g  ! include redundant point when receiving as coarse receiver with odd block size
     endif
     ! -z border
     if (any(relation_temp == (/ 17,18,19,20,  33,34,35,36,41,42,43,44,  49,50,51,52 /))) then
         idx(1,3) = g-gMinus+1
         idx(2,3) = g
+        if (mod(Bs(3),2)==1 .and. lvl_diff == -1) idx(2,3) = g+1  ! include redundant point when receiving as coarse receiver with odd block size
     endif
     ! +z border
     if (any(relation_temp == (/ 21,22,23,24,  37,38,39,40,45,46,47,48,  53,54,55,56 /))) then
         idx(1,3) = Bs(3)+g+1
         idx(2,3) = Bs(3)+g+gplus
+        if (mod(Bs(3),2)==1 .and. lvl_diff == -1) idx(1,3) = Bs(3)+g  ! include redundant point when receiving as coarse receiver with odd block size
     endif
 
     ! now for lvl_diff=1 and lvl_diff=-1 set the free directions
@@ -236,7 +259,7 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
         if (lvl_diff == +1) then
             idx(2,1) = Bs(1)+g+gplus
         elseif (lvl_diff == -1) then
-            idx(2,1) = g+(Bs(1))/2
+            idx(2,1) = g+(Bs(1)+1)/2
         endif
     endif
     ! -y border change, variational +y
@@ -254,7 +277,7 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
         if (lvl_diff == +1) then
             idx(2,2) = Bs(2)+g+gplus
         elseif (lvl_diff == -1) then
-            idx(2,2) = g+(Bs(2))/2
+            idx(2,2) = g+(Bs(2)+1)/2
         endif
     endif
     if (dim == 3) then
@@ -273,22 +296,22 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
             if (lvl_diff == +1) then
                 idx(2,3) = Bs(3)+g+gplus
             elseif (lvl_diff == -1) then
-                idx(2,3) = g+(Bs(3))/2
+                idx(2,3) = g+(Bs(3)+1)/2
             endif
         endif
     endif
 
-    !---2D--3D--family relation, assume values on finer side are already WDed in mallat-ordering
+    !---2D--3D--family relation, assume values on finer side / daughter are already WDed in mallat-ordering
     if (relation_temp < 0 .and. relation_temp >= -8) then   
         if (lvl_diff <= 0) then
             return
         ! lvl_diff=+1 - family is mother and I am the daughter
         ! only transfer SC if this is the finer block, from Mallat ordering
-        ! take into account that this depends on if g is even or odd
+        ! take into account that this depends on if g is even or odd by using integer division (floor(.../2.0))
         else
             do i_dim = 1, dim
-                idx(1,i_dim) = ceiling(g/2.0)+1
-                idx(2,i_dim) = ceiling(g/2.0)+Bs(i_dim)/2
+                idx(1,i_dim) = g/2+1
+                idx(2,i_dim) = g/2+(Bs(i_dim)+1)/2
             enddo
         endif
     elseif (relation_temp < -8 .and. relation_temp >= -16) then   
@@ -297,20 +320,21 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
         ! lvl_diff=-1 - family is daughter and I am the mother
         ! Transfer directly from domain wich is not decomposed so we only select the quarter or eigth part
         ! keep in mind: 0,1 varies in y- and 0,2 varies in x-direction
+        ! also, division here is integer division (floor(.../2.0)), (BS+1)/2 are for odd-valued BS to include last point
         else
             if (modulo(-relation_temp-9, 2) == 0) then
-                idx(2,2) = g+Bs(1)/2
+                idx(2,2) = g+(Bs(1)+1)/2
             else
                 idx(1,2) = g+1+Bs(1)/2
             endif
             if (modulo((-relation_temp-9)/2, 2) == 0) then
-                idx(2,1) = g+Bs(2)/2
+                idx(2,1) = g+(Bs(2)+1)/2
             else
                 idx(1,1) = g+1+Bs(2)/2
             endif
             if (dim == 3) then
                 if (modulo((-relation_temp-9)/4, 2) == 0) then
-                    idx(2,3) = g+Bs(3)/2
+                    idx(2,3) = g+(Bs(3)+1)/2
                 else
                     idx(1,3) = g+1+Bs(3)/2
                 endif

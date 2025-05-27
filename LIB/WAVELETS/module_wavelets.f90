@@ -781,73 +781,6 @@ contains
         call WaveDecomposition_dim1( params, u )
     end subroutine
 
-
-    ! computes a one-level wavelet decomposition of a block.
-    ! The computation of coefficients is possible on the entire block, but
-    ! without sync'ing the reconstruction is not possible on the entire data.
-    ! We have to sync wavelet-transformed blocks.
-    ! Data are stored in Spaghetti-order (not Mallat-Order)
-    subroutine waveletDecomposition_block_old(params, u)
-        implicit none
-        type (type_params), intent(in) :: params
-        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
-
-        real(kind=rk), allocatable, dimension(:,:,:,:), save :: sc, wc, test, ucopy
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), ii
-        ! integer(kind=ik) :: ag, bg, ah, bh, ix, iy, iz, ic, shift
-        ! real(kind=rk) :: ug, uh
-
-        nx = size(u, 1)
-        ny = size(u, 2)
-        nz = size(u, 3)
-        nc = size(u, 4)
-        g  = params%g
-        Bs = params%Bs
-
-#ifdef DEV
-        if (nz /= 1) call abort(7223839, "currently 2D only")
-        if (modulo(Bs(1),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-        if (modulo(Bs(2),2)/=0) call abort(7223139, "only even Bs is possible with biorthogonal wavelets")
-#endif
-
-        if (allocated(sc)) then
-            if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
-        endif
-        if (allocated(wc)) then
-            if ((size(wc,1)/=nx).or.(size(wc,2)/=ny).or.(size(wc,3)/=nz).or.(size(wc,4)/=nc)) deallocate(wc)
-        endif
-
-        if (.not. allocated(sc)) allocate( sc(1:nx, 1:ny, 1:nz, 1:nc) )
-        if (.not. allocated(wc)) allocate( wc(1:nx, 1:ny, 1:nz, 1:nc) )
-        ! if (.not. allocated(u_wc)) allocate( u_wc(1:nx, 1:ny, 1:nz, 1:nc) )
-
-        ! alternative algorithm (true Mallat ordering, but with ghost nodes)
-        call blockFilterCustom1_vct( params, u, sc, "HD", "x" )
-        call blockFilterCustom1_vct( params, u, wc, "GD", "x" )
-
-        u( 1:Bs(1)/2, :, :, :)       = sc( (g+1):(Bs(1)+g):2, :, :, :)
-        u( Bs(1)/2+1:Bs(1), :, :, :) = wc( (g+1):(Bs(1)+g):2, :, :, :)
-
-        call blockFilterCustom1_vct( params, u, sc, "HD", "y" )
-        call blockFilterCustom1_vct( params, u, wc, "GD", "y" )
-
-        u(:, 1:Bs(2)/2, :, :) =  sc(:, (g+1):(Bs(2)+g):2, :, :)
-        u(:, Bs(2)/2+1:Bs(2), :, :) = wc(:, (g+1):(Bs(2)+g):2, :, :)
-
-        ! Note at this point U contains SC/WC in "true Mallat ordering", but note
-        ! that data includes ghost nodes.
-
-        ! copy to Spaghetti ordering
-        sc=0.0_rk
-        sc( (g+1):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, 1:Bs(2)/2, :, :)
-        sc( (g+2):(Bs(1)+g):2, (g+1):(Bs(1)+g):2, :, :) = u(1:Bs(1)/2, Bs(2)/2+1:Bs(2), :, :)
-        sc( (g+1):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), 1:Bs(2)/2, :, :)
-        sc( (g+2):(Bs(1)+g):2, (g+2):(Bs(1)+g):2, :, :) = u(Bs(1)/2+1:Bs(1), Bs(2)/2+1:Bs(2), :, :)
-
-        ! copy to the back spaghetti-ordered coefficients to the block
-        u = sc
-    end subroutine
-
     !-------------------------------------------------------------------------------
 
     subroutine waveletReconstruction_block(params, u, SC_reconstruct, WC_reconstruct)
@@ -858,57 +791,6 @@ contains
 
         call WaveReconstruction_dim1( params, u, SC_reconstruct, WC_reconstruct)
     end subroutine
-
-    !-------------------------------------------------------------------------------
-
-!     subroutine waveletReconstruction_block_old(params, u)
-!         implicit none
-!         type (type_params), intent(in) :: params
-!         real(kind=rk), dimension(:,:,:,:), intent(inout) :: u
-!
-!         real(kind=rk), allocatable, dimension(:,:,:,:,:), save :: wc
-!         integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3)
-!
-!         nx = size(u, 1)
-!         ny = size(u, 2)
-!         nz = size(u, 3)
-!         nc = size(u, 4)
-!         g  = params%g
-!         Bs = params%Bs
-!
-!         if (allocated(sc)) then
-!             if ((size(sc,1)/=nx).or.(size(sc,2)/=ny).or.(size(sc,3)/=nz).or.(size(sc,4)/=nc)) deallocate(sc)
-!         endif
-!         if (allocated(wcx)) then
-!             if ((size(wcx,1)/=nx).or.(size(wcx,2)/=ny).or.(size(wcx,3)/=nz).or.(size(wcx,4)/=nc)) deallocate(wcx)
-!         endif
-!         if (allocated(wcy)) then
-!             if ((size(wcy,1)/=nx).or.(size(wcy,2)/=ny).or.(size(wcy,3)/=nz).or.(size(wcy,4)/=nc)) deallocate(wcy)
-!         endif
-!         if (allocated(wcxy)) then
-!             if ((size(wcxy,1)/=nx).or.(size(wcxy,2)/=ny).or.(size(wcxy,3)/=nz).or.(size(wcxy,4)/=nc)) deallocate(wcxy)
-!         endif
-!
-!         if (.not. allocated(sc  )) allocate(   sc(1:nx, 1:ny, 1:nz, 1:nc) )
-!         if (.not. allocated(wcx )) allocate(  wcx(1:nx, 1:ny, 1:nz, 1:nc) )
-!         if (.not. allocated(wcy )) allocate(  wcy(1:nx, 1:ny, 1:nz, 1:nc) )
-!         if (.not. allocated(wcxy)) allocate( wcxy(1:nx, 1:ny, 1:nz, 1:nc) )
-!
-! #ifdef DEV
-!         if (nz /= 1) call abort(7223839, "currently 2D only")
-!         if (modulo(Bs(1), 2) /= 0) call abort(99111,"This code requires Bs even")
-!         if (modulo(Bs(2), 2) /= 0) call abort(99111,"This code requires Bs even")
-! #endif
-!
-!         call spaghetti2inflatedMallat_block(params, u, sc, wcx, wcy, wcxy)
-!
-!         call blockFilterCustom_vct( params, sc  , sc  , "HR", "HR", "--" ) ! inplace should work, only a copy statement from the input
-!         call blockFilterCustom_vct( params, wcx , wcx , "HR", "GR", "--" ) ! inplace should work, only a copy statement from the input
-!         call blockFilterCustom_vct( params, wcy , wcy , "GR", "HR", "--" ) ! inplace should work, only a copy statement from the input
-!         call blockFilterCustom_vct( params, wcxy, wcxy, "GR", "GR", "--" ) ! inplace should work, only a copy statement from the input
-!
-!         u = sc + wcx + wcy + wcxy
-!     end subroutine
 
     !-------------------------------------------------------------------------------
 
@@ -968,7 +850,7 @@ contains
         logical, intent(in), optional :: set_garbage
 
         integer(kind=ik) :: Nwcl, Nwcr, i_neighborhood
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), i_dim, i_set
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), io(1:3), i_dim, i_set
         logical :: setGarbage
         real(kind = rk) :: setNumber
 
@@ -1003,32 +885,24 @@ contains
                 call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 
-            ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+            ! we need to know if the first point is a SC or WC for the patch and adapt the indices accordingly
             !     1 2 3 4 5 6 7 8 9 A B C
             !     G G G S W S W S W G G G
             !                 I I I
             ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-            ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-            ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
             ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-            idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-            ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
-            ! this gives problem if the last point is a SC so we need to handle this special case
-            do i_dim = 1, params%dim
-                if (idx(2, i_dim) /= size(wc, i_dim)) then
-                    idx(2, i_dim) = idx(2, i_dim) + modulo(g + idx(2, i_dim), 2)
-                endif
-            enddo
+            io = 0
+            io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 
             ! set really low number for ghost patch if we shoudln't access it
             setNumber = 0.0
             if (setGarbage .and. i_set == 2) setNumber = -9e200_rk
 
-            ! set values, we have to skip the SC
-            wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
-            wc(idx(1,1)  :idx(2,1)  , idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            ! set values, we have to skip the SC, so we delete first WX, then WY, WXY, then WZ, WXZ, WYZ, WXYZ
+            wc(idx(1,1)+1-io(1):idx(2,1):2, idx(1,2)  +io(2):idx(2,2):2, idx(1,3)  +io(3):idx(2,3):2, 1:nc) = setNumber
+            wc(idx(1,1)        :idx(2,1)  , idx(1,2)+1-io(2):idx(2,2):2, idx(1,3)  +io(3):idx(2,3):2, 1:nc) = setNumber
             if (params%dim == 3) then
-                wc(idx(1,1)  :idx(2,1)  , idx(1,2)  :idx(2,2)  , idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+                wc(idx(1,1)    :idx(2,1)  , idx(1,2)        :idx(2,2)  , idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber
             endif
 
             ! wc(idx(1,1)  :idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
@@ -1057,7 +931,7 @@ contains
         integer(kind=ik), intent(in)   :: neighborhood               !< Which neighborhood to apply manipulation
         integer(kind=ik), intent(in), optional   :: ijk(2,3)         !< ijk of patch that we only care about, if not given it is the full block
 
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_set, i_neighborhood
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), i_set, i_neighborhood, io(1:3)
         integer(kind=ik) :: Nscl, Nscr, Nreconl, Nreconr, idx(2,3)
         logical          :: skip_copy  ! sometimes this is called but actually nothing will be changed, in this case we skip it
 
@@ -1086,17 +960,14 @@ contains
                 call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
 
-            ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+            ! we need to know if the first point is a SC or WC for the patch and adapt the indices accordingly
             !     1 2 3 4 5 6 7 8 9 A B C
             !     G G G S W S W S W G G G
             !                 I I I
             ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-            ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-            ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
             ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-            idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-            ! also, when the patch size to be copied is odd, the last point is only partially included but its WC have to be considered
-            ! However, here we treat SC so we can ignore it completely
+            io = 0
+            io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 
             ! sometimes we do not want to look at the full block, then we can skip the copy where the indices do not matter
             if (present(ijk)) then
@@ -1108,8 +979,8 @@ contains
             endif
 
             if (.not. skip_copy) then
-                wc(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = &
-                    u_copy(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc)
+                wc(idx(1,1)+io(1):idx(2,1):2, idx(1,2)+io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc) = &
+            u_copy(idx(1,1)+io(1):idx(2,1):2, idx(1,2)+io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc)
             endif
 
         enddo
@@ -1164,10 +1035,10 @@ contains
             !           consequently, the coarsen(refine(u)) unit test will fail.
             ! Issue #2: Coarse extension is to be clarified with coiflet -> copying of SC near interface may make less sense than for CDF ?
             allocate(params%HD(-4:7))
-            allocate(params%GD(-6:5))
+            allocate(params%GD(-6:5))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
 
             allocate(params%HR(-7:4))
-            allocate(params%GR(-5:6))
+            allocate(params%GR(-5:6))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
 
             ! copied from flusi coiflet (output)
             params%HD=(/1.638733646318000E-02, -4.146493678197000E-02, -6.737255472230000E-02, 3.861100668230900E-01, 8.127236354496100E-01, 4.170051844237800E-01,-7.648859907826000E-02,-5.943441864647000E-02, 2.368017194688000E-02, 5.611434819370000E-03,-1.823208870910000E-03,-7.205494453700000E-04/)
@@ -1370,21 +1241,21 @@ contains
             endif
 
             ! G TILDE filter - HR filter with different sign for every second off-center value
-            allocate( params%GD( lbound(params%HR, dim=1)+1:ubound(params%HR, dim=1)+1) )
+            allocate( params%GD( lbound(params%HR, dim=1):ubound(params%HR, dim=1)) )
             do i = lbound(params%GD, dim=1), ubound(params%GD, dim=1)
-                params%GD(i) = (-1.0_rk)**(i-1) * params%HR(i-1)
+                params%GD(i) = (-1.0_rk)**(i) * params%HR(i)
             enddo
                         
             ! G filter - HD filter with different sign for every second off-center value
-            if (params%wavelet(5:5) == "0") then  ! for unlifted wavelets GR filter is set larger than HD filter
-                allocate( params%GR(-2:0) )
-                params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
-            else
-                allocate( params%GR( lbound(params%HD, dim=1)-1:ubound(params%HD, dim=1)-1) )
+            ! if (params%wavelet(5:5) == "0") then  ! for unlifted wavelets GR filter is set larger than HD filter
+            !     allocate( params%GR(-1:1) )
+            !     params%GR = (/ 0.0_rk, 1.0_rk, 0.0_rk /)
+            ! else
+                allocate( params%GR( lbound(params%HD, dim=1):ubound(params%HD, dim=1)) )
                 do i = lbound(params%GR, dim=1), ubound(params%GR, dim=1)
-                    params%GR(i) = (-1.0_rk)**(i+1) * params%HD(i+1)
+                    params%GR(i) = (-1.0_rk)**(i) * params%HD(i)
                 enddo
-            endif
+            ! endif
 
             ! Unlifted or lifted - every CDFX0er wavelet is considered unlifted and the rest lifted
             params%isLiftedWavelet = params%wavelet(5:5) /= "0"
@@ -1406,12 +1277,10 @@ contains
         g_min = max(g_min, abs(lbound(params%HD, dim=1)))
         g_min = max(g_min, abs(ubound(params%HD, dim=1)))
         g_min = max(g_min, abs(lbound(params%GD, dim=1)))
-        ! GD right side is not applied on the rightmost point due to restriction, so we can subtract 1
-        g_min = max(g_min, abs(ubound(params%GD, dim=1))-1)
+        g_min = max(g_min, abs(ubound(params%GD, dim=1)))
         g_min = max(g_min, abs(lbound(params%HR, dim=1)))
         g_min = max(g_min, abs(ubound(params%HR, dim=1)))
-        ! GR does not affect the first point, as it is the limiting factor for g, this is dealt with in the reconstruction to benefit from it
-        g_min = max(g_min, abs(lbound(params%GR, dim=1))-1)
+        g_min = max(g_min, abs(lbound(params%GR, dim=1)))
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
         ! g_RHS is decided by X in CDFXY or by FD order
@@ -1451,7 +1320,13 @@ contains
         params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
         params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
 
-        params%Nscr    = ubound(params%HD, dim=1)
+        if (any(mod(params%BS(1:params%dim), 2) == 0) .or. any(params%BS(1:params%dim) == 0)) then
+            ! even block size or BS was not set, set size as usually
+            params%Nscr    = ubound(params%HD, dim=1)
+        else
+            ! odd block size, last point is SC so Nscr can be reduced by one like Nscl
+            params%Nscr    = max(ubound(params%HD, dim=1) - 1, 0)
+        endif
         params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
         params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
 
@@ -1622,7 +1497,7 @@ contains
         real(kind=rk), dimension(:), intent(inout) :: u_filtered       !< the resulting filtered signal
         integer, intent(in) :: fl_l, fl_r                               !< filter bound indices left and right
         real(kind=rk), dimension(fl_l:fl_r), intent(in) :: filter       !< the actual filter
-        integer, intent(in) :: skip_g                                   !< 0 to filter everything, params%g to skip ghost points
+        integer, intent(in) :: skip_g(1:2)                              !< 0 to filter everything, (/params%g,/params%g) to skip ghost points
         !> sampling rate, 1 for normal mode, 2 for restriction, no optional parameter as this is inside critical point-loop and I want to avoid if-clauses
         integer, intent(in) :: sampling                                        
 
@@ -1641,7 +1516,7 @@ contains
         ! enddo
 
         ! vectorized filter
-        do i =  1+skip_g, N-skip_g, sampling
+        do i =  1+skip_g(1), N-skip_g(2), sampling
             u_filtered(i) = sum(u(i+fl_l:i+fl_r) * filter(:))
         enddo
 
@@ -1689,14 +1564,14 @@ contains
             do iy = 1, ny
                 do iz = 1, nz
                     ! low-pass filter (scaling function)
-                    call filter1dim(params, u_wc(:,iy,iz,ic), buffer1(1:nx), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=params%g, sampling=2)
+                    call filter1dim(params, u_wc(:,iy,iz,ic), buffer1(1:nx), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=(/params%g,params%g/), sampling=2)
 
                     ! high-pass filter (these guys are the details)
-                    call filter1dim(params, u_wc(:,iy,iz,ic), buffer2(1:nx), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=params%g, sampling=2)
+                    call filter1dim(params, u_wc(:,iy,iz,ic), buffer2(1:nx), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=(/params%g+1,params%g/), sampling=2)
 
                     ! decimation by 2, sort into array in spaghetti form SC WC
                     u_wc((g+1):(Bs(1)+g):2,iy,iz,ic) = buffer1( (g+1):(Bs(1)+g):2 )
-                    u_wc((g+2):(Bs(1)+g):2,iy,iz,ic) = buffer2( (g+1):(Bs(1)+g):2 )
+                    u_wc((g+2):(Bs(1)+g):2,iy,iz,ic) = buffer2( (g+2):(Bs(1)+g):2 )
                 enddo
             enddo
         enddo
@@ -1707,14 +1582,14 @@ contains
             do ix = (g+1), (Bs(1)+g)
                 do iz = 1, nz
                     ! low-pass filter (scaling function)
-                    call filter1dim(params, u_wc(ix,:,iz,ic), buffer1(1:ny), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=params%g, sampling=2)
+                    call filter1dim(params, u_wc(ix,:,iz,ic), buffer1(1:ny), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=(/params%g,params%g/), sampling=2)
 
                     ! high-pass filter (these guys are the details)
-                    call filter1dim(params, u_wc(ix,:,iz,ic), buffer2(1:ny), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=params%g, sampling=2)
+                    call filter1dim(params, u_wc(ix,:,iz,ic), buffer2(1:ny), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=(/params%g+1,params%g/), sampling=2)
 
                     ! decimation by 2, sort into array in spaghetti form SC WC
                     u_wc(ix,(g+1):(Bs(2)+g):2,iz,ic) = buffer1( (g+1):(Bs(2)+g):2 )
-                    u_wc(ix,(g+2):(Bs(2)+g):2,iz,ic) = buffer2( (g+1):(Bs(2)+g):2 )
+                    u_wc(ix,(g+2):(Bs(2)+g):2,iz,ic) = buffer2( (g+2):(Bs(2)+g):2 )
                 enddo
             enddo
         enddo
@@ -1725,14 +1600,14 @@ contains
                 do ix = (g+1), (Bs(1)+g)
                     do iy = (g+1), (Bs(2)+g)
                         ! low-pass filter (scaling function)
-                        call filter1dim(params, u_wc(ix,iy,:,ic), buffer1(1:nz), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=params%g, sampling=2)
+                        call filter1dim(params, u_wc(ix,iy,:,ic), buffer1(1:nz), params%HD, lbound(params%HD,dim=1), ubound(params%HD,dim=1), skip_g=(/params%g,params%g/), sampling=2)
 
                         ! high-pass filter (these guys are the details)
-                        call filter1dim(params, u_wc(ix,iy,:,ic), buffer2(1:nz), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=params%g, sampling=2)
+                        call filter1dim(params, u_wc(ix,iy,:,ic), buffer2(1:nz), params%GD, lbound(params%GD,dim=1), ubound(params%GD,dim=1), skip_g=(/params%g+1,params%g/), sampling=2)
 
                         ! decimation by 2, sort into array in spaghetti form SC WC
                         u_wc(ix,iy,(g+1):(Bs(3)+g):2,ic) = buffer1( (g+1):(Bs(3)+g):2 )
-                        u_wc(ix,iy,(g+2):(Bs(3)+g):2,ic) = buffer2( (g+1):(Bs(3)+g):2 )
+                        u_wc(ix,iy,(g+2):(Bs(3)+g):2,ic) = buffer2( (g+2):(Bs(3)+g):2 )
                     enddo
                 enddo
             enddo ! loop over components
@@ -1797,7 +1672,7 @@ contains
         if (allocated(buffer2)) then
             if (size(buffer2, dim=1)<=maxn) deallocate(buffer2)
         endif
-        if (.not.allocated(buffer2)) allocate(buffer2(1:maxn+2))
+        if (.not.allocated(buffer2)) allocate(buffer2(1:maxn))
         if (allocated(buffer3)) then
             if (size(buffer3, dim=1)<=maxn) deallocate(buffer3)
         endif
@@ -1821,15 +1696,15 @@ contains
                 ! apply low-pass filter to upsampled signal
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(1+io:Bs(1)+2*g:2, iy, iz, ic) ! SC
-                call filter1dim(params, buffer3(1:nx), buffer1(1:nx), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:nx), buffer1(1:nx), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
-                ! shifted by one point to account for lbound(GR) possibly being larger than g
+                ! GR locations shifted by one point
                 buffer3 = 0.0_rk
-                buffer3(2+io:nx:2) = u_wc(2+io:Bs(1)+2*g:2, iy, iz, ic) ! WC
-                call filter1dim(params, buffer3(1:nx+2), buffer2(1:nx+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
+                buffer3(2-io:nx:2) = u_wc(2-io:Bs(1)+2*g:2, iy, iz, ic) ! WC
+                call filter1dim(params, buffer3(1:nx), buffer2(1:nx), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
-                u_wc(:, iy, iz, ic) = buffer1(1:nx) + buffer2(2:nx+1)
+                u_wc(:, iy, iz, ic) = buffer1(1:nx) + buffer2(1:nx)
             enddo; enddo; enddo
         elseif (SC_rec) then
             do ic = 1, nc; do iy = 1, ny; do iz = 1, nz
@@ -1837,7 +1712,7 @@ contains
                 ! apply low-pass filter to upsampled signal
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(1+io:Bs(1)+2*g:2, iy, iz, ic) ! SC
-                call filter1dim(params, buffer3(1:nx), u_wc(1:nx, iy, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:nx), u_wc(1:nx, iy, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
             enddo; enddo; enddo
         endif
 
@@ -1849,16 +1724,16 @@ contains
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(ix, 1+io:Bs(2)+2*g:2, iz, ic) ! SC
                 ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
-                call filter1dim(params, buffer3(1:ny), buffer1(1:ny), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:ny), buffer1(1:ny), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
                 ! shifted by one point to account for lbound(GR) possibly being larger than g
                 buffer3 = 0.0_rk
-                buffer3(2+io:nx:2) = u_wc(ix, 2+io:Bs(2)+2*g:2, iz, ic) ! WC
+                buffer3(2-io:nx:2) = u_wc(ix, 2-io:Bs(2)+2*g:2, iz, ic) ! WC
                 ! buffer3(1:ny:2) = u_wc(ix, n(2)+1:2*n(2), iz, ic)
-                call filter1dim(params, buffer3(1:ny+2), buffer2(1:ny+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
+                call filter1dim(params, buffer3(1:ny), buffer2(1:ny), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
-                u_wc(ix, :, iz, ic) = buffer1(1:ny) + buffer2(2:ny+1)
+                u_wc(ix, :, iz, ic) = buffer1(1:ny) + buffer2(1:ny)
             enddo; enddo; enddo
         elseif (SC_rec) then
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iz = 1, nz
@@ -1866,7 +1741,7 @@ contains
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(ix, 1+io:Bs(2)+2*g:2, iz, ic) ! SC
                 ! buffer3(1:ny:2) = u_wc(ix, 1:n(2), iz, ic)
-                call filter1dim(params, buffer3(1:ny), u_wc(ix, 1:ny, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:ny), u_wc(ix, 1:ny, iz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
             enddo; enddo; enddo
         endif
 
@@ -1881,22 +1756,22 @@ contains
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g:2, ic) ! SC
-                call filter1dim(params, buffer3(1:nz), buffer1(1:nz), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:nz), buffer1(1:nz), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
                 ! fill upsampling buffer for high-pass filter: every second point
                 ! shifted by one point to account for lbound(GR) possibly being larger than g
                 buffer3 = 0.0_rk
-                buffer3(2+io:nx:2) = u_wc(ix, iy, 2+io:Bs(3)+2*g:2, ic) ! WC
-                call filter1dim(params, buffer3(1:nz+2), buffer2(1:nz+2), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=params%g+1, sampling=1)
+                buffer3(2-io:nx:2) = u_wc(ix, iy, 2-io:Bs(3)+2*g:2, ic) ! WC
+                call filter1dim(params, buffer3(1:nz), buffer2(1:nz), params%GR, lbound(params%GR,dim=1), ubound(params%GR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
 
-                u_wc(ix, iy, :, ic) = buffer1(1:nz) + buffer2(2:nz+1)
+                u_wc(ix, iy, :, ic) = buffer1(1:nz) + buffer2(1:nz)
             enddo; enddo; enddo
         elseif (SC_rec) then
             do ic = 1, nc; do ix = (g+1), (Bs(1)+g); do iy = (g+1), (Bs(2)+g)
                 ! fill upsampling buffer for low-pass filter: every second point
                 buffer3 = 0.0_rk
                 buffer3(1+io:nx:2) = u_wc(ix, iy, 1+io:Bs(3)+2*g:2, ic) ! SC
-                call filter1dim(params, buffer3(1:nz), u_wc(ix, iy, 1:nz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=params%g, sampling=1)
+                call filter1dim(params, buffer3(1:nz), u_wc(ix, iy, 1:nz, ic), params%HR, lbound(params%HR,dim=1), ubound(params%HR,dim=1), skip_g=(/params%g,params%g/), sampling=1)
             enddo; enddo; enddo
         endif
 
@@ -1923,7 +1798,7 @@ contains
         integer(kind=ik), intent(in), optional :: indices(1:2, 1:3)
         logical, intent(in), optional          :: verbose_check  !< No matter the value, if this is present we debug
 
-        integer(kind=ik)                       :: idx(2,3), nc, g, Jref, i_dim, Bs(1:3)
+        integer(kind=ik)                       :: idx(2,3), nc, g, Jref, i_dim, Bs(1:3), io(1:3)
 
         nc     = size(val_block, 4)
         Bs     = params%Bs
@@ -1946,29 +1821,21 @@ contains
             endif
         endif
 
-        ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
+        ! we need to know if the first point is a SC or WC for the patch and adapt the indices accordingly
         !     1 2 3 4 5 6 7 8 9 A B C
         !     G G G S W S W S W G G G
         !                 I I I
         ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-        ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-        ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
         ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-        idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-        ! also, when the last point is a SC, the last point is only partially included but its WC have to be considered
-        ! this gives problem if the last point is a SC so we need to handle this special case
-        do i_dim = 1, params%dim
-            if (idx(2, i_dim) /= size(val_block, i_dim)) then
-                idx(2, i_dim) = idx(2, i_dim) + modulo(idx(2, i_dim) - idx(1, i_dim) + 1, 2)
-            endif
-        enddo
+        io = 0
+        io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 
         ! copy only part we need
         val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = &
            val_block(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc)
 
         ! set sc to zero to more easily compute the maxval, use offset if first index is not a SC
-        val_renormed(idx(1,1):idx(2,1):2, idx(1,2):idx(2,2):2, idx(1,3):idx(2,3):2, 1:nc) = 0.0_rk
+        val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2)+io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc) = 0.0_rk
 
         ! We renorm by multiplying all values by level shifts+1 (SC) and then on the level change all SC-factors to WC-factors (apply WC-factor^2)
         ! -1 from the fact, that wavelet decomposed values on a block of level J will be decomposed values on level J-1
@@ -1978,22 +1845,30 @@ contains
         case ("L1")
             ! Wavelets get factor 2^-j per SC and 2^j per WC
             ! apply level shift
-            val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim))
+            val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim))
             ! change SC to WC factors on this level - factor^2
-            val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 4.0_rk
-            val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 4.0_rk
+            val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) / 4.0_rk
+            val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) / 4.0_rk
             if (params%dim == 3) then
-                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 4.0_rk
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) = \
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) / 4.0_rk
             endif
         case ("L2")
             ! Wavelets get factor 2^-j/2 per SC and 2^j/2 per WC
             ! apply level shift
-            val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim)/2.0_rk)
+            val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) * 2.0_rk**(dble((Jref-level_block-1)*params%dim)/2.0_rk)
             ! change SC to WC factors on this level - factor^2
-            val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1):idx(2,1):2, :, :, 1:nc) / 2.0_rk
-            val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2):idx(2,2):2, :, 1:nc) / 2.0_rk
+            val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) / 2.0_rk
+            val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) = \
+            val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) / 2.0_rk
             if (params%dim == 3) then
-                val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3):idx(2,3):2, 1:nc) / 2.0_rk
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) = \
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) / 2.0_rk
             endif
         case ("H1")
             ! Wavelets get factor 2^(2-d)j/(2d) per SC and 2^(d-2)j/(2d) per WC, for d=2 this is equivalent to Linfty, for d=3 to 2^-j/6 (between Linfty and L2)
@@ -2002,11 +1877,15 @@ contains
             ! JB - and then another mystery to solve, but the factor between each seems to be 2^(-2/3)
             if (params%dim == 3) then
                 ! apply level shift
-                val_renormed(:, :, :, 1:nc) = val_renormed(:, :, :, 1:nc) * 2.0_rk**(dble((Jref-level_block)*(2.0_rk-params%dim))/2.0_rk)
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) * 2.0_rk**(dble((Jref-level_block)*(2.0_rk-params%dim))/2.0_rk)
                 ! change SC to WC factors on this level - factor^2
-                val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) = val_renormed(idx(1,1)+1:idx(2,1):2, :, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
-                val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) = val_renormed(:, idx(1,2)+1:idx(2,2):2, :, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
-                val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) = val_renormed(:, :, idx(1,3)+1:idx(2,3):2, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
+                val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) = \
+                val_renormed(idx(1,1)+io(1):idx(2,1):2, idx(1,2):idx(2,2), idx(1,3):idx(2,3), 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
+                val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) = \
+                val_renormed(idx(1,1):idx(2,1), idx(1,2)+io(2):idx(2,2):2, idx(1,3):idx(2,3), 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) = \
+                val_renormed(idx(1,1):idx(2,1), idx(1,2):idx(2,2), idx(1,3)+io(3):idx(2,3):2, 1:nc) * 2.0_rk**(2.0_rk*(params%dim-2.0_rk)/3.0_rk)
             endif
         case default
             call abort(241024, "ERROR:Unknown wavelet normalization!")

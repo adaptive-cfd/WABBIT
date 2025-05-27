@@ -425,6 +425,7 @@ contains
 
 
     !> \brief Fill a 4D array of any size with random numbers
+    !  For redundant grids, this does not have coinciding values for the overlapping points, so make sure to call with those excluded (g+2:BS(i)+g-1)!
     subroutine random_data( field )
         implicit none
         real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)  !> input field
@@ -439,6 +440,73 @@ contains
                 enddo
             enddo
         enddo
+    end subroutine
+
+
+    !> \brief Fill a 4D array of any size with random numbers for a given position
+    !> This computes a position to a given tolerance (which is computed by dx_min), set this position as the seed and then computes the random number.
+    !! This way, points with the same position will have the same value. However, it computes really many seeds, so it might be expensive.
+    subroutine random_data_unique( field, x0, dx, g_origin, domain_size, Jmax, BS)
+        implicit none
+        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)  !> input field
+        real(kind=rk), intent(in) :: x0(1:3)  !> coords origin of the block
+        real(kind=rk), intent(in) :: dx(1:3)  !> grid size of the block
+        integer(kind=ik), intent(in) :: g_origin(1:3)  !> how many grid points are before the origin? Should be (/params%g, params%g, params%g/) normally
+        real(kind=rk), intent(in) :: domain_size(1:3)  !> size of the domain
+        integer(kind=ik), intent(in) :: Jmax  !> max level of the grid
+        integer(kind=ik), intent(in) :: BS(1:3)    !> block size (assumed scalar for all dims)
+        integer :: ix,iy,iz,id,ir
+        real(kind=rk) :: x,y,z, dx_min(1:3)
+        integer, allocatable :: seed(:)
+        integer :: nseed
+        integer(kind=8) :: hashval
+
+        ! compute position tolerance with the minima dx in the whole domain
+        dx_min = 1.0e-3_rk * domain_size / (dble(2**Jmax) * BS)
+        if (size(field,3) == 1) then
+            dx_min(3) = 1.0_rk
+        endif
+
+        call random_seed(size=nseed)
+        allocate(seed(nseed))
+
+        do id = 1, size(field,4)
+            do iz = 1, size(field,3)
+                z = 0.0
+                if (size(field,3) > 1) then
+                    z = x0(3) + (iz - g_origin(3) - 1) * dx(3)
+                    z = modulo(z, domain_size(3))
+                endif
+                do iy = 1, size(field,2)
+                    y = x0(2) + (iy - g_origin(2) - 1) * dx(2)
+                    y = modulo(y, domain_size(2))
+                    do ix = 1, size(field,1)
+                        x = x0(1) + (ix - g_origin(1) - 1) * dx(1)
+                        x = modulo(x, domain_size(1))
+
+                        ! Compute a unique hash for the position and id
+                        hashval = int(nint(x/dx_min(1))) * 6364136223846793005_8
+                        hashval = ieor(hashval, int(nint(y/dx_min(2))) * 1442695040888963407_8)
+                        hashval = ieor(hashval, int(nint(z/dx_min(3))) * 22695477_8)
+                        hashval = ieor(hashval, int(id,kind=8) * 69069_8)
+
+                        ! Fill the seed array with the hash value, split into integers
+                        seed = 0
+                        seed(1) = int(ishft(hashval, -32))
+                        if (nseed > 1) seed(2) = int(iand(hashval, Z'FFFFFFFF'))
+
+                        ! Set the random seed based on the position and id
+                        call random_seed(put=seed)
+                        ! random number generator needs to "warm up" apparently, so let's call it a few times
+                        do ir = 1,10
+                            field(ix,iy,iz,id) = rand_nbr()
+                        enddo
+                    enddo
+                enddo
+            enddo
+        enddo
+
+        deallocate(seed)
     end subroutine
 
 

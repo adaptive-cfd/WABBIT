@@ -41,8 +41,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), io(1:3)
     real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, &
     tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
@@ -69,9 +68,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
     ! compute the size of blocks
+    Bs = 1
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
-    Bs(3) = size(u,3) - 2*g
+    if (params_acm%dim == 3) Bs(3) = size(u,3) - 2*g
+    ! for odd block sizes, we have an overlap of the points from the center line and want to ignore those
+    io = 0
+    do k = 1,params_acm%dim
+        if (modulo(Bs(k),2) == 1) io(k) = 1
+    enddo
 
     C_eta_inv = 1.0_rk / params_acm%C_eta
 
@@ -189,29 +194,29 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! most integral quantities can be computed with block-wise function calls
             ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 2))
+            meanflow_block(1) = sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 1))
+            meanflow_block(2) = sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 2))
 
             ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
+            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 1:2)**2 )
 
             ! acm energy
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/params_acm%c_0**2 + ekin_block
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 3)**2 )/params_acm%c_0**2 + ekin_block
 
             ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
+            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2),:,1:2)**2, dim=4)))
 
             ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
+            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1)))
+            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1)))
 
             ! volume of mask (useful to see if it is properly generated)
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6))
+            tmp_volume = sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 1))
+            tmp_volume2 = sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 6))
 
             ! some computations need point-wise loops
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g-io(2)
+                do ix = g+1, Bs(1)+g-io(1)
                     color = int( mask(ix, iy, 1, 5), kind=2 )
 
                     chi = mask(ix,iy,1,1) * C_eta_inv
@@ -238,7 +243,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! should we ever use more than 1 scalar seriously, this has to be adopted
                 ! because it uses only the 1st one (:,:,1,4)
                 ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = scalar_removal_block + sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 4)) * C_eta_inv
+                scalar_removal_block = scalar_removal_block + sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 1) * u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 4)) * C_eta_inv
             endif
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
@@ -252,34 +257,34 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! block-wise function calls for quantities
             ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
-            meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
+            meanflow_block(1) = sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1))
+            meanflow_block(2) = sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 2))
+            meanflow_block(3) = sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 3))
 
             ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
+            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1:3)**2 )
 
             ! acm energy
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/params_acm%c_0**2 + ekin_block
+            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 4)**2 )/params_acm%c_0**2 + ekin_block
 
             ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
+            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1:3)**2,dim=4)))
 
             ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
+            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3))))
+            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3))))
 
             ! volume of mask (useful to see if it is properly generated)
             ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6))
+            tmp_volume = sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1))
+            tmp_volume2 = sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 6))
 
             ! point-wise loop for quantities
-            do iz = g+1, Bs(3)+g
+            do iz = g+1, Bs(3)+g-io(3)
                 z = x0(3) + dble(iz-(g+1)) * dx(3)
-                do iy = g+1, Bs(2)+g
+                do iy = g+1, Bs(2)+g-io(2)
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
-                    do ix = g+1, Bs(1)+g
+                    do ix = g+1, Bs(1)+g-io(1)
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
                         ! get this points color
@@ -340,7 +345,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! should we ever use more than 1 scalar seriously, this has to be adopted
                 ! because it uses only the 1st one (:,:,:,5)
                 ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 5)) * C_eta_inv
+                scalar_removal_block = sum(mask(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 5)) * C_eta_inv
             endif
 
         endif
@@ -364,10 +369,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim == 2) then
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), 1, 1)**2)*dV
         else
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
-            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1:3)**2)*dV
+            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1:3) * u(g+1:Bs(1)+g-io(1), g+1:Bs(2)+g-io(2), g+1:Bs(3)+g-io(3), 1:3))*dV
         end if
 
         call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)

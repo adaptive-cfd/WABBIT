@@ -59,28 +59,10 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
         endif
     endif
 
-    ! we need to know if the first point is a SC or WC for the patch we check and skip it if it is a WC
-    !     1 2 3 4 5 6 7 8 9 A B C
-    !     G G G S W S W S W G G G
-    !                 I I I
-    ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
-    ! Patch I is checked, but we need to know that index 7 has a WC and should be skipped
-    ! this is for parity with inflatedMallat version where SC and WC are situated on the SC indices of the spaghetti format
-    ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
-    idx(1, 1:params%dim) = idx(1, 1:params%dim) + modulo(g + idx(1, 1:params%dim) + 1, 2)
-    ! also, when the last point is a SC, the last point is only partially included but its WC have to be considered
-    ! this gives problem if the last point is a SC so we need to handle this special case
-    do i_dim = 1, params%dim
-        if (idx(2, i_dim) /= size(u, i_dim)) then
-            idx(2, i_dim) = idx(2, i_dim) + modulo(idx(2, i_dim) - idx(1, i_dim) + 1, 2)
-        endif
-    enddo
-
-
 #ifdef DEV
     if (.not. allocated(params%GD)) call abort(1213149, "The cat is angry: Wavelet-setup not yet called?")
-    if (modulo(Bs(1),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
-    if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
+    ! if (modulo(Bs(1),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
+    ! if (modulo(Bs(2),2) /= 0) call abort(1213150, "The dog is angry: Block size must be even.")
 #endif
 
     if (.not. input_is_WD) then

@@ -30,8 +30,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), io(1:3)
     real(kind=rk) :: scalar_integral, scalar_max
     real(kind=rk), save :: umag, umax, dx_min
 
@@ -40,6 +39,12 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
+    ! for odd block sizes, we have an overlap of the points from the center line and want to ignore those
+    io = 0
+    do k = 1,params_convdiff%dim
+        if (modulo(Bs(k),2) == 1) io(k) = 1
+    enddo
+
 
     select case(stage)
     case ("init_stage")
@@ -64,16 +69,16 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
 
         if (params_convdiff%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g-io(2)
+                do ix = g+1, Bs(1)+g-io(1)
                     scalar_integral = scalar_integral + u(ix,iy,1,1)
                 enddo
             enddo
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+            do iz = g+1, Bs(3)+g-io(3)
+                do iy = g+1, Bs(2)+g-io(2)
+                    do ix = g+1, Bs(1)+g-io(1)
                         scalar_integral = scalar_integral + u(ix,iy,iz,1)
                     enddo
                 enddo

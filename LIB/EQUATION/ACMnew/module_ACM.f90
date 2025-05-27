@@ -387,7 +387,7 @@ end subroutine
     else
       params_acm%Bs=(/17,17,1/)
     endif
-    params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim)
+    params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim, params_acm%mpirank)
 
     call clean_ini_file_mpi( FILE )
 

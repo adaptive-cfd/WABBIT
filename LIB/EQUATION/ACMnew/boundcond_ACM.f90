@@ -78,50 +78,73 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_on
     if (n_domain(1) == -1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(g+1:-1,:,:,is) = 0.0_rk
+                u(g+1,:,:,is) = 0.0_rk
                 u(g:1:-1,:,:,is) = - u(g+2:2*g+1,:,:,is)
             else  ! symmetric components
                 ! values on symmetry line are untouched
                 u(g:1:-1,:,:,is) = + u(g+2:2*g+1,:,:,is)
             endif
         enddo
-    elseif (n_domain(1) == +1 .and. params_acm%symmetry_BC(1)) then
+    endif
+    if (n_domain(1) == +1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(Bs(1)+g+1,:,:,is) = 0.0_rk
-                u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = - u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
-            else  ! symmetric components
-                ! for the approximation of the mirror line, we need to use only SC for the spaghetti form
-                if (.not. spaghetti_form) then
-                    u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-2,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-3,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-4,:,:,is))
+                if (modulo(Bs(1),2) == 0) then
+                    u(Bs(1)+g+1,:,:,is) = 0.0_rk
+                    u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = - u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
                 else
-                    u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-3,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-5,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-7,:,:,is))
+                    u(Bs(1)+g,:,:,is) = 0.0_rk
+                    u(Bs(1)+g+1:Bs(1)+2*g,:,:,is) = - u(Bs(1)+g-1:Bs(1):-1,:,:,is)
                 endif
-                u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = + u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
+            else  ! symmetric components
+                if (modulo(Bs(1),2) == 0) then
+                    ! for the approximation of the mirror line, we need to use only SC for the spaghetti form
+                    if (.not. spaghetti_form) then
+                        u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-2,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-3,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-4,:,:,is))
+                    else
+                        u(Bs(2)+g+1,:,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(Bs(2)+g-1,:,:,is) - 4.0_rk/10.0_rk * u(Bs(2)+g-3,:,:,is) + 4.0_rk/35.0_rk * u(Bs(2)+g-5,:,:,is) - 1.0_rk/70.0_rk * u(Bs(2)+g-7,:,:,is))
+                    endif
+                    u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = + u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
+                else
+                    ! values on symmetry line are untouched
+                    u(Bs(1)+g+1:Bs(1)+2*g,:,:,is) = + u(Bs(1)+g-1:Bs(1):-1,:,:,is)
+                endif
             endif
         enddo
-    elseif (n_domain(2) == -1 .and. params_acm%symmetry_BC(2)) then
+    endif
+    if (n_domain(2) == -1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(:,g+1:-1,:,is) = 0.0_rk
+                u(:,g+1,:,is) = 0.0_rk
                 u(:,g:1:-1,:,is) = - u(:,g+2:2*g+1,:,is)
             else  ! symmetric components
                 ! values on symmetry line are untouched
                 u(:,g:1:-1,:,is) = + u(:,g+2:2*g+1,:,is)
             endif
         enddo
-    elseif (n_domain(2) == +1 .and. params_acm%symmetry_BC(2)) then
+    endif
+    if (n_domain(2) == +1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(:,Bs(2)+g+1,:,is) = 0.0_rk
-                u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = - u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
-            else  ! symmetric components
-                if (.not. spaghetti_form) then
-                    u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-2,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-3,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-4,:,is))
+                if (modulo(Bs(2),2) == 0) then
+                    u(:,Bs(2)+g+1,:,is) = 0.0_rk
+                    u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = - u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
                 else
-                    u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-3,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-5,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-7,:,is))
+                    u(:,Bs(2)+g,:,is) = 0.0_rk
+                    u(:,Bs(2)+g+1:Bs(2)+2*g,:,is) = - u(:,Bs(2)+g-1:Bs(2):-1,:,is)
                 endif
-                u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = + u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
+            else  ! symmetric components
+                if (modulo(Bs(1),2) == 0) then
+                    if (.not. spaghetti_form) then
+                        u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-2,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-3,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-4,:,is))
+                    else
+                        u(:,Bs(2)+g+1,:,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,Bs(2)+g-1,:,is) - 4.0_rk/10.0_rk * u(:,Bs(2)+g-3,:,is) + 4.0_rk/35.0_rk * u(:,Bs(2)+g-5,:,is) - 1.0_rk/70.0_rk * u(:,Bs(2)+g-7,:,is))
+                    endif
+                    u(:,Bs(2)+g+2:Bs(2)+2*g,:,is) = + u(:,Bs(2)+g:Bs(2)+2:-1,:,is)
+                else
+                    ! values on symmetry line are untouched
+                    u(:,Bs(2)+g+1:Bs(2)+2*g,:,is) = + u(:,Bs(2)+g-1:Bs(2):-1,:,is)
+                endif
             endif
         enddo
     endif
@@ -129,25 +152,36 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_on
         if (n_domain(3) == -1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                    u(:,:,g+1:-1,is) = 0.0_rk
+                    u(:,:,g+1,is) = 0.0_rk
                     u(:,:,g:1:-1,is) = - u(:,:,g+2:2*g+1,is)
                 else  ! symmetric components
                     ! values on symmetry line are untouched
                     u(:,:,g:1:-1,is) = + u(:,:,g+2:2*g+1,is)
                 endif
             enddo
-        elseif (n_domain(3) == +1 .and. params_acm%symmetry_BC(3)) then
+        endif
+        if (n_domain(3) == +1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                    u(:,:,Bs(3)+g+1,is) = 0.0_rk
-                    u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = - u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
-                else  ! symmetric components
-                    if (.not. spaghetti_form) then
-                        u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-2,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-3,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-4,is))
+                    if (modulo(Bs(3),2) == 0) then
+                        u(:,:,Bs(3)+g+1,is) = 0.0_rk
+                        u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = - u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
                     else
-                        u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-3,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-5,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-7,is))
+                        u(:,:,Bs(3)+g,is) = 0.0_rk
+                        u(:,:,Bs(3)+g+1:Bs(3)+2*g,is) = - u(:,:,Bs(3)+g-1:Bs(3):-1,is)
                     endif
-                    u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = + u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
+                else  ! symmetric components
+                    if (modulo(Bs(3),2) == 0) then
+                        if (.not. spaghetti_form) then
+                            u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-2,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-3,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-4,is))
+                        else
+                            u(:,:,Bs(3)+g+1,is) = 2.0_rk*(4.0_rk/5.0_rk * u(:,:,Bs(3)+g-1,is) - 4.0_rk/10.0_rk * u(:,:,Bs(3)+g-3,is) + 4.0_rk/35.0_rk * u(:,:,Bs(3)+g-5,is) - 1.0_rk/70.0_rk * u(:,:,Bs(3)+g-7,is))
+                        endif
+                        u(:,:,Bs(3)+g+2:Bs(3)+2*g,is) = + u(:,:,Bs(3)+g:Bs(3)+2:-1,is)
+                    else
+                        ! values on symmetry line are untouched
+                        u(:,:,Bs(3)+g+1:Bs(3)+2*g,is) = + u(:,:,Bs(3)+g-1:Bs(3):-1,is)
+                    endif
                 endif
             enddo
         endif

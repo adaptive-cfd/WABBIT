@@ -90,7 +90,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
         case('vor', 'vort')
-            if (size(params_acm%names,1) - k < 2) then
+            if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
             if (params_acm%dim /= 2) then

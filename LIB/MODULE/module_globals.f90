@@ -210,7 +210,11 @@ module module_globals
             implicit none
             real(kind=rk),dimension(1:3),intent(in) :: a
             real(kind=rk),dimension(1:3) :: unit_vector
-            unit_vector = a / norm2(a)
+            if (norm2(a)>1.0e-16) then
+                unit_vector = a / norm2(a)
+            else
+                unit_vector = 0.0_rk
+            endif
         end function
 
         !-----------------------------------------------------------------------------

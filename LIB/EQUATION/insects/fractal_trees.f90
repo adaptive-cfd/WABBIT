@@ -8,6 +8,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
     real(kind=rk) :: x1(1:3), x2(1:3), R
+    integer(kind=2) :: color
     integer ::  i
 
     ! check if the global treedata is already filled = initialization is done
@@ -37,7 +38,16 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
         ! the file containes the radius of the cylinder
         R = treedata(i,7)*Insect%fractal_tree_scaling
 
-        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(0,kind=2), bounding_box=treedata_boundingbox(i,1:6))
+        ! color of the tree (for force computation)
+        color = 0_2
+
+        if (Insect%fractal_tree_spheres) then
+            ! cylinders with endpoint spheres
+            call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, color, bounding_box=treedata_boundingbox(i,1:6))
+        else
+            ! cylinders without entdpoint spheres
+            call draw_cylinder_SD_nospheres( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, color, bounding_box=treedata_boundingbox(i,1:6))
+        endif
     end do
 
 end subroutine draw_fractal_tree

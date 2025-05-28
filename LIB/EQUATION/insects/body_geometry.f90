@@ -1483,7 +1483,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
 
     if (present(bounding_box)) then
-        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn, fractal tree)
+        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn: fractal tree)
         xmin = nint( (bounding_box(1)-xx0(1))/ddx(1) ) - Nsafety
         ymin = nint( (bounding_box(2)-xx0(2))/ddx(2) ) - Nsafety
         zmin = nint( (bounding_box(3)-xx0(3))/ddx(3) ) - Nsafety
@@ -1589,6 +1589,136 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     call drawsphere( x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val )
 end subroutine draw_cylinder_new
 
+
+!-------------------------------------------------------------------------------
+! draw a cylinder defined by GLOBALS points (x1,y1,z1), (x2,y2,z2) and radius R0
+! Based on the (exact) signed distance function of a cylinder segment, without the endpoint spheres.
+! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
+! The solid velocity field us is not touched -- we consider this routine for bodies
+! therefore the solid velocity field (which is a solid body rotation around
+! insect%xc) is added in the main insect drawing routine.
+! The color of the new cylinder will be what you pass in color_val
+!-------------------------------------------------------------------------------
+subroutine draw_cylinder_SD_nospheres( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val, bounding_box)
+    use module_helpers
+    implicit none
+
+    real(kind=rk),dimension(1:3),intent(inout )::x1,x2
+    real(kind=rk),intent(in)::R0
+    type(diptera),intent(inout)::Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+    integer(kind=2),intent(in) :: color_val
+    ! (/xmin,ymin,zmin,xmax,ymax,zmax/) of cylinder (in global coordinates)
+    real(kind=rk),optional,intent(in) :: bounding_box(1:6)
+
+    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_3
+    real(kind=rk),dimension(1:3,1:3) :: M_phi
+    real(kind=rk):: R, RR0, clength, safety, t, phi, dist
+    integer :: ix,iy,iz, Nphi
+
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety, i
+
+    safety = 1.5*Insect%safety
+    Nsafety = ceiling(safety / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g ! note zero based indexing
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
+
+    if (present(bounding_box)) then
+        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn: fractal tree)
+        xmin = nint( (bounding_box(1)-xx0(1))/ddx(1) ) - Nsafety
+        ymin = nint( (bounding_box(2)-xx0(2))/ddx(2) ) - Nsafety
+        zmin = nint( (bounding_box(3)-xx0(3))/ddx(3) ) - Nsafety
+
+        xmax = nint( (bounding_box(4)-xx0(1))/ddx(1) ) + Nsafety
+        ymax = nint( (bounding_box(5)-xx0(2))/ddx(2) ) + Nsafety
+        zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
+
+    else
+
+        ! unit vector in cylinder axis direction and cylinder length
+        e_x = x2 - x1
+        clength = norm2(e_x)
+        e_x = e_x / clength
+
+        ! radial unit vector
+        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
+        ! it does not really matter which one. however, we must be sure that the vector
+        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
+        e_r = (/0.0_rk,0.0_rk,0.0_rk/)
+        do while ( norm2(e_r) <= 1.0d-12 )
+            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
+        enddo
+        e_r = e_r / norm2(e_r)
+
+        ! third (also radial) unit vector, simply the cross product of the others
+        e_3 = cross(e_x,e_r)
+        e_3 = e_3 / norm2(e_3)
+        RR0 = R0 + safety
+
+        ! bounding box of the vicinity of the cylinder.
+        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
+        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
+        ! we do it in preprocessing and only once per cylinder
+        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
+
+        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
+
+        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
+
+        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+
+        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+
+        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+    endif
+
+
+
+    ! first we draw the cylinder, then the endpoint spheres
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+
+                ! compute signed distance
+                dist = signed_distance_cylinder(x_glob, x1, x2, R0)
+
+                ! convert to mask function
+                t = steps(dist, 0.0_rk, Insect%smooth)
+
+                if (t >= mask(ix,iy,iz)) then
+                    mask(ix,iy,iz) = t
+                    mask_color(ix,iy,iz) = color_val
+                endif
+
+            enddo
+        enddo
+    enddo
+end subroutine
 
 
 !-------------------------------------------------------------------------------

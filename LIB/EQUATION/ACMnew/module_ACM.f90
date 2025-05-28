@@ -48,6 +48,9 @@ module module_acm
 
   type(wingsection) :: wingsections(2)
 
+! how many different parts of the mask can be distinguished
+  integer, parameter :: ncolors=8
+
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params_acm
@@ -62,7 +65,7 @@ module module_acm
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
     ! forces for the different colors
-    real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
+    real(kind=rk) :: force_color(1:3,0:ncolors), moment_color(1:3,0:ncolors)
     real(kind=rk) :: gamma_p
     logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:

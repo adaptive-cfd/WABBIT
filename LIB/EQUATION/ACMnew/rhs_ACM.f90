@@ -66,7 +66,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     dim = params_acm%dim
 
     ! EXPERIMENTAL. Soft penalization: gently turn on penalization at the beginning (t=0) of a simulation. This makes the initial wave 
-    ! travelling through the domain smoother. Its thickness is usually C_eta*C_0 (dimension L). Slowly decreasing C_eta from C_eta_start=1.0
+    ! travelling through the domain smoother. Its thickness is usually C_eta*C_0 (dimension: L). Slowly decreasing C_eta from C_eta_start=1.0
     ! to its final value (small, say C_eta=1e-4) thus drastically increases the shock width. The shock intensity decays as R^-1 (2D) or 
     ! R^-2 (3D), but even in 3D it can still require resolution of the shock wave that can be expensive.
     if (params_acm%soft_penalization_startup) then

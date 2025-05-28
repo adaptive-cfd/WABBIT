@@ -231,12 +231,13 @@ module module_insects
       logical :: damaged(1:4)
 
       !--------------------------------------------------------------
-      ! Wing kinematics
+      ! Fractal tree
       !--------------------------------------------------------------
       logical :: fractal_tree = .false.
       character(len=clong) :: fractal_tree_file = "tree_data.in"
       real(kind=rk), dimension(1:3) :: fractal_tree_x0 = (/0.0_rk, 0.0_rk, 0.0_rk/)
       real(kind=rk) :: fractal_tree_scaling = 1.0_rk
+      logical :: fractal_tree_spheres = .true.
 
       !--------------------------------------------------------------
       ! Wing kinematics
@@ -552,9 +553,9 @@ contains
       ! f is 0 if x>t+h
       ! f is variable (smooth) in between
       if (x<=t-h) then
-         steps = 1._rk
+         steps = 1.0_rk
       elseif (((t-h)<x).and.(x<(t+h))) then
-         steps = 0.5_rk*(1._rk+dcos((x-t+h)*pi/(2._rk*h)) )
+         steps = 0.5_rk*(1.0_rk+dcos((x-t+h)*pi/(2.0_rk*h)) )
       else
          steps = 0.0_rk
       endif

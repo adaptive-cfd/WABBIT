@@ -58,7 +58,7 @@ contains
         endif
 
 
-        write(*,*) "Rank", mpirank, "triangles:", npercpu, istart, iend
+        write(*,*) "Rank=", mpirank, "N_triangles_per_cpu:", npercpu, "(", istart, ":", iend, ")"
         call MPI_BARRIER(MPI_COMM_WORLD, mpicode)
 
         ! compute all normals for all triangles.
@@ -107,7 +107,7 @@ contains
         real(kind=rk), dimension(1:3) :: vertexnormal
         real(kind=rk), dimension(1:3) :: p1, p2, p3
         integer :: ntri, i,  k
-        integer :: faces1(1:20), faces2(1:20), faces3(1:20)
+        integer :: faces1(1:600), faces2(1:600), faces3(1:600)
         integer :: N1, N2, N3
         real(kind=rk) :: alpha
 
@@ -120,6 +120,8 @@ contains
         N3 = 0
         vertexnormal = 0.0_rk
 
+        ! expensive - to compute the vertexnormal of a point, we loop over all triangles and find the ones
+        ! that share this point
         do i = 1, ntri
             if (is_same_vector(x, points(i,1:3))) then
                 ! faces containing the vertex as 1st point

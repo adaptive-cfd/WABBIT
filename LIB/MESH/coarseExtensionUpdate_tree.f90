@@ -3,6 +3,7 @@
 !> This is very similar to adapt_tree but only affects blocks on coarse-fine interfaces and does not need to loop
 !  !!! ATTENTION !!!         This routine is finished but has not been cross-checked yet
 !  !!! ANOTHER ATTENTION !!! This routine was not adapted to work with full wavelet transformation. It might need a higher blocksize to work correctly
+!  Instead of trying to get this function to work, I recommend you to use adapt_tree function with ignore_coarsening=.true.
 subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, input_is_synced)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params

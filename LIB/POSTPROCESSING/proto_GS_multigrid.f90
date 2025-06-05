@@ -121,6 +121,9 @@ subroutine proto_GS_multigrid(params)
     call read_attributes(file_b, lgt_n(tree_ID), time, it, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! ! odd BS test - but that doesn't work so great for now
+    ! BS(1:params%dim) = Bs(1:params%dim) + 1
+
     params%Jmax = tc_length
     params%Jmin = 0   ! yes, I want to go down to one block only!
     params%n_eqn = params%dim
@@ -158,12 +161,23 @@ subroutine proto_GS_multigrid(params)
     if (exist_u) then
         if (exist_uFD) then
             call readHDF5vct_tree( (/file_b, file_u, file_uFD/), params, hvy_block, tree_ID)
+            i_cycle = 3
         else
             call readHDF5vct_tree( (/file_b, file_u/), params, hvy_block, tree_ID)
+            i_cycle = 2
         endif
     else
         call readHDF5vct_tree( (/file_b/), params, hvy_block, tree_ID)
     endif
+    call componentWiseNorm_tree(params, hvy_block(:,:,:,1:i_cycle,:), tree_ID, "Mean", norm(1:i_cycle))
+    if (params%rank == 0) write(*, '(A, 3(1x,es10.3))') "--- Mean values of read data: ", norm(1:i_cycle)
+    do ic = 1,i_cycle
+        do k_block = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k_block, tree_ID)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            hvy_block(:,:,:,ic,hvy_id) = hvy_block(:,:,:,ic,hvy_id) - norm(ic)
+        enddo
+    enddo
 
     ! debug max-min
     ! do k = 1, hvy_n(tree_ID)
@@ -280,22 +294,36 @@ subroutine proto_GS_multigrid(params)
             endif
         endif
 
+    ! for not saving the intermediate values, also change all save times to 0
+    ! enddo
+
+        ! delete all non-leaf blocks with daughters as we for now do not have any use for them
+        call prune_fulltree2leafs(params, tree_ID)
+        
+        ! save file under new name
+        write(fname, '(A, i4.4, A)') "u_00", i_cycle, "00000.h5"
+        call saveHDF5_tree(fname, dble(i_cycle), i_cycle, 1, params, hvy_tmp, tree_ID )
+
+        ! save file under new name
+        write(fname, '(A, i4.4, A)') "res_00", i_cycle, "00000.h5"
+        call saveHDF5_tree(fname, dble(i_cycle), i_cycle, 1, params, hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID )
+
+        ! save file under new name
+        write(fname, '(A, I4.4, A)') "b-out_00", i_cycle, "00000.h5"
+        call saveHDF5_tree(fname, dble(i_cycle), i_cycle, 1, params, hvy_block, tree_ID )
+
+    ! for saving intermediate value, also change all save times to i_cycle
+        ! save spectral u at new time position
+        if (exist_u) then
+            write(fname, '(A, I4.4, A)') "u-spectral_00", i_cycle, "00000.h5"
+            call saveHDF5_tree(fname, dble(i_cycle), i_cycle, 1, params, hvy_block(:,:,:,nc+1:2*nc,:), tree_ID )
+            if (exist_uFD) then
+                write(fname, '(A, I4.4, A)') "u-FD_00", i_cycle, "00000.h5"
+                call saveHDF5_tree(fname, dble(i_cycle), i_cycle, 1, params, hvy_block(:,:,:,2*nc+1:3*nc,:), tree_ID )
+            endif
+        endif
+        call init_full_tree(params, tree_ID, set_ref=0)
     enddo
-
-    ! delete all non-leaf blocks with daughters as we for now do not have any use for them
-    call prune_fulltree2leafs(params, tree_ID)
-    
-    ! save file under new name
-    write(fname, '(A)') "u_00000000000.h5"
-    call saveHDF5_tree(fname, 0.0_rk, it, 1, params, hvy_tmp, tree_ID )
-
-    ! save file under new name
-    write(fname, '(A)') "res_00000000000.h5"
-    call saveHDF5_tree(fname, 0.0_rk, it, 1, params, hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID )
-
-    ! save file under new name
-    write(fname, '(A)') "b-out_00000000000.h5"
-    call saveHDF5_tree(fname, 0.0_rk, it, 1, params, hvy_block, tree_ID )
 
     t_block = MPI_Wtime()
     call fft_destroy(params)

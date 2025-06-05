@@ -11,10 +11,10 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     logical, optional, intent(in)           :: verbose
 
     integer(kind=ik)                        :: k, hvy_id, lgt_id
-    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii
-    integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk), allocatable :: norm(:), norm_ref(:)
-    integer(kind=tsize)        :: treecode
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), Jmin, Jmax
+    real(kind=rk)                           :: x0(1:3), dx(1:3)
+    real(kind=rk), allocatable              :: norm(:), norm_ref(:)
+    integer(kind=tsize)                     :: treecode
     character(len=80)                       :: file_dump
     logical                                 :: apply_verbose, error_OOM
 
@@ -45,16 +45,26 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
         return
     endif
 
+    ! test is on Jmin=0, so let's enable that for a moment
+    Jmin = params%Jmin
+    Jmax = params%Jmax
+    params%Jmax = 1
+    params%Jmin = 0
+
     !----------------------------------------------------------------------------
-    ! create an equidistant grid on level J=1 (and not Jmin, because that may well be 0)
+    ! create an equidistant grid on level J=0, that is sufficient for the test
     !----------------------------------------------------------------------------
-    call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID )
+    call createEquidistantGrid_tree( params, hvy_block, 0, .true., tree_ID )
 
     !----------------------------------------------------------------------------
     ! create just some data...
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
+
         call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 
@@ -78,7 +88,22 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
 
     if (error_OOM) call abort(2512118,"Refinement failed, out of memory. Try with more memory.")
 
-    call sync_ghosts_tree( params, hvy_block, tree_ID )
+    ! print out some debugging infos to files
+    if (apply_verbose) then
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k,tree_ID)
+            call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+            treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
+            write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+            open(unit=32, file=file_dump, status='unknown', position='append')
+            write(32, '(A)') ""  ! new line
+            write(32, '(A)') "After refine:"
+            write(32, '(A)') ""  ! new line
+            close(32)
+
+            call dump_block_fancy(hvy_block(:, :, :, 1:1, hvy_id), file_dump, Bs, g, append=.true.)
+        enddo
+    endif
 
     ! coarsening (back to the original level)
     call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, "everywhere", hvy_tmp)
@@ -131,4 +156,8 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
 
     ! delete the grid we created for this subroutine
     call reset_tree(params, .true., tree_ID=tree_ID)
+
+    ! reset the Jmin and Jmax parameters to their original values
+    params%Jmax = Jmax
+    params%Jmin = Jmin
 end subroutine

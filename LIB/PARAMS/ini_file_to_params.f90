@@ -289,7 +289,7 @@ subroutine ini_blocks(params, FILE )
    endif
 
    ! read number_block_nodes
-   params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
+   params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim, params%rank)
 
    ! annoyingly, this is redundant with the definition in setup_wavelet, but as setup_wavelet is part of module_wavelets
    ! which use module_params it cannot be called here (circular dependency....)
@@ -480,12 +480,14 @@ end subroutine ini_time
 
  !-------------------------------------------------------------------------!
  !> @brief Read Bs from inifile for unknown number of Bs in inifile
-function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
+function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
+   implicit none
    type(inifile) ,intent(inout)     :: FILE
    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
    character(len=*), intent(in)    :: keyword ! what keyword do you
    integer(kind=ik), intent(in)    :: default_Bs(:)
    integer(kind=ik), intent(in)    :: dims !number of dimensions
+   integer(kind=ik), intent(in)    :: rank !used for printing warnings
    integer(kind=ik):: Bs(3)
    integer(kind=ik):: i, n_entries
    character(len=cshort):: output
@@ -495,7 +497,7 @@ function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
    call read_param_mpi(FILE, section, keyword, output, "empty")
 
    if (trim(output) .eq. "empty") then
-      write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+      if (rank == 0) write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
       Bs = default_Bs
 
    else
@@ -514,10 +516,8 @@ function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
       endif
    endif
 
-   do i = 1, dims
-      if (mod(Bs(i), 2) /= 0) then
-         write(*,*) "Bs=", Bs
-         call abort(202392929, "Block-size must be EVEN number")
-      end if
-   end do
+   if (any(mod(Bs(1:dims), 2) /= 0)) then
+      ! if (rank == 0) write(*, '(A)') "WARNING! Block size is ODD, this is experimental"
+      call abort(202392929, "Block-size must be EVEN number")
+   end if
 end function

@@ -78,6 +78,7 @@ program main
 
     ! init time loop
     time          = 0.0_rk
+    dt            = 0.0_rk
     output_time   = 0.0_rk
     iteration     = 0
 

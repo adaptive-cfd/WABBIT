@@ -90,20 +90,20 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
         case('vor', 'vort')
-            if (size(params_acm%names,1) - k < 2) then
-                call abort(19101810,"ACM: Not enough space to compute vorticity, atleast two variables need to follow. Easiest is to put it at beginning of field_names. Works only in 2D (known bug)")
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
             if (params_acm%dim /= 2) then
-                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' or compute in post (known bug)")
+                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' ''vorabs or compute in post (known bug)")
             endif
 
             ! vorticity
             call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
         case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
-            if (size(params_acm%names,1) - k < 2) then
-                call abort(19101810,"ACM: Not enough space to compute vorticity, atleast two variables need to follow. Easiest is to put it at beginning of field_names. Works only in 3D (known bug)")
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
             if (params_acm%dim /= 3) then
                 call abort(19101811,"ACM: storing vector vor is not possible in 2D - use 'vor' or compute in post (known bug)")
@@ -122,8 +122,8 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
         
         case('helx', 'Helx', 'HelX', 'hely', 'Hely', 'HelY', 'helz', 'Helz', 'HelZ', 'helabs', 'Helabs', 'HelAbs', 'hel-abs', 'Hel-abs', 'Hel-Abs')
-            if (size(params_acm%names,1) - k < 2) then
-                call abort(19101810,"ACM: Not enough space to compute vorticity for helicity, atleast two variables need to follow. Easiest is to put it at beginning of field_names. Works only in 3D (known bug)")
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity for helicity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
             if (params_acm%dim /= 3) then
                 call abort(19101811,"ACM: Helicity is always 0 in 2D - we do not need to store that!")

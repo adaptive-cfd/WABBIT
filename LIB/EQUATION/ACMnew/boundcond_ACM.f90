@@ -78,14 +78,15 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_on
     if (n_domain(1) == -1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(g+1:-1,:,:,is) = 0.0_rk
+                u(g+1,:,:,is) = 0.0_rk
                 u(g:1:-1,:,:,is) = - u(g+2:2*g+1,:,:,is)
             else  ! symmetric components
                 ! values on symmetry line are untouched
                 u(g:1:-1,:,:,is) = + u(g+2:2*g+1,:,:,is)
             endif
         enddo
-    elseif (n_domain(1) == +1 .and. params_acm%symmetry_BC(1)) then
+    endif
+    if (n_domain(1) == +1 .and. params_acm%symmetry_BC(1)) then
         do is = 1,size(u,4)
             if (is == 1 .and. .not. disable_antisymmetric) then  ! antisymmetric components
                 u(Bs(1)+g+1,:,:,is) = 0.0_rk
@@ -100,17 +101,19 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_on
                 u(Bs(1)+g+2:Bs(1)+2*g,:,:,is) = + u(Bs(1)+g:Bs(1)+2:-1,:,:,is)
             endif
         enddo
-    elseif (n_domain(2) == -1 .and. params_acm%symmetry_BC(2)) then
+    endif
+    if (n_domain(2) == -1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                u(:,g+1:-1,:,is) = 0.0_rk
+                u(:,g+1,:,is) = 0.0_rk
                 u(:,g:1:-1,:,is) = - u(:,g+2:2*g+1,:,is)
             else  ! symmetric components
                 ! values on symmetry line are untouched
                 u(:,g:1:-1,:,is) = + u(:,g+2:2*g+1,:,is)
             endif
         enddo
-    elseif (n_domain(2) == +1 .and. params_acm%symmetry_BC(2)) then
+    endif
+    if (n_domain(2) == +1 .and. params_acm%symmetry_BC(2)) then
         do is = 1,size(u,4)
             if (is == 2 .and. .not. disable_antisymmetric) then  ! antisymmetric components
                 u(:,Bs(2)+g+1,:,is) = 0.0_rk
@@ -129,14 +132,15 @@ subroutine BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edges_on
         if (n_domain(3) == -1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
-                    u(:,:,g+1:-1,is) = 0.0_rk
+                    u(:,:,g+1,is) = 0.0_rk
                     u(:,:,g:1:-1,is) = - u(:,:,g+2:2*g+1,is)
                 else  ! symmetric components
                     ! values on symmetry line are untouched
                     u(:,:,g:1:-1,is) = + u(:,:,g+2:2*g+1,is)
                 endif
             enddo
-        elseif (n_domain(3) == +1 .and. params_acm%symmetry_BC(3)) then
+        endif
+        if (n_domain(3) == +1 .and. params_acm%symmetry_BC(3)) then
             do is = 1,size(u,4)
                 if (is == 3 .and. .not. disable_antisymmetric) then  ! antisymmetric components
                     u(:,:,Bs(3)+g+1,is) = 0.0_rk

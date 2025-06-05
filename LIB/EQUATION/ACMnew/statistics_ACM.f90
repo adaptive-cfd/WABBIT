@@ -41,8 +41,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
     real(kind=rk) :: tmp(1:6), meanflow_block(1:3), residual_block(1:3), ekin_block, &
     tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:6), moment_block(1:3,0:6), x_glob(1:3), x_lev(1:3)
@@ -69,9 +68,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
     ! compute the size of blocks
+    Bs = 1
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
-    Bs(3) = size(u,3) - 2*g
+    if (params_acm%dim == 3) Bs(3) = size(u,3) - 2*g
 
     C_eta_inv = 1.0_rk / params_acm%C_eta
 

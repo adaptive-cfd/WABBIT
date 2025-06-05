@@ -200,6 +200,9 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
             ! flag for coarsening
             lgt_block(lgt_ID, IDX_REFINE_STS) = -1
         enddo
+    case ("nowhere")
+        ! keep all blocks. Simple as that. Might sound stupid but might be useful for debugging purposes
+        ! ref stats where already set to 0 so we do nothing here
 
     case ("random")
         ! random coarsening, set random seed after cpu clock

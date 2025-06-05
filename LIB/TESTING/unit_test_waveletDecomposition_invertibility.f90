@@ -11,9 +11,9 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     logical, optional, intent(in)           :: verbose
 
     integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt, it_random, l_init
-    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max
-    integer(kind=ik), dimension(3)          :: Bs
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max, Bs(1:3)
     real(kind=rk), allocatable :: norm_1(:), norm_ref(:), norm_2(:)
+    real(kind=rk)                           :: x0(1:3), dx(1:3)
     integer(kind=tsize)        :: treecode
     character(len=80)                       :: file_dump
     logical                                 :: apply_verbose, problem, grid_is_equidistant
@@ -66,6 +66,10 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
+
         call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 

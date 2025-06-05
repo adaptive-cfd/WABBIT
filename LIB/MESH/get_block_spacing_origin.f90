@@ -47,8 +47,10 @@ subroutine get_adjacent_boundary_surface_normal(params, lgt_id, n_surface)
 
   n_surface(1:params%dim) = 0
   do i_dim = 1, params%dim
+    ! check if origin_b = 0
     if (abs(x0(i_dim)-0.0_rk) < tolerance ) then !x_i == 0
       n_surface(i_dim) = -1
+    ! check if origin_b + BS*dx = L
     elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
       n_surface(i_dim) = +1
     endif

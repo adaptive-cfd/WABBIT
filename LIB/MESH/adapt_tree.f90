@@ -414,7 +414,9 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         ! synchronize ghost nodes - required to apply wavelet filters
         ! block only needs information from medium and fine neighbors as CE will cut dependency to coarse neighbors
         t_block = MPI_Wtime()
-        g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1)-1)
+        ! first point is SC and last WC, so we need left(HD) or right(GD) for sync
+        g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1))
+
         ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         ! if (params%isLiftedWavelet) then
         !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)
@@ -528,9 +530,9 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
     ! ! for debugging purposes - savin does a sync if any ghost values are NaN
     ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_block, tree_ID)
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_block, tree_ID)
     ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_tmp, tree_ID)
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_tmp, tree_ID)
 end subroutine
 
 
@@ -554,7 +556,7 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
     integer(kind=ik), intent(in)        :: tree_ID
 
     ! loop variables
-    integer(kind=ik)                    :: iteration, k, Jmax_active, Jmin_active, level, hvy_ID, lgt_ID, level_me, Jmin, g_spaghetti
+    integer(kind=ik)                    :: iteration, k, Jmax_active, Jmin_active, level, hvy_ID, lgt_ID, level_me, Jmin
     real(kind=rk)                       :: t_block, t_all, t_loop
     character(len=clong)                :: toc_statement
 
@@ -566,12 +568,6 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
     ! to the last subroutine.)  -Thomas
 
     Jmin        = params%Jmin
-
-    ! it turns out, when the coefficients are spaghetti-ordered,
-    ! we can sync only even numbers of points and save one for odd numbered
-    ! g_spaghetti = params%g/2*2
-    g_spaghetti = params%g
-
     Jmax_active = maxActiveLevel_tree(tree_ID)
     iteration = 0
     do level = Jmin, Jmax_active
@@ -584,7 +580,7 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
         t_block = MPI_Wtime()
-        call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=g_spaghetti, g_plus=g_spaghetti, level=level)
+        call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=params%g, g_plus=params%g, level=level)
         call toc( "reconstruct_tree (sync lvl <- MC)", 115, MPI_Wtime()-t_block )
 
         write(toc_statement, '(A, i0, A)') "reconstruct_tree (it ", iteration, " sync level <- MC)"
@@ -639,9 +635,9 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
 
     ! ! for debugging purposes - savin does a sync if any ghost values are NaN
     ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_block, tree_ID)
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_block, tree_ID)
     ! write( toc_statement,'(A, i6.6, A)') 'TestN_', 100, "000000.h5"
-    ! call saveHDF5_tree(toc_statement, dble(100), 100, 3, params, hvy_tmp, tree_ID)
+    ! call saveHDF5_tree(toc_statement, dble(100), 100, 1, params, hvy_tmp, tree_ID)
 end subroutine
 
 

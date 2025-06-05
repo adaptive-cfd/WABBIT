@@ -596,18 +596,21 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     ! buffer. However, estimating those latter is difficult: it depends on the grid and the parallelization
     ! JB: This can only trigger if we change g during the run?, and why increase by 125%? What if that is not enough?
     if (sum(data_recv_counter) + sum(meta_recv_counter)*S_META_SEND + params%number_procs > size(rData_recvBuffer, 1)) then
+        new_size = int( real(size(rData_recvBuffer,1),kind=rk) * 125.0_rk/100.0_rk, kind=ik )
+
         ! out-of-memory case: the preallocated buffer is not large enough.
-        write(*,'("rank=",i4," OOM for ghost nodes and increases its receive buffer size to 125%")') myrank
-        new_size = size(rData_recvBuffer,1)*125/100
+        write(*,'("rank=",i4," OOM for ghost nodes and increases its receive buffer size to 125% new_size=",i10)') myrank, new_size
         deallocate(rData_recvBuffer)
         allocate( rData_recvBuffer(1:new_size), stat=status )
         if (status /= 0) call abort(999992, "Buffer allocation failed. Not enough memory?")
     endif
 
     if (sum(data_send_counter) + sum(meta_send_counter)*S_META_SEND + params%number_procs > size(rData_sendBuffer, 1)) then
+        ! new_size = size(rData_sendBuffer,1)*125/100
+        new_size = int( real(size(rData_sendBuffer,1),kind=rk) * 125.0_rk/100.0_rk, kind=ik )
+        
         ! out-of-memory case: the preallocated buffer is not large enough.
-        write(*,'("rank=",i4," OOM for ghost nodes and increases its send buffer size to 125%")') myrank
-        new_size = size(rData_sendBuffer,1)*125/100
+        write(*,'("rank=",i4," OOM for ghost nodes and increases its send buffer size to 125% new_size=",i10)') myrank, new_size
         deallocate(rData_sendBuffer)
         allocate( rData_sendBuffer(1:new_size), stat=status )
         if (status /= 0) call abort(999993, "Buffer allocation failed. Not enough memory?")

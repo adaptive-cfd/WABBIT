@@ -1,4 +1,4 @@
-!> \brief Module to handle writing of so-called t-files where array entries can be written to
+!> \brief Module to handle writing of so-called t-files where array entries can be written to (log-files).
 !> For every t-file a buffer area will be created and data values are stored and only flushed with specific frequency
 !! in order to avoid excessive file opening and closing
 !> Why do we have this module ?
@@ -15,23 +15,22 @@ module module_t_files
 
     ! precision statement
     integer, save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
-    integer, parameter :: max_parallel_files = 50
+    integer, parameter :: max_parallel_files = 150
     integer, parameter :: max_columns = 160
     integer, save :: mpirank = 7
+
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)
     character(len=cshort), save, allocatable :: filenames(:)
     integer, save, allocatable :: iteration(:), n_columns(:)
     logical :: disable_all_output = .false.
+
     ! I usually find it helpful to use the private keyword by itself initially, which specifies
     ! that everything within the module is private unless explicitly marked public.
     PRIVATE
 
 
-
-
-
-    PUBLIC :: init_t_file, append_t_file, close_t_file, close_all_t_files, disable_all_t_files_output
+    PUBLIC :: init_t_file, append_t_file, close_all_t_files, disable_all_t_files_output
 
 contains
 
@@ -200,31 +199,6 @@ contains
 
 
 
-    !> \brief Write latest bufferd values to files.
-    !> This does not actually close a file but rather ensures that the buffers are appropriately flushed
-    subroutine close_t_file(fname)
-        implicit none
-        character(len=*), intent(in) :: fname  !< name of the file, mostly should end in ".t"
-        integer :: fileID
-
-        if (disable_all_output) return
-        if (mpirank/=0) return
-
-        ! dump data to buffer, flush if it is time to do so
-
-        fileID = 1
-        do while (  filenames(fileID) /= "---" )
-            ! entry for current subroutine exists
-            if (  filenames(fileID) == fname ) exit
-            fileID = fileID + 1
-        end do
-
-        call flush_t_file( fileID )
-
-    end subroutine
-
-
-
     !> \brief Write latest buffered values to files for all files.
     !> This does not actually close a file but rather ensures that the buffers are appropriately flushed
     subroutine close_all_t_files()
@@ -234,14 +208,12 @@ contains
         if (disable_all_output) return
         if (mpirank/=0) return
 
-        ! dump data to buffer, flush if it is time to do so
-
-        fileID = 1
-        do while (  filenames(fileID) /= "---" )
-            call flush_t_file( fileID )
-            fileID = fileID + 1
-        end do
-
+        ! flush all open t files to disk
+        do fileID = 1, max_parallel_files
+            if (  filenames(fileID) /= "---" ) then
+                call flush_t_file( fileID )
+            endif       
+        enddo
     end subroutine
 
 

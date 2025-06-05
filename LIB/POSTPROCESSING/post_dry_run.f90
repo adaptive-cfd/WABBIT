@@ -337,5 +337,7 @@ subroutine post_dry_run
     endif
 
 
+    call summarize_profiling(WABBIT_COMM)
+
 
 end subroutine post_dry_run

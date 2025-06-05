@@ -1,6 +1,7 @@
 subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! to test update insect here (HACK)
     use module_ACM
+    use module_timing
     implicit none
 
     type (type_params), intent(inout)      :: params
@@ -9,10 +10,11 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
     logical, intent(in), optional          :: all_parts
     integer(kind=ik)                       :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jactive, Jmax
-    real(kind=rk)                          :: x0(1:3), dx(1:3)
+    real(kind=rk)                          :: x0(1:3), dx(1:3), t0
     logical, save                          :: time_independent_part_ready = .false.
     logical                                :: force_all_parts
 
+    t0 = MPI_wtime()
     Bs      = params%Bs
     g       = params%g
     Jactive = maxActiveLevel_tree(tree_ID_flow)
@@ -66,6 +68,8 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     if (((Jactive < Jmax-1 .and. params%force_maxlevel_dealiasing) .or. Jactive < Jmax) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
         ! generate complete mask (may be expensive)
         call createCompleteMaskDirect_tree(params, time, hvy_mask)
+
+        call toc( "create_mask_tree (createCompleteMaskDirect_tree)", 210, MPI_Wtime()-t0 )
 
         ! we're done, all parts of mask function are created, leave routine now
         return
@@ -141,6 +145,8 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
             if (params%rank==0) write(*,'(A, i0)') "WARNING: mask generation with time independent part fails (flow grid neither on Jmax nor Jmax-1 but on level ", Jactive," )"
         endif
     endif
+
+    call toc( "create_mask_tree (pruned_tree_logic)", 211, MPI_Wtime()-t0 )
 
 end subroutine
 

@@ -22,6 +22,46 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
+    ! Based on the (exact) signed distance function of a cylinder segment
+    ! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
+    function signed_distance_cylinder(p, a, b, r) result(d)
+        implicit none
+        real(kind=rk), dimension(3), intent(in) :: p, a, b
+        real(kind=rk), intent(in) :: r
+        real(kind=rk) :: d
+        real(kind=rk), dimension(3) :: ba, pa, tmp
+        real(kind=rk) :: baba, paba, x, y, x2, y2
+
+        ba = b - a
+        pa = p - a
+        baba = dot_product(ba, ba)
+        paba = dot_product(pa, ba)
+        
+        tmp = pa * baba - ba * paba
+        x = norm2(tmp) - r * baba
+        y = abs(paba - baba * 0.5_rk) - baba * 0.5_rk
+
+        x2 = x * x
+        y2 = y * y * baba
+
+        if (max(x, y) < 0.0_rk) then
+            ! d = -sqrt(min(x2, y2))
+            d = -min(x2,y2)
+        else
+            ! d = sqrt((merge(x2, 0.0_rk, x > 0.0_rk) + merge(y2, 0.0_rk, y > 0.0_rk)))
+            d = 0.0_rk
+            if (x > 0.0_rk) then
+                d = d + x2
+            end if
+            if (y > 0.0_rk) then
+                d = d + y2
+            end if
+        end if
+
+        d = sign(1.0_rk, d) * sqrt(abs(d)) / baba
+        ! d = sign(1.0_rk, d) * d / baba
+    end function 
+
     ! https://de.wikipedia.org/wiki/Polynominterpolation#Lagrangesche_Interpolationsformel
     ! Returns the value of $\ell_j(x)$ with nodes $x_i$
     function lagrange_polynomial(x, xi, j) result(result)

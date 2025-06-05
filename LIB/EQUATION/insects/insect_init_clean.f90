@@ -273,6 +273,9 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     call read_param_mpi(PARAMS, "Insects", "fractal_tree_file", Insect%fractal_tree_file, "tree_data.in")
     call read_param_mpi(PARAMS, "Insects", "fractal_tree_x0", Insect%fractal_tree_x0, (/0.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(PARAMS, "Insects", "fractal_tree_scaling", Insect%fractal_tree_scaling, 1.0_rk )
+    call read_param_mpi(PARAMS, "Insects", "fractal_tree_spheres", Insect%fractal_tree_spheres, .true. )
+
+    
 
 
     ! wing inertia tensor (we currently assume two identical forewings and two identical hindwings)

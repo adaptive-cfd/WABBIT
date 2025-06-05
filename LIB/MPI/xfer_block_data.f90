@@ -51,17 +51,18 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     do k = 0, mpisize-1
         ! write in total size of entries at beginning of each part and pre-shift real_pos
         buffer_offset = sum(meta_send_counter(0:k-1))*S_META_SEND + sum(data_send_counter(0:k-1)) + k + 1
+
+        ! out-of memory case.
+        ! It is more useful for users to provide a clear error message. The buffer rData_sendBuffer is simply not large enough
+        ! to perform the selected transfer. It is okay to have this message checking inside the loop, because its a relatively
+        ! small loop only over MPIRANKs.
+        if (buffer_offset >= size(rData_sendBuffer,1)) then
+            call abort(202505141, "ERROR: Out of memory! [rData_sendBuffer for MPI communication bundling overflow] Try increasing --memory. If no more memory left, possibly increase Ncpu to obtain more.")
+        endif
+
         rData_sendBuffer(buffer_offset) = meta_send_counter(k)
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
-
-    ! if (present(verbose_check)) then
-    !     ! for debugging with exactly four procs, useful to see if their is a mismatch in send/receive
-    !     write(*, '("Rank ", i0, " Send N ", 4(i4, 1x), "Receive N ", 4(i4, 1x), "Send P ", 4(i2, 1x), "Recv P ", 4(i2, 1x), "Send total ", i3)') myrank, data_send_counter, data_recv_counter, meta_send_counter, meta_recv_counter, count_send_total
-        
-    !     ! ! for debugging send/receive volume
-    !     ! write(*, '("Rank ", i0, " Send N ", 1(i6, 1x), "Receive N ", 1(i6, 1x), "Send P ", 1(i2, 1x), "Recv P ", 1(i2, 1x), "Send total ", i3)') myrank, sum(data_send_counter), sum(data_recv_counter), sum(meta_send_counter), sum(meta_recv_counter), count_send_total
-    ! endif
 
     call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
     REF_FLAG, ignore_Filter=ignoreFilter)

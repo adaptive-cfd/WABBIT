@@ -48,21 +48,24 @@ module module_acm
 
   type(wingsection) :: wingsections(2)
 
+! how many different parts of the mask can be distinguished
+  integer, parameter :: ncolors=8
+
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_params_acm
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, penalization_startup_tau
+    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk, bulk_viscosity=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
     ! forces for the different colors
-    real(kind=rk) :: force_color(1:3,0:6), moment_color(1:3,0:6)
+    real(kind=rk) :: force_color(1:3,0:ncolors), moment_color(1:3,0:ncolors)
     real(kind=rk) :: gamma_p
     logical :: penalization, smooth_mask=.True., compute_flow=.true.
     ! sponge term:
@@ -279,6 +282,7 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
     call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
+    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)
     call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)
     call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
     call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
@@ -459,7 +463,7 @@ end subroutine
 
     ! read lamballais reference fields, see
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
-    if (params_acm%geometry == "lamballais") then
+    if ((params_acm%geometry == "lamballais").or.(params_acm%geometry=="lamballais-local")) then
         if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
         
         ! read us field

@@ -245,14 +245,20 @@ subroutine laplacian_inplace_filtered_FD( params, u_hat, dx, order_discretizatio
 
     do iz = 1, params%bs(3)
         !-- wavenumber in z-direction
-        kz = wave_z(iz, params%bs(3))
+        if (params%dim < 3) then
+            kz = 0.0_rk
+        else
+            kz = wave_z(iz, params%bs(3))
+            kz = wave_k2_FD2(kz,dx(3),order_discretization)
+        endif
         do iy = 1, params%bs(2)
             !-- wavenumber in y-direction
             ky = wave_y(iy, params%bs(2))
+            ky = wave_k2_FD2(ky,dx(2),order_discretization)
             do ix = 1, params%bs(1)/2+1
                 !-- wavenumber in x-direction
                 kx = wave_x(ix, params%bs(1))
-                k2 = wave_k2_FD2(kx,dx(1),order_discretization) + wave_k2_FD2(ky,dx(2),order_discretization) + wave_k2_FD2(kz,dx(3),order_discretization)
+                k2 = wave_k2_FD2(kx,dx(1),order_discretization) + ky + kz
                 u_hat(ix,iy,iz) = -k2*u_hat(ix,iy,iz)
             enddo
         enddo
@@ -306,8 +312,12 @@ subroutine invlaplacian_inplace_filtered_FD( params, u_hat, dx, order_discretiza
     
     do iz = 1, params%bs(3)
         !-- wavenumber in z-direction
-        kz = wave_z(iz, params%bs(3))
-        kz = wave_k2_FD2(kz,dx(3),order_discretization)
+        if (params%dim < 3) then
+            kz = 0.0_rk
+        else
+            kz = wave_z(iz, params%bs(3))
+            kz = wave_k2_FD2(kz,dx(3),order_discretization)
+        endif
         do iy = 1, params%bs(2)
             !-- wavenumber in y-direction
             ky = wave_y(iy, params%bs(2))

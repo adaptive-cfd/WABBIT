@@ -105,7 +105,6 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, a, sten
 
         ! only leaf layer has solution
         if (.not. block_is_leaf(params, hvy_id)) cycle
-
         hvy_work(:,:,:,1:nc,hvy_id) = hvy_sol(:,:,:,1:nc,hvy_id)
     enddo
     call toc( "GS Downwards - Backup solution", 10022, MPI_Wtime()-t_block )
@@ -527,10 +526,15 @@ subroutine multigrid_upwards_2(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin
     integer(kind=tsize)                :: treecode
 
     logical            :: sweep_forward
-    integer(kind=ik)   :: k_block, lgt_ID, hvy_id, nc, ic, i_sweep, mpierr, i_level, level_me, ref_me, sync_freq
+    integer(kind=ik)   :: k_block, lgt_ID, hvy_id, nc, ic, i_sweep, mpierr, i_level, level_me, ref_me, sync_freq, i_g(1:3), i_BS(1:3)
     real(kind=rk)      :: t_loop, t_block, t_print(1:1)
     real(kind=rk)      :: dx(1:3), x0(1:3)
     nc = size(hvy_sol,4)
+
+    i_g = 0
+    i_g(1:params%dim) = mod(params%g, 2)
+    i_BS = 0
+    i_BS(1:params%dim) = mod(params%Bs(1:params%dim), 2)
 
     ! prepare grid, set all ref stats to EMPTY and only lowest level to 1
     do k_block = 1, lgt_n(tree_ID)
@@ -612,12 +616,18 @@ subroutine multigrid_upwards_2(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin
             if (lgt_block(lgt_id,IDX_REFINE_STS) /= 1) cycle
 
             do ic = 1,nc
+                ! We now predict, here we insert the following, example BS=6, g=2:
+                !    GS GW IS IW IS IW IS IW GS GW
+                !    GS    IS    IS    IS    GS
+                ! We use the grid between the outmost GS to interpolate and retrieve the grid with points in between afterwards
+                ! Leftmost GS is dependent on g even(1)/odd(2)
+                ! Rightmost GS is dependent on BS even g even(N-1)/odd(N) and BS odd g even(N)/odd(N-1)
                 if (params%dim==2) then
-                    call prediction(hvy_sol(1:params%Bs(1)+2*params%g:2,1:params%Bs(2)+2*params%g:2,:,ic,hvy_id), &
-                                    hvy_sol(1:params%Bs(1)+2*params%g-1,1:params%Bs(2)+2*params%g-1,:,ic,hvy_id), params%order_predictor)
+                    call prediction(hvy_sol(1+i_g(1):params%Bs(1)+2*params%g:2,1+i_g(2):params%Bs(2)+2*params%g:2,:,ic,hvy_id), &
+                                    hvy_sol(1+i_g(1):params%Bs(1)+2*params%g-1+mod(i_g(1)+i_BS(1),2),1+i_g(2):params%Bs(2)+2*params%g-1+mod(i_g(2)+i_BS(2),2),:,ic,hvy_id), params%order_predictor)
                 else
-                    call prediction(hvy_sol(1:params%Bs(1)+2*params%g:2,1:params%Bs(2)+2*params%g:2,1:params%Bs(3)+2*params%g:2,ic,hvy_id), &
-                                    hvy_sol(1:params%Bs(1)+2*params%g-1,1:params%Bs(2)+2*params%g-1,1:params%Bs(3)+2*params%g-1,ic,hvy_id), params%order_predictor)
+                    call prediction(hvy_sol(1+i_g(1):params%Bs(1)+2*params%g:2,1+i_g(2):params%Bs(2)+2*params%g:2,1+i_g(3):params%Bs(3)+2*params%g:2,ic,hvy_id), &
+                                    hvy_sol(1+i_g(1):params%Bs(1)+2*params%g-1+mod(i_g(1)+i_BS(1),2),1+i_g(2):params%Bs(2)+2*params%g-1+mod(i_g(2)+i_BS(2),2),1+i_g(3):params%Bs(3)+2*params%g-1+mod(i_g(3)+i_BS(3),2),ic,hvy_id), params%order_predictor)
                 endif
             enddo
 
@@ -657,24 +667,26 @@ subroutine multigrid_upwards_2(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin
         call toc( "GS Upwards - RHS and solution restoration", 10032, MPI_Wtime()-t_block )
 
         ! do actual sweeps
-        sync_freq = 1
-        ! sync_freq = params%g / a
-        sweep_forward = .true.
-        do i_sweep = 1, it_sweep
-            if (modulo(i_sweep-1, sync_freq) == 0) then
-                ! we need to synch before a sweep
-                t_block = MPI_Wtime()
-                call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, a, a, ignore_Filter=.true.)
-                ! call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, a*sync_freq, a*sync_freq)
-                call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
-            endif
+        ! if (i_level /= Jmax_a) then
+            sync_freq = 1
+            ! sync_freq = params%g / a
+            sweep_forward = .true.
+            do i_sweep = 1, it_sweep
+                if (modulo(i_sweep-1, sync_freq) == 0) then
+                    ! we need to synch before a sweep
+                    t_block = MPI_Wtime()
+                    call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, a, a, ignore_Filter=.true.)
+                    ! call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, a*sync_freq, a*sync_freq)
+                    call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
+                endif
 
-            ! blocks on this iteration do a GS-sweep, they have refinement status 0 or 1
-            ! call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), a, stencil, sweep_forward)
-            call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), a, stencil, sweep_forward, filter_offset=params%g-(sync_freq-1)*a)
+                ! blocks on this iteration do a GS-sweep, they have refinement status 0 or 1
+                ! call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), a, stencil, sweep_forward)
+                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), a, stencil, sweep_forward, filter_offset=params%g-(sync_freq-1)*a)
 
-            sweep_forward = .not. sweep_forward
-        enddo
+                sweep_forward = .not. sweep_forward
+            enddo
+        ! endif
 
         t_print = MPI_Wtime()-t_loop
         call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
@@ -724,13 +736,9 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
             t_block = MPI_Wtime()
 
             ! we want to solve laplacian for finest level, so if FFT has fft precision, we need to adjust it to the finest level
-            do k_block = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k_block, tree_ID)
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-                if (lgt_block(lgt_id,IDX_MESH_LVL) /= Jmax_a) cycle  ! skip blocks not on this level
-                call get_block_spacing_origin( params, lgt_ID, x0, dx )  ! get spacing
-                exit
-            enddo
+            ! so let's get a dx on the finest level, we could loop over blocks and use get_block_origin_spacing, but maybe the processor with block on Jmin does not have one!
+            ! so we aquire it directly by calling the underlying function with TC 0 and the correct level
+            call get_block_spacing_origin_b( 0_tsize, params%domain_size, params%Bs, x0, dx, dim=params%dim, level=Jmax_a, max_level=params%Jmax)
 
             do k_block = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k_block, tree_ID)
@@ -739,7 +747,7 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
                 ! skip blocks not on this level
                 if (lgt_block(lgt_id,IDX_MESH_LVL) /= i_level) cycle
 
-                ! ! get spacing
+                ! ! get spacing of lowest level block - usually we need that of level max though
                 ! call get_block_spacing_origin( params, lgt_ID, x0, dx )
 
                 call fft_solve_poisson(params, hvy_sol(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), fft_order_discretization, dx)

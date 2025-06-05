@@ -12,8 +12,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     !> Additional value to be considered for norm logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: n_val
 
-    real(kind=rk)                       :: x0(1:3), dx(1:3), volume, norm_block
-    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), io(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id
+    real(kind=rk)                       :: x0(1:3), dx(1:3), volume, norm_block, mean_block, mean(size(norm))
+    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), io(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id, sign
     logical          :: SC_only
     integer, dimension(:), allocatable  :: mask_i, mask
 
@@ -28,6 +28,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     do k = 1, params%dim
         if (modulo(Bs(k), 2) == 1) io(k) = 1
     end do
+
+    ! sometimes we want to subtract parts of the norm, for example the mean parts / parts on the root layer
+    sign = 1
 
     ! for threshold state vector components we do some slicing magic
     ! fortran does not allow logical mask slicing, so we build a mask of indices to slice with
@@ -54,6 +57,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         if (index(norm_case, "tree") > 0) norm_case_id = norm_case_id + 10*3
         if (index(norm_case, "leaf") > 0) norm_case_id = norm_case_id + 0  ! this is basically the normal one
         if (index(norm_case, "root") > 0) norm_case_id = norm_case_id + 10*4  ! only on lowest available layer
+        if (index(norm_case, "wavelets") > 0) norm_case_id = norm_case_id + 10*5  ! leaf layer minus root layer, only Norm in wavelets
     endif
 
     select case (which_norm)
@@ -83,13 +87,25 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             elseif (norm_case_ID/10 == 4) then
                 ! only sum up over roots, we sadly don't have access to function block_is_root
                 if (hvy_family(hvy_ID, 1) /= -1) cycle
+            elseif (norm_case_ID/10 == 5) then
+                ! only sum up over leafs and subtract roots, we sadly don't have access to function block_is_root/leaf
+                if (hvy_family(hvy_ID, 1) /= -1) then
+                    sign = -1
+                elseif (any(hvy_family(hvy_ID, 2+2**params%dim:1+2**(params%dim+1)) /= -1)) then
+                    sign = 1
+                else
+                    cycle  ! block is not root or leaf, we cycle
+                endif
+                ! For Linfty, we cannot subtract the mean value. In theory this sounds nice but with penalization it makes no sense.
+                ! Because inside the domain the velocity is zero and we would again only have something around the mean-velocity as the max-norm.
+                if (which_norm == "Linfty") call abort(20030201, "Linfty norm is not supported only over wavelets. How dare you!")
             endif
 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
             ! compute integral over the volume for this block, only needed for mean but it is cheap
-            volume = volume + product(params%Bs-io)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            if (sign == 1) volume = volume + product(params%Bs-io)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             ! compute norm for thresholding components that are treated on their own, here we treat all norms together
             do p = 1, n_eqn
@@ -98,16 +114,16 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                         norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )**2 )
                     elseif (which_norm == "L1") then
                         norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )) )
-                    elseif (which_norm == "Linfty") then
+                    elseif (which_norm == "Linfty" .and. sign == 1) then
                         norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )) )
                     elseif (which_norm == "Mean") then
                         norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id ) )
                     endif
 
-                    if (which_norm == "Linfty") then
+                    if (which_norm == "Linfty" .and. sign == 1) then
                         norm(p) = max(norm(p), norm_block)
                     else
-                        norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
+                        norm(p) = norm(p) + sign*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
                     endif
                 endif
             enddo
@@ -124,16 +140,16 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                     norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )**2 )
                 elseif (which_norm == "L1") then
                     norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )) )
-                elseif (which_norm == "Linfty") then
+                elseif (which_norm == "Linfty" .and. sign == 1) then
                     norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )) )
                 elseif (which_norm == "Mean") then
                     norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id ) )
                 endif
 
-                if (which_norm == "Linfty") then
+                if (which_norm == "Linfty" .and. sign == 1) then
                     norm(mask) = max(norm(mask), norm_block)
                 else
-                    norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
+                    norm(mask) = norm(mask) + sign*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
                 endif
             enddo
         enddo
@@ -287,6 +303,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 
 end subroutine
 
+!> Prototype, will probably be deleted later and is not up to latest formulations
 subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, norm_case, n_val)
     implicit none
 

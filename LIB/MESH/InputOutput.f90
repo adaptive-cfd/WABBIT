@@ -13,7 +13,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
-    integer(kind=ik)                    :: g, dim, Bs(1:3), io(1:3)             ! grid parameter
+    integer(kind=ik)                    :: g, dim, Bs(1:3)                      ! grid parameter
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
     ! coordinates and spacing arrays
@@ -58,11 +58,6 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     Bs   = params%Bs
     g    = params%g
     dim  = params%dim
-    ! for odd block-sizes we handle some things differently
-    io(1:3) = 0
-    do k=1,dim
-        if (mod(Bs(k), 2) == 1) io(k) = 1
-    enddo
     periodic_BC = 0_ik
     symmetry_BC = 0_ik
 
@@ -82,7 +77,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     else
         ! uniqueGrid modification: we save the first ghost node in addition to the internal
         ! points for visualization
-        allocate(myblockbuffer( 1:Bs(1)+1-io(1), 1:Bs(2)+1-io(2), 1:Bs(3)+1-io(3), 1:hvy_n(tree_ID) ), stat=status)
+        allocate(myblockbuffer( 1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:hvy_n(tree_ID) ), stat=status)
     endif
 
     if (status /= 0) then
@@ -137,7 +132,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         lbounds3D = (/1, 1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ! ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
-        ubounds3D = (/Bs(1)+1-io(1), Bs(2)+1-io(2), Bs(3)+1-io(3), lbounds3D(4)+hvy_n(tree_ID)/) - 1
+        ubounds3D = (/Bs(1)+1, Bs(2)+1, Bs(3)+1, lbounds3D(4)+hvy_n(tree_ID)/) - 1
         if (saveGhosts) ubounds3D = (/Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, lbounds3D(4)+hvy_n(tree_ID)/) - 1
 
     else
@@ -148,7 +143,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         lbounds2D = (/1, 1, sum(actual_blocks_per_proc(0:rank-1))+1/) - 1
         ! ubounds2D = (/Bs(1), Bs(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
         ! uniqueGrid modification:
-        ubounds2D = (/Bs(1)+1-io(1), Bs(2)+1-io(2), lbounds2D(3)+hvy_n(tree_ID)/) - 1
+        ubounds2D = (/Bs(1)+1, Bs(2)+1, lbounds2D(3)+hvy_n(tree_ID)/) - 1
         if (saveGhosts) ubounds2D = (/Bs(1)+2*g, Bs(2)+2*g, lbounds2D(3)+hvy_n(tree_ID)/) - 1
 
     endif
@@ -176,7 +171,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 else
                     ! myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, hvy_id)
                     ! uniqueGrid modification:
-                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g+1-io(1), g+1:Bs(2)+g+1-io(2), g+1:Bs(3)+g+1-io(3), dF, hvy_id)
+                    myblockbuffer(:,:,:,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, hvy_id)
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -205,7 +200,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 else
                     ! myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, hvy_id)
                     ! uniqueGrid modification:
-                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1-io(1), g+1:Bs(2)+g+1-io(2), 1, dF, hvy_id)
+                    myblockbuffer(:,:,1,l) = hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, 1, dF, hvy_id)
                 endif
 
                 ! note reverse ordering (paraview uses C style, we fortran...life can be hard)
@@ -275,8 +270,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
         ! we could split this up into bs and g but for now to work with visualization scripts I keep it at that
         Bs(1:params%dim) = Bs(1:params%dim) + 2*g
     else
-        ! Even for odd BS, we save it as the even counterparts, so that it is easier to save and read in and visualize
-        Bs(1:params%dim) = Bs(1:params%dim) - io(1:params%dim)
+        Bs(1:params%dim) = Bs(1:params%dim)
     endif
     call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
@@ -345,7 +339,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     integer(kind=ik) :: N_files         !< number of files to read in this tree (=number of vector components)
     integer(kind=ik) :: NblocksFile
-    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(1:3), g, dF, i, level_min, Jmin_set, hvy_id, lgt_id, lgt_n_old, io(1:3)
+    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(1:3), g, dF, i, level_min, Jmin_set, hvy_id, lgt_id, lgt_n_old
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
@@ -374,11 +368,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     g            = params%g
     NblocksFile  = getNumberBlocksH5File(fnames(1))
     N_files      = size(fnames)
-    ! for odd block-sizes we handle some things differently
-    io(1:3) = 0
-    do k=1,params%dim
-        if (mod(Bs(k), 2) == 1) io(k) = 1
-    enddo
 
     if (tree_ID <= tree_N) then
         ! the tree already exists: to overwrite it, we first delete the existing one
@@ -566,12 +555,12 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     if ( params%dim == 3 ) then
         ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
         ! important for visualization. Hence, Bs+1 points are read if we have even BS
-        allocate( hvy_buffer(1:Bs(1)+1-io(1), 1:Bs(2)+1-io(2), 1:Bs(3)+1-io(3), 1:N_files, 1:my_hvy_n) )
+        allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x Bsz x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds3D = (/0, 0, 0, sum(blocks_per_rank_list(0:rank-1))/)
-        ubounds3D = (/Bs(1)-io(1), Bs(2)-io(2), Bs(3)-io(3), lbounds3D(4)+my_hvy_n-1/)
+        ubounds3D = (/Bs(1), Bs(2), Bs(3), lbounds3D(4)+my_hvy_n-1/)
 
         ! 3D data case
         ! actual reading of file (into hvy_buffer! not hvy_work)
@@ -591,12 +580,12 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     else
         ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
         ! important for visualization. Hence, Bs+1 points are read if we have even BS
-        allocate( hvy_buffer(1:Bs(1)+1-io(1), 1:Bs(2)+1-io(2), 1, 1:N_files, 1:my_hvy_n) )
+        allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x 1 x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
         ! (note zero-based offset):
         lbounds2D = (/0,0,sum(blocks_per_rank_list(0:rank-1))/)
-        ubounds2D = (/Bs(1)-io(1),Bs(2)-io(2),lbounds2D(3)+my_hvy_n-1/)
+        ubounds2D = (/Bs(1),Bs(2),lbounds2D(3)+my_hvy_n-1/)
 
         ! 2D data case
         ! actual reading of file (into hvy_buffer! not hvy_work)
@@ -662,9 +651,9 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             if (params%dim == 3) then
                 ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
                 ! important for visualization. Hence, Bs+1 points are read if we have even BS
-                hvy_block( g+1:Bs(1)+g+1-io(1), g+1:Bs(2)+g+1-io(2), g+1:Bs(3)+g+1-io(3), dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
+                hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
             else
-                hvy_block( g+1:Bs(1)+g+1-io(1), g+1:Bs(2)+g+1-io(2), :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
+                hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
             endif
         end do
     end do

@@ -168,8 +168,6 @@ subroutine spaghetti2Mallat_block(params, u, wc)
     ! For different BS or g the actual points could look differently, let's have a look at 1D:
     ! BS even, g even:     GS GW IS IW IS IW GS GW    (2G,4I,2G)   ->  GS IS IS GS GW IW IW GW    (1G,2I,1G | 1G,2I,1G)
     ! BS even, g odd :        GW IS IW IS IW GS       (1G,4I,1G)   ->     IS IS GS GW IW IW       (   2I,1G | 1G,2I   )
-    ! BS odd , g even:     GS GW IS IW IS IW IS GW GS (2G,5I,2G)   ->  GS IS IS IS GS GW IW IW GW (1G,3I,1G | 1G,2I,1G)
-    ! BS odd , g odd :        GW IS IW IS IW IS GW    (2G,5I,2G)   ->     IS IS IS GW IW IW GW    (   3I    | 1G,2I,1G)
     ! We therefore have: G_SC_L = g//2, G_WC_L = g//2 + 1, Start_WC = (BS+1)//2 + (g//2)*2
 
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
@@ -181,11 +179,7 @@ subroutine spaghetti2Mallat_block(params, u, wc)
     nc = size(u, 4)
     ! how many points are in the scaling function part, bear in mind we do integer division here
     do i_s = 1,params%dim
-        if (mod(params%Bs(i_s),2) == 0) then
-            sc_e(i_s) = params%Bs(i_s)/2 + params%g
-        else
-            sc_e(i_s) = (params%Bs(i_s)+1)/2 + (params%g/2)*2
-        end if
+        sc_e(i_s) = params%Bs(i_s)/2 + params%g
     end do
 
 #ifdef DEV
@@ -242,8 +236,6 @@ subroutine Mallat2Spaghetti_block(params, wc, u)
     ! For different BS or g the actual points could look differently, let's have a look at 1D:
     ! BS even, g even:     GS IS IS GS GW IW IW GW    (1G,2I,1G | 1G,2I,1G)   ->  GS GW IS IW IS IW GS GW    (2G,4I,2G)
     ! BS even, g odd :        IS IS GS GW IW IW       (   2I,1G | 1G,2I   )   ->     GW IS IW IS IW GS       (1G,4I,1G)
-    ! BS odd , g even:     GS IS IS IS GS GW IW IW GW (1G,3I,1G | 1G,2I,1G)   ->  GS GW IS IW IS IW IS GW GS (2G,5I,2G)
-    ! BS odd , g odd :        IS IS IS GW IW IW GW    (   3I    | 1G,2I,1G)   ->     GW IS IW IS IW IS GW    (2G,5I,2G)
     ! We therefore have: G_SC_L = g//2, G_WC_L = g//2 + 1, Start_WC = (BS+1)//2 + (g//2)*2
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     integer(kind=ik) :: nx, ny, nz, nc, i_s, sc_e(1:3)
@@ -252,13 +244,9 @@ subroutine Mallat2Spaghetti_block(params, wc, u)
     ny = size(u, 2)
     nz = size(u, 3)
     nc = size(u, 4)
-    ! how many points are in the scaling function part, bear in mind we do integer division here
+    ! how many points are in the scaling function part
     do i_s = 1,params%dim
-        if (mod(params%Bs(i_s),2) == 0) then
-            sc_e(i_s) = params%Bs(i_s)/2 + params%g
-        else
-            sc_e(i_s) = (params%Bs(i_s)+1)/2 + (params%g/2)*2
-        end if
+        sc_e(i_s) = params%Bs(i_s)/2 + params%g
     end do
     
 #ifdef DEV

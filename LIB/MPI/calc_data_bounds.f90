@@ -57,7 +57,7 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: lvl_diff, gminus, gplus
 
-    integer(kind=ik) :: n(1:3), g(3), Bs(1:3), i_dim, a, min_size, Nsender, r_offset(1:3)
+    integer(kind=ik) :: n(1:3), g(3), Bs(1:3), i_dim, a, min_size, Nsender
 
     g(:) = params%g
     Bs = params%bs
@@ -65,12 +65,6 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
     n(:) = 1
     do i_dim = 1,params%dim
         n(i_dim) = Bs(i_dim) + 2*g(i_dim)
-    enddo
-
-    ! for redundant grids, we have to shift the sender bounds
-    r_offset(:) = 0
-    do i_dim = 1,params%dim
-        if (mod(Bs(i_dim),2) == 1) r_offset(i_dim) = 1
     enddo
 
     ! the number a is how many extra coarse points on the sender side you use to
@@ -94,19 +88,15 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
     if (lvl_diff == 0) then
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
             (/gminus, gminus, gminus/), (/gplus, gplus, gplus/), &
-            g_m=(/g, g, g/), g_p=(/g, g, g/), lvl_diff=lvl_diff, redundant_shift=r_offset)
+            g_m=(/g, g, g/), g_p=(/g, g, g/), lvl_diff=lvl_diff)
     elseif (lvl_diff == +1) then  ! restriction for coarser neighbor
         ! Restriction, example with Bs=8, g=3 for even grids:
         ! Normal grid:              g   g   g   i   i   i   i   i   i   i   i   g   g   g
         ! Restricted:                           l       lr      lr      r
         ! Values have to be odd (coincide with SC from spaghetti form), thats why left and right are treated differently then
-        ! Restriction, example with Bs=9, g=3 for odd grids:
-        ! Normal grid:              g   g   g   i   i   i   i   i   i   i   i   i   g   g   g
-        ! Restricted:                           l       lr      lr      lr      r
-        ! We sent more values, as we update the redundant points as well
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
-            (/(gminus+r_offset(1))*2-1, (gminus+r_offset(1))*2-1, (gminus+r_offset(1))*2-1/), (/(gplus+r_offset(1))*2-1, (gplus+r_offset(1))*2-1, (gplus+r_offset(1))*2-1/), &
-            g_m=(/g, g, g/), g_p=(/g+1-r_offset(1), g+1-r_offset(2), g+1-r_offset(3)/), lvl_diff=lvl_diff)
+            (/gminus*2-1, gminus*2-1, gminus*2-1/), (/gplus*2-1, gplus*2-1, gplus*2-1/), &
+            g_m=(/g, g, g/), g_p=(/g+1, g+1, g+1/), lvl_diff=lvl_diff)
         ! buffer is the same but 1-based
         do i_dim = 1, params%dim
             Nsender = data_bounds(2, i_dim) - data_bounds(1, i_dim) + 1
@@ -117,13 +107,9 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
         ! Normal grid:              g   g   g   i   i   i   i   i   i   g   g   g
         ! Predicted:                            l l l             r r r
         ! Needed for prediction:                r   r           r   r   r
-        ! Prediction, example with Bs=7, g=3, 2nd order for odd grids:
-        ! Normal grid:              g   g   g   i   i   i   i   i   i   i   g   g   g
-        ! Predicted:                            l l l               r r r
-        ! Needed for prediction:                r   r               r   r
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
-            (/(gminus+r_offset(1))/2+1, (gminus+r_offset(2))/2+1, (gminus+r_offset(3))/2+1/), (/(gplus+1)/2+1, (gplus+1)/2+1, (gplus+1)/2+1/), &
-            g_m=(/g, g, g/), g_p=(/g-1+r_offset(1), g-1+r_offset(1), g-1+r_offset(1)/), lvl_diff=lvl_diff)
+            (/gminus/2+1, gminus/2+1, gminus/2+1/), (/(gplus+1)/2+1, (gplus+1)/2+1, (gplus+1)/2+1/), &
+            g_m=(/g, g, g/), g_p=(/g-1, g-1, g-1/), lvl_diff=lvl_diff)
 
         ! enlargen area with stencil size
         do i_dim = 1, params%dim
@@ -135,22 +121,10 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
         do i_dim = 1, params%dim
             ! first where do we start? If it is left-bounded then 1+a, else 2+a
             ! first point is always directly after ghost patch, also for even sync all other patches are left-bounded as well
-            if (mod(Bs(i_dim),2) == 0) then
-                if (data_bounds(1, i_dim) == params%g+1-a .or. mod(gminus,2) == 0) then
-                    data_buffer(1, i_dim) = 1+a*2
-                else
-                    data_buffer(1, i_dim) = 2+a*2
-                endif
+            if (data_bounds(1, i_dim) == params%g+1-a .or. mod(gminus,2) == 0) then
+                data_buffer(1, i_dim) = 1+a*2
             else
-            ! for redundant grid it is exactly opposite, left-bounded always has to be interpolated, so 2+a, rightbounded depends on g
-            ! however, long edges always start with non-interpolated point
-            ! I admit, this one is ugly
-                if ((data_bounds(1, i_dim) <= params%g+1 .and. data_bounds(2, i_dim) - data_bounds(1, i_dim) <= g(i_dim)+a) .or. \
-                    (mod(gminus,2) == 1 .and. .not. (data_bounds(1, i_dim) <= params%g+1 .and. data_bounds(2, i_dim) - data_bounds(1, i_dim) > g(i_dim)+a))) then
-                    data_buffer(1, i_dim) = 2+a*2
-                else
-                    data_buffer(1, i_dim) = 1+a*2
-                endif
+                data_buffer(1, i_dim) = 2+a*2
             endif
             data_buffer(2, i_dim) = data_buffer(1, i_dim) + gplus-1
             ! for edges the length is increased by Bs

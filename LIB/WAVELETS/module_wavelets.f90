@@ -850,7 +850,7 @@ contains
         logical, intent(in), optional :: set_garbage
 
         integer(kind=ik) :: Nwcl, Nwcr, i_neighborhood
-        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), d, idx(2,3), io(1:3), i_dim, i_set
+        integer(kind=ik) :: nx, ny, nz, nc, g, Bs(1:3), io(1:3), d, idx(2,3), i_dim, i_set
         logical :: setGarbage
         real(kind = rk) :: setNumber
 
@@ -891,6 +891,7 @@ contains
             !                 I I I
             ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
             ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+            ! depending on BS this can change as well
             io = 0
             io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 
@@ -966,6 +967,7 @@ contains
             !                 I I I
             ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
             ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+            ! depending on BS this can change as well
             io = 0
             io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 
@@ -1320,13 +1322,7 @@ contains
         params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
         params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
 
-        if (any(mod(params%BS(1:params%dim), 2) == 0) .or. any(params%BS(1:params%dim) == 0)) then
-            ! even block size or BS was not set, set size as usually
-            params%Nscr    = ubound(params%HD, dim=1)
-        else
-            ! odd block size, last point is SC so Nscr can be reduced by one like Nscl
-            params%Nscr    = max(ubound(params%HD, dim=1) - 1, 0)
-        endif
+        params%Nscr    = ubound(params%HD, dim=1)
         params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
         params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
 
@@ -1827,6 +1823,7 @@ contains
         !                 I I I
         ! 1-C - index numbering in hex format, G - ghost point, S - SC, W - WC, I - point of patch to be checked
         ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
+        ! depending on BS this can change as well
         io = 0
         io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
 

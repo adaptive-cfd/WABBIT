@@ -14,7 +14,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
     real(kind=rk), allocatable, save    :: data_predict_fine(:,:,:,:)  ! data fields for interpolation
-    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id, level, idx_d(2,3), io(1:3)
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id, level, idx_d(2,3)
     integer(kind=tsize)                 :: treecode
 
     dim = params%dim
@@ -22,12 +22,6 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     rank = params%rank
     Bs = params%Bs
     g  = params%g
-
-    ! for odd block sizes, we have an overlap of the points from the center line for the daughter blocks
-    io = 0
-    do df = 1,dim
-        if (modulo(Bs(df),2) == 1) io(df) = 1
-    enddo
 
     ! data fields for interpolation
     ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
@@ -92,13 +86,13 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! save interpolated data - select data from correct quadrant
         ! k=0 -> X_l, Y_l; k=1 -> X_l, Y_r; k=2 -> X_r, Y_l; k=3 -> X_r, Y_r;
         ! compute indices of new block, include ghost points
-        idx_d(1,1) = 1*g +     1 + (Bs(1)-io(1)) * modulo(k_daughter/2,2)
-        idx_d(2,1) = 3*g + Bs(1) + (Bs(1)-io(1)) * modulo(k_daughter/2,2)
-        idx_d(1,2) = 1*g +     1 + (Bs(2)-io(2)) * modulo(k_daughter,2)
-        idx_d(2,2) = 3*g + Bs(1) + (Bs(2)-io(2)) * modulo(k_daughter,2)
+        idx_d(1,1) = 1*g +     1 + Bs(1) * modulo(k_daughter/2,2)
+        idx_d(2,1) = 3*g + Bs(1) + Bs(1) * modulo(k_daughter/2,2)
+        idx_d(1,2) = 1*g +     1 + Bs(2) * modulo(k_daughter,2)
+        idx_d(2,2) = 3*g + Bs(1) + Bs(2) * modulo(k_daughter,2)
         if (dim == 3) then
-            idx_d(1,3) = 1*g +     1 + (Bs(3)-io(3)) * (k_daughter/4)
-            idx_d(2,3) = 3*g + Bs(3) + (Bs(3)-io(3)) * (k_daughter/4)
+            idx_d(1,3) = 1*g +     1 + Bs(3) * (k_daughter/4)
+            idx_d(2,3) = 3*g + Bs(3) + Bs(3) * (k_daughter/4)
         endif
 
         if (dim == 2) then

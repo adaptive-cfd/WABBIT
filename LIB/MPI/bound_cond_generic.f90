@@ -56,8 +56,7 @@ subroutine bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_f
                 if (abs(x0(i_dim)-0.0_rk) < tolerance ) then !x_i == 0
                     n_domain(i_dim) = -1
                 ! check if origin_b + BS*dx = L
-                ! (Bs/2)*2 uses integer division so that for redundant grids with odd BS we have the same dx
-                elseif (abs(x0(i_dim)+dx(i_dim)*real((params%Bs(i_dim)/2)*2,kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
+                elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
                     n_domain(i_dim) = +1
                 endif
             end do

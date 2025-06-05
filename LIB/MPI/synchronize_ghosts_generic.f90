@@ -232,8 +232,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
 
 #ifdef DEV
     ! for dev check ghosts by wiping if we set all of them
-    ! for odd BS, we have internal nodes in the ghost patches, but might not overwrite them (if synching from M), so we skip that
-    if (sync_case == "full" .and. all(modulo(params%BS(1:params%dim),2)==0)) call reset_ghost_nodes( params, hvy_block, tree_ID)
+    if (sync_case == "full") call reset_ghost_nodes( params, hvy_block, tree_ID)
 #endif
 
     ! We require two stages: first, we fill all ghost nodes which are simple copy (including restriction),

@@ -37,7 +37,7 @@ subroutine unit_test_fill_linearly(params, hvy_block, hvy_work, hvy_tmp, tree_ID
                 y = real(iy-(g+1), kind=rk) * ddx(2) + xx0(2)
                 do ix = 1, size(hvy_block, 1)
                     x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
-                    hvy_block(ix, iy, iz, 1, hvy_id) = 2**(Jm_a)*(Bs(1)/2)*2*x + 2**(Jm_a+1)*(Bs(2)/2)*2*y + 2**(Jm_a+2)*(Bs(3)/2)*2*z
+                    hvy_block(ix, iy, iz, 1, hvy_id) = 2**(Jm_a)*Bs(1)*x + 2**(Jm_a+1)*Bs(2)*y + 2**(Jm_a+2)*Bs(3)*z
                 enddo
             enddo
         enddo

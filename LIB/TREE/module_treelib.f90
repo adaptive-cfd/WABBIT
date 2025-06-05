@@ -92,14 +92,13 @@ module module_treelib
 
     ! the spacing on a block is the basic spacing Lx/Bs of the coarsest block (if there
     ! is only one block, j=0) divided by 2 for each level, thus the 2^-j factor
-    ! (Bs/2)*2 uses integer division so that for redundant grids with odd BS we have the same dx
     dx = 0.0_rk
-    dx(1:dim) = 2.0_rk**(-n_level) * domain(1:dim) / real( (Bs(1:dim)/2)*2, kind=rk )
+    dx(1:dim) = 2.0_rk**(-n_level) * domain(1:dim) / real( Bs(1:dim), kind=rk )
     ! dx(1:dim) = 2.0_rk**(-J) * domain(1:dim) / real( Bs(1:dim)-1, kind=rk )
 
     ! note zero based indexing:
     ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
-    x0 = real( ((ixyz) - 1)*(Bs/2)*2) * dx
+    x0 = real( ((ixyz) - 1)*Bs * dx, kind=rk)
 
   end subroutine get_block_spacing_origin_b
 

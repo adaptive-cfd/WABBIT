@@ -11,7 +11,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     logical, optional, intent(in)           :: verbose
 
     integer(kind=ik)                        :: k, hvy_id, lgt_id
-    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), io(1:3), Jmin, Jmax
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), Jmin, Jmax
     real(kind=rk), allocatable :: norm(:), norm_ref(:), wc(:,:,:,:,:)
     real(kind=rk)                           :: x0(1:3), dx(1:3)
     character(len=cshort)                   :: debug_name
@@ -31,11 +31,6 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
     Bs = params%Bs
     g = params%g
     nc = params%n_eqn
-    ! for odd block sizes, we have an overlap of the points from the center line and want to ignore those
-    io = 0
-    do k = 1,params%dim
-        if (modulo(Bs(k),2) == 1) io(k) = 1
-    enddo
 
     allocate(norm(1:params%n_eqn))
     allocate(norm_ref(1:params%n_eqn))
@@ -60,12 +55,7 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
 
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        if (all(io == 0)) then
-            call random_data(hvy_block(:,:,:,:,hvy_id))
-        else
-            ! redundant grid, so we have to make sure that redundant points receive the same values
-            call random_data_unique( hvy_block(:,:,:,:,hvy_id), x0, dx, (/params%g,params%g,params%g/), params%domain_size, params%Jmax, params%BS)
-        endif
+        call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )

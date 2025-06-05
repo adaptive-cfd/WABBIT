@@ -13,7 +13,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     integer(kind=ik), intent(in), optional  :: n_val
 
     real(kind=rk)                       :: x0(1:3), dx(1:3), volume, norm_block, mean_block, mean(size(norm))
-    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), io(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id, sign
+    integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id, sign
     logical          :: SC_only
     integer, dimension(:), allocatable  :: mask_i, mask
 
@@ -23,11 +23,6 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     g = 0
     g(1:params%dim) = params%g
     D = params%dim
-    ! for odd block sizes, we have an overlap of the points from the center line and do not want to count those
-    io = 0
-    do k = 1, params%dim
-        if (modulo(Bs(k), 2) == 1) io(k) = 1
-    end do
 
     ! sometimes we want to subtract parts of the norm, for example the mean parts / parts on the root layer
     sign = 1
@@ -105,19 +100,19 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
             ! compute integral over the volume for this block, only needed for mean but it is cheap
-            if (sign == 1) volume = volume + product(params%Bs-io)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            if (sign == 1) volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             ! compute norm for thresholding components that are treated on their own, here we treat all norms together
             do p = 1, n_eqn
                 if (params%threshold_state_vector_component(p) == 1) then
                     if (which_norm == "L2" .or. which_norm == "H1") then
-                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )**2 )
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
                     elseif (which_norm == "L1") then
-                        norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )) )
+                        norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
                     elseif (which_norm == "Linfty" .and. sign == 1) then
-                        norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )) )
+                        norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
                     elseif (which_norm == "Mean") then
-                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id ) )
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id ) )
                     endif
 
                     if (which_norm == "Linfty" .and. sign == 1) then
@@ -137,13 +132,13 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
 
                 if (which_norm == "L2" .or. which_norm == "H1") then
-                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )**2 )
+                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
                 elseif (which_norm == "L1") then
-                    norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )) )
+                    norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
                 elseif (which_norm == "Linfty" .and. sign == 1) then
-                    norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )) )
+                    norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
                 elseif (which_norm == "Mean") then
-                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id ) )
+                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id ) )
                 endif
 
                 if (which_norm == "Linfty" .and. sign == 1) then
@@ -205,11 +200,11 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
             ! compute integral over the volume for this block
-            volume = volume + product(params%Bs-io)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             do p = 1, n_eqn
                 norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-                sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )**2 )
+                sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
             enddo
         enddo
 
@@ -259,13 +254,13 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
             ! compute integral over the volume for this block
-            volume = volume + product(params%Bs-io)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
+            volume = volume + product(params%Bs)*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
             ! compute norm for thresholding components that are treated on their own
             do p = 1, n_eqn
                 if (params%threshold_state_vector_component(p) == 1) then
                     norm(p) = norm(p) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-                    sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), p, hvy_id )**2 )
+                    sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
                 endif
             enddo
 
@@ -277,7 +272,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 ! convert logical mask to index mask
                 mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
                 norm(mask) = norm(mask) + product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim* &
-                sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), mask, hvy_id )**2 )
+                sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
             enddo
         enddo
 
@@ -319,17 +314,12 @@ subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, 
     integer(kind=ik), intent(in), optional  :: n_val
 
     real(kind=rk)                       :: x0(1:3), dx(1:3), volume
-    integer(kind=ik) :: k, n_eqn, Bs(1:3), g(1:3), io(1:3), p, p_norm, l, mpierr, level_me, ref_me, norm_case_id
+    integer(kind=ik) :: k, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, level_me, ref_me, norm_case_id
     logical          :: SC_only
 
     Bs = params%Bs
     g = 0
     g(1:params%dim) = params%g
-    ! for odd block sizes, we have an overlap of the points from the center line and do not want to count those
-    io = 0
-    do k = 1, params%dim
-        if (modulo(Bs(k), 2) == 1) io(k) = 1
-    end do
 
     if (.not. present(norm_case)) then
         norm_case_id = 1
@@ -357,10 +347,10 @@ subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, 
         ! volume = dble(product(params%Bs(1:params%dim)))*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim
 
         ! compute energy
-        norm = sum( hvy_block(g(1)+1:Bs(1)+g(1)-io(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2)-io(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3)-io(3):mod(norm_case_id,10), 1:params%dim )**2 )
+        norm = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), 1:params%dim )**2 )
 
         ! we have to compute cell weighted values, which for uniform grids is the mean so divide by amount of points
-        norm = norm / dble(product(params%Bs(1:params%dim)-io(1:params%dim)))
+        norm = norm / dble(product(params%Bs(1:params%dim)))
     case default
         write(*,'(A)') which_norm
         call abort(20030201, "The tree norm you desire is not implemented. How dare you.")

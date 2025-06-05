@@ -517,7 +517,7 @@ function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
    endif
 
    if (any(mod(Bs(1:dims), 2) /= 0)) then
-      if (rank == 0) write(*, '(A)') "WARNING! Block size is ODD, this is experimental"
-      ! call abort(202392929, "Block-size must be EVEN number")
+      ! if (rank == 0) write(*, '(A)') "WARNING! Block size is ODD, this is experimental"
+      call abort(202392929, "Block-size must be EVEN number")
    end if
 end function

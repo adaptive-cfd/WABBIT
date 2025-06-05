@@ -414,13 +414,9 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         ! synchronize ghost nodes - required to apply wavelet filters
         ! block only needs information from medium and fine neighbors as CE will cut dependency to coarse neighbors
         t_block = MPI_Wtime()
-        if (all(mod(params%BS(1:params%dim),2) == 1)) then
-            ! first and latest point are SC, so we need max(HD) or max(GD)-1 for sync - reducing sync width by 1 for unlifted wavelets
-            g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1)-1)
-        else
-            ! first point is SC and last WC, so we need left(HD) or right(GD) for sync
-            g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1))
-        endif
+        ! first point is SC and last WC, so we need left(HD) or right(GD) for sync
+        g_this = max(abs(lbound(params%HD,1)),ubound(params%GD,1))
+
         ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
         ! if (params%isLiftedWavelet) then
         !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp)

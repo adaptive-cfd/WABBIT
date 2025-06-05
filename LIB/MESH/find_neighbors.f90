@@ -133,7 +133,7 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     ! 1) Check if we find a neighbor on the SAME LEVEL
     !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (level == 0) then
-        ! Check if this block is on level 0. Then all neighbors are itself.
+        ! Check if this block is on level 0. If that is the case, then only a single block exists and all neighbors are the block itself.
         hvy_neighbor( hvyID_block, neighborDirCode_sameLevel ) = lgtID_block
         if (.not. search_overlapping) return
     else

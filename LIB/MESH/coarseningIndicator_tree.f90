@@ -187,9 +187,12 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! coarseningIndicator_block)
     select case(indicator)
     case ("everywhere")
-        ! coarsen all blocks. Note: it is not always possible (with any grid) to do that!
-        ! The flag may be removed again (completeness, Jmin, gradedness)...
-        ! Needs to be a heavy loop as elsewise we don't know which is a leaf-block
+        ! Coarsen all leaf blocks. Note: it is not always possible (i.e. with any grid) to do that!
+        ! This is because the flag may be removed again (completeness, Jmin, gradedness).
+        ! Why only leaf blocks? You could assign the "coarsen" status to all blocks, but then you'd
+        ! end up with only one active block (or rather an equidistant grid on Jmin, if Jmin /= 1). This
+        ! is probably not what you'd want.
+        ! Needs to be a heavy loop as elsewise we don't know which is a leaf-block.
         do k_b = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k_b, tree_ID)
             call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
@@ -199,6 +202,17 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
 
             ! flag for coarsening
             lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+        enddo
+    case ("nowhere")
+        ! keep all blocks. Simple as that. Might sound stupid but might be useful for debugging purposes
+        ! refinement status was already set to 0 so we could do nothing here -- as this is a debugging/development tool,
+        ! it does however not hurt to be safe and reset the refinement status to STAY:
+        do k_b = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k_b, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+
+            ! flag for staying
+            lgt_block(lgt_ID, IDX_REFINE_STS) = 0
         enddo
 
     case ("random")
@@ -238,7 +252,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
         ! Default is wavelet thresholding...
 
         ! if (params%rank == 0) then
-        !     write(*, '(A, 10(es10.3, 2x))') "Norm: ", norm(:)
+        !     write(*, '(A, 10(es10.3, 1x))') "Norm: ", norm(:)
         ! endif
         
         ! NOTE: even if additional mask thresholding is used, passing the mask is optional,

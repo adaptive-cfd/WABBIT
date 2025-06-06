@@ -32,7 +32,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
     integer(kind=2), intent(in) :: n_domain(3)
 
-    real(kind=rk)    :: x, y, z
+    real(kind=rk)    :: x, y, z, param_1, param_2
     integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar, ix_global, iy_global
 
     ! compute the size of blocks
@@ -327,19 +327,161 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         endif
 
     case("taylor_green")
+        ! this condition is 2D only!
         do iy= 1,Bs(2)+2*g
+            y = x0(2) + dble(iy-g-1)*dx(2)
+            call continue_periodic(y,params_acm%domain_size(2))
             do ix= 1, Bs(1)+2*g
                 x = x0(1) + dble(ix-g-1)*dx(1)
-                y = x0(2) + dble(iy-g-1)*dx(2)
 
                 call continue_periodic(x,params_acm%domain_size(1))
-                call continue_periodic(y,params_acm%domain_size(2))
 
                 u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
                 u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
                 u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
             end do
         end do
+    case("mixing_layer")
+        ! random excitement
+        call random_data(u)
+        u(:,:,:,params_acm%dim+1:) = 0.0_rk  ! we only need random velocity data
+
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+                z = z - params_acm%domain_size(3)/2.0_rk
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                y = y - params_acm%domain_size(2)/2.0_rk
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    x = x - params_acm%domain_size(1)/2.0_rk
+
+                    ! ! tanh profile with random variation to trigger 3D instabilities, change last number to set intensity
+                    ! ! the exp term focusses the instabilities and fades it out towards the edges to ease the symmetry BC
+                    ! u(ix,iy,iz,1) = tanh(z) * 1 + (u(ix,iy,iz,1)-0.5_rk)*2.0_rk*3e-1* exp(-z**2/5**2)
+                    ! u(ix,iy,iz,2:params_acm%dim) = u(ix,iy,iz,2:params_acm%dim)*0e-6
+                    
+                    ! ! condition from Roussel & Schneider 2010 for 2D instabilities
+                    ! param_1 = 3  ! maximum number of nodes
+                    ! u(ix,iy,iz,1) = tanh(z) * 1 + 1/(2.0_rk*param_1*cosh(z)**2.0_rk) * &
+                    !     (cos(2.0_rk*pi*(x+y)/params_acm%domain_size(1)) + cos(2.0_rk*pi*(x-y)/params_acm%domain_size(1)))
+                    ! do idir = 1, param_1-1
+                    !     u(ix,iy,iz,1) = u(ix,iy,iz,1) + 1/(2.0_rk*param_1*cosh(z)**2.0_rk) * &
+                    !         cos(2**(idir+1)*pi*x/params_acm%domain_size(1))
+                    ! enddo
+                    
+                    ! condition to provoke 3D instabilities
+                    ! amount of modes should change the second number in cosh denominator
+                    ! every direction can have a random shift, which is the addition in the cos terms
+                    ! for reproducability, these are hardcoded
+                    param_1 = 2.0_rk*pi/dble(params_acm%domain_size(1))  ! maximum number of nodes
+                    param_2 = 2.7_rk
+                    u(ix,iy,iz,1) = tanh(z) * 1 + 1/(2.0_rk*4.0_rk*cosh(z)**2.0_rk) * &
+                        (cos(2.0_rk*(cos(param_2)*x+sin(param_2)*y)*param_1+4.0_rk) + cos(2.0_rk*(cos(param_2)*x-sin(-param_2)*y)*param_1+2.0_rk) + cos(2.0_rk*2.0_rk*pi*(z)/5.0_rk+1.0_rk))
+                    param_2 = 1.1_rk
+                    u(ix,iy,iz,1) = u(ix,iy,iz,1) * 1 + 1/(2.0_rk*4.0_rk*cosh(z)**2.0_rk) * &
+                        (cos(3.0_rk*(cos(param_2)*x+sin(param_2)*y)*param_1+1.5_rk) + cos(3.0_rk*(cos(param_2)*x-sin(-param_2)*y)*param_1+3.7_rk) + cos(3.0_rk*2.0_rk*pi*(z)/5.0_rk+1.8_rk))
+                    param_2 = 4.3_rk
+                    u(ix,iy,iz,1) = u(ix,iy,iz,1) * 1 + 1/(2.0_rk*4.0_rk*cosh(z)**2.0_rk) * &
+                        (cos(5.0_rk*(cos(param_2)*x+sin(param_2)*y)*param_1+5.2_rk) + cos(5.0_rk*(cos(param_2)*x-sin(-param_2)*y)*param_1+1.3_rk) + cos(5.0_rk*2.0_rk*pi*(z)/5.0_rk+3.0_rk))
+                    param_2 = 0.5_rk
+                    u(ix,iy,iz,1) = u(ix,iy,iz,1) * 1 + 1/(2.0_rk*4.0_rk*cosh(z)**2.0_rk) * &
+                        (cos(7.0_rk*(cos(param_2)*x+sin(param_2)*y)*param_1+6.0_rk) + cos(7.0_rk*(cos(param_2)*x-sin(-param_2)*y)*param_1+1.4_rk) + cos(7.0_rk*2.0_rk*pi*(z)/5.0_rk+0.5_rk))
+
+                    ! y- and z- velocity is not set
+                    u(ix,iy,iz,2:params_acm%dim) = u(ix,iy,iz,2:params_acm%dim)*0e-6
+
+                enddo
+            enddo
+        enddo
+
+    case("mixing_layer_rollup")
+        ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is symmetric in z
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+                z = z - params_acm%domain_size(3)/2.0_rk
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                y = y - params_acm%domain_size(2)/2.0_rk
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    x = x - params_acm%domain_size(1)/2.0_rk
+
+                    ! tanh profile with specific thickness L/(4*7)
+                    u(ix,iy,iz,1) = tanh(2.0_rk*y*28.0_rk/params_acm%domain_size(2)) + 1.0_rk/(2.0_rk*cosh(y)**2.0_rk) * &
+                        (sin(2.0_rk*pi*(x+z)/params_acm%domain_size(1)) + sin(2.0_rk*pi*(x-z)/params_acm%domain_size(1)))
+
+                enddo
+            enddo
+        enddo
+    case("mixing_layer_rollup2")
+        ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is periodic in all directions with 2 shear layers
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+                z = z - params_acm%domain_size(3)/2.0_rk
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                y = y - params_acm%domain_size(2)/2.0_rk
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    x = x - params_acm%domain_size(1)/2.0_rk
+
+                    ! tanh profile with specific thickness L/(4*7), but we have two of them to have periodicity
+                    u(ix,iy,iz,1) = -1.0_rk - tanh(2.0_rk*(y - params_acm%domain_size(2)/4.0_rk)*28.0_rk/params_acm%domain_size(2)*2.0_rk) + &
+                        1.0_rk/(2.0_rk*cosh(y - params_acm%domain_size(2)/4.0_rk)**2.0_rk) * &
+                        (sin(2.0_rk*pi*(x+z)/params_acm%domain_size(1)*2.0_rk) + sin(2.0_rk*pi*(x-z)/params_acm%domain_size(1)*2.0_rk)) &
+                        + tanh(2.0_rk*(y + params_acm%domain_size(2)/4.0_rk)*28.0_rk/params_acm%domain_size(2)*2.0_rk) + &
+                        1.0_rk/(2.0_rk*cosh(y + params_acm%domain_size(2)/4.0_rk)**2.0_rk) * &
+                        (sin(2.0_rk*pi*(x+z)/params_acm%domain_size(1)*2.0_rk) + sin(2.0_rk*pi*(x-z)/params_acm%domain_size(1)*2.0_rk))
+
+                enddo
+            enddo
+        enddo
+    case("mixing_layer_rollup3")
+        ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is periodic in all directions with 2 shear layers
+        ! compares to Yasuda2023 and AbdulGafoor2024
+        do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+            z = 0.0_rk
+            if (params_acm%dim == 3) then
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                call continue_periodic(z,params_acm%domain_size(3))
+                z = z - params_acm%domain_size(3)/2.0_rk
+            endif
+            do iy = 1, Bs(2)+2*g
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                y = y - params_acm%domain_size(2)/2.0_rk
+                do ix = 1, Bs(1)+2*g
+                    x = dble(ix-(g+1)) * dx(1) + x0(1)
+                    call continue_periodic(x,params_acm%domain_size(1))
+                    x = x - params_acm%domain_size(1)/2.0_rk
+
+                    ! tanh profile with specific thickness L/(4*7), but we have two of them to have periodicity
+                    u(ix,iy,iz,1) = -1.0_rk - tanh((y - params_acm%domain_size(2)/4.0_rk)*80.0_rk/params_acm%domain_size(2)*2.0_rk) + &
+                        tanh((y + params_acm%domain_size(2)/4.0_rk)*80.0_rk/params_acm%domain_size(2)*2.0_rk)    
+                    u(ix,iy,iz,2) = 0.05_rk * sin((x - params_acm%domain_size(2)/4.0_rk)*2.0_rk*pi)
+
+                enddo
+            enddo
+        enddo
 
     case default
         call abort(428764, "ACM inicond: "//trim(adjustl(params_acm%inicond))//" is unkown.")

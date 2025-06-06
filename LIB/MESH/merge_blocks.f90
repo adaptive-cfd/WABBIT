@@ -21,7 +21,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
     ! what CPU is responsible for merging:
     integer(kind=ik)                    :: data_rank(8)
-    integer(kind=ik)                    :: heavy_ids(8), tree_ID          ! list of block ids, proc ranks
+    integer(kind=ik)                    :: hvy_ids(8), tree_ID          ! list of block ids, proc ranks
 
     integer(kind=tsize)                 :: treecode
     integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
@@ -115,7 +115,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
         ! loop over the sisters and store the corresponding mpirank and heavy index
         ! in a list (still, we are dealing with all four sisters)
         do i = 1, N_merge
-            call lgt2hvy( heavy_ids(i), lgt_blocks_to_merge(i), data_rank(1), params%number_blocks )
+            call lgt2hvy( hvy_ids(i), lgt_blocks_to_merge(i), data_rank(1), params%number_blocks )
         enddo
 
         ! get heavy id of merge block
@@ -143,53 +143,53 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
             ! ************ 2D case ***********************
             ! biorthogonal wavelets: apply a low-pass filter (called H) prior to decimation
             ! sister 0
-            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(1) ), tmpblock) ! low-pass filtering
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, hvy_ids(1) ), tmpblock) ! low-pass filtering
             hvy_block(icoars1(1):icoarsm(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:)
 
             ! sister 1
-            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(2) ), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, hvy_ids(2) ), tmpblock)
             hvy_block(icoars1(1):icoarsm(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:)
 
             ! sister 2
-            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(3) ), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, hvy_ids(3) ), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2), :, :, hvy_merge_id) = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, :,:)
 
             ! sister 3
-            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, heavy_ids(4) ), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block( :,:,:,:, hvy_ids(4) ), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), :, :, hvy_merge_id) = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, :,:)
 
         elseif (N_merge == 8) then
             ! ************ 3D case ***********************
             ! sister 0
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(1)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(1)), tmpblock)
             hvy_block(icoars1(1):icoarsm(1)  , icoars1(2):icoarsm(2)  , icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
             ! sister 1
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(2)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(2)), tmpblock)
             hvy_block(icoars1(1):icoarsm(1)  , icoarsm(2)+1:icoars2(2), icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
             ! sister 2
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(3)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(3)), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2)  , icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
             ! sister 3
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(4)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(4)), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), icoars1(3):icoarsm(3),  :, hvy_merge_id )  = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine1(3):Bs(3)+g:2, :)
 
             ! sister 4
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(5)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(5)), tmpblock)
             hvy_block(icoars1(1):icoarsm(1)  , icoars1(2):icoarsm(2)  , icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine1(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
             ! sister 5
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(6)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(6)), tmpblock)
             hvy_block(icoars1(1):icoarsm(1)  , icoarsm(2)+1:icoars2(2), icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine1(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
             ! sister 6
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(7)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(7)), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoars1(2):icoarsm(2)  , icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine2(1):Bs(1)+g:2, ifine1(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
 
             ! sister 7
-            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,heavy_ids(8)), tmpblock)
+            call restriction_prefilter_vct(params, hvy_block(:,:,:,:,hvy_ids(8)), tmpblock)
             hvy_block(icoarsm(1)+1:icoars2(1), icoarsm(2)+1:icoars2(2), icoarsm(3)+1:icoars2(3), :, hvy_merge_id ) = tmpblock( ifine2(1):Bs(1)+g:2, ifine2(2):Bs(2)+g:2, ifine2(3):Bs(3)+g:2, :)
         endif
     endif

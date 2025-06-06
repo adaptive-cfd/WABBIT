@@ -18,7 +18,7 @@ subroutine updateFamily_tree(params, tree_ID)
     implicit none
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
     integer(kind=ik), intent(in)        :: tree_ID
-    integer(kind=ik)                    :: k, lgtID, hvyID
+    integer(kind=ik)                    :: k, lgt_ID, hvyID, level
 
 
     ! loop over active heavy data blocks
@@ -27,15 +27,16 @@ subroutine updateFamily_tree(params, tree_ID)
         hvyID = hvy_active(k, tree_ID)
         hvy_family(hvyID, :) = -1
 
-        call hvy2lgt( lgtID, hvyID, params%rank, params%number_blocks )
+        call hvy2lgt( lgt_ID, hvyID, params%rank, params%number_blocks )
+        level = lgt_block(lgt_ID, IDX_MESH_LVL)
 
-        ! search for family
-        call find_mother(params, lgtID, hvy_family(hvyID, 1))
-        call find_sisters(params, lgtID, hvy_family(hvyID, 2:1+2**params%dim))
-        call find_daughters(params, lgtID, hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)))
+        ! search for family, skip mother for blocks on Jmin and daughter for blocks on Jmax for performance purposes
+        if (level /= params%Jmin) call find_mother(params, lgt_ID, hvy_family(hvyID, 1))
+        call find_sisters(params, lgt_ID, hvy_family(hvyID, 2:1+2**params%dim))
+        if (level /= params%Jmax) call find_daughters(params, lgt_ID, hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)))
 
         ! write(*, '("3R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
-        ! params%rank, k, lgtID, lgt_block(lgtID, IDX_MESH_LVL), lgt_block(lgtID, IDX_REFINE_STS), hvy_family(hvy_ID, :), lgt_block(lgt_ID, IDX_TC_2)
+        ! params%rank, k, lgt_ID, lgt_block(lgt_ID, IDX_MESH_LVL), lgt_block(lgt_ID, IDX_REFINE_STS), hvy_family(hvy_ID, :), lgt_block(lgt_ID, IDX_TC_2)
 
         ! error check - we should always find atleast one sister, which is the block itself
         if (all(hvy_family(hvyID, 2:1+2**params%dim) == -1)) then

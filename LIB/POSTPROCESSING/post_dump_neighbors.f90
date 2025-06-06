@@ -59,6 +59,7 @@ subroutine post_dump_neighbors(params)
     ! unused so just fill any value
     params%order_discretization = "FD_2nd_central"
     params%order_predictor = "multiresolution_2nd"
+    params%wavelet = "CDF20"
     params%g = 2_ik
     params%Jmax = tc_length+1
     params%n_eqn = params%dim
@@ -72,11 +73,14 @@ subroutine post_dump_neighbors(params)
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
+    ! init wavelet
+    call setup_wavelet(params)
+
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
     ! read mesh and field
-    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID)
+    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID, synchronize_ghosts=.false.)
 
     ! create lists of active blocks (light and heavy data)
     ! update list of sorted nunmerical treecodes, used for finding blocks

@@ -26,6 +26,14 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
   logical                           :: array_compare, do_timing
   character(len=params%Jmax)        :: tc_str
 
+  if (params%Jmax == 0) then
+    if (params%rank == 0) then
+      write(*,'(20("_/¯\"))')
+      write(*,'("UNIT TEST: Skipping treecode test, as JMax=0. You should consider going back to Matlab for whatever you are trying to do.")')
+    endif
+    return
+  endif
+
   Kcheck = 50  ! how many random times the direction should be checked
   KK = 1000000  ! How many iterations for measuring time
   do_timing = .false.
@@ -113,12 +121,12 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
       !   if (abort_on_fail) call abort(123980)
       ! end if
 
-      call encoding_revised(treecode, ixy, 3, params%Jmax)
-      call decoding(treecode, ix, iy, iz, treeN)
-      if (ixy(1) /= iy .or. ixy(2) /= ix .or. ixy(3) /= iz) then
-        write(*,'("UNIT TEST FAILED: treecode old - orig=", 3(i0, 1x), "now=", 3(i0, 1x), "TC=", 13(i0))') ixy, iy, ix, iz, treecode
-        if (abort_on_fail) call abort(123980)
-      end if
+      ! call encoding_revised(treecode, ixy, 3, params%Jmax)
+      ! call decoding(treecode, ix, iy, iz, treeN)
+      ! if (ixy(1) /= iy .or. ixy(2) /= ix .or. ixy(3) /= iz) then
+      !   write(*,'("UNIT TEST FAILED: treecode old - orig=", 3(i0, 1x), "now=", 3(i0, 1x), "TC=", 13(i0))') ixy, iy, ix, iz, treecode
+      !   if (abort_on_fail) call abort(123980)
+      ! end if
     end do
     write(*, '("UNIT TEST: -> Bravooo, Treecodes can be en- and decoded from block positions")')
     write(*,'("UNIT TEST: Checking all cardinal directions in 2D")')
@@ -131,7 +139,7 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
 
       call encoding_b( ixy, tc_b, 2)
       call encoding_d( ixy, newtreecode, 2)
-      call encoding(treecode, ixy, 2, 4**treeN, treeN)
+      ! call encoding(treecode, ixy, 2, 4**treeN, treeN)
 
       ! tests for JB version - binary
       ! loop over all directions - in if condition we set the correct neighbouring index change
@@ -158,17 +166,17 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         endif
       end do
 
-      ! tests for old version
-      ! loop over all directions - in if condition we set the correct neighbouring index change
-      do j= 1,4
-        call adjacent_block_2D( treecode, n, dir_2d(j), params%Jmax, params%Jmax)
-        call decoding(n, ix,iy,iz, treeN)
-        if ( ix /= ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)) &
-        .or. iy /= ixy(1) + (j-1)/2       * (-1 + 2*modulo((j-1), 2))) then
-          write(*,'("UNIT TEST FAILED: treecode num old ", i0, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d(j), ixy(1:2), iy, ix
-          if (abort_on_fail) call abort(123980)
-        endif
-      end do
+      ! ! tests for old version
+      ! ! loop over all directions - in if condition we set the correct neighbouring index change
+      ! do j= 1,4
+      !   call adjacent_block_2D( treecode, n, dir_2d(j), params%Jmax, params%Jmax)
+      !   call decoding(n, ix,iy,iz, treeN)
+      !   if ( ix /= ixy(2) + (1 - (j-1)/2) * (-1 + 2*modulo((j-1), 2)) &
+      !   .or. iy /= ixy(1) + (j-1)/2       * (-1 + 2*modulo((j-1), 2))) then
+      !     write(*,'("UNIT TEST FAILED: treecode num old ", a3, " - orig", 2(1x, i0), " neighbour ", 2(1x, i0))') dir_2d(j), ixy(1:2), iy, ix
+      !     if (abort_on_fail) call abort(123980)
+      !   endif
+      ! end do
     end do
     write(*,'("UNIT TEST: -> Bravooo, 2D leaves don''t have to be lonely and can find their neighbours")')
 
@@ -211,19 +219,19 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
         endif
       end do
 
-      ! tests for old version
-      ! loop over all directions - in if condition we set the correct neighbouring index change
-      do j= 1,6
-        call adjacent_block_3D( treecode, n, dir_3d(j), params%Jmax, params%Jmax)
-        call decoding(n, ix,iy,iz, treeN)
+      ! ! tests for old version
+      ! ! loop over all directions - in if condition we set the correct neighbouring index change
+      ! do j= 1,6
+      !   call adjacent_block_3D( treecode, n, dir_3d(j), params%Jmax, params%Jmax)
+      !   call decoding(n, ix,iy,iz, treeN)
 
-        if ( (ix /= ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
-        .or. (iy /= ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
-        .or. (iz /= ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)))) then
-          write(*,'("UNIT TEST FAILED: treecode num old 3D ", i0, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, iy, ix, iz
-          if (abort_on_fail) call abort(123980)
-        endif
-      end do
+      !   if ( (ix /= ixy(2) + (1 - (j-1)/2)*(2 - (j-1)/2)/2 * (-1 + 2*modulo((j-1), 2))) &
+      !   .or. (iy /= ixy(1) + (j-1)/2*(2 - (j-1)/2)         * (-1 + 2*modulo((j-1), 2))) &
+      !   .or. (iz /= ixy(3) + (j-1)/4*(1 - (j-1)/2)*-1      * (-1 + 2*modulo((j-1), 2)))) then
+      !     write(*,'("UNIT TEST FAILED: treecode num old 3D ", a7, " - orig", 3(1x, i0), " neighbour ", 3(1x, i0))') dir_3d(j), ixy, iy, ix, iz
+      !     if (abort_on_fail) call abort(123980)
+      !   endif
+      ! end do
     end do
     write(*,'("UNIT TEST: -> Bravooo, 3D leaves don''t have to be lonely and can find their neighbours")')
   end if
@@ -364,66 +372,66 @@ subroutine unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, ab
     end if
 
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    if (params%rank == 0) then
-      write(*,'("=== array === measuring time")')
-    end if
+    ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! if (params%rank == 0) then
+    !   write(*,'("=== array === measuring time")')
+    ! end if
 
-    t = MPI_wtime()
-    do k = 1, kk
-      call encoding(treecode, ixy, 2, 4**treeN, treeN)
-      call decoding(treecode, ix, iy, iz, treeN)
-    enddo
-    if (params%rank == 0) then
-      write(*,'("2D arr enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
-    end if
+    ! t = MPI_wtime()
+    ! do k = 1, kk
+    !   call encoding(treecode, ixy, 2, 4**treeN, treeN)
+    !   call decoding(treecode, ix, iy, iz, treeN)
+    ! enddo
+    ! if (params%rank == 0) then
+    !   write(*,'("2D arr enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
+    ! end if
 
-    t = MPI_wtime()
-    do k = 1, kk
-      call adjacent_block_2D(treecode, n, dir_2d(1), params%Jmax, params%Jmax)
-      call adjacent_block_2D(n, treecode, dir_2d(2), params%Jmax, params%Jmax)
-      call adjacent_block_2D(treecode, n, dir_2d(3), params%Jmax, params%Jmax)
-      call adjacent_block_2D(n, treecode, dir_2d(4), params%Jmax, params%Jmax)
+    ! t = MPI_wtime()
+    ! do k = 1, kk
+    !   call adjacent_block_2D(treecode, n, dir_2d(1), params%Jmax, params%Jmax)
+    !   call adjacent_block_2D(n, treecode, dir_2d(2), params%Jmax, params%Jmax)
+    !   call adjacent_block_2D(treecode, n, dir_2d(3), params%Jmax, params%Jmax)
+    !   call adjacent_block_2D(n, treecode, dir_2d(4), params%Jmax, params%Jmax)
 
-      ! loop of 1000 simulates searching loop for neighbour
-      ! do iz = 1,1000
-      if (array_compare(treecode, n, params%Jmax)) then
-        call abort(123980)
-      endif
-      ! enddo
-    enddo
-    if (params%rank == 0) then
-      write(*,'("2D arr adj: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
-    end if
+    !   ! loop of 1000 simulates searching loop for neighbour
+    !   ! do iz = 1,1000
+    !   if (array_compare(treecode, n, params%Jmax)) then
+    !     call abort(123980)
+    !   endif
+    !   ! enddo
+    ! enddo
+    ! if (params%rank == 0) then
+    !   write(*,'("2D arr adj: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
+    ! end if
 
-    t = MPI_wtime()
-    do k = 1, kk
-      call encoding_revised(treecode, ixy, 3, params%Jmax)
-      call decoding(treecode, ix, iy, iz, treeN)
-    enddo
-    if (params%rank == 0) then
-      write(*,'("3D arr enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
-    end if
+    ! t = MPI_wtime()
+    ! do k = 1, kk
+    !   call encoding_revised(treecode, ixy, 3, params%Jmax)
+    !   call decoding(treecode, ix, iy, iz, treeN)
+    ! enddo
+    ! if (params%rank == 0) then
+    !   write(*,'("3D arr enc: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
+    ! end if
 
-    t = MPI_wtime()
-    do k = 1, kk
-      call adjacent_block_3D(treecode, n, dir_3d(1), params%Jmax, params%Jmax)
-      call adjacent_block_3D(n, treecode, dir_3d(2), params%Jmax, params%Jmax)
-      call adjacent_block_3D(treecode, n, dir_3d(3), params%Jmax, params%Jmax)
-      call adjacent_block_3D(n, treecode, dir_3d(4), params%Jmax, params%Jmax)
-      call adjacent_block_3D(treecode, n, dir_3d(5), params%Jmax, params%Jmax)
-      call adjacent_block_3D(n, treecode, dir_3d(6), params%Jmax, params%Jmax)
+    ! t = MPI_wtime()
+    ! do k = 1, kk
+    !   call adjacent_block_3D(treecode, n, dir_3d(1), params%Jmax, params%Jmax)
+    !   call adjacent_block_3D(n, treecode, dir_3d(2), params%Jmax, params%Jmax)
+    !   call adjacent_block_3D(treecode, n, dir_3d(3), params%Jmax, params%Jmax)
+    !   call adjacent_block_3D(n, treecode, dir_3d(4), params%Jmax, params%Jmax)
+    !   call adjacent_block_3D(treecode, n, dir_3d(5), params%Jmax, params%Jmax)
+    !   call adjacent_block_3D(n, treecode, dir_3d(6), params%Jmax, params%Jmax)
 
-      ! loop of 1000 simulates searching loop for neighbour
-      ! do iz = 1,1000
-      if (array_compare(treecode, n, params%Jmax)) then
-        call abort(123980)
-      endif
-      ! enddo
-    enddo
-    if (params%rank == 0) then
-      write(*,'("3D arr adj: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
-    end if
+    !   ! loop of 1000 simulates searching loop for neighbour
+    !   ! do iz = 1,1000
+    !   if (array_compare(treecode, n, params%Jmax)) then
+    !     call abort(123980)
+    !   endif
+    !   ! enddo
+    ! enddo
+    ! if (params%rank == 0) then
+    !   write(*,'("3D arr adj: rank=", i0, " elapsed= ", f6.4, " s")') params%rank, MPI_wtime()-t
+    ! end if
   end if
 
 

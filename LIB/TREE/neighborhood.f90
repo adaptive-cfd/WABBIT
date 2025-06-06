@@ -28,11 +28,11 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     integer(kind=ik), intent(in)             :: relation            !> Which relation to apply manipulation
     integer(kind=ik), intent(out)            :: idx(1:2, 1:3)       !> Output of indices, first entry is l/r and second is dim
     integer(kind=ik), intent(in)             :: N_xyz(1:3)          !> Size of blocks including ghost points, should be size(block, i_dim)
-    integer(kind=ik), intent(in)             :: N_s(1:3)             !> Number of points to modify at start, vec with entry for each dimension
-    integer(kind=ik), intent(in)             :: N_e(1:3)             !> Number of points to modify at end, vec with entry for each dimension
-    integer(kind=ik), intent(in), optional   :: g_p(1:3)             !> Ghost points left side, will be skipped
-    integer(kind=ik), intent(in), optional   :: g_m(1:3)             !> Ghost points right side, will be skipped
-    integer(kind=ik), intent(in), optional   :: lvl_diff             !> lvl_diff, special treatment for -1
+    integer(kind=ik), intent(in)             :: N_s(1:3)            !> Number of points to modify at start, vec with entry for each dimension
+    integer(kind=ik), intent(in)             :: N_e(1:3)            !> Number of points to modify at end, vec with entry for each dimension
+    integer(kind=ik), intent(in), optional   :: g_p(1:3)            !> Ghost points left side, will be skipped
+    integer(kind=ik), intent(in), optional   :: g_m(1:3)            !> Ghost points right side, will be skipped
+    integer(kind=ik), intent(in), optional   :: lvl_diff            !> lvl_diff, special treatment for -1
 
     integer(kind=ik) :: i_dim, lvlDiff, relation_temp
     ! Indexes where to start or finish, short name because elsewise this list gets looong
@@ -73,18 +73,24 @@ subroutine get_indices_of_modify_patch(g, dim, relation, idx, N_xyz, N_s, N_e, g
     ! g i i i g           - s - - -
     ! g i i i g           - s - - -
     ! g g g g g           - - - - -
-    if (any((/  1, 2, 3, 4,  25,26,29,30,33,34,37,38,  49,51,53,55 /) == relation_temp)) &
+    if (any((/  1, 2, 3, 4,  25,26,29,30,33,34,37,38,  49,51,53,55 /) == relation_temp)) then
         idx(2, 1) = N_s(1)+gm(1)  ! -x
-    if (any((/  5, 6, 7, 8,  27,28,31,32,35,36,39,40,  50,52,54,56 /) == relation_temp)) &
+    endif
+    if (any((/  5, 6, 7, 8,  27,28,31,32,35,36,39,40,  50,52,54,56 /) == relation_temp)) then
         idx(1, 1) = N_xyz(1) - N_e(1)-gp(1) + 1  ! +x
-    if (any((/  9,10,11,12,  25,26,27,28,41,42,45,46,  49,50,53,54 /) == relation_temp)) &
+    endif
+    if (any((/  9,10,11,12,  25,26,27,28,41,42,45,46,  49,50,53,54 /) == relation_temp)) then
         idx(2, 2) = N_s(2)+gm(2)  ! -y
-    if (any((/ 13,14,15,16,  29,30,31,32,43,44,47,48,  51,52,55,56 /) == relation_temp)) &
+    endif
+    if (any((/ 13,14,15,16,  29,30,31,32,43,44,47,48,  51,52,55,56 /) == relation_temp)) then
         idx(1, 2) = N_xyz(2) - N_e(2)-gp(2) + 1  ! +y
-    if (any((/ 17,18,19,20,  33,34,35,36,41,42,43,44,  49,50,51,52 /) == relation_temp)) &
+    endif
+    if (any((/ 17,18,19,20,  33,34,35,36,41,42,43,44,  49,50,51,52 /) == relation_temp)) then
         idx(2, 3) = N_s(3)+gm(3)  ! -z
-    if (any((/ 21,22,23,24,  37,38,39,40,45,46,47,48,  53,54,55,56 /) == relation_temp)) &
+    endif
+    if (any((/ 21,22,23,24,  37,38,39,40,45,46,47,48,  53,54,55,56 /) == relation_temp)) then
         idx(1, 3) = N_xyz(3) - N_e(3)-gp(3) + 1  ! +z
+    endif
 
     ! for leveldiff = -1 we have to restrict some patches to half the length (at edges)
     ! Additionally, the patch stretches further for the receiver corner patch which we send as well
@@ -278,17 +284,17 @@ subroutine get_indices_of_ghost_patch( Bs, g, dim, relation, idx, gminus, gplus,
         endif
     endif
 
-    !---2D--3D--family relation, assume values on finer side are already WDed in mallat-ordering
+    !---2D--3D--family relation, assume values on finer side / daughter are already WDed in mallat-ordering
     if (relation_temp < 0 .and. relation_temp >= -8) then   
         if (lvl_diff <= 0) then
             return
         ! lvl_diff=+1 - family is mother and I am the daughter
         ! only transfer SC if this is the finer block, from Mallat ordering
-        ! take into account that this depends on if g is even or odd
+        ! take into account that this depends on if g is even or odd by using integer division (floor(.../2.0))
         else
             do i_dim = 1, dim
-                idx(1,i_dim) = ceiling(g/2.0)+1
-                idx(2,i_dim) = ceiling(g/2.0)+Bs(i_dim)/2
+                idx(1,i_dim) = g/2+1
+                idx(2,i_dim) = g/2+(Bs(i_dim))/2
             enddo
         endif
     elseif (relation_temp < -8 .and. relation_temp >= -16) then   
@@ -536,17 +542,17 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
         enddo
         ! print info which sides
         if (i_n == 4 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-x)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-x),"
         elseif (i_n == 8 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+x)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+x),"
         elseif (i_n == 12 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-y)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-y),"
         elseif (i_n == 16 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+y)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+y),"
         elseif (i_n == 20 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (-z)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (-z),"
         elseif (i_n == 24 .and. found_n) then
-            write(write_s(len_trim(write_s)+1:), '(A)') " (+z)"
+            write(write_s(len_trim(write_s)+1:), '(A)') " (+z),"
         endif
         if (mod(i_n, 4) == 0) found_n = .false.
     enddo
@@ -566,29 +572,29 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
             enddo
             ! print info which sides
             if (i_n == 26 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y),"
             elseif (i_n == 28 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y),"
             elseif (i_n == 30 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y),"
             elseif (i_n == 32 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y),"
             elseif (i_n == 34 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-z),"
             elseif (i_n == 36 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-z),"
             elseif (i_n == 38 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+z),"
             elseif (i_n == 40 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+z),"
             elseif (i_n == 42 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-y-z),"
             elseif (i_n == 44 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+y-z),"
             elseif (i_n == 46 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-y+z),"
             elseif (i_n == 48 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+y+z),"
             endif
             if (mod(i_n, 2) == 0) found_n = .false.
         enddo
@@ -609,23 +615,23 @@ subroutine write_neighborhood_info(lgt_id, hvy_neighbor, dim)
             enddo
             ! print info which sides
             if (i_n == 49 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y-z),"
             elseif (i_n == 50 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y-z),"
             elseif (i_n == 51 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y-z),"
             elseif (i_n == 52 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y-z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y-z),"
             elseif (i_n == 53 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x-y+z),"
             elseif (i_n == 54 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x-y+z),"
             elseif (i_n == 55 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (-x+y+z),"
             elseif (i_n == 56 .and. found_n) then
-                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y+z)"
+                write(write_s(len_trim(write_s)+1:), '(A)') " (+x+y+z),"
             endif
-            if (mod(i_n, 2) == 0) found_n = .false.
+            found_n = .false.
         enddo
         ! now print output
         write(*, '(A)') write_s(1:len_trim(write_s))

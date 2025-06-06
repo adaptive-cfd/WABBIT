@@ -97,6 +97,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         if (params_acm%HIT_linear_forcing) then
             params_acm%e_kin = 0.0_rk
             params_acm%enstrophy = 0.0_rk
+            params_acm%mean_flow = 0.0_rk
         endif
 
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
@@ -120,7 +121,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         ! called for each block.
         do i = 1, size(u,4)
             if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e4_rk) then
-                write(*,'("maxval in u(",i2,") = ", es15.8)') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i)))
+                write(*,'("RHS: maxval in u(",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))), x0, dx
+
+                ! call dump_block_fancy(u(:,:,:,i:i), "block_ACM_diverged_RHS.txt", Bs, g)
 
                 ! done by all ranks but well I hope the cluster can take one for the team.
                 ! This (empty) file is for scripting purposes on the supercomputers.
@@ -141,12 +144,15 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
             dV = product(dx(1:params_acm%dim))
 
+            params_acm%mean_flow(1) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            params_acm%mean_flow(2) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
             if (params_acm%dim==2) then
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1)**2)
             else
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)
+                params_acm%mean_flow(3) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
             endif
 
             ! NOTE: MPI_SUM is perfomed in the post_stage.
@@ -232,6 +238,12 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         if (params_acm%HIT_linear_forcing) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            if (params_acm%dim == 2) then
+                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
+            else
+                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
+            endif
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
         endif
 
@@ -256,13 +268,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             if (params_acm%compute_flow) then
                 ! this is a 2d case (ux,uy,p)
                 call RHS_2D_acm(g, Bs, dx(1:2), x0(1:2), u(:,:,1,:), params_acm%discretization, &
-                time, rhs(:,:,1,:), mask(:,:,1,:))
+                time, rhs(:,:,1,:), mask(:,:,1,:), n_domain)
             endif
             ! --------------------------------------------------------------------------
             ! passive scalars
             ! --------------------------------------------------------------------------
             if (params_acm%use_passive_scalar) then
-                call RHS_2D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+                call RHS_2D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask, n_domain)
             endif
 
         else
@@ -271,14 +283,14 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             ! --------------------------------------------------------------------------
             if (params_acm%compute_flow) then
                 ! this is a 3d case (ux,uy,uz,p)
-                call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+                call RHS_3D_acm(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask, n_domain)
             endif
 
             ! --------------------------------------------------------------------------
             ! passive scalars
             ! --------------------------------------------------------------------------
             if (params_acm%use_passive_scalar) then
-                call RHS_3D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask)
+                call RHS_3D_scalar(g, Bs, dx, x0, u, params_acm%discretization, time, rhs, mask, n_domain)
             endif
 
         endif
@@ -296,7 +308,7 @@ end subroutine RHS_ACM
 
 
 
-subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
 
     implicit none
 
@@ -318,21 +330,31 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     character(len=cshort), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    integer(kind=2), intent(in) :: n_domain(3)
 
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta, C_eta_inv, gamma
-    real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, v_dx, v_dy, v_dxdx, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, &
+    real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, u_dxdy, v_dx, v_dy, v_dxdx, v_dxdy, &
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, bulk_viscosity, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      C_sponge_inv, &
                      up_dx, vp_dy
     ! loop variables
     integer(kind=ik) :: ix, iy, idir
-    ! coefficients for Tam&Webb (4th order 1st derivative)
+    ! coefficients for Tam&Webb (4th order 1st derivative), see T&W 1993 - Dispersion- Relation- Preserving FD schemes for Computational Acoustics
     real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    ! coefficients for Tam&Webb revised (4th order 1st derivative), see T&W 1993 - Direct Computation of Nonlinear Acoustic Pulses using High Order FD schemes
+    real(kind=rk), parameter :: a_TWR4(-3:3) = (/-0.020843142770_rk, +0.166705904415_rk, -0.770882380518_rk, 0.0_rk, 0.770882380518_rk, -0.166705904415_rk, 0.020843142770_rk/)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
     ! 4th order coefficients for second derivative
@@ -346,6 +368,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     c_0         = params_acm%c_0
     nu          = params_acm%nu
     nu_p        = params_acm%nu_p
+    bulk_viscosity        = params_acm%bulk_viscosity
     C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
@@ -628,7 +651,40 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
 
                     rhs(ix,iy,3) = rhs(ix,iy,3) - up_dx - vp_dy
                 enddo
-            enddo    
+            enddo
+        case ('bulk_viscosity')
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! second derivatives of u and v
+                    u_dxdx = (b_FD4(-2)*phi(ix-2,iy,1) + b_FD4(-1)*phi(ix-1,iy,1) + b_FD4(0)*phi(ix,iy,1) + b_FD4(+1)*phi(ix+1,iy,1) + b_FD4(+2)*phi(ix+2,iy,1))*dx2_inv    
+                    v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv 
+                    ! cross derivatives, using hardcoded cross stencils, coefficients applied for each depth, for the signs we have NE+ SE- NW- SW+
+                    ! This will look like this:
+                    !   -       +
+                    !     -   +
+                    !       o
+                    !     +   -
+                    !   +       -
+                    ! ! ! second order: stencil is 1: 1/4
+                    ! u_dxdy = (  1.0_rk/4.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)))*dx_inv*dy_inv 
+                    ! v_dxdy = (  1.0_rk/4.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)))*dx_inv*dy_inv
+                    ! fourth order: stencil is 1: 1/3, 2:1/48
+                    u_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)))*dx_inv*dy_inv 
+                    v_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)) + \
+                              -1.0_rk/48.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)))*dx_inv*dy_inv
+                    ! ! sixth order: stencil is 1: 3/8, 2: -3/80, 1/360
+                    ! u_dxdy = (  3.0_rk/8.0_rk*(phi(ix+1,iy+1,1) - phi(ix+1,iy-1,1) - phi(ix-1,iy+1,1) + phi(ix-1,iy-1,1)) + \
+                    !           -1.0_rk/80.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)) + \
+                    !           1.0_rk/360.0_rk*(phi(ix+2,iy+2,1) - phi(ix+2,iy-2,1) - phi(ix-2,iy+2,1) + phi(ix-2,iy-2,1)))*dx_inv*dy_inv 
+                    ! v_dxdy = (  3.0_rk/8.0_rk*(phi(ix+1,iy+1,2) - phi(ix+1,iy-1,2) - phi(ix-1,iy+1,2) + phi(ix-1,iy-1,2)) + \
+                    !           -1.0_rk/80.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)) + \
+                    !           1.0_rk/360.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)))*dx_inv*dy_inv
+
+                    rhs(ix,iy,1) = rhs(ix,iy,1) + bulk_viscosity * (u_dxdx + v_dxdy)
+                    rhs(ix,iy,2) = rhs(ix,iy,2) + bulk_viscosity * (v_dydy + u_dxdy)
+                enddo
+            enddo
         case default
             call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
         end select    
@@ -762,7 +818,7 @@ end subroutine RHS_2D_acm
 
 
 
-subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
     implicit none
 
     !> grid parameter
@@ -783,6 +839,14 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     character(len=cshort), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    integer(kind=2), intent(in) :: n_domain(3)
 
 
     !> forcing term
@@ -792,18 +856,21 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
                      nu, C_eta, C_eta_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
-    real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
-                     v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
-                     w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
+    real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
+                     v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
+                     w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, w_dxdz, w_dydz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 
-    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+    ! coefficients for Tam&Webb (4th order 1st derivative), see T&W 1993 - Dispersion- Relation- Preserving FD schemes for Computational Acoustics
+    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
+    ! coefficients for Tam&Webb revised (4th order 1st derivative), see T&W 1993 - Direct Computation of Nonlinear Acoustic Pulses using High Order FD schemes
+    real(kind=rk), parameter :: a_TWR4(-3:3) = (/-0.020843142770_rk, +0.166705904415_rk, -0.770882380518_rk, 0.0_rk, 0.770882380518_rk, -0.166705904415_rk, 0.020843142770_rk/)
     ! 4th order coefficients for second derivative
     real(kind=rk), parameter :: b_FD4(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
     ! 6th order FD scheme
@@ -1116,7 +1183,42 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
                         rhs(ix,iy,iz,4) = rhs(ix,iy,iz,4) - (pu_dx+pv_dy+pw_dz)
                     enddo
                 enddo    
-            enddo    
+            enddo
+        case ('bulk_viscosity')
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! second derivatives of u and v
+                        u_dxdx = (b_FD4(-2)*phi(ix-2,iy,iz,1)  + b_FD4(-1)*phi(ix-1,iy,iz,1)  + b_FD4(0)*phi(ix,iy,iz,1)  + b_FD4(+1)*phi(ix+1,iy,iz,1)  + b_FD4(+2)*phi(ix+2,iy,iz,1))*dx2_inv  
+                        v_dydy = (b_FD4(-2)*phi(ix,iy-2,iz,2)  + b_FD4(-1)*phi(ix,iy-1,iz,2)  + b_FD4(0)*phi(ix,iy,iz,2)  + b_FD4(+1)*phi(ix,iy+1,iz,2)  + b_FD4(+2)*phi(ix,iy+2,iz,2))*dy2_inv    
+                        w_dzdz = (b_FD4(-2)*phi(ix,iy,iz-2,3)  + b_FD4(-1)*phi(ix,iy,iz-1,3)  + b_FD4(0)*phi(ix,iy,iz,3)  + b_FD4(+1)*phi(ix,iy,iz+1,3)  + b_FD4(+2)*phi(ix,iy,iz+2,3))*dz2_inv    
+                        ! cross derivatives, using hardcoded cross stencils, coefficients applied for each depth, for the signs we have NE+ SE- NW- SW+
+                        ! This will look like this:
+                        !   -       +
+                        !     -   +
+                        !       o
+                        !     +   -
+                        !   +       -
+                        ! fourth order: stencil is 1: 1/3, 2:1/48
+                        u_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,iz  ,1) - phi(ix+1,iy-1,iz  ,1) - phi(ix-1,iy+1,iz  ,1) + phi(ix-1,iy-1,iz  ,1)) + \
+                                -1.0_rk/48.0_rk*(phi(ix+2,iy+2,iz  ,1) - phi(ix+2,iy-2,iz  ,1) - phi(ix-2,iy+2,iz  ,1) + phi(ix-2,iy-2,iz  ,1)))*dx_inv*dy_inv 
+                        u_dxdz = (  1.0_rk/3.0_rk*(phi(ix+1,iy  ,iz+1,1) - phi(ix+1,iy  ,iz-1,1) - phi(ix-1,iy  ,iz+1,1) + phi(ix-1,iy  ,iz-1,1)) + \
+                                -1.0_rk/48.0_rk*(phi(ix+2,iy  ,iz+2,1) - phi(ix+2,iy  ,iz-2,1) - phi(ix-2,iy  ,iz+2,1) + phi(ix-2,iy  ,iz-2,1)))*dx_inv*dz_inv
+                        v_dxdy = (  1.0_rk/3.0_rk*(phi(ix+1,iy+1,iz  ,2) - phi(ix+1,iy-1,iz  ,2) - phi(ix-1,iy+1,iz  ,2) + phi(ix-1,iy-1,iz  ,2)) + \
+                                -1.0_rk/48.0_rk*(phi(ix+2,iy+2,iz  ,2) - phi(ix+2,iy-2,iz  ,2) - phi(ix-2,iy+2,iz  ,2) + phi(ix-2,iy-2,iz  ,2)))*dx_inv*dy_inv
+                        v_dydz = (  1.0_rk/3.0_rk*(phi(ix  ,iy+1,iz+1,2) - phi(ix  ,iy-1,iz+1,2) - phi(ix  ,iy+1,iz-1,2) + phi(ix  ,iy-1,iz-1,2)) + \
+                                -1.0_rk/48.0_rk*(phi(ix  ,iy+2,iz+2,2) - phi(ix  ,iy-2,iz+2,2) - phi(ix  ,iy+2,iz-2,2) + phi(ix  ,iy-2,iz-2,2)))*dy_inv*dz_inv
+                        w_dxdz = (  1.0_rk/3.0_rk*(phi(ix+1,iy  ,iz+1,3) - phi(ix+1,iy  ,iz-1,3) - phi(ix-1,iy  ,iz+1,3) + phi(ix-1,iy  ,iz-1,3)) + \
+                                -1.0_rk/48.0_rk*(phi(ix+2,iy  ,iz+1,3) - phi(ix+2,iy  ,iz-2,3) - phi(ix-2,iy  ,iz+2,3) + phi(ix-2,iy  ,iz-2,3)))*dx_inv*dz_inv
+                        w_dydz = (  1.0_rk/3.0_rk*(phi(ix  ,iy+1,iz+1,3) - phi(ix  ,iy-1,iz+1,3) - phi(ix  ,iy+1,iz-2,3) + phi(ix  ,iy-1,iz-1,3)) + \
+                                -1.0_rk/48.0_rk*(phi(ix  ,iy+2,iz+1,3) - phi(ix  ,iy-2,iz+2,3) - phi(ix  ,iy+2,iz-2,3) + phi(ix  ,iy-2,iz-2,3)))*dy_inv*dz_inv
+                        
+                        rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) + params_acm%bulk_viscosity * (u_dxdx + v_dxdy + w_dxdz)
+                        rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) + params_acm%bulk_viscosity * (v_dydy + u_dxdy + w_dydz)
+                        rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) + params_acm%bulk_viscosity * (w_dzdz + u_dxdz + v_dydz)
+                    enddo
+                enddo
+            enddo
         case default
             call abort(2501041, "pressure equation model is unkown: "//trim(adjustl(params_acm%p_eqn_model)))
         end select   
@@ -1357,19 +1459,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     end select
 
     ! --------------------------------------------------------------------------
-    ! HIT linear forcing
-    ! --------------------------------------------------------------------------
-    if (params_acm%HIT_linear_forcing) then
-        G_gain = params_acm%HIT_gain
-        e_kin_set = params_acm%HIT_energy
-        t_l_inf = 1.0_rk ! sqrt(nu / epsilon), should be adapted to by setting gain
-        ! forcing after Bassene konstant energy (2016)
-        A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
-            
-        rhs(:,:,:,1:3) = rhs(:,:,:,1:3) + A_forcing*phi(:,:,:,1:3)
-    endif
-
-    ! --------------------------------------------------------------------------
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
@@ -1394,13 +1483,37 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
     end if
 
 
+    ! --------------------------------------------------------------------------
+    ! HIT linear forcing
+    ! ATTENTION! This is at last position because I modify phi to avoid a 3-nested do-loop to subtract mean-flow
+    ! --------------------------------------------------------------------------
+    if (params_acm%HIT_linear_forcing) then
+        G_gain = params_acm%HIT_gain
+        e_kin_set = params_acm%HIT_energy * product(params_acm%domain_size(1:params_acm%dim))
+        t_l_inf = 1.0_rk ! sqrt(nu / epsilon), should be adapted to by setting gain
+        ! forcing after Bassene konstant energy (2016)
+        A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
+        
+        ! Forcing should not be applied onto the mean-flow, so we subtract it out
+        ! ATTENTION! This modifies phi so it should be the last statement with phi
+        phi(:,:,:,1) = phi(:,:,:,1) - params_acm%mean_flow(1)
+        phi(:,:,:,2) = phi(:,:,:,2) - params_acm%mean_flow(2)
+        phi(:,:,:,3) = phi(:,:,:,3) - params_acm%mean_flow(3)
+        ! cancel out mean_flow, this is quite brutal but let's see what it does
+        rhs(:,:,:,1) = rhs(:,:,:,1) - 1e4*params_acm%mean_flow(1)
+        rhs(:,:,:,2) = rhs(:,:,:,2) - 1e4*params_acm%mean_flow(2)
+        rhs(:,:,:,3) = rhs(:,:,:,3) - 1e4*params_acm%mean_flow(3)
+        ! apply forcing
+        rhs(:,:,:,1:3) = rhs(:,:,:,1:3) + A_forcing*phi(:,:,:,1:3)
+    endif
+
 
 end subroutine RHS_3D_acm
 
 
 
 
-subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
     implicit none
 
     !> grid parameter
@@ -1421,6 +1534,14 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     character(len=cshort), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    integer(kind=2), intent(in) :: n_domain(3)
 
     integer(kind=ik) :: ix, iy, iz, iscalar, j
 
@@ -1744,7 +1865,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 end subroutine RHS_3D_scalar
 
 
-subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask)
+subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
     implicit none
 
     !> grid parameter
@@ -1765,6 +1886,14 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     character(len=cshort), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    integer(kind=2), intent(in) :: n_domain(3)
 
     integer(kind=ik) :: ix, iy, iscalar, j
 

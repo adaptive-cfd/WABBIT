@@ -13,30 +13,22 @@ subroutine updateNeighbors_tree(params, tree_ID, search_overlapping, verbose_che
 
 
     logical                             :: error = .false.
-    integer(kind=ik)                    :: mpierror, k, N, lgtID, hvyID
+    integer(kind=ik)                    :: mpierror, k, N, lgt_ID, hvy_ID
     real(kind=rk)                       :: x0(1:3), dx(1:3)
     integer(kind=2)                     :: n_domain(1:3)
 
 
     N = params%number_blocks
 
-    ! special case:
-    ! if there is only one block => all neighbors are this block
-    ! one block criteria: lgt_n should be one!
-    if ( lgt_n(tree_ID) == 1 ) then
-        hvy_neighbor(1,1:26) = lgt_active(1, tree_ID)
-        return
-    end if
-
     ! loop over active heavy data blocks
     do k = 1, hvy_n(tree_ID)
         ! delete existing neighbors (they are assumed to be outdated when calling this routine)
         hvy_neighbor(hvy_active(k, tree_ID), :) = -1
-        hvyID = hvy_active(k, tree_ID)
+        hvy_ID = hvy_active(k, tree_ID)
 
-        call hvy2lgt( lgtID, hvyID, params%rank, N )
+        call hvy2lgt( lgt_ID, hvy_ID, params%rank, N )
 
-        call get_adjacent_boundary_surface_normal( params, lgtID, n_domain )
+        call get_adjacent_boundary_surface_normal( params, lgt_ID, n_domain )
 
         !> direction for neighbor search - number where each digit represents a cardinal direction XYZ
         !> 9 -> lower direction (-) - we would love to use -1 here but it's obviously not possible so we settled for 9 instead (kind of like 10-1)
@@ -44,37 +36,37 @@ subroutine updateNeighbors_tree(params, tree_ID, search_overlapping, verbose_che
         !> 0 -> no direction (but finer neighbors can vary in + and - and coarser neighbors have one configuration of those two) 
 
         ! faces, 2D edges
-        call find_neighbor(params, hvyID, lgtID, 900, error, n_domain, search_overlapping)  ! -x
-        call find_neighbor(params, hvyID, lgtID, 100, error, n_domain, search_overlapping)  ! +x
-        call find_neighbor(params, hvyID, lgtID, 090, error, n_domain, search_overlapping)  ! -y
-        call find_neighbor(params, hvyID, lgtID, 010, error, n_domain, search_overlapping)  ! +y
+        call find_neighbor(params, hvy_ID, lgt_ID, 900, error, n_domain, search_overlapping)  ! -x
+        call find_neighbor(params, hvy_ID, lgt_ID, 100, error, n_domain, search_overlapping)  ! +x
+        call find_neighbor(params, hvy_ID, lgt_ID, 090, error, n_domain, search_overlapping)  ! -y
+        call find_neighbor(params, hvy_ID, lgt_ID, 010, error, n_domain, search_overlapping)  ! +y
         if (params%dim == 3) then
-            call find_neighbor(params, hvyID, lgtID, 009, error, n_domain, search_overlapping)  ! -z
-            call find_neighbor(params, hvyID, lgtID, 001, error, n_domain, search_overlapping)  ! +z
+            call find_neighbor(params, hvy_ID, lgt_ID, 009, error, n_domain, search_overlapping)  ! -z
+            call find_neighbor(params, hvy_ID, lgt_ID, 001, error, n_domain, search_overlapping)  ! +z
         endif
         ! edges, 2D corners
-        call find_neighbor(params, hvyID, lgtID, 990, error, n_domain, search_overlapping)  ! -x-y
-        call find_neighbor(params, hvyID, lgtID, 910, error, n_domain, search_overlapping)  ! -x+y
-        call find_neighbor(params, hvyID, lgtID, 190, error, n_domain, search_overlapping)  ! +x-y
-        call find_neighbor(params, hvyID, lgtID, 110, error, n_domain, search_overlapping)  ! +x+x
+        call find_neighbor(params, hvy_ID, lgt_ID, 990, error, n_domain, search_overlapping)  ! -x-y
+        call find_neighbor(params, hvy_ID, lgt_ID, 910, error, n_domain, search_overlapping)  ! -x+y
+        call find_neighbor(params, hvy_ID, lgt_ID, 190, error, n_domain, search_overlapping)  ! +x-y
+        call find_neighbor(params, hvy_ID, lgt_ID, 110, error, n_domain, search_overlapping)  ! +x+x
         if (params%dim == 3) then
-            call find_neighbor(params, hvyID, lgtID, 909, error, n_domain, search_overlapping)  ! -x-z
-            call find_neighbor(params, hvyID, lgtID, 901, error, n_domain, search_overlapping)  ! -x+z
-            call find_neighbor(params, hvyID, lgtID, 109, error, n_domain, search_overlapping)  ! +x-z
-            call find_neighbor(params, hvyID, lgtID, 101, error, n_domain, search_overlapping)  ! +x+z
-            call find_neighbor(params, hvyID, lgtID, 099, error, n_domain, search_overlapping)  ! -y-z
-            call find_neighbor(params, hvyID, lgtID, 091, error, n_domain, search_overlapping)  ! -y+z
-            call find_neighbor(params, hvyID, lgtID, 019, error, n_domain, search_overlapping)  ! +y-z
-            call find_neighbor(params, hvyID, lgtID, 011, error, n_domain, search_overlapping)  ! +y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 909, error, n_domain, search_overlapping)  ! -x-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 901, error, n_domain, search_overlapping)  ! -x+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 109, error, n_domain, search_overlapping)  ! +x-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 101, error, n_domain, search_overlapping)  ! +x+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 099, error, n_domain, search_overlapping)  ! -y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 091, error, n_domain, search_overlapping)  ! -y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 019, error, n_domain, search_overlapping)  ! +y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 011, error, n_domain, search_overlapping)  ! +y+z
             ! ecorners
-            call find_neighbor(params, hvyID, lgtID, 999, error, n_domain, search_overlapping)  ! -x-y-z
-            call find_neighbor(params, hvyID, lgtID, 199, error, n_domain, search_overlapping)  ! +x-y-z
-            call find_neighbor(params, hvyID, lgtID, 919, error, n_domain, search_overlapping)  ! -x+y-z
-            call find_neighbor(params, hvyID, lgtID, 119, error, n_domain, search_overlapping)  ! +x+y-z
-            call find_neighbor(params, hvyID, lgtID, 991, error, n_domain, search_overlapping)  ! -x-y+z
-            call find_neighbor(params, hvyID, lgtID, 191, error, n_domain, search_overlapping)  ! +x-y+z
-            call find_neighbor(params, hvyID, lgtID, 911, error, n_domain, search_overlapping)  ! -x+y+z
-            call find_neighbor(params, hvyID, lgtID, 111, error, n_domain, search_overlapping)  ! +x+y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 999, error, n_domain, search_overlapping)  ! -x-y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 199, error, n_domain, search_overlapping)  ! +x-y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 919, error, n_domain, search_overlapping)  ! -x+y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 119, error, n_domain, search_overlapping)  ! +x+y-z
+            call find_neighbor(params, hvy_ID, lgt_ID, 991, error, n_domain, search_overlapping)  ! -x-y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 191, error, n_domain, search_overlapping)  ! +x-y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 911, error, n_domain, search_overlapping)  ! -x+y+z
+            call find_neighbor(params, hvy_ID, lgt_ID, 111, error, n_domain, search_overlapping)  ! +x+y+z
         endif
     end do
 

@@ -140,6 +140,15 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, lgt_n(tree_ID)
             lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = +1
         end do
+    
+    case ("nowhere")
+        !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))
+        ! set status "stay" for all active blocks, which is just setting the
+        ! last index in the light data block list to 0. This indicator is used
+        ! to keep the same grid. Might sound stupid but might be useful for debugging purposes
+        do k = 1, lgt_n(tree_ID)
+            lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = 0
+        end do
 
     case ("random")
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))

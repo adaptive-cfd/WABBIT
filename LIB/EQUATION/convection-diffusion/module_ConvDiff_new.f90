@@ -103,11 +103,6 @@ contains
     matr_dummy = 1.0_rk  ! avoid 0 division by default for blob_width
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width, matr_dummy )
 
-    write(*, '(A, 5(es12.3, 1x))') "x0: ", params_convdiff%x0
-    write(*, '(A, 5(es12.3, 1x))') "y0: ", params_convdiff%y0
-    write(*, '(A, 5(es12.3, 1x))') "z0: ", params_convdiff%z0
-    write(*, '(A, 5(es12.3, 1x))') "blob_width: ", params_convdiff%blob_width
-
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
 
@@ -478,56 +473,6 @@ contains
                     end do
                 end do
             enddo
-
-        ! case("blob")
-        !     if (params_convdiff%dim==2) then
-        !         ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-        !         do iy = 1, Bs(2)+2*g
-        !             do ix = 1, Bs(1)+2*g
-        !                 ! compute x,y coordinates from spacing and origin
-        !                 x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-        !                 y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-
-        !                 if (params_convdiff%periodic_BC(1)) then
-        !                 if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-        !                 if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-        !                 endif
-        !                 if (params_convdiff%periodic_BC(2)) then
-        !                 if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-        !                 if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-        !                 endif
-        !                 ! set actual inicond gauss blob
-        !                 u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
-        !             end do
-        !         end do
-        !     else
-        !         ! create gauss pulse
-        !         do iz = 1, Bs(3)+2*g
-        !             do iy = 1, Bs(2)+2*g
-        !                 do ix = 1, Bs(1)+2*g
-        !                     ! compute x,y coordinates from spacing and origin
-        !                     x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-        !                     y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-        !                     z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
-
-        !                     if (params_convdiff%periodic_BC(1)) then
-        !                     if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-        !                     if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-        !                     endif
-        !                     if (params_convdiff%periodic_BC(2)) then
-        !                     if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-        !                     if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-        !                     endif
-        !                     if (params_convdiff%periodic_BC(3)) then
-        !                     if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
-        !                     if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
-        !                     endif
-        !                     ! set actual inicond gauss blob
-        !                     u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
-        !                 end do
-        !             end do
-        !         end do
-        !     end if
         case default
             call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
         end select

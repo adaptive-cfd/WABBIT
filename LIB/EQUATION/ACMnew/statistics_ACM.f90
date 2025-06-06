@@ -42,8 +42,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
     
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
     real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2
     real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal=0.0_rk, apowtotal=0.0_rk
@@ -70,9 +69,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
     ! compute the size of blocks
+    Bs = 1
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
-    Bs(3) = size(u,3) - 2*g
+    if (params_acm%dim == 3) Bs(3) = size(u,3) - 2*g
 
     C_eta_inv    = 1.0_rk / params_acm%C_eta
     C_sponge_inv = 1.0_rk / params_acm%C_sponge
@@ -108,6 +108,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
+        params_acm%helicity = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
@@ -137,7 +138,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         do k = 1, size(u,4)
             if (maxval(abs(u(:,:,:,k))) > 1.0e4_rk) then
-                write(*,'("maxval in u(:,:,:,",i2,") = ", es15.8)') k, maxval(abs(u(:,:,:,k)))
+                write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
+
+                call dump_block_fancy(u(:,:,:,k:k), "block_ACM_diverged_statistics.txt", Bs, g)
 
                 ! done by all ranks but well I hope the cluster can take one for the team
                 ! This (empty) file is for scripting purposes on the supercomputers.
@@ -384,6 +387,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
         else
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
+            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
         end if
 
         call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)
@@ -414,11 +418,24 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%scalar_removal, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         endif
 
+        !-------------------------------------------------------------------------
+        ! kinetic energy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
+        ! divergence
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
+
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+
+        !-------------------------------------------------------------------------
+        ! kinetic enstrophy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%helicity, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         ! minium spacing of current grid, not smallest possible one.
@@ -460,92 +477,96 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call append_t_file( 'CFL.t', (/time, CFL, CFL_nu, CFL_eta/) )
             call append_t_file( 'meanflow.t', (/time, params_acm%mean_flow/) )
             call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
+            if (params_acm%penalization .or. params_acm%use_sponge) then
+                ! total force (excluding zero color)
+                call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:ncolors)), &
+                sum(params_acm%force_color(2,1:ncolors)), sum(params_acm%force_color(3,1:ncolors)) /) )
 
-            ! total force (excluding zero color)
-            call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:ncolors)), &
-            sum(params_acm%force_color(2,1:ncolors)), sum(params_acm%force_color(3,1:ncolors)) /) )
+                ! forces/moment for individual colors.
+                ! This is what we should have done in the first place. For the insects below,
+                ! some colors are (also) stored to different names. That's unfortunate but not a big deal.
+                do color = 0, ncolors
+                    ! save force for each color
+                    write(fname,'("forces_color",i1,".t")') color
+                    call append_t_file( fname, (/time, params_acm%force_color(:,color)/) )
 
-            ! forces/moment for individual colors.
-            ! This is what we should have done in the first place. For the insects below,
-            ! some colors are (also) stored to different names. That's unfortunate but not a big deal.
-            do color = 0, ncolors
-                ! save force for each color
-                write(fname,'("forces_color",i1,".t")') color
-                call append_t_file( fname, (/time, params_acm%force_color(:,color)/) )
+                    ! save moment for each color
+                    write(fname,'("moments_color",i1,".t")') color
+                    call append_t_file( fname, (/time, params_acm%moment_color(:,color)/) )
+                enddo
 
-                ! save moment for each color
-                write(fname,'("moments_color",i1,".t")') color
-                call append_t_file( fname, (/time, params_acm%moment_color(:,color)/) )
-            enddo
+                if (is_insect) then
+                    call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
 
-            if (is_insect) then
-                call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
+                    ! total moment w.r.t body center is computed in zeroth color slot:
+                    color = 0_2
+                    call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color)/) )
 
-                ! total moment w.r.t body center is computed in zeroth color slot:
-                color = 0_2
-                call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color)/) )
+                    ! body
+                    color = Insect%color_body
+                    call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color)/) )
 
-                ! body
-                color = Insect%color_body
-                call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color)/) )
-                call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color)/) )
+                    ! left wing
+                    color = Insect%color_l
+                    call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
 
-                ! left wing
-                color = Insect%color_l
-                call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color)/) )
-                call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                    ! right wing
+                    color = Insect%color_r
+                    call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
+                    call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
 
-                ! right wing
-                color = Insect%color_r
-                call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
-                call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                    ! kinematics data ('kinematics.t')
+                    if (Insect%second_wing_pair) then
+                        ! second left wing
+                        color = Insect%color_l2
+                        call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color)/) )
+                        call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
 
-                ! kinematics data ('kinematics.t')
-                if (Insect%second_wing_pair) then
-                    ! second left wing
-                    color = Insect%color_l2
-                    call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color)/) )
-                    call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                        ! second right wing
+                        color = Insect%color_r2
+                        call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color)/) )
+                        call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
 
-                    ! second right wing
-                    color = Insect%color_r2
-                    call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color)/) )
-                    call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
-
-                    call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-                    Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-                    Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-                    Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-                    Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
-                    Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
-                    Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
-                    Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
-                    Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
-                else
-                    call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-                    Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-                    Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-                    Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-                    Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
+                        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+                        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+                        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+                        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+                        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
+                        Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
+                        Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
+                        Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
+                        Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
+                    else
+                        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
+                        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
+                        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
+                        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
+                        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
+                    endif
                 endif
+
+                call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
+                call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
+                call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )    
             endif
 
             if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
                 call append_t_file( 'scalar_removal.t', (/time, params_acm%scalar_removal/) )
             endif
-            call append_t_file( 'e_kin.t', (/time, params_acm%e_kin/) )
-            call append_t_file( 'ACM_energy.t', (/time, params_acm%ACM_energy/) )
+            call append_t_file( 'e_kin.t', (/time, params_acm%e_kin, params_acm%ACM_energy/) )
             call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            if (params_acm%dim == 3) then
+                call append_t_file( 'helicity.t', (/time, params_acm%helicity/) )
+            endif
             call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
-            call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
-            call append_t_file( 'penal_power.t', (/time, params_acm%penal_power/) )
-            call append_t_file( 'u_residual.t', (/time, params_acm%u_residual/) )
 
-            ! turbulent statistics
-            if (params_acm%nu > 0.0_rk) then
-                dissipation = 2*params_acm%nu*params_acm%enstrophy
-                u_RMS = sqrt(2*params_acm%e_kin/3)
-                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin, u_RMS, &
+            ! turbulent statistics - these are normed by the volume!
+            if (params_acm%nu*params_acm%enstrophy > 0.0_rk) then
+                dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
+                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
             endif

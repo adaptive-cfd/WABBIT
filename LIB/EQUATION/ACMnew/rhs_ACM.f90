@@ -344,7 +344,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !>
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta, C_eta_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, u_dxdy, v_dx, v_dy, v_dxdx, v_dxdy, &
-                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, bulk_viscosity, &
+                     v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, nu_bulk, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      C_sponge_inv, &
@@ -368,7 +368,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     c_0         = params_acm%c_0
     nu          = params_acm%nu
     nu_p        = params_acm%nu_p
-    bulk_viscosity        = params_acm%bulk_viscosity
+    nu_bulk     = params_acm%nu_bulk
     C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
@@ -617,6 +617,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
             end do
         endif
 
+        ! ATTENTION The additional ACM terms are still experimental and available ONLY with the FORTH order code
         select case(params_acm%p_eqn_model)
         case ('acm')
             ! do nothing, is the eqn computed above without additional terms
@@ -681,8 +682,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     !           -1.0_rk/80.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)) + \
                     !           1.0_rk/360.0_rk*(phi(ix+2,iy+2,2) - phi(ix+2,iy-2,2) - phi(ix-2,iy+2,2) + phi(ix-2,iy-2,2)))*dx_inv*dy_inv
 
-                    rhs(ix,iy,1) = rhs(ix,iy,1) + bulk_viscosity * (u_dxdx + v_dxdy)
-                    rhs(ix,iy,2) = rhs(ix,iy,2) + bulk_viscosity * (v_dydy + u_dxdy)
+                    rhs(ix,iy,1) = rhs(ix,iy,1) + nu_bulk * (u_dxdx + v_dxdy)
+                    rhs(ix,iy,2) = rhs(ix,iy,2) + nu_bulk * (v_dydy + u_dxdy)
                 enddo
             enddo
         case default
@@ -1138,6 +1139,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
             end do
         endif
 
+        ! ATTENTION The additional ACM terms are still experimental and available ONLY with the FORTH order code
         select case(params_acm%p_eqn_model)
         case ('acm')
             ! do nothing, is the eqn computed above without additional terms
@@ -1213,9 +1215,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w_dydz = (  1.0_rk/3.0_rk*(phi(ix  ,iy+1,iz+1,3) - phi(ix  ,iy-1,iz+1,3) - phi(ix  ,iy+1,iz-2,3) + phi(ix  ,iy-1,iz-1,3)) + \
                                 -1.0_rk/48.0_rk*(phi(ix  ,iy+2,iz+1,3) - phi(ix  ,iy-2,iz+2,3) - phi(ix  ,iy+2,iz-2,3) + phi(ix  ,iy-2,iz-2,3)))*dy_inv*dz_inv
                         
-                        rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) + params_acm%bulk_viscosity * (u_dxdx + v_dxdy + w_dxdz)
-                        rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) + params_acm%bulk_viscosity * (v_dydy + u_dxdy + w_dydz)
-                        rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) + params_acm%bulk_viscosity * (w_dzdz + u_dxdz + v_dydz)
+                        rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) + params_acm%nu_bulk * (u_dxdx + v_dxdy + w_dxdz)
+                        rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) + params_acm%nu_bulk * (v_dydy + u_dxdy + w_dydz)
+                        rhs(ix,iy,iz,3) = rhs(ix,iy,iz,3) + params_acm%nu_bulk * (w_dzdz + u_dxdz + v_dydz)
                     enddo
                 enddo
             enddo

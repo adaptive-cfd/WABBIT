@@ -143,9 +143,9 @@ subroutine keyvalues(fname, params)
             do iz = g+1, Bs(3)+g
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        x = dble(ix-1)*dx(1) + x0(1)
-                        y = dble(iy-1)*dx(2) + x0(2)
-                        z = dble(iz-1)*dx(3) + x0(3)
+                        x = dble(ix-(g+1))*dx(1) + x0(1)
+                        y = dble(iy-(g+1))*dx(2) + x0(2)
+                        z = dble(iz-(g+1))*dx(3) + x0(3)
 
                         val_squares = val_squares + product(dx(1:3))*hvy_block(ix,iy,iz,1,hvy_id)**2
                         val_mean    = val_mean + product(dx(1:3))*hvy_block(ix,iy,iz,1,hvy_id)
@@ -158,8 +158,8 @@ subroutine keyvalues(fname, params)
         else
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
-                    x = dble(ix-1)*dx(1) + x0(1)
-                    y = dble(iy-1)*dx(2) + x0(2)
+                    x = dble(ix-(g+1))*dx(1) + x0(1)
+                    y = dble(iy-(g+1))*dx(2) + x0(2)
 
                     val_squares = val_squares + product(dx(1:2))*hvy_block(ix,iy,1,1,hvy_id)**2
                     val_mean    = val_mean + product(dx(1:2))*hvy_block(ix,iy,1,1,hvy_id)

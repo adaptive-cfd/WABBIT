@@ -14,7 +14,7 @@ module module_acm
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
   use module_params, only : read_bs
-  use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval
+  use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
   use module_timing
 
   implicit none
@@ -60,7 +60,7 @@ module module_acm
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
-    real(kind=rk) :: nu, nu_p=0.0_rk
+    real(kind=rk) :: nu, nu_p=0.0_rk, bulk_viscosity=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
@@ -107,7 +107,7 @@ module module_acm
     real(kind=rk) :: mean_flow(1:3)=0.0_rk, mean_p=0.0_rk, umax=0.0_rk, umag=0.0_rk
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, mask_volume=0.0_rk, u_residual(1:3)=0.0_rk, &
+    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, helicity=0.0_rk, mask_volume=0.0_rk, u_residual(1:3)=0.0_rk, &
     sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
@@ -243,6 +243,7 @@ end subroutine
     ! viscosity
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     call read_param_mpi(FILE, 'ACM-new', 'nu_p', params_acm%nu_p, 0.0_rk)
+    call read_param_mpi(FILE, 'ACM-new', 'bulk_viscosity', params_acm%bulk_viscosity, 0.0_rk)
     ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
@@ -262,7 +263,7 @@ end subroutine
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
     if (params_acm%read_from_files) then
         call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
-        timestamp = input_files( index(input_files,'_')+1:index(input_files,'.h5') )
+        timestamp = input_files( scan(input_files,'_', back=.true.)+1:scan(input_files,'.h5', back=.true.)-3)
         read(timestamp,*) params_acm%start_time
         ! note this requires to have timestamp in the filename (so we cannot rename files...)
         params_acm%start_time = params_acm%start_time * 1.0e-6
@@ -390,7 +391,7 @@ end subroutine
     else
       params_acm%Bs=(/17,17,1/)
     endif
-    params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim)
+    params_acm%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_acm%Bs, params_acm%dim, params_acm%mpirank)
 
     call clean_ini_file_mpi( FILE )
 
@@ -531,24 +532,10 @@ end subroutine
 
     ! compute square of velocity magnitude
     if (params_acm%dim == 2) then
-        u_mag = 0.0_rk
-        do iy = g+1, Bs(2)+g
-            do ix = g+1, Bs(1)+g
-                uu = u(ix,iy,1,1)*u(ix,iy,1,1)+u(ix,iy,1,2)*u(ix,iy,1,2)
-                u_mag = max( u_mag, uu)
-            enddo
-        enddo
-
+        u_mag = maxval(u(g+1:Bs(1)+g,g+1:Bs(2)+g,1,1)**2 + u(g+1:Bs(1)+g,g+1:Bs(2)+g,1,2)**2)
     else
-        u_mag = 0.0_rk
-        do iz=g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    uu = u(ix,iy,iz,1)*u(ix,iy,iz,1)+u(ix,iy,iz,2)*u(ix,iy,iz,2)+u(ix,iy,iz,3)*u(ix,iy,iz,3)
-                    u_mag = max( u_mag, uu)
-                enddo
-            enddo
-        enddo
+        u_mag = maxval(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,1)**2 + u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,2)**2 + &
+                        u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,3)**2)
     endif
 
     ! the velocity of the fast modes is u +- W and W= sqrt(c0^2 + u^2)
@@ -667,45 +654,47 @@ end subroutine
 
 
       call init_t_file('meanflow.t', overwrite)
-      call init_t_file('forces.t', overwrite)
-      call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
-      call init_t_file('ACM_energy.t', overwrite, (/"           time", " p^2/2c0^2+ekin"/))
-      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
-      "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
+      call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin", " p^2/2c0^2+ekin"/))
       call init_t_file('enstrophy.t', overwrite)
+      if (params_acm%dim == 3) then
+        call init_t_file('helicity.t', overwrite)
+      endif
       call init_t_file('dissipation.t', overwrite)
       call init_t_file('div.t', overwrite)
       call init_t_file('umag.t', overwrite)
-      ! write(44,'(5(A15,1x))') "%          time","u_max","c0","MachNumber","u_eigen"
+      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
+      "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
       call init_t_file('CFL.t', overwrite, (/&
       "           time", &
       "            CFL", &
       "         CFL_nu", &
       "        CFL_eta"/) )
-      if (is_insect) then
-        call init_t_file('moments.t', overwrite)
-        call init_t_file('aero_power.t', overwrite)
-        call init_t_file('forces_body.t', overwrite)
-        call init_t_file('moments_body.t', overwrite)
-        call init_t_file('forces_leftwing.t', overwrite)
-        call init_t_file('moments_leftwing.t', overwrite)
-        call init_t_file('forces_rightwing.t', overwrite)
-        call init_t_file('moments_rightwing.t', overwrite)
-        call init_t_file('insect_state_vector.t', overwrite)
-      endif
-      if (use_color) then
-        call init_t_file('forces_1.t', overwrite)
-        call init_t_file('forces_2.t', overwrite)
-      endif
-      call init_t_file('mask_volume.t', overwrite)
-      call init_t_file('u_residual.t', overwrite)
-      call init_t_file('kinematics.t', overwrite)
-      call init_t_file('forces_rk.t', overwrite)
-      call init_t_file('penal_power.t', overwrite, (/&
-      "           time", &
-      "  E_dot_f_solid"/))
+      if (params_acm%penalization .or. params_acm%use_sponge) then
+        call init_t_file('forces.t', overwrite)
+        if (is_insect) then
+            call init_t_file('moments.t', overwrite)
+            call init_t_file('aero_power.t', overwrite)
+            call init_t_file('forces_body.t', overwrite)
+            call init_t_file('moments_body.t', overwrite)
+            call init_t_file('forces_leftwing.t', overwrite)
+            call init_t_file('moments_leftwing.t', overwrite)
+            call init_t_file('forces_rightwing.t', overwrite)
+            call init_t_file('moments_rightwing.t', overwrite)
+            call init_t_file('insect_state_vector.t', overwrite)
+        endif
+        if (use_color) then
+            call init_t_file('forces_1.t', overwrite)
+            call init_t_file('forces_2.t', overwrite)
+        endif
+        call init_t_file('mask_volume.t', overwrite)
+        call init_t_file('u_residual.t', overwrite)
+        call init_t_file('kinematics.t', overwrite)
+        call init_t_file('forces_rk.t', overwrite)
+        call init_t_file('penal_power.t', overwrite, (/&
+        "           time", &
+        "  E_dot_f_solid"/))
 
-      if (Insect%second_wing_pair) then
+        if (Insect%second_wing_pair) then
           call init_t_file('forces_leftwing2.t', overwrite)
           call init_t_file('moments_leftwing2.t', overwrite)
           call init_t_file('forces_rightwing2.t', overwrite)
@@ -755,7 +744,7 @@ end subroutine
           "  rot_dt_r2_w_x", &
           "  rot_dt_r2_w_y", &
           "  rot_dt_r2_w_z"/) )
-      else
+        else
           call init_t_file('kinematics.t', overwrite, (/&
           "           time", &
           "    xc_body_g_x", &
@@ -783,7 +772,9 @@ end subroutine
           "   rot_dt_r_w_x", &
           "   rot_dt_r_w_y", &
           "   rot_dt_r_w_z"/) )
-      endif
+        endif
+    endif
+
 
   end subroutine INITIALIZE_ASCII_FILES_ACM
 

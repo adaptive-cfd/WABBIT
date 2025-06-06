@@ -69,6 +69,8 @@ module module_params
         ! HR - low pass reconstruction filter, H
         ! GR - high pass reconstruction filter, G
         real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
+        ! filters for multigrid method - restriction prediction filter, HD for lifted wavelets and low-pass filter for unlifted wavelets
+        real(kind=rk), dimension(:), allocatable :: MGR
         integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
 
 

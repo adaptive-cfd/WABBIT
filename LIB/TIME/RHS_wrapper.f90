@@ -123,7 +123,7 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
         if ( .not. All(params%periodic_BC) ) then
-            ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+            ! check if block is adjacent to a boundary of the domain, might be used later on
             call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
         endif
 

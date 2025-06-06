@@ -13,10 +13,9 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: rank, dim
     integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    real(kind=rk), allocatable, save    :: new_data(:,:,:,:), data_predict_fine(:,:,:)  ! data fields for interpolation
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
+    real(kind=rk), allocatable, save    :: data_predict_fine(:,:,:,:)  ! data fields for interpolation
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id, level, idx_d(2,3)
     integer(kind=tsize)                 :: treecode
-    integer(kind=ik)                    :: level
 
     dim = params%dim
     N = params%number_blocks
@@ -30,20 +29,9 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.
     ! The datafield for prediction is one level up, i.e. it contains Bs+g + (Bs+2g-1) points
     if (dim == 2) then
-        if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 1) )
+        if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 1, size(hvy_block,4)) )
     else
-        if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 2*(Bs(3)+2*g)-1) )
-    endif
-    ! the new_data field holds the interior part of the new, refined block (which
-    ! will become four/eight blocks), without the ghost nodes.
-    ! uniqueGrid modification
-    if (allocated(new_data)) then
-        if (size(new_data, 4) < size(hvy_block,4)) deallocate(new_data)
-    endif
-    if (dim == 2) then
-        if (.not. allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 1, size(hvy_block,4)) )
-    else
-        if (.not. allocated(new_data)) allocate( new_data(2*Bs(1), 2*Bs(2), 2*Bs(3), size(hvy_block,4)) )
+        if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 2*(Bs(3)+2*g)-1, size(hvy_block,4)) )
     endif
 
     ! extract treecode and mesh level
@@ -59,11 +47,9 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! interpolate data, then save new data, but cut ghost nodes.
         ! uniqueGrid modification
         if (dim == 2) then
-            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine, params%order_predictor)
-            new_data(:,:,1,dF) = data_predict_fine( 2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g, 1 )
+            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:, :, :, df), params%order_predictor)
         else
-            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine, params%order_predictor)
-            new_data(:,:,:,dF) = data_predict_fine( 2*g+1:2*Bs(1)+2*g, 2*g+1:2*Bs(2)+2*g, 2*g+1:2*Bs(3)+2*g )
+            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:, :, :, df), params%order_predictor)
         endif
     end do
 
@@ -75,11 +61,11 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
             call get_free_local_light_id( params, rank, lgt_free_id, message="refinement_execute")
-            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_hvy_id, lgt_free_id, rank, N )
         ! last daughter overwrites mother
         else
-            free_heavy_id = hvyID
-            call hvy2lgt( lgt_free_id, free_heavy_id, rank, N )
+            free_hvy_id = hvyID
+            call hvy2lgt( lgt_free_id, free_hvy_id, rank, N )
         endif
 
         treecode = tc_set_digit_at_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
@@ -97,20 +83,25 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! the tree_ID is the same as the one of the mother block
         lgt_block( lgt_free_id, IDX_TREE_ID ) = tree_ID
 
-        ! save interpolated data, loop over all datafields - select data from correct quadrant
+        ! save interpolated data - select data from correct quadrant
         ! k=0 -> X_l, Y_l; k=1 -> X_l, Y_r; k=2 -> X_r, Y_l; k=3 -> X_r, Y_r;
-        do dF = 1, size(hvy_block,4)
-            if (dim == 2) then
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, 1, dF, free_heavy_id ) =  new_data( &
-                          (k_daughter/2)*Bs(1) +1 : Bs(1)*(1+      (k_daughter/2)), &
-                    modulo(k_daughter,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter,2)), 1, dF)
-            else
-                hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, dF, free_heavy_id ) =  new_data( &
-                    modulo(k_daughter/2,2)*Bs(1) +1 : Bs(1)*(1+modulo(k_daughter/2,2)), &
-                    modulo(k_daughter  ,2)*Bs(2) +1 : Bs(2)*(1+modulo(k_daughter  ,2)), &
-                          (k_daughter/4  )*Bs(3) +1 : Bs(3)*(1+      (k_daughter/4  )), dF)
-            endif
-        end do
+        ! compute indices of new block, include ghost points
+        idx_d(1,1) = 1*g +     1 + Bs(1) * modulo(k_daughter/2,2)
+        idx_d(2,1) = 3*g + Bs(1) + Bs(1) * modulo(k_daughter/2,2)
+        idx_d(1,2) = 1*g +     1 + Bs(2) * modulo(k_daughter,2)
+        idx_d(2,2) = 3*g + Bs(1) + Bs(2) * modulo(k_daughter,2)
+        if (dim == 3) then
+            idx_d(1,3) = 1*g +     1 + Bs(3) * (k_daughter/4)
+            idx_d(2,3) = 3*g + Bs(3) + Bs(3) * (k_daughter/4)
+        endif
+
+        if (dim == 2) then
+            hvy_block( :, :, 1, 1:size(hvy_block,4), free_hvy_id ) = \
+                data_predict_fine( idx_d(1,1):idx_d(2,1), idx_d(1,2):idx_d(2,2), 1, 1:size(hvy_block,4))
+        else
+            hvy_block( :, :, :, 1:size(hvy_block,4), free_hvy_id ) = \
+                data_predict_fine( idx_d(1,1):idx_d(2,1), idx_d(1,2):idx_d(2,2), idx_d(1,3):idx_d(2,3), 1:size(hvy_block,4))
+        endif
     end do
 
 end subroutine refineBlock
@@ -131,9 +122,9 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik)                    :: k, N, dF, k_daughter                 ! loop variables
-    integer(kind=ik)                    :: rank, dim, g, data_bounds(2,3)
+    integer(kind=ik)                    :: rank, dim, g, idx_daughter(2,3), idx_mother(2,3)
     integer(kind=ik), dimension(3)      :: Bs
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level, lgtID
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: tmp_wd  ! used for data juggling
@@ -163,7 +154,7 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
             call get_free_local_light_id( params, rank, lgt_free_id, message="refinement_execute")
-            call lgt2hvy( free_heavy_id, lgt_free_id, rank, N )
+            call lgt2hvy( free_hvy_id, lgt_free_id, rank, N )
         endif
 
         treecode = tc_set_digit_at_level_b(treecode, k_daughter, dim=params%dim, level=level+1, max_level=params%Jmax)
@@ -188,28 +179,25 @@ subroutine refineBlock2SpaghettiWD(params, hvy_block, hvyID, tree_ID)
             tmp_wd(:, :, :, df) = 0.0_rk
 
             ! compute bounds from which quadrant / octant to copy
-            data_bounds = -1
-            data_bounds(1, 1) = g+1       + Bs(1)/2 * modulo(k_daughter/2, 2)
-            data_bounds(2, 1) = g+Bs(1)/2 + Bs(1)/2 * modulo(k_daughter/2, 2)
-            data_bounds(1, 2) = g+1       + Bs(2)/2 * modulo(k_daughter  , 2)
-            data_bounds(2, 2) = g+Bs(2)/2 + Bs(2)/2 * modulo(k_daughter  , 2)
-            data_bounds(1, 3) = g+1       + Bs(3)/2 * modulo(k_daughter/4, 2)
-            data_bounds(2, 3) = g+Bs(3)/2 + Bs(3)/2 * modulo(k_daughter/4, 2)
+            idx_mother = -1
+            idx_daughter = -1
+            call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, -k_daughter-1, idx_daughter, gminus=g, gplus=g, lvl_diff=+1)
+            call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, -k_daughter-9, idx_mother, gminus=g, gplus=g, lvl_diff=-1)
 
             ! now copy values from this quadrant / octant to SC area in Mallat format
             if (dim == 2) then
-                tmp_wd(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, 1, df) = &
-                    hvy_block(data_bounds(1, 1):data_bounds(2, 1), data_bounds(1, 2):data_bounds(2, 2), 1, df, hvyID)
+                tmp_wd(idx_daughter(1,1):idx_daughter(2,1), idx_daughter(1,2):idx_daughter(2,2), 1, df) = &
+                    hvy_block(idx_mother(1,1):idx_mother(2,1), idx_mother(1,2):idx_mother(2,2), 1, df, hvyID)
             else
-                tmp_wd(ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(1)/2, ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(2)/2, &
-                    ceiling(g/2.0)+1:ceiling(g/2.0)+Bs(3)/2, df) = &
-                    hvy_block(data_bounds(1, 1):data_bounds(2, 1), data_bounds(1, 2):data_bounds(2, 2), &
-                    data_bounds(1, 3):data_bounds(2, 3), df, hvyID)
+                tmp_wd(idx_daughter(1,1):idx_daughter(2,1), idx_daughter(1,2):idx_daughter(2,2), &
+                    idx_daughter(1,3):idx_daughter(2,3), df) = &
+                    hvy_block(idx_mother(1,1):idx_mother(2,1), idx_mother(1,2):idx_mother(2,2), &
+                    idx_mother(1,3):idx_mother(2,3), df, hvyID)
             endif
 
         end do
         ! transform to spaghetti form as this is what we usually work with
-        call Mallat2Spaghetti_block(params, tmp_wd(:, :, :, 1:size(hvy_block,4)), hvy_block(:, :, :, 1:size(hvy_block,4), free_heavy_id))
+        call Mallat2Spaghetti_block(params, tmp_wd(:, :, :, 1:size(hvy_block,4)), hvy_block(:, :, :, 1:size(hvy_block,4), free_hvy_id))
     end do
 
     ! delete mother
@@ -288,7 +276,7 @@ subroutine refinementExecute_lvl2SpaghettiWD( params, hvy_block, tree_ID, level 
     integer(kind=ik)                    :: rank                                 ! process rank
     integer(kind=ik)                    :: g                                    ! grid parameter
     integer(kind=ik), dimension(3)      :: Bs
-    integer(kind=ik)                    :: lgt_free_id, free_heavy_id, lgt_id 
+    integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id 
     integer(kind=tsize)                 :: treecode
     integer(kind=ik)                    :: level_me, hvyID
 

@@ -15,12 +15,13 @@ PRIVATE
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_vorticity, compute_vorticity_abs, divergence, gradient, compute_Qcriterion, componentWiseNorm_tree
+PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, divergence, gradient, compute_Qcriterion, componentWiseNorm_tree, componentWiseNorm_block
 
 contains
 
 #include "compute_Qcriterion.f90"
 #include "compute_vorticity.f90"
+#include "compute_derivative.f90"
 #include "divergence.f90"
 #include "gradient.f90"
 #include "componentWiseNorm_tree.f90"

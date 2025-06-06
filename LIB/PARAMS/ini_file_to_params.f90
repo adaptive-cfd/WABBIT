@@ -16,7 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R
    integer(kind=ik), dimension(3)                  :: Bs
 
    rank         = params%rank
@@ -142,6 +142,26 @@ subroutine ini_file_to_params( params, filename )
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
+   ! If NWC of CE is smaller than the size of the FD-stencils, this can create strong divergence peaks.
+   ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
+   ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
+   if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
+   if ( params%order_discretization == 'FD_4th_central' ) i = 4
+   if ( params%order_discretization == 'FD_2th_central') i = 2
+   diff_L = max(i - params%Nwcl, 0)
+   diff_R = max(i - params%Nwcr, 0)
+   params%Nwcl = params%Nwcl + diff_L
+   params%Nwcr = params%Nwcr + diff_R
+   params%Nreconl = params%Nreconl + diff_L
+   params%Nreconr = params%Nreconr + diff_R
+   if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
+      write(*, '(A, i0, A, i0)') "Increased Nwc to consider FD-stencil size by (L/R) : ", diff_L, " / ", diff_R
+   endif
+   ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
+   if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then
+      write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
+   endif
+
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
@@ -235,7 +255,7 @@ subroutine ini_domain(params, FILE )
    params%periodic_BC = .true.
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
-   if (.not. all(params%periodic_BC)) then
+   if (params%rank==0 .and. .not. all(params%periodic_BC)) then
       write(*, '(A)') "Symmetric BC are currently an experimental feature, you should know what you are doing!"
    endif
 
@@ -269,7 +289,7 @@ subroutine ini_blocks(params, FILE )
    endif
 
    ! read number_block_nodes
-   params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim)
+   params%Bs =read_Bs(FILE, 'Blocks', 'number_block_nodes', params%Bs,params%dim, params%rank)
 
    ! annoyingly, this is redundant with the definition in setup_wavelet, but as setup_wavelet is part of module_wavelets
    ! which use module_params it cannot be called here (circular dependency....)
@@ -280,13 +300,13 @@ subroutine ini_blocks(params, FILE )
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if (params%wavelet(4:4) == "2") then
-      g_default = 2
+      g_default = 1
       g_RHS_default = 1
    elseif (params%wavelet(4:4) == "4") then
-      g_default = 4
+      g_default = 3
       g_RHS_default = 2
    elseif (params%wavelet(4:4) == "6") then
-      g_default = 6
+      g_default = 5
       g_RHS_default = 3
    else 
       call abort(2320242, "no default specified for this wavelet...")
@@ -330,7 +350,10 @@ subroutine ini_blocks(params, FILE )
    endif
 
    if (params%g_RHS > params%g) then
-      call abort(2404241, "You set number_ghost_nodes_rhs>number_ghost_nodes this is not okay.")
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was explicitly set larger than number_ghost_nodes, adapting number_ghost_nodes from ", params%g, " to ", params%g_RHS, " (ignore this if you know what you are doing)"
+      endif
+      params%g = params%g_RHS
    endif
 
    if ( params%Jmax < params%Jmin ) then
@@ -457,12 +480,14 @@ end subroutine ini_time
 
  !-------------------------------------------------------------------------!
  !> @brief Read Bs from inifile for unknown number of Bs in inifile
-function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
+function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
+   implicit none
    type(inifile) ,intent(inout)     :: FILE
    character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
    character(len=*), intent(in)    :: keyword ! what keyword do you
    integer(kind=ik), intent(in)    :: default_Bs(:)
    integer(kind=ik), intent(in)    :: dims !number of dimensions
+   integer(kind=ik), intent(in)    :: rank !used for printing warnings
    integer(kind=ik):: Bs(3)
    integer(kind=ik):: i, n_entries
    character(len=cshort):: output
@@ -472,7 +497,7 @@ function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
    call read_param_mpi(FILE, section, keyword, output, "empty")
 
    if (trim(output) .eq. "empty") then
-      write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+      if (rank == 0) write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
       Bs = default_Bs
 
    else
@@ -491,10 +516,8 @@ function read_Bs(FILE, section, keyword, default_Bs, dims) result(Bs)
       endif
    endif
 
-   do i = 1, dims
-      if (mod(Bs(i), 2) /= 0) then
-         write(*,*) "Bs=", Bs
-         call abort(202392929, "Block-size must be EVEN number")
-      end if
-   end do
+   if (any(mod(Bs(1:dims), 2) /= 0)) then
+      ! if (rank == 0) write(*, '(A)') "WARNING! Block size is ODD, this is experimental"
+      call abort(202392929, "Block-size must be EVEN number")
+   end if
 end function

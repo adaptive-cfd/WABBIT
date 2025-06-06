@@ -30,8 +30,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k
-    integer(kind=ik), dimension(3) :: Bs
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
     real(kind=rk) :: scalar_integral, scalar_max
     real(kind=rk), save :: umag, umax, dx_min
 
@@ -40,6 +39,7 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
+
 
     select case(stage)
     case ("init_stage")

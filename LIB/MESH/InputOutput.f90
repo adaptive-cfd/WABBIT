@@ -13,8 +13,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
-    integer(kind=ik)                    :: g, dim                               ! grid parameter
-    integer(kind=ik), dimension(3)      :: Bs
+    integer(kind=ik)                    :: g, dim, Bs(1:3)                      ! grid parameter
     ! block data buffer, need for compact data storage
     real(kind=rk), allocatable          :: myblockbuffer(:,:,:,:)
     ! coordinates and spacing arrays
@@ -29,7 +28,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
-    logical                             :: saveGhosts
+    logical                             :: saveGhosts, saveGhosts_inBlock
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -44,6 +43,8 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     if (present(no_sync)) no_sync2 = no_sync
     saveGhosts = .false.
     if (present(save_ghosts)) saveGhosts = save_ghosts
+    ! this is a debug flag to save all ghost points within the block boudaries for visualization
+    saveGhosts_inBlock = .false.
 
     ! uniqueGrid modification
     if (.not. no_sync2) then
@@ -181,10 +182,16 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(2,l) = ddx(2)
                 coords_spacing(3,l) = ddx(1)
 
-                if (saveGhosts) then
+                if (saveGhosts .and. .not. saveGhosts_inBlock) then
                     coords_origin(1,l) = xx0(3) -dble(g)*ddx(3)
                     coords_origin(2,l) = xx0(2) -dble(g)*ddx(2)
                     coords_origin(3,l) = xx0(1) -dble(g)*ddx(1)
+                endif
+                ! For paraview so that we see all values in a visualization
+                if (saveGhosts .and. saveGhosts_inBlock) then
+                    coords_spacing(1,l) = ddx(3)*dble(Bs(1))/dble(Bs(1)+2*g)
+                    coords_spacing(2,l) = ddx(2)*dble(Bs(2))/dble(Bs(2)+2*g)
+                    coords_spacing(3,l) = ddx(1)*dble(Bs(3))/dble(Bs(3)+2*g)
                 endif
             else
                 ! 2D
@@ -202,9 +209,14 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
                 coords_spacing(1,l) = ddx(2)
                 coords_spacing(2,l) = ddx(1)
 
-                if (saveGhosts) then
+                if (saveGhosts .and. .not. saveGhosts_inBlock) then
                     coords_origin(1,l) = xx0(2) -dble(g)*ddx(1)
                     coords_origin(2,l) = xx0(1) -dble(g)*ddx(1)
+                endif
+                ! For paraview so that we see all values in a visualization
+                if (saveGhosts .and. saveGhosts_inBlock) then
+                    coords_spacing(1,l) = ddx(2)*dble(Bs(1))/dble(Bs(1)+2*g)
+                    coords_spacing(2,l) = ddx(1)*dble(Bs(2))/dble(Bs(2)+2*g)
                 endif
             endif
 
@@ -256,10 +268,11 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     call write_attribute(file_id, "blocks", "version", (/20240410/)) ! this is used to distinguish wabbit file formats
     if (saveGhosts) then
         ! we could split this up into bs and g but for now to work with visualization scripts I keep it at that
-        call write_attribute(file_id, "blocks", "block-size", Bs(:)+2*g)
+        Bs(1:params%dim) = Bs(1:params%dim) + 2*g
     else
-        call write_attribute(file_id, "blocks", "block-size", Bs)
+        Bs(1:params%dim) = Bs(1:params%dim)
     endif
+    call write_attribute(file_id, "blocks", "block-size", Bs)
     call write_attribute(file_id, "blocks", "time", (/time/))
     call write_attribute(file_id, "blocks", "iteration", (/iteration/))
     call write_attribute(file_id, "blocks", "total_number_blocks", (/lgt_n(tree_ID)/))
@@ -313,7 +326,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     implicit none
 
     character(len=*), intent(in)   :: fnames(1:)      !< list of files to be read (=number of vector components)
-    type (type_params), intent(in) :: params          !< user defined parameter structure
+    type (type_params), intent(inout) :: params          !< user defined parameter structure
     integer(kind=ik), intent(in)   :: tree_ID         !< index of the tree you want to save the data in
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - data are stored herein
 
@@ -326,7 +339,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     integer(kind=ik) :: N_files         !< number of files to read in this tree (=number of vector components)
     integer(kind=ik) :: NblocksFile
-    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(3), g, dF, i
+    integer(kind=ik) :: k, N, rank, number_procs, ierr, treecode_size, Bs(1:3), g, dF, i, level_min, Jmin_set, hvy_id, lgt_id, lgt_n_old
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
@@ -541,7 +554,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     !-----------------------------------------------------------------------------
     if ( params%dim == 3 ) then
         ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
-        ! important for visualization. Hence, Bs+1 points are read.
+        ! important for visualization. Hence, Bs+1 points are read if we have even BS
         allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1:Bs(3)+1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x Bsz x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
@@ -566,7 +579,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         enddo
     else
         ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
-        ! important for visualization. Hence, Bs+1 points are read.
+        ! important for visualization. Hence, Bs+1 points are read if we have even BS
         allocate( hvy_buffer(1:Bs(1)+1, 1:Bs(2)+1, 1, 1:N_files, 1:my_hvy_n) )
         ! tell the hdf5 wrapper what part of the global [Bsx x Bsy x 1 x hvy_n]
         ! array we want to hold, so that all CPU can read from the same file simultaneously
@@ -637,7 +650,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         do dF = 1, N_files
             if (params%dim == 3) then
                 ! NOTE: uniqueGrid stores the FIRST GHOST NODE as well as the interior points,
-                ! important for visualization. Hence, Bs+1 points are read.
+                ! important for visualization. Hence, Bs+1 points are read if we have even BS
                 hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, g+1:Bs(3)+g+1, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
             else
                 hvy_block( g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, :, dF, free_hvy_id ) = hvy_buffer(:, :, :, dF, k)
@@ -655,6 +668,19 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! be synced. However, the light data has to.
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
+    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
+    ! this code block checks this and temporally lowers Jmin, so that we can actually find all neighbours and do the refinement
+    level_min = minActiveLevel_tree(tree_ID, use_active_list=.false.)
+    if (level_min < params%Jmin) then
+        if (params%rank==0) then
+            write(*, '(A, i0, A, i0, A)') "READING: Minimum level of input data L=", level_min, " < Jmin=", params%Jmin, '. Refining input data to Jmin.'
+        endif
+        Jmin_set = params%Jmin
+        params%Jmin = level_min
+    else
+        Jmin_set = -1
+    endif
+
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
@@ -665,6 +691,33 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         endif
     else
         call sync_ghosts_tree(params, hvy_block, tree_ID )
+    endif
+
+    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
+    ! this goes from the lowest level to the desired Jmin and refines blocks along the way
+    if (Jmin_set /=-1) then
+        lgt_n_old = lgt_n(tree_ID)
+        do i = params%Jmin, Jmin_set-1
+            ! mark blocks on level i to refine
+            do k = 1, hvy_n(tree_ID)
+                hvy_ID = hvy_active(k, tree_ID)
+                call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+                if (lgt_block( lgt_id, IDX_MESH_LVL ) == i) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+            enddo
+            ! sync refinement status
+            call synchronize_lgt_data( params, refinement_status_only=.true. )
+            ! refine the blocks
+            call refinement_execute_tree( params, hvy_block, tree_ID )
+            ! update metadata (refinement execute already syncs lgt data)
+            call updateMetadata_tree(params, tree_ID)
+            ! ! sync ghosts - this should not be needed, as refinement fills ghost layer as well
+            ! call sync_ghosts_tree(params, hvy_block, tree_ID )
+        enddo
+        params%Jmin=Jmin_set
+
+        if (params%rank == 0) then
+            write(*, '(A,i0,A,i0)') "READING: Refined mesh to comply to Jmin. Nblocks before: ", lgt_n_old, ", Nblocks after: ", lgt_n(tree_id)
+        endif
     endif
 
     ! it is useful to print out the information on active levels in the file

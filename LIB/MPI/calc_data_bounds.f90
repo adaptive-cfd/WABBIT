@@ -90,10 +90,10 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
             (/gminus, gminus, gminus/), (/gplus, gplus, gplus/), &
             g_m=(/g, g, g/), g_p=(/g, g, g/), lvl_diff=lvl_diff)
     elseif (lvl_diff == +1) then  ! restriction for coarser neighbor
-        ! Restriction, example with Bs=8, g=3:
+        ! Restriction, example with Bs=8, g=3 for even grids:
         ! Normal grid:              g   g   g   i   i   i   i   i   i   i   i   g   g   g
         ! Restricted:                           l       lr      lr      r
-        ! Values have to be odd (coincide with SC from spaghetti form), thats why left and right are treated differently
+        ! Values have to be odd (coincide with SC from spaghetti form), thats why left and right are treated differently then
         call get_indices_of_modify_patch(params%g, params%dim, relation, data_bounds, n, &
             (/gminus*2-1, gminus*2-1, gminus*2-1/), (/gplus*2-1, gplus*2-1, gplus*2-1/), &
             g_m=(/g, g, g/), g_p=(/g+1, g+1, g+1/), lvl_diff=lvl_diff)
@@ -103,7 +103,7 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
             data_buffer(2, i_dim) = (Nsender+1)/2
         enddo
     elseif (lvl_diff == -1) then ! prediction for finer neighbor
-        ! Prediction, example with Bs=6, g=3, 2nd order:
+        ! Prediction, example with Bs=6, g=3, 2nd order for even grids:
         ! Normal grid:              g   g   g   i   i   i   i   i   i   g   g   g
         ! Predicted:                            l l l             r r r
         ! Needed for prediction:                r   r           r   r   r

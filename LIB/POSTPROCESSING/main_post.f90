@@ -42,7 +42,7 @@ program main_post
     !---------------------------------------------------------------------------
     ! read in the parameter file to setup the case
     call get_command_argument( 1, mode )
-    if (rank==0) write(*,'("Starting postprocessing in ", a20, "mode")') mode
+    if (rank==0) write(*,'("Starting postprocessing in ", a20, " mode")') mode
 
     select case(mode)
     case ("--extract-slice")
@@ -53,9 +53,6 @@ program main_post
 
     case ("--wavelet-decompose", "--wavelet-reconstruct")
         call post_wavelet_transform(params)
-
-    case ("--wavelet-vs-rhs")
-        call waveletVsRHS_timingTest(params)
 
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
@@ -113,14 +110,11 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--wavelettest")
-        call wavelet_test(params)
-
-    case("--wavelet-coarsening")
-        call wavelet_test_coarsening(params)
-
     case("--vorticity", "--divergence", "--vor-abs", "--Q", "--copy")
         call compute_vorticity_post(params)
+
+    case("--derivative")
+        call post_derivative(params)
 
     case("--gradient")
         call compute_scalar_field_post(params)
@@ -165,6 +159,9 @@ program main_post
 
     case ("--cvs-invertibility-test")
         call post_cvs_invertibility_test(params)
+
+    case ("--proto-GS-multigrid")
+        call proto_GS_multigrid(params)
         
     case default
 

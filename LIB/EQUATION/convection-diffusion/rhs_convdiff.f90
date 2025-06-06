@@ -152,7 +152,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
-
     ! set parameters for readability
     N = params_convdiff%N_scalars
     u0 = 0.0_rk
@@ -209,7 +208,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                             u_dydy = (phi(ix,iy-1,1,i)-2.0_rk*phi(ix,iy,1,i)+phi(ix,iy+1,1,i))*dy2_inv
 
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
-                            phi_max = max(phi_max, phi(ix,iy,1,i))
                         end do
                     end do
                 else !  no viscosity
@@ -219,8 +217,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
 
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
-
-                            phi_max = max(phi_max, phi(ix,iy,1,i))
                         end do
                     end do
                 endif
@@ -243,8 +239,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                             + b(+1)*phi(ix,iy+1,1,1) + b(+2)*phi(ix,iy+2,1,1))*dy2_inv
 
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
-
-                            phi_max = max(phi_max, phi(ix,iy,1,i))
                         end do
                     end do
                 else ! no viscosity
@@ -257,8 +251,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                             +  a(+3)*phi(ix,iy+3,1,i) + a(+2)*phi(ix,iy+2,1,i) + a(+1)*phi(ix,iy+1,1,i))*dy_inv
 
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
-
-                            phi_max = max(phi_max, phi(ix,iy,1,i))
                         end do
                     end do
                 endif
@@ -281,8 +273,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                +  b(+1)*phi(ix,iy+1,1,1) + b(+2)*phi(ix,iy+2,1,1))*dy2_inv
 
                         rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
-
-                        phi_max = max(phi_max, phi(ix,iy,1,i))
                     end do
                 end do
 
@@ -332,8 +322,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz &
                                 + nu*(u_dxdx+u_dydy+u_dzdz)
-
-                                phi_max = max(phi_max, phi(ix,iy,iz,i))
                             end do
                         end do
                     end do
@@ -346,8 +334,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                 u_dz = (phi(ix,iy,iz+1,i) - phi(ix,iy,iz-1,i))*dz_inv*0.5_rk
 
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
-
-                                phi_max = max(phi_max, phi(ix,iy,iz,i))
                             end do
                         end do
                     end do
@@ -377,8 +363,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                        +  b(+1)*phi(ix,iy,iz+1,i) + b(+2)*phi(ix,iy,iz+2,i))*dy2_inv
 
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz + nu*(u_dxdx+u_dydy+u_dzdz)
-
-                                phi_max = max(phi_max, phi(ix,iy,iz,i))
                             end do
                         end do
                     end do
@@ -394,9 +378,17 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                 u_dz = (a(-3)*phi(ix,iy,iz-3,i) + a(-2)*phi(ix,iy,iz-2,i) + a(-1)*phi(ix,iy,iz-1,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix,iy,iz+3,i) + a(+2)*phi(ix,iy,iz+2,i) + a(+1)*phi(ix,iy,iz+1,i))*dz_inv
 
-                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
+                                ! ! vectorized implementation, simple tests were ~15% slower - codes left to show what was tested
+                                ! u_dx   = sum(a * phi(ix-3:ix+3,iy,iz,1))*dx_inv
+                                ! u_dy   = sum(a * phi(ix,iy-3:iy+3,iz,1))*dy_inv
+                                ! u_dz   = sum(a * phi(ix,iy,iz-3:iz+3,1))*dz_inv
 
-                                phi_max = max(phi_max, phi(ix,iy,iz,i))
+                                ! ! blas implementation, needs to declare "real(kind=rk) :: ddot", tests were 3xslower - codes left to show what was tested
+                                ! u_dx = ddot(7, a, 1, phi(ix-3:ix+3,iy,iz,1), 1)*dx_inv
+                                ! u_dy = ddot(7, a, 1, phi(ix,iy-3:iy+3,iz,1), 1)*dy_inv
+                                ! u_dz = ddot(7, a, 1, phi(ix,iy,iz-3:iz+3,1), 1)*dz_inv
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
                             end do
                         end do
                     end do
@@ -407,6 +399,11 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             end select
         endif
 
+        if (params_convdiff%dim == 2) then
+            phi_max = maxval(phi(g+1:Bs(1)+g, g+1:Bs(2)+g, :, i))
+        else
+            phi_max = maxval(phi(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, i))
+        endif
         if (phi_max>2000.0_rk) then
             write(*,'("Phi_max: ", es10.3)') phi_max
             call abort(280420232,"Large values in phi. That cannot be good.")

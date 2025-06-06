@@ -10,17 +10,17 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     integer(kind=ik), intent(in)            :: tree_ID
     logical, optional, intent(in)           :: verbose
 
-    integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt
-    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max
-    integer(kind=ik), dimension(3)          :: Bs
+    integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt, it_random, l_init
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max, Bs(1:3)
     real(kind=rk), allocatable :: norm_1(:), norm_ref(:), norm_2(:)
+    real(kind=rk)                           :: x0(1:3), dx(1:3)
     integer(kind=tsize)        :: treecode
     character(len=80)                       :: file_dump
     logical                                 :: apply_verbose, problem, grid_is_equidistant
 
     apply_verbose = .false.
     if (present(verbose)) apply_verbose = verbose
-    block_dump_max = 0
+    block_dump_max = 10
 
     if (params%rank == 0) then
         write(*, '("")')  ! newline
@@ -45,14 +45,18 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     ! this parameter controls roughly how dense the random grid is, i.e., in % of the
     ! complete memory.
     if (params%Jmax/=params%Jmin .and. params%Jmax>1) then
-        ! perform at min 3 iterations of random refinement/coarsening
-        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=params%Jmin, verbosity=.true., iterations=max(3, params%Jmax-params%Jmin), tree_ID=tree_ID )
+        ! perform random refinement/coarsening
+        it_random = max(4, params%Jmax-params%Jmin)
+        l_init = max(min(3, params%Jmax), params%Jmin)  ! init on level 3 but adhere to Jmin Jmax restrictions
+        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=l_init, verbosity=.true., iterations=it_random, tree_ID=tree_ID )
     else
         if (params%rank == 0) then
             write(*, '("UNIT TEST: With these grid settings we need to do this test with an equidistand grid on level ", i0, ".")') params%Jmin
         endif
         call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID )
     endif
+
+    ! call createGrid_simple_adaptive(params, hvy_block, tree_ID)
 
     ! sometimes by chance or on purpose the resulting grid is equidistant, then every adaption should not alter the data
     grid_is_equidistant = maxActiveLevel_tree(tree_ID) == minActiveLevel_tree(tree_ID)
@@ -62,6 +66,10 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     !----------------------------------------------------------------------------
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
+
         call random_data(hvy_block(:,:,:,:,hvy_id))
     end do
 
@@ -75,7 +83,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
                 hvy_id = hvy_active(k,tree_ID)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-                write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+                write(file_dump, '(A, i0, A, i0, A)') "block_dumped_it0_tc=", treecode, ".t"
                 open(unit=32, file=file_dump, status='unknown', position='append')
                 write(32, '(A)') ""  ! new line
                 write(32, '(A)') "Beginning:"
@@ -94,10 +102,14 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
         ! this norm is the reference norm, as we compare to this one
         call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_ref)
 
-        call adapt_tree( 0.0_rk, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
+        call adapt_tree( dble(i_adapt), params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp)
         ! this norm is the reference norm, as we compare to this one
         call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norm_1)
-        norm_1 = abs(norm_1 / norm_ref - 1.0_rk)
+        do k = 1, nc
+            if (norm_ref(k) > 1.0e-12) then
+                norm_1(k) = abs(norm_1(k) / norm_ref(k) - 1.0_rk)
+            endif
+        enddo
 
         ! prepare for test results, any test after the second should pass
         if (i_adapt > 1 .or. grid_is_equidistant) then
@@ -112,7 +124,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
                     hvy_id = hvy_active(k,tree_ID)
                     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                     treecode = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-                    write(file_dump, '(A, i0, A, i0, A)') "block_dumped_tc=", treecode, ".t"
+                    write(file_dump, '(A, i0, A,i0, A, i0, A)') "block_dumped_it", i_adapt,"_tc=", treecode, ".t"
                     open(unit=32, file=file_dump, status='unknown', position='append')
                     write(32, '(A)') ""  ! new line
                     write(32, '(A)') "After adapt:"
@@ -129,6 +141,10 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
             write(*,'(A, i0, A, es15.8)') "UNIT TEST: Relative L2 error between before and after adaption no ", i_adapt, " : ", norm_1(1)
         endif
     enddo
+
+    if (apply_verbose) then
+        call summarize_profiling( WABBIT_COMM )
+    endif
 
     ! report to terminal / log and abort if critical
     if (params%rank==0) then

@@ -185,7 +185,7 @@ end subroutine createActiveSortedLists_tree
 !     integer(kind=ik), intent(in)        :: tree_ID
 !     !-----------------------------------------------------------------
 
-!     integer(kind=ik)                    :: k, N, heavy_id, block_rank
+!     integer(kind=ik)                    :: k, N, hvy_id, block_rank
 !     integer(kind=ik)                    :: rank, TREE_ID_IDX
 !     real(kind=rk) :: t0,t(5)
 
@@ -242,9 +242,9 @@ end subroutine createActiveSortedLists_tree
 !             call lgt2proc( block_rank, k, N )
 !             if ( rank == block_rank ) then
 !                 ! convert light data id into heavy data id
-!                 call lgt2hvy( heavy_id, k, rank, N)
+!                 call lgt2hvy( hvy_id, k, rank, N)
 
-!                 hvy_active( hvy_n(tree_ID) + 1, tree_ID) = heavy_id
+!                 hvy_active( hvy_n(tree_ID) + 1, tree_ID) = hvy_id
 !                 hvy_n(tree_ID) = hvy_n(tree_ID) + 1
 !             end if
 
@@ -452,7 +452,7 @@ subroutine createActiveSortedLists_forest(params)
     type (type_params), intent(in) :: params
     !-----------------------------------------------------------------
 
-    integer(kind=ik) :: k, N, heavy_id, block_rank, fsize
+    integer(kind=ik) :: k, N, hvy_id, block_rank, fsize
     integer(kind=ik) :: rank, tree_ID, lgt_n_sum, hvy_n_sum
     integer(kind=tsize) :: treecode_int
     integer(kind=ik) :: tc_ik(2)
@@ -524,9 +524,9 @@ subroutine createActiveSortedLists_forest(params)
             call lgt2proc( block_rank, k, N )
             if ( rank == block_rank ) then
                 ! convert light data id into heavy data id
-                call lgt2hvy( heavy_id, k, rank, N)
+                call lgt2hvy( hvy_id, k, rank, N)
                 hvy_n(tree_ID) = hvy_n(tree_ID) + 1
-                hvy_active( hvy_n(tree_ID) , tree_ID ) = heavy_id
+                hvy_active( hvy_n(tree_ID) , tree_ID ) = hvy_id
             end if
 
             ! sorted list

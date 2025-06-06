@@ -98,7 +98,7 @@ module module_treelib
 
     ! note zero based indexing:
     ! x0 = real( ((/ix,iy,iz/) - 1)*(Bs-1), kind=rk) * dx
-    x0 = real( ((ixyz) - 1)*(Bs), kind=rk) * dx
+    x0 = real( ((ixyz) - 1)*Bs * dx, kind=rk)
 
   end subroutine get_block_spacing_origin_b
 

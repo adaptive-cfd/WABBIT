@@ -89,25 +89,61 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor')
+        case('vor', 'vort')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
+            endif
+            if (params_acm%dim /= 2) then
+                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' ''vorabs or compute in post (known bug)")
+            endif
+
             ! vorticity
             call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
-            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+3))
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
-            if (k /= 1) then
-                call abort(19101810,"ACM: if you want to store vor, put it at 1st position of field_names. works only in 2D")
+        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
+            endif
+            if (params_acm%dim /= 3) then
+                call abort(19101811,"ACM: storing vector vor is not possible in 2D - use 'vor' or compute in post (known bug)")
             endif
 
-            if (params_acm%dim /= 2) then
-                call abort(19101811,"ACM: storing vor is not possible in 3D (known bug)")
+            ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
+            ! for different components y,z we need to copy the desired one to the first position
+            if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (name == 'vorz' .or. name == 'Vorz' .or. name == 'VorZ') then
+                work(:,:,:,k) = work(:,:,:,k+2)
+            elseif (name=='vorabs' .or. name=='Vorabs' .or.name=='VorAbs' .or. name=='vor-abs' .or. name=='Vor-abs' .or. name=='Vor-Abs') then
+                work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
+            endif
+        
+        case('helx', 'Helx', 'HelX', 'hely', 'Hely', 'HelY', 'helz', 'Helz', 'HelZ', 'helabs', 'Helabs', 'HelAbs', 'hel-abs', 'Hel-abs', 'Hel-Abs')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"ACM: Not enough space to compute vorticity for helicity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
+            endif
+            if (params_acm%dim /= 3) then
+                call abort(19101811,"ACM: Helicity is always 0 in 2D - we do not need to store that!")
             endif
 
-            if (size(params_acm%names,1) < 3) then
-                call abort(19101811,"ACM: storing vor requires at least 3 fields to be saved (known bug)")
+            ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
+            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
+            ! compute by velocity to get local helicity
+            work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
+            ! for different components y,z we need to copy the desired one to the first position
+            if (name == 'hely' .or. name == 'Hely' .or. name == 'HelY') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (name == 'helz' .or. name == 'Helz' .or. name == 'HelZ') then
+                work(:,:,:,k) = work(:,:,:,k+2)
+            elseif (name=='helabs' .or. name=='Helabs' .or.name=='HelAbs' .or. name=='hel-abs' .or. name=='Hel-abs' .or. name=='Hel-Abs') then
+                work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
 
-
-        case('div')
+        case('div', 'divu', 'divergence')
             ! div(u)
             call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
 

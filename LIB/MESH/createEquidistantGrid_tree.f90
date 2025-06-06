@@ -20,7 +20,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     integer(kind=ik)                    :: d
 
     ! on my section, which is the first and last light id?
-    integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, heavy_id
+    integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, hvy_id
     integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
     integer(kind=tsize)                 :: tc_b
 
@@ -110,7 +110,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
                             ! get a free block on this rank
                             call get_free_local_light_id( params, icpu, lgt_id, message="createEquidistantGrid_tree")
                             ! and the corresponding heavy id
-                            call lgt2hvy( heavy_id, lgt_id, icpu, params%number_blocks )
+                            call lgt2hvy( hvy_id, lgt_id, icpu, params%number_blocks )
 
                             ! save treecode in global light id list (NOTE: we need to sync that as only one proc did it..)
                             lgt_block( lgt_id, : ) = -1

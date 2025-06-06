@@ -183,11 +183,19 @@ subroutine compute_vorticity_post(params)
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--divergence") then
-            call divergence( hvy_block(:,:,:,1,hvyID), &
-            hvy_block(:,:,:,2,hvyID), &
-            hvy_block(:,:,:,3,hvyID),&
-            dx, Bs, g, &
-            params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+            if (params%dim == 3) then
+                call divergence( hvy_block(:,:,:,1,hvyID), &
+                hvy_block(:,:,:,2,hvyID), &
+                hvy_block(:,:,:,3,hvyID),&
+                dx, Bs, g, &
+                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+            else
+                call divergence( hvy_block(:,:,:,1,hvyID), &
+                hvy_block(:,:,:,2,hvyID), &
+                hvy_block(:,:,:,1,hvyID),&
+                dx, Bs, g, &
+                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+            endif
 
         ! elseif (operator == "--laplace") then
         !     call divergence( hvy_block(:,:,:,1,hvyID), &

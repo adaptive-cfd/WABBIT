@@ -60,7 +60,7 @@ module module_acm
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
     ! nu
-    real(kind=rk) :: nu, nu_p=0.0_rk, bulk_viscosity=0.0_rk
+    real(kind=rk) :: nu, nu_p=0.0_rk, nu_bulk=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
                      urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
@@ -243,7 +243,7 @@ end subroutine
     ! viscosity
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     call read_param_mpi(FILE, 'ACM-new', 'nu_p', params_acm%nu_p, 0.0_rk)
-    call read_param_mpi(FILE, 'ACM-new', 'bulk_viscosity', params_acm%bulk_viscosity, 0.0_rk)
+    call read_param_mpi(FILE, 'ACM-new', 'nu_bulk', params_acm%nu_bulk, 0.0_rk)
     ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )

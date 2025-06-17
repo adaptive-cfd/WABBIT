@@ -77,9 +77,10 @@ FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-# JB: Is linking towards the Fotran src libraries necessary here?
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(FFT_ROOT)/lib -lfftw3 $(SB_LIB) -lhdf5_fortran -lhdf5 -lz
-FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(FFT_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3 $(SB_LIB) -lz
+FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
+FFLAGS += -I$(FFT_ROOT)/include
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
 PRAGMAS = #-DSBLAS
@@ -116,9 +117,10 @@ FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(FFT_ROOT)/lib -lfftw3 -lhdf5_fortran -lhdf5 -lz
-#####-ldl -lm # -llapack -lblas
-FFLAGS += -I$(HDF_ROOT)/include -I$(FFT_ROOT)/include
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3 $(SB_LIB) -lz
+FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
+FFLAGS += -I$(FFT_ROOT)/include
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated
 PRAGMAS = #

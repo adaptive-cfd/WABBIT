@@ -56,6 +56,10 @@ subroutine post_prune_tree(params)
     fsize = params%forest_size
     params%order_predictor = "multiresolution_2nd"
     params%block_distribution = "sfc_hilbert"
+    params%wavelet = "CDF20" ! does not matter here...
+
+    call setup_wavelet(params)
+
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )

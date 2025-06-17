@@ -51,14 +51,13 @@ contains
 ! fft interface functions. These are the ones, that are available
 ! from the outside and should contain your fft routines
 !----------------------------------------------------------------
-subroutine fft_solve_poisson(params, u, f, FD_order_discretization, dx)
+subroutine fft_solve_poisson(params, u, f, dx)
     implicit none
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
     real(kind=rk), intent(inout) :: u(:, :, :, :)
     real(kind=rk), intent(in) :: f(:, :, :, :)
-    character(len=cshort), intent(in) :: FD_order_discretization
     real(kind=rk), intent(in) :: dx(1:3)
 
     ! Local variables
@@ -76,11 +75,13 @@ subroutine fft_solve_poisson(params, u, f, FD_order_discretization, dx)
         ! compute forward fft
         call fft_forward(params, u(:,:,:,ic), var_hat)
                 
-        ! compute inverse laplacian u_hat = f_hat/(-k^2)
-        if (FD_order_discretization == "spectral") then
+        ! compute inverse laplacian u_hat = f_hat/(-k^2), either spectral or FD accuracy
+        if (params%FFT_accuracy == "spectral") then
             call invlaplacian_inplace(params, var_hat)
+        elseif (params%FFT_accuracy == "FD") then
+            call invlaplacian_inplace_filtered_FD(params, var_hat, dx(1:3))
         else
-            call invlaplacian_inplace_filtered_FD(params, var_hat, dx(1:3), FD_order_discretization)
+            call abort(250617, "FFT_accuracy unknown "//params%FFT_accuracy//", please use 'spectral' or 'FD'")
         endif
 
         ! compute backward fft
@@ -232,16 +233,15 @@ end subroutine laplacian_inplace
 ! computes laplace(u_hat) for a scalar valued field and returns it in the same array
 ! note wavenumbers are reduced to FD accuracy, taken from canuto with general formula:
 ! 1/dx^2 * (i_0 + 2*sum_{j=1}^{a} (i_j * cos(j*k*dx)))
-subroutine laplacian_inplace_filtered_FD( params, u_hat, dx, order_discretization )
+subroutine laplacian_inplace_filtered_FD( params, u_hat, dx )
     implicit none
     !> parameter struct
     type (type_params), intent(inout)  :: params
     complex(kind=rk),intent(inout)::u_hat(:,:,:)
     real(kind=rk), intent(in) :: dx(1:3)
-    character(len=cshort), intent (in) :: order_discretization
 
     integer :: ix,iy,iz
-    real(kind=rk) :: kx,ky,kz,k2
+    real(kind=rk) :: kx, ky, kz, k2
 
     do iz = 1, params%bs(3)
         !-- wavenumber in z-direction
@@ -249,16 +249,14 @@ subroutine laplacian_inplace_filtered_FD( params, u_hat, dx, order_discretizatio
             kz = 0.0_rk
         else
             kz = wave_z(iz, params%bs(3))
-            kz = wave_k2_FD2(kz,dx(3),order_discretization)
         endif
         do iy = 1, params%bs(2)
             !-- wavenumber in y-direction
             ky = wave_y(iy, params%bs(2))
-            ky = wave_k2_FD2(ky,dx(2),order_discretization)
             do ix = 1, params%bs(1)/2+1
                 !-- wavenumber in x-direction
                 kx = wave_x(ix, params%bs(1))
-                k2 = wave_k2_FD2(kx,dx(1),order_discretization) + ky + kz
+                k2 = wave_k2_FD2(kx,ky,kz,dx,params%laplacian_order)
                 u_hat(ix,iy,iz) = -k2*u_hat(ix,iy,iz)
             enddo
         enddo
@@ -299,13 +297,12 @@ end subroutine invlaplacian_inplace
 ! computes laplace(u_hat) for a scalar valued field and returns it in the same array
 ! note wavenumbers are reduced to FD accuracy, taken from canuto with general formula:
 ! 1/dx^2 * (i_0 + 2*sum_{j=1}^{a} (i_j * cos(j*k*dx)))
-subroutine invlaplacian_inplace_filtered_FD( params, u_hat, dx, order_discretization )
+subroutine invlaplacian_inplace_filtered_FD( params, u_hat, dx )
     implicit none
     !> parameter struct
     type (type_params), intent(inout)  :: params
     complex(kind=rk),intent(inout)::u_hat(:,:,:)
     real(kind=rk), intent(in) :: dx(1:3)
-    character(len=cshort), intent (in) :: order_discretization
 
     integer :: ix,iy,iz
     real(kind=rk) :: kx,ky,kz,k2
@@ -316,16 +313,14 @@ subroutine invlaplacian_inplace_filtered_FD( params, u_hat, dx, order_discretiza
             kz = 0.0_rk
         else
             kz = wave_z(iz, params%bs(3))
-            kz = wave_k2_FD2(kz,dx(3),order_discretization)
         endif
         do iy = 1, params%bs(2)
             !-- wavenumber in y-direction
             ky = wave_y(iy, params%bs(2))
-            ky = wave_k2_FD2(ky,dx(2),order_discretization)
             do ix = 1, params%bs(1)/2+1
                 !-- wavenumber in x-direction
                 kx = wave_x(ix, params%bs(1))
-                k2 = wave_k2_FD2(kx,dx(1),order_discretization) + ky + kz
+                k2 = wave_k2_FD2(kx,ky,kz,dx,params%laplacian_order)
                 if (k2 .eq. 0.0_rk) then
                     u_hat(ix,iy,iz) = 0.0_rk
                 else
@@ -473,30 +468,55 @@ end function
 ! reduce wavenumbers to FD accuracy for second order derivatives with stencil coeffs c going from -a, ..., a
 ! general formula derived from canuto p140:
 ! 1/dx^2 * (c_0 + 2*sum_{j=1}^{a} (c_j * cos(j*k*dx)))
-real(kind=rk) function wave_k2_FD2( k, dx, order_discretization )
+real(kind=rk) function wave_k2_FD2( kx, ky, kz, dx, order_discretization )
     implicit none
-    real(kind=rk), intent (in) :: k, dx
+    real(kind=rk), intent (in) :: kx, ky, kz, dx(1:3)
     character(len=cshort), intent (in) :: order_discretization
-    real(kind=rk) :: kx
-
-    ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
-    if (dx == 0.0_rk) then
-        wave_k2_FD2 = 0.0_rk
-        return
-    endif
     
     ! ToDo: This is evaluated point-wise, so we should avoid string matching cases
     select case(order_discretization)
-    case("FD_2nd_central")
-        wave_k2_FD2 = (2.0_rk - 2.0_rk*dcos(k*dx)) / dx**2
-    case("FD_4th_central")
-        wave_k2_FD2 = (15.0_rk - 16.0_rk* dcos(k*dx) + 1.0_rk * dcos(2.0_rk*k*dx)) / 6.0_rk / dx**2
-    case("FD_6th_central")
-        wave_k2_FD2 = (490.0_rk * dsin(k*dx) - 540.0_rk * dsin(2.0_rk*k*dx) + 54.0_rk * dsin(3.0_rk*k*dx) - 4.0_rk * dsin(4.0_rk*k*dx)) / 180.0_rk / dx**2
-    case("FD_8th_central")
-        wave_k2_FD2 = (14350.0_rk * dsin(k*dx) - 16128.0_rk * dsin(2.0_rk*k*dx) + 2016.0_rk * dsin(3.0_rk*k*dx) - 256.0_rk * dsin(4.0_rk*k*dx) + 18.0_rk * dsin(4.0_rk*k*dx)) / 5040.0_rk / dx**2
+    case("CFD_2nd")
+        wave_k2_FD2 = (2.0_rk - 2.0_rk*dcos(kx*dx(1))) / dx(1)**2 + (2.0_rk - 2.0_rk*dcos(ky*dx(2))) / dx(2)**2
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) /= 0.0_rk) then
+            wave_k2_FD2 = wave_k2_FD2 + (2.0_rk - 2.0_rk*dcos(kz*dx(3))) / dx(3)**2
+        endif
+    case("CFD_4th")
+        wave_k2_FD2 = (30.0_rk - 32.0_rk * dcos(kx*dx(1)) + 2.0_rk * dcos(2.0_rk*kx*dx(1))) / 12.0_rk / dx(1)**2
+        wave_k2_FD2 = wave_k2_FD2 + (30.0_rk - 32.0_rk * dcos(ky*dx(2)) + 2.0_rk * dcos(2.0_rk*ky*dx(2))) / 12.0_rk / dx(2)**2
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) /= 0.0_rk) then
+            wave_k2_FD2 = wave_k2_FD2 + (30.0_rk - 32.0_rk * dcos(kz*dx(3)) + 2.0_rk * dcos(2.0_rk*kz*dx(3))) / 12.0_rk / dx(3)**2
+        endif
+    case("CFD_6th")
+        wave_k2_FD2 = (490.0_rk - 540.0_rk * dcos(kx*dx(1)) + 54.0_rk * dcos(2.0_rk*kx*dx(1)) - 4.0_rk * dcos(3.0_rk*kx*dx(1))) / 180.0_rk / dx(1)**2
+        wave_k2_FD2 = wave_k2_FD2 + (490.0_rk - 540.0_rk * dcos(ky*dx(2)) + 54.0_rk * dcos(2.0_rk*ky*dx(2)) - 4.0_rk * dcos(3.0_rk*ky*dx(2))) / 180.0_rk / dx(2)**2
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) /= 0.0_rk) then
+            wave_k2_FD2 = wave_k2_FD2 + (490.0_rk - 540.0_rk * dcos(kz*dx(3)) + 54.0_rk * dcos(2.0_rk*kz*dx(3)) - 4.0_rk * dcos(3.0_rk*kz*dx(3))) / 180.0_rk / dx(3)**2
+        endif
+    case("CFD_8th")
+        wave_k2_FD2 = (14350.0_rk - 16128.0_rk * dcos(kx*dx(1)) + 2016.0_rk * dcos(2.0_rk*kx*dx(1)) - 256.0_rk * dcos(3.0_rk*kx*dx(1)) + 18.0_rk * dcos(4.0_rk*kx*dx(1))) / 5040.0_rk / dx(1)**2
+        wave_k2_FD2 = wave_k2_FD2 + (14350.0_rk - 16128.0_rk * dcos(ky*dx(2)) + 2016.0_rk * dcos(2.0_rk*ky*dx(2)) - 256.0_rk * dcos(3.0_rk*ky*dx(2)) + 18.0_rk * dcos(4.0_rk*ky*dx(2))) / 5040.0_rk / dx(2)**2
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) /= 0.0_rk) then
+            wave_k2_FD2 = wave_k2_FD2 + (14350.0_rk - 16128.0_rk * dcos(kz*dx(3)) + 2016.0_rk * dcos(2.0_rk*kz*dx(3)) - 256.0_rk * dcos(3.0_rk*kz*dx(3)) + 18.0_rk * dcos(4.0_rk*kz*dx(3))) / 5040.0_rk / dx(3)**2
+        endif
+    case("MST_6th")
+        ! MST assumes that dx is the same in all directions
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) == 0.0_rk) then
+            wave_k2_FD2 = (20.0_rk - 8.0_rk * (dcos(kx*dx(1)) + dcos(ky*dx(2))) - 4.0_rk * (dcos(kx*dx(1))*dcos(ky*dx(2)))) / 6.0_rk / dx(1)**2
+        else
+            wave_k2_FD2 = ( -128.0_rk &
+                + 28.0_rk * (dcos(kx * dx(1)) + dcos(ky * dx(2)) + dcos(kz * dx(3))) &
+                + 12.0_rk * (dcos(kx * dx(1)) * dcos(ky * dx(2)) &
+                            + dcos(kx * dx(1)) * dcos(kz * dx(3)) &
+                            + dcos(ky * dx(2)) * dcos(kz * dx(3))) &
+                +  8.0_rk * (dcos(kx * dx(1)) * dcos(ky * dx(2)) * dcos(kz * dx(3)))) / 30.0_rk / dx(1)**2
+        endif
     case default
-        call abort(250430, "Discretization unkown "//order_discretization//", I ll walk into the light now." )
+        call abort(250430, "Discretization unkown "//order_discretization//", it's not like we have enough already ..." )
     end select
 end function
 

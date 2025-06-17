@@ -162,6 +162,9 @@ program main_post
 
     case ("--proto-GS-multigrid")
         call proto_GS_multigrid(params)
+
+    case ("--proto-pressure-multigrid")
+        call proto_pressure_multigrid(params)
         
     case default
 

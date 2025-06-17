@@ -328,7 +328,6 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     integer(kind=ik) :: N_neighbors, lvl_diff, neighborhood, i, j, k
     integer(kind=ik) :: ijk_recv(2,3), ijk_send(2,3), ijk_buff(2,3)
     logical :: debug_to_file
-    character(len=80) :: debug_file_name
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
@@ -340,9 +339,7 @@ subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
     debug_to_file = output_to_file
 #endif
     if (debug_to_file) then
-        write(debug_file_name, '(A, A5, 3(A, i0), A)') &
-            "ghost_bounds.dat"
-        open(16,file=debug_file_name,status='replace')
+        open(16,file="ghost_bounds.dat",status='replace')
         write(16,'(3(A, i0), 2(A))') "% dim=", params%dim, ", Bs=", params%Bs(1), ", g=", params%g, ", CDF=", params%wavelet
         write(16,'(A, A13, 8(A15))') "% ", "Neighborhood" , "lvl_diff", "send/recv/buff", "idx_1", "idx_2", "idy_1", "idy_2", "idz_1", "idz_2"
     endif
@@ -409,7 +406,6 @@ subroutine family_setup_patches(params, output_to_file)
     integer(kind=ik) :: N_family, lvl_diff, family, i, j, k, g, i_f
     integer(kind=ik) :: ijk_buff(2,3)
     logical :: debug_to_file
-    character(len=80) :: debug_file_name
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1
@@ -425,9 +421,7 @@ subroutine family_setup_patches(params, output_to_file)
         debug_to_file = output_to_file
 #endif
     if (debug_to_file) then
-        write(debug_file_name, '(A, A5, 3(A, i0), A)') &
-            "family_bounds.dat"
-        open(16,file=debug_file_name,status='replace')
+        open(16,file="family_bounds.dat",status='replace')
         write(16,'(3(A, i0))') "% dim=", params%dim, ", Bs=", params%Bs(1), ", g=", params%g
         write(16,'(A, A13, 8(A15))') "% ", "Relation" , "lvl_diff", "idx_1", "idx_2", "idy_1", "idy_2", "idz_1", "idz_2"
     endif

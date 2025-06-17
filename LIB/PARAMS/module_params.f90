@@ -85,6 +85,12 @@ module module_params
         character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
+        character(len=cshort) :: laplacian_order="not-initialized"
+        integer(kind=ik)      :: laplacian_stencil_size=0
+        integer(kind=ik)      :: laplacian_cycle_it=0
+        integer(kind=ik)      :: laplacian_GS_it=0
+        character(len=cshort) :: laplacian_coarsest="FFT"
+        character(len=cshort) :: FFT_accuracy="FD"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"

@@ -78,6 +78,13 @@ subroutine ini_file_to_params( params, filename )
    !
    ! discretization order
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
+   ! laplacian order
+   call read_param_mpi(FILE, 'Discretization', 'laplacian_order', params%laplacian_order, "CFD_4th")
+   call read_param_mpi(FILE, 'Discretization', 'laplacian_cycle_it', params%laplacian_cycle_it, 5)
+   call read_param_mpi(FILE, 'Discretization', 'laplacian_GS_it', params%laplacian_GS_it, 10)
+   call read_param_mpi(FILE, 'Discretization', 'laplacian_coarsest', params%laplacian_coarsest, "FFT")
+   call read_param_mpi(FILE, 'Discretization', 'FFT_accuracy', params%FFT_accuracy, "spectral")
+
    ! filter frequency
    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
    call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
@@ -126,19 +133,17 @@ subroutine ini_file_to_params( params, filename )
 
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-   if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
+   if ( (params%g < 6 .and. params%order_predictor == 'multiresolution_12th') .or. &
+        (params%g < 5 .and. params%order_predictor == 'multiresolution_10th') .or. &
+        (params%g < 4 .and. params%order_predictor == 'multiresolution_8th') .or. &
+        (params%g < 3 .and. params%order_predictor == 'multiresolution_6th') .or. &
+        (params%g < 2 .and. params%order_predictor == 'multiresolution_4th') .or. &
+        (params%g < 1 .and. params%order_predictor == 'multiresolution_2nd') ) then
       call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
-   if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
-   end if
-   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
-   end if
-   if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
-   end if
-   if ( (params%g < 1) .and. (params%order_discretization == 'FD_2th_central') ) then
+   if ( (params%g < 3 .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central')) .or. &
+        (params%g < 2 .and. params%order_discretization == 'FD_4th_central') .or. &
+        (params%g < 1 .and. params%order_discretization == 'FD_2th_central') ) then
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
@@ -174,6 +179,24 @@ subroutine ini_file_to_params( params, filename )
       endif
       params%g_RHS = g_RHS_min
    endif
+
+   ! we want to know the stencil size for laplacian schemes usually, so lets save this here
+   if (params%laplacian_order == 'CFD_2nd') then
+      params%laplacian_stencil_size = 1
+   elseif (params%laplacian_order == 'CFD_4th') then
+      params%laplacian_stencil_size = 2
+   elseif (params%laplacian_order == 'CFD_6th') then
+      params%laplacian_stencil_size = 3
+   elseif (params%laplacian_order == 'CFD_8th') then
+      params%laplacian_stencil_size = 4
+   elseif (params%laplacian_order == 'MST_6th') then
+      params%laplacian_stencil_size = 1
+   else
+      call abort(1234567, "Error: no laplacian order specified or not supported!")
+   endif
+   if ( params%g < params%laplacian_stencil_size ) then
+      call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
+   end if
 
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.

@@ -53,6 +53,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         if (index(norm_case, "leaf") > 0) norm_case_id = norm_case_id + 0  ! this is basically the normal one
         if (index(norm_case, "root") > 0) norm_case_id = norm_case_id + 10*4  ! only on lowest available layer
         if (index(norm_case, "wavelets") > 0) norm_case_id = norm_case_id + 10*5  ! leaf layer minus root layer, only Norm in wavelets
+        if (index(norm_case, "not_empty") > 0) norm_case_id = norm_case_id + 10*6  ! take from all blocks that are not REF_TMP_EMPTY
     endif
 
     select case (which_norm)
@@ -94,6 +95,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                 ! For Linfty, we cannot subtract the mean value. In theory this sounds nice but with penalization it makes no sense.
                 ! Because inside the domain the velocity is zero and we would again only have something around the mean-velocity as the max-norm.
                 if (which_norm == "Linfty") call abort(20030201, "Linfty norm is not supported only over wavelets. How dare you!")
+            elseif (norm_case_ID/10 == 6) then
+                if (ref_me == REF_TMP_EMPTY) cycle
             endif
 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
@@ -155,7 +158,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             call MPI_ALLREDUCE(MPI_IN_PLACE, norm, n_eqn, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         ! Mean is a special case, we need to divide by the volume
         elseif (which_norm == "Mean") then
-            if (norm_case_ID/10 == 0) then
+            if (any(norm_case_ID/10 == (/0, 4/))) then
                 norm(:) = norm(:) / product(params%domain_size(1:params%dim))
             else
                 call MPI_ALLREDUCE(MPI_IN_PLACE, volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -194,6 +197,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             elseif (norm_case_ID/10 == 4) then
                 ! only sum up over roots, we sadly don't have access to function block_is_root
                 if (hvy_family(hvy_ID, 1) /= -1) cycle
+            elseif (norm_case_ID/10 == 6) then
+                if (ref_me == REF_TMP_EMPTY) cycle
             endif
             
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
@@ -213,7 +218,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         ! we have to normalize by the volume as this is volume weighted
         do p = 1, n_eqn
             ! we integrate over the full leaf layer, this is the domain size so we do not have to call MPI_ALLREDUCE for the volume integral
-            if (norm_case_ID/10 == 0) then
+            if (any(norm_case_ID/10 == (/0, 4/))) then
                 norm(p) = norm(p) / product(params%domain_size(1:params%dim))
             ! we compute only a part of it, so we compute the actual integral of the volume
             else
@@ -248,6 +253,8 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             elseif (norm_case_ID/10 == 4) then
                 ! only sum up over roots, we sadly don't have access to function block_is_root
                 if (hvy_family(hvy_ID, 1) /= -1) cycle
+            elseif (norm_case_ID/10 == 6) then
+                if (ref_me == REF_TMP_EMPTY) cycle
             endif
 
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
@@ -281,7 +288,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         ! we have to normalize by the volume as this is volume weighted
         do p = 1, n_eqn
             ! we integrate over the full leaf layer, this is the domain size so we do not have to call MPI_ALLREDUCE for the volume integral
-            if (norm_case_ID/10 == 0) then
+            if (any(norm_case_ID/10 == (/0, 4/))) then
                 norm(p) = norm(p) / product(params%domain_size(1:params%dim))
             ! we compute only a part of it, so we compute the actual integral of the volume
             else

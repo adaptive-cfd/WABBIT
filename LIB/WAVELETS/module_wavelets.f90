@@ -94,6 +94,8 @@ contains
         nzfine   = size(fine  , 3)
 
         ! setup interpolation coefficients
+        ! All orders from Taylor expansion
+        ! Order 1-8 verified with Deriaz. JCP2023
         select case(order_predictor)
         case ("multiresolution_2nd")
             allocate(c(1:2))
@@ -106,6 +108,18 @@ contains
         case ("multiresolution_6th")
             allocate(c(1:6))
             c = (/ 3.0_rk, -25.0_rk, 150.0_rk, 150.0_rk, -25.0_rk, 3.0_rk /) / 256.0_rk
+
+        case ("multiresolution_8th")
+            allocate(c(1:8))
+            c = (/ -5.0_rk, 49.0_rk, -245.0_rk, 1225.0_rk, 1225.0_rk, -245.0_rk, 49.0_rk, -5.0_rk /) / 2048.0_rk
+
+        case ("multiresolution_10th")
+            allocate(c(1:10))
+            c = (/ 35.0_rk, -405.0_rk, 2268.0_rk, -8820.0_rk, 39690.0_rk, 39690.0_rk, -8820.0_rk, 2268.0_rk, -405.0_rk, 35.0_rk /) / 65536.0_rk
+        
+        case ("multiresolution_12th")
+            allocate(c(1:12))
+            c = (/ -63.0_rk, 847.0_rk, -5445.0_rk, 22869.0_rk, -76230.0_rk, 320166.0_rk, 320166.0_rk, -76230.0_rk, 22869.0_rk, -5445.0_rk, 847.0_rk, -63.0_rk /) / 524288.0_rk
 
         case default
             call abort(23070811,"Error: unkown order_predictor="//trim(adjustl(order_predictor)))
@@ -884,6 +898,7 @@ contains
             else
                 call get_indices_of_ghost_patch(params%Bs, params%g, params%dim, neighborhood, idx, params%g, params%g, lvl_diff=+1)
             endif
+            if (params%dim == 2) idx(:,3) = 1  ! make sure that in 2D we leave the third dimension undisturbed
 
             ! we need to know if the first point is a SC or WC for the patch and adapt the indices accordingly
             !     1 2 3 4 5 6 7 8 9 A B C
@@ -893,7 +908,7 @@ contains
             ! for g=odd, the SC are on even numbers; for g=even, the SC are on odd numbers
             ! depending on BS this can change as well
             io = 0
-            io(1:params%dim) = modulo(g + idx(1, 1:params%dim) + 1, 2)
+            io(1:params%dim) = modulo(g + idx(1, 1:params%dim)+1, 2)
 
             ! set really low number for ghost patch if we shoudln't access it
             setNumber = 0.0
@@ -906,15 +921,15 @@ contains
                 wc(idx(1,1)    :idx(2,1)  , idx(1,2)        :idx(2,2)  , idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber
             endif
 
-            ! wc(idx(1,1)  :idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
-            ! wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
-            ! wc(idx(1,1)+1:idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)  :idx(2,3):2, 1:nc) = setNumber
+            ! wc(idx(1,1)+1-io(1):idx(2,1):2, idx(1,2)  +io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc) = setNumber  ! WX
+            ! wc(idx(1,1)  +io(1):idx(2,1):2, idx(1,2)+1-io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc) = setNumber  ! WY
+            ! wc(idx(1,1)+1-io(1):idx(2,1):2, idx(1,2)+1-io(2):idx(2,2):2, idx(1,3)+io(3):idx(2,3):2, 1:nc) = setNumber  ! WXY
 
             ! if (params%dim == 3) then
-            !     wc(idx(1,1)  :idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
-            !     wc(idx(1,1)+1:idx(2,1):2, idx(1,2)  :idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
-            !     wc(idx(1,1)  :idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
-            !     wc(idx(1,1)+1:idx(2,1):2, idx(1,2)+1:idx(2,2):2, idx(1,3)+1:idx(2,3):2, 1:nc) = setNumber
+            !     wc(idx(1,1)  +io(1):idx(2,1):2, idx(1,2)  +io(2):idx(2,2):2, idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber  ! WZ
+            !     wc(idx(1,1)+1-io(1):idx(2,1):2, idx(1,2)  +io(2):idx(2,2):2, idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber  ! WXZ
+            !     wc(idx(1,1)  +io(1):idx(2,1):2, idx(1,2)+1-io(2):idx(2,2):2, idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber  ! WYZ
+            !     wc(idx(1,1)+1-io(1):idx(2,1):2, idx(1,2)+1-io(2):idx(2,2):2, idx(1,3)+1-io(3):idx(2,3):2, 1:nc) = setNumber  ! WXYZ
             ! endif
         enddo
 
@@ -1001,6 +1016,9 @@ contains
         logical, intent(in), optional :: verbose
         logical :: verbose1
         integer(kind=ik) :: i, g_min, a, block_min, diff_L, diff_R
+
+        character(len=80) :: debug_file_name
+        integer :: idx(2,3)
 
         if (allocated(params%GR)) deallocate(params%HD)
         if (allocated(params%GD)) deallocate(params%GD)
@@ -1238,6 +1256,21 @@ contains
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
                 endif    
+            elseif (params%wavelet(4:4) == "8") then
+                ! H TILDE filter  
+                allocate( params%HR(-7:7) )
+                params%HR = (/ -5.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 1225.0_rk, 2048.0_rk, 1225.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -5.0_rk /) / 2048.0_rk
+
+                ! H filter
+                if (params%wavelet(5:5) == "0") then
+                    allocate( params%HD(0:0) )
+                    params%HD = (/1.0_rk/)
+                    ! multigrid restriction - second order central average for lowpass filtering                  
+                    allocate( params%MGR(-1:1) )
+                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+                else
+                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+                endif   
             else
                 call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
             endif
@@ -1269,6 +1302,8 @@ contains
                 params%order_predictor = "multiresolution_4th"
             elseif (params%wavelet(4:4) == "6") then
                 params%order_predictor = "multiresolution_6th"
+            elseif (params%wavelet(4:4) == "8") then
+                params%order_predictor = "multiresolution_8th"
             endif
         end select
 
@@ -1296,6 +1331,7 @@ contains
             elseif (params%wavelet(4:4) == "6") then
                 g_RHS = 3
             endif
+            if ( (g_RHS < 4) .and. (params%order_discretization == 'FD_8th_central') ) g_RHS = 4
             if ( (g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) g_RHS = 3
             if ( (g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) g_RHS = 2
             if ( (g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) g_RHS = 1
@@ -1354,6 +1390,7 @@ contains
         ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
         ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
         i = 0
+        if ( params%order_discretization == 'FD_8th_central') i = 8
         if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
         if ( params%order_discretization == 'FD_4th_central' ) i = 4
         if ( params%order_discretization == 'FD_2nd_central') i = 2
@@ -1380,6 +1417,24 @@ contains
            write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
         endif
         !--------------------------------------------------------------------------------------------------------
+
+        ! we are debugging the patches for Coarse Extension SC Copy and WC Zero to a file so that we can check that they are correct
+#ifdef DEV
+        open(16,file="CE_bounds.dat",status='replace')
+        write(16,'(3(A, i0), 2(A))') "% dim=", params%dim, ", Bs=", params%Bs(1), ", g=", params%g, ", CDF=", params%wavelet
+        write(16,'(A, A13, 6(A15))') "% ", "Neighborhood" , "idx_1", "idx_2", "idy_1", "idy_2", "idz_1", "idz_2"
+        do i = 1, 56*3
+            call get_indices_of_modify_patch(params%g, params%dim, i, idx, (/ params%Bs(1)+2*params%g, params%Bs(2)+2*params%g, merge(1, params%Bs(3)+2*params%g, params%dim==2)/), (/params%Nscl, params%Nscl, params%Nscl/), (/params%Nscr, params%Nscr, params%Nscr/), &
+                g_p=(/ params%g, params%g, params%g/), g_m=(/ params%g, params%g, params%g/), lvl_diff=+1)
+            write(16,'(7(i15))') i, idx(:, :)
+            call get_indices_of_modify_patch(params%g, params%dim, i, idx, (/ params%Bs(1)+2*params%g, params%Bs(2)+2*params%g, merge(1, params%Bs(3)+2*params%g, params%dim==2)/), (/params%Nwcl, params%Nwcl, params%Nwcl/), (/params%Nwcr, params%Nwcr, params%Nwcr/), &
+                g_p=(/ params%g, params%g, params%g/), g_m=(/ params%g, params%g, params%g/), lvl_diff=+1)
+            write(16,'(7(i15))') i, idx(:, :)
+        enddo
+        close(16)
+#endif
+        
+        !---------------------------------------------------------------------------------------------------------
 
 
         if (present(g_wavelet)) then

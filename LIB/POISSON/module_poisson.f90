@@ -1,15 +1,9 @@
 !-------------------------------------------------------------------------------
-!> \brief FORTRAN FFT module for WABBIT
+!> \brief FORTRAN poisson solver module for WABBIT
 !-------------------------------------------------------------------------------
 !> \details
-!! This module implements some FFT functions, which can be used on a single block only (!!)\n
-!! For the case Jmin=0, this block is usually periodic. \n
-!! You are correct to thu_hat, that all this is of no great use for WABBIT, but we can utilize it for the lowest level solution in the Poisson solver. \n
-!! This module needs FFTW to be installed. \n
-!! This module is designed as blackbox, users should only use it's function with input and output real data, \n
-!! and not need to touch the complex-valued Fourier-coefficients.
-!-------------------------------------------------------------------------------
-!  Thanks to the FLUSI coders for the inspiration for this code
+!! ToDo: Explanations
+!! ATTENTION! This module might assume equidistant grid spacing, which might not always be the case. Needs to be checked!
 !-------------------------------------------------------------------------------
 module module_poisson
 
@@ -30,15 +24,134 @@ module module_poisson
     ! everything is save by default
     SAVE
 
+        ! we want to solve Ax = Bb where
+        !       A is the discrete Laplacian operator
+        !       B is an auxiliary operator for the RHS, used in the Mehrstellenverfahren
+        !       u is the solution vector
+        !       b is the right-hand side
+        ! Here we define the different stencils for each method, which then will later be applied
+
+        ! different stencils, either for one-dimensional cross-stencil form or tensorial form
+        real(kind=rk), allocatable  :: stencil(:), stencil_tensor_2D(:,:), stencil_tensor_3D(:,:,:), stencil_RHS_tensor_2D(:,:), stencil_RHS_tensor_3D(:,:,:)
+        real(kind=rk)  :: stencil_RHS
+        integer(kind=ik) :: stencil_size, stencil_RHS_size
+
+
+
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
     
-    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, CG_solve_poisson_level0
+    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils
 
 
 contains
 
-    subroutine GS_iteration_level(params, tree_id, level, u, b, a, stencil, sweep_forward)
+    subroutine setup_Laplacian_stencils(params, g)
+        implicit none
+        !> parameter struct
+        type (type_params), intent(inout)  :: params
+        integer(kind=ik), intent(inout), optional :: g  ! ghost points, if present then we set it if we require more points
+
+        ! prepare stencil
+        if (allocated(stencil)) deallocate(stencil)
+        if (allocated(stencil_tensor_2D)) deallocate(stencil_tensor_2D)
+        if (allocated(stencil_tensor_3D)) deallocate(stencil_tensor_3D)
+
+        if (params%laplacian_order == "CFD_2nd") then
+            allocate(stencil(-1:1))
+            stencil = (/  1.0_rk, -2.0_rk,    1.0_rk /)
+            stencil_RHS = 1.0_rk
+            params%laplacian_stencil_size = 1
+            stencil_size = 1
+            stencil_RHS_size = 0
+        elseif (params%laplacian_order == "CFD_4th") then
+            allocate(stencil(-2:2))
+            stencil = (/ -1.0_rk,  16.0_rk,  -30.0_rk,   16.0_rk,   -1.0_rk /) / 12.0_rk
+            stencil_RHS = 1.0_rk
+            params%laplacian_stencil_size = 2
+            stencil_size = 2
+            stencil_RHS_size = 0
+        elseif (params%laplacian_order == "CFD_6th") then
+            allocate(stencil(-3:3))
+            stencil = (/  2.0_rk, -27.0_rk,   270.0_rk, -490.0_rk,   270.0_rk,  -27.0_rk,    2.0_rk/) / 180.0_rk
+            stencil_RHS = 1.0_rk
+            params%laplacian_stencil_size = 3
+            stencil_size = 3
+            stencil_RHS_size = 0
+        elseif (params%laplacian_order == "CFD_8th") then
+            allocate(stencil(-4:4))
+            stencil = (/ -9.0_rk,  128.0_rk, -1008.0_rk, 8064.0_rk, -14350.0_rk, 8064.0_rk, -1008.0_rk, 128.0_rk, -9.0_rk /) / 5040_rk
+            stencil_RHS = 1.0_rk
+            params%laplacian_stencil_size = 4
+            stencil_size = 4
+            stencil_RHS_size = 0
+        elseif (params%laplacian_order == "MST_6th") then
+            if (params%dim == 2) then
+                allocate(stencil_tensor_2D(-1:1, -1:1))
+                allocate(stencil_RHS_tensor_2D(-2:2, -2:2))
+                stencil_tensor_2D = reshape( (/ &
+                    1.0_rk,   4.0_rk, 1.0_rk, &
+                    4.0_rk, -20.0_rk, 4.0_rk, &
+                    1.0_rk,   4.0_rk, 1.0_rk /), (/3,3/) ) / 6.0_rk
+                stencil_RHS_tensor_2D = reshape( (/ &
+                     0.0_rk,  0.0_rk,  -3.0_rk,  0.0_rk,  0.0_rk, &
+                     0.0_rk,  8.0_rk,  56.0_rk,  8.0_rk,  0.0_rk, &
+                    -3.0_rk, 56.0_rk, 476.0_rk, 56.0_rk, -3.0_rk, &
+                     0.0_rk,  8.0_rk,  56.0_rk,  8.0_rk,  0.0_rk, &
+                     0.0_rk,  0.0_rk,  -3.0_rk,  0.0_rk,  0.0_rk /), (/5,5/) ) / 720.0_rk
+            else
+                allocate(stencil_tensor_3D(-1:1, -1:1, -1:1))
+                allocate(stencil_RHS_tensor_3D(-2:2, -2:2, -2:2))
+                stencil_tensor_3D = reshape( (/ &
+                    1.0_rk,  3.0_rk, 1.0_rk,  3.0_rk,   14.0_rk,  3.0_rk, 1.0_rk,  3.0_rk, 1.0_rk, &
+                    3.0_rk, 14.0_rk, 3.0_rk, 14.0_rk, -128.0_rk, 14.0_rk, 3.0_rk, 14.0_rk, 3.0_rk, &
+                    1.0_rk,  3.0_rk, 1.0_rk,  3.0_rk,   14.0_rk,  3.0_rk, 1.0_rk,  3.0_rk, 1.0_rk /), (/3,3,3/) ) / 30.0_rk
+                stencil_RHS_tensor_3D = reshape( (/ &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,  -3.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   8.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  8.0_rk,  40.0_rk,  8.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   8.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+
+                0.0_rk,  0.0_rk,   -3.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  8.0_rk,   40.0_rk,  8.0_rk,  0.0_rk, &
+               -3.0_rk, 40.0_rk,  402.0_rk, 40.0_rk, -3.0_rk, &
+                0.0_rk,  8.0_rk,   40.0_rk,  8.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   -3.0_rk,  0.0_rk,  0.0_rk, &
+
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   8.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  8.0_rk,  40.0_rk,  8.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   8.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,  -3.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
+                0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk /), (/5,5,5/) ) / 720.0_rk
+            endif
+            params%laplacian_stencil_size = 1
+            stencil_size = 1
+            stencil_RHS_size = 2
+        else
+            call abort(250612, "I don't know about this laplacian discretization order: "//params%laplacian_order//" in GS_compute_residual")
+        endif
+
+        if (present(g)) then
+            g = max(g, params%laplacian_stencil_size)  ! we need at least the stencil size
+            g = max(g, stencil_RHS_size)  ! also take RHS into account
+        endif
+        
+    end subroutine setup_Laplacian_stencils
+
+    subroutine GS_iteration_level(params, tree_id, level, u, b, sweep_forward)
         implicit none
 
         !> parameter struct
@@ -46,8 +159,6 @@ contains
         integer(kind=ik), intent(in)       :: tree_id
         real(kind=rk), intent(inout)       :: u(:, :, :, :, :)
         real(kind=rk), intent(in)          :: b(:, :, :, :, :)
-        integer(kind=ik), intent(in)       :: a
-        real(kind=rk), intent(in)          :: stencil(-a:a)
         logical, intent(in)                :: sweep_forward
         integer(kind=ik), intent(in)       :: level
 
@@ -67,14 +178,14 @@ contains
             params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
             ! blocks on this level do a GS-sweep
-            call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), a, stencil, dx, sweep_forward)
+            call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), dx, sweep_forward)
         enddo
         call toc( "Gauss-Seidel iteration", 10006, MPI_Wtime()-t_block )
     end subroutine
 
 
     !> \brief Gauss-Seidel iteration for a given tree_id and refinement level
-    subroutine GS_iteration_ref(params, tree_id, ref, u, b, a, stencil, sweep_forward, filter_offset)
+    subroutine GS_iteration_ref(params, tree_id, ref, u, b, sweep_forward, filter_offset)
         implicit none
 
         !> parameter struct
@@ -83,8 +194,6 @@ contains
         integer(kind=ik), intent(in)       :: ref(:)  ! can be several, input as (/ VAL1, VAL2, ... /)
         real(kind=rk), intent(inout)       :: u(:, :, :, :, :)
         real(kind=rk), intent(in)          :: b(:, :, :, :, :)
-        integer(kind=ik), intent(in)       :: a
-        real(kind=rk), intent(in)          :: stencil(-a:a)
         logical, intent(in)                :: sweep_forward
         integer(kind=ik), intent(in), optional  :: filter_offset  ! where to apply the filter, default is params%g resulting in only interior points
 
@@ -107,68 +216,73 @@ contains
             params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
             ! blocks on this level do a GS-sweep
-            call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), a, stencil, dx, sweep_forward, filterOffset)
+            call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), dx, sweep_forward, filterOffset)
         enddo
         call toc( "Gauss-Seidel iteration", 10006, MPI_Wtime()-t_block )
     end subroutine
 
     ! do one Gauss Seidel iteration, either in backwards or forwards fashion, to solve Ax=b
     ! A is supposed to be periodic and sparse with given stencil
-    subroutine GS_iteration(params, u, b, a, stencil, dx, sweep_forward, filter_offset)
+    subroutine GS_iteration(params, u, b, dx, sweep_forward, filter_offset)
         implicit none
 
         !> parameter struct
         type (type_params), intent(inout)  :: params
         real(kind=rk), intent(inout)       :: u(:, :, :, :)
         real(kind=rk), intent(in)          :: b(:, :, :, :)
-        integer(kind=ik), intent(in)       :: a
-        real(kind=rk), intent(in)          :: stencil(-a:a)
         real(kind=rk), intent(in)          :: dx(:)           ! needed to weight b, stencil is assumed to not be adapted by dx
         logical, intent(in)                :: sweep_forward
         integer(kind=ik), intent(in), optional :: filter_offset  ! where to apply the filter, default is params%g resulting in only interior points
 
-        real(kind=rk)                      :: stencil_GS(-a:a), fac_GS
-        integer(kind=ik)                   :: ix,iy,iz, ic, filterOffset
+        integer(kind=ik)                   :: ix,iy,iz, ic, filterOffset, is(1:3), ie(1:3), dir, a
 
         filterOffset = params%g
         if (present(filter_offset)) filterOffset = filter_offset
 
-        ! prepare GS stencil
-        fac_GS = stencil(0)*params%dim            ! diagonal factor that we need to divide b with
-        stencil_GS = -stencil / fac_GS  ! inverted stencil for GS application
-        stencil_GS(0) = 0.0_rk         ! main diagonal needs to be 0
+        a = params%laplacian_stencil_size
+
+        is(:) = 1
+        ie(:) = 1
+        if (sweep_forward) then
+            is(1:params%dim) = filterOffset + 1
+            ie(1:params%dim) = params%bs(1:params%dim) + 2*params%g - filterOffset
+            dir = 1
+        else
+            is(1:params%dim) = params%bs(1:params%dim) + 2*params%g - filterOffset
+            ie(1:params%dim) = filterOffset + 1
+            dir = -1
+        endif
 
         do ic = 1, size(u,4)
-            ! forward sweep
-            if (sweep_forward) then
-                if (params%dim == 3) then
-                    do iz = filterOffset+1, params%bs(3)+2*params%g-filterOffset, 1
-                        do iy = filterOffset+1, params%bs(2)+2*params%g-filterOffset, 1
-                            do ix = filterOffset+1, params%bs(1)+2*params%g-filterOffset, 1
-                                u(ix,iy,iz,ic) = sum(stencil_GS * u(ix-a:ix+a,iy,iz,ic)) + sum(stencil_GS * u(ix,iy-a:iy+a,iz,ic)) + sum(stencil_GS * u(ix,iy,iz-a:iz+a,ic)) + b(ix,iy,iz,ic) / fac_GS * dx(1)*dx(1)
-                            enddo
+            if (params%laplacian_order == "CFD_2nd" .or. params%laplacian_order == "CFD_4th"  .or. params%laplacian_order == "CFD_6th"  .or. params%laplacian_order == "CFD_8th") then
+                if (params%dim == 2) then
+                    do iy = is(2), ie(2), dir
+                        do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = (-sum(stencil * u(ix-a:ix+a,iy,1,ic)) - sum(stencil * u(ix,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,1,ic)) / (stencil(0)*params%dim)
                         enddo
                     enddo
                 else
-                    do iy = filterOffset+1, params%bs(2)+2*params%g-filterOffset, 1
-                        do ix = filterOffset+1, params%bs(1)+2*params%g-filterOffset, 1
-                            u(ix,iy,1,ic) = sum(stencil_GS * u(ix-a:ix+a,iy,1,ic)) + sum(stencil_GS * u(ix,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic) / fac_GS * dx(1)*dx(1)
+                    do iz = is(3), ie(3), dir
+                        do iy = is(2), ie(2), dir
+                            do ix = is(1), ie(1), dir
+                                u(ix,iy,iz,ic) = (-sum(stencil * u(ix-a:ix+a,iy,iz,ic)) - sum(stencil * u(ix,iy-a:iy+a,iz,ic)) - sum(stencil * u(ix,iy,iz-a:iz+a,ic)) + b(ix,iy,iz,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,iz,ic)) / (stencil(0)*params%dim)
+                            enddo
                         enddo
                     enddo
                 endif
-            else
-                if (params%dim == 3) then
-                    do iz = params%bs(3)+2*params%g-filterOffset, filterOffset+1, -1
-                        do iy = params%bs(2)+2*params%g-filterOffset, filterOffset+1, -1
-                            do ix = params%bs(1)+2*params%g-filterOffset, filterOffset+1, -1
-                                u(ix,iy,iz,ic) = sum(stencil_GS * u(ix-a:ix+a,iy,iz,ic)) + sum(stencil_GS * u(ix,iy-a:iy+a,iz,ic)) + sum(stencil_GS * u(ix,iy,iz-a:iz+a,ic)) + b(ix,iy,iz,ic) / fac_GS * dx(1)*dx(1)
-                            enddo
+            elseif (params%laplacian_order == "MST_6th") then
+                if (params%dim == 2) then
+                    do iy = is(2), ie(2), dir
+                        do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = (-sum(stencil_tensor_2D * u(ix-a:ix+a,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic)*dx(1)*dx(1) + stencil_tensor_2D(0,0)*u(ix,iy,1,ic)) / stencil_tensor_2D(0,0)
                         enddo
                     enddo
                 else
-                    do iy = params%bs(2)+2*params%g-filterOffset, filterOffset+1, -1
-                        do ix = params%bs(1)+2*params%g-filterOffset, filterOffset+1, -1
-                            u(ix,iy,1,ic) = sum(stencil_GS * u(ix-a:ix+a,iy,1,ic)) + sum(stencil_GS * u(ix,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic) / fac_GS * dx(1)*dx(1)
+                    do iz = is(3), ie(3), dir
+                        do iy = is(2), ie(2), dir
+                            do ix = is(1), ie(1), dir
+                                u(ix,iy,iz,ic) = (-sum(stencil_tensor_3D * u(ix-a:ix+a,iy-a:iy+a,iz-a:iz+a,ic)) + b(ix,iy,iz,ic)*dx(1)*dx(1) + stencil_tensor_3D(0,0,0)*u(ix,iy,iz,ic)) / stencil_tensor_3D(0,0,0)
+                            enddo
                         enddo
                     enddo
                 endif
@@ -180,7 +294,7 @@ contains
     !> \brief compute residual r = b - Ax
     !> \details Compute the residual r = b - Ax, where A is the operator defined by the stencil.
     !> Can also be used to recompute b as b = r + Ax
-    subroutine GS_compute_residual(params, u, b, r, a, stencil, dx, recompute_b)
+    subroutine GS_compute_residual(params, u, b, r, dx, recompute_b)
         implicit none
 
         !> parameter struct
@@ -188,17 +302,12 @@ contains
         real(kind=rk), intent(in)         :: u(:, :, :, :)
         real(kind=rk), intent(in)         :: b(:, :, :, :)  !< RHS b
         real(kind=rk), intent(out)        :: r(:, :, :, :)  !< residual r, can be inplace with b
-        integer(kind=ik), intent(in)      :: a
-        real(kind=rk), intent(in)         :: stencil(-a:a)
         real(kind=rk), intent(in)         :: dx(:)
         logical, intent(in), optional     :: recompute_b    !< if .true. then b = r + Ax
 
         integer :: Ax_factor
 
-        real(kind=rk)                        :: stencil_x(-a:a)
-        real(kind=rk)                        :: stencil_y(-a:a)
-        real(kind=rk)                        :: stencil_z(-a:a)
-        integer(kind=ik)                     :: ix,iy,iz,ic
+        integer(kind=ik)                  :: ix,iy,iz,ic, a
 
         ! factor to multiply Ax with, decides if we compute r = b - Ax or recompute b = r + Ax
         Ax_factor = -1
@@ -206,79 +315,142 @@ contains
             if (recompute_b) Ax_factor = 1
         endif
 
-        stencil_x = stencil / (dx(1)*dx(1))
-        stencil_y = stencil / (dx(2)*dx(2))
-        if (params%dim==3) then
-            stencil_z = stencil / (dx(3)*dx(3))
-        endif
+        a = params%laplacian_stencil_size
 
         do ic = 1,size(u,4)
-            if (params%dim == 3) then
-                do iz = params%g+1, params%g+params%bs(3)
+            if (params%laplacian_order == "CFD_2nd" .or. params%laplacian_order == "CFD_4th"  .or. params%laplacian_order == "CFD_6th"  .or. params%laplacian_order == "CFD_8th") then
+                if (params%dim == 2) then
                     do iy = params%g+1, params%g+params%bs(2)
                         do ix = params%g+1, params%g+params%bs(1)
-                            r(ix,iy,iz,ic) = b(ix,iy,iz,ic) + Ax_factor * (sum(stencil_x * u(ix-a:ix+a,iy,iz,ic)) \
-                                + sum(stencil_y * u(ix,iy-a:iy+a,iz,ic)) + sum(stencil_z * u(ix,iy,iz-a:iz+a,ic)))
+                            r(ix,iy,1,ic) = b(ix,iy,1,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,1,ic)) / (dx(1)*dx(1)) \
+                                + sum(stencil * u(ix,iy-a:iy+a,1,ic))  / (dx(2)*dx(2)))
                         enddo
                     enddo
-                enddo
-            else
-                do iy = params%g+1, params%g+params%bs(2)
-                    do ix = params%g+1, params%g+params%bs(1)
-                        r(ix,iy,1,ic) = b(ix,iy,1,ic) + Ax_factor * (sum(stencil_x * u(ix-a:ix+a,iy,1,ic)) \
-                            + sum(stencil_y * u(ix,iy-a:iy+a,1,ic)))
+                else
+                    do iz = params%g+1, params%g+params%bs(3)
+                        do iy = params%g+1, params%g+params%bs(2)
+                            do ix = params%g+1, params%g+params%bs(1)
+                                r(ix,iy,iz,ic) = b(ix,iy,iz,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,iz,ic)) / (dx(1)*dx(1)) \
+                                    + sum(stencil * u(ix,iy-a:iy+a,iz,ic)) / (dx(2)*dx(2)) + sum(stencil * u(ix,iy,iz-a:iz+a,ic)) / (dx(3)*dx(3)))
+                            enddo
+                        enddo
                     enddo
-                enddo
+                endif
+            elseif (params%laplacian_order == "MST_6th") then
+                if (params%dim == 2) then
+                    do iy = params%g+1, params%g+params%bs(2)
+                        do ix = params%g+1, params%g+params%bs(1)
+                            r(ix,iy,1,ic) = b(ix,iy,1,ic) + Ax_factor * sum(stencil_tensor_2D * u(ix-a:ix+a,iy-a:iy+a,1,ic)) / (dx(1)*dx(1))
+                        enddo
+                    enddo
+                else
+                    do iz = params%g+1, params%g+params%bs(3)
+                        do iy = params%g+1, params%g+params%bs(2)
+                            do ix = params%g+1, params%g+params%bs(1)
+                                r(ix,iy,iz,ic) = b(ix,iy,iz,ic) + Ax_factor * sum(stencil_tensor_3D * u(ix-a:ix+a,iy-a:iy+a,iz-a:iz+a,ic)) / (dx(1)*dx(1))
+                            enddo
+                        enddo
+                    enddo
+                endif
             endif
         enddo
     end subroutine
 
 
-    ! apply laplacian and compute Ax
-    subroutine GS_compute_laplacian(params, u, ddu, a, stencil, dx)
+    ! apply laplacian and compute Ax, used for CG
+    subroutine GS_compute_Ax(params, u, ddu, dx, apply_B_RHS)
         implicit none
 
         !> parameter struct
         type (type_params), intent(inout) :: params
         real(kind=rk), intent(in)         :: u(:, :, :)
         real(kind=rk), intent(inout)      :: ddu(:, :, :)
-        integer(kind=ik), intent(in)      :: a
-        real(kind=rk), intent(in)         :: stencil(-a:a)
         real(kind=rk), intent(in)         :: dx(:)
+        logical, intent(in), optional     :: apply_B_RHS  !< if .true. then apply the B operator stencil_RHS instead of stencil
 
-        real(kind=rk)                     :: stencil_x(-a:a)
-        real(kind=rk)                     :: stencil_y(-a:a)
-        real(kind=rk)                     :: stencil_z(-a:a)
-        integer(kind=ik)                  :: ix,iy,iz
+        integer(kind=ik)                  :: ix,iy,iz, a, is(1:3), ie(1:3)
+        logical :: use_stencil_RHS
 
-        stencil_x = stencil / (dx(1)*dx(1))
-        stencil_y = stencil / (dx(2)*dx(2))
-        if (params%dim==3) then
-            stencil_z = stencil / (dx(3)*dx(3))
-        endif
+        ! get indices over which we loop
+        is(:) = 1
+        ie(:) = 1
+        is(1:params%dim) = params%g + 1
+        ie(1:params%dim) = params%g + params%bs(1:params%dim)
 
-        if (params%dim == 3) then
-            do iz = params%g+1, params%g+params%bs(3)
-                do iy = params%g+1, params%g+params%bs(2)
-                    do ix = params%g+1, params%g+params%bs(1)
-                        ddu(ix,iy,iz) = sum(stencil_x * u(ix-a:ix+a,iy,iz)) \
-                            + sum(stencil_y * u(ix,iy-a:iy+a,iz)) + sum(stencil_z * u(ix,iy,iz-a:iz+a))
+        use_stencil_RHS = .false.
+        if (present(apply_B_RHS)) use_stencil_RHS = apply_B_RHS
+
+        if (.not. apply_B_RHS) then
+            a = params%laplacian_stencil_size
+            if (params%laplacian_order == "CFD_2nd" .or. params%laplacian_order == "CFD_4th"  .or. params%laplacian_order == "CFD_6th"  .or. params%laplacian_order == "CFD_8th") then
+                if (params%dim == 2) then
+                    do iy = params%g+1, params%g+params%bs(2)
+                        do ix = params%g+1, params%g+params%bs(1)
+                            ddu(ix,iy,1) =  sum(stencil * u(ix-a:ix+a,iy,1)) / (dx(1)*dx(1)) \
+                                + sum(stencil * u(ix,iy-a:iy+a,1)) / (dx(2)*dx(2))
+                        enddo
                     enddo
-                enddo
-            enddo
+                else
+                    do iz = params%g+1, params%g+params%bs(3)
+                        do iy = params%g+1, params%g+params%bs(2)
+                            do ix = params%g+1, params%g+params%bs(1)
+                                ddu(ix,iy,iz) = sum(stencil * u(ix-a:ix+a,iy,iz)) / (dx(1)*dx(1)) \
+                                    + sum(stencil * u(ix,iy-a:iy+a,iz)) / (dx(2)*dx(2)) + sum(stencil * u(ix,iy,iz-a:iz+a)) / (dx(3)*dx(3))
+                            enddo
+                        enddo
+                    enddo
+                endif
+            elseif (params%laplacian_order == "MST_6th") then
+                if (params%dim == 2) then
+                    do iy = params%g+1, params%g+params%bs(2)
+                        do ix = params%g+1, params%g+params%bs(1)
+                            ddu(ix,iy,1) = sum(stencil_tensor_2D * u(ix-a:ix+a,iy-a:iy+a,1)) / (dx(1)*dx(1))
+                        enddo
+                    enddo
+                else
+                    do iz = params%g+1, params%g+params%bs(3)
+                        do iy = params%g+1, params%g+params%bs(2)
+                            do ix = params%g+1, params%g+params%bs(1)
+                                ddu(ix,iy,iz) = sum(stencil_tensor_3D * u(ix-a:ix+a,iy-a:iy+a,iz-a:iz+a)) / (dx(1)*dx(1))
+                            enddo
+                        enddo
+                    enddo
+                endif
+            endif
         else
-            do iy = params%g+1, params%g+params%bs(2)
-                do ix = params%g+1, params%g+params%bs(1)
-                    ddu(ix,iy,1) =  sum(stencil_x * u(ix-a:ix+a,iy,1)) \
-                        + sum(stencil_y * u(ix,iy-a:iy+a,1))
-                enddo
-            enddo
+            if (params%laplacian_order == "CFD_2nd" .or. params%laplacian_order == "CFD_4th"  .or. params%laplacian_order == "CFD_6th"  .or. params%laplacian_order == "CFD_8th") then
+                ddu(:,:,:) = u(:,:,:)
+            elseif (params%laplacian_order == "MST_6th") then
+                a = stencil_RHS_size
+                ddu(is(1):ie(1),is(2):ie(2),is(3):ie(3)) = 0.0_rk
+                if (params%dim == 2) then
+                    do iy = -a,a
+                        do ix = -a,a
+                            if (stencil_RHS_tensor_2D(ix,iy) /= 0.0_rk) then
+                                ddu(is(1):ie(1),is(2):ie(2),1) = ddu(is(1):ie(1),is(2):ie(2),1) + stencil_RHS_tensor_2D(ix,iy) * u(is(1)+ix:ie(1)+ix,is(2)+iy:ie(2)+iy,1)
+                            endif
+                        enddo
+                    enddo
+                else
+                    do iz = -a,a
+                        do iy = -a,a
+                            do ix = -a,a
+                                if (stencil_RHS_tensor_3D(ix,iy,iz) /= 0.0_rk) then
+                                    ddu(is(1):ie(1),is(2):ie(2),is(3):ie(3)) = ddu(is(1):ie(1),is(2):ie(2),is(3):ie(3)) + stencil_RHS_tensor_3D(ix,iy,iz) * u(is(1)+ix:ie(1)+ix,is(2)+iy:ie(2)+iy,is(3)+iz:ie(3)+iz)
+                                endif
+                            enddo
+                        enddo
+                    enddo
+                endif
+            else
+                call abort(250613, "I don't know about this laplacian discretization order: "//params%laplacian_order//" in GS_compute_Ax")
+            endif
         endif
     end subroutine
 
 
 
-    subroutine CG_solve_poisson_level0(params, u, f, a, stencil, dx, tol, max_iter)
+    subroutine CG_solve_poisson_level0(params, u, f, dx, tol, max_iter)
         use module_params
         implicit none
 
@@ -286,8 +458,6 @@ contains
         type (type_params), intent(inout)  :: params
         real(kind=rk), intent(inout) :: u(:, :, :, :)
         real(kind=rk), intent(in) :: f(:, :, :, :)
-        integer(kind=ik), intent(in)      :: a
-        real(kind=rk), intent(in)         :: stencil(-a:a)
         real(kind=rk), intent(in)         :: dx(:)
         real(kind=rk), intent(in) :: tol
         integer, intent(in) :: max_iter
@@ -321,7 +491,7 @@ contains
             ! call dump_block_fancy(u(:,:,:,:), fname, params%Bs, params%g, digits=2)
 
             ! r = f - A u
-            call GS_compute_laplacian(params, u(:,:,:,ic), Ap, a, stencil, dx)
+            call GS_compute_Ax(params, u(:,:,:,ic), Ap, dx)
             r(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)) = f(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3),ic) - Ap(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3))
             p(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)) = r(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3))
             rsold = sum(r(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3))**2)
@@ -331,7 +501,7 @@ contains
                 ! assume that we have only one periodic block here and laplacian is only a + shaped stencil
                 call sync_block_level0(params, p, sync_sides_only=.true.)
 
-                call GS_compute_laplacian(params, p, Ap, a, stencil, dx)
+                call GS_compute_Ax(params, p, Ap, dx)
                 alpha = rsold / sum(p(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)) * Ap(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)))
                 u(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3),ic) = u(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3),ic) + alpha * p(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3))
                 r(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)) = r(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3)) - alpha * Ap(g(1)+1:bs(1)+g(1),g(2)+1:bs(2)+g(2),g(3)+1:bs(3)+g(3))

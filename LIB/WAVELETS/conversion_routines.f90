@@ -166,9 +166,15 @@ subroutine spaghetti2Mallat_block(params, u, wc)
     ! wc(nx/2+1:nx  ,ny/2+1:ny  ,nz/2+1:nz  ,:)          GGG     wcxyz wavelet coeffs
     !
     ! For different BS or g the actual points could look differently, let's have a look at 1D:
-    ! BS even, g even:     GS GW IS IW IS IW GS GW    (2G,4I,2G)   ->  GS IS IS GS GW IW IW GW    (1G,2I,1G | 1G,2I,1G)
-    ! BS even, g odd :        GW IS IW IS IW GS       (1G,4I,1G)   ->     IS IS GS GW IW IW       (   2I,1G | 1G,2I   )
+    !                      |---- spaghetti ordering --------------|    |----- Mallat odering ---------------------------|
+    ! BS even, g even:     GS GW IS IW IS IW GS GW    (2G,4I,2G)    ->  GS IS IS GS GW IW IW GW    (1G,2I,1G | 1G,2I,1G)
+    ! BS even, g odd :        GW IS IW IS IW GS       (1G,4I,1G)    ->     IS IS GS GW IW IW       (   2I,1G | 1G,2I   )
     ! We therefore have: G_SC_L = g//2, G_WC_L = g//2 + 1, Start_WC = (BS+1)//2 + (g//2)*2
+    ! In the above:
+    !     G* : ghost point, I* interior point
+    !     *S : scaling function coeff *W: wavelet coeff  ==> GS: ghost nodes, scaling function coeff
+    !
+    
 
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: wc
     integer(kind=ik) :: nx, ny, nz, nc, i_s, sc_e(1:3)

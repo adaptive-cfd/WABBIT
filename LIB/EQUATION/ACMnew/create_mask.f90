@@ -4,11 +4,13 @@
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
 subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
+    use module_globals
     implicit none
 
     ! grid
     integer(kind=ik), intent(in) :: Bs(3), g
     !> mask term for every grid point of this block
+    ! components: mask, usx, usy, usz, color, sponge
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
     !     stage == "time-independent-part"
     !     stage == "time-dependent-part"
@@ -151,6 +153,10 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
         end select
 
+    case ('channel_3D')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_channel(x0, dx, Bs, g, mask )
+        endif
 
     case ('none')
         mask = 0.0_rk
@@ -960,6 +966,152 @@ subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
     end do
 
 end subroutine draw_fixed_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_channel(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min, H_fluid, safety, epsilon, xi, delta
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+     ! parameter for smoothing function (width)
+    dx_min = params_acm%dx_min
+
+    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
+    delta = 2.64822828_rk
+
+    ! Fluid domain
+    H_fluid = params_acm%domain_size(2) - 2*params_acm%h_channel
+
+    ! | h_channel
+    ! |____
+    ! |
+    ! | H_fluid
+    ! |____
+    ! |
+    ! | h_channel
+
+    select case(params_acm%smoothing_type)
+    !--------------------------------
+    case ("discontinuous", "dis")
+    !--------------------------------
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif ((y >= (params_acm%h_channel+H_fluid)).and.(y <=  params_acm%domain_size(2))) then
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("cos", "cosine")
+    !--------------------------------
+    safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel+safety) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = smoothstep(y, params_acm%h_channel, params_acm%C_smooth*params_acm%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif ((y <= (params_acm%h_channel+H_fluid-safety)).and.(y >= (params_acm%h_channel+H_fluid+safety))) then
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = smoothstep(-y, (params_acm%h_channel+H_fluid), params_acm%C_smooth*params_acm%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+    safety = 5.0_rk*epsilon
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel+safety) then
+                    ! lower wall
+                    xi = (y-params_acm%h_channel) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif ((y <= (params_acm%h_channel+H_fluid-safety)).and.(y >= (params_acm%h_channel+H_fluid+safety))) then
+                    ! upper wall
+                    xi = -1.0_rk*(y-(params_acm%h_channel+H_fluid)) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+    
+    
+    end select
+    
+
+end subroutine draw_channel
 
 !-------------------------------------------------------------------------------
 

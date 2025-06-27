@@ -17,17 +17,28 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id, level, idx_d(2,3)
     integer(kind=tsize)                 :: treecode
 
-    dim = params%dim
-    N = params%number_blocks
+    dim  = params%dim
+    N    = params%number_blocks
     rank = params%rank
-    Bs = params%Bs
-    g  = params%g
+    Bs   = params%Bs
+    g    = params%g
 
-    ! data fields for interpolation
-    ! coarse: current data, fine: new (refine) data, new_data: gather all refined data for all data fields
+    ! Allocate data buffer for interpolation (data_predict_fine).
+    ! The prediction below turns a block with size Bs+2*g (including ghost nodes) into a refined block
+    ! of size 2*(Bs+2*g)-1.
+    !
     ! NOTE: the predictor for the refinement acts on the extended blocks i.e. it
     ! includes the ghost nodes layer. Therefore, you MUST call sync_ghosts before this routine.
-    ! The datafield for prediction is one level up, i.e. it contains Bs+g + (Bs+2g-1) points
+    ! The datafield for prediction is one level up, i.e. it contains Bs+g + (Bs+2g-1) points.
+    !
+    ! The refinement routine may be called for different trees, for example the flow tree and the mask tree
+    ! and those trees may differ in their number of components. Ensure the buffer has the right size, if not, 
+    ! dealloacte it (and subsequently re-alloacte it correctly)
+    if (allocated(data_predict_fine)) then
+        if (size(data_predict_fine, 4) < size(hvy_block,4)) deallocate(data_predict_fine)
+    endif
+
+    ! actual allocation of data buffer for interpolation
     if (dim == 2) then
         if (.not. allocated(data_predict_fine)) allocate( data_predict_fine( 2*(Bs(1)+2*g)-1, 2*(Bs(2)+2*g)-1, 1, size(hvy_block,4)) )
     else
@@ -39,31 +50,29 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
     treecode = get_tc(lgt_block( lgt_id, IDX_TC_1 : IDX_TC_2 ))
     level    = lgt_block( lgt_id, IDX_MESH_LVL )
 
-    ! ------------------------------------------------------------------------------------------------------
-    ! first: interpolate block data
+    !------------------------------------------------------------------------------------------------------
+    ! 1st Step: interpolate block data
+    !------------------------------------------------------------------------------------------------------
+
     ! loop over all components
     do dF = 1, size(hvy_block,4)
         ! NOTE: the refinement interpolation acts on the entire block including ghost nodes.
-        ! interpolate data, then save new data, but cut ghost nodes.
-        ! uniqueGrid modification
-        if (dim == 2) then
-            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:, :, :, df), params%order_predictor)
-        else
-            call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:, :, :, df), params%order_predictor)
-        endif
+        call prediction(hvy_block(:, :, :, dF, hvyID), data_predict_fine(:, :, :, df), params%order_predictor)
     end do
 
-    ! ------------------------------------------------------------------------------------------------------
-    ! second: split new data and write into new blocks
-    !--------------------------
-    ! create all 4 or 8 daughters
-    do k_daughter = 0,2**(params%dim) -1
+    !------------------------------------------------------------------------------------------------------
+    ! 2nd Step: split new data and write into new blocks
+    !------------------------------------------------------------------------------------------------------
+
+    ! create all 4 or 8 new daughters
+    do k_daughter = 0, 2**(params%dim) -1
+
         ! find a free light id on this rank
         if (k_daughter < 2**(params%dim) -1) then
             call get_free_local_light_id( params, rank, lgt_free_id, message="refinement_execute")
             call lgt2hvy( free_hvy_id, lgt_free_id, rank, N )
-        ! last daughter overwrites mother
         else
+            ! last daughter overwrites mother
             free_hvy_id = hvyID
             call hvy2lgt( lgt_free_id, free_hvy_id, rank, N )
         endif
@@ -76,7 +85,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! write new light data
         ! new treecode
         call set_tc(lgt_block( lgt_free_id, IDX_TC_1 : IDX_TC_2 ), treecode)
-        ! new level + 1
+        ! new block is on (level + 1)
         lgt_block( lgt_free_id, IDX_MESH_LVL ) = level+1
         ! new blocks have refinement_status==0 (STAY)
         lgt_block( lgt_free_id, idx_refine_sts ) = 0

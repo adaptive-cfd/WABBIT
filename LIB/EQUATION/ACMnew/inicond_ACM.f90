@@ -297,6 +297,40 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         do idir = 1, params_acm%dim
             u(:,:,:,idir) = params_acm%u_mean_set(idir)
         enddo
+        
+    case("meanflow_channel")
+        ! set the initial condition for channel simulations: the ux-flow is 1 inside the channel and 0 inside the wall
+        ! the y,z directions have perturbations (sin-waves) with ampltiude beta (set in INI-file)
+        if (params_acm%dim == 2) then
+            call abort(2762025, "Initial condition meanflow_channel is valid only for 3D simulations")
+        endif
+
+        do iz = 1, Bs(3)+2*g
+            do iy = 1, Bs(2)+2*g
+                do ix = 1, Bs(1)+2*g
+                    ! coordinates
+                    x = x0(1) + dble(ix-g-1)*dx(1)
+                    y = x0(2) + dble(iy-g-1)*dx(2)
+                    z = x0(3) + dble(iz-g-1)*dx(3)
+
+                    ! ux: constant 1 in the fluid, 0 in the solid
+                    if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
+                        ! fluid part
+                        u(ix,iy,iz,1) = 1.0_rk
+                    else
+                        ! solid part
+                        u(ix,iy,iz,1) = 0.0_rk
+                    endif
+
+                    ! uy, uz: sine wave perturbations
+                    ! I don't know if this is the smartest choice ( I don't have a reference for it ) -TE
+                    u(ix,iy,iz,2) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*z/params_acm%domain_size(3) )
+                    u(ix,iy,iz,3) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*y/params_acm%domain_size(2) )
+                    ! pressure zero
+                    u(ix,iy,iz,4) = 0.0_rk 
+                end do
+            end do
+        end do
 
     case("sinewaves-nopress")
         ! some random sine waves, but no pressure imposed.

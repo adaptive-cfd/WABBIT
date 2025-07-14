@@ -162,51 +162,27 @@ subroutine compute_vorticity_post(params)
         call get_block_spacing_origin( params, lgtID, x0, dx )
 
         if (operator == "--vorticity") then
-            if (params%dim == 3) then
-                call compute_vorticity( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,3,hvyID),&
-                dx, Bs, g,&
-                params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
-            else
-                call compute_vorticity(hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,1,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
-            end if
+            call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
 
         elseif (operator=="--vor-abs") then
-            call compute_vorticity_abs(hvy_block(:,:,:,1,hvyID), &
-            hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,3,hvyID),&
+            call compute_vorticity_abs(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--divergence") then
-            if (params%dim == 3) then
-                call divergence( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), &
-                hvy_block(:,:,:,3,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
-            else
-                call divergence( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), &
-                hvy_block(:,:,:,1,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
-            endif
+            call compute_divergence( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         ! elseif (operator == "--laplace") then
-        !     call divergence( hvy_block(:,:,:,1,hvyID), &
+        !     call compute_divergence( hvy_block(:,:,:,1,hvyID), &
         !     hvy_block(:,:,:,2,hvyID), &
         !     hvy_block(:,:,:,3,hvyID),&
         !     dx, Bs, g, &
         !     params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--Q") then
-            call compute_Qcriterion( hvy_block(:,:,:,1,hvyID), &
-            hvy_block(:,:,:,2,hvyID), &
-            hvy_block(:,:,:,3,hvyID),&
-            dx, Bs, g, &
-            params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+            call compute_Qcriterion( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--copy") then
             hvy_tmp(:,:,:,1,hvyID) = hvy_block(:,:,:,1,hvyID)

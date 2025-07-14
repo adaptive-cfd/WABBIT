@@ -672,15 +672,15 @@ subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
     iteration   = 0
 
     ! J: I have decided for the following way of creating mother blocks
-    !   - main loop goes refine-evolve-coarsen, so first iteration will work on all available block
-    !     it is the one with the most data to send and it's nice that we can choose any of the ranks here (as they are all the same)
-    !   - after first iteration, not all sister-information are available, I just create the following mothers after a deterministic way
-    !     and choose the rank of the block with the highest digit, this ensures some form of spread of ranks, after all I do not really care anymore about the amount of data
+    !   - First iteration the lgt data for all blocks is present, we COULD therefore create mothers however we want
+    !   - after first iteration, not all sister-information are available between the processors without a sync if not done in a deterministic way, I have chosen to create mothers after their treecode to not need sister-information and choose the rank of the block with the highest digit (7 or 3), this ensures some form of spread of ranks, after all I do not really care anymore about the amount of data
+
+    ! Attention: In refine_tree/check_oom we check after the same logic if we run oom, so if you change anything here, also change the logic there
 
     ! just loop until hvy_n does not change anymore, that means all possible mothers have been created
     do while( hvy_n_old /= hvy_n(tree_ID) )
         !---------------------------------------------------------------------------
-        ! create new empty blocks on rank with block with digit = 2**dim-1
+        ! create new empty blocks on rank with block with digit = 2**dim-1 (7 or 3)
         !---------------------------------------------------------------------------
         do k = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k, tree_ID)

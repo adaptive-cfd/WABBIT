@@ -1,6 +1,6 @@
 ! initialize params struct from INI file
 subroutine ini_file_to_params( params, filename )
-    use module_t_files, only : flush_frequency
+   use module_t_files, only : flush_frequency
    implicit none
 
    !> user defined parameter structure
@@ -16,8 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R
-   integer(kind=ik), dimension(3)                  :: Bs
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
 
    rank         = params%rank
    number_procs = params%number_procs
@@ -120,6 +119,21 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .true.)
    call read_param_mpi(FILE, 'Debug', 'test_wavelet_decomposition', params%test_wavelet_decomposition, .true.)
 
+   ! Hack.
+   ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
+   ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
+   ! samples. In 2D, the code generally runs fast and does many time steps, hence
+   ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
+   call read_param_mpi(FILE, 'Debug', 'flush_frequency', flush_frequency, -1)
+   if (flush_frequency <= 0) then
+      if (params%dim == 2) then
+         flush_frequency = 50
+      else
+         flush_frequency = 10
+      endif
+   endif
+   if (params%rank==0) write(*, '(A, i0, A)') "INIT: Flushing t-files every ", flush_frequency, " appends."
+
    !***************************************************************************
    ! read MPI parameters
    !
@@ -180,34 +194,24 @@ subroutine ini_file_to_params( params, filename )
       params%g_RHS = g_RHS_min
    endif
 
-   ! we want to know the stencil size for laplacian schemes usually, so lets save this here
-   if (params%laplacian_order == 'CFD_2nd') then
-      params%laplacian_stencil_size = 1
-   elseif (params%laplacian_order == 'CFD_4th') then
-      params%laplacian_stencil_size = 2
-   elseif (params%laplacian_order == 'CFD_6th') then
-      params%laplacian_stencil_size = 3
-   elseif (params%laplacian_order == 'CFD_8th') then
-      params%laplacian_stencil_size = 4
-   elseif (params%laplacian_order == 'MST_6th') then
-      params%laplacian_stencil_size = 1
-   else
-      call abort(1234567, "Error: no laplacian order specified or not supported!")
-   endif
-   if ( params%g < params%laplacian_stencil_size ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
-   end if
-
-   ! Hack.
-   ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
-   ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
-   ! samples. In 2D, the code generally runs fast and does many time steps, hence
-   ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
-   if (params%dim == 2) then
-      flush_frequency = 50
-   else
-      flush_frequency = 10
-   endif
+   ! JB ToDo - correct once this is more settled
+   ! ! we want to know the stencil size for laplacian schemes usually, so lets save this here
+   ! if (params%laplacian_order == 'CFD_2nd') then
+   !    params%laplacian_stencil_size = 1
+   ! elseif (params%laplacian_order == 'CFD_4th') then
+   !    params%laplacian_stencil_size = 2
+   ! elseif (params%laplacian_order == 'CFD_6th') then
+   !    params%laplacian_stencil_size = 3
+   ! elseif (params%laplacian_order == 'CFD_8th') then
+   !    params%laplacian_stencil_size = 4
+   ! elseif (params%laplacian_order == 'MST_6th') then
+   !    params%laplacian_stencil_size = 1
+   ! else
+   !    call abort(1234567, "Error: no laplacian order specified or not supported!")
+   ! endif
+   ! if ( params%g < params%laplacian_stencil_size ) then
+   !    call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
+   ! end if
 
  
 end subroutine ini_file_to_params

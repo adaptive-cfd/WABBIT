@@ -61,7 +61,7 @@ program main
     ! filename of *.ini file used to read parameters
     character(len=clong)                :: filename
     ! some variables, loop, debug information and more
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, mpicode, Jmin1, Jmax1, Jmin2, Jmax2
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, mpicode, Jmin1, Jmax1
     character(len=2*clong)              :: write_statement  ! dynamically build the output lengths
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt

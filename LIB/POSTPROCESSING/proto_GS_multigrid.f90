@@ -85,20 +85,7 @@ subroutine proto_GS_multigrid(params)
 
     ! set laplace order
     call get_command_argument(4 + merge(1,0, exist_u) + merge(1,0, exist_uFD), params%laplacian_order)
-    if (params%laplacian_order == "CFD_2nd") then
-        params%laplacian_stencil_size = 1
-    elseif (params%laplacian_order == "CFD_4th") then
-        params%laplacian_stencil_size = 2
-    elseif (params%laplacian_order == "CFD_6th") then
-        params%laplacian_stencil_size = 3
-    elseif (params%laplacian_order == "CFD_8th") then
-        params%laplacian_stencil_size = 4
-    elseif (params%laplacian_order == "MST_6th") then
-        params%laplacian_stencil_size = 1
-    else
-        call abort(250612, "ERROR: laplace order not recognized. Use CFD_2nd, CFD_4th, CFD_6th, CFD_8th or MST_6th")
-    endif
-        ! set number of cycles
+    ! set number of cycles
     call get_command_argument(5 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
     read (cycle_type, *) params%laplacian_cycle_it
     call get_command_argument(6 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
@@ -130,7 +117,7 @@ subroutine proto_GS_multigrid(params)
     params%threshold_state_vector_component = 1
     params%order_discretization = "FD_4th_central"
     params%laplacian_coarsest = "FFT"
-    params%FFT_accuracy = "FD"  ! FD or spectral
+    params%FFT_accuracy = "spectral"  ! FD or spectral
 
     Bs = params%Bs
 
@@ -213,7 +200,7 @@ subroutine proto_GS_multigrid(params)
 
     ! For the Mehrstellenverfahren, we actually do solve the system Au = Bb
     ! So before doing anything, we apply the matrix B on b, this is a large tensorial matrix, but we only have to apply this operation once
-    if (params%laplacian_order == "MST_6th") then
+    if (params%laplacian_order == "FD_6th_mehrstellen") then
         t_block = MPI_Wtime()
         do k_block = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k_block, tree_ID)
@@ -242,7 +229,7 @@ subroutine proto_GS_multigrid(params)
     ! compute several v- or f-cycles
     do i_cycle = 1,params%laplacian_cycle_it
 
-        call multigrid_vcycle(params, hvy_tmp(:,:,:,1:nc,:), hvy_block(:,:,:,1:nc,:), hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID)
+        call multigrid_vcycle(params, hvy_tmp(:,:,:,1:nc,:), hvy_block(:,:,:,1:nc,:), hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID, verbose=.true.)
 
         ! laplacian is invariant to shifts of constant values
         ! our values are defined with zero mean for comparison
@@ -297,20 +284,20 @@ subroutine proto_GS_multigrid(params)
     ! for not saving the intermediate values, also change all save times to 0
     enddo
 
-        ! delete all non-leaf blocks with daughters as we for now do not have any use for them
-        call prune_fulltree2leafs(params, tree_ID)
-        
-        ! save file under new name
-        write(fname, '(A, i4.4, A)') "u_00", 0, "00000.h5"
-        call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_tmp, tree_ID )
+    ! delete all non-leaf blocks with daughters as we for now do not have any use for them
+    call prune_fulltree2leafs(params, tree_ID)
+    
+    ! save file under new name
+    write(fname, '(A, i4.4, A)') "u_00", 0, "00000.h5"
+    call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_tmp, tree_ID )
 
-        ! save file under new name
-        write(fname, '(A, i4.4, A)') "res_00", 0, "00000.h5"
-        call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID )
+    ! save file under new name
+    write(fname, '(A, i4.4, A)') "res_00", 0, "00000.h5"
+    call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID )
 
-        ! save file under new name
-        write(fname, '(A, I4.4, A)') "b-out_00", 0, "00000.h5"
-        call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_block, tree_ID )
+    ! save file under new name
+    write(fname, '(A, I4.4, A)') "b-out_00", 0, "00000.h5"
+    call saveHDF5_tree(fname, dble(0), 0, 1, params, hvy_block, tree_ID )
 
     ! ! for saving intermediate value, also change all save times to i_cycle
     !     ! save spectral u at new time position

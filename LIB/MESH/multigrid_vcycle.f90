@@ -1,3 +1,91 @@
+subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, verbose)
+    implicit none
+
+    !> parameter struct
+    type (type_params), intent(inout)  :: params
+    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    integer(kind=ik), intent(in)       :: tree_ID
+    logical, intent(in), optional      :: init_0
+    logical, intent(in), optional      :: verbose
+
+    integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, ic, i_cycle
+    real(kind=rk)                      :: dx(1:3), x0(1:3), norm(1:size(hvy_sol,4))
+    real(kind=rk)                      :: t_block
+    logical                            :: verbose_apply, init0
+
+    verbose_apply = .false.
+    if (present(verbose)) verbose_apply = verbose
+    init0 = .false.
+    if (present(init_0)) init0 = init_0
+
+    ! For the Mehrstellenverfahren, we actually do solve the system Au = Bb
+    ! So before doing anything, we apply the matrix B on b, this is a large tensorial matrix, but we only have to apply this operation once
+    if (params%laplacian_order == "FD_6th_mehrstellen") then
+        t_block = MPI_Wtime()
+        do k_block = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k_block, tree_ID)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call get_block_spacing_origin( params, lgt_ID, x0, dx )
+            do ic = 1, size(hvy_RHS,4)
+                ! apply the stencil to the RHS
+                call GS_compute_Ax(params, hvy_RHS(:,:,:,ic,hvy_id), hvy_work(:,:,:,ic,hvy_id), dx, apply_B_RHS=.true.)
+            enddo
+            hvy_RHS(:,:,:,1:size(hvy_RHS,4),hvy_id) = hvy_work(:,:,:,1:size(hvy_RHS,4),hvy_id)
+        enddo
+        call toc( "RHS Preparation Bb", 10000, MPI_Wtime()-t_block )
+
+        t_block = MPI_Wtime()
+        call sync_ghosts_tree(params, hvy_RHS(:,:,:,1:size(hvy_RHS,4),:), tree_ID)
+        call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
+    endif
+
+    ! prepare full tree grid, this will be populated along the way
+    ! blocks are practically empty, but we fill them along the way so ref flag will be set to 0 to allow synching
+    call init_full_tree(params, tree_ID, set_ref=0)
+
+    ! init solution on lower levels as zero, elsewise it is that from last time-step
+    do k_block = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        if (.not. block_is_leaf(params, hvy_ID) .or. init0) then
+            hvy_sol(:,:,:,1:size(hvy_RHS,4),hvy_id) = 0.0_rk
+        endif
+    enddo
+
+    ! compute several v- or f-cycles
+    do i_cycle = 1,params%laplacian_cycle_it
+
+        ! Call the multigrid vcycle function
+        call multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose=verbose_apply)
+
+        ! call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)))
+        ! if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, i0, A, 10(es10.4, 1x))') "   it ", i_cycle, "/", params%laplacian_cycle_it, " Residual Linfty: ", norm(1:size(hvy_sol,4))
+
+    enddo
+
+    ! laplacian is invariant to shifts of constant values
+    ! our values are defined with zero mean for comparison
+    ! as multigrid might accidently introduce a constant offset, we remove it
+    call componentWiseNorm_tree(params, hvy_sol(:,:,:,1:1,:), tree_ID, "Mean", norm(1:size(hvy_sol,4)))
+    do k_block = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        do ic = 1, size(hvy_RHS,4)
+            hvy_sol(:,:,:,ic,hvy_id) = hvy_sol(:,:,:,ic,hvy_id) - norm(ic)
+        enddo
+    enddo
+    if (params%rank == 0 .and. verbose_apply) write(*, '(A, 10(es10.3, 1x))') "--- Mean value: ", norm(1:size(hvy_sol,4))
+
+    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)))
+    if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, 10(es10.4, 1x))') "   Final Residual Linfty: ", norm(1:size(hvy_sol,4))
+
+    ! delete all non-leaf blocks with daughters as we for now do not have any use for them
+    call prune_fulltree2leafs(params, tree_ID)
+
+end subroutine multigrid_solve
+
+
+
 !> \brief Do a multigrid vcycle
 !> \details This function executes a multigrid vcycle. The structure is as following:
 !>    - It first goes down to the lowest level with downwards sweeps
@@ -13,13 +101,14 @@
 ! c - coarsest level solve (FFT, CG or GS)
 ! u - upwards prolongation and Gauss-Seidel sweeps with it_GS
 ! d - Decomposition with restriction filter
-subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID)
+subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose)
     implicit none
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
     real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
+    logical, intent(in), optional      :: verbose
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id
     integer(kind=ik)                   :: i_level, Jmax_a, it_coarsest, i_sweep, nc, ic, mpierr
@@ -30,8 +119,12 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID)
     real(kind=rk), allocatable         :: norm(:)
     integer(kind=2)                    :: n_domain(1:3)
     integer(kind=tsize)                :: treecode
+    logical                            :: verbose_apply
 
     real(kind=rk)        :: t_block, t_loop, t_cycle, t_print(1:1)
+
+    verbose_apply = .false.
+    if (present(verbose)) verbose_apply = verbose
 
     nc = size(hvy_sol,4)
     allocate(norm(3*nc))
@@ -82,9 +175,11 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID)
     t_block = MPI_Wtime()
     call wavelet_decompose_full_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, hvy_RHS, init_full_tree_grid=.false., compute_SC_only=.true., scaling_filter=params%MGR)
     call toc( "GS Downwards - full sweep", 10002, MPI_Wtime()-t_block )
-    t_block = MPI_Wtime()-t_block
-    call MPI_ALLREDUCE(MPI_IN_PLACE, t_block, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-    call append_t_file('multigrid-iteration.t', (/-1.0_rk, -1.0_rk, t_block/))
+    if (verbose_apply) then
+        t_block = MPI_Wtime()-t_block
+        call MPI_ALLREDUCE(MPI_IN_PLACE, t_block, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        call append_t_file('multigrid-iteration.t', (/-1.0_rk, -1.0_rk, t_block/))
+    endif
 
     ! usually after decomposition the residual is not synced, when doing multi-step GS sweeps, we need to sync it
     t_block = MPI_Wtime()
@@ -108,13 +203,13 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID)
     !    - Conjugent gradient method : only for level 0 for now
     !    - GS sweeps : very inefficient as blocks are usually too large for convergence
     !    - FFT :only for level 0, needs to be checked to solve true solution or discretized laplacian
-    call multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, params%Jmin, Jmax_a)
+    call multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, params%Jmin, Jmax_a, verbose_apply)
 
     ! upwards sweeps - prolong lower level solution, then solve Gauss-Seidel iterations
     ! do i_level = Jmin+1, Jmax_a
     !     call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, i_level, Jmax_a, hvy_depth)
     ! enddo
-    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%Jmin, Jmax_a)
+    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%Jmin, Jmax_a, verbose_apply)
 
     ! We do not solve Ae=r but Au=b and we need to restore the old solution as well as the RHS b
     ! this is happening for all leaf-blocks
@@ -169,23 +264,26 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID)
         call GS_compute_residual(params, hvy_sol(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_work(:,:,:,1:nc,hvy_id), dx)
     enddo
     call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Mean", norm)
-    if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Residual Mean: ", norm(1), " ---"
+    if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.3, A)') "--- Residual Mean: ", norm(1), " ---"
     do k_block = 1, hvy_n(tree_ID)
         do ic = 1,nc
             hvy_id = hvy_active(k_block, tree_ID)
             hvy_work(:,:,:,ic,hvy_id) = hvy_work(:,:,:,ic,hvy_id) - norm(ic)
         enddo
     enddo
-    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", norm)
-    if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L2: ", norm(1), " ---"
-    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L1", norm(nc+1:2*nc))
-    ! if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L1: ", norm(nc+1), " ---"
-    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Linfty", norm(2*nc+1:3*nc))
-    if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual Linfty: ", norm(nc+2), " ---"
 
-    t_print = MPI_Wtime()-t_cycle
-    call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-    call append_t_file('multigrid-cycle.t', (/norm(1), norm(nc+1), norm(2*nc+1), t_print(1)/))
+    if (verbose_apply) then
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", norm)
+        if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.4, A)') "--- Residual L2: ", norm(1), " ---"
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L1", norm(nc+1:2*nc))
+        ! if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L1: ", norm(nc+1), " ---"
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Linfty", norm(2*nc+1:3*nc))
+        if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.4, A)') "--- Residual Linfty: ", norm(nc+2), " ---"
+
+        t_print = MPI_Wtime()-t_cycle
+        call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        call append_t_file('multigrid-cycle.t', (/norm(1), norm(nc+1), norm(2*nc+1), t_print(1)/))
+    endif
 
     call toc( "Final residual", 10014, MPI_Wtime()-t_block )
 
@@ -202,7 +300,7 @@ end subroutine multigrid_vcycle
 !> Does three things:
 !>   - sync the coarser solution from the lower lewel as WD decomposed values, reconstruct the coarser solution
 !>   - do GS sweeps on this level
-subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, Jmax_a)
+subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, Jmax_a, verbose)
     implicit none
 
     !> parameter struct
@@ -211,6 +309,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     integer(kind=ik), intent(in)       :: tree_ID
     integer(kind=ik), intent(in)       :: Jmin
     integer(kind=ik), intent(in)       :: Jmax_a
+    logical, intent(in), optional      :: verbose
 
     character(len=cshort)              :: fname
     integer(kind=tsize)                :: treecode
@@ -220,6 +319,11 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     integer(kind=ik)   :: k_block, lgt_ID, hvy_id, nc, ic, i_sweep, mpierr, i_level, level_me, ref_me, sync_freq, i_g(1:3), i_BS(1:3)
     real(kind=rk)      :: t_loop, t_block, t_print(1:1)
     real(kind=rk)      :: dx(1:3), x0(1:3)
+    logical            :: verbose_apply
+
+    verbose_apply = .false.
+    if (present(verbose)) verbose_apply = verbose
+
     nc = size(hvy_sol,4)
 
     i_g = 0
@@ -244,7 +348,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
 
         t_loop = MPI_Wtime()
 
-        if (params%rank == 0) write(*, '(A, 2(A, i0))') repeat('  ', i_level+1), 'Upwards GS sweep lvl ', i_level, ' it ', params%laplacian_GS_it
+        if (params%rank == 0 .and. verbose_apply) write(*, '(A, 2(A, i0))') repeat('  ', i_level+1), 'Upwards GS sweep lvl ', i_level, ' it ', params%laplacian_GS_it
 
         ! Preparation for this level:
         !   - ref = -1: last level that is ready to go upwards
@@ -333,7 +437,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
         ! our values are defined with zero mean for comparison
         ! as multigrid might accidently introduce a constant offset, we remove it
         call componentWiseNorm_tree(params, hvy_RHS(:,:,:,1:nc,:), tree_ID, "Mean", norm(1:nc), norm_case="not_empty")
-        if (params%rank == 0) write(*, '(A, A, es10.3)') repeat('  ', i_level+1), 'RHS mean ', norm(1)
+        if (params%rank == 0 .and. verbose_apply) write(*, '(A, A, es10.3)') repeat('  ', i_level+1), 'RHS mean ', norm(1)
         do k_block = 1, hvy_n(tree_ID)
             do ic = 1,nc
                 hvy_id = hvy_active(k_block, tree_ID)
@@ -350,7 +454,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 if (modulo(i_sweep-1, sync_freq) == 0) then
                     ! we need to synch before a sweep
                     t_block = MPI_Wtime()
-                    call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, params%laplacian_stencil_size, params%laplacian_stencil_size, ignore_Filter=.true.)
+                    call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, params%laplacian_stencil_size, params%laplacian_stencil_size, ignore_Filter=(params%laplacian_stencil_size<=ubound(params%HD, dim=1)/2 .or. .not. params%isLiftedWavelet))
                     ! call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, a*sync_freq, a*sync_freq)
                     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
                 endif
@@ -360,12 +464,19 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g-(sync_freq-1)*params%laplacian_stencil_size)
 
                 sweep_forward = .not. sweep_forward
+
+                ! second sweep without sync
+                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g-(sync_freq-1)*params%laplacian_stencil_size)
+
+                sweep_forward = .not. sweep_forward
             enddo
         ! endif
 
-        t_print = MPI_Wtime()-t_loop
-        call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-        call append_t_file('multigrid-iteration.t', (/1.0_rk, dble(i_level), t_print/))
+        if (verbose_apply) then
+            t_print = MPI_Wtime()-t_loop
+            call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+            call append_t_file('multigrid-iteration.t', (/1.0_rk, dble(i_level), t_print/))
+        endif
 
         call toc( "GS Upwards - full sweep", 10005, MPI_Wtime()-t_loop )
     enddo
@@ -380,7 +491,7 @@ end subroutine multigrid_upwards
 !>   - FFT, but only for level 0
 !>   - Conjugent gradient method, (but only for level 0 for now)
 !>   - GS sweeps
-subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a)
+subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a, verbose)
     implicit none
 
     !> parameter struct
@@ -389,6 +500,7 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
     integer(kind=ik), intent(in)       :: tree_ID
     integer(kind=ik), intent(in)       :: i_level
     integer(kind=ik), intent(in)       :: Jmax_a
+    logical, intent(in), optional      :: verbose
 
     character(len=cshort)              :: fname
     integer(kind=tsize)                :: treecode
@@ -401,6 +513,12 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
     ! should be set in params
     real(kind=rk)      :: tol_cg
     integer(kind=ik)   :: it_sweep
+
+    logical            :: verbose_apply
+
+    verbose_apply = .false.
+    if (present(verbose)) verbose_apply = verbose
+
     tol_cg = 1.0e-4
     it_sweep = 100
 
@@ -409,7 +527,7 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
     if (i_level == 0 .and. (params%laplacian_coarsest == "FFT" .or. params%laplacian_coarsest == "CG")) then
         if (params%laplacian_coarsest == "FFT") then
             ! FFT for lowest block if level = 0
-            if (params%rank == 0) write(*, '(A, A, i0)') repeat('  ', i_level+1), 'FFT lvl ', i_level
+            if (params%rank == 0 .and. verbose_apply) write(*, '(A, A, i0)') repeat('  ', i_level+1), 'FFT lvl ', i_level
             t_block = MPI_Wtime()
 
             ! we want to solve laplacian for finest level, so if FFT has fft precision, we need to adjust it to the finest level
@@ -433,13 +551,15 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
                 ! call dump_block_fancy(hvy_RHS(:,:,:,1:nc,hvy_id), 'RHS_L0.txt', params%Bs, params%g, digits=2, print_ghosts=.true.)
 
             enddo
-            t_print = MPI_Wtime()-t_block
-            call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-            call append_t_file('multigrid-iteration.t', (/0.0_rk, dble(i_level), t_print/))
+            if (verbose_apply) then
+                t_print = MPI_Wtime()-t_block
+                call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+                call append_t_file('multigrid-iteration.t', (/0.0_rk, dble(i_level), t_print/))
+            endif
             call toc( "fft solve poisson", 10004, MPI_Wtime()-t_block )
         elseif (params%laplacian_coarsest == "CG") then
             ! conjugent gradient method for lowest block if level = 0
-            if (params%rank == 0) write(*, '(A, 2(A, i0), A, es7.1)') repeat('  ', i_level+1), 'Coarsest CG lvl ', i_level, ' it max ', it_sweep, ' tol ', tol_cg
+            if (params%rank == 0 .and. verbose_apply) write(*, '(A, 2(A, i0), A, es7.1)') repeat('  ', i_level+1), 'Coarsest CG lvl ', i_level, ' it max ', it_sweep, ' tol ', tol_cg
             t_block = MPI_Wtime()
             do k_block = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k_block, tree_ID)
@@ -453,14 +573,16 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
                 
                 call CG_solve_poisson_level0(params, hvy_sol(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), dx, tol_cg, it_sweep)
             enddo
-            t_print = MPI_Wtime()-t_block
-            call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-            call append_t_file('multigrid-iteration.t', (/0.0_rk, dble(i_level), t_print/))
+            if (verbose_apply) then
+                t_print = MPI_Wtime()-t_block
+                call MPI_ALLREDUCE(MPI_IN_PLACE, t_print, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+                call append_t_file('multigrid-iteration.t', (/0.0_rk, dble(i_level), t_print/))
+            endif
             call toc( "conjugent gradient", 10004, MPI_Wtime()-t_block )
         endif
     elseif (params%laplacian_coarsest == "GS") then
         ! coarsest level sweeps
-        if (params%rank == 0) write(*, '(A, 2(A, i0))') repeat('  ', i_level+1), 'Coarsest GS sweeps lvl ', i_level, ' it ', it_sweep
+        if (params%rank == 0 .and. verbose_apply) write(*, '(A, 2(A, i0))') repeat('  ', i_level+1), 'Coarsest GS sweeps lvl ', i_level, ' it ', it_sweep
 
         sweep_forward = .true.
         do i_sweep = 1, it_sweep

@@ -324,7 +324,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_derivative.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
+	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_derivative.f90 compute_vorticity.f90 compute_divergence.f90 compute_gradient.f90 compute_Qcriterion.f90 \
 	componentWiseNorm_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

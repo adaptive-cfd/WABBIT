@@ -14,15 +14,15 @@ module module_t_files
     implicit none
 
     ! precision statement
-    integer, save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
-    integer, parameter :: max_parallel_files = 150
-    integer, parameter :: max_columns = 160
-    integer, save :: mpirank = 7
+    integer(kind=ik), save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
+    integer(kind=ik), parameter :: max_parallel_files = 150
+    integer(kind=ik), parameter :: max_columns = 160
+    integer(kind=ik), save :: mpirank = 7
 
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)
     character(len=cshort), save, allocatable :: filenames(:)
-    integer, save, allocatable :: iteration(:), n_columns(:)
+    integer(kind=ik), save, allocatable :: iteration(:), n_columns(:)
     logical :: disable_all_output = .false.
 
     ! I usually find it helpful to use the private keyword by itself initially, which specifies

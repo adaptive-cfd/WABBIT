@@ -122,10 +122,10 @@ subroutine compute_scalar_field_post(params)
 
         if (operator == "--gradient") then
             if (params%dim == 3) then
-                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
+                call compute_gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
                 params%order_discretization, hvy_tmp(:,:,:,1:3,hvy_id))
             else
-                call gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
+                call compute_gradient( hvy_block(:,:,:,1,hvy_id), dx, params%Bs, params%g, &
                 params%order_discretization, hvy_tmp(:,:,:,1:2,hvy_id))
             end if
 

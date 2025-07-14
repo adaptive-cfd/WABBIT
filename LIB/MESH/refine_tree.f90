@@ -70,7 +70,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, error_OO
     ! be perfectly balanced (+- 2**D blocks, because we can only distribute a block before refinement
     ! which means 2**D blocks after refinement), but is better than before.
     ! To ensure perfect balancing, a second step is done after the actual refinement.
-    if (params%refinement_indicator=="significant") then
+    if (indicator /= "everywhere") then
         call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true.)
     endif
 
@@ -80,31 +80,7 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, error_OO
     ! NOTE: in the simulation part, a second check is performed BEFORE this routine
     ! is called. It then aborts the time loop and dumps a backup for late resuming.
     ! If the following check fails, then this will be in postprocessing, and it will kill the code.
-    hvy_n_afterRefinement = 0
-    do k = 1, hvy_n(tree_ID)
-        ! loop over hvy is safer, because we can tell for each mpirank if it fails or not
-        ! so we detect also problems arising from load-imbalancing.
-        call hvy2lgt(lgt_id, hvy_active(k, tree_ID), params%rank, params%number_blocks)
-
-        if ( lgt_block(lgt_id, IDX_REFINE_STS) == +1) then
-            ! this block will be refined, so it creates 2**D new blocks but it itself deleted
-            hvy_n_afterRefinement = hvy_n_afterRefinement + (2**params%dim - 1)
-        else
-            ! this block will not be refined, so it remains.
-            hvy_n_afterRefinement = hvy_n_afterRefinement + 1
-        endif
-    enddo
-
-    ! oh-oh case.
-    if ( hvy_n_afterRefinement > params%number_blocks ) then
-        write(*,'("On rank:",i5," hvy_n=",i5," will refine to ",i5," but limit is ",i5)') &
-        params%rank, hvy_n(tree_ID), hvy_n_afterRefinement, params%number_blocks
-        ! return the error. in simulations, this causes us to jump to backup saving. in postprocessing,
-        ! the code shall abort.
-        error_OOM = .true.
-    endif
-    ! not all ranks might run OOM (out-of-memory)
-    call MPI_ALLREDUCE(MPI_IN_PLACE, error_OOM, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierr)
+    call check_oom(params, tree_id, error_OOM, check_full_tree=.false., check_ref=.true.)
     ! byebye
     if (error_OOM) return
     !---------------------------------------------------------------------------
@@ -139,7 +115,104 @@ subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, error_OO
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 
+    ! check once again to see if we can create the full tree
+    call check_oom(params, tree_id, error_OOM, check_full_tree=.true., check_ref=.false.)
+
     call toc( "refine_tree (lists+neighbors)", 146, t_misc )
     call toc( "refine_tree (TOTAL)", 140, MPI_wtime()-t0 )
 
 end subroutine refine_tree
+
+
+
+!> \brief Check if a refinement step will succeed or if we will run out of memory
+subroutine check_oom(params, tree_id, error_OOM, check_full_tree, check_ref)
+    implicit none
+
+    type (type_params), intent(in) :: params                   !> user defined parameter structure
+    integer(kind=ik), intent(in) :: tree_id                    !> tree ID to check
+    !> Out-of-memory error, causes the main time loop to exit.
+    logical, intent(out) :: error_OOM
+    logical, intent(in), optional :: check_full_tree  !> if true, checks if a full tree can be created in deterministic fashion
+    logical, intent(in), optional :: check_ref        !> if true, checks for blocks that will be refined
+
+    integer(kind=tsize) :: treecode
+    integer(kind=ik) :: hvy_n_afterRefinement, k, i_level, mpierr, lgt_id, hvy_id, level, digit, ref
+    logical :: checkFullTree, checkRef
+    integer(kind=ik), allocatable :: hvy_n_procs(:)
+
+    checkFullTree = .false.
+    if (present(check_full_tree)) checkFullTree = check_full_tree
+    checkRef = .false.
+    if (present(check_ref)) checkRef = check_ref
+
+    ! Attention: This logic has to be in line with the logic in init_full_tree
+
+    ! check if the refinement step will succeed or if we will run out of memory
+    hvy_n_afterRefinement = 0
+    do k = 1, hvy_n(tree_ID)
+        ! loop over hvy is safer, because we can tell for each mpirank if it fails or not
+        ! so we detect also problems arising from load-imbalancing.
+
+        hvy_id = hvy_active(k, tree_ID)
+        call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+        ref = lgt_block(lgt_id, IDX_REFINE_STS)
+        level = lgt_block(lgt_id, IDX_MESH_LVL)
+
+        ! add block itself
+        if ( ref == +1 .and. level /= params%Jmax .and. check_ref) then
+            ! this block will be refined, so it creates 2**D new blocks
+            hvy_n_afterRefinement = hvy_n_afterRefinement + 2**params%dim
+        else
+            ! this block will not be refined, so it remains.
+            hvy_n_afterRefinement = hvy_n_afterRefinement + 1
+        endif
+
+        ! if we check the full tree, we also need to add all blocks that might be spawned by this one
+        if (checkFullTree) then
+            treecode = get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 ))
+            do i_level = level, params%Jmin+1, -1
+                digit = tc_get_digit_at_level_b(treecode, params%dim, i_level, params%Jmax)
+                if (digit == 2**params%dim-1) then
+                    hvy_n_afterRefinement = hvy_n_afterRefinement + 1
+                else
+                    exit
+                endif
+            enddo
+        endif
+    enddo
+
+    ! oh-oh case.
+    if ( hvy_n_afterRefinement > params%number_blocks ) then
+        if (check_ref) then
+            write(*,'("On rank:",i5," hvy_n=",i5," will refine to ",i5," but limit is ",i5)') &
+            params%rank, hvy_n(tree_ID), hvy_n_afterRefinement, params%number_blocks
+        elseif (checkFullTree) then
+            write(*,'("On rank:",i5," hvy_n=",i5," will create full tree with ",i5," blocks but limit is ",i5)') &
+            params%rank, hvy_n(tree_ID), hvy_n_afterRefinement, params%number_blocks
+        endif
+        ! return the error. in simulations, this causes us to jump to backup saving. in postprocessing,
+        ! the code shall abort.
+        error_OOM = .true.
+    else
+        error_OOM = .false.
+    endif
+
+    call MPI_ALLREDUCE(MPI_IN_PLACE, error_OOM, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierr)
+
+    if (error_OOM) then
+        allocate(hvy_n_procs(1:params%number_procs), stat=mpierr)
+        ! Gather hvy_n_afterRefinement from all ranks to rank 0
+        call MPI_GATHER(hvy_n_afterRefinement, 1, MPI_INTEGER, hvy_n_procs, 1, MPI_INTEGER, 0, WABBIT_COMM, mpierr)
+        if (params%rank == 0) then
+            open(unit=99, file="oom_hvy_n_per_rank.txt", status="replace")
+            write(99,'(A, i0)') "Rank, current hvy_n, expected hvy_n after refinement, limit is: ", params%number_blocks
+            do k = 1, params%number_procs
+                write(99,'(i0, 1x, i0, 1x, i0)') k, hvy_n(tree_ID), hvy_n_procs(k)
+            enddo
+            close(99)
+        endif
+        deallocate(hvy_n_procs)
+    endif
+
+end subroutine check_oom

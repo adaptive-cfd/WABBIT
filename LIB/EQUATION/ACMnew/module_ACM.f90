@@ -12,7 +12,7 @@ module module_acm
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
-  use module_operators, only : compute_vorticity, divergence
+  use module_operators, only : compute_vorticity, compute_divergence
   use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
   use module_timing
@@ -96,7 +96,7 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder", order_predictor=""
+    character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder"
     character(len=cshort) :: sponge_type=""
     character(len=cshort) :: p_eqn_model="acm"
     character(len=cshort) :: coarsening_indicator=""

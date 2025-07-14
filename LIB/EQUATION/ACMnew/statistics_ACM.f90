@@ -185,8 +185,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
-            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
+            call compute_divergence( u(:,:,:,1:2), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
             where (mask(:,:,:,1)>0.0_rk)
@@ -256,7 +255,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
             ! compute divergence on this block
-            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
+            call compute_divergence( u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
             where (mask(:,:,:,1)>0.0_rk)
@@ -381,7 +380,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
         ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
-        call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+        call compute_vorticity(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim == 2) then
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV

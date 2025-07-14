@@ -76,8 +76,6 @@ end type type_boundary
 
       !wavelet filter
       !---------------
-      ! fine/coarse predictor of wavelets
-      character(len=cshort)                  ::order_predictor
        ! threshold value for wavelets
       real(kind=rk)                     ::eps
 

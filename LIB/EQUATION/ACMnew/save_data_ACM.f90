@@ -98,7 +98,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
 
             ! vorticity
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
         case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
@@ -110,7 +110,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
 
             ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! for different components y,z we need to copy the desired one to the first position
             if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
@@ -130,7 +130,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
 
             ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! compute by velocity to get local helicity
             work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
@@ -145,7 +145,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
 
         case('div', 'divu', 'divergence')
             ! div(u)
-            call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+            call compute_divergence(u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
 
         case('mask')
             work(:,:,:,k) = mask(:,:,:,1)

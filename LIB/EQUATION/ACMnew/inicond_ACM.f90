@@ -118,28 +118,6 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             end do
         end if
 
-    case ("taylor-green-vanRees2011")
-        do iz = 1, Bs(3)+2*g
-            do iy = 1, Bs(2)+2*g
-                do ix = 1, Bs(1)+2*g
-                    ! compute x,y coordinates from spacing and origin
-                    x = dble(ix-(g+1)) * dx(1) + x0(1)
-                    y = dble(iy-(g+1)) * dx(2) + x0(2)
-                    z = dble(iz-(g+1)) * dx(3) + x0(3)
-
-                    ! the initial condition is known analytically. Note in vanrees JCP2011,
-                    ! there is a parameter \theta which is set to zero.
-                    ! See also: "Problem C3.5 Direct Numerical Simulation of the Taylor-Green Vortex at Re = 1600"
-                    ! the constants rho_0 and p_0 are set to 1.0 and 0.0, respectively
-                    ! NOTE: domain size has to be 2*pi = 6.283185307179586
-                    u(ix, iy, iz, 1) = dsin(x)*dcos(y)*dcos(z)
-                    u(ix, iy, iz, 2) =-dcos(x)*dsin(y)*dcos(z)
-                    u(ix, iy, iz, 3) = 0.0_rk
-                    u(ix, iy, iz, 4) = (dcos(2.0_rk*x) + dcos(2.0_rk*y))*(dcos(2.0_rk*z) + 2.0_rk) / 16.0_rk
-                end do
-            end do
-        end do
-
     case("jet-x")
         ! a jet with constant (unit) velocity, with a bit of noise to trigger the instability
         do iy = 1, Bs(2)+2*g
@@ -328,19 +306,48 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
 
     case("taylor_green")
         ! this condition is 2D only!
-        do iy= 1,Bs(2)+2*g
-            y = x0(2) + dble(iy-g-1)*dx(2)
-            call continue_periodic(y,params_acm%domain_size(2))
-            do ix= 1, Bs(1)+2*g
-                x = x0(1) + dble(ix-g-1)*dx(1)
+        if (params_acm%dim==2) then
+            do iy= 1,Bs(2)+2*g
+                y = x0(2) + dble(iy-g-1)*dx(2)
+                call continue_periodic(y,params_acm%domain_size(2))
+                do ix= 1, Bs(1)+2*g
+                    x = x0(1) + dble(ix-g-1)*dx(1)
 
-                call continue_periodic(x,params_acm%domain_size(1))
+                    call continue_periodic(x,params_acm%domain_size(1))
 
-                u(ix,iy,1,1) = params_acm%u_mean_set(1) + dsin(x)*dcos(y)
-                u(ix,iy,1,2) = params_acm%u_mean_set(2) - dcos(x)*dsin(y)
-                u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
+                    u(ix,iy,1,1) = params_acm%u_mean_set(1) - dsin(x)*dcos(y)
+                    u(ix,iy,1,2) = params_acm%u_mean_set(2) + dcos(x)*dsin(y)
+                    u(ix,iy,1,3) = 0.25_rk*(dcos(2.0_rk*x) + dcos(2.0_rk*y))
+                end do
             end do
-        end do
+        else
+            call abort(250708, "taylor_green is a 2D test case. Use taylor-green-vanRees2011 for 3D case")
+        endif
+    case ("taylor-green-vanRees2011")
+        ! this condition is 3D only!
+        if (params_acm%dim==3) then
+            do iz = 1, Bs(3)+2*g
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                do iy = 1, Bs(2)+2*g
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    do ix = 1, Bs(1)+2*g
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                        ! the initial condition is known analytically. Note in vanrees JCP2011,
+                        ! there is a parameter \theta which is set to zero.
+                        ! See also: "Problem C3.5 Direct Numerical Simulation of the Taylor-Green Vortex at Re = 1600"
+                        ! the constants rho_0 and p_0 are set to 1.0 and 0.0, respectively
+                        ! NOTE: domain size has to be 2*pi = 6.283185307179586
+                        u(ix, iy, iz, 1) = dsin(x)*dcos(y)*dcos(z)
+                        u(ix, iy, iz, 2) =-dcos(x)*dsin(y)*dcos(z)
+                        u(ix, iy, iz, 3) = 0.0_rk
+                        u(ix, iy, iz, 4) = (dcos(2.0_rk*x) + dcos(2.0_rk*y))*(dcos(2.0_rk*z) + 2.0_rk) / 16.0_rk
+                    end do
+                end do
+            end do
+        else
+            call abort(250708, "taylor-green-vanRees2011 is a 3D test case. Use taylor-green for 2D case")
+        endif
     case("mixing_layer")
         ! random excitement
         call random_data(u)

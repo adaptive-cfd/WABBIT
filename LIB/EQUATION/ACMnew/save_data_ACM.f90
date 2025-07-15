@@ -145,7 +145,22 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
 
         case('div', 'divu', 'divergence')
             ! div(u)
-            call compute_divergence(u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+            call compute_divergence(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+        
+        case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
+            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz')
+            ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
+            if (INDEX(name, 'x') > 0) then
+                call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k))
+            elseif (INDEX(name, 'y') > 0) then
+                call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k))
+            elseif (INDEX(name, 'z') > 0) then
+                if (params_acm%dim == 3) then
+                    call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k))
+                else
+                    call abort(19101812,"ACM: Gradient of p in z-direction is not defined for 2D runs")
+                endif
+            endif  
 
         case('mask')
             work(:,:,:,k) = mask(:,:,:,1)

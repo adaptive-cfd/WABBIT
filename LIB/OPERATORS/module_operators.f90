@@ -58,7 +58,7 @@ real(kind=rk), parameter :: FD1_R1_4(-1:3) = (/ -3.0_rk, -10.0_rk, 18.0_rk, -6.0
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_divergence, compute_gradient, compute_Qcriterion, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil
+PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_divergence, compute_gradient, compute_laplacian, compute_Qcriterion, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil
 
 contains
 
@@ -67,6 +67,7 @@ contains
 #include "compute_derivative.f90"
 #include "compute_divergence.f90"
 #include "compute_gradient.f90"
+#include "compute_laplacian.f90"
 #include "componentWiseNorm_tree.f90"
 
 !**********************************************************************************************
@@ -106,12 +107,12 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_start = -4
             l_end = 0
             allocate(FD1_l_array(l_start:l_end))
-            FD1_l_array(:) = -FD1_R0_4(l_end:l_start:-1) ! left side is reversed
+            FD1_l_array(:) = -FD1_R0_4(-l_start:-l_end:-1) ! left side is reversed
         case("FD_4th_conv_1_3")
             l_start = -3
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
-            FD1_l_array(:) = -FD1_R1_4(l_end:l_start:-1) ! left side is reversed
+            FD1_l_array(:) = -FD1_R1_4(-l_start:-l_end:-1) ! left side is reversed
         case default
             call abort(250615, "ERROR: order of FD1 discretization not known: " // trim(FD1_order_discretization_in))
     end select

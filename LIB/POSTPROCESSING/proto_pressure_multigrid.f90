@@ -458,9 +458,10 @@ subroutine proto_NSI_EE(params)
         order_disc_pressure = "FD_4th_central"
         params%order_discretization = "FD_4th_central"
     case ("FD_4th_conv_1_3")
-        order_disc_nonlinear = "FD_4th_central"
-        ! order_disc_pressure = "FD_4th_conv_1_3"
-        order_disc_pressure = "FD_4th_central"
+        ! order_disc_nonlinear = "FD_4th_central"
+        order_disc_nonlinear = "FD_4th_conv_1_3"
+        order_disc_pressure = "FD_4th_conv_1_3"
+        ! order_disc_pressure = "FD_4th_central"
         params%order_discretization = "FD_4th_conv_1_3"
     case ("FD_6th_conv_3_3")
         order_disc_nonlinear = "FD_6th_central"
@@ -1144,11 +1145,15 @@ subroutine compute_projection(params, hvy_u, hvy_p, hvy_u_div0, order_discretiza
     real(kind=rk) :: p_dx, p_dy, p_dz
 
     !> parameters for FD1_r operator
-    real(kind=rk), allocatable, dimension(:) :: FD1_r
-    integer(kind=ik) :: FD1_rs, FD1_re
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r
+    integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re
 
     ! Setup stencils using the unified interface from module_operators
+    call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
     call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
+
+    ! write(*,'(A,10(es10.3))') "Left stencil FD1: ", FD1_l(FD1_ls:FD1_le)
+    ! write(*,'(A,10(es10.3))') "Right stencil FD1: ", FD1_r(FD1_rs:FD1_re)
     
     ! loop over all blocks
     do k_block = 1, hvy_n(treeID)

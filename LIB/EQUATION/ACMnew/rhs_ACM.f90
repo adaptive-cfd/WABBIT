@@ -100,14 +100,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             params_acm%mean_flow = 0.0_rk
         endif
 
-        ! mean flow forcing in channel flow
-        if (params_acm%use_channel_forcing) then
-            ! compute G (mean pressure gradient)
-            params_acm%G_mean_p_grad = 0.0_rk
-            ! compute volume of mask function (the fluid volume is the rest of the domain)
-            params_acm%mask_volume = 0.0_rk
-        endif
-
         if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
 
         if (params_acm%use_free_flight_solver) then
@@ -166,13 +158,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             endif
 
             ! NOTE: MPI_SUM is perfomed in the post_stage.
-        endif
-
-        ! Mean flow forcing for channel flow
-        ! each block calculates mean values
-        if (params_acm%use_channel_forcing) then
-            params_acm%mask_volume = params_acm%mask_volume + dV*sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            params_acm%G_mean_p_grad = params_acm%G_mean_p_grad + dV*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)*mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))/params_acm%C_eta
         endif
 
         ! if (params_acm%geometry == "Insect".and. params_acm%use_free_flight_solver) then
@@ -266,18 +251,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         if (params_acm%use_free_flight_solver) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        endif
-
-        if (params_acm%use_channel_forcing) then
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%G_mean_p_grad, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
-            ! convert integral values into mean values by dividing by domain volume
-            params_acm%mask_volume = params_acm%mask_volume / product(params_acm%domain_size)
-            params_acm%G_mean_p_grad = params_acm%G_mean_p_grad / product(params_acm%domain_size)
-
-            ! final expression
-            params_acm%G_mean_p_grad = params_acm%G_mean_p_grad / (1.0_rk-params_acm%mask_volume)
         endif
 
     case ("local_stage")
@@ -1511,25 +1484,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
             end do
         end do
     end if
-
-    ! --------------------------------------------------------------------------
-    ! channel flow
-    ! --------------------------------------------------------------------------
-    ! chi = mask(ix,iy,iz,1) * C_eta_inv
-    ! penalx = -chi * (u - mask(ix,iy,iz,2))
-    
-    ! rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
-    ! rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
-                        
-    if (params_acm%use_channel_forcing) then
-        do iz = g+1, Bs(3)+g
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) + params_acm%G_mean_p_grad*(1.0_rk-mask(ix,iy,iz,1))
-                end do
-            end do
-        end do
-    endif
 
     ! --------------------------------------------------------------------------
     ! HIT linear forcing

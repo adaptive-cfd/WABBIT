@@ -324,8 +324,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
 
                     ! uy, uz: sine wave perturbations
                     ! I don't know if this is the smartest choice ( I don't have a reference for it ) -TE
-                    u(ix,iy,iz,2) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*z/params_acm%domain_size(3) )
-                    u(ix,iy,iz,3) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*y/params_acm%domain_size(2) )
+                    u(ix,iy,iz,2) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*x/params_acm%domain_size(1) )
+                    u(ix,iy,iz,3) = 0.0_rk + params_acm%beta * sin( 2.0_rk*pi*z/params_acm%domain_size(3) )
                     ! pressure zero
                     u(ix,iy,iz,4) = 0.0_rk 
                 end do

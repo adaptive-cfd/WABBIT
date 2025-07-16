@@ -81,7 +81,7 @@ module module_acm
 
     ! channel flow
     logical :: use_channel_forcing = .false.
-    real(kind=rk) ::  G_mean_p_grad=0.0_rk, mask_volume=0.0_rk
+    real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999

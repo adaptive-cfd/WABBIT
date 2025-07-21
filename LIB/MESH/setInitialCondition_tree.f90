@@ -106,7 +106,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         if (params%inicond_refinements > 0) then
             do k = 1, params%inicond_refinements
                 ! refine entire mesh.
-                call refine_tree( params, hvy_block, hvy_tmp,  "everywhere", tree_ID, error_OOM)
+                call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM)
 
                 if (error_OOM) call abort(2512117,"Refinement failed, out of memory. Try with more memory.")
 
@@ -151,7 +151,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     !! go up one level where a refinement indicator tells us to do so, but in the current code
                     !! versions it is easier to use everywhere. NOTE: you actually should call sync_ghosts before
                     !! but it shouldnt be necessary as the inicond is set also in the ghost nodes layer
-                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM  )
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM  )
                     if (error_OOM) call abort(2512113,"Refinement failed, out of memory. Try with more memory.")
 
 
@@ -186,7 +186,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             if (params%inicond_refinements > 0) then
                 do k = 1, params%inicond_refinements
                     ! refine entire mesh.
-                    call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID, error_OOM)
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM)
 
                     if (error_OOM) call abort(2512114,"Refinement failed, out of memory. Try with more memory.")
 

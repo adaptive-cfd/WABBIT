@@ -5,7 +5,6 @@ program main
     use module_MPI
     use module_params           ! global parameters
     use module_timing
-    use module_initialization   ! init data module
     use module_mesh             ! mesh manipulation subroutines
     use module_forestMetaData
     use module_time_step        ! time step module
@@ -15,15 +14,16 @@ program main
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
     ! it exists to disentangle module_forest and module_IO
     use module_saving
-
     implicit none
-
+    
     integer(kind=ik)                    :: ierr           ! MPI error variable
     integer(kind=ik)                    :: rank           ! process rank
     integer(kind=ik)                    :: number_procs   ! number of processes
     real(kind=rk)                       :: t0, t1, t2     ! cpu time variables for running time calculation
     type (type_params)                  :: params         ! user defined parameter structure
 
+    ! externally (makefile) generated version string (git hash ID) and build_date
+#include "version.f90"
 
     ! heavy data array (the actual state vector). Is synchronized.
     ! dim 1-3: x,y,z coord ( 1:Bs+2*g )
@@ -97,6 +97,10 @@ program main
         write(*,'(20("─"), A21, 39("─"))') "   STARTING wabbit   "
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
+
+        ! externally (makefile) generated version string (git hash ID)
+        write(*,'("WABBIT VERSION (git commit ID)=", A)') git_version
+        write(*,'("WABBIT Build date=", A)') build_date
     end if
 
     call print_command_line_arguments()
@@ -114,8 +118,6 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
-    ! initialize wavelet
-    call setup_wavelet(params)
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
     ! have the pysics module read their own parameters
@@ -280,9 +282,9 @@ program main
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
             if (params%refinement_indicator == "significant" .and. iteration == 0) then
-                call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM)
+                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM)
             else
-                call refine_tree( params, hvy_block, hvy_tmp, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM )
+                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM )
             endif
             ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
             ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.

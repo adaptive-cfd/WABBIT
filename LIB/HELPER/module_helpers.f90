@@ -579,47 +579,6 @@ contains
     end subroutine Initialize_runtime_control_file
 
 
-    logical function runtime_control_stop(  )
-        ! reads runtime control command
-        use module_ini_files_parser_mpi
-        implicit none
-        character(len=cshort) :: command
-        character(len=cshort) :: file
-        type(inifile) :: CTRL_FILE
-        logical :: exists
-        integer :: mpirank, mpicode
-
-        file ="runtime_control"
-        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
-
-        if (mpirank==0) then
-            inquire(file=file, exist=exists)
-            if (.not. exists) then
-                call Initialize_runtime_control_file()
-            endif
-        endif
-
-        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
-        if (.not. exists) then
-            runtime_control_stop = .false.
-            return
-        endif
-
-        ! root reads in the control file
-        ! and fetched the command
-        call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
-        call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
-        call clean_ini_file_mpi( CTRL_FILE )
-
-        if (command == "save_stop") then
-            runtime_control_stop = .true.
-        else
-            runtime_control_stop = .false.
-        endif
-
-    end function runtime_control_stop
-
-
     ! source: http://fortranwiki.org/fortran/show/String_Functions
     ! Modified to correctly work with blanks (ie replace "a " by "b", note the blank after a)
     FUNCTION str_replace_text (strInput, strFind, strReplace)  RESULT(strOutput)

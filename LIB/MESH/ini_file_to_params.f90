@@ -23,7 +23,7 @@ subroutine ini_file_to_params( params, filename )
 
 
    ! read the file, only process 0 should create output on screen
-   call set_lattice_spacing_mpi(1.0d0)
+   call set_lattice_spacing_mpi(1.0_rk)
    call read_ini_file_mpi(FILE, filename, .true.)
 
    ! which physics module is used? (note that the initialization of different parameters takes
@@ -144,6 +144,9 @@ subroutine ini_file_to_params( params, filename )
    if (params%rank==0) write(*,'("INIT: cleaning ini file")')
    call clean_ini_file_mpi(FILE)
 
+   ! initialize wavelet (needs to be after reading parameters because it also checks the discretization)
+    call setup_wavelet(params)
+
 
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
@@ -160,26 +163,6 @@ subroutine ini_file_to_params( params, filename )
         (params%g < 1 .and. params%order_discretization == 'FD_2th_central') ) then
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
-
-   ! If NWC of CE is smaller than the size of the FD-stencils, this can create strong divergence peaks.
-   ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
-   ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
-   if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
-   if ( params%order_discretization == 'FD_4th_central' ) i = 4
-   if ( params%order_discretization == 'FD_2th_central') i = 2
-   diff_L = max(i - params%Nwcl, 0)
-   diff_R = max(i - params%Nwcr, 0)
-   params%Nwcl = params%Nwcl + diff_L
-   params%Nwcr = params%Nwcr + diff_R
-   params%Nreconl = params%Nreconl + diff_L
-   params%Nreconr = params%Nreconr + diff_R
-   if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
-      write(*, '(A, i0, A, i0)') "Increased Nwc to consider FD-stencil size by (L/R) : ", diff_L, " / ", diff_R
-   endif
-   ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
-   if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then
-      write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
-   endif
 
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
@@ -502,49 +485,3 @@ subroutine ini_time(params, FILE )
 
    call read_param_mpi(FILE, 'Time', 'butcher_tableau', params%butcher_tableau, butcher_RK4)
 end subroutine ini_time
-
-
-
- !-------------------------------------------------------------------------!
- !> @brief Read Bs from inifile for unknown number of Bs in inifile
-function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
-   implicit none
-   type(inifile) ,intent(inout)     :: FILE
-   character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
-   character(len=*), intent(in)    :: keyword ! what keyword do you
-   integer(kind=ik), intent(in)    :: default_Bs(:)
-   integer(kind=ik), intent(in)    :: dims !number of dimensions
-   integer(kind=ik), intent(in)    :: rank !used for printing warnings
-   integer(kind=ik):: Bs(3)
-   integer(kind=ik):: i, n_entries
-   character(len=cshort):: output
-
-   Bs = 1
-   ! read number_block_nodes
-   call read_param_mpi(FILE, section, keyword, output, "empty")
-
-   if (trim(output) .eq. "empty") then
-      if (rank == 0) write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
-      Bs = default_Bs
-
-   else
-      call count_entries(output, n_entries)
-
-      ! check if the number of entries is valid
-      if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
-
-      ! Cast the output string into the integer
-      read(output,*) (Bs(i), i=1,n_entries)
-
-      ! If only one Bs is given in the ini file, we duplicate it
-      ! for the rest of the Bs array:
-      if (n_entries==1) then
-         Bs(1:dims) = Bs(1)
-      endif
-   endif
-
-   if (any(mod(Bs(1:dims), 2) /= 0)) then
-      ! if (rank == 0) write(*, '(A)') "WARNING! Block size is ODD, this is experimental"
-      call abort(202392929, "Block-size must be EVEN number")
-   end if
-end function

@@ -4,7 +4,6 @@
 module module_unit_test
     use mpi
     use module_params           ! global parameters
-    use module_initialization   ! init module
     use module_mesh
     use module_time_step
     use module_treelib          ! for treecode test

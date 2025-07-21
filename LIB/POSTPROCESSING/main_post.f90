@@ -69,7 +69,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks", "--add", "--subtract", "--multiply", "--test_operations")
+    case ("--add-two-masks", "--add", "--subtract", "--multiply", "--test_operations", "--grid1-to-grid2", "--noise-like-grid1")
         call post_add_two_masks(params)
 
     case ("--stl2dist")

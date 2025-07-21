@@ -12,14 +12,13 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, hvy_tmp, indicator, tree_ID, error_OOM)
+subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM)
     use module_indicators
 
     implicit none
 
     type (type_params), intent(inout) :: params                   !> user defined parameter structure
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
-    real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)   :: tree_ID
     logical, intent(out)   :: error_OOM !> Out-of-memory error, causes the main time loop to exit.

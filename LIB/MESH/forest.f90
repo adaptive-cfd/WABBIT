@@ -514,7 +514,7 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 
     implicit none
     !-----------------------------------------------------------------
-    type (type_params), intent(in) :: params   !< params structure
+    type (type_params), intent(inout) :: params   !< params structure
     integer(kind=ik), intent(in)      :: tree_ID !< number of the tree
     integer(kind=ik), intent(inout)   :: lgt_n_ref !< number of light active blocks
     integer(kind=ik), intent(inout)   :: lgt_block_ref(:, : )  !< light data array
@@ -608,12 +608,8 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
             ! coarse the tagged blocks
             !----------------------------
             if (params%rank == 0 .and. verbose) write(*,'("Number of blocks marked for coarsening: ",i9)') Nblocks_2coarsen
-
-            call ensureGradedness_tree(params, tree_ID)
-
-            call executeCoarsening_tree(params, hvy_block, tree_ID)
-
-            call updateMetadata_tree(params, tree_ID)
+            call sync_ghosts_tree( params, hvy_block, tree_ID)
+            call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "nothing (external)", hvy_tmp)
 
         endif
     end do

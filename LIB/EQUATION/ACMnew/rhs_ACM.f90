@@ -134,6 +134,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             endif
         enddo
 
+        dV = product(dx(1:params_acm%dim))
+
         ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
         ! rate at all times, so compute that, if we use the forcing.
         if (params_acm%HIT_linear_forcing) then
@@ -142,7 +144,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             ! to compute the current dissipation rate
             call compute_vorticity(u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, vor(:,:,:,:))
 
-            dV = product(dx(1:params_acm%dim))
+
 
             params_acm%mean_flow(1) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
             params_acm%mean_flow(2) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
@@ -157,7 +159,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
             ! NOTE: MPI_SUM is perfomed in the post_stage.
         endif
-
 
         ! if (params_acm%geometry == "Insect".and. params_acm%use_free_flight_solver) then
         if (params_acm%use_free_flight_solver) then
@@ -1483,7 +1484,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
             end do
         end do
     end if
-
 
     ! --------------------------------------------------------------------------
     ! HIT linear forcing

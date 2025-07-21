@@ -43,11 +43,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     
     ! local variables
     integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
-    real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2
+    real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2, meanflow_channel_block(1:3)
     real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
-    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0
+    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
@@ -105,6 +105,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! performs initializations in the RHS module, such as resetting integrals
         params_acm%mean_flow = 0.0_rk
         params_acm%force_color = 0.0_rk
+        params_acm%meanflow_channel = 0.0_rk
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
@@ -152,6 +153,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         enddo
 
         ! tmp values for computing the current block only
+        meanflow_channel_block = 0.0_rk
         meanflow_block = 0.0_rk
         force_block = 0.0_rk
         moment_block = 0.0_rk
@@ -213,6 +215,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! volume of mask (useful to see if it is properly generated)
             tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
+            ! volume of sponge
             tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6))
 
             ! some computations need point-wise loops
@@ -268,6 +271,20 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
             meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
 
+            ! relevant in 3D only
+            if (params_acm%use_channel_forcing) then
+                do iy = g+1, Bs(2)+g
+                    y = x0(2) + dble(iy-(g+1)) * dx(2)
+
+                    ! exclude channel walls
+                    if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
+                        meanflow_channel_block(1) = meanflow_channel_block(1) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
+                        meanflow_channel_block(2) = meanflow_channel_block(2) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
+                        meanflow_channel_block(3) = meanflow_channel_block(3) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
+                    endif
+                enddo
+            endif
+
             ! kinetic energy
             ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
 
@@ -285,6 +302,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! volume of mask (useful to see if it is properly generated)
             ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
             tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            ! volume of sponge
             tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6))
 
             ! point-wise loop for quantities
@@ -366,16 +384,17 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
-        params_acm%u_residual    = params_acm%u_residual    + residual_block * dV
-        params_acm%mean_flow     = params_acm%mean_flow     + meanflow_block * dV
-        params_acm%mask_volume   = params_acm%mask_volume   + tmp_volume * dV
-        params_acm%sponge_volume = params_acm%sponge_volume + tmp_volume2 * dV
-        params_acm%force_color   = params_acm%force_color   + force_block * dV
-        params_acm%moment_color  = params_acm%moment_color  + moment_block * dV
-        params_acm%e_kin         = params_acm%e_kin         + ekin_block * dV
-        params_acm%penal_power   = params_acm%penal_power   + penal_power_block * dV
-        params_acm%scalar_removal= params_acm%scalar_removal+ scalar_removal_block * dV
-        params_acm%ACM_energy    = params_acm%ACM_energy    + ACM_energy_block * dV
+        params_acm%u_residual     = params_acm%u_residual     + residual_block * dV
+        params_acm%mean_flow      = params_acm%mean_flow      + meanflow_block * dV
+        params_acm%meanflow_channel = params_acm%meanflow_channel + meanflow_channel_block * dV
+        params_acm%mask_volume    = params_acm%mask_volume    + tmp_volume * dV
+        params_acm%sponge_volume  = params_acm%sponge_volume  + tmp_volume2 * dV
+        params_acm%force_color    = params_acm%force_color    + force_block * dV
+        params_acm%moment_color   = params_acm%moment_color   + moment_block * dV
+        params_acm%e_kin          = params_acm%e_kin          + ekin_block * dV
+        params_acm%penal_power    = params_acm%penal_power    + penal_power_block * dV
+        params_acm%scalar_removal = params_acm%scalar_removal + scalar_removal_block * dV
+        params_acm%ACM_energy     = params_acm%ACM_energy     + ACM_energy_block * dV
 
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
@@ -398,17 +417,28 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! this stage is called only once, NOT for each block.
 
-        ! mean flow
+        ! volume of mask (useful to see if it is properly generated)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        ! volume of sponge
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        ! mean flow (in entire domain)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:params_acm%dim))
+
+        if (params_acm%use_channel_forcing) then
+            ! mean flow but only in fluid domain
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+            V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
+            params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
+        endif
+
         ! force & moment
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         ! residual velocity in solid domain
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-        ! volume of mask (useful to see if it is properly generated)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
@@ -475,6 +505,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'CFL.t', (/time, CFL, CFL_nu, CFL_eta/) )
             call append_t_file( 'meanflow.t', (/time, params_acm%mean_flow/) )
+
+            if (params_acm%use_channel_forcing) then
+                call append_t_file( 'meanflow_channel.t', (/time, params_acm%meanflow_channel   /) )
+            endif
+
             call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
             if (params_acm%penalization .or. params_acm%use_sponge) then
                 ! total force (excluding zero color)

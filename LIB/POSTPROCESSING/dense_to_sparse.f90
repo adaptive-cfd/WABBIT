@@ -6,7 +6,6 @@ subroutine dense_to_sparse(params)
     use module_mesh
     use module_params
     use module_mpi
-    use module_initialization
     use module_helpers
     use module_forestMetaData
 

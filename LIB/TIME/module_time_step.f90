@@ -7,6 +7,8 @@ module module_time_step
     use module_mesh !, only : get_block_spacing_origin, maxActiveLevel_tree
     ! to call RHS routines:
     use module_physics_metamodule, only : RHS_meta, STATISTICS_meta
+    ! HACK, used because of channel flow forcing
+    use module_acm
     use module_treelib
 
     implicit none

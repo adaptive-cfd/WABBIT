@@ -184,8 +184,5 @@ module module_params
 
 contains
 
-    ! this file reads the ini file and distributes all the parameters to the
-    ! various structs holding them
-#include "ini_file_to_params.f90"
 
 end module module_params

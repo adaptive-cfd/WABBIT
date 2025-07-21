@@ -1038,6 +1038,14 @@ contains
         params%Nreconl = 0
         params%Nreconr = 0
 
+        ! put header first so output is easier to understand
+        if (params%rank==0 .and. verbose1) then
+            write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
+            write(*, '("──╯ │ ╭────╯ │ ╭───   Wavelet-setup   ───╯ │ ╭───────╯   │   ╭───────╯ │ ╭──────")')
+            write(*, '("    ╰─╯      ╰─╯                           ╰─╯           ╰───╯         ╰─╯      ")')
+            write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
+        endif
+
         ! the wavelet filter banks:
         ! HD - low pass decomposition filter, H_TILDE
         ! GD - high pass decomposition filter, G_TILDE - for CDF it is always HR with different sign for every second off-center value
@@ -1408,7 +1416,7 @@ contains
         endif
         
         
-        if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 .and. any((/diff_L, diff_R/) > 0)) then
+        if ((params%useCoarseExtension .or. params%useSecurityZone) .and. params%rank==0 ) then
            write(*, '(A,i3,1x,i3," L/R")') "Increased Nwc to consider FD-stencil size by ", diff_L, diff_R
         endif
 
@@ -1449,10 +1457,6 @@ contains
         endif
 
         if (params%rank==0 .and. verbose1) then
-            write(*, '("  ╭─╮      ╭─╮                           ╭─╮         ╭───╮           ╭─╮        ")')
-            write(*, '("──╯ │ ╭────╯ │ ╭───   Wavelet-setup   ───╯ │ ╭───────╯   │   ╭───────╯ │ ╭──────")')
-            write(*, '("    ╰─╯      ╰─╯                           ╰─╯           ╰───╯         ╰─╯      ")')
-            write(*,'(2A)') "The wavelet is ", trim(adjustl(params%wavelet))
             if (params%useCoarseExtension) then
                 write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
                 write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr

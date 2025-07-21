@@ -6,6 +6,7 @@ module module_ini_files_parser_mpi
 ! use the serial ini files parser. the present module is just a wrapper for mpi codes
 ! since the original ini files parser is serial
 use module_ini_files_parser
+use module_helpers, only : count_entries
 use mpi
 
 
@@ -655,5 +656,49 @@ contains
         call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
 
     end subroutine param_matrix_read_mpi
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief Read Bs from inifile for unknown number of Bs in inifile
+    function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
+        implicit none
+        type(inifile) ,intent(inout)     :: FILE
+        character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+        character(len=*), intent(in)    :: keyword ! what keyword do you
+        integer(kind=ik), intent(in)    :: default_Bs(:)
+        integer(kind=ik), intent(in)    :: dims !number of dimensions
+        integer(kind=ik), intent(in)    :: rank !used for printing warnings
+        integer(kind=ik):: Bs(3)
+        integer(kind=ik):: i, n_entries
+        character(len=cshort):: output
+
+        Bs = 1
+        ! read number_block_nodes
+        call read_param_mpi(FILE, section, keyword, output, "empty")
+
+        if (trim(output) .eq. "empty") then
+            if (rank == 0) write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+            Bs = default_Bs
+
+        else
+            call count_entries(output, n_entries)
+
+            ! check if the number of entries is valid
+            if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
+
+            ! Cast the output string into the integer
+            read(output,*) (Bs(i), i=1,n_entries)
+
+            ! If only one Bs is given in the ini file, we duplicate it
+            ! for the rest of the Bs array:
+            if (n_entries==1) then
+                Bs(1:dims) = Bs(1)
+            endif
+        endif
+
+        if (any(mod(Bs(1:dims), 2) /= 0)) then
+            call abort(202392929, "Block-size must be EVEN number")
+        end if
+    end function
 
 end module

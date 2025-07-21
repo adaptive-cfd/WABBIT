@@ -171,7 +171,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! coarseningIndicator_tree works on all blocks (for wavelet cases).
         ! blocks that are significant now have status 0, others have -1
 
-        if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random") then
+        if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/='nothing (external)') then
             ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
             ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
             ! in that case we set the neighbouring block to be important as well (with a temporary flag)
@@ -193,8 +193,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                 ! delete blocks
                 lgt_block(lgt_ID, :) = -1
             endif
-            ! ! reset all refinement flags
-            ! lgt_block(lgt_ID, IDX_REFINE_STS) = 0
         enddo
 
         ! update grid lists: active list, neighbor relations, etc
@@ -210,52 +208,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             ! After CE we need to update bound cond for symmetry
             call bound_cond_generic(params, hvy_block, tree_ID, "tree", .true., edges_only=.false.)
         endif
-
-        ! this was scrapped after investigating it 25-03-25
-        ! ! when using significant refinement, C-F interfaces may stay intact over long time, due to this we see the instability of the adapted grid + central FD
-        ! ! in order to counteract this, we delete all WC of non-significant blocks on the leaf-layer. This acts as a regularization and like theoretically coarsening then
-        ! ! After all, they are only kept due to the grid itself and not due to significancy, so deleting these WC is in spirit of our coarsening criteria
-        ! if (params%refinement_indicator == "significant") then
-        !     do k = 1, hvy_n(tree_ID)
-        !         hvy_ID = hvy_active(k, tree_ID)
-        !         call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
-
-        !         ! only leaf blocks that are unsignificant get their WC deleted, all others are untouched
-        !         if (block_is_leaf(params, hvy_ID, check_empty=.false.) .and. lgt_block( lgt_id, IDX_REFINE_STS ) == REF_UNSIGNIFICANT_STAY) then
-
-        !             ! set all WC, we have to skip the SC
-        !             if (params%dim == 2) then
-        !                 hvy_block(params%g+2:params%g+params%bs(1):2, params%g+1:params%g+params%bs(2):2, :, 1:size(hvy_block, 4), hvy_id) = 0.0_rk  ! wipe WX
-        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+2:params%g+params%bs(2):2, :, 1:size(hvy_block, 4), hvy_id) = 0.0_rk  ! wipe WY, WXY
-        !             else
-        !                 hvy_block(params%g+2:params%g+params%bs(1):2, params%g+1:params%g+params%bs(2):2, params%g+1:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WX
-        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+2:params%g+params%bs(2):2, params%g+1:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WY, WXY
-        !                 hvy_block(params%g+1:params%g+params%bs(1)  , params%g+1:params%g+params%bs(2)  , params%g+2:params%g+params%bs(3):2, 1:size(hvy_block, 4), hvy_id) = 0.0_rk ! wipe WZ, WXZ, WYZ, WXYZ
-        !             endif
-
-        !             ! the code above ensures, that all C-F interfaces for non-significant blocks are cleared or refined for significant blocks, however, on JMax we cannot refine any block
-        !             ! to avoid persisting C-F interfaces, neighbors on Jmax-1 will refine even if they are not significant
-        !             if (.not. params%force_maxlevel_dealiasing .and. level_me == params%Jmax-1) then
-        !                 level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-        !                 ! loop over neighbors
-        !                 do k1 = 1, size(hvy_neighbor, 2)
-        !                     ! neighbor exists
-        !                     if ( hvy_neighbor( hvy_ID, k1 ) /= -1 ) then
-        !                         ! if neighbor is on maximum level, this block needs to refine next step to avoid persisting C-F interfaces on Jmax
-        !                         if (lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_MESH_LVL ) == params%Jmax) then
-        !                         ! if (lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_MESH_LVL ) == params%Jmax .and. lgt_block( hvy_neighbor( hvy_ID, k1 ), IDX_REFINE_STS ) == 0) then
-        !                             lgt_block( lgt_ID, IDX_REFINE_STS) = 0
-        !                             exit  ! no need to check further
-        !                         endif
-        !                     endif
-        !                 enddo
-        !             endif
-        !         endif
-        !     enddo
-
-        !     ! ref status was changed, so lets resynch
-        !     call synchronize_lgt_data( params, refinement_status_only=.true.)
-        ! endif
 
         call toc( "adapt_tree (coarsening)", 104, MPI_Wtime()-t_loop )
     endif
@@ -325,6 +277,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     character(len=clong) :: toc_statement
     logical              :: iterate, use_leaf_first, initFullTreeGrid, computeSCOnly
     real(kind=rk), dimension(:), allocatable :: scalingFilter
+    integer(kind=ik), dimension(:), allocatable, save :: lgt_refinementStatus_backup
 
     initFullTreeGrid = .true.
     if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
@@ -339,6 +292,20 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         allocate(scalingFilter(lbound(params%HD, dim=1):ubound(params%HD, dim=1)))
         scalingFilter(:) = params%HD(:)
     endif
+
+    ! the refinement_status is used in this routine for things other than the refinement_status
+    ! but that may be problematic if we have set the refinement_status externally and like to keep it.
+    ! This happens for example in postprocessing (--grid1-to-grid2). In this case, the indicator is
+    ! "nothing (external)" and we should not overwrite it. Hence, we make a backup, and copy the original
+    ! status (when entering this routine) back to lgt_block
+    if (.not. allocated(lgt_refinementStatus_backup)) then
+        allocate(lgt_refinementStatus_backup(1:size(lgt_block,1)))
+    endif
+
+    do k = 1, lgt_n(tree_ID)
+        lgt_refinementStatus_backup(lgt_active(k, tree_ID)) = lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS)
+    enddo
+
 
     ! we can only use the more parallel optimized leaf-first option with a specific minimum blocksize, so we test that here
     use_leaf_first = all(params%Bs(1:params%dim) >= 3* max(abs(lbound(params%HD, dim=1)), abs(ubound(params%HD, dim=1))))
@@ -527,6 +494,11 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         ! write( toc_statement,'(A, i6.6, A)') 'TestN_', iteration, "000000.h5"
         ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_tmp, tree_ID)
     end do
+
+    ! copy the original refinemtn_status (when entering this routine) back to lgt_block
+    do k = 1, lgt_n(tree_ID)
+        lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = lgt_refinementStatus_backup(lgt_active(k, tree_ID))
+    enddo
 
     ! ! for debugging purposes - savin does a sync if any ghost values are NaN
     ! write( toc_statement,'(A, i6.6, A)') 'TestWD_', 100, "000000.h5"

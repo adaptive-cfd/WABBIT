@@ -13,7 +13,6 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, compute_divergence, compute_derivative
-  use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
   use module_timing
 
@@ -63,7 +62,7 @@ module module_acm
     real(kind=rk) :: nu, nu_p=0.0_rk, nu_bulk=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3)
+                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3), h_channel
     ! forces for the different colors
     real(kind=rk) :: force_color(1:3,0:ncolors), moment_color(1:3,0:ncolors)
     real(kind=rk) :: gamma_p
@@ -78,6 +77,10 @@ module module_acm
     logical :: HIT_linear_forcing = .false., skew_symmetry=.false.
     real(kind=rk) :: HIT_energy = 1.0_rk
     real(kind=rk) :: HIT_gain = 100.0_rk
+
+    ! channel flow
+    logical :: use_channel_forcing = .false.
+    real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
@@ -107,7 +110,7 @@ module module_acm
     real(kind=rk) :: mean_flow(1:3)=0.0_rk, mean_p=0.0_rk, umax=0.0_rk, umag=0.0_rk
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, helicity=0.0_rk, mask_volume=0.0_rk, u_residual(1:3)=0.0_rk, &
+    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, helicity=0.0_rk, u_residual(1:3)=0.0_rk, &
     sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
@@ -255,6 +258,8 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'p_eqn_model', params_acm%p_eqn_model, "acm" )
     call read_param_mpi(FILE, 'ACM-new', 'skew_symmetry', params_acm%skew_symmetry, .false. )
 
+    ! channel flow
+    call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
 
     ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
@@ -302,6 +307,9 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_acm%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_acm%file_usp, 'none')
     call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'hester')
+
+    ! stuff for channel flow
+    call read_param_mpi(FILE, 'VPM', 'h_channel', params_acm%h_channel, 0.25_rk)
 
     if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
         call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))

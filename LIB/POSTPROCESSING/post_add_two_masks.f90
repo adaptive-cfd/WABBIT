@@ -18,10 +18,15 @@ subroutine post_add_two_masks(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
-    integer :: hvy_id, lgt_id, fsize, j, tree_ID
+    integer(kind=ik) :: hvy_id, lgt_id, fsize, j, tree_ID, k
 
     integer(kind=ik) :: iteration, Bs(1:3), tc_length1, dim, tc_length2, N1, N2
     real(kind=rk) :: time, domain(1:3), norm
+
+    integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
+    integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
+
+
 
     !-----------------------------------------------------------------------------------------------------
     ! get values from command line (filename and level for interpolation)
@@ -34,6 +39,8 @@ subroutine post_add_two_masks(params)
             write(*,*) "./wabbit-post --add mask_001.h5 mask_002.h5 output.h5"
             write(*,*) "./wabbit-post --subtract mask_001.h5 mask_002.h5 output.h5"
             write(*,*) "./wabbit-post --multiply mask_001.h5 mask_002.h5 output.h5"
+            write(*,*) "./wabbit-post --grid1-to-grid2 mask_001.h5 mask_002.h5 output.h5"
+            write(*,*) "./wabbit-post --noise-like-grid1 mask_001.h5 mask_002.h5 output.h5"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) ""
             write(*,*) ""
@@ -101,6 +108,12 @@ subroutine post_add_two_masks(params)
 
 
     select case(mode)
+    case ("--noise-like-grid1")
+        do k = 1, hvy_n(1)
+            hvy_id = hvy_active(k, 1)
+            call random_data(hvy_block(:,:,:,:,hvy_id))
+        enddo
+
     case ("--add")
         call add_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2, verbosity=.true.)
 
@@ -109,6 +122,17 @@ subroutine post_add_two_masks(params)
 
     case ("--multiply")
         call multiply_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2)
+    
+    case ("--grid1-to-grid2")
+        ! Store (both) grids (=only treedata) in the *_ref variables
+        call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1=1, tree_ID2=2)
+        ! before applying wavelet filters we need to sync
+        call sync_ghosts_tree(params, hvy_block, tree_ID=1)
+        ! make grid1 equal to grid 1 (by only coarsening).
+	! Should refinement be required error will be thrown.
+        call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
+        hvy_block, hvy_tmp, tree_ID=1, verbosity=.true.)
+
     case ("--test_operations")
         ! this tests inplace vs out of place operations
         ! z = x*y + x

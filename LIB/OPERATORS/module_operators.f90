@@ -88,12 +88,12 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C2(:)
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_conv_2_2")
             l_start = -2
             l_end = 2
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C4(:)
-        case("FD_6th_central")
+        case("FD_6th_central", "FD_6th_conv_3_3")
             l_start = -3
             l_end = 3
             allocate(FD1_l_array(l_start:l_end))
@@ -136,12 +136,12 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 1
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C2(:)
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_conv_2_2")
             r_start = -2
             r_end = 2
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C4(:)
-        case("FD_6th_central")
+        case("FD_6th_central", "FD_6th_conv_3_3")
             r_start = -3
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
@@ -184,7 +184,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             fd2_end = 1
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
-        case("FD_4th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3")
+        case("FD_4th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3", "FD_4th_conv_2_2")
             fd2_start = -2
             fd2_end = 2
             allocate(FD2_array(fd2_start:fd2_end))
@@ -227,7 +227,7 @@ subroutine setup_FD1X_stencil(FD1_order_discretization_in, FD1X_array, fd1x_star
             fd1x_end = 2
             allocate(FD1X_array(fd1x_start:fd1x_end))
             FD1X_array(:) = FD1X_C4(:)
-        case("FD_6th_central", "FD_8th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3")
+        case("FD_6th_central", "FD_8th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3", "FD_4th_conv_2_2")
             ! For higher orders, default to 4th order cross derivatives for now
             fd1x_start = -2
             fd1x_end = 2

@@ -8,7 +8,7 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, std_est)
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, init_full_tree_grid, std_est)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -33,6 +33,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_coarsening
     !> during mask generation it can be required to ignore the maxlevel coarsening....life can suck, at times.
     logical, intent(in), optional       :: ignore_maxlevel
+    !> Maybe we already have a full tree grid, so we do not need to initialize it
+    logical, intent(in), optional       :: init_full_tree_grid
     integer(kind=ik), intent(in)        :: tree_ID
     !> Sometimes we want to pass in and out the estimated std - this probably will be made more smart at some point
     real(kind=rk), optional, intent(inout) :: std_est(:)
@@ -41,7 +43,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     integer(kind=ik)                    :: iteration, k, lgt_id
     real(kind=rk)                       :: t_block, t_all, t_loop
     integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id
-    logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, iterate, toBeManipulated
+    logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, initFullTreeGrid, iterate, toBeManipulated
     integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this
     character(len=clong)                :: toc_statement
     integer(kind=tsize)                 :: treecode
@@ -76,6 +78,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ignore_maxlevel_apply = .false.
     if (present(ignore_coarsening)) ignore_coarsening_apply = ignore_coarsening
     if (present(ignore_maxlevel)) ignore_maxlevel_apply = ignore_maxlevel
+    initFullTreeGrid = .true.
+    if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -90,7 +94,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Blocks always pass their SC to their mother (pendant to excuteCoarsening of old function), new blocks only synch from medium neighbors to avoid CE
     ! This is repeated until all blocks on the layer JMin are present with wavelet decomposed values
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp)
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -301,7 +305,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     if (.not. allocated(lgt_refinementStatus_backup)) then
         allocate(lgt_refinementStatus_backup(1:size(lgt_block,1)))
     endif
-
+    lgt_refinementStatus_backup(:) = 0  ! reset back-up as some newly created mother blocks might be kept after coarsening
     do k = 1, lgt_n(tree_ID)
         lgt_refinementStatus_backup(lgt_active(k, tree_ID)) = lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS)
     enddo
@@ -495,7 +499,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         ! call saveHDF5_tree(toc_statement, dble(iteration), iteration, 1, params, hvy_tmp, tree_ID)
     end do
 
-    ! copy the original refinemtn_status (when entering this routine) back to lgt_block
+    ! copy the original refinement_status (when entering this routine) back to lgt_block
     do k = 1, lgt_n(tree_ID)
         lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = lgt_refinementStatus_backup(lgt_active(k, tree_ID))
     enddo

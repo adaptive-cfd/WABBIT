@@ -526,96 +526,56 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
     integer(kind=ik)    :: rank, level_ref, level, Jmax, lgt_id_ref, lgt_id, fsize
     integer(kind=ik)    :: k1, k2, Nblocks_2coarsen, level_min
     integer(kind=tsize) :: treecode_ref, treecode
-    logical :: verbose = .false.
+    logical :: verbose, exists
 
     Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
+    verbose = .false.
 
     if (present(verbosity)) verbose=verbosity
 
     call updateMetadata_tree(params, tree_ID)
 
-    ! The Trees can only be added when their grids are identical. At present we
-    ! try to keep the finest levels of all trees. This means we refine
-    ! all blocks which are not on the same level.
-
     ! Operations (addition, multiplication, etc) using two trees (=grids) require both trees (=grids)
-    ! to be identical. Therefore, this routine modifies both trees such that for any position x in space
-    ! the resolution is the higher
+    ! to be identical. Therefore, this routine first initializes a full grid structure with -1 on the actual tree,
+    ! gives all blocks with identical TC/level to reference tree the status 0 and deletes all finer blocks, voila
 
-    ! loop until both trees have the same grid structure, meaning that no block has to be refined anymore
-    do while( .true. )
-        Nblocks_2coarsen = 0
+    ! init full grid structure on the actual tree
+    call init_full_tree(params, tree_ID, set_ref=0, verbose_check=.false.)
 
-        ! Loop over the active light data of both trees and compare the meshlevels
-        do k1 = 1, lgt_n_ref
-            !--------
-            ! TREE 1
-            !--------
-            lgt_id_ref = lgt_active_ref(k1)
-            level_ref  = lgt_block_ref(lgt_id_ref, IDX_MESH_LVL)
-
-            do k2 = 1, lgt_n(tree_ID)
-                !--------
-                ! TREE 2
-                !--------
-                lgt_id  = lgt_active(k2, tree_ID)
-                ! Skip this block if it is already tagged for coarsening.
-                if ( lgt_block(lgt_id, IDX_REFINE_STS) == -1 ) then
-                    cycle
-                endif
-                level = lgt_block(lgt_id, IDX_MESH_LVL)
-
-                ! The treecodes can only be compared if they have the same size
-                ! (i.e. treecode length).
-                level_min = min(level_ref,level)
-                treecode_ref = get_tc(lgt_block_ref(lgt_id_ref, IDX_TC_1 : IDX_TC_2))
-                treecode     = get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2))
-                treecode_ref = tc_clear_until_level_b(treecode_ref, params%dim, level_min, Jmax)
-                treecode     = tc_clear_until_level_b(treecode, params%dim, level_min, Jmax)
-
-                !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-                ! Comparison of the trees:
-                ! - Compare the treecodes up to the smallest level both blocks share (level_min)
-                ! - check if they are already on the same level. in this case, they are identical
-                !   and nothing needs to be done (the block exists in both trees already)
-                ! - If the treecodes agree and they are not on both the same level, mark the finner
-                !   block for coarsening. As there may well be more than one level difference between
-                !   both blocks, this process potentially has to be repeated afterwards.
-                !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-                if ((treecode_ref == treecode)) then
-                    if (level_ref < level) then
-                        Nblocks_2coarsen = Nblocks_2coarsen + 1
-                        ! now tag the block for coarsening
-                        lgt_block(lgt_id, IDX_REFINE_STS) = -1
-                    elseif (level_ref == level) then
-                        ! treecode comparison okay and both blocks on same level: they're the same block
-                        exit  ! exit the inner loop (TREE2)
-                    else !level_ref > level
-                        call abort(20200806, "Something went wrong: Block on reference tree1 should be coarser!!!")
-                    end if
-                end if
-                !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-            end do ! loop over tree2
-        end do ! loop over tree1
-
-        ! Decide if trees have the same treestructure or not (i.e. exit loop or coarse)
-        if (Nblocks_2coarsen == 0) then
-            exit   ! EXIT the (while true) loop when nothing has to be refined anymore
-        else
-            !----------------------------
-            ! coarse the tagged blocks
-            !----------------------------
-            if (params%rank == 0 .and. verbose) write(*,'("Number of blocks marked for coarsening: ",i9)') Nblocks_2coarsen
-            call sync_ghosts_tree( params, hvy_block, tree_ID)
-            call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "nothing (external)", hvy_tmp)
-
-        endif
+    ! init all ref stats to -1
+    do k1 = 1, lgt_n(tree_ID)
+        lgt_id = lgt_active(k1, tree_ID)
+        lgt_block(lgt_id, IDX_REFINE_STS) = -1
     end do
 
-    call sync_ghosts_tree( params, hvy_block, tree_ID)
-    call balanceLoad_tree( params, hvy_block, tree_ID )
+    !----------------------------
+    ! loop over all blocks of the reference tree and find the corresponding block with our sorted list to be kept
+    do k1 = 1, lgt_n_ref
+        lgt_id_ref = lgt_active_ref(k1)
+        level_ref  = lgt_block_ref(lgt_id_ref, IDX_MESH_LVL)
+
+        ! get the treecode of the reference block
+        treecode_ref = get_tc(lgt_block_ref(lgt_id_ref, IDX_TC_1 : IDX_TC_2))
+
+        call doesBlockExist_tree(treecode_ref, exists, lgt_id, dim=params%dim, level=level_ref, tree_id=tree_ID, max_level=params%Jmax)
+
+        if (.not. exists) then
+            call abort(20200806, "Something went wrong: Block on reference tree1 is too fine!!!")
+        endif
+
+        ! set lgt_id to be kept
+        lgt_block(lgt_id, IDX_REFINE_STS) = 0
+
+    end do ! loop over reference blocks
+    !----------------------------
+
+    !----------------------------
+    ! Coarsen the tagged blocks
+    !    ensure_gradedness will take care of keeping mother blocks
+    !    This will also apply CE to the grid if set
+    call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "nothing (external)", hvy_tmp, ignore_coarsening=.false., init_full_tree_grid=.false.)
+    !----------------------------
 end subroutine
 
 

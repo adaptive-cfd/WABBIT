@@ -29,7 +29,7 @@ subroutine operator_reconstruction(params)
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
     character(len=1) :: dir
-    logical :: refine, notAllPointsAreZero
+    logical :: refine, notAllPointsAreZero, error_OOM
     real(kind=rk), dimension(4), PARAMETER :: permut_x=(/0.0_rk, 1.0_rk, 0.0_rk, 1.0_rk/), permut_y=(/0.0_rk, 0.0_rk, 1.0_rk, 1.0_rk/)
     real(kind=rk) :: x_in2, y_in2
 
@@ -252,9 +252,7 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if (refine) then
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-!                call refine_tree( params, hvy_block, "everywhere", tree_ID )
-
+                call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
                 call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif
 

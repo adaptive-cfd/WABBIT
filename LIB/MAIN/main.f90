@@ -14,15 +14,16 @@ program main
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
     ! it exists to disentangle module_forest and module_IO
     use module_saving
-
     implicit none
-
+    
     integer(kind=ik)                    :: ierr           ! MPI error variable
     integer(kind=ik)                    :: rank           ! process rank
     integer(kind=ik)                    :: number_procs   ! number of processes
     real(kind=rk)                       :: t0, t1, t2     ! cpu time variables for running time calculation
     type (type_params)                  :: params         ! user defined parameter structure
 
+    ! externally (makefile) generated version string (git hash ID) and build_date
+#include "version.f90"
 
     ! heavy data array (the actual state vector). Is synchronized.
     ! dim 1-3: x,y,z coord ( 1:Bs+2*g )
@@ -96,6 +97,10 @@ program main
         write(*,'(20("─"), A21, 39("─"))') "   STARTING wabbit   "
         write(*, '("MPI: using ", i5, " processes")') params%number_procs
         write(*,'("MPI: code build with NON-blocking send/recv in transfer (block_xfer_nonblocking.f90)")')
+
+        ! externally (makefile) generated version string (git hash ID)
+        write(*,'("WABBIT VERSION (git commit ID)=", A)') git_version
+        write(*,'("WABBIT Build date=", A)') build_date
     end if
 
     call print_command_line_arguments()

@@ -42,6 +42,10 @@ ifndef HDF_SOURCE
 HDF_SOURCE = $(HDF_ROOT)
 endif
 
+# to print the version number at each run. version number == git hash ID of current commit
+GIT_HASH := $(shell git rev-parse HEAD)
+BUILD_DATE := $(shell date)
+
 #Place of Sparse BLAS objects
 SB_LIB = #-L../../sblas/SOFTWARE -lSparseBLAS_GNU
 #Place of Sparse BLAS modules
@@ -162,9 +166,14 @@ endif
 # add the PRAGMAS to FFLAGS: (for all compilers)
 FFLAGS += $(PPFLAG) $(PRAGMAS) -fPIC
 
+.PHONY: version.f90
 
 # Both programs are compiled by default.
-all: directories wabbit wabbit-post #doc
+all: version.f90 directories wabbit wabbit-post #doc
+
+version.f90: 
+	@echo 'character(len=*), parameter :: git_version = "$(GIT_HASH)"' > LIB/MAIN/version.f90
+	@echo 'character(len=*), parameter :: build_date = "$(BUILD_DATE)"' >> LIB/MAIN/version.f90
 
 # Compile main programs, with dependencies.
 wabbit: main.f90 $(MOBJS) $(OBJS)

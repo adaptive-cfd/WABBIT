@@ -36,6 +36,7 @@ subroutine rhs_operator_reconstruction(params)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
     type(inifile) :: ini_file
     real(kind=rk) :: dt,CFL_number
+    logical :: error_OOM
 
     ! following are to suppress warnings
     character(len=80) :: def_wavelet, def_operator
@@ -100,12 +101,6 @@ subroutine rhs_operator_reconstruction(params)
     !params%adapt_tree = .False.
     !---------------------------------------------------------------------------
 
-    if (params%wavelet=="CDF44") then
-        params%g = 6_ik
-    else
-        params%g = 4_ik
-    endif
-
     ! we have to allocate grid if this routine is called for the first time
     call allocate_forest(params, hvy_block, hvy_work,hvy_mask=hvy_mask, hvy_tmp=hvy_tmp)
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
@@ -144,36 +139,32 @@ subroutine rhs_operator_reconstruction(params)
     !---------------------------------------------------------------------------
     !---------------------------------------------------------------------------
     tree_ID_u = 1
-    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID_u, verbosity=.true.)
+    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID_u, verbosity=.true.) ! read both grid and data in this tree
 
     ! this hack ensures, on mono_CPU, that later on, refine+coarsening always ends up in the same order in hvy_actve
     if (params%adapt_tree) then
         call sync_ghosts_tree(params, hvy_block, tree_ID_u)
-
-        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-        ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u )
-
+        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_u, error_OOM=error_OOM )
         call sync_ghosts_tree(params, hvy_block, tree_ID_u)
-
         call adapt_tree( time, params, hvy_block, tree_ID_u, "everywhere", hvy_tmp )
-
     endif
 
     !---------------------------------------------------------------------------
     tree_ID_rhs_u = 2
     call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_rhs_u)
-    call multiply_tree_with_scalar(params, hvy_block, tree_ID_rhs_u, 0.0_rk, verbosity)
+    call multiply_tree_with_scalar(params, hvy_block, tree_ID_rhs_u, 0.0_rk, verbosity) ! effectively, we just read the grid in this tree
     !---------------------------------------------------------------------------
     tree_ID_ei = 3
-    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_ei)
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_ei) ! effectively, we just read the grid in this tree
     call multiply_tree_with_scalar(params, hvy_block, tree_ID_ei, 0.0_rk, verbosity)
     !---------------------------------------------------------------------------
     tree_ID_rhs_u_ei = 4
-    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_rhs_u_ei)
+    call readHDF5vct_tree( (/file/), params, hvy_block, tree_ID_rhs_u_ei) ! effectively, we just read the grid in this tree
     call multiply_tree_with_scalar(params, hvy_block, tree_ID_rhs_u_ei, 0.0_rk, verbosity)
 
-    dx_fine = (2.0_rk**-maxActiveLevel_tree(tree_ID_u))*domain(2)/real((Bs(2)-1), kind=rk)
+    dx_fine = (2.0_rk**-maxActiveLevel_tree(tree_ID_u))*domain(2)/real((Bs(2)), kind=rk)
     nx_fine = nint(domain(2)/dx_fine)
+
     write(*,*) "nx_fine=", nx_fine
     write(*,*) "n_ghost=", g
     write(*,*) "nblocks=", lgt_n, "bs=", Bs, "npoints (op. matrix size!)=", lgt_n*bs(1)*bs(2)
@@ -200,6 +191,7 @@ subroutine rhs_operator_reconstruction(params)
         enddo
     enddo
     close(19)
+
     !---------------------------------------------------------------------------
     ! compute operator matrix
     !---------------------------------------------------------------------------
@@ -208,7 +200,7 @@ subroutine rhs_operator_reconstruction(params)
     ! we now calculate 1/h[rhs(u + h* e_i) - rhs(u)]1/h[rhs(u + h* e_i) - rhs(u)]
 
     !---------------------------------------------------------------------------
-    ! store_rewrite(*,*) "hvyn old/new",Nhvyn, hvy_n(tree_ID_rhs)ference_mesh
+    ! store_reference_mesh
     !---------------------------------------------------------------------------
     call copy_tree(params, hvy_block, tree_ID_rhs_u, tree_ID_u)
 
@@ -218,15 +210,24 @@ subroutine rhs_operator_reconstruction(params)
         call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID_u, tree_ID_ei)
         Nhvyn = hvy_n(tree_ID_u)
         !---------------------------------------------------------------------------
-        ! refine grid ones
+        ! refine grid once
+        !
+        ! The total operator we investigate here is
+        !
+        ! R * E * C
+        !
+        ! and this refinement step is the first "R"
         !---------------------------------------------------------------------------
+
         call sync_ghosts_tree( params, hvy_block, tree_ID_tmp )
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-        ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp )
+        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_tmp, error_OOM=error_OOM )
 
         call sync_ghosts_tree(params, hvy_block, tree_ID_tmp)
     endif
 
+    ! -----------------------------------------------
+    ! Operator "E" from R * E * C
+    ! -----------------------------------------------
     hvy_work(:,:,:,:,:,1) = 0
     if (OPERATOR == "RHS") then
         call RHS_wrapper(time, params, hvy_block, hvy_work(:,:,:,:,:,1), hvy_mask, hvy_tmp, tree_ID_rhs_u)
@@ -278,9 +279,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
 
                 if ( params%adapt_tree ) then
                     call sync_ghosts_tree( params, hvy_block, tree_ID_ei )
-                    call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-                    ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei )
-
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_ei, error_OOM=error_OOM )
                 endif
 
                 call updateMetadata_tree(params, tree_ID_ei)
@@ -343,7 +342,7 @@ call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
                 ! note: unfortunately, we use the index on the finest level, i.e., we temporarily
                 ! create a matrix N_max**2 by N_max**2, where N_max is Npoints on the finest level.
                 ! Many points do not exist; they are on coarse levels. however, this is a problem
-                ! for the python script, because it first reads the entie matrix, then removes zero cols/rows.
+                ! for the python script, because it first reads the entire matrix, then removes zero cols/rows.
                 do k = 1, hvy_n(tree_ID_rhs_u_ei)
                     call hvy2lgt(lgt_id, hvy_active(k,tree_ID_rhs_u_ei), params%rank, params%number_blocks)
                     call get_block_spacing_origin( params, lgt_id, x0, dx )

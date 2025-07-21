@@ -49,6 +49,11 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     Bs = params%Bs
     g = params%g
 
+    ! In some cases the refinement_status is set up by a routine other than this one. This is the case
+    ! in some forest processing (=handling multiple trees). In such a case, we do nothing here (in particular
+    ! we do not reset the refinement status)
+    if (indicator == 'nothing (external)') return
+
     ! reset refinement status to "stay" on all active blocks
     ! caution: if the code will ever be adapted again to not work on whole tree then this needs to be adapted
     do k_b = 1, lgt_n(tree_ID)

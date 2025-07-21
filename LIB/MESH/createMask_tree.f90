@@ -232,7 +232,7 @@ subroutine createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
 
 
         ! refine the mesh
-        call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_mask, error_OOM)
+        call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_mask, error_OOM)
 
         if (error_OOM) call abort(2512112,"Refinement failed, out of memory. Try with more memory.")
 

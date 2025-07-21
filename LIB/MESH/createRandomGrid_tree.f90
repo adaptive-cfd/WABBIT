@@ -47,7 +47,7 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init, verbos
         endif
 
         ! randomly refine some blocks
-        call refine_tree( params, hvy_block, hvy_tmp, "random", tree_ID=tree_ID, error_OOM=error_OOM   )
+        call refine_tree( params, hvy_block, "random", tree_ID=tree_ID, error_OOM=error_OOM   )
 
         if (error_OOM) call abort(2512111, "Out of memory, refinement failed. Try with more memory.")
 

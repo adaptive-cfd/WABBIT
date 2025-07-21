@@ -13,7 +13,6 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, divergence
-  use module_params, only : read_bs
   use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
   use module_timing
 

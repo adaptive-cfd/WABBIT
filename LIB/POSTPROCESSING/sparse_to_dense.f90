@@ -191,7 +191,7 @@ subroutine sparse_to_dense(params)
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
     elseif ((operator=="--refine-everywhere").or.(operator=="--refine-everywhere-forced")) then
-        call refine_tree( params, hvy_block, hvy_tmp, "everywhere", tree_ID=tree_ID, error_OOM=error_OOM )
+        call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID, error_OOM=error_OOM )
 
         if (error_OOM) call abort(2512181,"Refinement failed, out of memory. Try with more memory.")
 

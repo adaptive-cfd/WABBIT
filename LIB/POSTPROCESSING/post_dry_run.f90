@@ -5,7 +5,6 @@ subroutine post_dry_run
     use module_MPI
     use module_params               ! global parameters
     use module_timing
-    use module_initialization       ! init data module
     use module_mesh                 ! mesh manipulation subroutines
     use module_time_step
     use module_unit_test
@@ -221,7 +220,7 @@ subroutine post_dry_run
                 call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
                 ! refine the mesh, but only where the mask is interesting (not everywhere!)
-                call refine_tree( params, hvy_mask, hvy_tmp, "mask-threshold", tree_ID_flow, error_OOM )
+                call refine_tree( params, hvy_mask, "mask-threshold", tree_ID_flow, error_OOM )
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 

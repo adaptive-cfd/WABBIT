@@ -14,7 +14,7 @@ OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
 
 # Files that create modules:
 MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_timing.f90 module_hdf5_wrapper.f90 \
-	module_wavelets.f90 module_initialization.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
+	module_wavelets.f90 module_mesh.f90 module_time_step.f90 module_mpi.f90 module_unit_test.f90 \
 	module_treelib.f90  module_ini_files_parser.f90  module_ini_files_parser_mpi.f90 \
 	module_indicators.f90 module_operators.f90 module_navier_stokes.f90 module_ns_penalization.f90 \
 	module_physics_metamodule.f90 module_ACM.f90 module_ConvDiff_new.f90 module_bridge_interface.f90 \
@@ -198,7 +198,7 @@ $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integrat
 	kineloader.f90 active_grid_winglets.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
@@ -275,11 +275,6 @@ $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/m
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_initialization.o: module_initialization.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_mesh.o  $(OBJDIR)/module_physics_metamodule.o  \
-	setInitialCondition_tree.f90 setInicondBlocks_tree.f90 $(OBJDIR)/module_treelib.o
-	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
 $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_physics_metamodule.o blocks_per_mpirank.f90 reset_ghost_nodes.f90 synchronize_lgt_data.f90 bound_cond_generic.f90 \
 	restrict_predict_data.f90 calc_data_bounds.f90 synchronize_ghosts_generic.f90 reconstruction_step.f90 \
@@ -315,7 +310,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_initialization.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
+$(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
 	$(OBJDIR)/module_treelib.o unit_test_treecode.f90 unit_test_Sync.f90 unit_test_ghostSync.f90 unit_test_waveletDecomposition.f90 unit_test_refineCoarsen.f90 \
 	unit_test_waveletDecomposition_invertibility.f90 createTestGrids.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)

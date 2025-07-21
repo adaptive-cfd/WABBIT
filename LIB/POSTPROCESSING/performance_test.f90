@@ -4,7 +4,6 @@ subroutine performance_test(params)
     use module_MPI
     use module_params           ! global parameters
     use module_timing
-    use module_initialization   ! init data module
     use module_mesh             ! mesh manipulation subroutines
     use module_time_step
     use module_unit_test

@@ -333,7 +333,6 @@ subroutine proto_NSI_EE(params)
     use module_forestMetaData
     use module_fft
     use module_poisson
-    use module_initialization   ! init data module
     use module_ini_files_parser_mpi
     use module_time_step  ! statistics wrapper
     ! this module is the saving wrapper (e.g. save state vector or vorticity)
@@ -383,10 +382,10 @@ subroutine proto_NSI_EE(params)
     type (type_params), intent(inout)  :: params
     character(len=cshort)              :: file_params
     real(kind=rk)                      :: dt, time
-    integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3), iteration
+    integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3), g(1:3), iteration, j, l
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_mask(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
-    integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr, g(1:3)
+    integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr
 
     character(len=cshort)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:6), volume
@@ -469,8 +468,6 @@ subroutine proto_NSI_EE(params)
         params%order_discretization = "FD_6th_central"
     end select
 
-    Bs = params%Bs
-
     ! HACK - read in values that are only read bu ACM module but that we need
     call read_ini_file_mpi(FILE, file_params, .true.)
     call read_param_mpi(FILE, 'ACM-new', 'nu', nu, 5.0e-5_rk )
@@ -495,7 +492,7 @@ subroutine proto_NSI_EE(params)
     call toc( "fft initialize", 10101, MPI_Wtime()-t_block )
 
     ! allocate data
-    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work, nrhs_slots1=2, neqn_hvy_tmp=8)
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_hvy_tmp=8)
 
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
@@ -524,6 +521,11 @@ subroutine proto_NSI_EE(params)
     if (params%rank==0) then
         call Initialize_runtime_control_file()
     endif
+
+    ! shorten indices
+    Bs   = params%Bs
+    g(:) = params%g
+    if (params%dim==2) g(3) = 0
 
     ! ------------------------------------------------------------
     ! Gauss-Seidel Multi-Grid - solve the system Ax = b
@@ -600,111 +602,172 @@ subroutine proto_NSI_EE(params)
         ! params%laplacian_order = "FD_6th_mehrstellen"
         ! call setup_laplacian_stencils(params, params%g)
 
+        ! RK_generic
         call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
 
-        ! compute stage 1 RHS, k_1
-        call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,1), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
+        ! caluclate timestep, here ignored
 
-        ! build tentative velocity
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
+        ! compute RHS for the first stage without pressure gradient
+        call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,1), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
+
+        ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
+        call sync_ghosts_tree( params, hvy_work(:,:,:,1:params%dim,:,1), tree_ID_flow )
+        call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
+        call multigrid_solve(params, hvy_tmp(:,:,:,4:4,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,3:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,4:4,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
+
+        ! compute k_1, k_2, .... (coefficients for final stage)
+        do j = 2, size(params%butcher_tableau, 1) - 1
+            ! build intermediate velocity as input for RHS of this stage
+            do k_block = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k_block, tree_ID)
+                hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id) = hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id)
+            end do
+            do l = 2, j
+                ! check if coefficient is zero - if so, avoid loop over all components and active blocks
+                if (abs(params%butcher_tableau(j,l)) < 1.0e-8_rk) cycle
+
+                do k_block = 1, hvy_n(tree_ID)
+                    hvy_id = hvy_active(k_block, tree_ID)
+                    ! new input for computation of k-coefficients
+                    ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
+                    hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id) = hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id) &
+                    + dt * params%butcher_tableau(j,l) * hvy_work(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id,l-1)
+                end do
+            end do
+            call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+            ! compute RHS for the current stage without pressure gradient
+            call compute_NSI_RHS(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,j), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
+            ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
+            call sync_ghosts_tree( params, hvy_work(:,:,:,1:params%dim,:,j), tree_ID_flow )
+            call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
+            call multigrid_solve(params, hvy_tmp(:,:,:,4:4,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,3:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+            call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,4:4,:), hvy_work(:,:,:,1:params%dim,:,j), order_disc_pressure, tree_ID_flow, 1.0_rk)
         enddo
-        ! sync ghosts for the tentative velocity
-        call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
 
-        ! compute RHS for pressure poisson equation
-        call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
+        ! final stage (actual final update of state vector)
+        ! for the RK4 the final stage looks like this:
+        ! data_field(t+dt) = data_field(t) + dt*(b1*k1 + b2*k2 + b3*k3 + b4*k4)
+        do k_block = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k_block, tree_ID)
+            do j = 2, size(params%butcher_tableau, 2)
+                ! check if coefficient is zero - if so, avoid loop over all components and active blocks
+                if ( abs(params%butcher_tableau(size(params%butcher_tableau, 1),j)) < 1.0e-8_rk) then
+                    cycle
+                endif
 
-        ! divide by dt
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_tmp(:,:,:,params%dim+1,hvy_id) = hvy_tmp(:,:,:,params%dim+1,hvy_id) / dt
-        enddo
-        ! sync ghosts for the RHS
-        call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+                ! ... dt*(b1*k1 + b2*k2+ ..)
+                ! params%butcher_tableau(size(params%butcher_tableau,1)), since we want to access last line,
+                ! e.g. b1 = butcher(last line,2)
+                hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id) = hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id) &
+                    + dt*params%butcher_tableau(size(params%butcher_tableau,1),j) * hvy_work(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id,j-1)
+            end do
+        end do
+        call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
 
-        ! solve Poisson equation
-        call multigrid_solve(params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
-        ! sync ghosts for the pressure
-        call sync_ghosts_tree( params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), tree_ID_flow )
+        ! ! compute stage 1 RHS, k_1
+        ! call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,1), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
 
-        ! project velocity derivative onto divergence-free space by adding the missing -grad p term
-        call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
-
-        ! -----
-        ! compute second order velocity estimate for Heuns method
-        ! -----
-        ! build intermediate velocity for RHS u^n + dt k_1
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
-        enddo
-        ! sync ghosts for the intermediate velocity
-        call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
-
-        ! compute stage 2 RHS, k_2
-        call compute_NSI_RHS(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,2), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
-
-        ! build tentative velocity
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,2)
-        enddo
-        ! sync ghosts for the tentative velocity
-        call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
-
-        ! compute RHS for pressure poisson equation
-        call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
-        ! divide by dt and copy k1 pressure as IC for k2 pressure
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_tmp(:,:,:,params%dim+1,hvy_id) = hvy_tmp(:,:,:,params%dim+1,hvy_id) / dt
-            hvy_work(:,:,:,params%dim+1,hvy_id,2) = hvy_work(:,:,:,params%dim+1,hvy_id,1)
-        enddo
-        ! sync ghosts for the RHS
-        call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-
-        ! solve Poisson equation
-        call multigrid_solve(params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
-        ! sync ghosts for the pressure
-        call sync_ghosts_tree( params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), tree_ID_flow )
-
-        ! project velocity derivative onto divergence-free space by adding the missing -grad p term
-        call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,2), hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), hvy_work(:,:,:,1:params%dim,:,2), order_disc_pressure, tree_ID_flow, 1.0_rk)
-
-        ! -----
-        ! compute final velocity estimate for Heuns method or Euler explicit
-        ! -----
-
-        ! Heun velocity: build final velocity for RHS: u^{n+1} = u^n + dt/2 (k_1 + k_2)
-        do k_block = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k_block, tree_ID_flow)
-            hvy_block(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * 0.5_rk * (hvy_work(:,:,:,1:params%dim,hvy_id,1) + hvy_work(:,:,:,1:params%dim,hvy_id,2))
-        enddo
-        ! Heun pressure: We do not build the pressure, it is only done implicitly for saving or statistics
-
-        ! ! Euler velocity: build final velocity for RHS: u^{n+1} = u^n + dt k_1
+        ! ! build tentative velocity
         ! do k_block = 1, hvy_n(tree_ID_flow)
         !     hvy_id = hvy_active(k_block, tree_ID_flow)
-        !     hvy_block(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
+        !     hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
         ! enddo
-        ! ! Euler pressure: take pressure from the last solve
+        ! ! sync ghosts for the tentative velocity
+        ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+
+        ! ! compute RHS for pressure poisson equation
+        ! call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
+
+        ! ! divide by dt
         ! do k_block = 1, hvy_n(tree_ID_flow)
         !     hvy_id = hvy_active(k_block, tree_ID_flow)
-        !     hvy_block(:,:,:,params%dim+1,hvy_id) = hvy_work(:,:,:,params%dim+1,hvy_id,1)
+        !     hvy_tmp(:,:,:,params%dim+1,hvy_id) = hvy_tmp(:,:,:,params%dim+1,hvy_id) / dt
         ! enddo
-
-        ! ! Maybe u is not completely divergence free in the discrete sense, so we do one projection in order to get a divergence free velocity field
-        ! params%laplacian_order = order_laplacian
-        ! call setup_laplacian_stencils(params, params%g)
-
-        ! call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
-        ! call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
+        ! ! sync ghosts for the RHS
         ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-        ! call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
-        ! call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-        ! call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
+
+        ! ! solve Poisson equation
+        ! call multigrid_solve(params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        ! ! sync ghosts for the pressure
+        ! call sync_ghosts_tree( params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), tree_ID_flow )
+
+        ! ! project velocity derivative onto divergence-free space by adding the missing -grad p term
+        ! call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_work(:,:,:,params%dim+1:params%dim+1,:,1), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
+
+        ! ! -----
+        ! ! compute second order velocity estimate for Heuns method
+        ! ! -----
+        ! ! build intermediate velocity for RHS u^n + dt k_1
+        ! do k_block = 1, hvy_n(tree_ID_flow)
+        !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        !     hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
+        ! enddo
+        ! ! sync ghosts for the intermediate velocity
+        ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+
+        ! ! compute stage 2 RHS, k_2
+        ! call compute_NSI_RHS(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,2), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
+
+        ! ! build tentative velocity
+        ! do k_block = 1, hvy_n(tree_ID_flow)
+        !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        !     hvy_tmp(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,2)
+        ! enddo
+        ! ! sync ghosts for the tentative velocity
+        ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+
+        ! ! compute RHS for pressure poisson equation
+        ! call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
+        ! ! divide by dt and copy k1 pressure as IC for k2 pressure
+        ! do k_block = 1, hvy_n(tree_ID_flow)
+        !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        !     hvy_tmp(:,:,:,params%dim+1,hvy_id) = hvy_tmp(:,:,:,params%dim+1,hvy_id) / dt
+        !     hvy_work(:,:,:,params%dim+1,hvy_id,2) = hvy_work(:,:,:,params%dim+1,hvy_id,1)
+        ! enddo
+        ! ! sync ghosts for the RHS
+        ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+
+        ! ! ! solve Poisson equation
+        ! ! call multigrid_solve(params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        ! ! ! sync ghosts for the pressure
+        ! ! call sync_ghosts_tree( params, hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), tree_ID_flow )
+
+        ! ! ! project velocity derivative onto divergence-free space by adding the missing -grad p term
+        ! ! call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,2), hvy_work(:,:,:,params%dim+1:params%dim+1,:,2), hvy_work(:,:,:,1:params%dim,:,2), order_disc_pressure, tree_ID_flow, 1.0_rk)
+
+        ! ! -----
+        ! ! compute final velocity estimate for Heuns method or Euler explicit
+        ! ! -----
+
+        ! ! Heun velocity: build final velocity for RHS: u^{n+1} = u^n + dt/2 (k_1 + k_2)
+        ! do k_block = 1, hvy_n(tree_ID_flow)
+        !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        !     hvy_block(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * 0.5_rk * (hvy_work(:,:,:,1:params%dim,hvy_id,1) + hvy_work(:,:,:,1:params%dim,hvy_id,2))
+        ! enddo
+        ! ! Heun pressure: We do not build the pressure, it is only done implicitly for saving or statistics
+
+        ! ! ! Euler velocity: build final velocity for RHS: u^{n+1} = u^n + dt k_1
+        ! ! do k_block = 1, hvy_n(tree_ID_flow)
+        ! !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        ! !     hvy_block(:,:,:,1:params%dim,hvy_id) = hvy_block(:,:,:,1:params%dim,hvy_id) + dt * hvy_work(:,:,:,1:params%dim,hvy_id,1)
+        ! ! enddo
+        ! ! ! Euler pressure: take pressure from the last solve
+        ! ! do k_block = 1, hvy_n(tree_ID_flow)
+        ! !     hvy_id = hvy_active(k_block, tree_ID_flow)
+        ! !     hvy_block(:,:,:,params%dim+1,hvy_id) = hvy_work(:,:,:,params%dim+1,hvy_id,1)
+        ! ! enddo
+
+        ! ! ! Maybe u is not completely divergence free in the discrete sense, so we do one projection in order to get a divergence free velocity field
+        ! ! params%laplacian_order = order_laplacian
+        ! ! call setup_laplacian_stencils(params, params%g)
+
+        ! ! call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+        ! ! call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
+        ! ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+        ! ! call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+        ! ! call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+        ! ! call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
 
 
 

@@ -134,12 +134,12 @@ subroutine proto_pressure_multigrid(params)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = 1
     select case(params%laplacian_order)
-    case ("FD_2nd_central", "FD_4th_central", "FD_6th_central", "FD_8th_central")
-        params%order_discretization = params%laplacian_order
-    case ("FD_4th_conv_0_4", "FD_6th_conv_2_2")
+    case ("FD_4th_comp_2_2")
         params%order_discretization = "FD_4th_central"
-    case ("FD_6th_mehrstellen", "FD_6th_conv_3_3", "FD_6th_conv_2_4", "FD_6th_conv_1_5", "FD_6th_conv_0_6")
+    case ("FD_6th_comp_3_3")
         params%order_discretization = "FD_6th_central"
+    case default
+        params%order_discretization = params%laplacian_order
     end select
     params%laplacian_coarsest = "FFT"
     params%FFT_accuracy = "FD"  ! FD or spectral
@@ -448,24 +448,28 @@ subroutine proto_NSI_EE(params)
         order_disc_nonlinear = "FD_6th_central"
         order_disc_pressure = "FD_6th_central"
         params%order_discretization = "FD_6th_central"
-    case ("FD_4th_conv_0_4")
+    case ("FD_4th_comp_0_4")
         order_disc_nonlinear = "FD_4th_central"
-        order_disc_pressure = "FD_4th_conv_0_4"
-        params%order_discretization = "FD_4th_conv_0_4"
-    case ("FD_4th_conv_2_2")
+        order_disc_pressure = "FD_4th_comp_0_4"
+        params%order_discretization = "FD_4th_comp_0_4"
+    case ("FD_4th_comp_2_2")
         order_disc_nonlinear = "FD_4th_central"
         order_disc_pressure = "FD_4th_central"
         params%order_discretization = "FD_4th_central"
-    case ("FD_4th_conv_1_3")
+    case ("FD_4th_comp_1_3")
         ! order_disc_nonlinear = "FD_4th_central"
-        order_disc_nonlinear = "FD_4th_conv_1_3"
-        order_disc_pressure = "FD_4th_conv_1_3"
+        order_disc_nonlinear = "FD_4th_comp_1_3"
+        order_disc_pressure = "FD_4th_comp_1_3"
         ! order_disc_pressure = "FD_4th_central"
-        params%order_discretization = "FD_4th_conv_1_3"
-    case ("FD_6th_conv_3_3")
+        params%order_discretization = "FD_4th_comp_1_3"
+    case ("FD_6th_comp_3_3")
         order_disc_nonlinear = "FD_6th_central"
         order_disc_pressure = "FD_6th_central"
         params%order_discretization = "FD_6th_central"
+    case ("FD_6th_comp_2_4")
+        order_disc_nonlinear = "FD_6th_comp_2_4"
+        order_disc_pressure = "FD_6th_comp_2_4"
+        params%order_discretization = "FD_6th_comp_2_4"
     end select
 
     ! HACK - read in values that are only read bu ACM module but that we need

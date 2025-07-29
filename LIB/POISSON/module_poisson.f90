@@ -92,7 +92,7 @@ contains
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_conv_0_4") then
+        elseif (params%laplacian_order == "FD_4th_comp_0_4") then
             allocate(stencil(-4:4))
             stencil = (/  -75.0_rk, 544.0_rk, -1776.0_rk, 3552.0_rk, -4490.0_rk, 3552.0_rk, -1776.0_rk, 544.0_rk, -75.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
@@ -100,7 +100,7 @@ contains
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_conv_2_2") then
+        elseif (params%laplacian_order == "FD_4th_comp_2_2") then
             allocate(stencil(-4:4))
             stencil = (/  1.0_rk, -16.0_rk, 64.0_rk, 16.0_rk, -130.0_rk, 16.0_rk, 64.0_rk, -16.0_rk, 1.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
@@ -108,7 +108,7 @@ contains
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_conv_1_3") then
+        elseif (params%laplacian_order == "FD_4th_comp_1_3") then
             allocate(stencil(-4:4))
             stencil = (/  3.0_rk, -8.0_rk, -24.0_rk, 264.0_rk, -470.0_rk, 264.0_rk, -24.0_rk, -8.0_rk, 3.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
@@ -116,7 +116,7 @@ contains
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_conv_3_3") then
+        elseif (params%laplacian_order == "FD_6th_comp_3_3") then
             allocate(stencil(-6:6))
             stencil = (/  1.0_rk, -18.0_rk, 171.0_rk, -810.0_rk, 1935.0_rk, 828.0_rk, -4214.0_rk, 828.0_rk, 1935.0_rk, -810.0_rk, 171.0_rk, -18.0_rk, 1.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
@@ -124,7 +124,7 @@ contains
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_conv_2_4") then
+        elseif (params%laplacian_order == "FD_6th_comp_2_4") then
             allocate(stencil(-6:6))
             stencil = (/  2.0_rk, -40.0_rk, 217.0_rk, -520.0_rk, 270.0_rk, 4656.0_rk, -9170.0_rk, 4656.0_rk, 270.0_rk, -520.0_rk, 217.0_rk, -40.0_rk, 2.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
@@ -132,7 +132,7 @@ contains
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_conv_1_5") then
+        elseif (params%laplacian_order == "FD_6th_comp_1_5") then
             allocate(stencil(-6:6))
             stencil = (/  20.0_rk, 4.0_rk, -955.0_rk, 5300.0_rk, -15300.0_rk, 31560.0_rk, -41258.0_rk, 31560.0_rk, -15300.0_rk, 5300.0_rk, -955.0_rk, 4.0_rk, 20.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
@@ -140,7 +140,7 @@ contains
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_conv_0_6") then
+        elseif (params%laplacian_order == "FD_6th_comp_0_6") then
             allocate(stencil(-6:6))
             stencil = (/  -1470.0_rk, 14184.0_rk, -63495.0_rk, 176200.0_rk, -342450.0_rk, 501840.0_rk, -569618.0_rk, 501840.0_rk, -342450.0_rk, 176200.0_rk, -63495.0_rk, 14184.0_rk, -1470.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk

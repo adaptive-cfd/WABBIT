@@ -502,26 +502,33 @@ real(kind=rk) function wave_k2_FD2( kx, ky, kz, dx, order_discretization )
         if (dx(3) /= 0.0_rk) then
             wave_k2_FD2 = wave_k2_FD2 + (14350.0_rk - 16128.0_rk * dcos(kz*dx(3)) + 2016.0_rk * dcos(2.0_rk*kz*dx(3)) - 256.0_rk * dcos(3.0_rk*kz*dx(3)) + 18.0_rk * dcos(4.0_rk*kz*dx(3))) / 5040.0_rk / dx(3)**2
         endif
-    case("FD_4th_conv_0_4")
+    case("FD_4th_comp_0_4")
         wave_k2_FD2 = (4490.0_rk - 7104.0_rk * dcos(kx*dx(1)) + 3552.0_rk * dcos(2.0_rk*kx*dx(1)) - 1088.0_rk * dcos(3.0_rk*kx*dx(1)) + 150.0_rk * dcos(4.0_rk*kx*dx(1))) / 144.0_rk / dx(1)**2
         wave_k2_FD2 = wave_k2_FD2 + (4490.0_rk - 7104.0_rk * dcos(ky*dx(2)) + 3552.0_rk * dcos(2.0_rk*ky*dx(2)) - 1088.0_rk * dcos(3.0_rk*ky*dx(2)) + 150.0_rk * dcos(4.0_rk*ky*dx(2))) / 144.0_rk / dx(2)**2
         ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
         if (dx(3) /= 0.0_rk) then
             wave_k2_FD2 = wave_k2_FD2 + (4490.0_rk - 7104.0_rk * dcos(kz*dx(3)) + 3552.0_rk * dcos(2.0_rk*kz*dx(3)) - 1088.0_rk * dcos(3.0_rk*kz*dx(3)) + 150.0_rk * dcos(4.0_rk*kz*dx(3))) / 144.0_rk / dx(3)**2
         endif
-    case("FD_4th_conv_1_3")
+    case("FD_4th_comp_1_3")
         wave_k2_FD2 = (470.0_rk - 528.0_rk * dcos(kx*dx(1)) + 48.0_rk * dcos(2.0_rk*kx*dx(1)) + 16.0_rk * dcos(3.0_rk*kx*dx(1)) - 6.0_rk * dcos(4.0_rk*kx*dx(1))) / 144.0_rk / dx(1)**2
         wave_k2_FD2 = wave_k2_FD2 + (470.0_rk - 528.0_rk * dcos(ky*dx(2)) + 48.0_rk * dcos(2.0_rk*ky*dx(2)) + 16.0_rk * dcos(3.0_rk*ky*dx(2)) - 6.0_rk * dcos(4.0_rk*ky*dx(2))) / 144.0_rk / dx(2)**2
         ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
         if (dx(3) /= 0.0_rk) then
             wave_k2_FD2 = wave_k2_FD2 + (470.0_rk - 528.0_rk * dcos(kz*dx(3)) + 48.0_rk * dcos(2.0_rk*kz*dx(3)) + 16.0_rk * dcos(3.0_rk*kz*dx(3)) - 6.0_rk * dcos(4.0_rk*kz*dx(3))) / 144.0_rk / dx(3)**2
         endif
-    case("FD_4th_conv_2_2")
+    case("FD_4th_comp_2_2")
         wave_k2_FD2 = (130.0_rk - 32.0_rk * dcos(kx*dx(1)) - 128.0_rk * dcos(2.0_rk*kx*dx(1)) + 32.0_rk * dcos(3.0_rk*kx*dx(1)) - 2.0_rk * dcos(4.0_rk*kx*dx(1))) / 144.0_rk / dx(1)**2
         wave_k2_FD2 = wave_k2_FD2 + (130.0_rk - 32.0_rk * dcos(ky*dx(2)) - 128.0_rk * dcos(2.0_rk*ky*dx(2)) + 32.0_rk * dcos(3.0_rk*ky*dx(2)) - 2.0_rk * dcos(4.0_rk*ky*dx(2))) / 144.0_rk / dx(2)**2
         ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
         if (dx(3) /= 0.0_rk) then
             wave_k2_FD2 = wave_k2_FD2 + (130.0_rk - 32.0_rk * dcos(kz*dx(3)) - 128.0_rk * dcos(2.0_rk*kz*dx(3)) + 32.0_rk * dcos(3.0_rk*kz*dx(3)) - 2.0_rk * dcos(4.0_rk*kz*dx(3))) / 144.0_rk / dx(3)**2
+        endif
+    case("FD_6th_comp_2_4")
+        wave_k2_FD2 = (9170.0_rk - 9312.0_rk * dcos(kx*dx(1)) - 540.0_rk * dcos(2.0_rk*kx*dx(1)) + 1040.0_rk * dcos(3.0_rk*kx*dx(1)) - 434.0_rk * dcos(4.0_rk*kx*dx(1)) + 80.0_rk * dcos(5.0_rk*kx*dx(1)) - 4.0_rk * dcos(6.0_rk*kx*dx(1))) / 3600.0_rk / dx(1)**2
+        wave_k2_FD2 = wave_k2_FD2 + (9170.0_rk - 9312.0_rk * dcos(ky*dx(2)) - 540.0_rk * dcos(2.0_rk*ky*dx(2)) + 1040.0_rk * dcos(3.0_rk*ky*dx(2)) - 434.0_rk * dcos(4.0_rk*ky*dx(2)) + 80.0_rk * dcos(5.0_rk*ky*dx(2)) - 4.0_rk * dcos(6.0_rk*ky*dx(2))) / 3600.0_rk / dx(2)**2
+        ! if dx is zero then we probably have a 2D case, we just set the return value to 0 for that to proceed
+        if (dx(3) /= 0.0_rk) then
+            wave_k2_FD2 = wave_k2_FD2 + (9170.0_rk - 9312.0_rk * dcos(kz*dx(3)) - 540.0_rk * dcos(2.0_rk*kz*dx(3)) + 1040.0_rk * dcos(3.0_rk*kz*dx(3)) - 434.0_rk * dcos(4.0_rk*kz*dx(3)) + 80.0_rk * dcos(5.0_rk*kz*dx(3)) - 4.0_rk * dcos(6.0_rk*kz*dx(3))) / 3600.0_rk / dx(3)**2
         endif
     case("FD_6th_mehrstellen")
         ! MST assumes that dx is the same in all directions

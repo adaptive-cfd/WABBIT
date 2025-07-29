@@ -54,6 +54,7 @@ real(kind=rk), parameter :: FD1_R0_6(0:6) = (/ -147.0_rk, 360.0_rk, -450.0_rk, 4
 ! R1 = starting from point -1, using mostly points to the right
 real(kind=rk), parameter :: FD1_R1_3(-1:2) = (/ -2.0_rk, -3.0_rk, 6.0_rk, -1.0_rk /) / 6.0_rk  ! 3rd order biased difference (4-point, stencil from -1 to +2)
 real(kind=rk), parameter :: FD1_R1_4(-1:3) = (/ -3.0_rk, -10.0_rk, 18.0_rk, -6.0_rk, 1.0_rk /) / 12.0_rk  ! 4th order biased difference (5-point, stencil from -1 to +3)
+real(kind=rk), parameter :: FD1_R2_6(-2:4) = (/ 2.0_rk, -24.0_rk, -35.0_rk, 80.0_rk, -30.0_rk, 8.0_rk, -1.0_rk /) / 60.0_rk  ! 6th order biased difference (7-point, stencil from -2 to +4)
 
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
@@ -88,12 +89,12 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C2(:)
-        case("FD_4th_central", "FD_4th_conv_2_2")
+        case("FD_4th_central", "FD_4th_comp_2_2")
             l_start = -2
             l_end = 2
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C4(:)
-        case("FD_6th_central", "FD_6th_conv_3_3")
+        case("FD_6th_central", "FD_6th_comp_3_3")
             l_start = -3
             l_end = 3
             allocate(FD1_l_array(l_start:l_end))
@@ -103,16 +104,21 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 4
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C8(:)
-        case("FD_4th_conv_0_4")
+        case("FD_4th_comp_0_4")
             l_start = -4
             l_end = 0
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = -FD1_R0_4(-l_start:-l_end:-1) ! left side is reversed
-        case("FD_4th_conv_1_3")
+        case("FD_4th_comp_1_3")
             l_start = -3
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = -FD1_R1_4(-l_start:-l_end:-1) ! left side is reversed
+        case("FD_6th_comp_2_4")
+            l_start = -4
+            l_end = 2
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = -FD1_R2_6(-l_start:-l_end:-1) ! left side is reversed
         case default
             call abort(250615, "ERROR: order of FD1 discretization not known: " // trim(FD1_order_discretization_in))
     end select
@@ -136,12 +142,12 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 1
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C2(:)
-        case("FD_4th_central", "FD_4th_conv_2_2")
+        case("FD_4th_central", "FD_4th_comp_2_2")
             r_start = -2
             r_end = 2
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C4(:)
-        case("FD_6th_central", "FD_6th_conv_3_3")
+        case("FD_6th_central", "FD_6th_comp_3_3")
             r_start = -3
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
@@ -151,16 +157,21 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 4
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C8(:)
-        case("FD_4th_conv_0_4")
+        case("FD_4th_comp_0_4")
             r_start = 0
             r_end = 4
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_R0_4(:)
-        case("FD_4th_conv_1_3")
+        case("FD_4th_comp_1_3")
             r_start = -1
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_R1_4(:)
+        case("FD_6th_comp_2_4")
+            r_start = -2
+            r_end = 4
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_R2_6(:)
         case default
             call abort(250615, "ERROR: order of FD1 discretization not known: " // trim(FD1_order_discretization_in))
     end select
@@ -184,12 +195,12 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             fd2_end = 1
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
-        case("FD_4th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3", "FD_4th_conv_2_2")
+        case("FD_4th_central", "FD_4th_comp_0_4", "FD_4th_comp_1_3", "FD_4th_comp_2_2")
             fd2_start = -2
             fd2_end = 2
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C4(:)
-        case("FD_6th_central", "FD_6th_conv_0_6")
+        case("FD_6th_central", "FD_6th_comp_0_6", "FD_6th_comp_1_5", "FD_6th_comp_2_4")
             fd2_start = -3
             fd2_end = 3
             allocate(FD2_array(fd2_start:fd2_end))
@@ -227,7 +238,8 @@ subroutine setup_FD1X_stencil(FD1_order_discretization_in, FD1X_array, fd1x_star
             fd1x_end = 2
             allocate(FD1X_array(fd1x_start:fd1x_end))
             FD1X_array(:) = FD1X_C4(:)
-        case("FD_6th_central", "FD_8th_central", "FD_4th_conv_0_4", "FD_4th_conv_1_3", "FD_4th_conv_2_2")
+        case("FD_6th_central", "FD_8th_central", "FD_4th_comp_0_4", "FD_4th_comp_1_3", "FD_4th_comp_2_2", &
+             "FD_6th_comp_0_6", "FD_6th_comp_1_5", "FD_6th_comp_2_4")
             ! For higher orders, default to 4th order cross derivatives for now
             fd1x_start = -2
             fd1x_end = 2

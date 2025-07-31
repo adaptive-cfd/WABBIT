@@ -89,7 +89,9 @@ module module_params
         integer(kind=ik)      :: laplacian_stencil_size=0
         integer(kind=ik)      :: laplacian_cycle_it=0
         integer(kind=ik)      :: laplacian_GS_it=0
+        integer(kind=ik)      :: laplacian_Sync_it=0
         character(len=cshort) :: laplacian_coarsest="FFT"
+        integer(kind=ik) :: nprojection_NSI = 20 !> let's do regular projections every nprojection_NSI time steps
         character(len=cshort) :: FFT_accuracy="FD"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"

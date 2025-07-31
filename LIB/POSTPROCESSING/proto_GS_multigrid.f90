@@ -51,14 +51,15 @@ subroutine proto_GS_multigrid(params)
             write(*, '(A)') "-----------------------------------------------------------"
             write(*, '(A)') " Read in a data field (2D or 3D) b and solves the system laplacian u = b"
             write(*, '(A)') "-----------------------------------------------------------"
-            write(*, '(A)') "./wabbit-post --proto-GS-multigrid b.h5 [u.h5] [u_FD.h5] WAVELET LAPLACE-ORDER IT_CYCLE IT_GS"
+            write(*, '(A)') "./wabbit-post --proto-GS-multigrid b.h5 [u.h5] [u_FD.h5] WAVELET LAPLACE-ORDER IT_CYCLE IT_GS IT_SYNC"
             write(*, '(A)') "    b.h5 = RHS field to be solved"
             write(*, '(A)') "    u.h5 = solution field for comparison (optional)"
             write(*, '(A)') "    u_FD.h5 = solution field with FD accuracy for comparison (optional)"
             write(*, '(A)') "    WAVELET = CDFXY"
             write(*, '(A)') "    LAPLACE-ORDER = 2, 4, 6, 8 for the order of the Laplace operator"
             write(*, '(A)') "    IT_CYCLE = Number of cycles to perform"
-            write(*, '(A)') "    IT_GS = Number of GS-sweeps for upwards iterations"
+            write(*, '(A)') "    IT_GS = Number of GS-sweeps per iterations"
+            write(*, '(A)') "    IT_SYNC = Number of steps per sync"
             write(*, '(A)') "-----------------------------------------------------------"
         end if
         return
@@ -90,6 +91,8 @@ subroutine proto_GS_multigrid(params)
     read (cycle_type, *) params%laplacian_cycle_it
     call get_command_argument(6 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
     read (cycle_type, *) params%laplacian_GS_it
+    call get_command_argument(7 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
+    read (cycle_type, *) params%laplacian_Sync_it
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_b, lgt_n(tree_ID), time, it, domain, Bs, tc_length, params%dim, &
@@ -234,7 +237,7 @@ subroutine proto_GS_multigrid(params)
         ! laplacian is invariant to shifts of constant values
         ! our values are defined with zero mean for comparison
         ! as multigrid might accidently introduce a constant offset, we remove it
-        call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:nc,:), tree_ID, "Mean", norm(1:nc))
+        call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:nc,:), tree_ID, "Mean", norm(1:nc), threshold_state_vector=.false.)
         do k_block = 1, hvy_n(tree_ID)
             do ic = 1,nc
                 hvy_id = hvy_active(k_block, tree_ID)
@@ -253,11 +256,11 @@ subroutine proto_GS_multigrid(params)
                 hvy_work(:,:,:,1:nc,hvy_id,1) = hvy_tmp(:,:,:,1:nc,hvy_id) - hvy_block(:,:,:,nc+1:2*nc,hvy_id)
             enddo
             ! compute norms
-            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm)
+            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm, threshold_state_vector=.false.)
             if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L2: ", norm(1), " ---"
-            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(nc+1:2*nc))
+            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(nc+1:2*nc), threshold_state_vector=.false.)
             if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L1: ", norm(nc+1), " ---"
-            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(2*nc+1:3*nc))
+            call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(2*nc+1:3*nc), threshold_state_vector=.false.)
             if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral Linfty: ", norm(2*nc+1), " ---"
 
             if (exist_uFD) then
@@ -268,11 +271,11 @@ subroutine proto_GS_multigrid(params)
                     hvy_work(:,:,:,1:nc,hvy_id,1) = hvy_tmp(:,:,:,1:nc,hvy_id) - hvy_block(:,:,:,2*nc+1:3*nc,hvy_id)
                 enddo
                 ! compute norms
-                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm(3*nc+1:4*nc))
+                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm(3*nc+1:4*nc), threshold_state_vector=.false.)
                 if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD L2: ", norm(3*nc+1), " ---"
-                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(4*nc+1:5*nc))
+                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(4*nc+1:5*nc), threshold_state_vector=.false.)
                 if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD L1: ", norm(4*nc+1), " ---"
-                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(5*nc+1:6*nc))
+                call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(5*nc+1:6*nc), threshold_state_vector=.false.)
                 if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD Linfty: ", norm(5*nc+1), " ---"
 
                 call append_t_file('multigrid-compare.t', (/dble(i_cycle), norm(1), norm(2), norm(3), norm(4), norm(5), norm(6)/))

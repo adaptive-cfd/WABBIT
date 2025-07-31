@@ -1,4 +1,4 @@
-subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, norm_case, n_val)
+subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, norm_case, n_val, threshold_state_vector)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
@@ -11,10 +11,12 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     character(len=*), intent(in), optional  :: norm_case
     !> Additional value to be considered for norm logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
     integer(kind=ik), intent(in), optional  :: n_val
+    !> compute after threshold state vector components, if false we do it for all, defaults to true
+    logical, intent(in), optional :: threshold_state_vector
 
     real(kind=rk)                       :: x0(1:3), dx(1:3), volume, norm_block, mean_block, mean(size(norm))
     integer(kind=ik) :: k, hvy_id, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, lgt_id, D, level_me, ref_me, norm_case_id, sign
-    logical          :: SC_only
+    logical          :: SC_only, thresholdStateVector
     integer, dimension(:), allocatable  :: mask_i, mask
 
     ! note: if norm and hvy_block components are of different size, we use the smaller one.
@@ -23,6 +25,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     g = 0
     g(1:params%dim) = params%g
     D = params%dim
+
+    thresholdStateVector = .true.
+    if (present(threshold_state_vector)) thresholdStateVector = threshold_state_vector
 
     ! sometimes we want to subtract parts of the norm, for example the mean parts / parts on the root layer
     sign = 1
@@ -107,7 +112,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 
             ! compute norm for thresholding components that are treated on their own, here we treat all norms together
             do p = 1, n_eqn
-                if (params%threshold_state_vector_component(p) == 1) then
+                if (params%threshold_state_vector_component(p) == 1 .or. .not. thresholdStateVector) then
                     if (which_norm == "L2" .or. which_norm == "H1") then
                         norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
                     elseif (which_norm == "L1") then
@@ -130,26 +135,28 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
             ! every value >1 in thresholding_component are treated as belonging together
             ! so we could set 2 2 3 3 and actually have those treated as independent vector fields, where we compute the norm
             ! maybe a bit overkill because usually we only have the velocity, but why not have the capacity that we can build up on
-            do l = 2, maxval(params%threshold_state_vector_component(:))
-                ! convert logical mask to index mask
-                mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
+            if (thresholdStateVector) then
+                do l = 2, maxval(params%threshold_state_vector_component(:))
+                    ! convert logical mask to index mask
+                    mask = pack(mask_i, params%threshold_state_vector_component(:)==l)
 
-                if (which_norm == "L2" .or. which_norm == "H1") then
-                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
-                elseif (which_norm == "L1") then
-                    norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
-                elseif (which_norm == "Linfty" .and. sign == 1) then
-                    norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
-                elseif (which_norm == "Mean") then
-                    norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id ) )
-                endif
+                    if (which_norm == "L2" .or. which_norm == "H1") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
+                    elseif (which_norm == "L1") then
+                        norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
+                    elseif (which_norm == "Linfty" .and. sign == 1) then
+                        norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
+                    elseif (which_norm == "Mean") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id ) )
+                    endif
 
-                if (which_norm == "Linfty" .and. sign == 1) then
-                    norm(mask) = max(norm(mask), norm_block)
-                else
-                    norm(mask) = norm(mask) + sign*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
-                endif
-            enddo
+                    if (which_norm == "Linfty" .and. sign == 1) then
+                        norm(mask) = max(norm(mask), norm_block)
+                    else
+                        norm(mask) = norm(mask) + sign*product(dx(1:params%dim))*mod(norm_case_id,10)**params%dim * norm_block
+                    endif
+                enddo
+            endif
         enddo
 
         ! last operation to apply norm over all processes

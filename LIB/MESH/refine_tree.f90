@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM)
+subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_full_tree)
     use module_indicators
 
     implicit none
@@ -22,12 +22,17 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM)
     character(len=*), intent(in)   :: indicator                   !> how to choose blocks for refinement
     integer(kind=ik), intent(in)   :: tree_ID
     logical, intent(out)   :: error_OOM !> Out-of-memory error, causes the main time loop to exit.
+    logical, intent(in), optional :: check_full_tree  !> if true, checks if a full tree can be created in deterministic fashion
 
 
     ! cpu time variables for running time calculation
     real(kind=rk)                  :: t0, t1, t2, t_misc, test(1:size(hvy_block, 4))
     integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id, mpierr
     real(kind=rk) :: norm(1:params%n_eqn)
+    logical :: checkFullTree
+
+    checkFullTree = .false.
+    if (present(check_full_tree)) checkFullTree = check_full_tree
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -115,7 +120,9 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM)
     endif
 
     ! check once again to see if we can create the full tree
-    call check_oom(params, tree_id, error_OOM, check_full_tree=.true., check_ref=.false.)
+    if (checkFullTree) then
+        call check_oom(params, tree_id, error_OOM, check_full_tree=.true., check_ref=.false.)
+    endif
 
     call toc( "refine_tree (lists+neighbors)", 146, t_misc )
     call toc( "refine_tree (TOTAL)", 140, MPI_wtime()-t0 )

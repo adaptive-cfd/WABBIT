@@ -81,7 +81,9 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'laplacian_order', params%laplacian_order, "CFD_4th")
    call read_param_mpi(FILE, 'Discretization', 'laplacian_cycle_it', params%laplacian_cycle_it, 5)
    call read_param_mpi(FILE, 'Discretization', 'laplacian_GS_it', params%laplacian_GS_it, 10)
+   call read_param_mpi(FILE, 'Discretization', 'laplacian_Sync_it', params%laplacian_Sync_it, 2)
    call read_param_mpi(FILE, 'Discretization', 'laplacian_coarsest', params%laplacian_coarsest, "FFT")
+   call read_param_mpi(FILE, 'Discretization', 'nprojection_NSI', params%nprojection_NSI, 20)
    call read_param_mpi(FILE, 'Discretization', 'FFT_accuracy', params%FFT_accuracy, "spectral")
 
    ! filter frequency

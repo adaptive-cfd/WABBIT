@@ -58,7 +58,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
         ! Call the multigrid vcycle function
         call multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose=verbose_apply)
 
-        ! call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)))
+        ! call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)), threshold_state_vector=.false.)
         ! if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, i0, A, 10(es10.4, 1x))') "   it ", i_cycle, "/", params%laplacian_cycle_it, " Residual Linfty: ", norm(1:size(hvy_sol,4))
 
     enddo
@@ -66,7 +66,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     ! laplacian is invariant to shifts of constant values
     ! our values are defined with zero mean for comparison
     ! as multigrid might accidently introduce a constant offset, we remove it
-    call componentWiseNorm_tree(params, hvy_sol(:,:,:,1:1,:), tree_ID, "Mean", norm(1:size(hvy_sol,4)))
+    call componentWiseNorm_tree(params, hvy_sol(:,:,:,1:1,:), tree_ID, "Mean", norm(1:size(hvy_sol,4)), threshold_state_vector=.false.)
     do k_block = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k_block, tree_ID)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
@@ -76,7 +76,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     enddo
     if (params%rank == 0 .and. verbose_apply) write(*, '(A, 10(es10.3, 1x))') "--- Mean value: ", norm(1:size(hvy_sol,4))
 
-    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)))
+    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:size(hvy_sol,4),:), tree_ID, "Linfty", norm(1:size(hvy_sol,4)), threshold_state_vector=.false.)
     if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, 10(es10.4, 1x))') "   Final Residual Linfty: ", norm(1:size(hvy_sol,4))
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
@@ -263,7 +263,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
         ! compute actual residual r = b - Ax
         call GS_compute_residual(params, hvy_sol(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_work(:,:,:,1:nc,hvy_id), dx)
     enddo
-    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Mean", norm)
+    call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Mean", norm, threshold_state_vector=.false.)
     if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.3, A)') "--- Residual Mean: ", norm(1), " ---"
     do k_block = 1, hvy_n(tree_ID)
         do ic = 1,nc
@@ -273,11 +273,11 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     enddo
 
     if (verbose_apply) then
-        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", norm)
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", norm, threshold_state_vector=.false.)
         if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.4, A)') "--- Residual L2: ", norm(1), " ---"
-        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L1", norm(nc+1:2*nc))
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L1", norm(nc+1:2*nc), threshold_state_vector=.false.)
         ! if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L1: ", norm(nc+1), " ---"
-        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Linfty", norm(2*nc+1:3*nc))
+        call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Linfty", norm(2*nc+1:3*nc), threshold_state_vector=.false.)
         if (params%rank == 0 .and. verbose_apply) write(*, '(A, es10.4, A)') "--- Residual Linfty: ", norm(nc+2), " ---"
 
         t_print = MPI_Wtime()-t_cycle
@@ -436,7 +436,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
         ! laplacian is invariant to shifts of constant values
         ! our values are defined with zero mean for comparison
         ! as multigrid might accidently introduce a constant offset, we remove it
-        call componentWiseNorm_tree(params, hvy_RHS(:,:,:,1:nc,:), tree_ID, "Mean", norm(1:nc), norm_case="not_empty")
+        call componentWiseNorm_tree(params, hvy_RHS(:,:,:,1:nc,:), tree_ID, "Mean", norm(1:nc), norm_case="not_empty", threshold_state_vector=.false.)
         if (params%rank == 0 .and. verbose_apply) write(*, '(A, A, es10.3)') repeat('  ', i_level+1), 'RHS mean ', norm(1)
         do k_block = 1, hvy_n(tree_ID)
             do ic = 1,nc
@@ -447,7 +447,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
 
         ! do actual sweeps
         ! if (i_level /= Jmax_a) then
-            sync_freq = 1
+            sync_freq = params%laplacian_Sync_it
             ! sync_freq = params%g / params%laplacian_stencil_size
             sweep_forward = .true.
             do i_sweep = 1, params%laplacian_GS_it
@@ -460,13 +460,8 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 endif
 
                 ! blocks on this iteration do a GS-sweep, they have refinement status 0 or 1
-                ! call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward)
-                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g-(sync_freq-1)*params%laplacian_stencil_size)
-
-                sweep_forward = .not. sweep_forward
-
-                ! second sweep without sync
-                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g-(sync_freq-1)*params%laplacian_stencil_size)
+                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g)
+                ! call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=max(0,params%g-(sync_freq-1)*params%laplacian_stencil_size))
 
                 sweep_forward = .not. sweep_forward
             enddo

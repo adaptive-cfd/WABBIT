@@ -282,9 +282,9 @@ program main
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
             if (params%refinement_indicator == "significant" .and. iteration == 0) then
-                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM)
+                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true.)
             else
-                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM )
+                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true.)
             endif
             ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
             ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.

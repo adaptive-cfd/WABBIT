@@ -697,7 +697,9 @@ subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
         iteration = iteration + 1
 
         if (present(verbose_check)) then
-            write(*, '(A, i0, A, i0, A, i0)') "R", params%rank, " Deterministic mother addition it ", iteration, ", hvy_n= ", hvy_n(tree_ID)
+            if (verbose_check) then
+                write(*, '(A, i0, A, i0, A, i0)') "R", params%rank, " Deterministic mother addition it ", iteration, ", hvy_n= ", hvy_n(tree_ID)
+            endif
         endif
     enddo
 

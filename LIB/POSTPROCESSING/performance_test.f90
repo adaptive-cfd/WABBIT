@@ -31,6 +31,7 @@ subroutine performance_test(params)
     character(len=cshort)                   :: filename
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, j, a
     real(kind=rk)                       :: t0, dt, t4
+    logical :: error_OOM
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -53,7 +54,7 @@ subroutine performance_test(params)
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work)
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, hvy_mask=hvy_mask)
 
 
     ! reset the grid: all blocks are inactive and empty
@@ -63,6 +64,13 @@ subroutine performance_test(params)
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
+    ! Test is as follows:
+    ! 1 Create a random grid with given density
+    ! 2 perform N_timesteps times: (for statistical results)
+    !   2.1 Refine everywhere
+    !   2.2 Evolve in time
+    !   2.3 Coarsen everhwyere
+    !
 
     params%max_grid_density = target_grid_density / real(N_grids)
 
@@ -84,8 +92,7 @@ subroutine performance_test(params)
             if ( params%adapt_tree ) then
                 call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
-                ! call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM )
             endif
             call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
             Nblocks_rhs = lgt_n(tree_ID_flow)

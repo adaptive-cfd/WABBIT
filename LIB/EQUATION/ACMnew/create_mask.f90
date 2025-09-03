@@ -1062,9 +1062,9 @@ subroutine draw_channel(x0, dx, Bs, g, mask )
                     ! color: channel has color 0
                     mask(ix,iy,iz,5) = 0.0_rk
 
-                elseif ((y <= (params_acm%h_channel+H_fluid-safety)).and.(y >= (params_acm%h_channel+H_fluid+safety))) then
+                elseif (y >= (params_acm%h_channel+H_fluid-safety)) then 
                     ! upper wall
-                    mask(ix, iy, iz, 1) = smoothstep(-y, (params_acm%h_channel+H_fluid), params_acm%C_smooth*params_acm%dx_min)
+                    mask(ix, iy, iz, 1) = 1 - smoothstep(y, (params_acm%h_channel+H_fluid), params_acm%C_smooth*params_acm%dx_min)
                     ! color: channel has color 0
                     mask(ix,iy,iz,5) = 0.0_rk
                 endif
@@ -1094,7 +1094,7 @@ subroutine draw_channel(x0, dx, Bs, g, mask )
                     ! color: channel has color 0
                     mask(ix,iy,iz,5) = 0.0_rk
 
-                elseif ((y <= (params_acm%h_channel+H_fluid-safety)).and.(y >= (params_acm%h_channel+H_fluid+safety))) then
+                elseif (y >= (params_acm%h_channel+H_fluid-safety)) then
                     ! upper wall
                     xi = -1.0_rk*(y-(params_acm%h_channel+H_fluid)) / epsilon
                     mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))

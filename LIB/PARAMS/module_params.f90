@@ -85,14 +85,17 @@ module module_params
         character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
-        character(len=cshort) :: laplacian_order="not-initialized"
-        integer(kind=ik)      :: laplacian_stencil_size=0
-        integer(kind=ik)      :: laplacian_cycle_it=0
-        integer(kind=ik)      :: laplacian_GS_it=0
-        integer(kind=ik)      :: laplacian_Sync_it=0
-        character(len=cshort) :: laplacian_coarsest="FFT"
-        integer(kind=ik) :: nprojection_NSI = 20 !> let's do regular projections every nprojection_NSI time steps
-        character(len=cshort) :: FFT_accuracy="FD"  ! FD or spectral
+        character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_stencil_size=0
+        character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
+        integer(kind=ik)      :: poisson_cycle_it=0
+        real(kind=rk)         :: poisson_cycle_tol=0.0_rk
+        integer(kind=ik)      :: poisson_cycle_max_it=0
+        integer(kind=ik)      :: poisson_GS_it=0
+        integer(kind=ik)      :: poisson_Sync_it=0
+        character(len=cshort) :: poisson_coarsest="FFT"
+        integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
+        character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"

@@ -77,13 +77,16 @@ subroutine ini_file_to_params( params, filename )
    !
    ! discretization order
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
-   ! laplacian order
-   call read_param_mpi(FILE, 'Discretization', 'laplacian_order', params%laplacian_order, "CFD_4th")
-   call read_param_mpi(FILE, 'Discretization', 'laplacian_cycle_it', params%laplacian_cycle_it, 5)
-   call read_param_mpi(FILE, 'Discretization', 'laplacian_GS_it', params%laplacian_GS_it, 10)
-   call read_param_mpi(FILE, 'Discretization', 'laplacian_Sync_it', params%laplacian_Sync_it, 2)
-   call read_param_mpi(FILE, 'Discretization', 'laplacian_coarsest', params%laplacian_coarsest, "FFT")
-   call read_param_mpi(FILE, 'Discretization', 'nprojection_NSI', params%nprojection_NSI, 20)
+   ! poisson order
+   call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol', params%poisson_cycle_tol, 1.0e-6_rk)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_max_it', params%poisson_cycle_max_it, 100)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_GS_it', params%poisson_GS_it, 8)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_Sync_it', params%poisson_Sync_it, 2)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_coarsest', params%poisson_coarsest, "FFT")
+   call read_param_mpi(FILE, 'Discretization', 'nprojection_NSI', params%nprojection_NSI, 1)
    call read_param_mpi(FILE, 'Discretization', 'FFT_accuracy', params%FFT_accuracy, "spectral")
 
    ! filter frequency
@@ -181,20 +184,20 @@ subroutine ini_file_to_params( params, filename )
 
    ! JB ToDo - correct once this is more settled
    ! ! we want to know the stencil size for laplacian schemes usually, so lets save this here
-   ! if (params%laplacian_order == 'CFD_2nd') then
-   !    params%laplacian_stencil_size = 1
-   ! elseif (params%laplacian_order == 'CFD_4th') then
-   !    params%laplacian_stencil_size = 2
-   ! elseif (params%laplacian_order == 'CFD_6th') then
-   !    params%laplacian_stencil_size = 3
-   ! elseif (params%laplacian_order == 'CFD_8th') then
-   !    params%laplacian_stencil_size = 4
-   ! elseif (params%laplacian_order == 'MST_6th') then
-   !    params%laplacian_stencil_size = 1
+   ! if (params%poisson_order == 'CFD_2nd') then
+   !    params%poisson_stencil_size = 1
+   ! elseif (params%poisson_order == 'CFD_4th') then
+   !    params%poisson_stencil_size = 2
+   ! elseif (params%poisson_order == 'CFD_6th') then
+   !    params%poisson_stencil_size = 3
+   ! elseif (params%poisson_order == 'CFD_8th') then
+   !    params%poisson_stencil_size = 4
+   ! elseif (params%poisson_order == 'MST_6th') then
+   !    params%poisson_stencil_size = 1
    ! else
    !    call abort(1234567, "Error: no laplacian order specified or not supported!")
    ! endif
-   ! if ( params%g < params%laplacian_stencil_size ) then
+   ! if ( params%g < params%poisson_stencil_size ) then
    !    call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
    ! end if
 

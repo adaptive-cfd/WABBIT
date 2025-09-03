@@ -60,95 +60,95 @@ contains
         if (allocated(stencil_RHS_tensor_2D)) deallocate(stencil_RHS_tensor_2D)
         if (allocated(stencil_RHS_tensor_3D)) deallocate(stencil_RHS_tensor_3D)
 
-        if (params%laplacian_order == "FD_2nd_central") then
+        if (params%poisson_order == "FD_2nd_central") then
             allocate(stencil(-1:1))
             stencil = (/  1.0_rk, -2.0_rk,    1.0_rk /)
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 1
+            params%poisson_stencil_size = 1
             stencil_size = 1
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_central") then
+        elseif (params%poisson_order == "FD_4th_central") then
             allocate(stencil(-2:2))
             stencil = (/ -1.0_rk,  16.0_rk,  -30.0_rk,   16.0_rk,   -1.0_rk /) / 12.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 2
+            params%poisson_stencil_size = 2
             stencil_size = 2
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_central") then
+        elseif (params%poisson_order == "FD_6th_central") then
             allocate(stencil(-3:3))
             stencil = (/  2.0_rk, -27.0_rk,   270.0_rk, -490.0_rk,   270.0_rk,  -27.0_rk,    2.0_rk/) / 180.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 3
+            params%poisson_stencil_size = 3
             stencil_size = 3
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_8th_central") then
+        elseif (params%poisson_order == "FD_8th_central") then
             allocate(stencil(-4:4))
             stencil = (/ -9.0_rk,  128.0_rk, -1008.0_rk, 8064.0_rk, -14350.0_rk, 8064.0_rk, -1008.0_rk, 128.0_rk, -9.0_rk /) / 5040_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 4
+            params%poisson_stencil_size = 4
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_comp_0_4") then
+        elseif (params%poisson_order == "FD_4th_comp_0_4") then
             allocate(stencil(-4:4))
             stencil = (/  -75.0_rk, 544.0_rk, -1776.0_rk, 3552.0_rk, -4490.0_rk, 3552.0_rk, -1776.0_rk, 544.0_rk, -75.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 4
+            params%poisson_stencil_size = 4
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_comp_2_2") then
+        elseif (params%poisson_order == "FD_4th_comp_2_2") then
             allocate(stencil(-4:4))
             stencil = (/  1.0_rk, -16.0_rk, 64.0_rk, 16.0_rk, -130.0_rk, 16.0_rk, 64.0_rk, -16.0_rk, 1.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 4
+            params%poisson_stencil_size = 4
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_4th_comp_1_3") then
+        elseif (params%poisson_order == "FD_4th_comp_1_3") then
             allocate(stencil(-4:4))
             stencil = (/  3.0_rk, -8.0_rk, -24.0_rk, 264.0_rk, -470.0_rk, 264.0_rk, -24.0_rk, -8.0_rk, 3.0_rk /) / 144.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 4
+            params%poisson_stencil_size = 4
             stencil_size = 4
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_comp_3_3") then
+        elseif (params%poisson_order == "FD_6th_comp_3_3") then
             allocate(stencil(-6:6))
             stencil = (/  1.0_rk, -18.0_rk, 171.0_rk, -810.0_rk, 1935.0_rk, 828.0_rk, -4214.0_rk, 828.0_rk, 1935.0_rk, -810.0_rk, 171.0_rk, -18.0_rk, 1.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 6
+            params%poisson_stencil_size = 6
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_comp_2_4") then
+        elseif (params%poisson_order == "FD_6th_comp_2_4") then
             allocate(stencil(-6:6))
             stencil = (/  2.0_rk, -40.0_rk, 217.0_rk, -520.0_rk, 270.0_rk, 4656.0_rk, -9170.0_rk, 4656.0_rk, 270.0_rk, -520.0_rk, 217.0_rk, -40.0_rk, 2.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 6
+            params%poisson_stencil_size = 6
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_comp_1_5") then
+        elseif (params%poisson_order == "FD_6th_comp_1_5") then
             allocate(stencil(-6:6))
             stencil = (/  20.0_rk, 4.0_rk, -955.0_rk, 5300.0_rk, -15300.0_rk, 31560.0_rk, -41258.0_rk, 31560.0_rk, -15300.0_rk, 5300.0_rk, -955.0_rk, 4.0_rk, 20.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 6
+            params%poisson_stencil_size = 6
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_comp_0_6") then
+        elseif (params%poisson_order == "FD_6th_comp_0_6") then
             allocate(stencil(-6:6))
             stencil = (/  -1470.0_rk, 14184.0_rk, -63495.0_rk, 176200.0_rk, -342450.0_rk, 501840.0_rk, -569618.0_rk, 501840.0_rk, -342450.0_rk, 176200.0_rk, -63495.0_rk, 14184.0_rk, -1470.0_rk /) / 3600.0_rk
             stencil_RHS = 1.0_rk
-            params%laplacian_stencil_size = 6
+            params%poisson_stencil_size = 6
             stencil_size = 6
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%laplacian_order == "FD_6th_mehrstellen") then
+        elseif (params%poisson_order == "FD_6th_mehrstellen") then
             if (params%dim == 2) then
                 allocate(stencil_tensor_2D(-1:1, -1:1))
                 allocate(stencil_RHS_tensor_2D(-2:2, -2:2))
@@ -200,16 +200,16 @@ contains
                 0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk, &
                 0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk /), (/5,5,5/) ) / 720.0_rk
             endif
-            params%laplacian_stencil_size = 1
+            params%poisson_stencil_size = 1
             stencil_size = 1
             stencil_RHS_size = 2
             use_tensor = .true.
         else
-            call abort(250612, "I don't know about this laplacian discretization order: "//trim(adjustl(params%laplacian_order))//" in GS_compute_residual")
+            call abort(250612, "I don't know about this laplacian discretization order: "//trim(adjustl(params%poisson_order))//" in GS_compute_residual")
         endif
 
         if (present(g)) then
-            g = max(g, params%laplacian_stencil_size)  ! we need at least the stencil size
+            g = max(g, params%poisson_stencil_size)  ! we need at least the stencil size
             g = max(g, stencil_RHS_size)  ! also take RHS into account
         endif
         
@@ -303,7 +303,7 @@ contains
         filterOffset = params%g
         if (present(filter_offset)) filterOffset = filter_offset
 
-        a = params%laplacian_stencil_size
+        a = params%poisson_stencil_size
 
         is(:) = 1
         ie(:) = 1
@@ -379,7 +379,7 @@ contains
             if (recompute_b) Ax_factor = 1
         endif
 
-        a = params%laplacian_stencil_size
+        a = params%poisson_stencil_size
 
         do ic = 1,size(u,4)
             if (.not. use_tensor) then
@@ -445,7 +445,7 @@ contains
         if (present(apply_B_RHS)) use_stencil_RHS = apply_B_RHS
 
         if (.not. apply_B_RHS) then
-            a = params%laplacian_stencil_size
+            a = params%poisson_stencil_size
             if (.not. use_tensor) then
                 if (params%dim == 2) then
                     do iy = params%g+1, params%g+params%bs(2)

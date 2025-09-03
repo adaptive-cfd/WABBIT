@@ -25,7 +25,7 @@ subroutine proto_GS_multigrid(params)
 
     character(len=cshort)              :: fname, cycle_type
     logical                            :: exist_u, exist_uFD
-    real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:6), volume
+    real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:9), volume
     integer(kind=tsize)                :: treecode
 
     real(kind=rk)        :: t_block, t_loop, t_cycle
@@ -85,14 +85,14 @@ subroutine proto_GS_multigrid(params)
     call get_command_argument(3 + merge(1,0, exist_u) + merge(1,0, exist_uFD), params%wavelet)
 
     ! set laplace order
-    call get_command_argument(4 + merge(1,0, exist_u) + merge(1,0, exist_uFD), params%laplacian_order)
+    call get_command_argument(4 + merge(1,0, exist_u) + merge(1,0, exist_uFD), params%poisson_order)
     ! set number of cycles
     call get_command_argument(5 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
-    read (cycle_type, *) params%laplacian_cycle_it
+    read (cycle_type, *) params%poisson_cycle_it
     call get_command_argument(6 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
-    read (cycle_type, *) params%laplacian_GS_it
+    read (cycle_type, *) params%poisson_GS_it
     call get_command_argument(7 + merge(1,0, exist_u) + merge(1,0, exist_uFD), cycle_type)
-    read (cycle_type, *) params%laplacian_Sync_it
+    read (cycle_type, *) params%poisson_Sync_it
 
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_b, lgt_n(tree_ID), time, it, domain, Bs, tc_length, params%dim, &
@@ -119,7 +119,7 @@ subroutine proto_GS_multigrid(params)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = 1
     params%order_discretization = "FD_4th_central"
-    params%laplacian_coarsest = "FFT"
+    params%poisson_coarsest = "FFT"
     params%FFT_accuracy = "spectral"  ! FD or spectral
 
     Bs = params%Bs
@@ -203,7 +203,7 @@ subroutine proto_GS_multigrid(params)
 
     ! For the Mehrstellenverfahren, we actually do solve the system Au = Bb
     ! So before doing anything, we apply the matrix B on b, this is a large tensorial matrix, but we only have to apply this operation once
-    if (params%laplacian_order == "FD_6th_mehrstellen") then
+    if (params%poisson_order == "FD_6th_mehrstellen") then
         t_block = MPI_Wtime()
         do k_block = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k_block, tree_ID)
@@ -230,9 +230,9 @@ subroutine proto_GS_multigrid(params)
     enddo
 
     ! compute several v- or f-cycles
-    do i_cycle = 1,params%laplacian_cycle_it
+    do i_cycle = 1,params%poisson_cycle_it
 
-        call multigrid_vcycle(params, hvy_tmp(:,:,:,1:nc,:), hvy_block(:,:,:,1:nc,:), hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID, verbose=.true.)
+        call multigrid_vcycle(params, hvy_tmp(:,:,:,1:nc,:), hvy_block(:,:,:,1:nc,:), hvy_tmp(:,:,:,nc+1:size(hvy_tmp,4),:), tree_ID, residual_out=norm, verbose=.true.)
 
         ! laplacian is invariant to shifts of constant values
         ! our values are defined with zero mean for comparison

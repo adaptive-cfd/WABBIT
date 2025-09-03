@@ -256,7 +256,7 @@ subroutine laplacian_inplace_filtered_FD( params, u_hat, dx )
             do ix = 1, params%bs(1)/2+1
                 !-- wavenumber in x-direction
                 kx = wave_x(ix, params%bs(1))
-                k2 = wave_k2_FD2(kx,ky,kz,dx,params%laplacian_order)
+                k2 = wave_k2_FD2(kx,ky,kz,dx,params%poisson_order)
                 u_hat(ix,iy,iz) = -k2*u_hat(ix,iy,iz)
             enddo
         enddo
@@ -320,7 +320,7 @@ subroutine invlaplacian_inplace_filtered_FD( params, u_hat, dx )
             do ix = 1, params%bs(1)/2+1
                 !-- wavenumber in x-direction
                 kx = wave_x(ix, params%bs(1))
-                k2 = wave_k2_FD2(kx,ky,kz,dx,params%laplacian_order)
+                k2 = wave_k2_FD2(kx,ky,kz,dx,params%poisson_order)
                 if (k2 .eq. 0.0_rk) then
                     u_hat(ix,iy,iz) = 0.0_rk
                 else

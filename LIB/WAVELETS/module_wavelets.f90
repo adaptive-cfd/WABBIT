@@ -1858,7 +1858,7 @@ contains
         nc     = size(val_block, 4)
         Bs     = params%Bs
         g      = params%g
-        Jref   = params%Jmax
+        Jref   = 0
         if (present(level_ref)) Jref = level_ref
 
         ! set the indices we want to threshold

@@ -20,7 +20,7 @@ module module_convdiff_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
-  INICOND_convdiff, FIELD_NAMES_convdiff, statistics_convdiff
+  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -31,7 +31,9 @@ module module_convdiff_new
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
-    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
+    logical :: time_statistics = .false.
+    integer(kind=ik) :: N_time_statistics = 0
+    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:), time_statistics_names(:)
     character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
   end type type_paramsb
@@ -45,6 +47,7 @@ module module_convdiff_new
 contains
 
 #include "statistics_convdiff.f90"
+#include "time_statistics_convdiff.f90"
 #include "rhs_convdiff.f90"
 
   !-----------------------------------------------------------------------------
@@ -116,6 +119,14 @@ contains
     ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%blobs_x0 )
     ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%blobs_y0 )
     ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%blobs_z0 )
+
+    ! time statistics (averaging or similar)
+    call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params_convdiff%time_statistics, .false.)
+    if (params_convdiff%time_statistics) then
+        call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_convdiff%N_time_statistics, 1)
+        allocate( params_convdiff%time_statistics_names(1:params_convdiff%N_time_statistics) )
+        call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_convdiff%time_statistics_names, (/"none"/))
+    endif
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
@@ -209,6 +220,8 @@ contains
             call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
         endif
     endif
+
+    ! ToDo: Adapt to naming conventions as in ACM module, incorporate time statistics as well
 
   end subroutine
 

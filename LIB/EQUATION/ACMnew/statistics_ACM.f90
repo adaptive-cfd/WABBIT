@@ -408,8 +408,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
         end if
 
-        call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)
-        params_acm%dissipation = params_acm%dissipation + dissipation_block
+        call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+        if (params_acm%dim == 2) then
+            params_acm%dissipation = params_acm%dissipation + sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
+        else
+            params_acm%dissipation = params_acm%dissipation + sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
+        endif
 
     case ("post_stage")
         !-------------------------------------------------------------------------

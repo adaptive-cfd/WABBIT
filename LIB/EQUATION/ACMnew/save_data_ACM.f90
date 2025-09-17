@@ -49,7 +49,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k, iscalar
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, iaverage
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -89,12 +89,12 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor', 'vort')
+        case('vor', 'vort', 'Vor', 'Vort', 'vorticity', 'Vorticity')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
             if (params_acm%dim /= 2) then
-                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' ''vorabs or compute in post (known bug)")
+                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' 'vorabs' or compute in post (known bug)")
             endif
 
             ! vorticity
@@ -147,6 +147,10 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! div(u)
             call compute_divergence(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
         
+        case('diss', 'dissipation')
+            ! local dissipation rate computed over velocity weighted laplacian
+            call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+        
         case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
             'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz')
             ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
@@ -186,6 +190,10 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
         if (name(1:6) == "scalar") then
             read( name(7:7), * ) iscalar
             work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
+        endif
+        if (name(1:14) == "timestatistics") then
+            read( name(15:15), * ) iaverage
+            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + params_acm%N_scalars + iaverage)
         endif
     end do
 

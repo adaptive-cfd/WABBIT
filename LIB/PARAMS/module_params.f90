@@ -116,6 +116,7 @@ module module_params
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik) :: n_eqn = 0_ik
+        integer(kind=ik) :: n_eqn_rhs = 0_ik
         integer(kind=ik) :: N_mask_components = 0_ik
 
         ! block distribution for load balancing (also used for start distribution)
@@ -133,6 +134,13 @@ module module_params
         ! -------------------------------------------------------------------------------------
         real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
+
+        ! -------------------------------------------------------------------------------------
+        ! time statistics (averaging or similar)
+        ! -------------------------------------------------------------------------------------
+        logical :: time_statistics = .false.
+        integer(kind=ik) :: N_time_statistics = 0
+        character(len=cshort), allocatable :: time_statistics_names(:)
 
         ! -------------------------------------------------------------------------------------
         ! MPI

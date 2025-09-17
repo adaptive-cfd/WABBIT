@@ -104,6 +104,15 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
 
    !***************************************************************************
+   ! read time statistics parameters
+   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
+   if (params%time_statistics) then
+      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
+      allocate( params%time_statistics_names(1:params%N_time_statistics) )
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
+   endif
+
+   !***************************************************************************
    ! WABBIT needs to know about the mask function (if penalization is used): does it contain
    ! a time-dependent-part (e.g. moving obstacles, time-dependent forcing)? does it contain
    ! a time-independent part (fixed walls, homogeneous forcing)? or both? WABBIT needs to know
@@ -348,6 +357,7 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_RHS, g_RHS_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
+   call read_param_mpi(FILE, 'Blocks', 'number_equations_rhs', params%n_eqn_rhs, params%n_eqn )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )

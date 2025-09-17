@@ -59,12 +59,13 @@ real(kind=rk), parameter :: FD1_R2_6(-2:4) = (/ 2.0_rk, -24.0_rk, -35.0_rk, 80.0
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_helicity, compute_helicity_abs, compute_divergence, compute_gradient, compute_laplacian, compute_Qcriterion, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil
+PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_helicity, compute_helicity_abs, compute_divergence, compute_gradient, compute_laplacian, compute_Qcriterion, compute_dissipation, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil
 
 contains
 
 #include "compute_Qcriterion.f90"
 #include "compute_vorticity.f90"
+#include "compute_dissipation.f90"
 #include "compute_derivative.f90"
 #include "compute_divergence.f90"
 #include "compute_gradient.f90"

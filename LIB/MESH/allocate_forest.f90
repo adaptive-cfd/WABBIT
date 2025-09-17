@@ -20,7 +20,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), optional, intent(in)              :: neqn_hvy_tmp, nrhs_slots1
     ! local shortcuts:
-    integer(kind=ik)                                    :: g, Neqn, number_blocks,&
+    integer(kind=ik)                                    :: g, Neqn, Neqn_RHS, number_blocks,&
     rank, number_procs,  dim
     integer(kind=ik), dimension(3)                      :: Bs
     integer(kind=ik)    :: rk_steps
@@ -45,6 +45,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     dim             = params%dim
     g               = params%g
     Neqn            = params%n_eqn
+    Neqn_RHS        = params%n_eqn_rhs
     number_procs    = params%number_procs
     memory_total    = 0.0_rk
     nx = Bs(1)+2*g
@@ -169,7 +170,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
         ! hvy_work
         if ( present(hvy_work) ) then
-            mem_per_block = mem_per_block + real(Neqn) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
+            mem_per_block = mem_per_block + real(Neqn_RHS) * real(nrhs_slots) * real(product(Bs(1:dim)+2*g))
         endif
 
         ! values from MPI - reference at module_mpi%init_ghost_nodes
@@ -232,7 +233,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     ! work data (Runge-Kutta substeps and old time level)
     if (present(hvy_work)) then
         if (allocated(hvy_work)) deallocate(hvy_work)
-        allocate( hvy_work( nx, ny, nz, Neqn, params%number_blocks, nrhs_slots ) )
+        allocate( hvy_work( nx, ny, nz, Neqn_RHS, params%number_blocks, nrhs_slots ) )
         memory_this = product(real(shape(hvy_work)))*8.0e-9
         memory_total = memory_total + memory_this
         if (rank==0) then

@@ -226,6 +226,11 @@ subroutine init_ghost_nodes( params )
         ! doesnt scale so size is not counted
         allocate( ijkPatches(1:2, 1:3, -16:56*3, 1:3), stat=status(1) )
 
+        ! re-hack
+        ! the line buffer is really tiny, it does however need to be able to hold everything even if we use many equations (scalars or time_statistics)
+        ! so let's enlargen it according to params%neqn, as this is also affected even if block memory is not depleted
+        Neqn = max(Neqn, params%n_eqn)
+
         ! thanks to the mix of Fortran and MPI this is quite a nightmare with 0- or 1-based arrays
         allocate( send_request(1:2*Ncpu) )
         allocate( recv_request(1:2*Ncpu) )

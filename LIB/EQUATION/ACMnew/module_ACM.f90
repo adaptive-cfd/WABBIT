@@ -12,7 +12,7 @@ module module_acm
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
-  use module_operators, only : compute_vorticity, compute_divergence, compute_derivative
+  use module_operators, only : compute_vorticity, compute_divergence, compute_derivative, compute_dissipation, compute_gradient, compute_laplacian
   use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
   use module_timing
 
@@ -26,7 +26,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
+  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
   !**********************************************************************************************
@@ -95,6 +95,10 @@ module module_acm
     logical :: set_mask_on_ghost_nodes = .false.
     logical :: absorbing_sponge = .true.
 
+    logical :: time_statistics = .false.
+    integer(kind=ik) :: N_time_statistics = 0
+    character(len=cshort), allocatable :: time_statistics_names(:)
+
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
@@ -145,6 +149,7 @@ contains
 #include "sponge.f90"
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
+#include "time_statistics_ACM.f90"
 #include "filter_ACM.f90"
 #include "2D_wingsection.f90"
 
@@ -347,7 +352,7 @@ end subroutine
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )
 
-
+    ! passive scalars
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
     if (params_acm%use_passive_scalar) then
         call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_acm%N_scalars, 1)
@@ -391,6 +396,14 @@ end subroutine
     else
         params_acm%set_mask_on_ghost_nodes = .false.
         params_acm%N_scalars = 0
+    endif
+
+    ! time statistics (averaging or similar)
+    call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params_acm%time_statistics, .false.)
+    if (params_acm%time_statistics) then
+        call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_acm%N_time_statistics, 1)
+        allocate( params_acm%time_statistics_names(1:params_acm%N_time_statistics) )
+        call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_acm%time_statistics_names, (/"none"/))
     endif
 
     ! set defaults
@@ -568,7 +581,7 @@ end subroutine
     if (params_acm%use_passive_scalar)  then
         do iscalar = 1, params_acm%N_scalars
             kappa = params_acm%nu * params_acm%schmidt_numbers(iscalar)
-            dt = min(dt, params_acm%CFL_nu * minval(dx(1:dim))**2 / kappa)
+            if (kappa>1.0e-13_rk) dt = min(dt, params_acm%CFL_nu * minval(dx(1:dim))**2 / kappa)
         enddo
     endif
 

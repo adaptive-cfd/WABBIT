@@ -17,12 +17,12 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
 
 
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, Neqn, l, grhs
+    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, Neqn_RHS, l, grhs
     real(kind=rk) :: t, t_call, t_stage
     ! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save  :: rk_coeffs(:,:)
 
-    Neqn = params%n_eqn
+    Neqn_RHS = params%n_eqn_rhs
     Bs   = params%Bs
     g    = params%g
     grhs = params%g_rhs
@@ -68,7 +68,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         ! first slot in hvy_work is previous time step (time level at start of time step)
-        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, 1 ) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id )
+        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, 1 ) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id )
     end do
 
 
@@ -87,8 +87,8 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             ! first slot in hvy_work is previous time step
-            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,:,hvy_id) = &
-            hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,:,hvy_id,1)
+            hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,1:Neqn_RHS,hvy_id) = &
+            hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,1:Neqn_RHS,hvy_id,1)
         end do
 
         do l = 2, j
@@ -102,9 +102,9 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
                 hvy_id = hvy_active(k, tree_ID)
                 ! new input for computation of k-coefficients
                 ! k_j = RHS((t+dt*c_j, data_field(t) + sum(a_jl*k_l))
-                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) = &
-                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id) &
-                + dt * rk_coeffs(j,l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, :, hvy_id, l)
+                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id) = &
+                hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id) &
+                + dt * rk_coeffs(j,l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, l)
             end do
         end do
 
@@ -130,8 +130,8 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         ! u_n = u_n +...
-        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id) = &
-        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id, 1)
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id) = &
+        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, 1)
 
         do j = 2, size(rk_coeffs, 2)
             ! check if coefficient is zero - if so, avoid loop over all components and active blocks
@@ -142,8 +142,8 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
             ! ... dt*(b1*k1 + b2*k2+ ..)
             ! rk_coeffs(size(rk_coeffs,1)) , since we want to access last line,
             ! e.g. b1 = butcher(last line,2)
-            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id) &
-                   + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn, hvy_id, j)
+            hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id) &
+                   + dt*rk_coeffs(size(rk_coeffs,1),j) * hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, j)
         end do
     end do
 

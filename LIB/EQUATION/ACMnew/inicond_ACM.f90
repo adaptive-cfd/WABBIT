@@ -44,7 +44,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
 
     if (.not. params_acm%initialized) write(*,'(A)') "WARNING: INICOND_ACM called but ACM not initialized"
 
-    if (params_acm%dim==2 .and. size(u,4) /= params_acm%dim + 1 + params_acm%N_scalars) then
+    if (params_acm%dim==2 .and. size(u,4) /= params_acm%dim + 1 + params_acm%N_scalars + params_acm%N_time_statistics) then
         call abort(23091801,"ACM: state vector has not the right number of components")
     endif
 
@@ -560,6 +560,13 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                 call abort(0409192, "Unkown scalar inicond")
             end select
         enddo
+    endif
+
+    ! initialize time statistics
+    if (params_acm%N_time_statistics > 0) then
+        do iscalar = 1, params_acm%N_time_statistics
+            u(:,:,:, params_acm%dim + 1 + params_acm%N_scalars + iscalar) = 0.0_rk
+        end do
     endif
 
 end subroutine INICOND_ACM

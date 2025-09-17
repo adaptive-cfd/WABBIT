@@ -20,7 +20,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     ! in fortran, we work with indices:
     integer                             :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
     integer, parameter                  :: y00=1, F0=2
-    integer(kind=ik)                    :: i, k, s, hvy_id, grhs
+    integer(kind=ik)                    :: i, k, s, hvy_id, grhs, Neqn_RHS
     real(kind=rk)                       :: tau, t_call, t_stage
     logical, save                       :: setup_complete = .false.
     logical, save                       :: informed = .false.
@@ -34,6 +34,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     ! s is the number of stages
     s = params%s
     grhs = params%g_rhs
+    Neqn_RHS = params%n_eqn_rhs
 
     if (.not. informed) then
         if (params%rank==0) then
@@ -74,9 +75,9 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         ! Y0 = u (in matlab: y00 = u;)
-        hvy_work(:,:,:,:,hvy_id, y00 ) = hvy_block(:,:,:,:,hvy_id)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y00 ) = hvy_block(:,:,:,1:Neqn_RHS,hvy_id)
         ! we need two copies (one is an iteration variable, the other (above) is kept constant)
-        hvy_work(:,:,:,:,hvy_id, y0  ) = hvy_block(:,:,:,:,hvy_id)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0  ) = hvy_block(:,:,:,1:Neqn_RHS,hvy_id)
     enddo
     Insect%rhs(:,y00) = Insect%STATE
     Insect%rhs(:,y0 ) = Insect%STATE
@@ -98,8 +99,8 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
         ! y1 = y0 + mu_tilde(1) * dt * F0;
-        hvy_work(:,:,:,:,hvy_id, y1 ) = hvy_work(:,:,:,:,hvy_id, y0) &
-        + mu_tilde(s,1) * dt * hvy_work(:,:,:,:,hvy_id, F0)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y1 ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0) &
+        + mu_tilde(s,1) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0)
     enddo
     Insect%rhs(:,y1) = Insect%rhs(:,y0) + mu_tilde(s,1) * dt * Insect%rhs(:,F0)
     call toc( "timestep (Euler step)", 22, MPI_wtime()-t_call)
@@ -130,11 +131,11 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k,tree_ID)
 
-            hvy_work(:,:,:,:,hvy_id, y2 ) = (1.0_rk-mu(s,i)-nu(s,i))*hvy_work(:,:,:,:,hvy_id, y00) &
-            + mu(s,i) * hvy_work(:,:,:,:,hvy_id, y1 ) &
-            + nu(s,i) * hvy_work(:,:,:,:,hvy_id, y0 ) &
-            + mu_tilde(s,i) * dt * hvy_work(:,:,:,:,hvy_id, F1 ) &
-            + gamma_tilde(s,i) * dt * hvy_work(:,:,:,:,hvy_id, F0 )
+            hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y2 ) = (1.0_rk-mu(s,i)-nu(s,i))*hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y00) &
+            + mu(s,i) * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y1 ) &
+            + nu(s,i) * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0 ) &
+            + mu_tilde(s,i) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F1 ) &
+            + gamma_tilde(s,i) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0 )
         enddo
 
         Insect%rhs(:,y2) = (1.0_rk-mu(s,i)-nu(s,i))*Insect%rhs(:,y00) &
@@ -158,7 +159,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
 
-        hvy_block(:,:,:,:,hvy_id ) = hvy_work(:,:,:,:,hvy_id, y2 )
+        hvy_block(:,:,:,1:Neqn_RHS,hvy_id ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y2 )
     enddo
 
     Insect%STATE = Insect%rhs(:,y2)

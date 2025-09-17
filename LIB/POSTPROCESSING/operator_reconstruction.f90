@@ -58,12 +58,6 @@ subroutine operator_reconstruction(params)
     params%symmetry_vector_component = "0"
     params%number_blocks = ceiling(8.0_rk*lgt_n(tree_ID) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) ! to allow refinement and adapt_tree
 
-    ! Note:
-    ! When comparing with the basic hand-made matlab operator script, keep in mind
-    ! that the coarseWins solution overwrites the fine with coarse data on the interface.
-    ! The basic matlab script does not keep these points, but wabbit does. So at the interface, two
-    ! new points are added in wabbit
-
 
     call get_cmd_arg( "--discretization", params%order_discretization, default="FD_4th_central" )
     call get_cmd_arg( "--viscosity", nu, default=0.0_rk )
@@ -251,7 +245,7 @@ subroutine operator_reconstruction(params)
             if (refine) then
                 call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1=1, tree_ID2=1)
 
-                ! call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
 
                 call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif

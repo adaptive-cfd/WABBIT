@@ -40,6 +40,9 @@ contains
     subroutine reset_all_timings()
         implicit none
         if (allocated(comp_time)) comp_time = 0.0_dp
+        ! reset names and num
+        if (allocated(name_comp_time)) name_comp_time = "---"
+        if (allocated(num_comp_time)) num_comp_time(:, 1) = -1
     end subroutine
 
     ! List of codes that I somewhat arbitrarily set just to have some kind of sorting for toc calls

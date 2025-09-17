@@ -400,10 +400,11 @@ program main
 
                 ! actual coarsening (including the mask function)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask, hvy_work=hvy_work)
+                    hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_WD=params%n_eqn-params%N_time_statistics)
             else
                 ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_work=hvy_work, neqn_WD=params%n_eqn-params%N_time_statistics)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)

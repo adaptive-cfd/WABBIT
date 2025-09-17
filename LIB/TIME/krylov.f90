@@ -45,7 +45,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
     ! synchronize ghost nodes
     t_call = MPI_wtime()
-    call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs )
+    call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs )
     call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
@@ -92,7 +92,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
         t_call = MPI_wtime()
-        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,:,:,M_max+2), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,1:Neqn_RHS,:,M_max+2), tree_ID, g_minus=grhs, g_plus=grhs  )
         call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
         t_call = MPI_wtime()

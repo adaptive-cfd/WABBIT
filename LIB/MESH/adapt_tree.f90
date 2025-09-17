@@ -8,7 +8,7 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, init_full_tree_grid, std_est)
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, init_full_tree_grid, std_est, neqn_WD )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -16,6 +16,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(inout)   :: params  !< good ol' params
+    integer(kind=ik), intent(in)        :: tree_ID
     !> heavy data array
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy tmp data array - block data.
@@ -35,14 +36,16 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_maxlevel
     !> Maybe we already have a full tree grid, so we do not need to initialize it
     logical, intent(in), optional       :: init_full_tree_grid
-    integer(kind=ik), intent(in)        :: tree_ID
     !> Sometimes we want to pass in and out the estimated std - this probably will be made more smart at some point
     real(kind=rk), optional, intent(inout) :: std_est(:)
+    !> In rare cases, not all equations need to be wavelet decomposed, this saves a lot of extra work.
+    !> If not present, all equations are used. Applying this decomposes only SC and reconstructs by copying
+    integer(kind=ik), optional, intent(in) :: neqn_WD
     
     ! loop variables
     integer(kind=ik)                    :: iteration, k, lgt_id
     real(kind=rk)                       :: t_block, t_all, t_loop
-    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id, neqn_WD_apply
     logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, initFullTreeGrid, iterate, toBeManipulated
     integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this
     character(len=clong)                :: toc_statement
@@ -80,6 +83,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     if (present(ignore_maxlevel)) ignore_maxlevel_apply = ignore_maxlevel
     initFullTreeGrid = .true.
     if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
+    neqn_WD_apply = size(hvy_block, 4)
+    if (present(neqn_WD)) neqn_WD_apply = neqn_WD
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -228,9 +233,18 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             hvy_block(:, :, : ,1:size(hvy_block, 4), hvy_id) = hvy_tmp(:, :, : ,1:size(hvy_block, 4), hvy_id)  ! restore original values
         enddo
     else
-        ! In a special case reconstruction can be skipped as it has already been thone, therefore the if-condition
+        ! In a special case reconstruction can be skipped as it has already been done, therefore the if-condition
         if (.not. ((indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") .and. ignore_coarsening_apply)) then
-            call wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID)
+            ! generally, we wavelet reconstruct all equations. In some rare cases, only a subset is required, for example for time statistics
+            ! in this case, we reconstruct only the first neqn_WD_apply equations and the rest is copied from the backup
+            ! Note that hvy_tmp contains the original values, so we copy them back after reconstructing the first neqn_WD_apply equations
+            call wavelet_reconstruct_full_tree(params, hvy_block(:,:,:,1:neqn_WD_apply,:), hvy_tmp(:,:,:,1:neqn_WD_apply,:), tree_ID)
+            if (neqn_WD_apply < size(hvy_block, 4)) then
+                do k = 1, hvy_n(tree_ID)
+                    hvy_ID = hvy_active(k, tree_ID)
+                    hvy_block(:, :, : ,neqn_WD_apply+1:size(hvy_block, 4), hvy_ID) = hvy_tmp(:, :, : ,neqn_WD_apply+1:size(hvy_block, 4), hvy_ID)  ! restore original values
+                enddo
+            endif
         endif
     endif
     call toc( "adapt_tree (reconstruct_tree)", 105, MPI_Wtime()-t_block )
@@ -262,7 +276,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, neqn_WD, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -275,8 +289,11 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     logical, intent(in), optional       :: compute_SC_only  !< only apply scaling function filter, defaults to false
     real(kind=rk), optional :: scaling_filter(:)  !< filter to be used for the SC, only used with compute_SC_only=T, defaults to params%HD
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
+    !> In rare cases, not all equations need to be wavelet decomposed, this saves a lot of extra work.
+    !> If not present, all equations are used. Applying this decomposes only SC and reconstructs by copying
+    integer(kind=ik), optional, intent(in) :: neqn_WD
 
-    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level
+    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level, neqn_WD_apply
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: toc_statement
     logical              :: iterate, use_leaf_first, initFullTreeGrid, computeSCOnly
@@ -296,6 +313,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         allocate(scalingFilter(lbound(params%HD, dim=1):ubound(params%HD, dim=1)))
         scalingFilter(:) = params%HD(:)
     endif
+    neqn_WD_apply = size(hvy_block, 4)
+    if (present(neqn_WD)) neqn_WD_apply = neqn_WD
 
     ! the refinement_status is used in this routine for things other than the refinement_status
     ! but that may be problematic if we have set the refinement_status externally and like to keep it.
@@ -430,7 +449,12 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
                     call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), params%HD, &
                         lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
                 else
-                    call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_ID))
+                    ! generally, we wavelet decompose all equations. In some rare cases, only a subset is required, for example for time statistics
+                    ! in this case, we decompose only the first neqn_WD_apply equations and the rest only with the scaling function
+                    call waveletDecomposition_block(params, hvy_block(:,:,:,1:neqn_WD_apply,hvy_ID))
+                    if (neqn_WD_apply < size(hvy_block, 4)) then
+                        call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,neqn_WD_apply+1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,neqn_WD_apply+1:size(hvy_block, 4),hvy_ID), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
+                    endif
                 endif
             endif
         end do

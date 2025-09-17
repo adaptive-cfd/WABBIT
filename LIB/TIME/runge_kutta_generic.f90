@@ -49,7 +49,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
 
     ! synchronize ghost nodes
     t_call = MPI_wtime()
-    call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs )
+    call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs )
     call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
@@ -110,7 +110,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
 
         ! synchronize ghost nodes for new input
         t_call = MPI_wtime()
-        call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs )
+        call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs )
         call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
         ! note substeps are at different times, use temporary time "t"

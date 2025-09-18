@@ -54,9 +54,20 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
         case ("phi-int")
             ! compute the integral of phi over time
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)
-        case ("phi-avg")
+        case ("phi-avg", "phi-mean")
             ! compute the average of phi over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
+        case ("phi-var")
+            ! compute the variance of phi over time using Welford's method
+            ! This needs the computation of the average in the variable afterwards to work
+            if (i_ts == params_convdiff%N_time_statistics .or. (trim(params_convdiff%time_statistics_names(i_ts+1)) /= "phi-avg" .and. trim(params_convdiff%time_statistics_names(i_ts+1)) /= "phi-mean")) then
+                call abort(2153001, "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert 'phi-avg' right after 'phi-var' in time_statistics_names.")
+            end if
+            ! var_new = (time_diff-dt)/time_diff*var_old + dt/time_diff*(x - mean_old)*(x - mean_new)
+            ! mean_new = (time_diff-dt)/time_diff*mean_old + dt/time_diff*x
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff) * &
+                 (u(:,:,:,1) - u(:,:,:,N_offset + i_ts + 1)) * &
+                 (u(:,:,:,1) - ((time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts + 1) + dt/(time_diff)*u(:,:,:,1)))
         case ("phi-minmax")
             ! compute the minmax of phi over time
             do iz = merge(1,g+1,params_convdiff%dim==2), merge(1,Bs(3)+g,params_convdiff%dim==2)

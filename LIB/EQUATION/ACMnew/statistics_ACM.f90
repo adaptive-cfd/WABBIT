@@ -410,9 +410,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
         if (params_acm%dim == 2) then
-            params_acm%dissipation = params_acm%dissipation + sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
         else
-            params_acm%dissipation = params_acm%dissipation + sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
         endif
 
     case ("post_stage")
@@ -602,7 +602,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! turbulent statistics - these are normed by the volume!
             if (params_acm%nu*params_acm%enstrophy > 0.0_rk) then
-                dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                dissipation = params_acm%dissipation/product(params_acm%domain_size(1:params_acm%dim))
                 u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &

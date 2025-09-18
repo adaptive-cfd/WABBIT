@@ -146,15 +146,15 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
 
 
-            params_acm%mean_flow(1) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            params_acm%mean_flow(2) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
+            params_acm%mean_flow(1) = params_acm%mean_flow(1) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            params_acm%mean_flow(2) = params_acm%mean_flow(2) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
             if (params_acm%dim==2) then
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1)**2)
             else
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)
-                params_acm%mean_flow(3) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
+                params_acm%mean_flow(3) = params_acm%mean_flow(3) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
             endif
 
             ! NOTE: MPI_SUM is perfomed in the post_stage.
@@ -240,11 +240,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            if (params_acm%dim == 2) then
-                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
-            else
-                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
-            endif
+            params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:params_acm%dim))
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
         endif
 
@@ -1497,16 +1493,12 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
         
         ! Forcing should not be applied onto the mean-flow, so we subtract it out
-        ! ATTENTION! This modifies phi so it should be the last statement with phi
-        phi(:,:,:,1) = phi(:,:,:,1) - params_acm%mean_flow(1)
-        phi(:,:,:,2) = phi(:,:,:,2) - params_acm%mean_flow(2)
-        phi(:,:,:,3) = phi(:,:,:,3) - params_acm%mean_flow(3)
-        ! cancel out mean_flow, this is quite brutal but let's see what it does
-        rhs(:,:,:,1) = rhs(:,:,:,1) - 1e4*params_acm%mean_flow(1)
-        rhs(:,:,:,2) = rhs(:,:,:,2) - 1e4*params_acm%mean_flow(2)
-        rhs(:,:,:,3) = rhs(:,:,:,3) - 1e4*params_acm%mean_flow(3)
-        ! apply forcing
-        rhs(:,:,:,1:3) = rhs(:,:,:,1:3) + A_forcing*phi(:,:,:,1:3)
+        ! cancel out mean_flow, this is quite brutal but let's see what it does, also apply forcing
+        rhs(:,:,:,1) = rhs(:,:,:,1) + A_forcing*(phi(:,:,:,1) - params_acm%mean_flow(1))
+        rhs(:,:,:,2) = rhs(:,:,:,2) + A_forcing*(phi(:,:,:,2) - params_acm%mean_flow(2))
+        rhs(:,:,:,3) = rhs(:,:,:,3) + A_forcing*(phi(:,:,:,3) - params_acm%mean_flow(3))
+
+        ! accidental mean flow in domain is removed later at the end of RHS wrapper
     endif
 
 

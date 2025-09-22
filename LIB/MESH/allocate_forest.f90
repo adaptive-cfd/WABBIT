@@ -46,6 +46,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     g               = params%g
     Neqn            = params%n_eqn
     Neqn_RHS        = params%n_eqn_rhs
+    if (Neqn_RHS == 0) Neqn_RHS = Neqn
     number_procs    = params%number_procs
     memory_total    = 0.0_rk
     nx = Bs(1)+2*g

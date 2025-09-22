@@ -502,6 +502,18 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
           enddo
       enddo
       u0 = u0 * dexp(-(time / params_convdiff%tau) ** 2)
+    
+    case("center_expand")
+        ! this condition periodically expands and contracts the field from the center
+        do iy = 1, Bs(2) + 2*g
+            do ix = 1, Bs(1) + 2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                u0(ix,iy,1) = cos((pi*time)/T) * (sin(pi*x/c0x)) * params_convdiff%u0x(i)
+                u0(ix,iy,2) = cos((pi*time)/T) * (sin(pi*y/c0y)) * params_convdiff%u0y(i)
+            enddo
+        enddo
 
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')

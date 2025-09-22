@@ -3,6 +3,8 @@
 ! these are then also adapted over time
 !-----------------------------------------------------------------------------
 subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, mask )
+    use module_operators
+
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -77,6 +79,75 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
                     end do
                 end do
             end do
+
+        case ("phi2-int")
+            ! compute the integral of phi² over time
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)**2
+        case ("phi2-avg", "phi2-mean")
+            ! compute the average of phi² over time
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)**2
+        
+        ! Phi derivative cases
+        case ("phidx-int")
+            ! compute the integral of ∂phi/∂x over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidx-avg", "phidx-mean")
+            ! compute the average of ∂phi/∂x over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        case ("phidy-int")
+            ! compute the integral of ∂phi/∂y over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidy-avg", "phidy-mean")
+            ! compute the average of ∂phi/∂y over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        case ("phidz-int")
+            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
+            ! compute the integral of ∂phi/∂z over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidz-avg", "phidz-mean")
+            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
+            ! compute the average of ∂phi/∂z over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        
+        ! Squared phi derivative cases
+        case ("phidx2-int")
+            ! compute the integral of (∂phi/∂x)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidx2-avg", "phidx2-mean")
+            ! compute the average of (∂phi/∂x)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        case ("phidy2-int")
+            ! compute the integral of (∂phi/∂y)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidy2-avg", "phidy2-mean")
+            ! compute the average of (∂phi/∂y)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        case ("phidz2-int")
+            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
+            ! compute the integral of (∂phi/∂z)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("phidz2-avg", "phidz2-mean")
+            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
+            ! compute the average of (∂phi/∂z)² over time
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
+            work(:,:,:,1) = work(:,:,:,1)**2
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
 
         case default
             call abort(2153000, "[TIME_STATISTICS_CONVDIFF]: time_statistics_name "// &

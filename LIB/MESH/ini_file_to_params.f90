@@ -64,7 +64,7 @@ subroutine ini_file_to_params( params, filename )
       allocate( params%input_files( params%n_eqn ) )
 
       params%input_files = "---"
-      call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
+      call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files, check_file_exists=.true. )
    end if
 
    ! wabbit does need to know how many fiels are written to disk when saving is triggered.

@@ -47,7 +47,7 @@ module module_ini_files_parser
 
     ! the generic call "read_param" redirects to these routines, depending on the data
     ! type and the dimensionality. vectors can be read without setting a default.
-    interface read_param
+    interface read_param 
         module procedure param_sgl, param_dbl, param_int, param_vct, param_str, &
             param_bool, param_vct_str, param_vct_bool, param_matrix
         end interface
@@ -257,8 +257,7 @@ module module_ini_files_parser
             ! check if the specified file exists
             inquire ( file=file, exist=exists )
             if ( exists .eqv. .false.) then
-                write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-                call abort(300320201, "INIFILES: File not found!")
+                call abort(300320201, "INIFILES ERROR: Ini-file not found! " // trim(adjustl(file)) )
             endif
 
             ! we set the module-global variable verbosity. if set to false, all routines
@@ -359,7 +358,7 @@ module module_ini_files_parser
                     params_real = params_real*dx
                     write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
                     if ( lattice_spacing_set .eqv. .false.) then
-                        call abort(300320201, "INIFILES: ERROR: you try to read relative values without setting dx first.")
+                        call abort(300320201, "INIFILES ERROR: you try to read relative values without setting dx first.")
                     endif
                 endif
             else
@@ -409,7 +408,7 @@ module module_ini_files_parser
                     write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
 
                     if ( lattice_spacing_set .eqv. .false.) then
-                        call abort(03030303, "INIFILES:  ERROR: you try to read relative values without setting dx first.")
+                        call abort(03030303, "INIFILES ERROR: you try to read relative values without setting dx first.")
                     endif
 
                 endif
@@ -436,7 +435,7 @@ module module_ini_files_parser
         ! Output:
         !       params_string: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
-        subroutine param_str (PARAMS, section, keyword, params_string, defaultvalue)
+        subroutine param_str (PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
             implicit none
 
             ! Contains the ascii-params file
@@ -446,6 +445,9 @@ module module_ini_files_parser
             character(len=maxcolumns)  value    ! returns the value
             character(len=*), intent (inout) :: params_string
             character(len=*), intent (in) :: defaultvalue
+            logical, optional, intent(in) :: check_file_exists
+
+            logical :: exists
 
             call GetValue(PARAMS, section, keyword, value)
 
@@ -454,6 +456,16 @@ module module_ini_files_parser
             else
                 value = trim(adjustl(defaultvalue))//" (default!)"
                 params_string = defaultvalue
+            endif
+
+            ! sometimes we read in file-names. If the file is not there, then quirky things happen, so lets check that here
+            if (present(check_file_exists)) then
+                if (check_file_exists) then
+                    ! check if the specified file exists
+                    inquire ( file=params_string, exist=exists )
+                    call abort(250922, "INIFILES ERROR: File was not found! "// &
+                        trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_string)) )
+                endif
             endif
 
             ! in verbose mode, inform about what we did
@@ -495,9 +507,6 @@ module module_ini_files_parser
 
             if ( present(defaultvalue) ) then
                 m = size(defaultvalue,1)
-                if (n/=m) then
-                    write(*,*) "error: vector and default value are not of the same length"
-                endif
             endif
 
             write(formatstring,'("(",i3.3,"(g10.3,1x))")') n
@@ -508,13 +517,12 @@ module module_ini_files_parser
                 ! read the n values from the vector string
                 read (value, *, iostat=iostat) params_vector
                 if (iostat /= 0) then
-                    write(*,*) "ERROR! The vector we try to read from "//trim(adjustl(section))//"::"//trim(adjustl(keyword))
-                    write(*,*) "does NOT have the right length (expected::",n,")"
-                    call abort(3003209, "INIFILES: vector has incompatible length!")
+                    write(value,'(A, I0, A)') "INIFILES ERROR: Vector " // trim(adjustl(section))//"::"//trim(adjustl(keyword))//" has incompatible length! (expected ",n," )"
+                    call abort(250922, trim(value))
                 endif
                 write (value, formatstring) params_vector
             else
-                if (present(defaultvalue)) then
+                if (present(defaultvalue) .or. n==m) then
                     ! return default
                     write (value,formatstring) defaultvalue
                     value = trim(adjustl(value))//" (default!)"
@@ -523,7 +531,8 @@ module module_ini_files_parser
                     ! return zeros
                     params_vector = 0.0_rk
                     write (value,formatstring) params_vector
-                    value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
+                    if (.not. present(defaultvalue)) value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
+                    if (n/=m) value = trim(adjustl(value))//" (RETURNING ZEROS - DEFAULT HAS WRONG LENGTH!)"
                 endif
             endif
 
@@ -546,7 +555,7 @@ module module_ini_files_parser
         !! Output:
         !!       params_string: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
-        subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue)
+        subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
             implicit none
             ! Contains the ascii-params file
             type(inifile), intent(inout)    :: PARAMS
@@ -554,32 +563,65 @@ module module_ini_files_parser
             character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
             character(len=*), intent (inout) :: params_vector(1:)
             character(len=*), intent (in) :: defaultvalue(1:)
+            logical, optional, intent(in) :: check_file_exists
 
-            integer :: n,m
+            integer :: n,m,iostat
             character(len=maxcolumns) :: value
-            character(len=14)::formatstring
+            logical :: exists
 
             n = size(params_vector,1)
             m = size(defaultvalue,1)
             if (n==0) return
 
-            if (n/=m) then
-                write(*,*) "error: vector and default value are not of the same length"
-            endif
-
-            write(formatstring,'("(",i2.2,"(g8.3,1x))")') n
-
             call GetValue(PARAMS, section, keyword, value)
 
             if (value .ne. '') then
-                ! read the three values from the vector string
-                read (value, *) params_vector
-                write (value,formatstring) params_vector
+                ! read the values from the vector string
+                read (value, *, iostat=iostat) params_vector
+                if (iostat /= 0) then
+                    write(value,'(A, I0, A)') "INIFILES ERROR: Vector " // trim(adjustl(section))//"::"//trim(adjustl(keyword))//" has incompatible length! (expected ",n," )"
+                    call abort(250922, trim(value))
+                endif
+                ! Build trimmed value string manually
+                value = ''
+                do n = 1, size(params_vector)
+                    if (n == 1) then
+                        value = trim(params_vector(n))
+                    else
+                        value = trim(value) // ' ' // trim(params_vector(n))
+                    endif
+                enddo
                 !params_vector = value
             else
-                write (value,formatstring) defaultvalue
+                if (n/=m) then
+                    call abort(250922, "INIFILES ERROR: Trying to set default, but vector and default value are not of the same length")
+                endif
+
+                ! Build trimmed default value string manually
+                value = ''
+                do n = 1, size(defaultvalue)
+                    if (n == 1) then
+                        value = trim(defaultvalue(n))
+                    else
+                        value = trim(value) // ' ' // trim(defaultvalue(n))
+                    endif
+                enddo
                 value = trim(adjustl(value))//" (default!)"
                 params_vector = defaultvalue
+            endif
+
+            ! check for each entry in params_vector if the file exists, in case that is required
+            if (present(check_file_exists)) then
+                if (check_file_exists) then
+                    do n = 1, size(params_vector)
+                        ! check if the specified file exists
+                        inquire ( file=params_vector(n), exist=exists )
+                        if (.not. exists) then
+                            call abort(250922, "INIFILES ERROR: File was not found! "// &
+                                trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_vector(n))) )
+                        endif
+                    enddo
+                endif
             endif
 
             ! in verbose mode, inform about what we did
@@ -702,9 +744,6 @@ module module_ini_files_parser
             if (n==0) return
 
             m = size(defaultvalue,1)
-            if (n/=m) then
-                write(*,*) "error: vector and default value are not of the same length"
-            endif
 
             write(formatstring,'("(",i2.2,"(L1,1x))")') n
 
@@ -733,6 +772,9 @@ module module_ini_files_parser
                 end do
                 write (value,formatstring) params_vector
             else
+                if (n/=m) then
+                    call abort(250922, "INIFILES ERROR: Trying to set default, but vector and default value are not of the same length")
+                endif
                 write (value,formatstring) defaultvalue
                 value = trim(value)//" (default!)"
                 params_vector = defaultvalue
@@ -775,7 +817,7 @@ module module_ini_files_parser
             value = ''
 
             if (allocated(matrix)) then
-                call abort(030320207, "INIFILES: ERROR: matrix already allocated")
+                call abort(030320207, "INIFILES ERROR: matrix already allocated")
             end if
 
             !-- loop over the lines of PARAMS.ini file
@@ -1101,7 +1143,7 @@ module module_ini_files_parser
                                 exit
                             elseif (index(line2, "=") /= 0 .and. j>i) then
                                 ! a = would mean we skipped past the matrix definition to the next variable..
-                                call abort(767626201, "INIFILES: ERROR: invalid ini matrix (closing characters not found!)" )
+                                call abort(767626201, "INIFILES ERROR: invalid ini matrix (closing characters not found!)" )
                             end if
                         end do
 

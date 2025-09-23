@@ -617,8 +617,9 @@ module module_ini_files_parser
                         ! check if the specified file exists
                         inquire ( file=params_vector(n), exist=exists )
                         if (.not. exists) then
-                            call abort(250922, "INIFILES ERROR: File was not found! "// &
-                                trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_vector(n))) )
+                            write(value,'(A, I0, A)') "INIFILES ERROR: File ", n, " was not found! "// &
+                                trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_vector(n)))
+                            call abort(250922, value)
                         endif
                     enddo
                 endif

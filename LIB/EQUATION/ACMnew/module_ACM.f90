@@ -272,7 +272,8 @@ end subroutine
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params_acm%read_from_files, .false.)
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
     if (params_acm%read_from_files) then
-        call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "", check_file_exists=.true.)
+        ! read in all files as one string (so no check for file existence), then hack-extract the timestamp, which is used for insect_init
+        call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
         timestamp = input_files( scan(input_files,'_', back=.true.)+1:scan(input_files,'.h5', back=.true.)-3)
         read(timestamp,*) params_acm%start_time
         ! note this requires to have timestamp in the filename (so we cannot rename files...)

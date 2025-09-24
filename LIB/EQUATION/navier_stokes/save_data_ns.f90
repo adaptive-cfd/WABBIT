@@ -73,7 +73,12 @@
     if (  list_contains_name(params_ns%names,'vortx')>0 .or. &
           list_contains_name(params_ns%names,'vort') >0 ) then
       if ( .not. allocated(vort) ) allocate(vort(size(u,1),size(u,2),size(u,3),3))
-      call compute_vorticity(tmp_u(:,:,:,UxF), tmp_u(:,:,:,UyF), tmp_u(:,:,:,UzF), &
+      ! JB comment: compute_vorticity expects a 4D array, so we have to pass the full state vector
+      ! I assume here that UyF = UxF+1 and UzF = UxF+2
+      if (Uyf /= UxF+1 .or. (params_ns%dim == 3 .and. Uzf /= UxF+2)) then
+        call abort(250703, 'ERROR: UyF and UzF do not match the expected indices for vorticity computation, these should be UxF+1 and UxF+2.')
+      end if
+      call compute_vorticity(tmp_u(:,:,:,UxF:UxF+2), &
                             dx, Bs, g, params_ns%discretization, vort)
     end if
 

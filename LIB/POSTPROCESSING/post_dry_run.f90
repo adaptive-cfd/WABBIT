@@ -126,6 +126,7 @@ subroutine post_dry_run
 
     params%eps = 1.0e-6
     params%coarsening_indicator = "threshold-state-vector"
+    params%refinement_indicator = "mask-threshold"
 
     if (params%rank==0) then
         write(*,'(A)') "DRY-RUN: creating mask function. Please note that the params"

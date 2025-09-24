@@ -142,19 +142,19 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             ! vorticity work array
             if (.not. allocated(vor) ) allocate(vor(1:size(u,1), 1:size(u,2), 1:size(u,3), 1:3 ))
             ! to compute the current dissipation rate
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, vor(:,:,:,:))
+            call compute_vorticity(u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, vor(:,:,:,:))
 
 
 
-            params_acm%mean_flow(1) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            params_acm%mean_flow(2) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
+            params_acm%mean_flow(1) = params_acm%mean_flow(1) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
+            params_acm%mean_flow(2) = params_acm%mean_flow(2) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
             if (params_acm%dim==2) then
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g,    :       , 1)**2)
             else
                 params_acm%e_kin = params_acm%e_kin + 0.5_rk*dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:params_acm%dim)**2)
                 params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*dv*sum(vor(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)
-                params_acm%mean_flow(3) = dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
+                params_acm%mean_flow(3) = params_acm%mean_flow(3) + dv*sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
             endif
 
             ! NOTE: MPI_SUM is perfomed in the post_stage.
@@ -240,11 +240,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            if (params_acm%dim == 2) then
-                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2))
-            else
-                params_acm%mean_flow = params_acm%mean_flow / (params_acm%domain_size(1)*params_acm%domain_size(2)*params_acm%domain_size(3))
-            endif
+            params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:params_acm%dim))
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
         endif
 
@@ -380,7 +376,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     C_eta_inv = 1.0_rk / C_eta
 
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars) then
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
         call abort(66233,"wrong size, I go for a walk instead.")
     endif
 
@@ -1497,16 +1493,12 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)
         
         ! Forcing should not be applied onto the mean-flow, so we subtract it out
-        ! ATTENTION! This modifies phi so it should be the last statement with phi
-        phi(:,:,:,1) = phi(:,:,:,1) - params_acm%mean_flow(1)
-        phi(:,:,:,2) = phi(:,:,:,2) - params_acm%mean_flow(2)
-        phi(:,:,:,3) = phi(:,:,:,3) - params_acm%mean_flow(3)
-        ! cancel out mean_flow, this is quite brutal but let's see what it does
-        rhs(:,:,:,1) = rhs(:,:,:,1) - 1e4*params_acm%mean_flow(1)
-        rhs(:,:,:,2) = rhs(:,:,:,2) - 1e4*params_acm%mean_flow(2)
-        rhs(:,:,:,3) = rhs(:,:,:,3) - 1e4*params_acm%mean_flow(3)
-        ! apply forcing
-        rhs(:,:,:,1:3) = rhs(:,:,:,1:3) + A_forcing*phi(:,:,:,1:3)
+        ! cancel out mean_flow, this is quite brutal but let's see what it does, also apply forcing
+        rhs(:,:,:,1) = rhs(:,:,:,1) + A_forcing*(phi(:,:,:,1) - params_acm%mean_flow(1))
+        rhs(:,:,:,2) = rhs(:,:,:,2) + A_forcing*(phi(:,:,:,2) - params_acm%mean_flow(2))
+        rhs(:,:,:,3) = rhs(:,:,:,3) + A_forcing*(phi(:,:,:,3) - params_acm%mean_flow(3))
+
+        ! accidental mean flow in domain is removed later at the end of RHS wrapper
     endif
 
 
@@ -1516,6 +1508,7 @@ end subroutine RHS_3D_acm
 
 
 subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
+    use module_operators
     implicit none
 
     !> grid parameter
@@ -1547,15 +1540,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     integer(kind=ik) :: ix, iy, iz, iscalar, j
 
-    ! coefficients for Tam&Webb (4th order 1st derivative)
-    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    ! coefficients for a standard centered 4th order 1st derivative
-    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
-    ! 4th order coefficients for second derivative
-    real(kind=rk), parameter :: b_FD4(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-    ! 6th order FD scheme
-    real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
-    real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+    !> parameters for FD1L, FD2 operators (generalized stencil approach)
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
     real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
@@ -1578,296 +1565,219 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     nu = params_acm%nu
 
-    select case(order_discretization)
-    case("FD_2nd_central")
-        call abort(2208191, "passive scalar implemented only with 4th order....sorry, I am lazy")
+    !-----------------------------------------------------------------------
+    ! passive scalar equations: loop over all scalars and compute RHS
+    !-----------------------------------------------------------------------
+    ! Setup stencils using the unified interface from module_operators
+    call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
+    call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
 
-    case("FD_4th_central_optimized")
-        !-----------------------------------------------------------------------
-        ! 4th order
-        !-----------------------------------------------------------------------
-        do iscalar = 1, params_acm%N_scalars
-            ! actual index of this scalar in the array
-            j = iscalar + (params_acm%dim + 1)
+    ! Loop over all scalars
+    do iscalar = 1, params_acm%N_scalars
+        ! actual index of this scalar in the array
+        j = iscalar + (params_acm%dim + 1)
 
-            ! compute diffusivity from schmidt number (and fluid viscosity)
-            kappa = nu / params_acm%schmidt_numbers(iscalar)
+        ! compute diffusivity from schmidt number (and fluid viscosity)
+        kappa = nu / params_acm%schmidt_numbers(iscalar)
 
-            ! reset source term for each scalar.
-            source = 0.0_rk
+        ! reset source term for each scalar.
+        source = 0.0_rk
 
-            ! 1st: compute source terms (note the strcmp needs to be outside the loop)
-            select case (params_acm%scalar_source_type(iscalar))
-            case ("gaussian")
-                do iz = g+1, Bs(3)+g
-                    z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
-                    do iy = g+1, Bs(2)+g
-                        y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                        do ix = g+1, Bs(1)+g
-                            x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+        ! 1st: compute source terms (note the strcmp needs to be outside the loop)
+        select case (params_acm%scalar_source_type(iscalar))
+        case ("gaussian")
+            do iz = g+1, Bs(3)+g
+                z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
+                do iy = g+1, Bs(2)+g
+                    y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                    do ix = g+1, Bs(1)+g
+                        x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
-                            R = x + y + z ! note this is (x-x0)**2
+                        R = x + y + z ! note this is (x-x0)**2
 
-                            masksource = dexp( -R / (params_acm%widthsource(iscalar)**2)  )
+                        masksource = dexp( -R / (params_acm%widthsource(iscalar)**2)  )
 
-                            if (masksource > 1.0d-6) then
-                                ! for the source term, we use the usual dirichlet C_eta
-                                ! to force scalar to 1
-                                ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / params_acm%C_eta
-                                source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / params_acm%C_eta
-                                ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
-                            endif
-                        end do
-                    end do
-                end do
-            case ("circular")
-                R0sq = params_acm%widthsource(iscalar)**2
-                do iz = g+1, Bs(3)+g
-                    z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
-                    do iy = g+1, Bs(2)+g
-                        y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                        do ix = g+1, Bs(1)+g
-                            x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
-
-                            R = x + y + z ! note this is (x-x0)**2
-
-                            if ( R <= R0sq ) then
-                                ! for the source term, we use the usual dirichlet C_eta
-                                ! to force scalar to 1
-                                source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
-                            endif
-                        end do
-                    end do
-                end do
-
-            case ("inflow-x")
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            x = x0(1) + dble(ix-(g+1))*dx(1)
-                            if ( x <= params_acm%widthsource(iscalar) ) then
-                                ! INFLOW
-                                source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
-                            endif
-                        end do
-                    end do
-                end do
-
-            case ("in+outflow-x")
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            x = x0(1) + dble(ix-(g+1))*dx(1)
-                            if ( x <= params_acm%widthsource(iscalar) ) then
-                                ! INFLOW
-                                source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
-                            endif
-                            if ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
-                                ! OUTFLOW
-                                source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
-                            endif
-                        end do
-                    end do
-                end do
-
-            case ("mask_color_emission")
-                call abort(26081919,"lazy tommy not done yet")
-
-            case ("none", "empty")
-                ! do nothing
-
-            case default
-                call abort(2608191,"scalar source is unkown.")
-
-            end select
-
-
-            ! sponge layer
-            if (params_acm%absorbing_sponge) then
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
+                        if (masksource > 1.0d-6) then
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
-                            source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_eta
-                        end do
-                    end do
-                enddo
-            endif
-
-            if (params_acm%scalar_BC_type == "neumann") then
-                ! 2nd: compute rhs for this scalar.
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            ux = phi(ix,iy,iz,1)
-                            uy = phi(ix,iy,iz,2)
-                            uz = phi(ix,iy,iz,3)
-
-                            usx = mask(ix,iy,iz,2)
-                            usy = mask(ix,iy,iz,3)
-                            usz = mask(ix,iy,iz,4)
-
-                            ! ATTENTION you need to sync the mask
-                            chi = mask(ix,iy,iz,1)
-
-                            ! penalized diffusion coefficient at this point
-                            D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
-
-                            ! this is the vector in front of the gradient
-                            wx = -((1.d0-chi)*ux + chi*usx)
-                            wy = -((1.d0-chi)*uy + chi*usy)
-                            wz = -((1.d0-chi)*uz + chi*usz)
-
-                            ! gradient of passive scalar
-                            gx = (a_TW4(-3)*phi(ix-3,iy,iz,j)&
-                                 +a_TW4(-2)*phi(ix-2,iy,iz,j)&
-                                 +a_TW4(-1)*phi(ix-1,iy,iz,j)&
-                                 +a_TW4(+2)*phi(ix+2,iy,iz,j)&
-                                 +a_TW4(+3)*phi(ix+3,iy,iz,j)&
-                                 +a_TW4(+1)*phi(ix+1,iy,iz,j))*dx_inv
-
-                            gy = (a_TW4(-3)*phi(ix,iy-3,iz,j)&
-                                 +a_TW4(-2)*phi(ix,iy-2,iz,j)&
-                                 +a_TW4(-1)*phi(ix,iy-1,iz,j)&
-                                 +a_TW4(+2)*phi(ix,iy+2,iz,j)&
-                                 +a_TW4(+3)*phi(ix,iy+3,iz,j)&
-                                 +a_TW4(+1)*phi(ix,iy+1,iz,j))*dy_inv
-
-                            gz = (a_TW4(-3)*phi(ix,iy,iz-3,j)&
-                                 +a_TW4(-2)*phi(ix,iy,iz-2,j)&
-                                 +a_TW4(-1)*phi(ix,iy,iz-1,j)&
-                                 +a_TW4(+2)*phi(ix,iy,iz+2,j)&
-                                 +a_TW4(+3)*phi(ix,iy,iz+3,j)&
-                                 +a_TW4(+1)*phi(ix,iy,iz+1,j))*dz_inv
-
-                            ! gradient of mask function ( we need that for the diffusive term)
-                            ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
-                            ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
-                            ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
-                            chidx = (a_TW4(-3)*mask(ix-3,iy,iz, 1)&
-                                    +a_TW4(-2)*mask(ix-2,iy,iz, 1)&
-                                    +a_TW4(-1)*mask(ix-1,iy,iz, 1)&
-                                    +a_TW4(+3)*mask(ix+3,iy,iz, 1)&
-                                    +a_TW4(+2)*mask(ix+2,iy,iz, 1)&
-                                    +a_TW4(+1)*mask(ix+1,iy,iz, 1))*dx_inv
-
-                            chidy = (a_TW4(-3)*mask(ix,iy-3,iz, 1)&
-                                    +a_TW4(-2)*mask(ix,iy-2,iz, 1)&
-                                    +a_TW4(-1)*mask(ix,iy-1,iz, 1)&
-                                    +a_TW4(+3)*mask(ix,iy+3,iz, 1)&
-                                    +a_TW4(+2)*mask(ix,iy+2,iz, 1)&
-                                    +a_TW4(+1)*mask(ix,iy+1,iz, 1))*dy_inv
-
-                            chidz = (a_TW4(-3)*mask(ix,iy,iz-3, 1)&
-                                    +a_TW4(-2)*mask(ix,iy,iz-2, 1)&
-                                    +a_TW4(-1)*mask(ix,iy,iz-1, 1)&
-                                    +a_TW4(+3)*mask(ix,iy,iz+3, 1)&
-                                    +a_TW4(+2)*mask(ix,iy,iz+2, 1)&
-                                    +a_TW4(+1)*mask(ix,iy,iz+1, 1))*dz_inv
-
-                            D_dx = kappa*(1.0_rk-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
-                            D_dy = kappa*(1.0_rk-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
-                            D_dz = kappa*(1.0_rk-chidz) + params_acm%scalar_Ceta(iscalar) * chidz
-
-                            ! second derivatives of passive scalar
-                            gxx = (b_FD4(-2)*phi(ix-2,iy,iz ,j)&
-                                  +b_FD4(-1)*phi(ix-1,iy,iz ,j)&
-                                  +b_FD4( 0)*phi(ix  ,iy,iz ,j)&
-                                  +b_FD4(+1)*phi(ix+1,iy,iz ,j)&
-                                  +b_FD4(+2)*phi(ix+2,iy,iz ,j))*dx2_inv
-                            gyy = (b_FD4(-2)*phi(ix,iy-2,iz ,j)&
-                                  +b_FD4(-1)*phi(ix,iy-1,iz ,j)&
-                                  +b_FD4( 0)*phi(ix,iy  ,iz ,j)&
-                                  +b_FD4(+1)*phi(ix,iy+1,iz ,j)&
-                                  +b_FD4(+2)*phi(ix,iy+2,iz ,j))*dy2_inv
-                            gzz = (b_FD4(-2)*phi(ix,iy,iz-2 ,j)&
-                                  +b_FD4(-1)*phi(ix,iy,iz-1 ,j)&
-                                  +b_FD4( 0)*phi(ix,iy,iz   ,j)&
-                                  +b_FD4(+1)*phi(ix,iy,iz+1 ,j)&
-                                  +b_FD4(+2)*phi(ix,iy,iz+2 ,j))*dz2_inv
-
-                            ! assemble everything
-                            rhs(ix,iy,iz,j) = wx*gx + wy*gy + wz*gz & ! penalized convection term
-                            + D_dx*gx + D*gxx & ! penalized laplacian
-                            + D_dy*gy + D*gyy &
-                            + D_dz*gz + D*gzz &
-                            + source(ix,iy,iz)
-                        end do
+                            ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / params_acm%C_eta
+                            source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / params_acm%C_eta
+                            ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                        endif
                     end do
                 end do
-            elseif (params_acm%scalar_BC_type == "dirichlet") then
-                do iz = g+1, Bs(3)+g
-                    do iy = g+1, Bs(2)+g
-                        do ix = g+1, Bs(1)+g
-                            ux = phi(ix,iy,iz,1)
-                            uy = phi(ix,iy,iz,2)
-                            uz = phi(ix,iy,iz,3)
+            end do
+        case ("circular")
+            R0sq = params_acm%widthsource(iscalar)**2
+            do iz = g+1, Bs(3)+g
+                z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
+                do iy = g+1, Bs(2)+g
+                    y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                    do ix = g+1, Bs(1)+g
+                        x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
-                            chi = mask(ix,iy,iz,1)
+                        R = x + y + z ! note this is (x-x0)**2
 
-                            ! gradient
-                            phi_dx = (a_TW4(-3)*phi(ix-3,iy,iz,j) &
-                                    + a_TW4(-2)*phi(ix-2,iy,iz,j) &
-                                    + a_TW4(-1)*phi(ix-1,iy,iz,j) &
-                                    + a_TW4(+1)*phi(ix+1,iy,iz,j) &
-                                    + a_TW4(+2)*phi(ix+2,iy,iz,j) &
-                                    + a_TW4(+3)*phi(ix+3,iy,iz,j))*dx_inv
+                        if ( R <= R0sq ) then
+                            ! for the source term, we use the usual dirichlet C_eta
+                            ! to force scalar to 1
+                            source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                        endif
+                    end do
+                end do
+            end do
 
-                            phi_dy = (a_TW4(-3)*phi(ix,iy-3,iz,j) &
-                                    + a_TW4(-2)*phi(ix,iy-2,iz,j) &
-                                    + a_TW4(-1)*phi(ix,iy-1,iz,j) &
-                                    + a_TW4(+1)*phi(ix,iy+1,iz,j) &
-                                    + a_TW4(+2)*phi(ix,iy+2,iz,j) &
-                                    + a_TW4(+3)*phi(ix,iy+3,iz,j))*dy_inv
+        case ("inflow-x")
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        x = x0(1) + dble(ix-(g+1))*dx(1)
+                        if ( x <= params_acm%widthsource(iscalar) ) then
+                            ! INFLOW
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                        endif
+                    end do
+                end do
+            end do
 
-                            phi_dz = (a_TW4(-3)*phi(ix,iy,iz-3,j) &
-                                    + a_TW4(-2)*phi(ix,iy,iz-2,j) &
-                                    + a_TW4(-1)*phi(ix,iy,iz-1,j) &
-                                    + a_TW4(+1)*phi(ix,iy,iz+1,j) &
-                                    + a_TW4(+2)*phi(ix,iy,iz+2,j) &
-                                    + a_TW4(+3)*phi(ix,iy,iz+3,j))*dz_inv
+        case ("in+outflow-x")
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        x = x0(1) + dble(ix-(g+1))*dx(1)
+                        if ( x <= params_acm%widthsource(iscalar) ) then
+                            ! INFLOW
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                        endif
+                        if ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
+                            ! OUTFLOW
+                            source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                        endif
+                    end do
+                end do
+            end do
 
-                            ! laplace
-                            phi_dxdx = (  b_FD4(-2)*phi(ix-2,iy,iz,j) &
-                                        + b_FD4(-1)*phi(ix-1,iy,iz,j) &
-                                        + b_FD4( 0)*phi(ix  ,iy,iz,j) &
-                                        + b_FD4(+1)*phi(ix+1,iy,iz,j) &
-                                        + b_FD4(+2)*phi(ix+2,iy,iz,j))*dx2_inv
+        case ("mask_color_emission")
+            call abort(26081919,"lazy tommy not done yet")
 
-                            phi_dydy = (  b_FD4(-2)*phi(ix,iy-2,iz,j) &
-                                        + b_FD4(-1)*phi(ix,iy-1,iz,j) &
-                                        + b_FD4( 0)*phi(ix,iy  ,iz,j) &
-                                        + b_FD4(+1)*phi(ix,iy+1,iz,j) &
-                                        + b_FD4(+2)*phi(ix,iy+2,iz,j))*dy2_inv
+        case ("none", "empty")
+            ! do nothing
 
-                            phi_dzdz = (  b_FD4(-2)*phi(ix,iy,iz-2,j) &
-                                        + b_FD4(-1)*phi(ix,iy,iz-1,j) &
-                                        + b_FD4( 0)*phi(ix,iy,iz  ,j) &
-                                        + b_FD4(+1)*phi(ix,iy,iz+1,j) &
-                                        + b_FD4(+2)*phi(ix,iy,iz+2,j))*dz2_inv
+        case default
+            call abort(2608191,"scalar source is unkown.")
 
-                            ! easy RHS for dirichlet BC
-                            rhs(ix,iy,iz,j) = -ux*phi_dx -uy*phi_dy -uz*phi_dz &
-                            + kappa*(phi_dxdx + phi_dydy + phi_dzdz) &
-                            - chi*(phi(ix,iy,iz,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
-                            + source(ix, iy, iz) ! source term is actually a dirichlet penalization term as well
-                        enddo
+        end select
+
+
+        ! sponge layer
+        if (params_acm%absorbing_sponge) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! for the source term, we use the usual dirichlet C_eta
+                        ! to force scalar to 1
+                        source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_eta
+                    end do
+                end do
+            enddo
+        endif
+
+        if (params_acm%scalar_BC_type == "neumann") then
+            ! 2nd: compute rhs for this scalar using generalized approach
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ux = phi(ix,iy,iz,1)
+                        uy = phi(ix,iy,iz,2)
+                        uz = phi(ix,iy,iz,3)
+
+                        usx = mask(ix,iy,iz,2)
+                        usy = mask(ix,iy,iz,3)
+                        usz = mask(ix,iy,iz,4)
+
+                        ! ATTENTION you need to sync the mask
+                        chi = mask(ix,iy,iz,1)
+
+                        ! penalized diffusion coefficient at this point
+                        D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
+
+                        ! this is the vector in front of the gradient
+                        wx = -((1.d0-chi)*ux + chi*usx)
+                        wy = -((1.d0-chi)*uy + chi*usy)
+                        wz = -((1.d0-chi)*uz + chi*usz)
+
+                        ! gradient of passive scalar using generalized stencils
+                        gx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,j)) * dx_inv
+                        gy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,j)) * dy_inv
+                        gz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,j)) * dz_inv
+
+                        ! gradient of mask function (we need that for the diffusive term)
+                        ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
+                        ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
+                        ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
+                        chidx = sum(FD1_l(FD1_ls:FD1_le) * mask(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        chidy = sum(FD1_l(FD1_ls:FD1_le) * mask(ix,iy+FD1_ls:iy+FD1_le,iz,1)) * dy_inv
+                        chidz = sum(FD1_l(FD1_ls:FD1_le) * mask(ix,iy,iz+FD1_ls:iz+FD1_le,1)) * dz_inv
+
+                        D_dx = kappa*(-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
+                        D_dy = kappa*(-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
+                        D_dz = kappa*(-chidz) + params_acm%scalar_Ceta(iscalar) * chidz
+
+                        ! second derivatives of passive scalar using generalized stencils
+                        gxx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,j)) * dx2_inv
+                        gyy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,j)) * dy2_inv
+                        gzz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,j)) * dz2_inv
+
+                        ! assemble everything
+                        rhs(ix,iy,iz,j) = wx*gx + wy*gy + wz*gz & ! penalized convection term
+                        + D_dx*gx + D*gxx & ! penalized laplacian
+                        + D_dy*gy + D*gyy &
+                        + D_dz*gz + D*gzz &
+                        + source(ix,iy,iz)
+                    end do
+                end do
+            end do
+        elseif (params_acm%scalar_BC_type == "dirichlet") then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ux = phi(ix,iy,iz,1)
+                        uy = phi(ix,iy,iz,2)
+                        uz = phi(ix,iy,iz,3)
+
+                        chi = mask(ix,iy,iz,1)
+
+                        ! gradient using generalized stencils
+                        phi_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,j)) * dx_inv
+                        phi_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,j)) * dy_inv
+                        phi_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,j)) * dz_inv
+
+                        ! laplace using generalized stencils
+                        phi_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,j)) * dx2_inv
+                        phi_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,j)) * dy2_inv
+                        phi_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,j)) * dz2_inv
+
+                        ! easy RHS for dirichlet BC
+                        rhs(ix,iy,iz,j) = -ux*phi_dx -uy*phi_dy -uz*phi_dz &
+                        + kappa*(phi_dxdx + phi_dydy + phi_dzdz) &
+                        - chi*(phi(ix,iy,iz,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
+                        + source(ix, iy, iz) ! source term is actually a dirichlet penalization term as well
                     enddo
                 enddo
-            else
-                call abort(22092234, "scalar_BC_type unkown"//trim(adjustl(params_acm%scalar_BC_type))//". Time to fake a smile :)" )
-            endif
-        end do ! loop over scalars
+            enddo
+        else
+            call abort(22092234, "scalar_BC_type unkown"//trim(adjustl(params_acm%scalar_BC_type))//". Time to fake a smile :)" )
+        endif
+    end do ! loop over scalars
 
-
-    case default
-        call abort(441167, "3d Discretization unkown "//trim(adjustl(order_discretization))//", I ll walk into the light now." )
-    end select
 end subroutine RHS_3D_scalar
 
 
 subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_globals
+    use module_operators
+    
     implicit none
 
     !> grid parameter
@@ -1903,15 +1813,10 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv
     real(kind=rk) :: ux, uy, usx, usy, wx, wy, gx, gy, D, chi, chidx, chidy, D_dx, D_dy, gxx, gyy
     real(kind=rk) :: phi_dx, phi_dy, phi_dxdx, phi_dydy
-    ! coefficients for Tam&Webb (4th order 1st derivative)
-    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    ! coefficients for a standard centered 4th order 1st derivative
-    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
-    ! 4th order coefficients for second derivative
-    real(kind=rk), parameter :: b_FD4(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-    ! 6th order FD scheme
-    real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
-    real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+
+    !> parameters for FD1L, FD2 operators (generalized stencil approach)
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
     ! we have quite some of these work arrays in the code, but they are very small,
     ! only one block. They're negligible in front of the lgt_block array.
@@ -1928,384 +1833,155 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     nu = params_acm%nu
 
+    !-----------------------------------------------------------------------
+    ! passive scalar equations: loop over all scalars and compute RHS
+    !-----------------------------------------------------------------------
+    ! Setup stencils using the unified interface from module_operators
+    call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
+    call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
 
-    if (order_discretization == "FD_4th_central_optimized") then
-        !-----------------------------------------------------------------------
-        ! 4th order
-        !-----------------------------------------------------------------------
-        do iscalar = 1, params_acm%N_scalars
-            ! actual index of this scalar in the array
-            j = iscalar + (params_acm%dim + 1)
+    ! Loop over all scalars
+    do iscalar = 1, params_acm%N_scalars
+        ! actual index of this scalar in the array
+        j = iscalar + (params_acm%dim + 1)
 
-            ! compute diffusivity from schmidt number (and of course fluid viscosity)
-            kappa = nu / params_acm%schmidt_numbers(iscalar)
+        ! compute diffusivity from schmidt number (and of course fluid viscosity)
+        kappa = nu / params_acm%schmidt_numbers(iscalar)
 
-            source = 0.0_rk
+        source = 0.0_rk
 
-            ! 1st: compute source terms (note the strcmp needs to be outside the loop)
-            select case (params_acm%scalar_source_type(iscalar))
-            case ("gaussian")
-                do iy = g+1, Bs(2)+g
-                    y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
-                    do ix = g+1, Bs(1)+g
-                        x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+        ! 1st: compute source terms (note the strcmp needs to be outside the loop)
+        select case (params_acm%scalar_source_type(iscalar))
+        case ("gaussian")
+            do iy = g+1, Bs(2)+g
+                y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                do ix = g+1, Bs(1)+g
+                    x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
 
-                        masksource = dexp( -(x + y) / (params_acm%widthsource(iscalar))**2  )
+                    masksource = dexp( -(x + y) / (params_acm%widthsource(iscalar))**2  )
 
-                        if (masksource > 1.0d-6) then
-                            ! for the source term, we use the usual dirichlet C_eta
-                            ! to force scalar to 1
-                            source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / params_acm%C_eta
-                            ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
-                        endif
-                    end do
-                end do
-
-            case("in+outflow")
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1))*dx(2)
-                    do ix = g+1, Bs(1)+g
-                        x = x0(1) + dble(ix-(g+1))*dx(1)
-                        if ( x <= params_acm%widthsource(iscalar) ) then
-                            ! INFLOW
-                            source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
-
-                        elseif ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
-                            ! OUTFLOW
-                            source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta
-                        endif
-                    end do
-                end do
-
-            case ("mask_color_emission")
-                where ( abs(mask(:,:,:,5) - params_acm%widthsource(iscalar)) <=1.0e-8 )
-                    source = -mask(:,:,:,5)*(phi(:,:,:,j)-1.d0) / params_acm%C_eta
-                end where
-
-            case ("none", "empty")
-                ! do nothing.
-
-            case default
-                call abort(2608191,"scalar source is unkown.")
-
-            end select
-
-
-            ! sponge layer
-            if (params_acm%absorbing_sponge) then
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
+                    if (masksource > 1.0d-6) then
                         ! for the source term, we use the usual dirichlet C_eta
-                        ! to force scalar to 0
-                        source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
-                    end do
+                        ! to force scalar to 1
+                        source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / params_acm%C_eta
+                        ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
+                    endif
                 end do
-            endif
+            end do
 
+        case("in+outflow")
+            do iy = g+1, Bs(2)+g
+                y = x0(2) + dble(iy-(g+1))*dx(2)
+                do ix = g+1, Bs(1)+g
+                    x = x0(1) + dble(ix-(g+1))*dx(1)
+                    if ( x <= params_acm%widthsource(iscalar) ) then
+                        ! INFLOW
+                        source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
 
-            if (params_acm%scalar_BC_type == "neumann") then
-                ! 2nd: compute rhs for this scalar.
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        ux = phi(ix,iy,1,1)
-                        uy = phi(ix,iy,1,2)
-
-                        ! ATTENTION you need to sync the mask
-                        chi = mask(ix,iy,1,1)
-                        usx = mask(ix,iy,1,2)
-                        usy = mask(ix,iy,1,3)
-
-                        ! penalized diffusion coefficient at this point
-                        D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
-
-                        ! this is the vector in front of the gradient
-                        wx = -((1.d0-chi)*ux + chi*usx)
-                        wy = -((1.d0-chi)*uy + chi*usy)
-
-                        ! gradient of passive scalar
-                        gx = (a_TW4(-3)*phi(ix-3,iy,1,j) &
-                             +a_TW4(-2)*phi(ix-2,iy,1,j) &
-                             +a_TW4(-1)*phi(ix-1,iy,1,j) &
-                             +a_TW4( 0)*phi(ix  ,iy,1,j) &
-                             +a_TW4(+1)*phi(ix+1,iy,1,j) &
-                             +a_TW4(+2)*phi(ix+2,iy,1,j) &
-                             +a_TW4(+3)*phi(ix+3,iy,1,j))*dx_inv
-
-                        gy = (a_TW4(-3)*phi(ix,iy-3,1,j) &
-                             +a_TW4(-2)*phi(ix,iy-2,1,j) &
-                             +a_TW4(-1)*phi(ix,iy-1,1,j) &
-                             +a_TW4( 0)*phi(ix,iy  ,1,j) &
-                             +a_TW4(+1)*phi(ix,iy+1,1,j) &
-                             +a_TW4(+2)*phi(ix,iy+2,1,j) &
-                             +a_TW4(+3)*phi(ix,iy+3,1,j))*dy_inv
-
-                        ! gradient of mask function ( we need that for the diffusive term)
-                        ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
-                        ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
-                        ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
-                        chidx = (a_TW4(-3)*mask(ix-3,iy,1, 1) &
-                                +a_TW4(-2)*mask(ix-2,iy,1, 1) &
-                                +a_TW4(-1)*mask(ix-1,iy,1, 1) &
-                                +a_TW4( 0)*mask(ix  ,iy,1, 1) &
-                                +a_TW4(+1)*mask(ix+1,iy,1, 1) &
-                                +a_TW4(+2)*mask(ix+2,iy,1, 1) &
-                                +a_TW4(+3)*mask(ix+3,iy,1, 1))*dx_inv
-
-                        chidy = (a_TW4(-3)*mask(ix,iy-3,1, 1) &
-                                +a_TW4(-2)*mask(ix,iy-2,1, 1) &
-                                +a_TW4(-1)*mask(ix,iy-1,1, 1) &
-                                +a_TW4( 0)*mask(ix,iy  ,1, 1) &
-                                +a_TW4(+1)*mask(ix,iy+1,1, 1) &
-                                +a_TW4(+2)*mask(ix,iy+2,1, 1) &
-                                +a_TW4(+3)*mask(ix,iy+3,1, 1))*dy_inv
-
-                        D_dx = kappa*(-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
-                        D_dy = kappa*(-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
-
-                        ! second derivatives of passive scalar
-                        gxx = (b_FD4(-2)*phi(ix-2,iy,1 ,j) &
-                              +b_FD4(-1)*phi(ix-1,iy,1 ,j) &
-                              +b_FD4( 0)*phi(ix  ,iy,1 ,j) &
-                              +b_FD4(+1)*phi(ix+1,iy,1 ,j) &
-                              +b_FD4(+2)*phi(ix+2,iy,1 ,j))*dx2_inv
-                        gyy = (b_FD4(-2)*phi(ix,iy-2,1 ,j) &
-                              +b_FD4(-1)*phi(ix,iy-1,1 ,j) &
-                              +b_FD4( 0)*phi(ix,iy  ,1 ,j) &
-                              +b_FD4(+1)*phi(ix,iy+1,1 ,j) &
-                              +b_FD4(+2)*phi(ix,iy+2,1 ,j))*dy2_inv
-
-                        ! assemble everything
-                        rhs(ix,iy,1,j) = wx*gx + wy*gy & ! penalized convection term
-                                       + D_dx*gx + D*gxx + D_dy*gy + D*gyy & ! penalized laplacian
-                                       + source(ix, iy, 1)
-                    end do
+                    elseif ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
+                        ! OUTFLOW
+                        source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta
+                    endif
                 end do
-            elseif (params_acm%scalar_BC_type == "dirichlet") then
+            end do
 
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        ux = phi(ix,iy,1,1)
-                        uy = phi(ix,iy,1,2)
+        case ("mask_color_emission")
+            where ( abs(mask(:,:,:,5) - params_acm%widthsource(iscalar)) <=1.0e-8 )
+                source = -mask(:,:,:,5)*(phi(:,:,:,j)-1.d0) / params_acm%C_eta
+            end where
 
-                        chi = mask(ix,iy,1,1)
-                        usx = mask(ix,iy,1,2)
-                        usy = mask(ix,iy,1,3)
+        case ("none", "empty")
+            ! do nothing.
 
-                        ! gradient
-                        phi_dx = (a_TW4(-3)*phi(ix-3,iy,1,j) &
-                                + a_TW4(-2)*phi(ix-2,iy,1,j) &
-                                + a_TW4(-1)*phi(ix-1,iy,1,j) &
-                                + a_TW4( 0)*phi(ix  ,iy,1,j) &
-                                + a_TW4(+1)*phi(ix+1,iy,1,j) &
-                                + a_TW4(+2)*phi(ix+2,iy,1,j) &
-                                + a_TW4(+3)*phi(ix+3,iy,1,j))*dx_inv
-                        phi_dy = (a_TW4(-3)*phi(ix,iy-3,1,j) &
-                                + a_TW4(-2)*phi(ix,iy-2,1,j) &
-                                + a_TW4(-1)*phi(ix,iy-1,1,j) &
-                                + a_TW4( 0)*phi(ix,iy  ,1,j) &
-                                + a_TW4(+1)*phi(ix,iy+1,1,j) &
-                                + a_TW4(+2)*phi(ix,iy+2,1,j) &
-                                + a_TW4(+3)*phi(ix,iy+3,1,j))*dy_inv
+        case default
+            call abort(2608191,"scalar source is unkown.")
 
-                        ! laplace
-                        phi_dxdx = (  b_FD4(-2)*phi(ix-2,iy,1,j) &
-                                    + b_FD4(-1)*phi(ix-1,iy,1,j) &
-                                    + b_FD4( 0)*phi(ix  ,iy,1,j) &
-                                    + b_FD4(+1)*phi(ix+1,iy,1,j) &
-                                    + b_FD4(+2)*phi(ix+2,iy,1,j))*dx2_inv
-                        phi_dydy = (  b_FD4(-2)*phi(ix,iy-2,1,j) &
-                                    + b_FD4(-1)*phi(ix,iy-1,1,j) &
-                                    + b_FD4( 0)*phi(ix,iy  ,1,j) &
-                                    + b_FD4(+1)*phi(ix,iy+1,1,j) &
-                                    + b_FD4(+2)*phi(ix,iy+2,1,j))*dy2_inv
+        end select
 
-                        ! easy RHS for dirichlet BC
-                        rhs(ix,iy,1,j) = -ux*phi_dx -uy*phi_dy &
-                                       + kappa*(phi_dxdx + phi_dydy) &
-                                       - chi*(phi(ix,iy,1,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask
-                                       + source(ix, iy, 1) ! source term is actually a dirichlet penalization term as well
-                    end do
+
+        ! sponge layer
+        if (params_acm%absorbing_sponge) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! for the source term, we use the usual dirichlet C_eta
+                    ! to force scalar to 0
+                    source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
                 end do
+            end do
+        endif
 
-            endif
-        end do ! loop over scalars
 
+        if (params_acm%scalar_BC_type == "neumann") then
+            ! 2nd: compute rhs for this scalar using generalized approach
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ux = phi(ix,iy,1,1)
+                    uy = phi(ix,iy,1,2)
 
-    else
-        call abort(2109231, "Passive scalar discretization unkown "//trim(adjustl(order_discretization))//". Just as well. I was tired anyways, sleep tight!" )
-    end if
+                    ! ATTENTION you need to sync the mask
+                    chi = mask(ix,iy,1,1)
+                    usx = mask(ix,iy,1,2)
+                    usy = mask(ix,iy,1,3)
+
+                    ! penalized diffusion coefficient at this point
+                    D = kappa*(1.0_rk - chi) + params_acm%scalar_Ceta(iscalar)*chi
+
+                    ! this is the vector in front of the gradient
+                    wx = -((1.d0-chi)*ux + chi*usx)
+                    wy = -((1.d0-chi)*uy + chi*usy)
+
+                    ! gradient of passive scalar using generalized stencils
+                    gx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1,j)) * dx_inv
+                    gy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1,j)) * dy_inv
+
+                    ! gradient of mask function (we need that for the diffusive term)
+                    ! since this guy reads div( (kappa(1-mask) + eps*mask) * grad(phi) )
+                    ! so this boils down to d/dx (D*gx) = D_dx*gx + D*gxx
+                    ! so we need D_dx and this is kappa*(1-mask_dx)+ eps*mask_dx
+                    chidx = sum(FD1_l(FD1_ls:FD1_le) * mask(ix+FD1_ls:ix+FD1_le,iy,1,1)) * dx_inv
+                    chidy = sum(FD1_l(FD1_ls:FD1_le) * mask(ix,iy+FD1_ls:iy+FD1_le,1,1)) * dy_inv
+
+                    D_dx = kappa*(-chidx) + params_acm%scalar_Ceta(iscalar) * chidx
+                    D_dy = kappa*(-chidy) + params_acm%scalar_Ceta(iscalar) * chidy
+
+                    ! second derivatives of passive scalar using generalized stencils
+                    gxx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,1,j)) * dx2_inv
+                    gyy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,1,j)) * dy2_inv
+
+                    ! assemble everything
+                    rhs(ix,iy,1,j) = wx*gx + wy*gy & ! penalized convection term
+                                   + D_dx*gx + D*gxx + D_dy*gy + D*gyy & ! penalized laplacian
+                                   + source(ix, iy, 1)
+                end do
+            end do
+        elseif (params_acm%scalar_BC_type == "dirichlet") then
+
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ux = phi(ix,iy,1,1)
+                    uy = phi(ix,iy,1,2)
+
+                    chi = mask(ix,iy,1,1)
+                    usx = mask(ix,iy,1,2)
+                    usy = mask(ix,iy,1,3)
+
+                    ! gradient using generalized stencils
+                    phi_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1,j)) * dx_inv
+                    phi_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1,j)) * dy_inv
+
+                    ! laplace using generalized stencils
+                    phi_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,1,j)) * dx2_inv
+                    phi_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,1,j)) * dy2_inv
+
+                    ! easy RHS for dirichlet BC
+                    rhs(ix,iy,1,j) = -ux*phi_dx -uy*phi_dy &
+                                   + kappa*(phi_dxdx + phi_dydy) &
+                                   - chi*(phi(ix,iy,1,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask
+                                   + source(ix, iy, 1) ! source term is actually a dirichlet penalization term as well
+                end do
+            end do
+
+        endif
+    end do ! loop over scalars
+
 end subroutine RHS_2D_scalar
-
-
-
-! on a block compute the dissipation rate,
-! i.e. \varepsilon = 2 nu (du_i/dx_j) (du_i/dx_j) 
-! and thus do not make use of the vorticity
-subroutine dissipation_ACM_block(Bs, g, dx, u, dissipation_rate)
-    use module_globals
-    implicit none
-
-    !> grid parameter
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> spacing of the block
-    real(kind=rk), dimension(3), intent(in) :: dx
-    !> datafields
-    real(kind=rk), intent(inout) :: u(:,:,:,:)
-    real(kind=rk), intent(inout) :: dissipation_rate
-
-    !> inverse of dx, dy, dz
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, u_dxdx, u_dydy, u_dzdz, &
-    v_dxdx, v_dydy, v_dzdz, w_dxdx, w_dydy, w_dzdz
-    ! loop variables
-    integer(kind=ik) :: ix, iy, iz
-    ! coefficients for Tam&Webb (4th order 1st derivative)
-    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    ! coefficients for a standard centered 4th order 1st derivative
-    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
-    ! 4th order coefficients for second derivative
-    real(kind=rk), parameter :: b_FD4(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-    ! 6th order FD scheme
-    real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
-    real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
-
-
-    if (.not. params_acm%initialized) write(*,*) "WARNING: vorticity_ACM_block called but ACM not initialized"
-
-    ! Dissipation rate is u_j*laplace(u_j) (einstein summation convention)
-
-    dissipation_rate = 0.0_rk
-
-    if ( params_acm%dim == 2) then
-        dx2_inv = 1.0_rk / dx(1)**2
-        dy2_inv = 1.0_rk / dx(2)**2
-
-        iz = 1
-
-        select case(params_acm%discretization)
-        case("FD_2nd_central")
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    u_dxdx = (u(ix-1,iy,iz,1) -2.0_rk*u(ix,iy,iz,1) +u(ix+1,iy,iz,1))*dx2_inv
-                    v_dxdx = (u(ix-1,iy,iz,2) -2.0_rk*u(ix,iy,iz,2) +u(ix+1,iy,iz,2))*dx2_inv
-                    
-                    u_dydy = (u(ix,iy-1,iz,1) -2.0_rk*u(ix,iy,iz,1) +u(ix,iy+1,iz,1))*dy2_inv
-                    v_dydy = (u(ix,iy-1,iz,2) -2.0_rk*u(ix,iy,iz,2) +u(ix,iy+1,iz,2))*dy2_inv
-
-                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
-                end do
-            end do
-
-        case("FD_4th_central", "FD_4th_central_optimized") ! same 2nd derivatives used
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! second derivatives of u and v
-                    u_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,1) + b_FD4(-1)*u(ix-1,iy,iz,1) + b_FD4(0)*u(ix,iy,iz,1) + b_FD4(+1)*u(ix+1,iy,iz,1) + b_FD4(+2)*u(ix+2,iy,iz,1))*dx2_inv
-                    v_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,2) + b_FD4(-1)*u(ix-1,iy,iz,2) + b_FD4(0)*u(ix,iy,iz,2) + b_FD4(+1)*u(ix+1,iy,iz,2) + b_FD4(+2)*u(ix+2,iy,iz,2))*dx2_inv
-
-                    u_dydy = (b_FD4(-2)*u(ix,iy-2,iz,1) + b_FD4(-1)*u(ix,iy-1,iz,1) + b_FD4(0)*u(ix,iy,iz,1) + b_FD4(+1)*u(ix,iy+1,iz,1) + b_FD4(+2)*u(ix,iy+2,iz,1))*dy2_inv
-                    v_dydy = (b_FD4(-2)*u(ix,iy-2,iz,2) + b_FD4(-1)*u(ix,iy-1,iz,2) + b_FD4(0)*u(ix,iy,iz,2) + b_FD4(+1)*u(ix,iy+1,iz,2) + b_FD4(+2)*u(ix,iy+2,iz,2))*dy2_inv
- 
-                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
-                end do
-            end do
-
-        case("FD_6th_central")
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    ! second derivatives of u and v
-                    u_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,1) +b_FD6(-2)*u(ix-2,iy,iz,1) +b_FD6(-1)*u(ix-1,iy,iz,1) +b_FD6( 0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix+1,iy,iz,1) +b_FD6(+2)*u(ix+2,iy,iz,1) +b_FD6(+3)*u(ix+3,iy,iz,1))*dx2_inv
-                    v_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,2) +b_FD6(-2)*u(ix-2,iy,iz,2) +b_FD6(-1)*u(ix-1,iy,iz,2) +b_FD6( 0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix+1,iy,iz,2) +b_FD6(+2)*u(ix+2,iy,iz,2) +b_FD6(+3)*u(ix+3,iy,iz,2))*dx2_inv
-                    
-                    u_dydy = (b_FD6(-3)*u(ix,iy-3,iz,1) +b_FD6(-2)*u(ix,iy-2,iz,1) +b_FD6(-1)*u(ix,iy-1,iz,1) +b_FD6( 0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy+1,iz,1) +b_FD6(+2)*u(ix,iy+2,iz,1) +b_FD6(+3)*u(ix,iy+3,iz,1))*dy2_inv
-                    v_dydy = (b_FD6(-3)*u(ix,iy-3,iz,2) +b_FD6(-2)*u(ix,iy-2,iz,2) +b_FD6(-1)*u(ix,iy-1,iz,2) +b_FD6( 0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy+1,iz,2) +b_FD6(+2)*u(ix,iy+2,iz,2) +b_FD6(+3)*u(ix,iy+3,iz,2))*dy2_inv
-      
-                    dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy) + u(ix,iy,iz,2)*(v_dxdx+v_dydy)
-                end do
-            end do
-
-        case default
-            call abort(1902201, "unknown order_discretization in ACM dissipation rate")
-        end select
-
-    else
-        dx2_inv = 1.0_rk / dx(1)**2
-        dy2_inv = 1.0_rk / dx(2)**2
-        dz2_inv = 1.0_rk / dx(3)**2
-
-        select case(params_acm%discretization)
-        case("FD_2nd_central")
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        u_dxdx = (u(ix-1, iy  , iz  , 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix+1, iy  , iz  , 1))*dx2_inv
-                        u_dydy = (u(ix  , iy-1, iz  , 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix  , iy+1, iz  , 1))*dy2_inv
-                        u_dzdz = (u(ix  , iy  , iz-1, 1) -2.0_rk*u(ix, iy, iz, 1) + u(ix  , iy  , iz+1, 1))*dz2_inv
-
-                        v_dxdx = (u(ix-1, iy  , iz  , 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix+1, iy  , iz  , 2))*dx2_inv
-                        v_dydy = (u(ix  , iy-1, iz  , 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix  , iy+1, iz  , 2))*dy2_inv
-                        v_dzdz = (u(ix  , iy  , iz-1, 2) -2.0_rk*u(ix, iy, iz, 2) + u(ix  , iy  , iz+1, 2))*dz2_inv
-
-                        w_dxdx = (u(ix-1, iy  , iz  , 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix+1, iy  , iz  , 3))*dx2_inv
-                        w_dydy = (u(ix  , iy-1, iz  , 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix  , iy+1, iz  , 3))*dy2_inv
-                        w_dzdz = (u(ix  , iy  , iz-1, 3) -2.0_rk*u(ix, iy, iz, 3) + u(ix  , iy  , iz+1, 3))*dz2_inv
-
-                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
-                    end do
-                end do
-            end do
-
-        case("FD_4th_central", "FD_4th_central_optimized") ! same 2nd derivatives used
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        ! second derivatives of u, v and w
-                        u_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,1) +b_FD4(-1)*u(ix-1,iy,iz,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix+1,iy,iz,1) +b_FD4(+2)*u(ix+2,iy,iz,1))*dx2_inv
-                        v_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,2) +b_FD4(-1)*u(ix-1,iy,iz,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix+1,iy,iz,2) +b_FD4(+2)*u(ix+2,iy,iz,2))*dx2_inv
-                        w_dxdx = (b_FD4(-2)*u(ix-2,iy,iz,3) +b_FD4(-1)*u(ix-1,iy,iz,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix+1,iy,iz,3) +b_FD4(+2)*u(ix+2,iy,iz,3))*dx2_inv
-                        
-                        u_dydy = (b_FD4(-2)*u(ix,iy-2,iz,1) +b_FD4(-1)*u(ix,iy-1,iz,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix,iy+1,iz,1) +b_FD4(+2)*u(ix,iy+2,iz,1))*dy2_inv
-                        v_dydy = (b_FD4(-2)*u(ix,iy-2,iz,2) +b_FD4(-1)*u(ix,iy-1,iz,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix,iy+1,iz,2) +b_FD4(+2)*u(ix,iy+2,iz,2))*dy2_inv
-                        w_dydy = (b_FD4(-2)*u(ix,iy-2,iz,3) +b_FD4(-1)*u(ix,iy-1,iz,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix,iy+1,iz,3) +b_FD4(+2)*u(ix,iy+2,iz,3))*dy2_inv
-
-                        u_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,1) +b_FD4(-1)*u(ix,iy,iz-1,1) +b_FD4(0)*u(ix,iy,iz,1) +b_FD4(+1)*u(ix,iy,iz+1,1) +b_FD4(+2)*u(ix,iy,iz+2,1))*dz2_inv
-                        v_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,2) +b_FD4(-1)*u(ix,iy,iz-1,2) +b_FD4(0)*u(ix,iy,iz,2) +b_FD4(+1)*u(ix,iy,iz+1,2) +b_FD4(+2)*u(ix,iy,iz+2,2))*dz2_inv
-                        w_dzdz = (b_FD4(-2)*u(ix,iy,iz-2,3) +b_FD4(-1)*u(ix,iy,iz-1,3) +b_FD4(0)*u(ix,iy,iz,3) +b_FD4(+1)*u(ix,iy,iz+1,3) +b_FD4(+2)*u(ix,iy,iz+2,3))*dz2_inv
-
-                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
-                    end do
-                end do
-            end do
-
-        case("FD_6th_central")
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        ! second derivatives of u, v and w
-                        u_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,1) +b_FD6(-2)*u(ix-2,iy,iz,1) +b_FD6(-1)*u(ix-1,iy,iz,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix+1,iy,iz,1) +b_FD6(+2)*u(ix+2,iy,iz,1) +b_FD6(+3)*u(ix+3,iy,iz,1))*dx2_inv
-                        u_dydy = (b_FD6(-3)*u(ix,iy-3,iz,1) +b_FD6(-2)*u(ix,iy-2,iz,1) +b_FD6(-1)*u(ix,iy-1,iz,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy+1,iz,1) +b_FD6(+2)*u(ix,iy+2,iz,1) +b_FD6(+3)*u(ix,iy+3,iz,1))*dy2_inv
-                        u_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,1) +b_FD6(-2)*u(ix,iy,iz-2,1) +b_FD6(-1)*u(ix,iy,iz-1,1) +b_FD6(0)*u(ix,iy,iz,1) +b_FD6(+1)*u(ix,iy,iz+1,1) +b_FD6(+2)*u(ix,iy,iz+2,1) +b_FD6(+3)*u(ix,iy,iz+3,1))*dz2_inv
-
-                        v_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,2) +b_FD6(-2)*u(ix-2,iy,iz,2) +b_FD6(-1)*u(ix-1,iy,iz,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix+1,iy,iz,2) +b_FD6(+2)*u(ix+2,iy,iz,2) +b_FD6(+3)*u(ix+3,iy,iz,2))*dx2_inv
-                        v_dydy = (b_FD6(-3)*u(ix,iy-3,iz,2) +b_FD6(-2)*u(ix,iy-2,iz,2) +b_FD6(-1)*u(ix,iy-1,iz,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy+1,iz,2) +b_FD6(+2)*u(ix,iy+2,iz,2) +b_FD6(+3)*u(ix,iy+3,iz,2))*dy2_inv
-                        v_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,2) +b_FD6(-2)*u(ix,iy,iz-2,2) +b_FD6(-1)*u(ix,iy,iz-1,2) +b_FD6(0)*u(ix,iy,iz,2) +b_FD6(+1)*u(ix,iy,iz+1,2) +b_FD6(+2)*u(ix,iy,iz+2,2) +b_FD6(+3)*u(ix,iy,iz+3,2))*dz2_inv
-                        
-                        w_dxdx = (b_FD6(-3)*u(ix-3,iy,iz,3) +b_FD6(-2)*u(ix-2,iy,iz,3) +b_FD6(-1)*u(ix-1,iy,iz,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix+1,iy,iz,3) +b_FD6(+2)*u(ix+2,iy,iz,3) +b_FD6(+3)*u(ix+3,iy,iz,3))*dx2_inv
-                        w_dydy = (b_FD6(-3)*u(ix,iy-3,iz,3) +b_FD6(-2)*u(ix,iy-2,iz,3) +b_FD6(-1)*u(ix,iy-1,iz,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix,iy+1,iz,3) +b_FD6(+2)*u(ix,iy+2,iz,3) +b_FD6(+3)*u(ix,iy+3,iz,3))*dy2_inv
-                        w_dzdz = (b_FD6(-3)*u(ix,iy,iz-3,3) +b_FD6(-2)*u(ix,iy,iz-2,3) +b_FD6(-1)*u(ix,iy,iz-1,3) +b_FD6(0)*u(ix,iy,iz,3) +b_FD6(+1)*u(ix,iy,iz+1,3) +b_FD6(+2)*u(ix,iy,iz+2,3) +b_FD6(+3)*u(ix,iy,iz+3,3))*dz2_inv
-
-                        dissipation_rate = dissipation_rate + u(ix,iy,iz,1)*(u_dxdx+u_dydy+u_dzdz) + u(ix,iy,iz,2)*(v_dxdx+v_dydy+v_dzdz) + u(ix,iy,iz,3)*(w_dxdx+w_dydy+w_dzdz) 
-                    end do
-                end do
-            end do
-
-        case default
-            call abort(1902201, "unknown order_discretization in ACM dissipation rate")
-        end select
-
-    endif
-
-    dissipation_rate = dissipation_rate * product(dx(1:params_acm%dim))
-
-
-end subroutine

@@ -76,6 +76,12 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
         a = 1
     elseif (params%order_predictor == "multiresolution_6th" ) then
         a = 2
+    elseif (params%order_predictor == "multiresolution_8th" ) then
+        a = 3
+    elseif (params%order_predictor == "multiresolution_10th" ) then
+        a = 4
+    elseif (params%order_predictor == "multiresolution_12th" ) then
+        a = 5
     else
         call abort(2875490, "The predictor method is unknown")
     endif

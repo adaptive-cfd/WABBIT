@@ -7,7 +7,7 @@ keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 po
 post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 \
 post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
 post_evaluate_thresholding.f90 post_unit_test.f90 post_compression_unit_test.f90 post_denoising.f90 post_cvs_invertibility_test.f90 \
-post_wavelet_transform.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90
+post_wavelet_transform.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90 proto_pressure_multigrid.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -252,12 +252,12 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D_wingsection.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_t_files.o $(OBJDIR)/module_timing.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o
+$(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_timing.o: module_timing.f90
@@ -328,7 +328,7 @@ $(OBJDIR)/module_treelib.o: module_treelib.f90 $(OBJDIR)/module_params.o $(OBJDI
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_operators.o: module_operators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o \
-	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_derivative.f90 compute_vorticity.f90 divergence.f90 compute_Qcriterion.f90 \
+	$(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_treelib.o compute_derivative.f90 compute_vorticity.f90 compute_divergence.f90 compute_gradient.f90 compute_Qcriterion.f90 compute_laplacian.f90 compute_dissipation.f90 \
 	componentWiseNorm_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 

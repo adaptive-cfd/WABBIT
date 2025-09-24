@@ -180,9 +180,8 @@ contains
             inquire ( file=file, exist=exists )
 
             ! check if the specified file exists
-            if (.not. exists) then
-              write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-              call abort(30302020,"INI file not found")
+            if ( exists .eqv. .false.) then
+                call abort(250922, "INIFILES ERROR: Ini-file not found! " // trim(adjustl(file)) )
             endif
 
             if (present(remove_comments)) then
@@ -207,7 +206,7 @@ contains
     ! Output:
     !       params_real: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_dbl_mpi (PARAMS, section, keyword, params_real, defaultvalue)
+    subroutine param_dbl_mpi(PARAMS, section, keyword, params_real, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -222,7 +221,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_real, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_real, defaultvalue)
         endif
 
         ! And then broadcast
@@ -248,7 +247,7 @@ contains
     ! Output:
     !       params_string: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_str_mpi (PARAMS, section, keyword, params_string, defaultvalue)
+    subroutine param_str_mpi(PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
         implicit none
 
         ! Contains the ascii-params file
@@ -257,6 +256,7 @@ contains
         character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
         character(len=*), intent (inout) :: params_string
         character(len=*), intent (in) :: defaultvalue
+        logical, optional, intent(in) :: check_file_exists
         integer :: mpicode
         integer :: mpirank
 
@@ -265,7 +265,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_string, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
         endif
 
         ! And then broadcast
@@ -291,7 +291,7 @@ contains
     ! Output:
     !       params_vector: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_vct_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_vct_mpi(PARAMS, section, keyword, params_vector, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -312,9 +312,9 @@ contains
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
             if (present(defaultvalue)) then
-                call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+                call read_param(PARAMS, section, keyword, params_vector, defaultvalue)
             else
-                call read_param (PARAMS, section, keyword, params_vector)
+                call read_param(PARAMS, section, keyword, params_vector)
             endif
         endif
 
@@ -339,7 +339,7 @@ contains
     ! Output:
     !       params_string: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_vct_str_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_vct_str_mpi(PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout)    :: PARAMS
@@ -347,6 +347,7 @@ contains
         character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
         character(len=*), intent(inout) :: params_vector(1:)
         character(len=*), intent(in)    :: defaultvalue(1:)
+        logical, optional, intent(in)   :: check_file_exists
 
         integer :: n
         integer :: mpicode
@@ -359,7 +360,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
         endif
 
         call MPI_BCAST( params_vector, len(params_vector(1))*n, MPI_CHARACTER, 0, WABBIT_COMM, mpicode )
@@ -384,7 +385,7 @@ contains
     ! Output:
     !       params_matrix: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_mpi (PARAMS, section, keyword, matrix, defaultvalue)
+    subroutine param_matrix_mpi(PARAMS, section, keyword, matrix, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -402,7 +403,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, matrix, defaultvalue)
+            call read_param(PARAMS, section, keyword, matrix, defaultvalue)
             n = size(matrix,1)
             m = size(matrix,2)
         endif
@@ -512,7 +513,7 @@ contains
     ! Output:
     !       params_vector: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_boolvct_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_boolvct_mpi(PARAMS, section, keyword, params_vector, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -532,7 +533,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_vector, defaultvalue)
         endif
 
         ! And then broadcast
@@ -576,7 +577,7 @@ contains
     !   allocate(matrix(1:a,1:b))
     !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_size_mpi (PARAMS, section, keyword, matrixlines, matrixcols)
+    subroutine param_matrix_size_mpi(PARAMS, section, keyword, matrixlines, matrixcols)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -625,7 +626,7 @@ contains
     !   allocate(matrix(1:a,1:b))
     !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_read_mpi (PARAMS, section, keyword, matrix)
+    subroutine param_matrix_read_mpi(PARAMS, section, keyword, matrix)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS

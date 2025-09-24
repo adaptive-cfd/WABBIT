@@ -151,6 +151,9 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     if (params_acm%use_channel_forcing) then
         call ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID)
     endif
+    if (params_acm%HIT_linear_forcing) then
+        call HIT_remove_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID)
+    endif
 
     call toc( "RHS_wrapper (TOTAL)", 30, MPI_wtime()-t0 )
 end subroutine RHS_wrapper
@@ -228,3 +231,39 @@ subroutine ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask
     end do
 
 end subroutine
+
+
+subroutine HIT_remove_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID)
+   implicit none
+
+    real(kind=rk), intent(in)           :: time
+    type (type_params), intent(inout)   :: params                       !> user defined parameter structure, hvy_active
+    real(kind=rk), intent(inout)        :: hvy_rhs  (:, :, :, :, :)     !> heavy work data array - block data
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)      !> hvy_mask: the mask function, usx,usy,usz,color,sponge
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    integer(kind=ik), intent(in)        :: tree_ID
+
+    real(kind=rk)                :: rhs_mean, dV, V_domain, u_RMS
+    integer(kind=ik)             :: ix, iy, iz, k, hvy_id, mpierr, lgt_id, g, Bs(1:3)
+    real(kind=rk), dimension(3)  :: dx, x0
+
+    ! This subroutine is actually a hack. It enforces zero mean flow for HIT simulations with linear forcing.
+    ! Because it is a tree-level routine, it cannot be merged easily in the ACM module.
+    ! -TE
+    g = params%g 
+    Bs = params%Bs
+
+    ! --- mean flow was already computed in RHS_ACM, we just need to remove it here
+    
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+        ! convert given hvy_id to lgt_id for block spacing routine
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        ! remove mean flow
+        hvy_block(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id) - params_acm%mean_flow(1)
+        hvy_block(:,:,:,2,hvy_id) = hvy_block(:,:,:,2,hvy_id) - params_acm%mean_flow(2)
+        if (params%dim == 3) hvy_block(:,:,:,3,hvy_id) = hvy_block(:,:,:,3,hvy_id) - params_acm%mean_flow(3)
+    enddo
+
+end subroutine HIT_remove_meanrhs

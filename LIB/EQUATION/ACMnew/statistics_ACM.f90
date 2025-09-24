@@ -187,8 +187,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         if (params_acm%dim == 2) then
             ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
-            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
+            call compute_divergence( u(:,:,:,1:2), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
             where (mask(:,:,:,1)>0.0_rk)
@@ -259,7 +258,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         else
             ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
             ! compute divergence on this block
-            call divergence( u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, div)
+            call compute_divergence( u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, div)
 
             ! mask divergence inside the solid body
             where (mask(:,:,:,1)>0.0_rk)
@@ -400,7 +399,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! compute enstrophy in the whole domain (including penalized regions)
         ! note in 2D case, uz is ignored, so we pass p=u(:,:,:,3) just for fun.
-        call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
+        call compute_vorticity(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim == 2) then
             params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
@@ -409,8 +408,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
         end if
 
-        call dissipation_ACM_block(Bs, g, dx, u(:,:,:,1:3), dissipation_block)
-        params_acm%dissipation = params_acm%dissipation + dissipation_block
+        call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+        if (params_acm%dim == 2) then
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
+        else
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
+        endif
 
     case ("post_stage")
         !-------------------------------------------------------------------------
@@ -599,7 +602,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! turbulent statistics - these are normed by the volume!
             if (params_acm%nu*params_acm%enstrophy > 0.0_rk) then
-                dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
+                dissipation = params_acm%dissipation/product(params_acm%domain_size(1:params_acm%dim))
                 u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &

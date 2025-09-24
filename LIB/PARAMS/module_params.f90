@@ -85,6 +85,17 @@ module module_params
         character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
+        character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_stencil_size=0
+        character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
+        integer(kind=ik)      :: poisson_cycle_it=0
+        real(kind=rk)         :: poisson_cycle_tol=0.0_rk
+        integer(kind=ik)      :: poisson_cycle_max_it=0
+        integer(kind=ik)      :: poisson_GS_it=0
+        integer(kind=ik)      :: poisson_Sync_it=0
+        character(len=cshort) :: poisson_coarsest="FFT"
+        integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
+        character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
         character(len=cshort) :: coarsening_indicator="threshold-state-vector"
         character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
@@ -105,6 +116,7 @@ module module_params
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik) :: n_eqn = 0_ik
+        integer(kind=ik) :: n_eqn_rhs = 0_ik
         integer(kind=ik) :: N_mask_components = 0_ik
 
         ! block distribution for load balancing (also used for start distribution)
@@ -122,6 +134,13 @@ module module_params
         ! -------------------------------------------------------------------------------------
         real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
+
+        ! -------------------------------------------------------------------------------------
+        ! time statistics (averaging or similar)
+        ! -------------------------------------------------------------------------------------
+        logical :: time_statistics = .false.
+        integer(kind=ik) :: N_time_statistics = 0
+        character(len=cshort), allocatable :: time_statistics_names(:)
 
         ! -------------------------------------------------------------------------------------
         ! MPI

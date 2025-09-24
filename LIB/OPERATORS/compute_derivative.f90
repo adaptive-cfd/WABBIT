@@ -1,5 +1,5 @@
 !> \brief compute derivative for time step t (for saving it on disk)
-! ********************************************************************************************
+! ************************************************************************************
 subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, discretization, u_out)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
@@ -16,15 +16,15 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
     integer(kind=ik), dimension(3), intent(in)     :: Bs
     !> derivatives
     real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv    !> inverse of dx, dy, dz
-    integer(kind=ik)                               :: ix, iy, iz, dim, gs(3)
-    ! coefficients for Tam&Webb (4th order 1st derivative)
-    real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
-    ! 4th order central FD scheme
-    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
-    real(kind=rk), parameter :: b_FD4(-2:2) = (/-1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
-    ! 6th order central FD scheme
-    real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
-    real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+    integer(kind=ik)                               :: ix, iy, iz, dim, gs(3), s
+    !> parameters for FD1L, FD2, FD1X operators
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2, FD1X
+    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e, FD1X_s, FD1X_e
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+    call setup_FD2_stencil(discretization, FD2, FD2_s, FD2_e)
+    call setup_FD1X_stencil(discretization, FD1X, FD1X_s, FD1X_e)
 
     dim = 2
     if (size(u,3)> 1) dim = 3
@@ -43,247 +43,125 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
         dz2_inv = 1.0_rk / (dx(3)**2)
     endif
 
-    select case(discretization)
-    case("FD_2nd_central")
-        select case(derivative_order)
-        case(1) ! first order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix+1, iy, iz) - u(ix-1, iy, iz)) * dx_inv * 0.5_rk
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix, iy+1, iz) - u(ix, iy-1, iz)) * dy_inv * 0.5_rk
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix, iy, iz+1) - u(ix, iy, iz-1)) * dx_inv * 0.5_rk
-                end do; end do; end do
-            end select
-        case(2) ! second order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix-1, iy  , iz  ) -2.0_rk*u(ix, iy, iz) + u(ix+1, iy  , iz  ))*dx2_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix  , iy+1, iz  ) -2.0_rk*u(ix, iy, iz) + u(ix  , iy+1, iz  ))*dy2_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (u(ix  , iy  , iz-1) -2.0_rk*u(ix, iy, iz) + u(ix  , iy  , iz+1))*dz2_inv
-                end do; end do; end do
-            end select
-        case(11) ! cross derivatives
-            select case(derivative_dim)
-            case(12) ! derivative in xy-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix+1, iy+1, iz  ) - u(ix-1, iy+1, iz  ) - u(ix+1, iy-1, iz  ) + u(ix-1, iy-1, iz  ))*dx_inv*dy_inv
-                end do; end do; end do
-            case(13) ! derivative in xz-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix+1, iy  , iz+1) - u(ix-1, iy  , iz+1) - u(ix+1, iy  , iz-1) + u(ix-1, iy  , iz-1))*dx_inv*dz_inv
-                end do; end do; end do
-            case(23) ! derivative in yz-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = 1.0_rk/4.0_rk*(u(ix  , iy+1, iz+1) - u(ix  , iy-1, iz+1) - u(ix  , iy+1, iz-1) + u(ix  , iy-1, iz-1))*dy_inv*dz_inv
-                end do; end do; end do
-            end select
+    ! Unified derivative computation using module variables
+    select case(derivative_order)
+    case(1) ! first order derivative
+        select case(derivative_dim)
+        case(1) ! derivative in x-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz)) * dx_inv
+                    end do
+                end do
+            end do
+        case(2) ! derivative in y-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz)) * dy_inv
+                    end do
+                end do
+            end do
+        case(3) ! derivative in z-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le)) * dz_inv
+                    end do
+                end do
+            end do
         end select
-    case("FD_4th_central")
-        select case(derivative_order)
-        case(1) ! first order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD4(-2)*u(ix-2,iy,iz) +a_FD4(-1)*u(ix-1,iy,iz) +a_FD4(+1)*u(ix+1,iy,iz) +a_FD4(+2)*u(ix+2,iy,iz))*dx_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD4(-2)*u(ix,iy-2,iz) +a_FD4(-1)*u(ix,iy-1,iz) +a_FD4(+1)*u(ix,iy+1,iz) +a_FD4(+2)*u(ix,iy+2,iz))*dy_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD4(-2)*u(ix,iy,iz-2) +a_FD4(-1)*u(ix,iy,iz-1) +a_FD4(+1)*u(ix,iy,iz+1) +a_FD4(+2)*u(ix,iy,iz+2))*dz_inv
-                end do; end do; end do
-            end select
-        case(2) ! second order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)   = (b_FD4(-2)*u(ix-2,iy,iz) &
-                            + b_FD4(-1)*u(ix-1,iy,iz) &
-                            + b_FD4(0)*u(ix,iy,iz) &
-                            + b_FD4(+1)*u(ix+1,iy,iz) &
-                            + b_FD4(+2)*u(ix+2,iy,iz))*dx2_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)   = (b_FD4(-2)*u(ix,iy-2,iz) &
-                            + b_FD4(-1)*u(ix,iy-1,iz) &
-                            + b_FD4(0)*u(ix,iy,iz) &
-                            + b_FD4(+1)*u(ix,iy+1,iz) &
-                            + b_FD4(+2)*u(ix,iy+2,iz))*dy2_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)   = (b_FD4(-2)*u(ix,iy,iz-2) &
-                            + b_FD4(-1)*u(ix,iy,iz-1) &
-                            + b_FD4(0)*u(ix,iy,iz) &
-                            + b_FD4(+1)*u(ix,iy,iz+1) &
-                            + b_FD4(+2)*u(ix,iy,iz+2))*dz2_inv
-                end do; end do; end do
-            end select
-        case(11) ! cross derivatives
-            select case(derivative_dim)
-            case(12) ! derivative in xy-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix+1, iy+1, iz  ) - u(ix-1, iy+1, iz  ) - u(ix+1, iy-1, iz  ) + u(ix-1, iy-1, iz  )) + \
-                                     -1.0_rk/48.0_rk*(u(ix+2, iy+2, iz  ) - u(ix-2, iy+2, iz  ) - u(ix+2, iy-2, iz  ) + u(ix-2, iy-2, iz  )))*dx_inv*dy_inv
-                end do; end do; end do
-            case(13) ! derivative in xz-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix+1, iy  , iz+1) - u(ix-1, iy  , iz+1) - u(ix+1, iy  , iz-1) + u(ix-1, iy  , iz-1)) + \
-                                     -1.0_rk/48.0_rk*(u(ix+2, iy  , iz+2) - u(ix-2, iy  , iz+2) - u(ix+2, iy  , iz-2) + u(ix-2, iy  , iz-2)))*dx_inv*dz_inv
-                end do; end do; end do
-            case(23) ! derivative in yz-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (1.0_rk/3.0_rk*(u(ix  , iy+1, iz+1) - u(ix  , iy-1, iz+1) - u(ix  , iy+1, iz-1) + u(ix  , iy-1, iz-1)) + \
-                                     -1.0_rk/48.0_rk*(u(ix  , iy+2, iz+2) - u(ix  , iy-2, iz+2) - u(ix  , iy+2, iz-2) + u(ix  , iy-2, iz-2)))*dy_inv*dz_inv
-                end do; end do; end do
-            end select
+    case(2) ! second order derivative
+        select case(derivative_dim)
+        case(1) ! derivative in x-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD2(FD2_s:FD2_e) * u(ix+FD2_s:ix+FD2_e, iy, iz)) * dx2_inv
+                    end do
+                end do
+            end do
+        case(2) ! derivative in y-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD2(FD2_s:FD2_e) * u(ix, iy+FD2_s:iy+FD2_e, iz)) * dy2_inv
+                    end do
+                end do
+            end do
+        case(3) ! derivative in z-direction
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        u_out(ix,iy,iz) = sum(FD2(FD2_s:FD2_e) * u(ix, iy, iz+FD2_s:iz+FD2_e)) * dz2_inv
+                    end do
+                end do
+            end do
         end select
-    case("FD_6th_central")
-        select case(derivative_order)
-        case(1) ! first order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD6(-3)*u(ix-3,iy,iz) &
-                           +a_FD6(-2)*u(ix-2,iy,iz) &
-                           +a_FD6(-1)*u(ix-1,iy,iz) &
-                           +a_FD6(+1)*u(ix+1,iy,iz) &
-                           +a_FD6(+2)*u(ix+2,iy,iz) &
-                           +a_FD6(+3)*u(ix+3,iy,iz))*dx_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD6(-3)*u(ix,iy-3,iz) &
-                           +a_FD6(-2)*u(ix,iy-2,iz) &
-                           +a_FD6(-1)*u(ix,iy-1,iz) &
-                           +a_FD6(+1)*u(ix,iy+1,iz) &
-                           +a_FD6(+2)*u(ix,iy+2,iz) &
-                           +a_FD6(+3)*u(ix,iy+3,iz))*dy_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_FD6(-3)*u(ix,iy,iz-3) &
-                           +a_FD6(-2)*u(ix,iy,iz-2) &
-                           +a_FD6(-1)*u(ix,iy,iz-1) &
-                           +a_FD6(+1)*u(ix,iy,iz+1) &
-                           +a_FD6(+2)*u(ix,iy,iz+2) &
-                           +a_FD6(+3)*u(ix,iy,iz+3))*dz_inv
-                end do; end do; end do
-            end select
-        case(2) ! second order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)  = (b_FD6(-3)*u(ix-3,iy,iz) &
-                            + b_FD6(-2)*u(ix-2,iy,iz) &
-                            + b_FD6(-1)*u(ix-1,iy,iz) &
-                            + b_FD6(0)*u(ix,iy,iz) &
-                            + b_FD6(+1)*u(ix+1,iy,iz) &
-                            + b_FD6(+2)*u(ix+2,iy,iz) &
-                            + b_FD6(+3)*u(ix+3,iy,iz))*dx2_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)  = (b_FD6(-3)*u(ix,iy-3,iz) &
-                            + b_FD6(-2)*u(ix,iy-2,iz) &
-                            + b_FD6(-1)*u(ix,iy-1,iz) &
-                            + b_FD6(0)*u(ix,iy,iz) &
-                            + b_FD6(+1)*u(ix,iy+1,iz) &
-                            + b_FD6(+2)*u(ix,iy+2,iz) &
-                            + b_FD6(+3)*u(ix,iy+3,iz))*dy2_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz)  = (b_FD6(-3)*u(ix,iy,iz-3) &
-                            + b_FD6(-2)*u(ix,iy,iz-2) &
-                            + b_FD6(-1)*u(ix,iy,iz-1) &
-                            + b_FD6(0)*u(ix,iy,iz) &
-                            + b_FD6(+1)*u(ix,iy,iz+1) &
-                            + b_FD6(+2)*u(ix,iy,iz+2) &
-                            + b_FD6(+3)*u(ix,iy,iz+3))*dz2_inv
-                end do; end do; end do
-            end select
-        end select
-    case("FD_4th_central_optimized")
-        select case(derivative_order)
-        case(1) ! first order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_TW4(-3)*u(ix-3,iy,iz) &
-                           +a_TW4(-2)*u(ix-2,iy,iz) &
-                           +a_TW4(-1)*u(ix-1,iy,iz) &
-                           +a_TW4(+1)*u(ix+1,iy,iz) &
-                           +a_TW4(+2)*u(ix+2,iy,iz) &
-                           +a_TW4(+3)*u(ix+3,iy,iz))*dx_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_TW4(-3)*u(ix,iy-3,iz) &
-                           +a_TW4(-2)*u(ix,iy-2,iz) &
-                           +a_TW4(-1)*u(ix,iy-1,iz) &
-                           +a_TW4(+1)*u(ix,iy+1,iz) &
-                           +a_TW4(+2)*u(ix,iy+2,iz) &
-                           +a_TW4(+3)*u(ix,iy+3,iz))*dy_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (a_TW4(-3)*u(ix,iy,iz-3) &
-                           +a_TW4(-2)*u(ix,iy,iz-2) &
-                           +a_TW4(-1)*u(ix,iy,iz-1) &
-                           +a_TW4(+1)*u(ix,iy,iz+1) &
-                           +a_TW4(+2)*u(ix,iy,iz+2) &
-                           +a_TW4(+3)*u(ix,iy,iz+3))*dz_inv
-                end do; end do; end do
-            end select
-        case(2) ! second order derivative
-            select case(derivative_dim)
-            case(1) ! derivative in x-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (b_FD4(-2)*u(ix-2,iy,iz) &
-                           + b_FD4(-1)*u(ix-1,iy,iz) &
-                           + b_FD4(0)*u(ix,iy,iz) &
-                           + b_FD4(+1)*u(ix+1,iy,iz) &
-                           + b_FD4(+2)*u(ix+2,iy,iz))*dx2_inv
-                end do; end do; end do
-            case(2) ! derivative in y-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (b_FD4(-2)*u(ix,iy-2,iz) &
-                           + b_FD4(-1)*u(ix,iy-1,iz) &
-                           + b_FD4(0)*u(ix,iy,iz) &
-                           + b_FD4(+1)*u(ix,iy+1,iz) &
-                           + b_FD4(+2)*u(ix,iy+2,iz))*dy2_inv
-                end do; end do; end do
-            case(3) ! derivative in z-direction
-                do iz = gs(3)+1, Bs(3)+gs(3); do iy = gs(2)+1, Bs(2)+gs(2); do ix = gs(1)+1, Bs(1)+gs(1)
-                    u_out(ix,iy,iz) = (b_FD4(-2)*u(ix,iy,iz-2) &
-                           + b_FD4(-1)*u(ix,iy,iz-1) &
-                           + b_FD4(0)*u(ix,iy,iz) &
-                           + b_FD4(+1)*u(ix,iy,iz+1) &
-                           + b_FD4(+2)*u(ix,iy,iz+2))*dz2_inv
-                end do; end do; end do
-            end select
+    case(11) ! cross derivatives (using FD1X stencils in cross-shaped pattern)
+        select case(derivative_dim)
+        case(12) ! derivative in xy-direction (mixed partial d²/dxdy)
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        ! Apply cross-shaped stencil for mixed partial: d²u/dxdy
+                        ! FD1X stencil is applied twice: once for each diagonal
+                        ! First diagonal (i,j): from (-s,-s) to (s,s) with positive sign
+                        ! Second diagonal (i,-j): from (-s,s) to (s,-s) with negative sign
+                        u_out(ix,iy,iz) = 0.0_rk
+                        do s = FD1X_s, FD1X_e
+                            ! First diagonal: positive contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) + FD1X(s) * u(ix+s, iy+s, iz)
+                            ! Second diagonal: negative contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) - FD1X(s) * u(ix+s, iy-s, iz)
+                        end do
+                        u_out(ix,iy,iz) = u_out(ix,iy,iz) * dx_inv * dy_inv
+                    end do
+                end do
+            end do
+        case(13) ! derivative in xz-direction (mixed partial d²/dxdz)
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        ! Apply cross-shaped stencil for mixed partial: d²u/dxdz
+                        ! FD1X stencil is applied twice: once for each diagonal
+                        ! First diagonal (i,k): from (-s,-s) to (s,s) with positive sign
+                        ! Second diagonal (i,-k): from (-s,s) to (s,-s) with negative sign
+                        u_out(ix,iy,iz) = 0.0_rk
+                        do s = FD1X_s, FD1X_e
+                            ! First diagonal: positive contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) + FD1X(s) * u(ix+s, iy, iz+s)
+                            ! Second diagonal: negative contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) - FD1X(s) * u(ix+s, iy, iz-s)
+                        end do
+                        u_out(ix,iy,iz) = u_out(ix,iy,iz) * dx_inv * dz_inv
+                    end do
+                end do
+            end do
+        case(23) ! derivative in yz-direction (mixed partial d²/dydz)
+            do iz = gs(3)+1, Bs(3)+gs(3)
+                do iy = gs(2)+1, Bs(2)+gs(2)
+                    do ix = gs(1)+1, Bs(1)+gs(1)
+                        ! Apply cross-shaped stencil for mixed partial: d²u/dydz
+                        ! FD1X stencil is applied twice: once for each diagonal
+                        ! First diagonal (j,k): from (-s,-s) to (s,s) with positive sign
+                        ! Second diagonal (j,-k): from (-s,s) to (s,-s) with negative sign
+                        u_out(ix,iy,iz) = 0.0_rk
+                        do s = FD1X_s, FD1X_e
+                            ! First diagonal: positive contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) + FD1X(s) * u(ix, iy+s, iz+s)
+                            ! Second diagonal: negative contribution
+                            u_out(ix,iy,iz) = u_out(ix,iy,iz) - FD1X(s) * u(ix, iy+s, iz-s)
+                        end do
+                        u_out(ix,iy,iz) = u_out(ix,iy,iz) * dy_inv * dz_inv
+                    end do
+                end do
+            end do
         end select
     case default
-        write(*,*) discretization
-        call abort(240321, "ERROR: discretization method in discretization is unknown")
+        write(*,*) "ERROR: derivative_order", derivative_order, "is not supported"
+        call abort(240321, "ERROR: derivative_order in compute_derivative is unknown")
     end select
 
 end subroutine compute_derivative

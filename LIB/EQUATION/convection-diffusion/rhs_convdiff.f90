@@ -6,13 +6,13 @@
 ! ********************************************************************************************
 
 
-  !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid and any MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
-  !-----------------------------------------------------------------------------
-  subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag  )
+!-----------------------------------------------------------------------------
+! main level wrapper to set the right hand side on a block. Note this is completely
+! independent of the grid and any MPI formalism, neighboring relations and the like.
+! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
+! from that. Ghost nodes are assumed to be sync'ed.
+!-----------------------------------------------------------------------------
+subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag  )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -62,53 +62,53 @@
 
     select case(stage)
     case ("init_stage")
-      !-------------------------------------------------------------------------
-      ! 1st stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-      ! performs initializations in the RHS module, such as resetting integrals
+        !-------------------------------------------------------------------------
+        ! 1st stage: init_stage.
+        !-------------------------------------------------------------------------
+        ! this stage is called only once, not for each block.
+        ! performs initializations in the RHS module, such as resetting integrals
 
-      return
+        return
 
     case ("integral_stage")
-      !-------------------------------------------------------------------------
-      ! 2nd stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! For some RHS, the eqn depend not only on local, block based qtys, such as
-      ! the state vector, but also on the entire grid, for example to compute a
-      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
-      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
-      ! them nicer, two RHS stages have to be defined: integral / local stage.
-      !if abs(params_convdiff%gamma)>0
-      ! called for each block.
+        !-------------------------------------------------------------------------
+        ! 2nd stage: init_stage.
+        !-------------------------------------------------------------------------
+        ! For some RHS, the eqn depend not only on local, block based qtys, such as
+        ! the state vector, but also on the entire grid, for example to compute a
+        ! global forcing term (e.g. in FSI the forces on bodies). As the physics
+        ! modules cannot see the grid, (they only see blocks), in order to encapsulate
+        ! them nicer, two RHS stages have to be defined: integral / local stage.
+        !if abs(params_convdiff%gamma)>0
+        ! called for each block.
 
-      return
+        return
 
     case ("post_stage")
-      !-------------------------------------------------------------------------
-      ! 3rd stage: post_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
+        !-------------------------------------------------------------------------
+        ! 3rd stage: post_stage.
+        !-------------------------------------------------------------------------
+        ! this stage is called only once, not for each block.
 
-      return
+        return
 
     case ("local_stage")
-      !-------------------------------------------------------------------------
-      ! 4th stage: local evaluation of RHS on all blocks
-      !-------------------------------------------------------------------------
-      ! the second stage then is what you would usually do: evaluate local differential
-      ! operators etc.
-      !
-      ! called for each block.
-      call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
+        !-------------------------------------------------------------------------
+        ! 4th stage: local evaluation of RHS on all blocks
+        !-------------------------------------------------------------------------
+        ! the second stage then is what you would usually do: evaluate local differential
+        ! operators etc.
+        !
+        ! called for each block.
+        call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
 
 
     case default
-      call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
+        call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
     end select
 
 
-  end subroutine RHS_convdiff
+end subroutine RHS_convdiff
 
 
 
@@ -158,7 +158,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     rhs = 0.0_rk
 
 #ifdef DEV
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,4)/=N) then
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,4)/=N+params_convdiff%N_time_statistics) then
         call abort(2804231,"wrong size. There's someone at the door, I'll leave u to it.")
     endif
 #endif
@@ -502,6 +502,18 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
           enddo
       enddo
       u0 = u0 * dexp(-(time / params_convdiff%tau) ** 2)
+    
+    case("center_expand")
+        ! this condition periodically expands and contracts the field from the center
+        do iy = 1, Bs(2) + 2*g
+            do ix = 1, Bs(1) + 2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                u0(ix,iy,1) = cos((pi*time)/T) * (sin(pi*x/c0x)) * params_convdiff%u0x(i)
+                u0(ix,iy,2) = cos((pi*time)/T) * (sin(pi*y/c0y)) * params_convdiff%u0y(i)
+            enddo
+        enddo
 
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')

@@ -20,12 +20,13 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     integer :: M_max ! M is M_krylov number of subspace
     real(kind=rk), allocatable, save :: H(:,:), phiMat(:,:), H_tmp(:,:)
     integer :: M_iter
-    integer :: i, j, k, l, iter, grhs
+    integer :: i, j, k, l, iter, grhs, Neqn_RHS
     real(kind=rk) :: normv, eps, beta, err_tolerance
     real(kind=rk) :: h_klein, err, t_call, t_stage
 
     M_max = params%M_krylov
     grhs = params%g_rhs
+    Neqn_RHS = params%n_eqn_rhs
 
     ! allocate matrices with largest admissible
     if (.not. allocated(H)) then
@@ -44,7 +45,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
     ! synchronize ghost nodes
     t_call = MPI_wtime()
-    call sync_ghosts_RHS_tree( params, hvy_block, tree_ID, g_minus=grhs, g_plus=grhs )
+    call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs )
     call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
@@ -72,7 +73,7 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
     ! start iteration, fill first slot
     do k = 1, hvy_n(tree_ID)
-        hvy_work(:,:,:,:,hvy_active(k,tree_ID),1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+3) / beta
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),1) = hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+3) / beta
     enddo
 
     !**************************************!
@@ -85,13 +86,13 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
         ! perturbed right hand side is first-to-last (M+2) slot
         do k = 1, hvy_n(tree_ID)
-            hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+2) = hvy_block(:,:,:,:,hvy_active(k,tree_ID)) &
-            + eps * hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_iter)
+            hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+2) = hvy_block(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID)) &
+            + eps * hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_iter)
         enddo
 
         ! call RHS with perturbed state vector, stored in slot (M_max+1)
         t_call = MPI_wtime()
-        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,:,:,M_max+2), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,1:Neqn_RHS,:,M_max+2), tree_ID, g_minus=grhs, g_plus=grhs  )
         call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
         t_call = MPI_wtime()
@@ -101,25 +102,25 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
 
         ! linearization of RHS slot (M_max+1)
         do k = 1, hvy_n(tree_ID)
-            hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+1) = ( hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+1) &
-            -hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+3) ) / eps
+            hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+1) = ( hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+1) &
+            -hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+3) ) / eps
         enddo
 
         ! --- inner loop ----
         ! --- ARNOLDI ---
         do iter = 1, M_iter
-            call scalarproduct(params, hvy_work(:,:,:,:,:,iter), hvy_work(:,:,:,:,:,M_max+1), H(iter, M_iter), tree_ID )
+            call scalarproduct(params, hvy_work(:,:,:,1:Neqn_RHS,:,iter), hvy_work(:,:,:,1:Neqn_RHS,:,M_max+1), H(iter, M_iter), tree_ID )
 
              do k = 1, hvy_n(tree_ID)
-                 hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+1) &
-                 - H(iter,M_iter) * hvy_work(:,:,:,:,hvy_active(k,tree_ID),iter)
+                 hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+1) = hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+1) &
+                 - H(iter,M_iter) * hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),iter)
              enddo
         enddo
         ! end of inner i =1:j loop
-        call wabbit_norm(params, hvy_work(:,:,:,:,:,M_max+1), H(M_iter+1,M_iter), tree_ID )
+        call wabbit_norm(params, hvy_work(:,:,:,1:Neqn_RHS,:,M_max+1), H(M_iter+1,M_iter), tree_ID )
 
         do k = 1, hvy_n(tree_ID)
-            hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_iter+1) = hvy_work(:,:,:,:,hvy_active(k,tree_ID),M_max+1) / H(M_iter+1,M_iter)
+            hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_iter+1) = hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),M_max+1) / H(M_iter+1,M_iter)
         enddo
 
 
@@ -179,8 +180,8 @@ subroutine krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work,
     ! result will be in hvy_block again (inout)
     do iter = 1, M_iter+1
         do k = 1, hvy_n(tree_ID)
-            hvy_block(:,:,:,:,hvy_active(k,tree_ID)) = hvy_block(:,:,:,:,hvy_active(k,tree_ID)) &
-            + beta * hvy_work(:,:,:,:,hvy_active(k,tree_ID),iter) * phiMat(iter,M_iter+1)
+            hvy_block(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID)) = hvy_block(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID)) &
+            + beta * hvy_work(:,:,:,1:Neqn_RHS,hvy_active(k,tree_ID),iter) * phiMat(iter,M_iter+1)
         enddo
     enddo
 
@@ -495,6 +496,7 @@ subroutine get_sum_all(inout,COMM)
 end subroutine get_sum_all
 
 
+! JB25: This function looks old and redundant, however as long as it works ..
 subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
     implicit none
     type (type_params), intent(in)      :: params
@@ -540,6 +542,7 @@ subroutine wabbit_norm(params, hvy_block, norm, tree_ID)
 
 end subroutine wabbit_norm
 
+! JB25: This function looks old and could be vectorized/simplified, however as long as it works ..
 subroutine scalarproduct(params, hvy_block1, hvy_block2, result, tree_ID)
     implicit none
     type (type_params), intent(in)      :: params

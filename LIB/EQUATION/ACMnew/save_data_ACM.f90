@@ -49,7 +49,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k, iscalar
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, iaverage
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -89,16 +89,16 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor', 'vort')
+        case('vor', 'vort', 'Vor', 'Vort', 'vorticity', 'Vorticity')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
             if (params_acm%dim /= 2) then
-                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' ''vorabs or compute in post (known bug)")
+                call abort(19101811,"ACM: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' 'vorabs' or compute in post (known bug)")
             endif
 
             ! vorticity
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
         case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
@@ -110,7 +110,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
 
             ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! for different components y,z we need to copy the desired one to the first position
             if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
@@ -130,7 +130,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             endif
 
             ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
-            call compute_vorticity(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), &
+            call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! compute by velocity to get local helicity
             work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
@@ -145,7 +145,26 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
 
         case('div', 'divu', 'divergence')
             ! div(u)
-            call divergence(u(:,:,:,1), u(:,:,:,2), u(:,:,:,3), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+            call compute_divergence(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+        
+        case('diss', 'dissipation')
+            ! local dissipation rate computed over velocity weighted laplacian
+            call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
+        
+        case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
+            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz')
+            ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
+            if (INDEX(name, 'x') > 0) then
+                call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k))
+            elseif (INDEX(name, 'y') > 0) then
+                call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k))
+            elseif (INDEX(name, 'z') > 0) then
+                if (params_acm%dim == 3) then
+                    call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k))
+                else
+                    call abort(19101812,"ACM: Gradient of p in z-direction is not defined for 2D runs")
+                endif
+            endif  
 
         case('mask')
             work(:,:,:,k) = mask(:,:,:,1)
@@ -171,6 +190,10 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
         if (name(1:6) == "scalar") then
             read( name(7:7), * ) iscalar
             work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
+        endif
+        if (name(1:14) == "timestatistics") then
+            read( name(15:15), * ) iaverage
+            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + params_acm%N_scalars + iaverage)
         endif
     end do
 

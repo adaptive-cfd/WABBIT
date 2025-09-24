@@ -17,7 +17,7 @@ subroutine compute_vorticity_post(params)
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
-    character(len=2)                   :: order
+    character(len=cshort)                   :: order
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
@@ -104,11 +104,26 @@ subroutine compute_vorticity_post(params)
     elseif (order == "4op") then
         params%order_discretization = "FD_4th_central_optimized"
         params%g = 3_ik
+    elseif (order == "4_comp_13") then
+        params%order_discretization = "FD_4th_comp_1_3"
+        params%g = 3_ik
+    elseif (order == "4_comp_04") then
+        params%order_discretization = "FD_4th_comp_0_4"
+        params%g = 4_ik
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
         params%g = 3_ik
+    elseif (order == "6_comp_24") then
+        params%order_discretization = "FD_6th_comp_2_4"
+        params%g = 4_ik
+    elseif (order == "6_comp_15") then
+        params%order_discretization = "FD_6th_comp_1_5"
+        params%g = 5_ik
+    elseif (order == "6_comp_06") then
+        params%order_discretization = "FD_6th_comp_0_6"
+        params%g = 6_ik
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central), 4op (FD_4th_central_optimized) and 2 (FD_2nd_central)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central), 4op (FD_4th_central_optimized), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5), 6_comp_06 (FD_6th_comp_0_6) and 2 (FD_2nd_central)")
     end if
     params%wavelet="CDF20"  ! wavelet is not used
 
@@ -162,51 +177,35 @@ subroutine compute_vorticity_post(params)
         call get_block_spacing_origin( params, lgtID, x0, dx )
 
         if (operator == "--vorticity") then
-            if (params%dim == 3) then
-                call compute_vorticity( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,3,hvyID),&
-                dx, Bs, g,&
-                params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
-            else
-                call compute_vorticity(hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,1,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
-            end if
+            call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
 
         elseif (operator=="--vor-abs") then
-            call compute_vorticity_abs(hvy_block(:,:,:,1,hvyID), &
-            hvy_block(:,:,:,2,hvyID), hvy_block(:,:,:,3,hvyID),&
+            call compute_vorticity_abs(hvy_block(:,:,:,1:3,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+
+        elseif (operator=="--helicity") then
+            call compute_helicity(hvy_block(:,:,:,1:3,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
+
+        elseif (operator=="--hel-abs") then
+            call compute_helicity_abs(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--divergence") then
-            if (params%dim == 3) then
-                call divergence( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), &
-                hvy_block(:,:,:,3,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
-            else
-                call divergence( hvy_block(:,:,:,1,hvyID), &
-                hvy_block(:,:,:,2,hvyID), &
-                hvy_block(:,:,:,1,hvyID),&
-                dx, Bs, g, &
-                params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
-            endif
+            call compute_divergence( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         ! elseif (operator == "--laplace") then
-        !     call divergence( hvy_block(:,:,:,1,hvyID), &
+        !     call compute_divergence( hvy_block(:,:,:,1,hvyID), &
         !     hvy_block(:,:,:,2,hvyID), &
         !     hvy_block(:,:,:,3,hvyID),&
         !     dx, Bs, g, &
         !     params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--Q") then
-            call compute_Qcriterion( hvy_block(:,:,:,1,hvyID), &
-            hvy_block(:,:,:,2,hvyID), &
-            hvy_block(:,:,:,3,hvyID),&
-            dx, Bs, g, &
-            params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+            call compute_Qcriterion( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--copy") then
             hvy_tmp(:,:,:,1,hvyID) = hvy_block(:,:,:,1,hvyID)
@@ -232,6 +231,18 @@ subroutine compute_vorticity_post(params)
     elseif (operator == "--vor-abs") then
         write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
 
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    
+    elseif (operator=="--helicity") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'helx', nint(time * 1.0e6_rk)
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+        write( fname,'(a, "_", i12.12, ".h5")') 'hely', nint(time * 1.0e6_rk)
+        call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID )
+        write( fname,'(a, "_", i12.12, ".h5")') 'helz', nint(time * 1.0e6_rk)
+        call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID )
+    
+    elseif (operator=="--hel-abs") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'helabs', nint(time * 1.0e6_rk)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--divergence") then

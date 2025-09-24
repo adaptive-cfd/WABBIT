@@ -20,7 +20,7 @@ module module_convdiff_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
-  INICOND_convdiff, FIELD_NAMES_convdiff, statistics_convdiff
+  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -31,7 +31,9 @@ module module_convdiff_new
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
-    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:)
+    logical :: time_statistics = .false.
+    integer(kind=ik) :: N_time_statistics = 0
+    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:), time_statistics_names(:)
     character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
   end type type_paramsb
@@ -45,6 +47,7 @@ module module_convdiff_new
 contains
 
 #include "statistics_convdiff.f90"
+#include "time_statistics_convdiff.f90"
 #include "rhs_convdiff.f90"
 
   !-----------------------------------------------------------------------------
@@ -117,6 +120,14 @@ contains
     ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%blobs_y0 )
     ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%blobs_z0 )
 
+    ! time statistics (averaging or similar)
+    call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params_convdiff%time_statistics, .false.)
+    if (params_convdiff%time_statistics) then
+        call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_convdiff%N_time_statistics, 1)
+        allocate( params_convdiff%time_statistics_names(1:params_convdiff%N_time_statistics) )
+        call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_convdiff%time_statistics_names, (/"none"/))
+    endif
+
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
 
@@ -140,7 +151,7 @@ contains
 
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_convdiff%N_fields_saved, 1 )
     allocate( params_convdiff%names(1:params_convdiff%N_fields_saved))
-    call read_param_mpi(FILE, 'Saving', 'field_names', params_convdiff%names, (/"phi1","phi2","phi3"/) )
+    call read_param_mpi(FILE, 'Saving', 'field_names', params_convdiff%names, (/"phi1"/) )
 
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_convdiff%CFL, 1.0_rk)
@@ -190,25 +201,85 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik) :: neqn, nwork
+    integer(kind=ik) :: neqn, nwork, i_var, k
     integer(kind=ik), dimension(3) :: Bs
+    character(len=cshort) :: name
 
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    ! copy state vector
-    work(:,:,:,1:size(u,4)) = u(:,:,:,:)
+    do k = 1, size(params_convdiff%names,1)
+        name = params_convdiff%names(k)
+        
+        ! saving of phi
+        if (name(1:3) == "phi") then
+            read( name(4:4), * ) i_var
+            if (i_var >=1 .and. i_var <= params_convdiff%N_scalars) then
+                work(:,:,:,k) = u(:,:,:,i_var)
+            else
+                call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
+            endif
+        endif
 
-    if (params_convdiff%dim == 2) then
-        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
-            call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1, u(:,:,1,1) )
+        ! saving of velocity field
+        if (name(1:2) == 'ux' .or. name(1:2) == 'uy' .or. name(1:2) == 'uz') then
+            read( name(4:4), * ) i_var
+            if (params_convdiff%dim == 2) then
+                if (size(work,4) - k < 1) then
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
+                endif
+                if (k > params_convdiff%N_scalars+2) then
+                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
+                endif
+                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,:,k), i_var, u(:,:,1,i_var) )
+            elseif (params_convdiff%dim == 3) then
+                if (size(work,4) - k < 2) then
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
+                endif
+                if (k > params_convdiff%N_scalars+3) then
+                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist " // trim(name) )
+                endif
+                call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,k:k+2), i_var )
+            endif
+            if (name(1:2) == 'uy') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (name(1:2) == 'uz') then
+                if (params_convdiff%dim == 2) then
+                    call abort(250922, "CONVDIFF: You try to save uz in 2d!")
+                endif
+                work(:,:,:,k) = work(:,:,:,k+2)
+            endif
         endif
-    elseif (params_convdiff%dim == 3) then
-        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
-            call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
+
+        ! saving of time statistics
+        if (name(1:14) == "timestatistics") then
+            read( name(15:15), * ) i_var
+            if (i_var >=1 .and. i_var <= params_convdiff%N_time_statistics) then
+                if (.not. params_convdiff%time_statistics) then
+                    call abort(250922, "CONVDIFF: You try to save time statistics but did not activate it in the ini file")
+                endif
+                work(:,:,:,k) = u(:,:,:,params_convdiff%N_scalars + i_var)
+            else
+                call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
+            endif
         endif
-    endif
+    enddo
+
+    ! ! copy state vector
+    ! work(:,:,:,1:size(u,4)) = u(:,:,:,:)
+
+    ! if (params_convdiff%dim == 2) then
+    !     if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
+    !         call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1, u(:,:,1,1) )
+    !     endif
+    ! elseif (params_convdiff%dim == 3) then
+    !     if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
+    !         call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
+    !     endif
+    ! endif
+
+    ! ! ToDo: Adapt to naming conventions as in ACM module, incorporate time statistics as well
 
   end subroutine
 

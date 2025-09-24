@@ -1,6 +1,6 @@
 ! initialize params struct from INI file
 subroutine ini_file_to_params( params, filename )
-    use module_t_files, only : flush_frequency
+   use module_t_files, only : flush_frequency
    implicit none
 
    !> user defined parameter structure
@@ -16,8 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R
-   integer(kind=ik), dimension(3)                  :: Bs
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
 
    rank         = params%rank
    number_procs = params%number_procs
@@ -65,7 +64,7 @@ subroutine ini_file_to_params( params, filename )
       allocate( params%input_files( params%n_eqn ) )
 
       params%input_files = "---"
-      call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files)
+      call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files, check_file_exists=.true. )
    end if
 
    ! wabbit does need to know how many fiels are written to disk when saving is triggered.
@@ -78,6 +77,18 @@ subroutine ini_file_to_params( params, filename )
    !
    ! discretization order
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
+   ! poisson order
+   call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol', params%poisson_cycle_tol, 1.0e-6_rk)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_max_it', params%poisson_cycle_max_it, 100)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_GS_it', params%poisson_GS_it, 8)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_Sync_it', params%poisson_Sync_it, 2)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_coarsest', params%poisson_coarsest, "FFT")
+   call read_param_mpi(FILE, 'Discretization', 'nprojection_NSI', params%nprojection_NSI, 1)
+   call read_param_mpi(FILE, 'Discretization', 'FFT_accuracy', params%FFT_accuracy, "spectral")
+
    ! filter frequency
    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
    call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
@@ -91,6 +102,15 @@ subroutine ini_file_to_params( params, filename )
    ! read statistics parameters
    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params%nsave_stats, 99999999_ik )
    call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
+
+   !***************************************************************************
+   ! read time statistics parameters
+   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
+   if (params%time_statistics) then
+      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
+      allocate( params%time_statistics_names(1:params%N_time_statistics) )
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
+   endif
 
    !***************************************************************************
    ! WABBIT needs to know about the mask function (if penalization is used): does it contain
@@ -113,6 +133,21 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .true.)
    call read_param_mpi(FILE, 'Debug', 'test_wavelet_decomposition', params%test_wavelet_decomposition, .true.)
 
+   ! Hack.
+   ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
+   ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
+   ! samples. In 2D, the code generally runs fast and does many time steps, hence
+   ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
+   call read_param_mpi(FILE, 'Debug', 'flush_frequency', flush_frequency, -1)
+   if (flush_frequency <= 0) then
+      if (params%dim == 2) then
+         flush_frequency = 50
+      else
+         flush_frequency = 10
+      endif
+   endif
+   if (params%rank==0) write(*, '(A, i0, A)') "INIT: Flushing t-files every ", flush_frequency, " appends."
+
    !***************************************************************************
    ! read MPI parameters
    !
@@ -129,19 +164,17 @@ subroutine ini_file_to_params( params, filename )
 
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
-   if ( (params%g < 2) .and. (params%order_predictor == 'multiresolution_4th') ) then
+   if ( (params%g < 6 .and. params%order_predictor == 'multiresolution_12th') .or. &
+        (params%g < 5 .and. params%order_predictor == 'multiresolution_10th') .or. &
+        (params%g < 4 .and. params%order_predictor == 'multiresolution_8th') .or. &
+        (params%g < 3 .and. params%order_predictor == 'multiresolution_6th') .or. &
+        (params%g < 2 .and. params%order_predictor == 'multiresolution_4th') .or. &
+        (params%g < 1 .and. params%order_predictor == 'multiresolution_2nd') ) then
       call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
-   if ( (params%g < 1) .and. (params%order_predictor == 'multiresolution_2nd') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
-   end if
-   if ( (params%g < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
-   end if
-   if ( (params%g < 2) .and. (params%order_discretization == 'FD_4th_central') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
-   end if
-   if ( (params%g < 1) .and. (params%order_discretization == 'FD_2th_central') ) then
+   if ( (params%g < 3 .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central')) .or. &
+        (params%g < 2 .and. params%order_discretization == 'FD_4th_central') .or. &
+        (params%g < 1 .and. params%order_discretization == 'FD_2th_central') ) then
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
@@ -158,16 +191,24 @@ subroutine ini_file_to_params( params, filename )
       params%g_RHS = g_RHS_min
    endif
 
-   ! Hack.
-   ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
-   ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
-   ! samples. In 2D, the code generally runs fast and does many time steps, hence
-   ! we flush more rarely. In 3D, we can flush more often, because time steps take longer
-   if (params%dim == 2) then
-      flush_frequency = 50
-   else
-      flush_frequency = 10
-   endif
+   ! JB ToDo - correct once this is more settled
+   ! ! we want to know the stencil size for laplacian schemes usually, so lets save this here
+   ! if (params%poisson_order == 'CFD_2nd') then
+   !    params%poisson_stencil_size = 1
+   ! elseif (params%poisson_order == 'CFD_4th') then
+   !    params%poisson_stencil_size = 2
+   ! elseif (params%poisson_order == 'CFD_6th') then
+   !    params%poisson_stencil_size = 3
+   ! elseif (params%poisson_order == 'CFD_8th') then
+   !    params%poisson_stencil_size = 4
+   ! elseif (params%poisson_order == 'MST_6th') then
+   !    params%poisson_stencil_size = 1
+   ! else
+   !    call abort(1234567, "Error: no laplacian order specified or not supported!")
+   ! endif
+   ! if ( params%g < params%poisson_stencil_size ) then
+   !    call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
+   ! end if
 
  
 end subroutine ini_file_to_params
@@ -316,6 +357,7 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_RHS, g_RHS_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
+   call read_param_mpi(FILE, 'Blocks', 'number_equations_rhs', params%n_eqn_rhs, params%n_eqn )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )

@@ -27,7 +27,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
+    STATISTICS_meta, TIME_STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
     !**********************************************************************************************
 
 contains
@@ -334,7 +334,7 @@ contains
             call PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, thresholdfield_block, &
                                N_thresholding_components)
         case default
-            call abort(2152000, "[PREPARE_THRESHOLDFIELD_meta.f90]: physics_type is unknown"//physics)
+            call abort(2152000, "[PREPARE_THRESHOLDFIELD_meta]: physics_type is unknown"//physics)
 
         end select
 
@@ -393,11 +393,62 @@ contains
             call STATISTICS_NStokes( time, u, g, x0, dx, stage )
 
         case default
-            call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+            call abort(2152000, "[STATISTICS_meta]: physics_type is unknown"//physics)
 
         end select
 
     end subroutine STATISTICS_meta
+
+
+    !-----------------------------------------------------------------------------
+    ! main level wrapper to compute local statistics over time, like average or minmax of specific quantities
+    ! these are then also adapted over time
+    !-----------------------------------------------------------------------------
+    subroutine TIME_STATISTICS_meta(physics, time, dt, time_start, u, g, x0, dx, work, mask)
+        implicit none
+
+        character(len=*), intent(in) :: physics
+        ! it may happen that some source terms have an explicit time-dependency
+        ! therefore the general call has to pass time
+        real(kind=rk), intent (in) :: time, dt, time_start
+
+        ! block data, containg the state vector. In general a 4D field (3 dims+components)
+        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+        ! as you are allowed to compute anything only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
+        integer, intent(in) :: g
+
+        ! for each block, you'll need to know where it lies in physical space. The first
+        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+        ! work array
+        real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+
+        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+        ! block level) so the physics modules have to provide an interface to create the mask at a tree
+        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
+
+        select case(physics)
+        case ("ACM-new")
+            call TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
+
+        case ("ConvDiff-new")
+            call TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, mask )
+
+        case ("navier_stokes")
+            call abort(250915, "time statistics not implemented for Navier-Stokes")
+
+        case default
+            call abort(2152000, "[TIME_STATISTICS_meta]: physics_type is unknown"//physics)
+
+        end select
+    end subroutine
 
     ! the statistics are written to ascii files (usually *.t files) with the help
     ! of module_t_files. In any case, the files have to be intialized: ideally, they

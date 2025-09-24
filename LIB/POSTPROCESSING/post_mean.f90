@@ -65,10 +65,6 @@ subroutine post_mean(params)
     ! read input data
     call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    ! create lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call updateMetadata_tree( params, tree_ID )
-
     ! compute an additional quantity that depends also on the position
     ! (the others are translation invariant)
     if (params%dim == 3) then

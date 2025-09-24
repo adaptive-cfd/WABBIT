@@ -155,7 +155,7 @@ subroutine post_denoising_test(params)
 
         ! denoise data
         t_den = MPI_Wtime()
-        call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true., std_est=std_est)
+        call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_work, ignore_coarsening=.true.)
         t_den = MPI_Wtime()-t_den
 
         if (save_results) then

@@ -183,8 +183,7 @@ program main
     ! backup startup time, usefull for time statistics (averaging)
     time_start = time
     if (params%time_statistics) then
-        call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
-
+        ! no sync needed as all values will simply be set to 0
         call time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
     end if
 
@@ -361,7 +360,9 @@ program main
             ! time statistics (integral, average, minmax or similar over time)
             !*******************************************************************
             if (params%time_statistics) then
-                call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
+                ! synching of state vector needed, as some quantities might need ghost nodes (e.g. vorticity)
+                ! synching of n_eqn_rhs is enough, as time statistics need no sync
+                call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:params%n_eqn_rhs,:), tree_ID_flow )
 
                 call time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             end if

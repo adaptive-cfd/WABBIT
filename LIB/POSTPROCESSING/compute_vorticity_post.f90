@@ -209,6 +209,10 @@ subroutine compute_vorticity_post(params)
 
         elseif (operator == "--copy") then
             hvy_tmp(:,:,:,1,hvyID) = hvy_block(:,:,:,1,hvyID)
+        
+        elseif (operator == "--dissipation") then
+            call compute_dissipation( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         else
             call abort(1812011, "operator is neither --vorticity --vor-abs --divergence --Q")
@@ -252,6 +256,11 @@ subroutine compute_vorticity_post(params)
 
     elseif (operator=="--Q") then
         write( fname,'(a, "_", i12.12, ".h5")') 'Qcrit', nint(time * 1.0e6_rk)
+
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    
+    elseif (operator=="--dissipation") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'dissipation', nint(time * 1.0e6_rk)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 

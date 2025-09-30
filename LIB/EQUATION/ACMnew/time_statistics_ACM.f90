@@ -360,16 +360,16 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         
         ! Squared velocity component cases
-        case ("ux2-avg", "ux2-mean")
+        case ("ux-2-avg", "ux-2-mean")
             ! compute the average of ux² over time
             work(:,:,:,1) = u(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
-        case ("uy2-avg", "uy2-mean")
+        case ("uy-2-avg", "uy-2-mean")
             ! compute the average of uy² over time
             work(:,:,:,1) = u(:,:,:,2)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
-        case ("uz2-avg", "uz2-mean")
-            if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uz2 not available in 2D simulations.")
+        case ("uz-2-avg", "uz-2-mean")
+            if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uz-2 not available in 2D simulations.")
             ! compute the average of uz² over time
             work(:,:,:,1) = u(:,:,:,3)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)

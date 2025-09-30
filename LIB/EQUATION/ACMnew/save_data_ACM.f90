@@ -49,7 +49,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     integer(kind=2), intent(in) :: n_domain(3)
 
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k, iscalar, iaverage
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -188,12 +188,28 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
 
 
         if (name(1:6) == "scalar") then
+            ! check if the 7th character is actually a digit
+            if (.not. (name(7:7) >= '0' .and. name(7:7) <= '9')) then
+                call abort(250920, "ERROR: PREPARE_SAVE_DATA_ACM: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//name(7:7)//"' at position 7.")
+            end if
             read( name(7:7), * ) iscalar
             work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
         endif
-        if (name(1:14) == "timestatistics") then
-            read( name(15:15), * ) iaverage
-            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + params_acm%N_scalars + iaverage)
+
+        ! if any of those endings is in the name, then it is a timestatistics variable
+        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
+            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0) then
+            ! now we have to find the index of it
+            do i_time_statistics = 1, params_acm%N_time_statistics
+                if (name == trim(params_acm%time_statistics_names(i_time_statistics))) exit
+            end do
+
+            ! safety check if the name was found
+            if (i_time_statistics > params_acm%N_time_statistics) then
+                call abort(250929, "ERROR: PREPARE_SAVE_DATA_ACM: field_name " // trim(name) // " not found in time_statistics_names")
+            endif
+
+            work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + params_acm%N_scalars + i_time_statistics)
         endif
     end do
 

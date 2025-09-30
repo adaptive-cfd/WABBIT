@@ -154,6 +154,8 @@ subroutine check_oom(params, tree_id, error_OOM, check_full_tree, check_ref)
 
     ! Attention: This logic has to be in line with the logic in init_full_tree
 
+    ! ToDo: Change loop over hvy_n to loop over lgt_n and omit allreduce call
+
     ! check if the refinement step will succeed or if we will run out of memory
     hvy_n_afterRefinement = 0
     do k = 1, hvy_n(tree_ID)

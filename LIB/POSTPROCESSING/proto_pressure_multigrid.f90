@@ -144,6 +144,7 @@ subroutine proto_pressure_multigrid(params)
     end select
     params%poisson_coarsest = "FFT"
     params%FFT_accuracy = "FD"  ! FD or spectral
+    params%poisson_Sync_it = 2
 
     Bs = params%Bs
 
@@ -160,7 +161,7 @@ subroutine proto_pressure_multigrid(params)
     ! allocate data
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, nrhs_slots1=1, neqn_hvy_tmp=8)
 
-    ! read input data, if comparison file is given, we read it in as well
+    ! read input data
     if (exist_p) then
         call readHDF5vct_tree( (/file_ux, file_uy, file_uz, file_p/), params, hvy_block, tree_ID)
     else

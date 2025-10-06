@@ -510,7 +510,7 @@ end function
 !> This routine is usefull, when trying to go back to a old
 !> treestructure, after calling for example refine_trees2sametreelevel.
 subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, lgt_n_ref, &
-    hvy_block, hvy_tmp, tree_ID, verbosity)
+    hvy_block, hvy_tmp, tree_ID, ref_can_be_finer, verbosity)
 
     implicit none
     !-----------------------------------------------------------------
@@ -521,16 +521,20 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
     integer(kind=ik), intent(inout)   :: lgt_active_ref(:) !< active lists
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
+    !> if true, the routine will also work if the reference mesh has some finer blocks, needs refine_tree_2_reference_mesh afterwards
+    logical, intent(in),optional      :: ref_can_be_finer
     logical, intent(in),optional      :: verbosity
     !-----------------------------------------------------------------
     integer(kind=ik)    :: rank, level_ref, level, Jmax, lgt_id_ref, lgt_id, fsize
     integer(kind=ik)    :: k1, k2, Nblocks_2coarsen, level_min
     integer(kind=tsize) :: treecode_ref, treecode
-    logical :: verbose, exists
+    logical :: verbose, exists, refCanBeFiner
 
     Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
     verbose = .false.
+    refCanBeFiner = .false.
+    if (present(ref_can_be_finer)) refCanBeFiner = ref_can_be_finer
 
     if (present(verbosity)) verbose=verbosity
 
@@ -541,7 +545,8 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
     ! gives all blocks with identical TC/level to reference tree the status 0 and deletes all finer blocks, voila
 
     ! init full grid structure on the actual tree
-    call init_full_tree(params, tree_ID, set_ref=0, verbose_check=.false.)
+    call init_full_tree(params, tree_ID, set_ref=-1, verbose_check=.false.)
+    if (params%rank==0 .and. verbose) write(*,'("coarse_tree_2_reference_mesh : init_full_tree completed, size Nb=",i7)') lgt_n(tree_ID)
 
     ! init all ref stats to -1
     do k1 = 1, lgt_n(tree_ID)
@@ -560,14 +565,30 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
 
         call doesBlockExist_tree(treecode_ref, exists, lgt_id, dim=params%dim, level=level_ref, tree_id=tree_ID, max_level=params%Jmax)
 
-        if (.not. exists) then
-            call abort(20200806, "Something went wrong: Block on reference tree1 is too fine!!!")
+        ! if the block does not exists the reference block is finer than the actual tree (or Jmin is not respected)
+        ! we have two options:
+        !    1) panic, scream and abort, because something went wrong (default)
+        !    2) if refCanBeFiner is set to true, we coarsen the reference block until we find a block on the actual tree
+        !       or we fall below Jmin, means we just keep the finest mesh possible at that position and afterwards need to refine as well
+        if (.not. exists .and. .not. refCanBeFiner) then
+            call abort(250930, "Something went wrong: Block on reference tree1 is too fine (or lower than Jmin)!!!")
+        endif
+        if (.not. exists .and. refCanBeFiner) then
+            do while( .not. exists .and. level_ref >= params%Jmin )
+                level_ref = level_ref - 1
+                treecode_ref = tc_clear_until_level_b( treecode_ref, params%dim, level_ref, params%Jmax)
+                call doesBlockExist_tree(treecode_ref, exists, lgt_id, dim=params%dim, level=level_ref, tree_id=tree_ID, max_level=params%Jmax)
+            end do
+            if (.not. exists) then
+                call abort(250930, "Something went wrong: I have no Idea how you ended up here")
+            endif
         endif
 
         ! set lgt_id to be kept
         lgt_block(lgt_id, IDX_REFINE_STS) = 0
 
     end do ! loop over reference blocks
+    if (params%rank==0 .and. verbose) write(*,'("coarse_tree_2_reference_mesh : marking blocks completed")')
     !----------------------------
 
     !----------------------------
@@ -578,6 +599,109 @@ subroutine coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, l
     !----------------------------
 end subroutine
 
+
+
+!##############################################################
+!> This function refines a tree to its reference mesh.
+!> The reference mesh is saved in lgt_..._ref and stores the treecode and
+!> all necessary light data.
+!> All blocks on the actual tree are refined to have the same
+!> treecode structure as the reference.
+subroutine refine_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref, lgt_n_ref, &
+    hvy_block, hvy_tmp, tree_ID, ref_can_be_coarser, verbosity)
+
+    implicit none
+    !-----------------------------------------------------------------
+    type (type_params), intent(inout) :: params   !< params structure
+    integer(kind=ik), intent(in)      :: tree_ID !< number of the tree
+    integer(kind=ik), intent(inout)   :: lgt_n_ref !< number of light active blocks
+    integer(kind=ik), intent(inout)   :: lgt_block_ref(:, : )  !< light data array
+    real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    integer(kind=ik), intent(inout)   :: lgt_active_ref(:) !< active lists
+    real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) ! used for saving, filtering, and helper qtys
+    !> if true, the routine will also work if the reference mesh has some coarser blocks, needs coarse_tree_2_reference_mesh afterwards
+    logical, intent(in),optional      :: ref_can_be_coarser
+    logical, intent(in),optional      :: verbosity
+    !-----------------------------------------------------------------
+    integer(kind=ik)    :: level_ref, level, Jmax, lgt_id_ref, lgt_id, fsize
+    integer(kind=ik)    :: k1, k2, Nblocks_2coarsen, level_min, mpierr, loop_i
+    integer(kind=tsize) :: treecode_ref, treecode
+    logical :: verbose, exists, refCanBeCoarser, continue_loop
+
+    Jmax = params%Jmax ! max treelevel
+    fsize= params%forest_size   ! maximal number of trees in forest
+    verbose = .false.
+    refCanBeCoarser = .false.
+    if (present(ref_can_be_coarser)) refCanBeCoarser = ref_can_be_coarser
+
+    if (present(verbosity)) verbose=verbosity
+
+    call updateMetadata_tree(params, tree_ID)
+
+    ! Operations (addition, multiplication, etc) using two trees (=grids) require both trees (=grids)
+    ! to be identical. Therefore, this routine flags all blocks for refinement which are not on the reference tree, but a higher one is
+
+    ! init full grid structure on the actual tree, so that we also check if reference mesh is coarser
+    if (refCanBeCoarser) call init_full_tree(params, tree_ID, set_ref=0, verbose_check=.false.)
+
+    continue_loop = .true.
+    loop_i = 1
+    do while (continue_loop)
+        continue_loop = .false.
+        if (params%rank==0 .and. verbose) write(*,'("refine_tree_2_reference_mesh : loop ",i3)') loop_i
+
+        ! init all ref stats to 0
+        do k1 = 1, lgt_n(tree_ID)
+            lgt_id = lgt_active(k1, tree_ID)
+            lgt_block(lgt_id, IDX_REFINE_STS) = 0
+        end do
+
+        !----------------------------
+        ! loop over all blocks of the reference tree and find the corresponding block with our sorted list to be kept
+        do k1 = 1, lgt_n_ref
+            lgt_id_ref = lgt_active_ref(k1)
+            level_ref  = lgt_block_ref(lgt_id_ref, IDX_MESH_LVL)
+
+            ! get the treecode of the reference block
+            treecode_ref = get_tc(lgt_block_ref(lgt_id_ref, IDX_TC_1 : IDX_TC_2))
+
+            call doesBlockExist_tree(treecode_ref, exists, lgt_id, dim=params%dim, level=level_ref, tree_id=tree_ID, max_level=params%Jmax)
+
+            ! if the block does not exists the reference block is finer than the actual tree (or Jmin is not respected)
+            ! we now go downwards in levels until we find the mother block and set it to be refined.
+            ! If this does not exist, then the reference mesh is coarser than the actual mesh or Jmin is not respected
+            if (.not. exists) then
+                do while( .not. exists .and. level_ref >= params%Jmin )
+                    level_ref = level_ref - 1
+                    treecode_ref = tc_clear_until_level_b( treecode_ref, params%dim, level_ref, params%Jmax)
+                    call doesBlockExist_tree(treecode_ref, exists, lgt_id, dim=params%dim, level=level_ref, tree_id=tree_ID, max_level=params%Jmax)
+                end do
+                if (.not. exists) then
+                    call abort(250930, "Something went wrong: Block on reference tree2 is too coarse (or lower than Jmin)!!!")
+                endif
+                ! set lgt_id to be refined
+                lgt_block(lgt_id, IDX_REFINE_STS) = 1
+            endif
+
+        end do ! loop over reference blocks
+        !----------------------------
+
+        !----------------------------
+        ! refine the tagged blocks
+        call refine_tree( params, hvy_block, indicator='nothing (external)', tree_id=tree_ID, error_OOM=exists, check_full_tree=.false.)
+        !----------------------------
+
+        ! gather continue_loop to see if any mpirank wants to continue
+        call MPI_Allreduce(MPI_IN_PLACE, continue_loop, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpierr)
+        
+    end do
+
+    if (params%rank==0 .and. verbose) write(*,'("refine_tree_2_reference_mesh : refinement completed, size Nb=",i7)') lgt_n(tree_ID)
+
+    ! remove full tree
+    if (refCanBeCoarser) call prune_fulltree2leafs(params, tree_ID)
+
+end subroutine
 
 !> \brief Stores the lgt data of two trees in an extra array as backup
 subroutine store_ref_meshes(lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1, tree_ID2)

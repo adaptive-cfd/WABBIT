@@ -161,6 +161,24 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID)
     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
 
+    ! we need to preserve b
+    ! Usually we could restore it later with b = r + Ax, however, with coarse extension we have to alter the residual and would not get back the original b
+        ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
+    ! compute the residual r = b - Ax to pass it downwards
+    t_block = MPI_Wtime()
+    do k_block = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k_block, tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+        ! b only defined on leaf layer
+        if (.not. block_is_leaf(params, hvy_id)) cycle
+
+        ! store b
+        hvy_work(:,:,:,nc+1:2*nc,hvy_id) = hvy_RHS(:,:,:,1:nc,hvy_id)
+    enddo
+    call toc( "GS Downwards - Store b", 10020, MPI_Wtime()-t_block )
+
+
     ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
     ! compute the residual r = b - Ax to pass it downwards
     t_block = MPI_Wtime()
@@ -233,8 +251,10 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
             ! get spacing
             call get_block_spacing_origin( params, lgt_ID, x0, dx )
 
-            ! recompute RHS b = r + Ax, 
-            call GS_compute_residual(params, hvy_work(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), dx, recompute_b=.true.)
+            ! ! recompute RHS b = r + Ax, 
+            ! call GS_compute_residual(params, hvy_work(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), dx, recompute_b=.true.)
+            ! restore full RHS b
+            hvy_RHS(:,:,:,1:nc,hvy_id) = hvy_work(:,:,:,nc+1:2*nc,hvy_id)
     
             ! add reconstructed solution to residual to previous solution
             hvy_sol(:,:,:,1:nc,hvy_id) = hvy_sol(:,:,:,1:nc,hvy_id) + hvy_work(:,:,:,1:nc,hvy_id)

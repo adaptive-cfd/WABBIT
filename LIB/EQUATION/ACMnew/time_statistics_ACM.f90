@@ -46,9 +46,9 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
     time_diff = time-time_start
 
     do i_ts = 1, params_acm%N_time_statistics
-        ! at the beginning of the simulation, initialize the array to zero
-        if ( abs(time - time_start) < 1.0e-12_rk ) then
-            u(:,:,:,N_offset + i_ts) = 0.0_rk
+        ! if time is right at time_start, we do nothing, we already set the values to zero or load them in earlier
+        if ( time - time_start < 1.0e-12_rk ) then
+            ! u(:,:,:,N_offset + i_ts) = 0.0_rk
             cycle
         end if
 

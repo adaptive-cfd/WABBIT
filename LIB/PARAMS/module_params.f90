@@ -141,6 +141,8 @@ module module_params
         logical :: time_statistics = .false.
         integer(kind=ik) :: N_time_statistics = 0
         character(len=cshort), allocatable :: time_statistics_names(:)
+        logical :: read_from_files_time_statistics = .false.
+        real(kind=rk) :: time_statistics_start_time = 0.0_rk
 
         ! -------------------------------------------------------------------------------------
         ! MPI

@@ -399,7 +399,7 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz
+    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
@@ -541,6 +541,13 @@ contains
         end select
 
     enddo
+
+    ! initialize time statistics
+    if (params_convdiff%N_time_statistics > 0) then
+        do i_time_statistics = 1, params_convdiff%N_time_statistics
+            u(:,:,:, params_convdiff%N_scalars + i_time_statistics) = 0.0_rk
+        end do
+    endif
 
 
   end subroutine INICOND_convdiff

@@ -88,11 +88,11 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
 end subroutine statistics_wrapper
 
 
-subroutine time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
+subroutine time_statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
 
     implicit none
 
-    real(kind=rk), intent(in)           :: time, dt, time_start
+    real(kind=rk), intent(in)           :: time, dt
     type (type_params), intent(inout)   :: params                     !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)     !> heavy work data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
@@ -121,7 +121,7 @@ subroutine time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_
             hvy_id_mask = hvy_id
         endif
 
-        call TIME_STATISTICS_meta(params%physics_type, time, dt, time_start, hvy_block(:,:,:,:, hvy_id), params%g, x0, dx, &
+        call TIME_STATISTICS_meta(params%physics_type, time, dt, params%time_statistics_start_time, hvy_block(:,:,:,:, hvy_id), params%g, x0, dx, &
         hvy_tmp(:,:,:,:, hvy_id), hvy_mask(:,:,:,:, hvy_id_mask))
     enddo
 

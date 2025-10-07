@@ -56,7 +56,7 @@ program main
     !!!!!! => renaming: hvy_tmp -> hvy_work
 
     ! time loop variables
-    real(kind=rk)                       :: time, time_start, output_time
+    real(kind=rk)                       :: time, output_time
     integer(kind=ik)                    :: iteration
     ! filename of *.ini file used to read parameters
     character(len=clong)                :: filename
@@ -176,16 +176,6 @@ program main
     call reset_tree( params, .true., tree_ID=tree_ID_flow )
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
-
-    !*******************************************************************
-    ! initial time statistics (integral, average, minmax or similar over time) - initializes the arrays (to 0)
-    !*******************************************************************
-    ! backup startup time, usefull for time statistics (averaging)
-    time_start = time
-    if (params%time_statistics) then
-        ! no sync needed as all values will simply be set to 0
-        call time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
-    end if
 
     if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
         ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
@@ -364,7 +354,7 @@ program main
                 ! synching of n_eqn_rhs is enough, as time statistics need no sync
                 call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:params%n_eqn_rhs,:), tree_ID_flow )
 
-                call time_statistics_wrapper(time, dt, time_start, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+                call time_statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             end if
 
             !*******************************************************************

@@ -16,7 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, N_files, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
 
    rank         = params%rank
    number_procs = params%number_procs
@@ -42,6 +42,17 @@ subroutine ini_file_to_params( params, filename )
    params%symmetry_vector_component = "0"
    call read_param_mpi(FILE, 'Domain', 'symmetry_vector_component', params%symmetry_vector_component, params%symmetry_vector_component )
 
+   !***************************************************************************
+   ! read time statistics parameters - before reading to decide how many files are read in
+   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
+   if (params%time_statistics) then
+      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
+      allocate( params%time_statistics_names(1:params%N_time_statistics) )
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
+      call read_param_mpi(FILE, 'Time-Statistics', 'read_from_files_time_statistics', params%read_from_files_time_statistics, .false.)
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_start_time', params%time_statistics_start_time, 0.0_rk)
+   endif
+
    !**************************************************************************
    ! read INITIAL CONDITION parameters
 
@@ -61,7 +72,13 @@ subroutine ini_file_to_params( params, filename )
 
    if (params%read_from_files ) then
       ! read variable names
-      allocate( params%input_files( params%n_eqn ) )
+      N_files = params%n_eqn
+      ! sometimes we want to read in time_statistics, sometimes we do not want that, this affects the number of files to read in
+      if (params%time_statistics .and. .not. params%read_from_files_time_statistics) then
+         N_files = N_files - params%N_time_statistics
+      endif
+
+      allocate( params%input_files( N_files ) )
 
       params%input_files = "---"
       call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files, check_file_exists=.true. )
@@ -102,15 +119,6 @@ subroutine ini_file_to_params( params, filename )
    ! read statistics parameters
    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params%nsave_stats, 99999999_ik )
    call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
-
-   !***************************************************************************
-   ! read time statistics parameters
-   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
-   if (params%time_statistics) then
-      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
-      allocate( params%time_statistics_names(1:params%N_time_statistics) )
-      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
-   endif
 
    !***************************************************************************
    ! WABBIT needs to know about the mask function (if penalization is used): does it contain

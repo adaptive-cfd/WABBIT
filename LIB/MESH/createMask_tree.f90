@@ -10,11 +10,12 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     real(kind=rk), intent(inout)           :: hvy_tmp(:, :, :, :, :)
     logical, intent(in), optional          :: all_parts
     integer(kind=ik)                       :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jactive, Jmax
-    real(kind=rk)                          :: x0(1:3), dx(1:3), t0
+    real(kind=rk)                          :: x0(1:3), dx(1:3)
     logical, save                          :: time_independent_part_ready = .false.
     logical                                :: force_all_parts
+    real(kind=rk)                          :: t_block, t_cycle
 
-    t0 = MPI_wtime()
+    t_cycle = MPI_wtime()
     Bs      = params%Bs
     g       = params%g
     Jactive = maxActiveLevel_tree(tree_ID_flow)
@@ -31,6 +32,7 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! some mask functions have initialization routines (insects) which are to be called once and not for each
     ! block (efficiency). Usually, this would be a staging concept as well, but as only Thomas uses it anyways, cleanup
     ! is left as FIXME
+    ! You look outside the window and see Julius shaking his head in disapproval ...
     if (params_acm%geometry=="Insect") then
         call Update_Insect_wrapper(time)
     endif
@@ -67,9 +69,10 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     !-----------------------------------------------------------------------
     if (((Jactive < Jmax-1 .and. params%force_maxlevel_dealiasing) .or. Jactive < Jmax) .or. (params%threshold_mask .eqv. .false.) .or. (force_all_parts)) then
         ! generate complete mask (may be expensive)
+        t_block = MPI_Wtime()
         call createCompleteMaskDirect_tree(params, time, hvy_mask)
 
-        call toc( "create_mask_tree (createCompleteMaskDirect_tree)", 210, MPI_Wtime()-t0 )
+        call toc( "createMask_tree (createCompleteMaskDirect_tree)", 66, MPI_Wtime()-t_block )
 
         ! we're done, all parts of mask function are created, leave routine now
         return
@@ -84,14 +87,18 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! finest level (refined only where interesting).
     ! At most, mask in generated (Jmax-Jmin) times.
     if ((.not. time_independent_part_ready) .and. (params%mask_time_independent_part)) then
+        t_block = MPI_Wtime()
         call createTimeIndependentMask_tree(params, time, hvy_mask, hvy_tmp)
+        call toc( "createMask_tree (createTimeIndependentMask_tree)", 67, MPI_Wtime()-t_block )
 
         time_independent_part_ready = .true.
     endif
 
     ! create "time-dependent-part" here, add the existing "time-independent-part"
     ! if it is available, return the complete mask incl. all parts
+    t_block = MPI_Wtime()
     if ( params%mask_time_dependent_part ) then
+        t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID_flow)
             hvy_id = hvy_active(k, tree_ID_flow)
 
@@ -118,9 +125,10 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
             ! hvy_mask(:,:,:,6,hvy_id) = 0.0_rk ! sponge. as we keep it time-dependent, it is not required.
         enddo
     endif
-
+    call toc( "createMask_tree (time-dependent-part)", 68, MPI_Wtime()-t_block )
 
     if ( params%mask_time_independent_part ) then
+        t_block = MPI_Wtime()
         if (Jactive == params%Jmax ) then
             ! flow is on finest level: add complete mask on finest level
             ! this is the case when computing the right hand side.
@@ -144,9 +152,10 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
         else
             if (params%rank==0) write(*,'(A, i0)') "WARNING: mask generation with time independent part fails (flow grid neither on Jmax nor Jmax-1 but on level ", Jactive," )"
         endif
+        call toc( "createMask_tree (time-independent-part)", 69, MPI_Wtime()-t_block )
     endif
 
-    call toc( "create_mask_tree (pruned_tree_logic)", 211, MPI_Wtime()-t0 )
+    call toc( "createMask_tree (TOTAL)", 65, MPI_Wtime()-t_cycle )
 
 end subroutine
 

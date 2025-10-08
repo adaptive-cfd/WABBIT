@@ -221,11 +221,13 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     logical :: exists
     integer(kind=ik), allocatable, save :: comm_list(:,:)
     integer(kind=tsize) :: treecode1, treecode2
+    real(kind=rk) :: t_cycle, t_block
 
     fsize = params%forest_size
     Jmax = params%Jmax ! max treelevel
     rank = params%rank
     N = params%number_blocks
+    t_cycle = MPI_Wtime()
 
     ! init
     treecode1 = 0_tsize; treecode2 = 0_tsize
@@ -236,7 +238,9 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
     if (.not.allocated(comm_list)) allocate( comm_list( 3, params%number_procs*N ) )
 
+    t_block = MPI_Wtime()
     call createActiveSortedLists_forest(params)
+    call toc("add_pruned_to_full_tree (createActiveSortedLists_forest)", 261, t_block - MPI_Wtime())
 
     ! a pruned tree has fewer entries: loop over it instead of the fuller (fluid) one!
     !
@@ -256,6 +260,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     ! holding the corresponding full trees block.
 
     ! Step 1a: prepare for xfer, gather all required xfers
+    t_block = MPI_Wtime()
     n_comm = 0
     do k = 1, lgt_n(tree_ID_pruned)
 
@@ -282,15 +287,21 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             endif
         endif
     enddo
+    call toc("add_pruned_to_full_tree (gather comms)", 262, t_block - MPI_Wtime())
 
     ! Step 1b: actual xfer.
+    t_block = MPI_Wtime()
     call block_xfer( params, comm_list, n_comm, hvy_block )
+    call toc("add_pruned_to_full_tree (block_xfer)", 263, t_block - MPI_Wtime())
 
     ! As some blocks have been transferred, the active lists are outdated.
+    t_block = MPI_Wtime()
     call createActiveSortedLists_tree(params, tree_ID_pruned)
+    call toc("add_pruned_to_full_tree (createActiveSortedLists_tree)", 264, t_block - MPI_Wtime())
 
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
     ! same mpirank. therefore, the responsible mpirank can just add them together.
+    t_block = MPI_Wtime()
     do k = 1, hvy_n(tree_ID_pruned)
 
         hvy_id1  = hvy_active(k, tree_ID_pruned)
@@ -339,6 +350,8 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             ! But that is no problem - We just ignore it
         endif
     enddo
+    call toc("add_pruned_to_full_tree (addition)", 265, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (TOTAL)", 260, MPI_Wtime() - t_cycle)
 
 end subroutine
 

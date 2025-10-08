@@ -89,7 +89,8 @@ module module_params
         integer(kind=ik)      :: poisson_stencil_size=0
         character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
         integer(kind=ik)      :: poisson_cycle_it=0
-        real(kind=rk)         :: poisson_cycle_tol=0.0_rk
+        real(kind=rk)         :: poisson_cycle_tol_abs=0.0_rk
+        real(kind=rk)         :: poisson_cycle_tol_rel=0.0_rk
         integer(kind=ik)      :: poisson_cycle_max_it=0
         integer(kind=ik)      :: poisson_GS_it=0
         integer(kind=ik)      :: poisson_Sync_it=0

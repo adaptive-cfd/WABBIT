@@ -15,13 +15,14 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
     !=============================================================================
 
     integer(kind=ik)  :: rank, mpirank_shouldBe, mpirank_currently, ierr, number_procs, &
-                         k, N, l, com_i, com_N, sfc_id, &
-                         lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), lgt_ID, Nblocks_toDistribute
+        k, N, l, com_i, com_N, sfc_id, lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), lgt_ID, Nblocks_toDistribute, &
+        num_blocks_count(3), i_var
     integer(kind=tsize) :: treecode, hilbertcode2
     ! block distribution lists
     integer(kind=ik), allocatable, save :: blocksPerRank_balanced(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
     real(kind=rk) :: t0, t1
     logical :: balanceForRefinement2
+    character(len=20) :: filenames(3)
 
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -44,6 +45,9 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
     if (present(balanceForRefinement)) then
         balanceForRefinement2 = balanceForRefinement
     endif
+
+    ! development counters, just to see how many blocks are send/received/kept
+    num_blocks_count(1:3) = 0
 
     ! allocate block to proc lists
     if (.not.allocated(blocksPerRank_balanced)) allocate( blocksPerRank_balanced(1:number_procs))
@@ -210,6 +214,20 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
             sfc_com_list(3, com_i) = sfc_sorted_list(1,k)   ! light id of block
         end if
 
+#ifdef DEV
+        ! Development checks - count how many blocks are send, received or kept
+        if ( params%rank == mpirank_currently .and. mpirank_currently /= mpirank_shouldBe ) then
+            ! block is send away from this mpirank
+            num_blocks_count(1) = num_blocks_count(1) + 1
+        elseif ( params%rank == mpirank_currently .and. mpirank_currently == mpirank_shouldBe ) then
+            ! block is kept on this mpirank
+            num_blocks_count(2) = num_blocks_count(2) + 1
+        elseif ( params%rank == mpirank_shouldBe .and. mpirank_currently /= mpirank_shouldBe ) then
+            ! block is received by this mpirank
+            num_blocks_count(3) = num_blocks_count(3) + 1
+        endif
+#endif
+
         ! The blocksPerRank_balanced defines how many blocks this rank should have, and
         ! we just treated one (which either already was on the mpirank or will be on
         ! it after communication), so remove one item from the blocksPerRank_balanced
@@ -239,6 +257,26 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     call updateMetadata_tree(params, tree_ID)
+
+#ifdef DEV
+    ! development output, gather information on rank 0 and print to file
+    ! reuse blocksPerRank_balanced for this
+    filenames = (/ "balanceLoad_send.csv", "balanceLoad_keep.csv", "balanceLoad_recv.csv" /)
+    
+    do i_var = 1, 3
+        ! gather number of blocks send/received/kept on rank 0
+        call MPI_GATHER(num_blocks_count(i_var), 1, MPI_INTEGER, blocksPerRank_balanced, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        if (params%rank == 0) then
+            open(unit=99, file=trim(filenames(i_var)), status="unknown", position="append")
+            if (params%number_procs == 1) then
+                write(99,'(i0)') blocksPerRank_balanced(1)
+            else
+                write(99,'(i0,99999(",",i0))') blocksPerRank_balanced(1), blocksPerRank_balanced(2:params%number_procs)
+            endif
+            close(99)
+        endif
+    enddo
+#endif
 
     ! timing
     call toc( "balanceLoad_tree (TOTAL)", 90, MPI_wtime()-t0 )

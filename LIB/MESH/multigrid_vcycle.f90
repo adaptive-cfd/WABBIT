@@ -9,7 +9,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     logical, intent(in), optional      :: verbose
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, ic, i_cycle
-    real(kind=rk)                      :: dx(1:3), x0(1:3), residual(1:4*size(hvy_sol,4))
+    real(kind=rk)                      :: dx(1:3), x0(1:3), residual(1:4*size(hvy_sol,4)), norm_sol(1:size(hvy_sol,4))
     real(kind=rk)                      :: t_block
     logical                            :: verbose_apply, init0
 
@@ -39,6 +39,9 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
         call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
     endif
 
+    ! compute norm of RHS for relative tolerances
+    call componentWiseNorm_tree(params, hvy_RHS(:,:,:,1:size(hvy_RHS,4),:), tree_ID, "Linfty", norm_sol(1:size(hvy_RHS,4)), threshold_state_vector=.false.)
+
     ! prepare full tree grid, this will be populated along the way
     ! blocks are practically empty, but we fill them along the way so ref flag will be set to 0 to allow synching
     call init_full_tree(params, tree_ID, set_ref=0)
@@ -67,7 +70,8 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
         if (params%poisson_cycle_end_criteria == "fixed_iterations") then
             if (i_cycle >= params%poisson_cycle_it) exit
         elseif (params%poisson_cycle_end_criteria == "tolerance") then
-            if (all(residual(1:size(hvy_sol,4)) < params%poisson_cycle_tol)) exit
+            if (all(residual(1:size(hvy_sol,4)) < params%poisson_cycle_tol_abs)) exit
+            if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel)) exit
         else
             call abort(250903, "Don't know how to stop! Please choose between 'fixed_iterations' and 'tolerance', thank you :)")
         endif

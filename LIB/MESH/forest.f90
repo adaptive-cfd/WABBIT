@@ -240,7 +240,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
 
     t_block = MPI_Wtime()
     call createActiveSortedLists_forest(params)
-    call toc("add_pruned_to_full_tree (createActiveSortedLists_forest)", 261, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (createActiveSortedLists_forest)", 261, MPI_Wtime() - t_block())
 
     ! a pruned tree has fewer entries: loop over it instead of the fuller (fluid) one!
     !
@@ -287,17 +287,17 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             endif
         endif
     enddo
-    call toc("add_pruned_to_full_tree (gather comms)", 262, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (gather comms)", 262, MPI_Wtime() - t_block())
 
     ! Step 1b: actual xfer.
     t_block = MPI_Wtime()
     call block_xfer( params, comm_list, n_comm, hvy_block )
-    call toc("add_pruned_to_full_tree (block_xfer)", 263, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (block_xfer)", 263, MPI_Wtime() - t_block())
 
     ! As some blocks have been transferred, the active lists are outdated.
     t_block = MPI_Wtime()
     call createActiveSortedLists_tree(params, tree_ID_pruned)
-    call toc("add_pruned_to_full_tree (createActiveSortedLists_tree)", 264, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (createActiveSortedLists_tree)", 264, MPI_Wtime() - t_block())
 
     ! Step 2: ADDITION. now we're sure that blocks existing in both trees are on the
     ! same mpirank. therefore, the responsible mpirank can just add them together.
@@ -350,7 +350,7 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
             ! But that is no problem - We just ignore it
         endif
     enddo
-    call toc("add_pruned_to_full_tree (addition)", 265, t_block - MPI_Wtime())
+    call toc("add_pruned_to_full_tree (addition)", 265, MPI_Wtime() - t_block)
     call toc("add_pruned_to_full_tree (TOTAL)", 260, MPI_Wtime() - t_cycle)
 
 end subroutine

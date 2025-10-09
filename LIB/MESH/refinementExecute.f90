@@ -229,26 +229,51 @@ end subroutine refineBlock2SpaghettiWD
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays \n
 ! ********************************************************************************************
-subroutine refinement_execute_tree( params, hvy_block, tree_ID )
+subroutine refinement_execute_tree( params, hvy_block, tree_ID, time )
 
     implicit none
 
     type (type_params), intent(in)      :: params                               !< user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !< heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID                              !< tree to work on
+    real(kind=rk), intent(in), optional :: time                                 !< current simulation time, used for development output only
 
-    integer(kind=ik)                    :: i_b, lgt_id
+    integer(kind=ik)                    :: i_b, lgt_id, ierr
+    integer(kind=ik)                    :: blocks_refined
+    integer(kind=ik), allocatable, save :: blocks_refined_list(:)
+    character(len=clong) :: format_string, string_prepare
 
     ! every proc loop over its active heavy data array
+    blocks_refined = 0
     do i_b = 1, hvy_n(tree_ID)
         ! light data id
         call hvy2lgt( lgt_id, hvy_active(i_b, tree_ID), params%rank, params%number_blocks )
 
         ! block wants to refine
         if ( (lgt_block( lgt_id, idx_refine_sts) == +1) ) then
+            blocks_refined = blocks_refined + 1
             call refineBlock(params, hvy_block, hvy_active(i_b, tree_ID), tree_ID)
         endif
     end do
+
+    if (params%debug_refinement) then
+        if (.not. allocated(blocks_refined_list)) allocate(blocks_refined_list(1:params%number_procs))
+
+        ! debug output to see how many blocks have been refined, gather information on rank 0 and print to file
+        call MPI_GATHER(blocks_refined, 1, MPI_INTEGER, blocks_refined_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        if (params%rank == 0) then
+            open(unit=99, file=trim("debug_refinement.csv"), status="unknown", position="append")
+            string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
+            if (present(time)) write(string_prepare,'(es16.6,",")') time
+            if (params%number_procs == 1) then
+                write(99,'(A, i0)') trim(adjustl(string_prepare)), blocks_refined_list(1)
+            else
+                write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs - 1
+                write(99,format_string) trim(adjustl(string_prepare)), blocks_refined_list(1), blocks_refined_list(2:params%number_procs)
+            endif
+            close(99)
+        endif
+    endif
 
     ! synchronize light data
     call synchronize_lgt_data( params, refinement_status_only=.false. )

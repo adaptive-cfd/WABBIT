@@ -176,9 +176,12 @@ module module_params
         logical :: use_iteration_as_fileid = .false.
 
         ! -------------------------------------------------------------------------------------
-        ! unit test
+        ! unit tests and debugging
         ! -------------------------------------------------------------------------------------
         logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
+
+        logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
+        logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
 
         ! -------------------------------------------------------------------------------------
         ! filter

@@ -211,10 +211,11 @@ $(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o $(OBJDIR)/module_t_files.o
+	ini_file_to_params.f90 $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o
+$(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/module_treelib.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o \
+	$(OBJDIR)/module_forestMetaData.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
@@ -256,7 +257,7 @@ $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_timing.o: module_timing.f90
@@ -314,7 +315,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
-	remove_nonperiodic_neighbors.f90 forest.f90 multigrid_vcycle.f90 \
+	remove_nonperiodic_neighbors.f90 forest.f90 multigrid_vcycle.f90 setInitialCondition_tree.f90 \
 	securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -339,12 +340,14 @@ $(OBJDIR)/module_forestMetaData.o: module_forestMetaData.f90 $(OBJDIR)/module_gl
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_saving.o: module_saving.f90 \
-	 $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mesh.o \
-	save_data.f90
+	 $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o \
+	 $(OBJDIR)/module_timing.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_helpers.o \
+	 $(OBJDIR)/module_operators.o save_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_MOR.o: module_MOR.f90  \
-	$(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o $(OBJDIR)/module_mesh.o
+	$(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_forestMetaData.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

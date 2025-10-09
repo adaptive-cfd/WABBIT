@@ -142,6 +142,13 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .true.)
    call read_param_mpi(FILE, 'Debug', 'test_wavelet_decomposition', params%test_wavelet_decomposition, .true.)
 
+   call read_param_mpi(FILE, 'Debug', 'debug_balanceLoad', params%debug_balanceLoad, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_refinement', params%debug_refinement, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_wavelet_decompose', params%debug_wavelet_decompose, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_wavelet_reconstruct', params%debug_wavelet_reconstruct, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_sync', params%debug_sync, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_pruned2full', params%debug_pruned2full, .false.)
+
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"

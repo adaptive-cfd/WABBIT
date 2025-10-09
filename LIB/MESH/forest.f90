@@ -215,19 +215,25 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
     integer(kind=ik), intent(in)      :: tree_ID_pruned, tree_ID_full
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
 
-    integer(kind=ik) :: k, lgt_id, Jmax, hvy_id, rank, N, fsize, i
+    integer(kind=ik) :: k, lgt_id, Jmax, hvy_id, rank, N, fsize, i, ierr
     integer(kind=ik) :: lgt_id1, lgt_id2, hvy_id1, hvy_id2
     integer(kind=ik) :: level1, level2, rank_pruned, rank_full, n_comm
+    integer(kind=ik) :: num_blocks_count(3), i_var  ! debug counters: [send, recv, keep]
     logical :: exists
     integer(kind=ik), allocatable, save :: comm_list(:,:)
     integer(kind=tsize) :: treecode1, treecode2
     real(kind=rk) :: t_cycle, t_block
+    character(len=4) :: string_kind(3)
+    character(len=cshort) :: format_string
 
     fsize = params%forest_size
     Jmax = params%Jmax ! max treelevel
     rank = params%rank
     N = params%number_blocks
     t_cycle = MPI_Wtime()
+
+    ! debug counters: [send, recv, keep]
+    num_blocks_count(1:3) = 0
 
     ! init
     treecode1 = 0_tsize; treecode2 = 0_tsize
@@ -284,6 +290,18 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
                 comm_list(1, n_comm) = rank_pruned   ! sender mpirank
                 comm_list(2, n_comm) = rank_full   ! receiver mpirank
                 comm_list(3, n_comm) = lgt_id1 ! block lgt_id to send
+                
+                ! count transferred blocks for this rank - used for development debugging output
+                if (params%rank == rank_pruned) then
+                    num_blocks_count(1) = num_blocks_count(1) + 1  ! send
+                endif
+                if (params%rank == rank_full) then
+                    num_blocks_count(2) = num_blocks_count(2) + 1  ! recv
+                endif
+            else
+                if (params%rank == rank_full) then
+                    num_blocks_count(3) = num_blocks_count(3) + 1  ! keep
+                endif
             endif
         endif
     enddo
@@ -351,6 +369,28 @@ subroutine add_pruned_to_full_tree( params, hvy_block, tree_ID_pruned, tree_ID_f
         endif
     enddo
     call toc("add_pruned_to_full_tree (addition)", 265, MPI_Wtime() - t_block)
+
+    if (params%debug_pruned2full) then
+        ! development output, gather information on rank 0 and print to file
+        string_kind = (/ "send", "recv", "keep" /)
+        
+        do i_var = 1, 3
+            ! gather number of blocks transferred/added/ignored on rank 0
+            call MPI_GATHER(num_blocks_count(i_var), 1, MPI_INTEGER, comm_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            if (params%rank == 0) then
+                ! Single IO operation with dynamic format
+                open(unit=99, file="debug_pruned2full.csv", status="unknown", position="append")
+                if (params%number_procs == 1) then
+                    write(99, '(A,i0)') string_kind(i_var)//",", comm_list(1,1)
+                else
+                    write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs - 1
+                    write(99, format_string) string_kind(i_var)//",", comm_list(1,1), comm_list(1,2:params%number_procs)
+                endif
+                close(99)
+            endif
+        enddo
+    endif
+
     call toc("add_pruned_to_full_tree (TOTAL)", 260, MPI_Wtime() - t_cycle)
 
 end subroutine

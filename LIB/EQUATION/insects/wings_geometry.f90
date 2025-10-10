@@ -46,6 +46,9 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
       endif
   endif
 
+  ! sometimes we have the geometry type insect but it has no wings (for example for fractal_tree), we then want to skip the rest
+  if (.not. Insect%RightWing=="yes" .and. .not. Insect%LeftWing=="yes" .and. Insect%RightWing2=="yes" .and. Insect%LeftWing2=="yes") return
+
   if ((dabs(Insect%time-time)>1.0d-10) .and. root) then
       write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
       write(*,'("Did you call Update_Insect before draw_insect_wings?")')

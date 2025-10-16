@@ -192,9 +192,9 @@ end subroutine
 
     character(len=*), intent(in) :: filename
     integer(kind=ik) :: mpicode, nx_max, n_entries
-    real(kind=rk) :: dx_min, dt_min
+    real(kind=rk) :: dx_min, dt_min_c0, dt_min_vpm, dt_min_nu
     character(len=cshort) :: Bs_str, Bs_conc
-    character(len=16834) :: input_files
+    character(len=400) :: input_files
     character(len=12) :: timestamp
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx
@@ -428,11 +428,23 @@ end subroutine
     ! uniqueGrid modification
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
+    ! print some time-step related information
     if (params_acm%c_0 > 0.0_rk) then
-        dt_min = params_acm%CFL*dx_min/params_acm%c_0
+        dt_min_c0 = params_acm%CFL*dx_min/params_acm%c_0
     else
-        dt_min = 0.0_rk
+        dt_min_c0 = 0.0_rk
     endif
+    if (params_acm%nu > 0.0_rk) then
+        dt_min_nu = params_acm%CFL_nu*dx_min**2/params_acm%nu
+    else
+        dt_min_nu = 0.0_rk
+    endif
+    if (params_acm%penalization .and. params_acm%C_eta > 0.0_rk) then
+        dt_min_vpm = params_acm%CFL_eta*params_acm%C_eta
+    else
+        dt_min_vpm = 0.0_rk
+    endif
+
     ! nice to have this elsewhere in the ACM module:
     params_acm%dx_min = dx_min
 
@@ -442,15 +454,17 @@ end subroutine
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
-      write(*,*) "Some information:"
-      write(*,'("c0=",g12.4," C_eta=",g12.4," CFL=",g12.4)') params_acm%c_0, params_acm%C_eta, params_acm%CFL
-      write(*,'("dx_min=",g12.4," dt(CFL,c0,dx_min)=",g12.4)') dx_min, dt_min
-      write(*,'("if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
+      write(*,'(A)') "Some information:"
+      write(*,'("   c0=",g12.4," CFL=",g12.4, "CFL_eta=",g12.4, "CFL_nu=",g12.4)') params_acm%c_0, params_acm%CFL, params_acm%CFL_eta, params_acm%CFL_nu
+      write(*,'("   dx_min=",g12.4)') dx_min
+      write(*,'("   dt(CFL,c0,dx_min)=",g12.4)') dt_min_c0
+      write(*,'("   dt(CFL_nu,nu,dx_min)=",g12.4)') dt_min_nu
+      write(*,'("   dt(CFL_vpm,C_eta,dx_min)=",g12.4)') dt_min_vpm
+      write(*,'("   if all blocks were at Jmax, the resolution would be nx=",i5)') nx_max
       if (params_acm%penalization) then
-          write(*,'("C_eta=",es12.4," K_eta=",es12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
+          write(*,'("   C_eta=",es12.4," K_eta=",es12.4)') params_acm%C_eta, sqrt(params_acm%C_eta*params_acm%nu)/dx_min
       endif
-      write(*,'("N_mask_components=",i1)') N_mask_components
-      write(*,'("N_scalars=",i2)') params_acm%N_scalars
+      write(*,'("N_mask_components=",i1, " N_scalars=",i1, " N_time_statistics=",i1)') N_mask_components, params_acm%N_scalars, params_acm%N_time_statistics
       write(*,'(80("<"))')
     endif
 

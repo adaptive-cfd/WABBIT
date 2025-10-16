@@ -193,6 +193,12 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         ! sync light data, as only root sets random refinement
         call MPI_BCAST( lgt_block(:, IDX_REFINE_STS), size(lgt_block,1), MPI_INTEGER4, 0, WABBIT_COMM, ierr )
 
+    ! In some cases the refinement_status is set up by a routine other than this one. This is the case
+    ! in some forest processing (=handling multiple trees). In such a case, we do nothing here (in particular
+    ! we do not reset the refinement status)
+    case ('nothing (external)')
+        return
+
     case default
         call abort("ERROR: refine_tree: the refinement indicator is unkown")
 

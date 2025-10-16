@@ -576,7 +576,7 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_val)
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_val, sync_debug_name)
 
     implicit none
 
@@ -589,6 +589,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
 
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
     integer(kind=ik), intent(in), optional  :: s_val
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! Following are global data used but defined in module_mpi:
     !    data_recv_counter, data_send_counter
@@ -600,6 +601,9 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
     integer(kind=ik) :: hvy_ID_n, lgt_ID_n, level_n, ref_n, rank_n
     integer(kind=tsize) :: tc
     logical :: b_send, b_recv
+    character(len=clong) :: format_string, string_prepare
+    integer(kind=ik)                    :: points_synched
+    integer(kind=ik), allocatable, save :: points_synched_list(:)
 
     !-----------------------------------------------------------------------
     ! set up constant arrays
@@ -811,6 +815,36 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
         endif ! check if daughters exist
     end do ! loop over all heavy active
 
+    if (params%debug_sync .and. present(sync_debug_name)) then
+        if (.not. allocated(points_synched_list)) allocate(points_synched_list(1:params%number_procs))
+
+        ! debug send volume
+        call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        if (params%rank == 0) then
+            open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
+            ! 0 is send as stage
+            if (params%number_procs == 1) then
+                write(99,'(A, i0, ",", i0)') trim(adjustl(sync_debug_name))//",send,", 0, points_synched_list(1)
+            else
+                write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                write(99,format_string) trim(adjustl(sync_debug_name))//",send,", 0, points_synched_list(1), points_synched_list(2:params%number_procs)
+            endif
+            close(99)
+        endif
+        ! debug recv volume
+        call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        if (params%rank == 0) then
+            open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
+            ! 0 is send as stage
+            if (params%number_procs == 1) then
+                write(99,'(A, i0, ",", i0)') trim(adjustl(sync_debug_name))//",recv,", 0, points_synched_list(1)
+            else
+                write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                write(99,format_string) trim(adjustl(sync_debug_name))//",recv,", 0, points_synched_list(1), points_synched_list(2:params%number_procs)
+            endif
+            close(99)
+        endif
+    endif
 
     ! NOTE: this feature is against wabbits memory policy: we try to allocate the
     ! whole memory of the machine on startup, then work with that. however, we have to

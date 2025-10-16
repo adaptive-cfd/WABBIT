@@ -142,16 +142,22 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       !------------------------------------------------------------------------------------
       
       call read_param_mpi(kinefile,"kinematics","nfft_phi",kine%nfft_phi,0)
+      if (.not. allocated(kine%ai_phi)) allocate(kine%ai_phi(max(1,kine%nfft_phi)))
+      if (.not. allocated(kine%bi_phi)) allocate(kine%bi_phi(max(1,kine%nfft_phi)))
       call read_param_mpi(kinefile,"kinematics","a0_phi",kine%a0_phi,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_phi",kine%ai_phi(1:kine%nfft_phi))
       call read_param_mpi(kinefile,"kinematics","bi_phi",kine%bi_phi(1:kine%nfft_phi))
       
       call read_param_mpi(kinefile,"kinematics","nfft_alpha",kine%nfft_alpha,0)
+      if (.not. allocated(kine%ai_alpha)) allocate(kine%ai_alpha(max(1,kine%nfft_alpha)))
+      if (.not. allocated(kine%bi_alpha)) allocate(kine%bi_alpha(max(1,kine%nfft_alpha)))
       call read_param_mpi(kinefile,"kinematics","a0_alpha",kine%a0_alpha,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_alpha",kine%ai_alpha(1:kine%nfft_alpha))
       call read_param_mpi(kinefile,"kinematics","bi_alpha",kine%bi_alpha(1:kine%nfft_alpha))
       
       call read_param_mpi(kinefile,"kinematics","nfft_theta",kine%nfft_theta,0)
+      if (.not. allocated(kine%ai_theta)) allocate(kine%ai_theta(max(1,kine%nfft_theta)))
+      if (.not. allocated(kine%bi_theta)) allocate(kine%bi_theta(max(1,kine%nfft_theta)))
       call read_param_mpi(kinefile,"kinematics","a0_theta",kine%a0_theta,0.0_rk)
       call read_param_mpi(kinefile,"kinematics","ai_theta",kine%ai_theta(1:kine%nfft_theta))
       call read_param_mpi(kinefile,"kinematics","bi_theta",kine%bi_theta(1:kine%nfft_theta))
@@ -359,6 +365,14 @@ case ("revolving-set3-degree")
       kine%nfft_theta = 10
       kine%nfft_phi   = 10
 
+      ! Allocate arrays
+      if (.not. allocated(kine%ai_phi)) allocate(kine%ai_phi(kine%nfft_phi))
+      if (.not. allocated(kine%bi_phi)) allocate(kine%bi_phi(kine%nfft_phi))
+      if (.not. allocated(kine%ai_alpha)) allocate(kine%ai_alpha(kine%nfft_alpha))
+      if (.not. allocated(kine%bi_alpha)) allocate(kine%bi_alpha(kine%nfft_alpha))
+      if (.not. allocated(kine%ai_theta)) allocate(kine%ai_theta(kine%nfft_theta))
+      if (.not. allocated(kine%bi_theta)) allocate(kine%bi_theta(kine%nfft_theta))
+
       kine%a0_phi   =25.4649398
       kine%a0_alpha =-0.3056968
       kine%a0_theta =-17.8244658  ! - sign (Dmitry, 10 Nov 2013)
@@ -400,6 +414,14 @@ case ("revolving-set3-degree")
       kine%nfft_alpha = 10
       kine%nfft_theta = 10
       kine%nfft_phi   = 10
+
+      ! Allocate arrays
+      if (.not. allocated(kine%ai_phi)) allocate(kine%ai_phi(kine%nfft_phi))
+      if (.not. allocated(kine%bi_phi)) allocate(kine%bi_phi(kine%nfft_phi))
+      if (.not. allocated(kine%ai_alpha)) allocate(kine%ai_alpha(kine%nfft_alpha))
+      if (.not. allocated(kine%bi_alpha)) allocate(kine%bi_alpha(kine%nfft_alpha))
+      if (.not. allocated(kine%ai_theta)) allocate(kine%ai_theta(kine%nfft_theta))
+      if (.not. allocated(kine%bi_theta)) allocate(kine%bi_theta(kine%nfft_theta))
 
       kine%a0_phi   =38.2280144124915
       kine%a0_alpha =1.09156750841542

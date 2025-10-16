@@ -74,6 +74,12 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
         end if
     end if
 
+    if ( params%time_statistics) then
+        ! time step should hit time_statistics_start_time exactly
+        if ( time+dt > params%time_statistics_start_time .and. time<params%time_statistics_start_time ) then
+            dt = params%time_statistics_start_time - time
+        end if
+    end if
 
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time

@@ -33,6 +33,17 @@ real(kind=rk), parameter :: FD2_C4(-2:2) = (/ -1.0_rk,  16.0_rk,  -30.0_rk,   16
 real(kind=rk), parameter :: FD2_C6(-3:3) = (/  2.0_rk, -27.0_rk,   270.0_rk, -490.0_rk,   270.0_rk,  -27.0_rk,    2.0_rk/) / 180.0_rk  ! 6th order central difference for second derivative
 real(kind=rk), parameter :: FD2_C8(-4:4) = (/ -9.0_rk,  128.0_rk, -1008.0_rk, 8064.0_rk, -14350.0_rk, 8064.0_rk, -1008.0_rk, 128.0_rk, -9.0_rk /) / 5040_rk  ! 8th order central difference for second derivative
 
+! Composite second derivative stencils (from module_poisson)
+real(kind=rk), parameter :: FD2_COMP_0_4(-4:4) = (/ -75.0_rk, 544.0_rk, -1776.0_rk, 3552.0_rk, -4490.0_rk, 3552.0_rk, -1776.0_rk, 544.0_rk, -75.0_rk /) / 144.0_rk  ! 4th order composite difference (0,4)
+real(kind=rk), parameter :: FD2_COMP_2_2(-4:4) = (/ 1.0_rk, -16.0_rk, 64.0_rk, 16.0_rk, -130.0_rk, 16.0_rk, 64.0_rk, -16.0_rk, 1.0_rk /) / 144.0_rk  ! 4th order composite difference (2,2)
+real(kind=rk), parameter :: FD2_COMP_1_3(-4:4) = (/ 3.0_rk, -8.0_rk, -24.0_rk, 264.0_rk, -470.0_rk, 264.0_rk, -24.0_rk, -8.0_rk, 3.0_rk /) / 144.0_rk  ! 4th order composite difference (1,3)
+real(kind=rk), parameter :: FD2_COMP_3_3(-6:6) = (/ 1.0_rk, -18.0_rk, 171.0_rk, -810.0_rk, 1935.0_rk, 828.0_rk, -4214.0_rk, 828.0_rk, 1935.0_rk, -810.0_rk, 171.0_rk, -18.0_rk, 1.0_rk /) / 3600.0_rk  ! 6th order composite difference (3,3)
+real(kind=rk), parameter :: FD2_COMP_2_4(-6:6) = (/ 2.0_rk, -40.0_rk, 217.0_rk, -520.0_rk, 270.0_rk, 4656.0_rk, -9170.0_rk, 4656.0_rk, 270.0_rk, -520.0_rk, 217.0_rk, -40.0_rk, 2.0_rk /) / 3600.0_rk  ! 6th order composite difference (2,4)
+real(kind=rk), parameter :: FD2_COMP_1_5(-6:6) = (/ 20.0_rk, 4.0_rk, -955.0_rk, 5300.0_rk, -15300.0_rk, 31560.0_rk, -41258.0_rk, 31560.0_rk, -15300.0_rk, 5300.0_rk, -955.0_rk, 4.0_rk, 20.0_rk /) / 3600.0_rk  ! 6th order composite difference (1,5)
+real(kind=rk), parameter :: FD2_COMP_0_6(-6:6) = (/ -1470.0_rk, 14184.0_rk, -63495.0_rk, 176200.0_rk, -342450.0_rk, 501840.0_rk, -569618.0_rk, 501840.0_rk, -342450.0_rk, 176200.0_rk, -63495.0_rk, 14184.0_rk, -1470.0_rk /) / 3600.0_rk  ! 6th order composite difference (0,6)
+
+
+
 ! Cross derivative coefficients (mixed partials d²/dxdy, d²/dxdz, d²/dydz)
 ! These are applied in a cross-shaped pattern along diagonals
 ! 2nd order cross derivative: 3-point stencil applied cross-wise
@@ -197,15 +208,52 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
         case("FD_4th_central", "FD_4th_comp_0_4", "FD_4th_comp_1_3", "FD_4th_comp_2_2")
+        ! case("FD_4th_central")
             fd2_start = -2
             fd2_end = 2
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C4(:)
+        ! case("FD_4th_comp_0_4")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_0_4(:)
+        ! case("FD_4th_comp_2_2")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_2_2(:)
+        ! case("FD_4th_comp_1_3")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_1_3(:)
         case("FD_6th_central", "FD_6th_comp_0_6", "FD_6th_comp_1_5", "FD_6th_comp_2_4")
+        ! case("FD_6th_central")
             fd2_start = -3
             fd2_end = 3
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C6(:)
+        ! case("FD_6th_comp_3_3")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_3_3(:)
+        ! case("FD_6th_comp_2_4")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_2_4(:)
+        ! case("FD_6th_comp_1_5")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_1_5(:)
+        ! case("FD_6th_comp_0_6")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_0_6(:)
         case("FD_8th_central")
             fd2_start = -4
             fd2_end = 4

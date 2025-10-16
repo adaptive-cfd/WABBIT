@@ -122,7 +122,7 @@ end subroutine executeCoarsening_tree
 
 
 !> For CVS decomposition we need to update mothers from decomposed daughter values, this does exactly that
-subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
+subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -134,6 +134,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
     integer(kind=ik), intent(in)        :: s_val
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
     integer(kind=ik)                    :: k, sync_case_id, nc, data_rank, n_xfer, lgt_ID, hvy_ID, level_me, ref_me
@@ -192,7 +193,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val)
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_" // sync_case, ncomponents=nc, s_val=s_val)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_" // sync_case, ncomponents=nc, s_val=s_val, sync_debug_name=sync_debug_name)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer, verbose_check=.true.)
 
     ! now the daughter blocks need to be retransformed to spaghetti
@@ -220,7 +221,7 @@ end subroutine sync_D2M
 
 
 !> For CVS reconstruction we need to update daughters from reconstructed mothers, this does exactly that
-subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
+subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -232,6 +233,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
     integer(kind=ik), intent(in)        :: s_val
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
     integer(kind=ik)                    :: k, sync_case_id, n_xfer, lgt_ID, hvy_ID, lgt_ID_m, level_m, ref_m, nc
@@ -297,7 +299,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val)
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_val=s_val)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_val=s_val, sync_debug_name=sync_debug_name)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     !---------------------------------------------------------------------------

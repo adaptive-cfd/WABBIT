@@ -46,6 +46,9 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
       endif
   endif
 
+  ! sometimes we have the geometry type insect but it has no wings (for example for fractal_tree), we then want to skip the rest
+  if (.not. Insect%RightWing=="yes" .and. .not. Insect%LeftWing=="yes" .and. Insect%RightWing2=="yes" .and. Insect%LeftWing2=="yes") return
+
   if ((dabs(Insect%time-time)>1.0d-10) .and. root) then
       write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
       write(*,'("Did you call Update_Insect before draw_insect_wings?")')
@@ -1524,6 +1527,21 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   if (Insect%wingsetup_done(wingID)) then
     ! the second call is just a return statement
     return
+  endif
+
+  ! Allocate wing Fourier coefficient arrays if not already allocated
+  if (.not. allocated(Insect%ai_wings)) then
+    allocate(Insect%ai_wings(nfft_max, 4))
+    Insect%ai_wings = 0.0_rk
+  endif
+  if (.not. allocated(Insect%bi_wings)) then
+    allocate(Insect%bi_wings(nfft_max, 4))
+    Insect%bi_wings = 0.0_rk
+  endif
+  ! Allocate R0_table if not already allocated
+  if (.not. allocated(Insect%R0_table)) then
+    allocate(Insect%R0_table(25000, 4))
+    Insect%R0_table = 0.0_rk
   endif
 
   Insect%a0_wings(wingID) = 0.0_rk

@@ -13,15 +13,26 @@ subroutine load_kine_init(kine)
     read (10, *) t_period ! stroke period in s, for normalization
     read (10, *) r_wing   ! wing length in mm, for normalization
     read (10, *) kine%nk
-    if (kine%nk > nhrmt_max) then
-      write(*,*) "WARNING(load_kine_init): adjusting the value kine%nk to nhrmt_max"
-      kine%nk = nhrmt_max
-    endif
     write(*,'("nk=",i5," t_period=",g12.4," r_wing=",g12.4)') kine%nk, t_period, r_wing
   endif
 
   call MPI_BCAST(kine%nk,1,MPI_INTEGER,0,MPI_COMM_WORLD,mpicode)
   nk = kine%nk
+
+  ! Allocate the kineloader arrays
+  if (.not. allocated(kine%vec_t)) allocate(kine%vec_t(max(1,nk)))
+  if (.not. allocated(kine%vec_phi)) allocate(kine%vec_phi(max(1,nk)))
+  if (.not. allocated(kine%vec_alpha)) allocate(kine%vec_alpha(max(1,nk)))
+  if (.not. allocated(kine%vec_theta)) allocate(kine%vec_theta(max(1,nk)))
+  if (.not. allocated(kine%vec_pitch)) allocate(kine%vec_pitch(max(1,nk)))
+  if (.not. allocated(kine%vec_vert)) allocate(kine%vec_vert(max(1,nk)))
+  if (.not. allocated(kine%vec_horz)) allocate(kine%vec_horz(max(1,nk)))
+  if (.not. allocated(kine%vec_phi_dt)) allocate(kine%vec_phi_dt(max(1,nk)))
+  if (.not. allocated(kine%vec_alpha_dt)) allocate(kine%vec_alpha_dt(max(1,nk)))
+  if (.not. allocated(kine%vec_theta_dt)) allocate(kine%vec_theta_dt(max(1,nk)))
+  if (.not. allocated(kine%vec_pitch_dt)) allocate(kine%vec_pitch_dt(max(1,nk)))
+  if (.not. allocated(kine%vec_vert_dt)) allocate(kine%vec_vert_dt(max(1,nk)))
+  if (.not. allocated(kine%vec_horz_dt)) allocate(kine%vec_horz_dt(max(1,nk)))
 
   ! intitalize vectors as zero (note: not all of the space is actually used)
   kine%vec_t = 0.0_rk
@@ -66,19 +77,19 @@ subroutine load_kine_init(kine)
     kine%vec_horz_dt = kine%vec_horz_dt * t_period / r_wing
   endif
 
-  call MPI_BCAST( kine%vec_t, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_phi, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_alpha, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_theta, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_pitch, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_vert, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_horz, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_phi_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_alpha_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_theta_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_pitch_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_vert_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
-  call MPI_BCAST( kine%vec_horz_dt, nhrmt_max, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_t, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_phi, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_alpha, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_theta, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_pitch, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_vert, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_horz, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_phi_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_alpha_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_theta_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_pitch_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_vert_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
+  call MPI_BCAST( kine%vec_horz_dt, nk, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
 
   kine%initialized = .true.
   if (root) write(*,*) "done initializing kineoader!"

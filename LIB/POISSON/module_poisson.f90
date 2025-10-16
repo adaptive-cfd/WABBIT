@@ -14,6 +14,9 @@ module module_poisson
     use module_forestMetaData
     use module_timing               ! debug module
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
+    use module_mesh                 ! needed for multigrid
+    use module_mpi                  ! needed for multigrid
+    use module_fft                  ! needed for multigrid
 
     implicit none
 
@@ -42,10 +45,12 @@ module module_poisson
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
     
-    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils
+    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils, multigrid_vcycle, multigrid_solve
 
 
 contains
+
+#include "multigrid_vcycle.f90"
 
     subroutine setup_Laplacian_stencils(params, g)
         implicit none

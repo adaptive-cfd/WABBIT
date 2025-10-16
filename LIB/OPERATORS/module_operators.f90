@@ -207,51 +207,53 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             fd2_end = 1
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_comp_0_4", "FD_4th_comp_1_3", "FD_4th_comp_2_2")
+        ! case("FD_4th_central")
             fd2_start = -2
             fd2_end = 2
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C4(:)
-        case("FD_4th_comp_0_4")
-            fd2_start = -4
-            fd2_end = 4
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_0_4(:)
-        case("FD_4th_comp_2_2")
-            fd2_start = -4
-            fd2_end = 4
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_2_2(:)
-        case("FD_4th_comp_1_3")
-            fd2_start = -4
-            fd2_end = 4
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_1_3(:)
-        case("FD_6th_central")
+        ! case("FD_4th_comp_0_4")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_0_4(:)
+        ! case("FD_4th_comp_2_2")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_2_2(:)
+        ! case("FD_4th_comp_1_3")
+        !     fd2_start = -4
+        !     fd2_end = 4
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_1_3(:)
+        case("FD_6th_central", "FD_6th_comp_0_6", "FD_6th_comp_1_5", "FD_6th_comp_2_4")
+        ! case("FD_6th_central")
             fd2_start = -3
             fd2_end = 3
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C6(:)
-        case("FD_6th_comp_3_3")
-            fd2_start = -6
-            fd2_end = 6
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_3_3(:)
-        case("FD_6th_comp_2_4")
-            fd2_start = -6
-            fd2_end = 6
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_2_4(:)
-        case("FD_6th_comp_1_5")
-            fd2_start = -6
-            fd2_end = 6
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_1_5(:)
-        case("FD_6th_comp_0_6")
-            fd2_start = -6
-            fd2_end = 6
-            allocate(FD2_array(fd2_start:fd2_end))
-            FD2_array(:) = FD2_COMP_0_6(:)
+        ! case("FD_6th_comp_3_3")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_3_3(:)
+        ! case("FD_6th_comp_2_4")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_2_4(:)
+        ! case("FD_6th_comp_1_5")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_1_5(:)
+        ! case("FD_6th_comp_0_6")
+        !     fd2_start = -6
+        !     fd2_end = 6
+        !     allocate(FD2_array(fd2_start:fd2_end))
+        !     FD2_array(:) = FD2_COMP_0_6(:)
         case("FD_8th_central")
             fd2_start = -4
             fd2_end = 4

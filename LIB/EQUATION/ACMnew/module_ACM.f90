@@ -194,7 +194,7 @@ end subroutine
     integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min_c0, dt_min_vpm, dt_min_nu
     character(len=cshort) :: Bs_str, Bs_conc
-    character(len=16834) :: input_files
+    character(len=400) :: input_files
     character(len=12) :: timestamp
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx

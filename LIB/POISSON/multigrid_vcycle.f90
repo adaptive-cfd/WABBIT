@@ -66,12 +66,12 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
 
         ! choose between different end criteria:
         ! fixed_iterations - do a set number of V-cycles
-        ! tolerance - stop when residuals are below a certain threshold or maximum number of iterations is reached
+        ! tolerance - stop when absolute or relative residuals are below a certain threshold or maximum number of iterations is reached
         if (params%poisson_cycle_end_criteria == "fixed_iterations") then
             if (i_cycle >= params%poisson_cycle_it) exit
         elseif (params%poisson_cycle_end_criteria == "tolerance") then
             if (all(residual(1:size(hvy_sol,4)) < params%poisson_cycle_tol_abs)) exit
-            if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel)) exit
+            if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel) .and. all(norm_sol(1:size(hvy_sol,4)) > 1e-8)) exit
         else
             call abort(250903, "Don't know how to stop! Please choose between 'fixed_iterations' and 'tolerance', thank you :)")
         endif
@@ -165,22 +165,23 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID)
     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
 
-    ! we need to preserve b
-    ! Usually we could restore it later with b = r + Ax, however, with coarse extension we have to alter the residual and would not get back the original b
-        ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
-    ! compute the residual r = b - Ax to pass it downwards
-    t_block = MPI_Wtime()
-    do k_block = 1, hvy_n(tree_ID)
-        hvy_id = hvy_active(k_block, tree_ID)
-        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+    ! JB Comment: I think this is not necessary, we do coarse extension but only keep the block values and not the decomposed ones, so we should reconstruct the original values later on without any problems
+    ! ! we need to preserve b
+    ! ! Usually we could restore it later with b = r + Ax, however, with coarse extension we have to alter the residual and would not get back the original b
+    !     ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
+    ! ! compute the residual r = b - Ax to pass it downwards
+    ! t_block = MPI_Wtime()
+    ! do k_block = 1, hvy_n(tree_ID)
+    !     hvy_id = hvy_active(k_block, tree_ID)
+    !     call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-        ! b only defined on leaf layer
-        if (.not. block_is_leaf(params, hvy_id)) cycle
+    !     ! b only defined on leaf layer
+    !     if (.not. block_is_leaf(params, hvy_id)) cycle
 
-        ! store b
-        hvy_work(:,:,:,nc+1:2*nc,hvy_id) = hvy_RHS(:,:,:,1:nc,hvy_id)
-    enddo
-    call toc( "GS Downwards - Store b", 10020, MPI_Wtime()-t_block )
+    !     ! store b
+    !     hvy_work(:,:,:,nc+1:2*nc,hvy_id) = hvy_RHS(:,:,:,1:nc,hvy_id)
+    ! enddo
+    ! call toc( "GS Downwards - Store b", 10020, MPI_Wtime()-t_block )
 
 
     ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
@@ -221,6 +222,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
 
     ! for all levels we are not solving Au = b, but rather Ae=r
     ! only on the last upwards step will we iterate on the original problem, so we need to backup u
+    ! starting from here, hvy_work contains the backed-up solution
     t_block = MPI_Wtime()
     do k_block = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k_block, tree_ID)
@@ -255,12 +257,12 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
             ! get spacing
             call get_block_spacing_origin( params, lgt_ID, x0, dx )
 
-            ! ! recompute RHS b = r + Ax, 
-            ! call GS_compute_residual(params, hvy_work(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), dx, recompute_b=.true.)
-            ! restore full RHS b
-            hvy_RHS(:,:,:,1:nc,hvy_id) = hvy_work(:,:,:,nc+1:2*nc,hvy_id)
+            ! recompute RHS b = r + Ax, 
+            call GS_compute_residual(params, hvy_work(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), dx, recompute_b=.true.)
+            ! ! restore full RHS b
+            ! hvy_RHS(:,:,:,1:nc,hvy_id) = hvy_work(:,:,:,nc+1:2*nc,hvy_id)
     
-            ! add reconstructed solution to residual to previous solution
+            ! add previous solution to reconstructed solution
             hvy_sol(:,:,:,1:nc,hvy_id) = hvy_sol(:,:,:,1:nc,hvy_id) + hvy_work(:,:,:,1:nc,hvy_id)
         endif
     enddo

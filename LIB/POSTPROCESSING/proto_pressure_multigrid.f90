@@ -550,6 +550,7 @@ subroutine proto_NSI_EE(params)
     call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
     call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
 
+    ! --- following block is for debugging the helmholtz projection ----
     ! call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
     ! write(fname, '(A, i12.12, A)') "ux_", int(100*1.0e6),".h5"
     ! call saveHDF5_tree(fname, 100.0_rk, 0, 1, params, hvy_block, tree_ID )
@@ -569,6 +570,7 @@ subroutine proto_NSI_EE(params)
     ! call saveHDF5_tree(fname, 100.0_rk, 0, 1, params, hvy_block, tree_ID )
     ! write(fname, '(A, i12.12, A)') "u2y_", int(100*1.0e6),".h5"
     ! call saveHDF5_tree(fname, 100.0_rk, 0, 2, params, hvy_block, tree_ID )
+    ! -----------------------------------------------------------------
 
     ! we have to recompute p
     call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
@@ -650,8 +652,8 @@ subroutine proto_NSI_EE(params)
         ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
         call sync_ghosts_tree( params, hvy_work(:,:,:,1:params%dim,:,1), tree_ID_flow )
         call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
-        call multigrid_solve(params, hvy_tmp(:,:,:,4:4,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,3:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
-        call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,4:4,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
+        call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
 
         ! compute k_1, k_2, .... (coefficients for final stage)
         do j = 2, size(params%butcher_tableau, 1) - 1

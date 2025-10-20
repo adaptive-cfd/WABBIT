@@ -51,10 +51,6 @@ subroutine post_mean(params)
     ! read input data
     call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    ! create lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call updateMetadata_tree( params, tree_ID )
-
     ! use functions from module_operators
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "Mean", norms(1:1), threshold_state_vector=.false.)
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "L1", norms(2:2), threshold_state_vector=.false.)

@@ -419,14 +419,15 @@ end subroutine RHS_convdiff_new
 
 
 
+!> Create a 2D velocity field for advecting a scalar field
 subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
     implicit none
-    real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, i
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
-    real(kind=rk), intent(inout) :: u0(:,:,:)
-    real(kind=rk), intent(in) :: u(:,:)
+    real(kind=rk), intent(in) :: time  !< current time
+    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index
+    integer(kind=ik), dimension(3), intent(in) :: Bs  !< block size
+    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)  !< grid spacing and origin of the block
+    real(kind=rk), intent(inout) :: u0(:,:,:)  !< output velocity field
+    real(kind=rk), intent(in) :: u(:,:)  !< scalar input field (for some velocity fields)
     ! note you cannot change these values without recomputing the coefficients
     real(kind=rk), parameter :: tau= 0.30_rk, t0=0.0_rk, t1=0.55_rk, t2=1.0_rk, u1=1.0_rk, u2=-1.2221975311385904
     real(kind=rk) :: u_this
@@ -522,13 +523,14 @@ end subroutine
 
 
 
+!> Create a 3D velocity field for advecting a scalar field
 subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     implicit none
-    real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, i
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    real(kind=rk), intent(in) :: dx(1:3), x0(1:3)
-    real(kind=rk), intent(inout) :: u0(:,:,:,1:)
+    real(kind=rk), intent(in) :: time  !< current time
+    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index
+    integer(kind=ik), dimension(3), intent(in) :: Bs  !< block size
+    real(kind=rk), intent(in) :: dx(1:3), x0(1:3)  !< grid spacing and origin of the block
+    real(kind=rk), intent(inout) :: u0(:,:,:,1:)  !< output velocity field
 
     integer(kind=ik) :: ix, iy, iz
     real(kind=rk) :: x, y, z, c0x, c0y, c0z, T

@@ -226,26 +226,23 @@ contains
             endif
         endif
 
-        ! saving of velocity field
+        ! saving of velocity field, this is done similar to save_data_ACM
         if (name(1:2) == 'ux' .or. name(1:2) == 'uy' .or. name(1:2) == 'uz') then
             read( name(4:4), * ) i_var
             if (params_convdiff%dim == 2) then
+                ! let's save a 2D velocity field, for this we need two work arrays
                 if (size(work,4) - k < 1) then
-                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast one other save variable afterwards.")
                 endif
-                if (k > params_convdiff%N_scalars+2) then
-                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
-                endif
-                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,:,k), i_var, u(:,:,1,i_var) )
+                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,k:k+1), i_var, u(:,:,1,i_var) )
             elseif (params_convdiff%dim == 3) then
+                ! let's save a 3D velocity field, for this we need three work arrays
                 if (size(work,4) - k < 2) then
-                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
-                endif
-                if (k > params_convdiff%N_scalars+3) then
-                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist " // trim(name) )
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast two other save variables afterwards.")
                 endif
                 call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,k:k+2), i_var )
             endif
+            ! now copy the correct component to the correct place
             if (name(1:2) == 'uy') then
                 work(:,:,:,k) = work(:,:,:,k+1)
             elseif (name(1:2) == 'uz') then
@@ -258,7 +255,7 @@ contains
 
         ! if any of those endings is in the name, then it is a timestatistics variable
         if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
-            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0) then
+            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
             ! now we have to find the index of it
             do i_time_statistics = 1, params_convdiff%N_time_statistics
                 if (name == trim(params_convdiff%time_statistics_names(i_time_statistics))) exit

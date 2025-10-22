@@ -251,7 +251,28 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* &
                  (work(:,:,:,1) - u(:,:,:,N_offset + mean_idx1)) * &
                  (work(:,:,:,1) - (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + mean_idx1) - dt/(time_diff)*work(:,:,:,1))
-        
+
+        ! Helicity magnitude cases
+        case ("helabs-int")
+            if (params_acm%dim == 2) call abort(251016, "[TIME_STATISTICS_ACM]: helabs not available in 2D simulations.")
+            ! compute the integral of helicity magnitude over time
+            call compute_helicity_abs(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
+        case ("helabs-avg", "helabs-mean")
+            if (params_acm%dim == 2) call abort(251016, "[TIME_STATISTICS_ACM]: helabs not available in 2D simulations.")
+            ! compute the average of helicity magnitude over time
+            call compute_helicity_abs(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
+        case ("helabs-var")
+            if (params_acm%dim == 2) call abort(251016, "[TIME_STATISTICS_ACM]: helabs not available in 2D simulations.")
+            ! compute the variance of helicity magnitude over time using Welford's method
+            call find_single_mean_index(i_ts, "helabs-avg", "helabs-mean", mean_idx1, &
+                "[TIME_STATISTICS_ACM]: You need to compute the variance together with the mean value. Insert 'helabs-avg' or 'helabs-mean' AFTER 'helabs-var' in time_statistics_names.", 251021_ik)
+            call compute_helicity_abs(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+            u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* &
+                 (work(:,:,:,1) - u(:,:,:,N_offset + mean_idx1)) * &
+                 (work(:,:,:,1) - (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + mean_idx1) - dt/(time_diff)*work(:,:,:,1))
+
         case ("dissipation-int")
             ! compute the integral of dissipation over time
             call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))

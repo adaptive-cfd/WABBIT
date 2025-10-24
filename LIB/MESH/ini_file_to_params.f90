@@ -436,7 +436,10 @@ subroutine ini_blocks(params, FILE )
    allocate(params%threshold_state_vector_component(1:params%n_eqn))
    ! as default, use ones (all components used for indicator)
    tmp = 1.0_rk
-   call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+   ! only read in threshold_state_vector_component if needed
+   if ((params%adapt_tree .and. params%coarsening_indicator=="threshold-state-vector") .or. (params%adapt_inicond .and. params%coarsening_indicator_inicond=="threshold-state-vector")) then
+      call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+   end if
    do i = 1, params%n_eqn
       params%threshold_state_vector_component(i) = nint(tmp(i))
    enddo

@@ -348,6 +348,9 @@ subroutine ini_blocks(params, FILE )
    elseif (params%wavelet(4:4) == "6") then
       g_default = 5
       g_RHS_default = 3
+   elseif (params%wavelet(4:4) == "8") then
+      g_default = 7
+      g_RHS_default = 4
    else 
       call abort(2320242, "no default specified for this wavelet...")
    endif

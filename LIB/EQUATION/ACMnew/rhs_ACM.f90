@@ -817,6 +817,7 @@ end subroutine RHS_2D_acm
 
 
 subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
+    use module_operators
     implicit none
 
     !> grid parameter
@@ -874,6 +875,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! 6th order FD scheme
     real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
     real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
 
     ! set parameters for readability
@@ -1453,7 +1457,131 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     case default
-        call abort(441167, "3d Discretization unkown "//order_discretization//", I ll walk into the light now." )
+        ! call abort(44167, "3d Discretization unknown "// trim(order_discretization)//", I'll walk into the light now.")
+
+        ! Flexible operator version for 3D ACM using generalized stencils
+
+        call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
+        call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+
+        if (params_acm%skew_symmetry) then
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        u = phi(ix,iy,iz,1)
+                        v = phi(ix,iy,iz,2)
+                        w = phi(ix,iy,iz,3)
+                        p = phi(ix,iy,iz,4)
+
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        ! Generalized first derivatives
+                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)) * dy_inv
+                        u_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)) * dz_inv
+
+                        v_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,2)) * dx_inv
+                        v_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
+                        v_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,2)) * dz_inv
+
+                        w_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,3)) * dx_inv
+                        w_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)) * dy_inv
+                        w_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
+                        p_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,4)) * dx_inv
+                        p_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,4)) * dy_inv
+                        p_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,4)) * dz_inv
+
+                        ! Generalized nonlinear terms
+                        uu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        uv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
+                        uw_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
+                        vu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,2)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        vv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
+                        vw_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,2)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
+                        wu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,3)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        wv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
+                        ww_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
+                        ! Generalized second derivatives
+                        u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,1)) * dx2_inv
+                        u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,1)) * dy2_inv
+                        u_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,1)) * dz2_inv
+
+                        v_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,2)) * dx2_inv
+                        v_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,2)) * dy2_inv
+                        v_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,2)) * dz2_inv
+
+                        w_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,3)) * dx2_inv
+                        w_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,3)) * dy2_inv
+                        w_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,3)) * dz2_inv
+
+                        ! Skew-symmetric formulation
+                        rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        else
+            do iz = g+1, Bs(3)+g
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        u = phi(ix,iy,iz,1)
+                        v = phi(ix,iy,iz,2)
+                        w = phi(ix,iy,iz,3)
+                        p = phi(ix,iy,iz,4)
+
+                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        penalx = -chi * (u - mask(ix,iy,iz,2))
+                        penaly = -chi * (v - mask(ix,iy,iz,3))
+                        penalz = -chi * (w - mask(ix,iy,iz,4))
+
+                        ! Generalized first derivatives
+                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)) * dy_inv
+                        u_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)) * dz_inv
+
+                        v_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,2)) * dx_inv
+                        v_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
+                        v_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,2)) * dz_inv
+
+                        w_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,3)) * dx_inv
+                        w_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)) * dy_inv
+                        w_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
+                        p_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,4)) * dx_inv
+                        p_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,4)) * dy_inv
+                        p_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,4)) * dz_inv
+
+                        ! Generalized second derivatives
+                        u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,1)) * dx2_inv
+                        u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,1)) * dy2_inv
+                        u_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,1)) * dz2_inv
+
+                        v_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,2)) * dx2_inv
+                        v_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,2)) * dy2_inv
+                        v_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,2)) * dz2_inv
+
+                        w_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,3)) * dx2_inv
+                        w_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,3)) * dy2_inv
+                        w_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,3)) * dz2_inv
+
+                        ! Standard formulation
+                        rhs(ix,iy,iz,1) = (-u*u_dx - v*u_dy - w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
+                        rhs(ix,iy,iz,2) = (-u*v_dx - v*v_dy - w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
+                        rhs(ix,iy,iz,3) = (-u*w_dx - v*w_dy - w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
+                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                    end do
+                end do
+            end do
+        endif
 
     end select
 
@@ -1483,7 +1611,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     ! --------------------------------------------------------------------------
     ! HIT linear forcing
-    ! ATTENTION! This is at last position because I modify phi to avoid a 3-nested do-loop to subtract mean-flow
     ! --------------------------------------------------------------------------
     if (params_acm%HIT_linear_forcing) then
         G_gain = params_acm%HIT_gain

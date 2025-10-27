@@ -636,24 +636,34 @@ subroutine proto_NSI_EE(params)
         !***********************************************************************
         ! Timestep - Euler Explicit or RK2 / Heun's method
         !***********************************************************************
-        ! ! possibility to set different stencil for intermediate projections
-        ! params%poisson_order = "FD_6th_mehrstellen"
-        ! call setup_laplacian_stencils(params, params%g)
+        t4 = MPI_wtime()
 
         ! RK_generic
+        t3 = MPI_wtime()
         call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+        call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
 
         ! caluclate timestep, here we use that of ACM and set the speed of sound to close to 0
         call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
         ! compute RHS for the first stage without pressure gradient
+        t3 = MPI_wtime()
         call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,1), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
+        call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
 
         ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
+        t3 = MPI_wtime()
         call sync_ghosts_tree( params, hvy_work(:,:,:,1:params%dim,:,1), tree_ID_flow )
+        call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+        t3 = MPI_wtime()
         call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
+        call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+        t3 = MPI_wtime()
         call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+        t3 = MPI_wtime()
         call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
+        call toc( "timestep: compute_projection", 25, MPI_wtime()-t3)
 
         ! compute k_1, k_2, .... (coefficients for final stage)
         do j = 2, size(params%butcher_tableau, 1) - 1
@@ -674,14 +684,26 @@ subroutine proto_NSI_EE(params)
                     + dt * params%butcher_tableau(j,l) * hvy_work(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id,l-1)
                 end do
             end do
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
             ! compute RHS for the current stage without pressure gradient
+            t3 = MPI_wtime()
             call compute_NSI_RHS(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,j), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
+            call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
             ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_work(:,:,:,1:params%dim,:,j), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
+            call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+            call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,j), order_disc_pressure, tree_ID_flow, 1.0_rk)
+            call toc( "timestep: compute_projection", 25, MPI_wtime()-t3)
         enddo
 
         ! final stage (actual final update of state vector)
@@ -702,7 +724,9 @@ subroutine proto_NSI_EE(params)
                     + dt*params%butcher_tableau(size(params%butcher_tableau,1),j) * hvy_work(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),1:params%dim,hvy_id,j-1)
             end do
         end do
+        t3 = MPI_wtime()
         call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+        call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
 
         ! write(fname, '(A, i12.12, A)') "ux_", int(time*1.0e6),".h5"
         ! call saveHDF5_tree(fname, time, 0, 1, params, hvy_block, tree_ID )
@@ -732,39 +756,68 @@ subroutine proto_NSI_EE(params)
         ! let's do some regular projections - this can be changed by a parameter
         if (modulo(iteration, params%nprojection_NSI)==0) then
             ! Maybe u is not completely divergence free in the discrete sense, so we do one projection in order to get a divergence free velocity field
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
+            call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+            call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
+            call toc( "timestep: compute_projection", 25, MPI_wtime()-t3)
         endif
 
         ! we reconstruct the pressure if we do statistics or save data to have it in respective accuracy
         if (it_is_time_to_save_data .or. (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk)) then
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_tmp(:,:,:,1:params%dim,:), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
+            call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
+            call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
             call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow)
+            call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
             do k_block = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k_block, tree_ID)
                 hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),params%dim+1,hvy_id) = hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),4,hvy_id)
             enddo
         endif
 
+        call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
+
         !*******************************************************************
         ! statistics
         !*******************************************************************
-        t_block = MPI_wtime()
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) .or. abs(time - params%time_max) < 1e-12_rk ) then
+            t4 = MPI_wtime()
             ! we need to sync ghost nodes for some derived qtys, for sure
             call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
             call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+            call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
+
+            ! update next stats time
+            if (abs(time - params%next_stats_time)<1e-12_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
-        call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t_block)
 
         !***********************************************************************
         ! Adapt mesh - (coarsening where possible)

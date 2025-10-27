@@ -410,8 +410,8 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_COMP7_3_4(:)
             ! no corresponding 7th order central stencil, fallback to 8th order
             else
-                fd2_start = -2
-                fd2_end = 2
+                fd2_start = -4
+                fd2_end = 4
                 allocate(FD2_array(fd2_start:fd2_end))
                 FD2_array(:) = FD2_C8(:)
             endif
@@ -427,8 +427,8 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 allocate(FD2_array(fd2_start:fd2_end))
                 FD2_array(:) = FD2_COMP8_3_5(:)
             else
-                fd2_start = -2
-                fd2_end = 2
+                fd2_start = -4
+                fd2_end = 4
                 allocate(FD2_array(fd2_start:fd2_end))
                 FD2_array(:) = FD2_C8(:)
             endif

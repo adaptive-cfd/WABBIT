@@ -83,7 +83,7 @@ module module_acm
     real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
 
     logical :: use_passive_scalar = .false.
-    integer(kind=ik) :: N_scalars = 0, nsave_stats = 999999
+    integer(kind=ik) :: N_scalars = 0
     real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
     z0source(:), scalar_Ceta(:), widthsource(:)
     character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
@@ -348,7 +348,6 @@ end subroutine
 
     call read_param_mpi(FILE, 'Time', 'time_max', params_acm%T_end, 1.0_rk   )
 
-    call read_param_mpi(FILE, 'Statistics', 'nsave_stats', params_acm%nsave_stats, 999999   )
     call read_param_mpi(FILE, 'FreeFlightSolver', 'use_free_flight_solver', params_acm%use_free_flight_solver, .false.   )
 
     call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params_acm%Jmax, 1   )

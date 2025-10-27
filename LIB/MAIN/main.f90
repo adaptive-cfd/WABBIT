@@ -226,14 +226,14 @@ program main
     !*******************************************************************
     ! initial statistics (usefull for checking IC)
     !*******************************************************************
-    t4 = MPI_wtime()
     if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+        t4 = MPI_wtime()
         ! we need to sync ghost nodes for some derived qtys, for sure
         call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
         call statistics_wrapper(time, 0.0_rk, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+        call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
     endif
-    call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
 
 
     ! timing
@@ -360,14 +360,17 @@ program main
             !*******************************************************************
             ! statistics
             !*******************************************************************
-            t4 = MPI_wtime()
             if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+                t4 = MPI_wtime()
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+                call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
+
+                ! update next stats time
+                if (abs(time - params%next_stats_time)<1e-12_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
-            call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
 
             ! if multiple time steps are performed on the same grid, we have to be careful
             ! not to skip past saving time intervals. Therefore, if it is time to save, we
@@ -390,7 +393,7 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-                
+
                 ! High-level optimization for time statistics:
                 ! Check if any time statistics components should be adapted (threshold_state_vector_component > 0)
                 ! Time statistics are always at the end of the state vector
@@ -499,13 +502,16 @@ program main
 
 
     !*******************************************************************
-    ! statistics ( last time )
+    ! statistics ( last time - always done if statistics is enabled, but skipped if it was already done at this time to prevent duplicates )
     !*******************************************************************
-    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+    if ( (params%nsave_stats /= 99999999_ik .or. (abs(params%tsave_stats - 9999999.9_rk) > 1e-12)) &
+        .and. .not. (modulo(iteration, params%nsave_stats) == 0 .or. abs(time - params%next_stats_time + params%tsave_stats)<1e-12_rk ) ) then
+        t4 = MPI_wtime()
         ! we need to sync ghost nodes for some derived qtys, for sure
         call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow)
 
         call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+        call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
     endif
 
 

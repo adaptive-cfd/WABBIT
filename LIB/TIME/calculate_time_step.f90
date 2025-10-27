@@ -5,12 +5,12 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
 
     !--------------------------------------------------------------
     implicit none
-    type (type_params), intent(in):: params                    !< user defined parameter structure
-    real(kind=rk), intent(in)     :: time                      !< current time of the simulation
-    integer(kind=ik), intent(in)  :: iteration
-    real(kind=rk), intent(in)     :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
-    integer(kind=ik), intent(in)  :: tree_ID
-    real(kind=rk), intent(out)    :: dt                         !< time step dt
+    type (type_params), intent(inout) :: params                    !< user defined parameter structure
+    real(kind=rk), intent(in)         :: time                      !< current time of the simulation
+    integer(kind=ik), intent(in)      :: iteration
+    real(kind=rk), intent(in)         :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
+    integer(kind=ik), intent(in)      :: tree_ID
+    real(kind=rk), intent(out)        :: dt                         !< time step dt
     !--------------------------------------------------------------
     ! MPI error variable
     integer(kind=ik) :: ierr, Jmax, k, lgt_id, hvy_id

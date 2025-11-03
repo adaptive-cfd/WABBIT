@@ -189,8 +189,15 @@ end subroutine TIME_STATISTICS_convdiff
 
 
 !----------------------------------------------------------------------------- 
-! Helper subroutine to find a single mean value index after a given position
-! This is adapted from the ACM version for flexible mean search in variance/covariance cases
+! Helper subroutine, returns the index of the AVERAGE of a quantity in the list of variables to save.
+! For example, if the vector is
+!        params_convdiff%time_statistics_names = [phi1, ux, ux-mean ....] 
+! then the call to this routine
+!        call find_single_mean_index(2, 'mean', 'avg', mean_idx, "Did not find it", 17)
+! will return the index "3".
+! Note: oddly, the same search on the array
+!        params_convdiff%time_statistics_names = [ux-mean, ux, phi1 ....]
+! will fail.
 !----------------------------------------------------------------------------- 
 subroutine find_single_mean_index(current_idx, mean_name1, mean_name2, mean_idx, error_message, error_code)
     implicit none

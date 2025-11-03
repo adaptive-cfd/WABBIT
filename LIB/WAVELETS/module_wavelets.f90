@@ -1421,7 +1421,7 @@ contains
         endif
 
         ! significant refinement without coarse extension can cause trouble, let's give a warning to the user (that no-one will probably read ever)
-        if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension .and. params%rank==0) then
+        if (params%refinement_indicator == 'significant' .and. .not. params%useCoarseExtension) then
            write(*, '(A)') 'WARNING: Significant refinement are prone to grid instabilities of our discrete operators. You should use the coarse extension in order to filter coarse-fine grid interfaces!'
         endif
         !--------------------------------------------------------------------------------------------------------

@@ -34,7 +34,7 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: iB, ix, iy, iz, Bs(3), i_ts, N_offset, i_scalar
+    integer(kind=ik) :: iB, ix, iy, iz, Bs(3), i_ts, N_offset, i_scalar, mean_idx1
     real(kind=rk) :: time_diff
     character(len=cshort) :: name_phi, stat_name
 
@@ -79,15 +79,18 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
         elseif (stat_name == trim(name_phi) // "-var") then
             ! compute the variance of phi over time using Welford's method
-            ! This needs the computation of the average in the variable afterwards to work
-            if (i_ts == params_convdiff%N_time_statistics .or. (trim(params_convdiff%time_statistics_names(i_ts+1)) /= trim(name_phi) // "-avg" .and. trim(params_convdiff%time_statistics_names(i_ts+1)) /= trim(name_phi) // "-mean")) then
-                call abort(2153001, "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert 'phi-avg' right after 'phi-var' in time_statistics_names.")
-            end if
+            ! This needs the computation of the average somewhere after this field
+            call find_single_mean_index(i_ts, trim(name_phi)//"-avg", trim(name_phi)//"-mean", mean_idx1, &
+                "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert '"//trim(name_phi)//"-avg' or '"//trim(name_phi)//"-mean' somewhere after '"//trim(name_phi)//"-var' in time_statistics_names.", 251023_ik)
             ! var_new = (time_diff-dt)/time_diff*var_old + dt/time_diff*(x - mean_old)*(x - mean_new)
             ! mean_new = (time_diff-dt)/time_diff*mean_old + dt/time_diff*x
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff) * &
-                 (u(:,:,:,1) - u(:,:,:,N_offset + i_ts + 1)) * &
-                 (u(:,:,:,1) - ((time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts + 1) + dt/(time_diff)*u(:,:,:,1)))
+                 (u(:,:,:,1) - u(:,:,:,N_offset + mean_idx1)) * &
+                 (u(:,:,:,1) - (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + mean_idx1) - dt/(time_diff)*u(:,:,:,1))
+            elseif (stat_name == trim(name_phi) // "-avg" .or. &
+                    stat_name == trim(name_phi) // "-mean") then
+                ! compute the average of phi over time (required for variance)
+                u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
         elseif (stat_name == trim(name_phi) // "-minmax") then
             ! compute the minmax of phi over time
             do iz = merge(1,g+1,params_convdiff%dim==2), merge(1,Bs(3)+g,params_convdiff%dim==2)
@@ -183,3 +186,36 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
     end do
 
 end subroutine TIME_STATISTICS_convdiff
+
+
+!----------------------------------------------------------------------------- 
+! Helper subroutine, returns the index of the AVERAGE of a quantity in the list of variables to save.
+! For example, if the vector is
+!        params_convdiff%time_statistics_names = [phi1, ux, ux-mean ....] 
+! then the call to this routine
+!        call find_single_mean_index(2, 'mean', 'avg', mean_idx, "Did not find it", 17)
+! will return the index "3".
+! Note: oddly, the same search on the array
+!        params_convdiff%time_statistics_names = [ux-mean, ux, phi1 ....]
+! will fail.
+!----------------------------------------------------------------------------- 
+subroutine find_single_mean_index(current_idx, mean_name1, mean_name2, mean_idx, error_message, error_code)
+    implicit none
+    integer(kind=ik), intent(in) :: current_idx
+    character(len=*), intent(in) :: mean_name1, mean_name2
+    integer(kind=ik), intent(out) :: mean_idx
+    character(len=*), intent(in) :: error_message
+    integer(kind=ik), intent(in) :: error_code
+    integer(kind=ik) :: j
+    mean_idx = -1
+    do j = current_idx + 1, params_convdiff%N_time_statistics
+        if (trim(params_convdiff%time_statistics_names(j)) == trim(mean_name1) .or. &
+            trim(params_convdiff%time_statistics_names(j)) == trim(mean_name2)) then
+            mean_idx = j
+            exit
+        end if
+    end do
+    if (mean_idx == -1) then
+        call abort(error_code, error_message)
+    end if
+end subroutine find_single_mean_index

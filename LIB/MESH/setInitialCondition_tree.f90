@@ -235,7 +235,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     call updateMetadata_tree(params,  tree_ID)
 
     ! balance the load
-    call balanceLoad_tree(params, hvy_block, tree_ID)
+    call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time )
 
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
     ! it is a safety issue. Better simply keep it.

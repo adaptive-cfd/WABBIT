@@ -16,7 +16,7 @@ subroutine ini_file_to_params( params, filename )
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
    ! string read from command line call
    character(len=cshort)                           :: memstring
-   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, Neqn, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
+   integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, N_files, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
 
    rank         = params%rank
    number_procs = params%number_procs
@@ -42,6 +42,17 @@ subroutine ini_file_to_params( params, filename )
    params%symmetry_vector_component = "0"
    call read_param_mpi(FILE, 'Domain', 'symmetry_vector_component', params%symmetry_vector_component, params%symmetry_vector_component )
 
+   !***************************************************************************
+   ! read time statistics parameters - before reading to decide how many files are read in
+   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
+   if (params%time_statistics) then
+      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
+      allocate( params%time_statistics_names(1:params%N_time_statistics) )
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
+      call read_param_mpi(FILE, 'Time-Statistics', 'read_from_files_time_statistics', params%read_from_files_time_statistics, .false.)
+      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_start_time', params%time_statistics_start_time, 0.0_rk)
+   endif
+
    !**************************************************************************
    ! read INITIAL CONDITION parameters
 
@@ -61,7 +72,13 @@ subroutine ini_file_to_params( params, filename )
 
    if (params%read_from_files ) then
       ! read variable names
-      allocate( params%input_files( params%n_eqn ) )
+      N_files = params%n_eqn
+      ! sometimes we want to read in time_statistics, sometimes we do not want that, this affects the number of files to read in
+      if (params%time_statistics .and. .not. params%read_from_files_time_statistics) then
+         N_files = N_files - params%N_time_statistics
+      endif
+
+      allocate( params%input_files( N_files ) )
 
       params%input_files = "---"
       call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files, check_file_exists=.true. )
@@ -81,7 +98,8 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
-   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol', params%poisson_cycle_tol, 1.0e-6_rk)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_abs', params%poisson_cycle_tol_abs, 1.0e-6_rk)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_rel', params%poisson_cycle_tol_rel, 1.0e-3_rk)
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_max_it', params%poisson_cycle_max_it, 100)
    call read_param_mpi(FILE, 'Discretization', 'poisson_GS_it', params%poisson_GS_it, 8)
    call read_param_mpi(FILE, 'Discretization', 'poisson_Sync_it', params%poisson_Sync_it, 2)
@@ -104,15 +122,6 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Statistics', 'tsave_stats', params%tsave_stats, 9999999.9_rk )
 
    !***************************************************************************
-   ! read time statistics parameters
-   call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params%time_statistics, .false.)
-   if (params%time_statistics) then
-      call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params%N_time_statistics, 1)
-      allocate( params%time_statistics_names(1:params%N_time_statistics) )
-      call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params%time_statistics_names, (/ "none" /))
-   endif
-
-   !***************************************************************************
    ! WABBIT needs to know about the mask function (if penalization is used): does it contain
    ! a time-dependent-part (e.g. moving obstacles, time-dependent forcing)? does it contain
    ! a time-independent part (fixed walls, homogeneous forcing)? or both? WABBIT needs to know
@@ -132,6 +141,13 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'test_treecode', params%test_treecode, .false.)
    call read_param_mpi(FILE, 'Debug', 'test_ghost_nodes_synch', params%test_ghost_nodes_synch, .true.)
    call read_param_mpi(FILE, 'Debug', 'test_wavelet_decomposition', params%test_wavelet_decomposition, .true.)
+
+   call read_param_mpi(FILE, 'Debug', 'debug_balanceLoad', params%debug_balanceLoad, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_refinement', params%debug_refinement, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_wavelet_decompose', params%debug_wavelet_decompose, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_wavelet_reconstruct', params%debug_wavelet_reconstruct, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_sync', params%debug_sync, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_pruned2full', params%debug_pruned2full, .false.)
 
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
@@ -332,6 +348,9 @@ subroutine ini_blocks(params, FILE )
    elseif (params%wavelet(4:4) == "6") then
       g_default = 5
       g_RHS_default = 3
+   elseif (params%wavelet(4:4) == "8") then
+      g_default = 7
+      g_RHS_default = 4
    else 
       call abort(2320242, "no default specified for this wavelet...")
    endif
@@ -420,7 +439,10 @@ subroutine ini_blocks(params, FILE )
    allocate(params%threshold_state_vector_component(1:params%n_eqn))
    ! as default, use ones (all components used for indicator)
    tmp = 1.0_rk
-   call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+   ! only read in threshold_state_vector_component if needed
+   if ((params%adapt_tree .and. params%coarsening_indicator=="threshold-state-vector") .or. (params%adapt_inicond .and. params%coarsening_indicator_inicond=="threshold-state-vector")) then
+      call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
+   end if
    do i = 1, params%n_eqn
       params%threshold_state_vector_component(i) = nint(tmp(i))
    enddo

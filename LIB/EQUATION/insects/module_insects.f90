@@ -38,9 +38,6 @@ module module_insects
    ! arrays for fourier coefficients are fixed size (avoiding issues with allocatable
    ! elements in derived datatypes) this is their length:
    integer, parameter :: nfft_max = 1024
-   ! Maximum number of Hermite interpolation nodes (hardcoded because of sxf90 compiler requirements)
-   ! JB: Array sizes resulting from this number result currently in 50% of WABBITs program size
-   integer, parameter :: nhrmt_max = 10000
 
    ! Allocatable arrays used in Insect object
    ! this will hold the surface markers and their normals used for particles:
@@ -84,8 +81,9 @@ module module_insects
    type wingkinematics
       ! Fourier coefficients
       real(kind=rk) :: a0_alpha=0.0_rk, a0_phi=0.0_rk, a0_theta=0.0_rk
-      real(kind=rk), dimension(1:nfft_max) :: ai_phi=0.0_rk, bi_phi=0.0_rk, ai_theta=0.0_rk, &
-         bi_theta=0.0_rk, ai_alpha=0.0_rk, bi_alpha=0.0_rk
+      ! JB: Made allocatable to avoid bloating the object file size
+      real(kind=rk), allocatable :: ai_phi(:), bi_phi(:), ai_theta(:), &
+         bi_theta(:), ai_alpha(:), bi_alpha(:)
       integer :: nfft_phi=0, nfft_alpha=0, nfft_theta=0
       ! coefficients are read only once from file (or set differently)
       logical :: initialized = .false.
@@ -93,10 +91,11 @@ module module_insects
       character(len=clong) :: infile_convention="", infile_type="", infile_units="", infile=""
       ! variables for kineloader (which uses non-periodic hermite interpolation)
       integer :: nk=0
-      real(kind=rk), dimension (1:nhrmt_max) :: vec_t=0.0_rk, &
-         vec_phi=0.0_rk,vec_alpha=0.0_rk,vec_theta=0.0_rk,vec_pitch=0.0_rk,vec_vert=0.0_rk,vec_horz=0.0_rk,  &
-         vec_phi_dt=0.0_rk,vec_alpha_dt=0.0_rk,vec_theta_dt=0.0_rk,vec_pitch_dt=0.0_rk,vec_vert_dt=0.0_rk, &
-         vec_horz_dt=0.0_rk
+      ! JB: Made allocatable to avoid bloating the object file size
+      real(kind=rk), allocatable :: vec_t(:), &
+         vec_phi(:),vec_alpha(:),vec_theta(:),vec_pitch(:),vec_vert(:),vec_horz(:),  &
+         vec_phi_dt(:),vec_alpha_dt(:),vec_theta_dt(:),vec_pitch_dt(:),vec_vert_dt(:), &
+         vec_horz_dt(:)
    end type
 
 
@@ -197,13 +196,12 @@ module module_insects
       !-------------------------------------------------------------
       ! wing shape fourier coefficients. Note notation:
       ! R = a0/2 + SUM ( ai cos(2pi*i) + bi sin(2pi*i)  )
-      ! to avoid compatibility issues, the array is of fixed size, although only
-      ! the first nftt_wings entries will be used
-      real(kind=rk), dimension(1:nfft_max,1:4) :: ai_wings=0.0_rk, bi_wings=0.0_rk
+      ! JB: Made allocatable to avoid bloating the object file size
+      real(kind=rk), allocatable :: ai_wings(:,:), bi_wings(:,:)
       real(kind=rk), dimension(1:4) :: a0_wings=0.0_rk
       ! fill the R0(theta) array once, then only table-lookup instead of Fseries
-      ! JB: This array increases WABBIT program size quite a bit, consider making it allocatable
-      real(kind=rk), dimension(1:25000,1:4) :: R0_table=0.0_rk
+      ! JB: Made allocatable to avoid bloating the object file size
+      real(kind=rk), allocatable :: R0_table(:,:)
       ! describes the origin of the wings system
       real(kind=rk), dimension(1:4) :: xc=0.0_rk, yc=0.0_rk
       ! number of fft coefficients for wing geometry

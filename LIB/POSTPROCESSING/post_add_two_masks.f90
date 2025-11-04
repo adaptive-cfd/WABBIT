@@ -70,7 +70,7 @@ subroutine post_add_two_masks(params)
     end if
     params%domain_size = domain
     params%Jmax = max( tc_length2, tc_length1 )
-    params%Jmin = 1
+    params%Jmin = 0
     params%n_eqn = 1
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
@@ -101,8 +101,8 @@ subroutine post_add_two_masks(params)
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
 
-    call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.false.)
-    call readHDF5vct_tree((/fname2/), params, hvy_block, tree_ID=2, verbosity=.false.)
+    call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
+    call readHDF5vct_tree((/fname2/), params, hvy_block, tree_ID=2, verbosity=.true.)
 
     call createActiveSortedLists_forest(params)
 
@@ -128,10 +128,15 @@ subroutine post_add_two_masks(params)
         call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1=1, tree_ID2=2)
         ! before applying wavelet filters we need to sync
         call sync_ghosts_tree(params, hvy_block, tree_ID=1)
-        ! make grid1 equal to grid 1 (by only coarsening).
-	! Should refinement be required error will be thrown.
+        ! make grid1 equal to grid 1 (by coarsening and refining).
+        ! something is not working here yet but I don't have the brain for it currently
+        if (params%rank==0) write(*,'(A)') "Coarsening grid 1 to grid 2"
         call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
-        hvy_block, hvy_tmp, tree_ID=1, verbosity=.true.)
+        hvy_block, hvy_tmp, tree_ID=1, ref_can_be_finer=.true., verbosity=.true.)
+
+        if (params%rank==0) write(*,'(A)') "Refining grid 1 to grid 2"
+        call refine_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
+        hvy_block, hvy_tmp, tree_ID=1, ref_can_be_coarser=.false., verbosity=.true.)
 
     case ("--test_operations")
         ! this tests inplace vs out of place operations

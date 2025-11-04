@@ -73,7 +73,7 @@ contains
         if (.not. params%poisson_order == "FD_6th_mehrstellen") then
             ! use standard 1D stencils via module_operators setup_FD2_stencil
             ! for Poisson solver, we want to use exact discretizations for composite stencils to preserve compatibility between operators
-            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_exact_discretization=.true.)
+            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_composite_stencils=.true.)
             
             ! set module variables for compatibility with existing code
             stencil_RHS = 1.0_rk

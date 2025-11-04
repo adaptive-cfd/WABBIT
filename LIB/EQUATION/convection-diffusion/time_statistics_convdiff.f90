@@ -70,25 +70,20 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
         end if
         write( name_phi, '(A,I0)' ) "phi", i_scalar
 
-        if (stat_name == trim(name_phi) // "-int") then
-            ! compute the integral of phi over time
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "-avg" .or. &
-                stat_name == trim(name_phi) // "-mean") then
+        if (stat_name == trim(name_phi) // "-avg") then
             ! compute the average of phi over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
         elseif (stat_name == trim(name_phi) // "-var") then
             ! compute the variance of phi over time using Welford's method
             ! This needs the computation of the average somewhere after this field
-            call find_single_mean_index(i_ts, trim(name_phi)//"-avg", trim(name_phi)//"-mean", mean_idx1, &
-                "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert '"//trim(name_phi)//"-avg' or '"//trim(name_phi)//"-mean' somewhere after '"//trim(name_phi)//"-var' in time_statistics_names.", 251023_ik)
+            call find_single_mean_index(i_ts, trim(name_phi)//"-avg", mean_idx1, &
+                "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert '"//trim(name_phi)//"-avg' somewhere after '"//trim(name_phi)//"-var' in time_statistics_names.", 251023_ik)
             ! var_new = (time_diff-dt)/time_diff*var_old + dt/time_diff*(x - mean_old)*(x - mean_new)
             ! mean_new = (time_diff-dt)/time_diff*mean_old + dt/time_diff*x
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff) * &
                  (u(:,:,:,1) - u(:,:,:,N_offset + mean_idx1)) * &
                  (u(:,:,:,1) - (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + mean_idx1) - dt/(time_diff)*u(:,:,:,1))
-            elseif (stat_name == trim(name_phi) // "-avg" .or. &
-                    stat_name == trim(name_phi) // "-mean") then
+            elseif (stat_name == trim(name_phi) // "-avg") then
                 ! compute the average of phi over time (required for variance)
                 u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
         elseif (stat_name == trim(name_phi) // "-minmax") then
@@ -101,76 +96,37 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
                 end do
             end do
 
-        elseif (stat_name == trim(name_phi) // "-2-int") then
-            ! compute the integral of phi² over time
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)**2
-        elseif (stat_name == trim(name_phi) // "-2-avg" .or. &
-                stat_name == trim(name_phi) // "-2-mean") then
+        elseif (stat_name == trim(name_phi) // "-2-avg") then
             ! compute the average of phi² over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)**2
         
         ! Phi derivative cases
-        elseif (stat_name == trim(name_phi) // "dx-int") then
-            ! compute the integral of ∂phi/∂x over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dx-avg" .or. &
-                stat_name == trim(name_phi) // "dx-mean") then
+        elseif (stat_name == trim(name_phi) // "dx-avg") then
             ! compute the average of ∂phi/∂x over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dy-int") then
-            ! compute the integral of ∂phi/∂y over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dy-avg" .or. &
-                stat_name == trim(name_phi) // "dy-mean") then
+        elseif (stat_name == trim(name_phi) // "dy-avg") then
             ! compute the average of ∂phi/∂y over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dz-int") then
-            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
-            ! compute the integral of ∂phi/∂z over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dz-avg" .or. &
-                stat_name == trim(name_phi) // "dz-mean") then
+        elseif (stat_name == trim(name_phi) // "dz-avg") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
             ! compute the average of ∂phi/∂z over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
         
         ! Squared phi derivative cases
-        elseif (stat_name == trim(name_phi) // "dx2-int") then
-            ! compute the integral of (∂phi/∂x)² over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
-            work(:,:,:,1) = work(:,:,:,1)**2
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dx2-avg" .or. &
-                stat_name == trim(name_phi) // "dx2-mean") then
+        elseif (stat_name == trim(name_phi) // "dx2-avg") then
             ! compute the average of (∂phi/∂x)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dy2-int") then
-            ! compute the integral of (∂phi/∂y)² over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
-            work(:,:,:,1) = work(:,:,:,1)**2
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dy2-avg" .or. &
-                stat_name == trim(name_phi) // "dy2-mean") then
+        elseif (stat_name == trim(name_phi) // "dy2-avg") then
             ! compute the average of (∂phi/∂y)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dz2-int") then
-            if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
-            ! compute the integral of (∂phi/∂z)² over time
-            call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
-            work(:,:,:,1) = work(:,:,:,1)**2
-            u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        elseif (stat_name == trim(name_phi) // "dz2-avg" .or. &
-                stat_name == trim(name_phi) // "dz2-mean") then
+        elseif (stat_name == trim(name_phi) // "dz2-avg") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
             ! compute the average of (∂phi/∂z)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
@@ -189,21 +145,20 @@ end subroutine TIME_STATISTICS_convdiff
 
 
 !----------------------------------------------------------------------------- 
-! Helper subroutine to find a single mean value index after a given position
+! Helper subroutine to find a single mean value index _after a given position_
 ! This is adapted from the ACM version for flexible mean search in variance/covariance cases
 !----------------------------------------------------------------------------- 
-subroutine find_single_mean_index(current_idx, mean_name1, mean_name2, mean_idx, error_message, error_code)
+subroutine find_single_mean_index(current_idx, mean_name, mean_idx, error_message, error_code)
     implicit none
     integer(kind=ik), intent(in) :: current_idx
-    character(len=*), intent(in) :: mean_name1, mean_name2
+    character(len=*), intent(in) :: mean_name
     integer(kind=ik), intent(out) :: mean_idx
     character(len=*), intent(in) :: error_message
     integer(kind=ik), intent(in) :: error_code
     integer(kind=ik) :: j
     mean_idx = -1
     do j = current_idx + 1, params_convdiff%N_time_statistics
-        if (trim(params_convdiff%time_statistics_names(j)) == trim(mean_name1) .or. &
-            trim(params_convdiff%time_statistics_names(j)) == trim(mean_name2)) then
+        if (trim(params_convdiff%time_statistics_names(j)) == trim(mean_name)) then
             mean_idx = j
             exit
         end if

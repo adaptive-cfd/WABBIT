@@ -45,13 +45,12 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
     N_offset = params_acm%dim + 1 + params_acm%N_scalars
     time_diff = time-time_start
 
-    do i_ts = 1, params_acm%N_time_statistics
-        ! if time is right at time_start, we do nothing, we already set the values to zero or load them in earlier
-        if ( time - time_start < 1.0e-12_rk ) then
-            ! u(:,:,:,N_offset + i_ts) = 0.0_rk
-            cycle
-        end if
+    ! if time is right at time_start, we do nothing, we already set the values to zero or load them in earlier
+    if ( time - time_start < 1.0e-12_rk ) then
+        return
+    end if
 
+    do i_ts = 1, params_acm%N_time_statistics
         select case (trim(params_acm%time_statistics_names(i_ts)))
         case ("ux-avg")
             ! compute the average of ux over time

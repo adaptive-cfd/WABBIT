@@ -36,8 +36,10 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_maxlevel
     !> Maybe we already have a full tree grid, so we do not need to initialize it
     logical, intent(in), optional       :: init_full_tree_grid
-    !> In rare cases, not all equations need to be wavelet decomposed, this saves a lot of extra work.
-    !> If not present, all equations are used. Applying this decomposes only SC and reconstructs by copying
+    !> In some cases, not all component of the state vector need to be wavelet decomposed, and in those cases
+    !> excluding those saves a lot of extra work. If present, the code wavelet decomposes the first [1:neqn_adapt components] of 
+    !> the vector. For the remaining ones [neqn_adapt+1:neqn], only scaling function coefficients are computed (and no WC); reconstruction
+    !> is done by simple copying. If neqn_adapt is not present, all components are fully decomposed (SC AND WC computed).
     integer(kind=ik), optional, intent(in) :: neqn_adapt
     
     ! loop variables

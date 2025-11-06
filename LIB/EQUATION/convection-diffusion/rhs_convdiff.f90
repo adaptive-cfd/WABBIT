@@ -477,7 +477,7 @@ end subroutine RHS_convdiff_new
 subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
     implicit none
     real(kind=rk), intent(in) :: time  !< current time
-    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index
+    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index (in case we solve several transport equations which different scalars)
     integer(kind=ik), dimension(3), intent(in) :: Bs  !< block size
     real(kind=rk), intent(in) :: dx(1:2), x0(1:2)  !< grid spacing and origin of the block
     real(kind=rk), intent(inout) :: u0(:,:,:)  !< output velocity field

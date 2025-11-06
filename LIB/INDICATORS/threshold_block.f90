@@ -35,6 +35,7 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
     if (allocated(u_wc)) then
         if (size(u_wc, 4) < nc) deallocate(u_wc)
     endif
+    ! ToDo: We should consider reducing the temporary work array size, we just need to take care how to do this with the mask
     if (.not. allocated(u_wc)) allocate(u_wc(1:size(u, 1), 1:size(u, 2), 1:size(u, 3), 1:nc ) )
 
     ! for threshold state vector components we do some slicing magic

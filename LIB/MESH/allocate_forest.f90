@@ -186,14 +186,15 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         ! balance load variables
         mem_per_block = mem_per_block + 10.0*real(number_procs)
 
-        ! put a safety buffer on just for miscellaneous arrays that are being created and used
-        mem_per_block = mem_per_block * 1.02  ! 2%
+        ! put a safety buffer on just for miscellaneous arrays that are being created and used - defaults to 2%
+        mem_per_block = mem_per_block * (1.0_rk + real(params%memory_safety_percentage)/100.0_rk)
 
         mem_per_block = mem_per_block * 8.0e-9 ! in GB
         params%number_blocks = nint(maxmem / mem_per_block)
 
         if (params%rank==0) then
             write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+            write(*,'("INIT: A memory safety percentage of ",f5.2," %% was used for miscellaneous arrays.")') real(params%memory_safety_percentage)
             write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
 

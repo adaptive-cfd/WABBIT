@@ -457,7 +457,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
                 else
                     ! generally, we wavelet decompose all equations. In some rare cases, only a subset is required, for example for time statistics
                     ! in this case, we decompose only the first neqn_adapt_apply equations and the rest only with the scaling function
-                    call waveletDecomposition_block(params, hvy_block(:,:,:,1:neqn_adapt_apply,hvy_ID))
+                    ! call waveletDecomposition_block(params, hvy_block(:,:,:,1:neqn_adapt_apply,hvy_ID))
+                    call waveletDecomposition_optimized_block(params, hvy_tmp(:,:,:,1:neqn_adapt_apply,hvy_ID), hvy_block(:,:,:,1:neqn_adapt_apply,hvy_ID))
                     if (neqn_adapt_apply < size(hvy_block, 4)) then
                         call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,neqn_adapt_apply+1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,neqn_adapt_apply+1:size(hvy_block, 4),hvy_ID), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
                     endif
@@ -490,7 +491,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
         ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
-        ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
+        ! on the fine block. Does nothing in the case of unlifted wavelets
         ! This is the first coarse extension before removing blocks
         ! As no blocks are deleted, modifying newly decomposed blocks is sufficient, they are non-leafs anyways and will be skipped
         if (params%useCoarseExtension) then
@@ -636,13 +637,17 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, ti
 
             ! RWT required for a block that is on the level
             if (level_me == level) then
-                ! Compute wavelet reconstruction
-                call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_ID))
+                ! ! Compute wavelet reconstruction
+                ! call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_ID))
 
-                ! make copy of data in hvy_tmp as we sync from coarser neighbors using that and I do not want to write another logic currently
-                ! One might be concerned if we sync from hvy_tmp and do prediction/interpolation, as it does not have it's ghost layers synced
-                ! however, we discard all interpolated values with the CE so we cleverly circumvent problems there
-                hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+                ! ! make copy of data in hvy_tmp as we sync from coarser neighbors using that and I do not want to write another logic currently
+                ! ! One might be concerned if we sync from hvy_tmp and do prediction/interpolation, as it does not have it's ghost layers synced
+                ! ! however, we discard all interpolated values with the CE so we cleverly circumvent problems there
+                ! hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID)
+
+                call waveletReconstruction_optimized_block(params, hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID))
+                hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID) = hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID)
+
                 blocks_reconstructed = blocks_reconstructed + 1
             endif
         end do

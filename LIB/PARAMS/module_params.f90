@@ -43,6 +43,8 @@ module module_params
         ! this number is used when generating random grids.
         ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
         real(kind=rk) :: max_grid_density = 0.1_rk
+        ! percentage of memory we leave free for miscellaneous arrays that are created during the run
+        real(kind=rk) :: memory_safety_percentage = 2.0_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable :: butcher_tableau

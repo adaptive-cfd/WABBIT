@@ -21,7 +21,7 @@ subroutine post_unit_test(params)
     integer(kind=ik)                   :: tree_ID=1, hvy_id, lgtID, hvyID
 
     integer(kind=ik)                        :: level, k, tc_length
-    integer(kind=ik)                        :: Bs, Jmin_diff
+    integer(kind=ik)                        :: Bs, Jmin_diff, CDFX, CDFY
     integer(hid_t)                          :: file_id
     character(len=cshort)                   :: operator, help
     real(kind=rk), dimension(3)             :: domain
@@ -63,8 +63,8 @@ subroutine post_unit_test(params)
             write(*, '(A)') "Parameters with default value:"
             write(*, '(A)') "   --wavelet=CDF44           - wavelet to be utilized"
             write(*, '(A)') "   --memory=8.0GB            - memory to initialize arrays"
-            write(*, '(A)') "   --JMax=6                  - maximum block level"
-            write(*, '(A)') "   --JMin=6                  - minimum block level"
+            write(*, '(A)') "   --JMax=10 (2D), 6 (3D)    - maximum block level"
+            write(*, '(A)') "   --JMin=0                  - minimum block level"
             write(*, '(A)') "   --dim=2                   - dimension of test"
             write(*, '(A)') "   --Bs                      - Block size, default adapts to wavelet"
             write(*, '(A)') "   --g                       - Amount of ghost points, default adapts to wavelet"
@@ -80,26 +80,52 @@ subroutine post_unit_test(params)
 
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF44" )
-    call get_cmd_arg( "--Jmax", params%Jmax, default=6 )
-    call get_cmd_arg( "--Jmin", params%Jmin, default=1 )
     call get_cmd_arg( "--dim", params%dim, default=2 )
+    if (params%dim == 2) then
+        Jmin_diff = 9
+    else
+        Jmin_diff = 6
+    endif
+    call get_cmd_arg( "--Jmax", params%Jmax, default=Jmin_diff )
+    call get_cmd_arg( "--Jmin", params%Jmin, default=0 )
     call get_cmd_arg( "--Bs", Bs, default=-1 )
     call get_cmd_arg( "--verbose", verbose, default=.false.)
     call get_cmd_arg( "--max-grid-density", params%max_grid_density, 0.1_rk)
 
     ! initialize block size dynamically, make it BSmin for every wavelet
     if (Bs == -1) then
-        ! unlifted wavelets, +4 per increase in X of CDFX0
-        if (params%wavelet(4:5) == "20") Bs = 4
-        if (params%wavelet(4:5) == "40") Bs = 8
-        if (params%wavelet(4:5) == "60") Bs = 12
+        ! we set BS to minimum for each wavelet, but first we have to read in the wavelet
+        read(params%wavelet(4:4), *) CDFX
+        ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
+        if (CDFX == 1) then
+                read(params%wavelet(4:5), *) CDFX
+        endif
+        if (all(CDFX /= (/2,4,6,8,10,12/))) then
+                call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+        endif
+        if (CDFX < 10) then
+                read(params%wavelet(5:5), *) CDFY
+        else
+                read(params%wavelet(6:6), *) CDFY
+        endif
+        if (CDFY == 1) then
+                if (CDFX < 10) then
+                read(params%wavelet(5:6), *) CDFY
+                else
+                read(params%wavelet(6:7), *) CDFY
+                endif
+        endif
+        if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
+                call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
+        endif
 
-        ! lifted wavelets, +4 per increase in X or Y of CDFXY, commented are the sizes were leaf-first decomposition optimization is used, where we have +6
-        if (params%wavelet(4:5) == "22") Bs = 6
-        if (params%wavelet(4:5) == "24" .or. params%wavelet(4:5) == "42") Bs = 10  ! 12
-        if (params%wavelet(4:5) == "26" .or. params%wavelet(4:5) == "44" .or. params%wavelet(4:5) == "62") Bs = 14  ! 18
-        if (params%wavelet(4:5) == "28" .or. params%wavelet(4:5) == "46" .or. params%wavelet(4:5) == "64") Bs = 18  ! 224
-        if (params%wavelet(4:5) == "66") Bs = 22  ! 30
+        if (CDFY == 0) then
+            ! unlifted wavelets, +4 per increase in X of CDFX0
+            Bs = 2*CDFX
+        else
+            ! lifted wavelets, +4 per increase in X or Y of CDFXY, for leaf-first decomposition optimization we'd have +6
+            Bs = (CDFX + CDFY) * 2 - 2
+        end if
     endif
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs

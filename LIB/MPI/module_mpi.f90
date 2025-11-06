@@ -73,10 +73,8 @@ module module_MPI
     ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a
     ! new block we delete the old filtered values from the previous one.
     real(kind=rk), allocatable :: hvy_restricted(:, :, :, :)
-    real(kind=rk), allocatable :: hvy_predicted(:, :, :, :)
     ! We need to save which block currently is filtered
     integer(kind=ik) :: restricted_hvy_ID
-    integer(kind=ik) :: predicted_hvy_ID
 
 
 
@@ -302,21 +300,11 @@ subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
 
     ! initialize that no block is currently filtered
     restricted_hvy_ID = -1
-    predicted_hvy_ID = -1
 
     if (allocated(hvy_restricted)) then
         if (nc > size(hvy_restricted, 4)) deallocate(hvy_restricted)
     endif
     if (.not. allocated(hvy_restricted)) allocate(hvy_restricted(1:nx, 1:ny, 1:nz, 1:nc) )
-
-    if (allocated(hvy_predicted)) then
-        if (nc > size(hvy_predicted, 4)) deallocate(hvy_predicted)
-    endif
-    if (.not. allocated(hvy_restricted)) then
-        if (params%dim == 3) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1:nz*2, 1:nc) )
-        if (params%dim == 2) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1, 1:nc) )
-    endif
-
 
 end subroutine
 

@@ -137,7 +137,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
-    integer(kind=ik)                    :: k, sync_case_id, nc, data_rank, n_xfer, lgt_ID, hvy_ID, level_me, ref_me
+    integer(kind=ik)                    :: k, sync_case_id, nc, ic, data_rank, n_xfer, lgt_ID, hvy_ID, level_me, ref_me
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -147,10 +147,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     ! to the last subroutine.)  -Thomas
 
     nc = size(hvy_block,4)
-    if (allocated(wc)) then
-        if (size(wc, 4) < nc) deallocate(wc)
-    endif
-    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:nc) )
+    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:1) )
 
     select case(sync_case)
     case("level")
@@ -179,8 +176,10 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         ! check if block exists and actually has a mother
         if ( lgt_block(lgt_ID, IDX_TC_1 ) >= 0 .and. .not. block_is_root(params, hvy_ID)) then
             ! This block will send or receive and its data needs to be transferred to Mallat for correct copying
-            call spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+            do ic = 1, nc
+                call spaghetti2Mallat_block(params, hvy_block(:,:,:,ic:ic,hvy_ID), wc(:,:,:,1:1))
+                hvy_block(:,:,:,ic,hvy_ID) = wc(:,:,:,1)
+            enddo
         endif
     enddo
 
@@ -212,8 +211,10 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         ! check if block exists and actually has a mother
         if ( lgt_block(lgt_ID, IDX_TC_1 ) >= 0 .and. .not. block_is_root(params, hvy_ID)) then
             ! block has to be retransformed into spaghetti form
-            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+            do ic = 1, nc
+                call Mallat2Spaghetti_block(params, hvy_block(:,:,:,ic:ic,hvy_ID), wc(:,:,:,1:1))
+                hvy_block(:,:,:,ic,hvy_ID) = wc(:,:,:,1)
+            enddo
         endif
     enddo
 
@@ -236,7 +237,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
-    integer(kind=ik)                    :: k, sync_case_id, n_xfer, lgt_ID, hvy_ID, lgt_ID_m, level_m, ref_m, nc
+    integer(kind=ik)                    :: k, sync_case_id, n_xfer, lgt_ID, hvy_ID, lgt_ID_m, level_m, ref_m, nc, ic
     logical                             :: change_form
     real(kind=rk), allocatable, dimension(:,:,:,:), save :: wc
 
@@ -247,10 +248,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     ! to the last subroutine.)  -Thomas
 
     nc = size(hvy_block,4)
-    if (allocated(wc)) then
-        if (size(wc, 4) < nc) deallocate(wc)
-    endif
-    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:nc) )
+    if (.not. allocated(wc)) allocate(wc(1:size(hvy_block,1), 1:size(hvy_block,2), 1:size(hvy_block,3), 1:1) )
 
     select case(sync_case)
     case("level")
@@ -285,8 +283,10 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
 
         if (change_form) then
             ! block has to be transformed into Mallat form
-            call Spaghetti2Mallat_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+            do ic = 1, nc
+                call Spaghetti2Mallat_block(params, hvy_block(:,:,:,ic:ic,hvy_ID), wc(:,:,:,1:1))
+                hvy_block(:,:,:,ic,hvy_ID) = wc(:,:,:,1)
+            enddo
         endif
     enddo
 
@@ -326,8 +326,10 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
 
         if (change_form) then
             ! block has to be retransformed into spaghetti form
-            call Mallat2Spaghetti_block(params, hvy_block(:,:,:,1:nc,hvy_ID), wc(:,:,:,1:nc))
-            hvy_block(:,:,:,1:nc,hvy_ID) = wc(:,:,:,1:nc)
+            do ic = 1, nc
+                call Mallat2Spaghetti_block(params, hvy_block(:,:,:,ic:ic,hvy_ID), wc(:,:,:,1:1))
+                hvy_block(:,:,:,ic,hvy_ID) = wc(:,:,:,1)
+            enddo
         endif
     enddo
 

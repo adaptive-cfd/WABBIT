@@ -266,8 +266,8 @@ $(OBJDIR)/module_timing.o: module_timing.f90
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o \
-	conversion_routines.f90
+$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_operators.o \
+	conversion_routines.f90 wavelet_decomposition_reconstruction.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_fft.o: module_fft.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o

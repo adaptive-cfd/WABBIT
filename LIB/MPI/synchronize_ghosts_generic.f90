@@ -216,11 +216,20 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
 
     gminus  = params%g
     gplus   = params%g
-    ! default is three stages:
+    ! Per defaultm, we do 2 (unlifted) or 3 (lifted) stages
+    ! Unlifted wavelets:
+    !    1. M2M, copy
+    !       M2C, decimate, independent from everything as data is only copied
+    !    2. M2F, interpolate, needs same-level and finer neighbor data
+    ! Lifted wavelets:
     !    1. M2M, copy
     !    2. M2C, decimate, independent from coarser neighbor but needs same-level data
     !    3. M2F, interpolate, needs same-level and finer neighbor data
-    Nstages = 3
+    if (params%isLiftedWavelet) then
+        Nstages = 3
+    else
+        Nstages = 2
+    endif
     ! if we sync a different number of ghost nodes
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
@@ -360,7 +369,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     !    meta_recv_counter, meta_send_counter
     !    meta_send_all (possibly needs renaming after this function)
 
-    integer(kind=ik) :: k_block, myrank, N, i_n, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id
+    integer(kind=ik) :: k_block, myrank, N, i_n, ijk(2,3), inverse, ierr, lvl_diff, status, new_size, sync_id, isUnlifted
     integer(kind=ik) :: hvy_ID, lgt_ID, level, ref
     integer(kind=ik) :: hvy_ID_n, lgt_ID_n, level_n, ref_n, rank_n
     logical :: b_send, b_recv
@@ -375,6 +384,13 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
     int_pos(:) = 0
     real_pos(:) = 0
+
+    ! for unlifted wavelets, stage 1 and 2 are the same
+    if (params%isLiftedWavelet) then
+        isUnlifted = 0
+    else
+        isUnlifted = 1
+    endif
 
     ! translate sync_case to sync_id so that we avoid string comparisons in loops
     ! at first, different neighbor restrictions are considered and set to first digit
@@ -432,6 +448,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 ! Some special cases:
                 !    REF   - only sync if the refinement value matches s_val for the neighbor
                 !    Level - only send if the neighbor level matches s_val
+                !    Unlifted wavelets - stage 2 and 3 will be translated to 1 and 2 respectively to merge stage 2 and 1
 
                 ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
                 ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
@@ -445,7 +462,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 b_send = .false.
                 ! neighbor wants to receive all patches, ids correspond to full
                 if (mod(sync_id,10) == 1 .and. &
-                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2-isUnlifted .and. lvl_diff==+1) .or. (istage == 3-isUnlifted .and. lvl_diff==-1))) then
                         b_send = .true.
                         ! CVS: non-leaf blocks do not send to fine neighbors
                         if (lvl_diff==-1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
@@ -458,7 +475,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                 ! neighbor wants to receive all leaf-patches, ids correspond to full_leaf
                 elseif (mod(sync_id,10) == 2 .and. &
-                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1) .or. (istage == 3 .and. lvl_diff==-1))) then
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2-isUnlifted .and. lvl_diff==+1) .or. (istage == 3-isUnlifted .and. lvl_diff==-1))) then
                         b_send = .true.
                         ! leaf-wise, Fine->Medium->Coarse
                         ! check for fine neighbor
@@ -471,7 +488,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                 ! neighbor wants to receive medium and coarse patches -> send to MoF, ids correspond to MoC
                 elseif (mod(sync_id,10) == 3 .and. &
-                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==-1))) then
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 3-isUnlifted .and. lvl_diff==-1))) then
                         b_send = .true.
                         ! CVS: non-leaf blocks do not send to fine neighbors
                         if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
@@ -480,7 +497,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                 ! neighbor wants to receive medium and fine patches -> send to MoC, ids correspond to MoF
                 elseif (mod(sync_id,10) == 4 .and. &
-                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==+1))) then
+                    ((istage == 1 .and. lvl_diff==0) .or. (istage == 2-isUnlifted .and. lvl_diff==+1))) then
                         b_send = .true.
                         ! CVS: non-root blocks do not send to coarse neighbors
                         if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then
@@ -536,6 +553,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 ! Some special cases:
                 !    REF   - only sync if the refinement value matches s_val for the receiver
                 !    Level - only send if the receiver level matches s_val
+                !    Unlifted wavelets - stage 2 and 3 will be translated to 1 and 2 respectively to merge stage 2 and 1
 
                 ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
                 ! normally, we choose the simplest one (medium, then finer, then coarser neighbor) if multiple are availbel to update the patch
@@ -552,7 +570,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                     ! I want to receive all patches, ids correspond to full
                     if (mod(sync_id,10) == 1 .and. &
-                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3-isUnlifted .and. lvl_diff==+1) .or. (istage == 2-isUnlifted .and. lvl_diff==-1))) then
                             b_recv = .true.
                             ! CVS: non-leaf blocks do not receive from coarser neighbors
                             if (lvl_diff==+1 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
@@ -571,7 +589,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                     ! I want to receive all leaf-patches, ids correspond to full_leaf
                     elseif (mod(sync_id,10) == 2 .and. &
-                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1) .or. (istage == 2 .and. lvl_diff==-1))) then
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3-isUnlifted .and. lvl_diff==+1) .or. (istage == 2-isUnlifted .and. lvl_diff==-1))) then
                             b_recv = .true.
                             ! leaf-wise, Fine->Medium->Coarse
                             ! check for fine neighbor
@@ -584,7 +602,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                     ! I want to receive medium and coarse patches, ids correspond to MoC
                     elseif (mod(sync_id,10) == 3 .and. &
-                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3 .and. lvl_diff==+1))) then
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 3-isUnlifted .and. lvl_diff==+1))) then
                             b_recv = .true.
                             ! CVS: non-leaf blocks do not receive from coarser neighbors
                             if (lvl_diff/=0 .and. .not. block_is_leaf(params, hvy_ID, check_empty=.true.)) then
@@ -596,7 +614,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
 
                     ! I want to receive medium and fine patches,ids correspond to MoF
                     elseif (mod(sync_id,10) == 4 .and. &
-                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2 .and. lvl_diff==-1))) then
+                        ((istage == 1 .and. lvl_diff==0) .or. (istage == 2-isUnlifted .and. lvl_diff==-1))) then
                             b_recv = .true.
                             ! CVS: non-root blocks do not receive from fine neighbors
                             if (lvl_diff/=0 .and. .not. block_is_root(params, hvy_ID, check_empty=.true.)) then

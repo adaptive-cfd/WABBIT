@@ -441,40 +441,22 @@ subroutine proto_NSI_EE(params)
     call init_physics_modules( params, file_params, params%N_mask_components  )
 
     order_laplacian = params%poisson_order
-    select case(params%poisson_order)
-    case ("FD_2nd_central", "FD_4th_central", "FD_6th_central", "FD_8th_central")
-        order_disc_nonlinear = params%poisson_order
-        order_disc_pressure = params%poisson_order
-        params%order_discretization = params%poisson_order
-    case ("FD_6th_mehrstellen")
+    order_disc_nonlinear = params%poisson_order
+    order_disc_pressure = params%poisson_order
+    params%order_discretization = params%poisson_order
+    
+    ! some special snowflakes
+    if (params%poisson_order == "FD_6th_mehrstellen") then
         order_disc_nonlinear = "FD_6th_central"
         order_disc_pressure = "FD_6th_central"
         params%order_discretization = "FD_6th_central"
-    case ("FD_4th_comp_0_4")
-        order_disc_nonlinear = "FD_4th_central"
-        order_disc_pressure = "FD_4th_comp_0_4"
-        params%order_discretization = "FD_4th_comp_0_4"
-    case ("FD_4th_comp_2_2")
-        order_disc_nonlinear = "FD_4th_central"
-        order_disc_pressure = "FD_4th_central"
-        params%order_discretization = "FD_4th_central"
-    case ("FD_4th_comp_1_3")
-        ! order_disc_nonlinear = "FD_4th_central"
-        order_disc_nonlinear = "FD_4th_comp_1_3"
-        order_disc_pressure = "FD_4th_comp_1_3"
-        ! order_disc_pressure = "FD_4th_central"
-        params%order_discretization = "FD_4th_comp_1_3"
-    case ("FD_6th_comp_3_3")
-        order_disc_nonlinear = "FD_6th_central"
-        order_disc_pressure = "FD_6th_central"
-        params%order_discretization = "FD_6th_central"
-    case ("FD_6th_comp_2_4")
-        order_disc_nonlinear = "FD_6th_comp_2_4"
-        order_disc_pressure = "FD_6th_comp_2_4"
-        params%order_discretization = "FD_6th_comp_2_4"
-    end select
+    ! elseif (params%poisson_order == "FD_4th_comp_1_3") then
+    !     order_disc_nonlinear = "FD_4th_comp_1_3"
+    !     order_disc_pressure = "FD_4th_comp_1_3"
+    !     params%order_discretization = "FD_4th_comp_1_3"
+    endif
 
-    ! HACK - read in values that are only read bu ACM module but that we need
+    ! HACK - read in values that are only read by ACM module but that we need
     call read_ini_file_mpi(FILE, file_params, .true.)
     call read_param_mpi(FILE, 'ACM-new', 'nu', nu, 5.0e-5_rk )
     call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta, 1.0_rk )
@@ -490,6 +472,8 @@ subroutine proto_NSI_EE(params)
         params%order_predictor = "multiresolution_8th"
     elseif (params%wavelet(4:4) == "8") then
         params%order_predictor = "multiresolution_10th"
+    elseif (params%wavelet(4:5) == "10" .or. params%wavelet(4:5) == "12") then
+        params%order_predictor = "multiresolution_12th"
     endif
     call setup_laplacian_stencils(params, params%g)
 
@@ -938,18 +922,18 @@ subroutine compute_NonLinear(params, hvy_u, hvy_NL, order_discretization, treeID
             do iy = params%g+1, params%Bs(2)+params%g
                 do ix = params%g+1, params%Bs(1)+params%g
                     ! First derivatives
-                    u_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
-                    v_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id)) * dx_inv
+                    u_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
+                    v_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id)) * dx_inv
 
-                    u_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id)) * dy_inv
-                    v_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
+                    u_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id)) * dy_inv
+                    v_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
 
                     ! Non-linear energy terms
-                    uu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    uv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    uu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    uv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
-                    vu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    vv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    vu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    vv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
                     hvy_NL(ix,iy,1,1,hvy_id) = -0.5_rk*(uu_dx + uv_dy   + hvy_u(ix,iy,1,1,hvy_id)*u_dx + hvy_u(ix,iy,1,2,hvy_id)*u_dy )
                     hvy_NL(ix,iy,1,2,hvy_id) = -0.5_rk*(vu_dx + vv_dy   + hvy_u(ix,iy,1,1,hvy_id)*v_dx + hvy_u(ix,iy,1,2,hvy_id)*v_dy )
@@ -963,30 +947,30 @@ subroutine compute_NonLinear(params, hvy_u, hvy_NL, order_discretization, treeID
                 do iy = params%g+1, params%Bs(2)+params%g
                     do ix = params%g+1, params%Bs(1)+params%g
                         ! First derivatives
-                        u_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
-                        v_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,2,hvy_id)) * dx_inv
-                        w_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,3,hvy_id)) * dx_inv
+                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
+                        v_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,2,hvy_id)) * dx_inv
+                        w_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,3,hvy_id)) * dx_inv
 
-                        u_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,1,hvy_id)) * dy_inv
-                        v_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
-                        w_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,3,hvy_id)) * dy_inv
+                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,1,hvy_id)) * dy_inv
+                        v_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
+                        w_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,3,hvy_id)) * dy_inv
 
-                        u_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,1,hvy_id)) * dz_inv
-                        v_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,2,hvy_id)) * dz_inv
-                        w_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
+                        u_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,1,hvy_id)) * dz_inv
+                        v_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,2,hvy_id)) * dz_inv
+                        w_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
 
                         ! Non-linear energy terms
-                        uu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        uv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,1,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        uw_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,1,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        uu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        uv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,1,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        uw_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,1,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
-                        vu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,2,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        vv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        vw_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,2,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        vu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,2,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        vv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        vw_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,2,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
-                        wu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,3,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        wv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,3,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        ww_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        wu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,3,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        wv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,3,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        ww_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
                         hvy_NL(ix,iy,iz,1,hvy_id) = -0.5_rk * (uu_dx + uv_dy + uw_dz + &
                             hvy_u(ix,iy,iz,1,hvy_id)*u_dx + hvy_u(ix,iy,iz,2,hvy_id)*u_dy + hvy_u(ix,iy,iz,3,hvy_id)*u_dz)
@@ -1108,18 +1092,18 @@ subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretizatio
                     v = hvy_u(ix, iy, 1, 2, hvy_id)
 
                     ! First derivatives
-                    u_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
-                    v_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id)) * dx_inv
+                    u_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
+                    v_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id)) * dx_inv
 
-                    u_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id)) * dy_inv
-                    v_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
+                    u_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id)) * dy_inv
+                    v_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
 
                     ! Non-linear energy terms
-                    uu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    uv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    uu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    uv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
-                    vu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    vv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    vu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    vv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
                     ! Second derivatives
                     u_dxdx = sum(FD2(FD2_s:FD2_e) * hvy_u(ix+FD2_s:ix+FD2_e,iy,1,1,hvy_id)) * dx2_inv
@@ -1147,30 +1131,30 @@ subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretizatio
                         w = hvy_u(ix, iy, iz, 3, hvy_id)
 
                         ! First derivatives
-                        u_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
-                        v_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,2,hvy_id)) * dx_inv
-                        w_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,3,hvy_id)) * dx_inv
+                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
+                        v_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,2,hvy_id)) * dx_inv
+                        w_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,3,hvy_id)) * dx_inv
 
-                        u_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,1,hvy_id)) * dy_inv
-                        v_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
-                        w_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,3,hvy_id)) * dy_inv
+                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,1,hvy_id)) * dy_inv
+                        v_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
+                        w_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,3,hvy_id)) * dy_inv
 
-                        u_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,1,hvy_id)) * dz_inv
-                        v_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,2,hvy_id)) * dz_inv
-                        w_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
+                        u_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,1,hvy_id)) * dz_inv
+                        v_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,2,hvy_id)) * dz_inv
+                        w_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
 
                         ! Non-linear energy terms
-                        uu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        uv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,1,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        uw_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,1,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        uu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        uv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,1,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        uw_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,1,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
-                        vu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,2,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        vv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        vw_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,2,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        vu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,2,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        vv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        vw_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,2,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
-                        wu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,3,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,iz,1,hvy_id)) * dx_inv
-                        wv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,3,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,iz,2,hvy_id)) * dy_inv
-                        ww_dz = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id) * hvy_u(ix,iy,iz+FD1_ls:iz+FD1_le,3,hvy_id)) * dz_inv
+                        wu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,3,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,iz,1,hvy_id)) * dx_inv
+                        wv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,3,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,iz,2,hvy_id)) * dy_inv
+                        ww_dz = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id) * hvy_u(ix,iy,iz+FD1_rs:iz+FD1_re,3,hvy_id)) * dz_inv
 
                         ! Second derivatives
                         u_dxdx = sum(FD2(FD2_s:FD2_e) * hvy_u(ix+FD2_s:ix+FD2_e,iy,iz,1,hvy_id)) * dx2_inv

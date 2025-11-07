@@ -244,7 +244,7 @@ contains
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(:,:,:,:), intent(in) :: u
-        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered  !< output, can also be inplace
         integer(kind=ik), intent(in) :: fl_l, fl_r  !< Filter length left and right
         real(kind=rk), intent(in) :: coefs_filter(fl_l:fl_r)
         logical, intent(in), optional :: do_restriction  !< when we do restriction anyways we can skip every second point

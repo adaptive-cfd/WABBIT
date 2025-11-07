@@ -416,7 +416,8 @@
     !   n n n n n n n n n n           n 0 n 0 n 0 n 0 n 0          0 n 0 n 0 n 0 n 0 n
     !   n n n n n n n n n n           n 0 n 0 n 0 n 0 n 0          0 n 0 n 0 n 0 n 0 n
     !
-    ! For reconstruction, we separate the two contributions and apply on the first part HR and on the second GR
+    ! For reconstruction, we separate the two contributions and apply on the first part HR and on the second GR]
+    ! However, the filter is applied for every point with half the coefficients being zero, this is why we apply it two times to optimize this.
     ! This is repeated for every dimension
     ! n = ghost point, h = scaling filter applied, g = wavelet filter applied, 0 = zero (upsampled point)
     !

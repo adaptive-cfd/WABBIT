@@ -114,7 +114,7 @@ module module_acm
     real(kind=rk) :: mean_flow(1:3)=0.0_rk, mean_p=0.0_rk, umax=0.0_rk, umag=0.0_rk
     real(kind=rk) :: start_time = 0.0_rk
     ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, helicity=0.0_rk, u_residual(1:3)=0.0_rk, &
+    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, max_vort=0.0_rk, min_vort=0.0_rk, helicity=0.0_rk, u_residual(1:3)=0.0_rk, &
     sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
@@ -690,15 +690,17 @@ end subroutine
 
       call init_t_file('meanflow.t', overwrite)
       call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin", " p^2/2c0^2+ekin"/))
-      call init_t_file('enstrophy.t', overwrite)
+      call init_t_file('enstrophy.t', overwrite, (/"           time", "      enstrophy", "     max(omega)", "     min(omega)"/))
       if (params_acm%dim == 3) then
-        call init_t_file('helicity.t', overwrite)
+        call init_t_file('helicity.t', overwrite, (/"           time", "       helicity"/))
       endif
-      call init_t_file('dissipation.t', overwrite)
-      call init_t_file('div.t', overwrite)
-      call init_t_file('umag.t', overwrite)
-      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
+      call init_t_file('dissipation.t', overwrite, (/"           time", " nu u laplace u"/))
+      call init_t_file('div.t', overwrite,  (/"           time", "       max(div)", "       min(div)"/))
+      call init_t_file('umag.t', overwrite, (/"           time", "    max(|u|)=um", "             c0", "          c0/um", "sqrt(c0^2+um^2)"/))
+      if (params_acm%HIT_linear_forcing) then
+        call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
+      endif
       call init_t_file('CFL.t', overwrite, (/&
       "           time", &
       "            CFL", &

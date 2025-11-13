@@ -90,7 +90,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
     ! we synchronize them.
     t_block = MPI_Wtime()
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.false.)
     call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,7 +99,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Blocks always pass their SC to their mother (pendant to excuteCoarsening of old function), new blocks only synch from medium neighbors to avoid CE
     ! This is repeated until all blocks on the layer JMin are present with wavelet decomposed values
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, neqn_adapt=neqn_adapt_apply, time=time)
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, neqn_adapt=neqn_adapt_apply, Jmin_set=Jmin, time=time)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -190,7 +190,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         endif
 
         ! check if block has reached minimal level, if so, remove refinement flags
-        call respectJmaxJmin_tree( params, tree_ID )
+        call respectJmaxJmin_tree( params, tree_ID, Jmin_set=Jmin, stay_value=REF_UNSIGNIFICANT_STAY )
 
         ! unmark blocks that cannot be coarsened due to gradedness and completeness, in one go this should converge to the final grid
         call ensureGradedness_tree( params, tree_ID, check_daughters=.true., stay_value=REF_UNSIGNIFICANT_STAY)
@@ -199,14 +199,14 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         do k = 1, lgt_n(tree_ID)
             lgt_ID = lgt_active(k, tree_ID)
             if ( lgt_block(lgt_ID, IDX_REFINE_STS) == -1) then
-                ! delete blocks
+                ! delete blocks by wiping it's light ID entries
                 lgt_block(lgt_ID, :) = -1
             endif
         enddo
 
         ! update grid lists: active list, neighbor relations, etc
         t_block = MPI_Wtime()
-        call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+        call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.true.)
         call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
         ! This is the actual important coarse extension after all cells have been deleted, which modifies now the lasting c-f interfaces
@@ -238,7 +238,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
             ! generally, we wavelet reconstruct all equations. In some rare cases, only a subset is required, for example for time statistics
             ! in this case, we reconstruct only the first neqn_adapt_apply equations and the rest is copied from the backup
             ! Note that hvy_tmp contains the original values, so we copy them back after reconstructing the first neqn_adapt_apply equations
-            call wavelet_reconstruct_full_tree(params, hvy_block(:,:,:,1:neqn_adapt_apply,:), hvy_tmp(:,:,:,1:neqn_adapt_apply,:), tree_ID, time=time)
+            call wavelet_reconstruct_full_tree(params, hvy_block(:,:,:,1:neqn_adapt_apply,:), hvy_tmp(:,:,:,1:neqn_adapt_apply,:), tree_ID, Jmin_set=Jmin, time=time)
             if (neqn_adapt_apply < size(hvy_block, 4)) then
                 do k = 1, hvy_n(tree_ID)
                     hvy_ID = hvy_active(k, tree_ID)
@@ -276,7 +276,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, neqn_adapt, time, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, neqn_adapt, Jmin_set, time, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -292,10 +292,12 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     !> In rare cases, not all equations need to be wavelet decomposed, this saves a lot of extra work.
     !> If not present, all equations are used. Applying this decomposes only SC and reconstructs by copying
     integer(kind=ik), optional, intent(in) :: neqn_adapt
+    !> In some cases, we like to set a different Jmin for the decomposition than the one active in the tree
+    integer(kind=ik), optional, intent(in) :: Jmin_set
     !> current simulation time, only used for development debugging output
     real(kind=rk), intent(in), optional  :: time
 
-    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level, neqn_adapt_apply, ierr
+    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level, neqn_adapt_apply, ierr, Jmin
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: format_string, string_prepare
     logical              :: iterate, use_leaf_first, initFullTreeGrid, computeSCOnly
@@ -319,6 +321,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     endif
     neqn_adapt_apply = size(hvy_block, 4)
     if (present(neqn_adapt)) neqn_adapt_apply = neqn_adapt
+    Jmin = params%Jmin
+    if (present(Jmin_set)) Jmin = Jmin_set
 
     ! the refinement_status is used in this routine for things other than the refinement_status
     ! but that may be problematic if we have set the refinement_status externally and like to keep it.
@@ -357,7 +361,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
         ! at first, initialize all mothers without any values yet
         t_block = MPI_Wtime()
-        call init_full_tree(params, tree_ID)
+        call init_full_tree(params, tree_ID, Jmin_set=Jmin)
         call toc( "decompose_tree (init_mothers_tree)", 110, MPI_Wtime()-t_block )
         ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status -1
     else
@@ -536,7 +540,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         iteration = iteration + 1
         level = level - 1
         ! loop continues until we are on the lowest level.
-        iterate = (level >= params%Jmin)
+        iterate = (level >= Jmin)
 
         write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " TOTAL)"
         call toc( format_string, 1250+iteration, MPI_Wtime()-t_loop )
@@ -571,7 +575,7 @@ end subroutine
 !! The input has to be in full grid format in order for the mother-update cycle to work.
 !! Blocks are reconstructed level-wise starting and JMin and mothers are updated until all blocks are reconstructed.
 !! Afterwards the grid is still in full tree format, but can be pruned by deleting all non-leafs
-subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, time)
+subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, Jmin_set, time)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -583,6 +587,7 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, ti
     !> heavy tmp data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in), optional :: Jmin_set  !< if present, use this as Jmin instead of params%Jmin
     real(kind=rk), intent(in), optional :: time  !< current simulation time, only for debug output
 
     ! loop variables
@@ -600,6 +605,7 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, ti
     ! to the last subroutine.)  -Thomas
 
     Jmin        = params%Jmin
+    if (present(Jmin_set)) Jmin = Jmin_set
     Jmax_active = maxActiveLevel_tree(tree_ID)
     iteration = 0
     do level = Jmin, Jmax_active
@@ -705,15 +711,16 @@ end subroutine
 !> \details This functions inits all mother blocks from a leaf-only grid down to JMin.
 !! This will be used for wavelet_decompose_full_tree in order to prepare the grid, which it then fills with values.
 !! The benefit is, that the grid topology needs to be updated only once instead of once every loop cycle.
-subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
+subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik), intent(in), optional :: set_ref     !< if not set, ref will be set to REF_TMP_EMPTY, else to this number
+    integer(kind=ik), intent(in), optional :: Jmin_set    !< if set, this is the minimum level to which we create mothers, else params%Jmin
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
 
-    integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit, refset
+    integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit, refset, Jmin
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: format_string
     logical              :: iterate
@@ -723,6 +730,8 @@ subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
 
     refset = REF_TMP_EMPTY
     if (present(set_ref)) refset = set_ref
+    Jmin = params%Jmin
+    if (present(Jmin_set)) Jmin = Jmin_set
 
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
@@ -747,7 +756,7 @@ subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
             level_b = lgt_block( lgt_ID, IDX_MESH_LVL )
 
             ! check if block does not have a mother yet and blocks are not on minimum level
-            if ( hvy_family(hvy_ID, 1) == -1 .and. level_b /= params%Jmin) then
+            if ( hvy_family(hvy_ID, 1) == -1 .and. level_b /= Jmin) then
                 ! Get digit
                 treecode = get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 ))
                 digit = tc_get_digit_at_level_b(treecode, params%dim, level_b, params%Jmax)
@@ -789,7 +798,7 @@ subroutine init_full_tree(params, tree_ID, set_ref, verbose_check)
     ! the active lists are outdated, so lets resynch
     call synchronize_lgt_data( params, refinement_status_only=.false.)
     ! At last, we update all full neighbor relations only once
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)
+    call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.true.)
 end subroutine
 
 
@@ -941,14 +950,18 @@ end subroutine
 
 !> \brief Prune tree by deleting all blocks which are not leafs
 !> \details This function takes a whole tree and prunes it so that only leaf-blocks are left over.
-subroutine prune_fulltree2leafs(params, tree_ID)
+subroutine prune_fulltree2leafs(params, tree_ID, Jmin_set)
     implicit none
 
     type (type_params), intent(in)  :: params
     integer(kind=ik), intent(in)    :: tree_ID
+    integer(kind=ik), intent(in), optional :: Jmin_set  !< if present, use this as Jmin instead of params%Jmin
 
-    integer(kind=ik) :: hvy_ID, lgt_ID, k
+    integer(kind=ik) :: hvy_ID, lgt_ID, k, Jmin
     real(kind=rk)    :: t_block
+
+    Jmin = params%Jmin
+    if (present(Jmin_set)) Jmin = Jmin_set
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     do k = 1, hvy_n(tree_ID)
@@ -965,7 +978,7 @@ subroutine prune_fulltree2leafs(params, tree_ID)
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     ! update grid lists: active list, neighbor relations, etc
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.false.)
 
 end subroutine
 

@@ -88,6 +88,7 @@ module module_params
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
         character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_Jmin=0
         integer(kind=ik)      :: poisson_stencil_size=0
         character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
         integer(kind=ik)      :: poisson_cycle_it=0

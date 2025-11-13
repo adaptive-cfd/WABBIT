@@ -29,7 +29,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
-    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
+    real(kind=rk), parameter ::  nstages = 3.0_rk ! stages for ghost node synching
     character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
     logical :: automatic_NB_per_rank = .false.

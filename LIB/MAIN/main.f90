@@ -198,12 +198,12 @@ program main
 
     ! a few files have to be intialized by wabbit, because they are logfiles produced
     ! by wabbit independent of the physics modules.
-    call init_t_file('dt.t', overwrite)
-    call init_t_file('performance.t', overwrite)
+    call init_t_file('dt.t', overwrite, (/ "           time", "             dt" /))
+    call init_t_file('performance.t', overwrite, (/ "           time", "      iteration", "      t_stepper", "   N_blocks_rhs", "       N_blocks", &
+        "           Jmin", "           Jmax", "        N_procs", " N_blocks_total" /))
     call init_t_file('eps_norm.t', overwrite)
-    call init_t_file('krylov_err.t', overwrite)
-    call init_t_file('balancing.t', overwrite)
-    call init_t_file('block_xfer.t', overwrite)
+    call init_t_file('krylov_err.t', overwrite, (/ "           time", "             dt", "            err", "         M_iter", "          M_max" /))
+    call init_t_file('block_xfer.t', overwrite, (/ "             t0", "        counter", "    Nxfer_total", "     Nxfer_done", "Nxfer_notPosNow" /))
     call init_t_file('thresholding.t', overwrite)
 
     if (rank==0) then

@@ -254,7 +254,7 @@ contains
         endif
 
         ! if any of those endings is in the name, then it is a timestatistics variable
-        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
+        if (index(name, "-avg") > 0 .or. index(name, "-var") > 0 &
             .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
             ! now we have to find the index of it
             do i_time_statistics = 1, params_convdiff%N_time_statistics

@@ -99,6 +99,7 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
    ! poisson order
    call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_Jmin', params%poisson_Jmin, params%Jmin )
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_abs', params%poisson_cycle_tol_abs, 1.0e-6_rk)

@@ -48,8 +48,8 @@ subroutine post_mean(params)
 
     call allocate_forest(params, hvy_block)
 
-    ! read input data
-    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
+    ! read input data, syncing data not needed
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID, synchronize_ghosts=.false.)
 
     ! use functions from module_operators
     call componentWiseNorm_tree(params, hvy_block, tree_ID, "Mean", norms(1:1), threshold_state_vector=.false.)

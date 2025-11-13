@@ -5,7 +5,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     type (type_params), intent(inout)  :: params
     real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
-    logical, intent(in), optional      :: init_0
+    logical, intent(in), optional      :: init_0  !< Initialize solution to zero
     logical, intent(in), optional      :: verbose
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, ic, i_cycle
@@ -44,7 +44,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
 
     ! prepare full tree grid, this will be populated along the way
     ! blocks are practically empty, but we fill them along the way so ref flag will be set to 0 to allow synching
-    call init_full_tree(params, tree_ID, set_ref=0)
+    call init_full_tree(params, tree_ID, Jmin_set=params%poisson_Jmin, set_ref=0)
 
     ! init solution on lower levels as zero, elsewise it is that from last time-step
     do k_block = 1, hvy_n(tree_ID)
@@ -207,7 +207,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     ! this overwrites b of the leaf layer, but we will recover it later
     ! solution in non-decomposed form is present in hvy_RHS
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, hvy_RHS, init_full_tree_grid=.false., compute_SC_only=.true., scaling_filter=params%MGR)
+    call wavelet_decompose_full_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, hvy_RHS, Jmin_set=params%poisson_Jmin, init_full_tree_grid=.false., compute_SC_only=.true., scaling_filter=params%MGR)
     call toc( "GS Downwards - full sweep", 10002, MPI_Wtime()-t_block )
     if (verbose_apply) then
         t_block = MPI_Wtime()-t_block
@@ -238,13 +238,13 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     !    - Conjugent gradient method : only for level 0 for now
     !    - GS sweeps : very inefficient as blocks are usually too large for convergence
     !    - FFT :only for level 0, needs to be checked to solve true solution or discretized laplacian
-    call multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, params%Jmin, Jmax_a, verbose_apply)
+    call multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, params%poisson_Jmin, Jmax_a, verbose_apply)
 
     ! upwards sweeps - prolong lower level solution, then solve Gauss-Seidel iterations
-    ! do i_level = Jmin+1, Jmax_a
+    ! do i_level = params%poisson_Jmin+1, Jmax_a
     !     call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, i_level, Jmax_a, hvy_depth)
     ! enddo
-    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%Jmin, Jmax_a, verbose_apply)
+    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%poisson_Jmin, Jmax_a, verbose_apply)
 
     ! We do not solve Ae=r but Au=b and we need to restore the old solution as well as the RHS b
     ! this is happening for all leaf-blocks

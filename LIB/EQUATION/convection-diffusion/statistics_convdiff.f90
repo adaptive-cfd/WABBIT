@@ -30,15 +30,30 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
     character(len=*), intent(in) :: stage
 
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
-    real(kind=rk) :: scalar_integral, scalar_max
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), x1,x2,y1,y2,z1,z2
+    real(kind=rk) :: dV
     real(kind=rk), save :: umag, umax, dx_min
 
 
     ! compute the size of blocks
+    Bs(:) = 0
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
-    Bs(3) = size(u,3) - 2*g
+    if (params_convdiff%dim==3) Bs(3) = size(u,3) - 2*g
+
+    ! block interior slicing excluding ghost points, for easier reading
+    x1 = g+1
+    x2 = Bs(1)+g
+    y1 = g+1
+    y2 = Bs(2)+g
+    if (params_convdiff%dim==3) then
+        z1 = g+1
+        z2 = Bs(3)+g
+    else
+        z1 = 1
+        z2 = 1
+    endif
+    dV = product(dx(1:params_convdiff%dim))
 
 
     select case(stage)
@@ -58,44 +73,43 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
         ! This stage contains all operations which are running on the blocks
         ! called for each block.
 
-        ! tmp values for computing the current block only
-        scalar_integral = 0.0_rk
-        scalar_max = -9.0e9_rk
+        do k = 1, params_convdiff%N_scalars
+            params_convdiff%scalar_integral(k) = params_convdiff%scalar_integral(k) + sum( u(x1:x2, y1:y2, z1:z2,k) )
+            params_convdiff%scalar_max(k) = max( params_convdiff%scalar_max(k), maxval(abs(u(x1:x2, y1:y2, z1:z2,k))) )
+        enddo
 
-        if (params_convdiff%dim == 2) then
-            ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    scalar_integral = scalar_integral + u(ix,iy,1,1)
-                enddo
+        if (params_convdiff%time_statistics) then
+            do k = 1, params_convdiff%N_time_statistics
+                params_convdiff%time_statistics_mean(k) = params_convdiff%time_statistics_mean(k) + sum( u(x1:x2, y1:y2, z1:z2,params_convdiff%N_scalars+k) )
+                params_convdiff%time_statistics_maxabs(k) = max( params_convdiff%time_statistics_maxabs(k), maxval(abs(u(x1:x2, y1:y2, z1:z2,params_convdiff%N_scalars+k))) )
             enddo
-        else
-            ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            do iz = g+1, Bs(3)+g
-                do iy = g+1, Bs(2)+g
-                    do ix = g+1, Bs(1)+g
-                        scalar_integral = scalar_integral + u(ix,iy,iz,1)
-                    enddo
-                enddo
-            enddo
+            params_convdiff%time_statistics_mean = params_convdiff%time_statistics_mean * dV
         endif
-
-        scalar_max = maxval(u(:,:,:,1))
 
         ! we just computed the values on the current block, which we now add to the
         ! existing blocks in the variables (recall normalization by dV)
-        params_convdiff%scalar_integral = params_convdiff%scalar_integral + scalar_integral * product(dx(1:params_convdiff%dim))
-        params_convdiff%scalar_max = max(params_convdiff%scalar_max, scalar_max)
+        params_convdiff%scalar_integral = params_convdiff%scalar_integral * dV
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
         !-------------------------------------------------------------------------
         ! this stage is called only once, NOT for each block.
 
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_integral, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_max     , 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_integral, params_convdiff%N_scalars, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%scalar_max     , params_convdiff%N_scalars, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
-        call append_t_file( 'scalar_integral.t', (/time, dt, params_convdiff%scalar_integral, params_convdiff%scalar_max /) )
+        call append_t_file( 'scalar_integral.t', (/time, dt, params_convdiff%scalar_integral /) )
+        call append_t_file( 'scalar_max.t', (/time, params_convdiff%scalar_max /) )
+
+        ! time statistics
+        if (params_convdiff%time_statistics) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%time_statistics_mean, params_convdiff%N_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%time_statistics_maxabs, params_convdiff%N_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+            params_convdiff%time_statistics_mean = params_convdiff%time_statistics_mean / product(params_convdiff%domain_size(1:params_convdiff%dim))
+
+            call append_t_file( 'time_statistics_mean.t', (/time, params_convdiff%time_statistics_mean /) )
+            call append_t_file( 'time_statistics_maxabs.t', (/time, params_convdiff%time_statistics_maxabs /) )
+        endif
 
     case default
         call abort(7772,"the STATISTICS wrapper requests a stage this physics module cannot handle.")

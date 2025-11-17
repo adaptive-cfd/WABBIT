@@ -20,19 +20,20 @@ module module_convdiff_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
-  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff
+  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff, INITIALIZE_ASCII_FILES_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
-    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
+    real(kind=rk) :: domain_size(3)=0.0_rk,w0(3)=0.0_rk
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary, scalar_integral, scalar_max
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
     logical :: time_statistics = .false.
     integer(kind=ik) :: N_time_statistics = 0
+    real(kind=rk), allocatable :: time_statistics_mean(:), time_statistics_maxabs(:)
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:), time_statistics_names(:)
     character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
@@ -90,6 +91,8 @@ contains
     allocate( params_convdiff%inicond(1:params_convdiff%N_scalars))
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
+    allocate( params_convdiff%scalar_integral(1:params_convdiff%N_scalars) )
+    allocate( params_convdiff%scalar_max(1:params_convdiff%N_scalars) )
 
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
@@ -125,6 +128,8 @@ contains
     if (params_convdiff%time_statistics) then
         call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_convdiff%N_time_statistics, 1)
         allocate( params_convdiff%time_statistics_names(1:params_convdiff%N_time_statistics) )
+        allocate( params_convdiff%time_statistics_mean(1:params_convdiff%N_time_statistics) )
+        allocate( params_convdiff%time_statistics_maxabs(1:params_convdiff%N_time_statistics) )
         call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_convdiff%time_statistics_names, (/"none"/))
     endif
 
@@ -548,6 +553,26 @@ contains
 
 
   end subroutine INICOND_convdiff
+
+
+  subroutine INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
+    implicit none
+
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+    logical, intent(in) :: overwrite
+    
+    call init_t_file('scalar_integral.t', overwrite)
+    call init_t_file('scalar_max.t', overwrite)
+
+    if (params_convdiff%time_statistics) then
+        call init_t_file('time_statistics_mean.t', overwrite)
+        call init_t_file('time_statistics_maxabs.t', overwrite)
+    endif
+
+  end subroutine INITIALIZE_ASCII_FILES_convdiff
+
 
 
 

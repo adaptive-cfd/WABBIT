@@ -98,6 +98,7 @@ module module_acm
     logical :: time_statistics = .false.
     integer(kind=ik) :: N_time_statistics = 0
     character(len=cshort), allocatable :: time_statistics_names(:)
+    real(kind=rk), allocatable :: time_statistics_mean(:), time_statistics_maxabs(:)
 
     logical :: read_from_files = .false.
 
@@ -403,6 +404,8 @@ end subroutine
     if (params_acm%time_statistics) then
         call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_acm%N_time_statistics, 1)
         allocate( params_acm%time_statistics_names(1:params_acm%N_time_statistics) )
+        allocate( params_acm%time_statistics_mean(1:params_acm%N_time_statistics) )
+        allocate( params_acm%time_statistics_maxabs(1:params_acm%N_time_statistics) )
         call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_acm%time_statistics_names, (/"none"/))
     endif
 
@@ -706,6 +709,10 @@ end subroutine
       "            CFL", &
       "         CFL_nu", &
       "        CFL_eta"/) )
+      if (params_acm%time_statistics) then
+        call init_t_file('time_statistics_mean.t', overwrite)
+        call init_t_file('time_statistics_maxabs.t', overwrite)
+      endif
       if (params_acm%penalization .or. params_acm%use_sponge) then
         call init_t_file('forces.t', overwrite)
         if (is_insect) then

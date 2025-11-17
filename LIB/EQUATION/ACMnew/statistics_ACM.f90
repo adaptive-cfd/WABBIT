@@ -42,18 +42,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
     
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), x1,x2,y1,y2,z1,z2
     real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2, meanflow_channel_block(1:3)
     real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
     real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel
-    real(kind=rk), dimension(3) :: dxyz
-    real(kind=rk), dimension(1:3,1:5) :: iwmoment
+    real(kind=rk) :: dxyz(1:3), iwmoment(1:3,1:5)
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
-    ! we have quite some of these work arrays in the code, but they are very small,
-    ! only one block. They're ngeligible in front of the lgt_block array.
-    real(kind=rk), allocatable, save :: div(:,:,:)
     ! Color         Description
     !   0           Boring parts (channel walls, cavity)
     !   1           Interesting parts (e.g. a cylinder), for the insects this is BODY
@@ -61,7 +57,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     !   3           For the insects, this is RIGHT WING
     !   4           Other parts, for the insects, this is 2ND LEFT WING
     !   5           For the insects, this is 2ND RIGHT WING
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
     integer(kind=2) :: color
     logical :: is_insect, use_color
     character(len=64) :: fname
@@ -74,19 +69,23 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     Bs(2) = size(u,2) - 2*g
     if (params_acm%dim == 3) Bs(3) = size(u,3) - 2*g
 
+    ! block interior slicing excluding ghost points, for easier reading
+    x1 = g+1
+    x2 = Bs(1)+g
+    y1 = g+1
+    y2 = Bs(2)+g
+    if (params_acm%dim==3) then
+        z1 = g+1
+        z2 = Bs(3)+g
+    else
+        z1 = 1
+        z2 = 1
+    endif
+    dV = product(dx(1:params_acm%dim))
+
     C_eta_inv    = 1.0_rk / params_acm%C_eta
     C_sponge_inv = 1.0_rk / params_acm%C_sponge
     C_0          = params_acm%C_0
-
-    if (params_acm%dim==3) then
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        dV = dx(1)*dx(2)*dx(3)
-    else
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        dV = dx(1)*dx(2)
-    endif
 
     ! save some computing time by using a logical and not comparing every time
     is_insect = .false.
@@ -109,6 +108,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
+        params_acm%max_vort = 0.0_rk
         params_acm%helicity = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
@@ -120,6 +120,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%dissipation = 0.0_rk
         params_acm%umag = 0.0_rk
         params_acm%ACM_energy = 0.0_rk
+        if (params_acm%time_statistics) then
+            params_acm%time_statistics_mean = 0.0_rk
+            params_acm%time_statistics_maxabs = 0.0_rk
+        endif
 
         dx_min = 90.0e9_rk
 
@@ -185,165 +189,98 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             endif
         endif
 
-        if (params_acm%dim == 2) then
-            ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            call compute_divergence( u(:,:,:,1:2), dx, Bs, g, params_acm%discretization, div)
+        ! most integral quantities can be computed with block-wise function calls
+        ! compute mean flow for output in statistics
+        do k = 1, params_acm%dim
+            meanflow_block(k) = sum(u(x1:x2, y1:y2, z1:z2, k))
+        enddo
 
-            ! mask divergence inside the solid body
-            where (mask(:,:,:,1)>0.0_rk)
-                div = 0.00_rk
-            end where
+        ! kinetic energy
+        ekin_block = 0.5_rk*sum( u(x1:x2, y1:y2, z1:z2,1:params_acm%dim)**2 )
 
-            ! most integral quantities can be computed with block-wise function calls
-            ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 2))
+        ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty,
+        ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
+        ACM_energy_block = 0.5_rk*sum( u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)**2 )/C_0**2 + ekin_block
 
-            ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
+        ! square of maximum of velocity in the field
+        params_acm%umag = max( params_acm%umag, maxval(sum(u(x1:x2, y1:y2, z1:z2,1:params_acm%dim)**2, dim=4)))
 
-            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
-            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/C_0**2 + ekin_block
+        ! maximum/min divergence in velocity field
+        call compute_divergence( u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
 
-            ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
+        ! mask divergence inside the solid body
+        where (mask(:,:,:,1)>0.0_rk)
+            work(:,:,:,1) = 0.00_rk
+        end where
+        params_acm%div_max = max( params_acm%div_max, maxval(work(x1:x2, y1:y2, z1:z2,1)))
+        params_acm%div_min = min( params_acm%div_min, minval(work(x1:x2, y1:y2, z1:z2,1)))
 
-            ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
-
+        ! penalization part
+        if (params_acm%penalization .or. params_acm%use_sponge) then
             ! volume of mask (useful to see if it is properly generated)
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
+            tmp_volume = sum(mask(x1:x2, y1:y2, z1:z2, 1))
             ! volume of sponge
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6))
+            if (params_acm%use_sponge) tmp_volume2 = sum(mask(x1:x2, y1:y2, z1:z2, 6))
 
-            ! some computations need point-wise loops
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    color = int( mask(ix, iy, 1, 5), kind=2 )
+            ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+            ! energy input from solid : (usx * (u-uxs) + usy * (v-usy) + usz * (w-usz)) * chi / C_eta
+            penal_power_block(1) = sum( &
+                 (mask(x1:x2, y1:y2, z1:z2, 2)*(u(x1:x2, y1:y2, z1:z2,1)-mask(x1:x2, y1:y2, z1:z2, 2)) &
+                + mask(x1:x2, y1:y2, z1:z2, 3)*(u(x1:x2, y1:y2, z1:z2,2)-mask(x1:x2, y1:y2, z1:z2, 3))) &
+                * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv)
+            if (params_acm%dim == 3) then
+                penal_power_block(1) = penal_power_block(1) + sum( &
+                      mask(x1:x2, y1:y2, z1:z2, 4)*(u(x1:x2, y1:y2, z1:z2,3)-mask(x1:x2, y1:y2, z1:z2, 4)) &
+                    * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            endif
+            ! dissipation inside solid : ((u-uxs)**2 + (v-usy)**2 + (w-usz)**2) * chi / C_eta
+            penal_power_block(2) = sum( &
+                 ((u(x1:x2, y1:y2, z1:z2,1)-mask(x1:x2, y1:y2, z1:z2, 2))**2 &
+                + (u(x1:x2, y1:y2, z1:z2,2)-mask(x1:x2, y1:y2, z1:z2, 3))**2) &
+                * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            if (params_acm%dim == 3) then
+                penal_power_block(2) = penal_power_block(2) + sum(((u(x1:x2, y1:y2, z1:z2,3)-mask(x1:x2, y1:y2, z1:z2, 4))**2) * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            endif
+            ! sponge input : ( u*(u-ubar) + v*(v-vbar) + w*(w-wbar) ) * chi_sponge / C_sponge
+            ! attention division by C_sponge C0**2 because of the way the energy eqn is derived (it is divided by C_0**2
+            ! such that dp/dt 1/C0**2 is on the right side)
+            if (params_acm%use_sponge) then
+                penal_power_block(3) = sum( &
+                     (u(x1:x2, y1:y2, z1:z2,1)*(u(x1:x2, y1:y2, z1:z2,1)-params_acm%u_mean_set(1)) &
+                    + u(x1:x2, y1:y2, z1:z2,2)*(u(x1:x2, y1:y2, z1:z2,2)-params_acm%u_mean_set(2)) &
+                    + u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)*(u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)-0.0_rk)/C_0**2) &
+                    * mask(x1:x2, y1:y2, z1:z2, 6) * C_sponge_inv )
+                if (params_acm%dim == 3) then
+                    penal_power_block(3) = penal_power_block(3) + sum( &
+                        u(x1:x2, y1:y2, z1:z2,3)*(u(x1:x2, y1:y2, z1:z2,3)-params_acm%u_mean_set(3)) &
+                        * mask(x1:x2, y1:y2, z1:z2, 6) * C_sponge_inv )
+                endif
+            endif
 
-                    chi = mask(ix,iy,1,1) * C_eta_inv
-                    usx = mask(ix,iy,1,2)
-                    usy = mask(ix,iy,1,3)
-
-                    ! forces acting on body
-                    force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-usx)*chi
-                    force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
-
-                    ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                    ! energy input from solid:
-                    penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
-                    ! dissipation inside solid:
-                    penal_power_block(2) = penal_power_block(2) + ( (u(ix,iy,1,1)-usx)**2 + (u(ix,iy,1,2)-usy)**2) *chi
-                    ! sponge input:
-                    penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,1,1)*(u(ix,iy,1,1)-params_acm%u_mean_set(1)) + u(ix,iy,1,2)*(u(ix,iy,1,2)-params_acm%u_mean_set(2))) *mask(ix,iy,1,6)
-
-
-                    ! residual velocity in the solid domain
-                    residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
-                    residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-usy) * mask(ix,iy,1,1))
-                enddo
+            ! residual velocity in the solid domain
+            do k = 1, params_acm%dim
+                residual_block(k) = maxval( abs(u(x1:x2, y1:y2, z1:z2,k)-mask(x1:x2, y1:y2, z1:z2, k+1)) * mask(x1:x2, y1:y2, z1:z2, 1) )
             enddo
 
-            ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
-            ! sense to keep track of this. however, note that with Neumann BC, that makes no
-            ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
-            if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
-                ! should we ever use more than 1 scalar seriously, this has to be adopted
-                ! because it uses only the 1st one (:,:,1,4)
-                ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = scalar_removal_block + sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 4)) * C_eta_inv
-            endif
-        else
-            ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            ! compute divergence on this block
-            call compute_divergence( u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, div)
-
-            ! mask divergence inside the solid body
-            where (mask(:,:,:,1)>0.0_rk)
-                div = 0.00_rk
-            end where
-
-            ! block-wise function calls for quantities
-            ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
-            meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
-
-            ! relevant in 3D only
-            if (params_acm%use_channel_forcing) then
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2)
-
-                    ! exclude channel walls
-                    if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
-                        meanflow_channel_block(1) = meanflow_channel_block(1) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
-                        meanflow_channel_block(2) = meanflow_channel_block(2) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
-                        meanflow_channel_block(3) = meanflow_channel_block(3) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
-                    endif
-                enddo
-            endif
-
-            ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
-
-            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
-            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/C_0**2 + ekin_block
-
-            ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
-
-            ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
-
-            ! volume of mask (useful to see if it is properly generated)
-            ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            ! volume of sponge
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6))
-
-            ! point-wise loop for quantities
-            do iz = g+1, Bs(3)+g
-                z = x0(3) + dble(iz-(g+1)) * dx(3)
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2)
-                    do ix = g+1, Bs(1)+g
+            ! some computations need point-wise loops, as we are picking the color of the points
+            do iz = z1,z2
+                if (params_acm%dim == 2) then
+                    z = 0.0_rk
+                else
+                    z = x0(3) + dble(iz-(g+1)) * dx(3)
+                endif
+                do iy = y1,y2
+                    y = x0(2) + dble(iy-(g+1)) * dx(2) 
+                    do ix = x1,x2
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
-                        chi        = mask(ix,iy,iz,1) * C_eta_inv
-                        usx        = mask(ix,iy,iz,2)
-                        usy        = mask(ix,iy,iz,3)
-                        usz        = mask(ix,iy,iz,4)
-                        color      = int( mask(ix, iy, iz, 5), kind=2 )
-                        chi_sponge = mask(ix,iy,iz,6) * C_sponge_inv
+                        color = int( mask(ix, iy, iz, 5), kind=2 )
 
                         ! penalization term
                         penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
-                        ! residual velocity in the solid domain
-                        residual_block(1) = max( residual_block(1), (u(ix,iy,iz,1)-mask(ix,iy,iz,2))*mask(ix,iy,iz,1) )
-                        residual_block(2) = max( residual_block(2), (u(ix,iy,iz,2)-mask(ix,iy,iz,3))*mask(ix,iy,iz,1) )
-                        residual_block(3) = max( residual_block(3), (u(ix,iy,iz,3)-mask(ix,iy,iz,4))*mask(ix,iy,iz,1) )
-
-                        ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                        ! NOTE: as this is qty used to show the global energy budget, it includes ALL mask colors
-                        ! 1/ energy input from solid:
-                        penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,iz,1)-usx) + usy*(u(ix,iy,iz,2)-usy) + usz*(u(ix,iy,iz,3)-usz))*chi
-                        ! 2/ dissipation inside solid:
-                        penal_power_block(2) = penal_power_block(2) + ((u(ix,iy,iz,1)-usx)**2 + (u(ix,iy,iz,2)-usy)**2 + (u(ix,iy,iz,3)-usz)**2)*chi
-                        ! 3/ sponge input:
-                        ! attention division by C_sponge C0**2 because of the way the energy eqn is derived (it is divided by C_0**2
-                        ! such that dp/dt 1/C0**2 is on the right side)
-                        penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,iz,1)*(u(ix,iy,iz,1)-params_acm%u_mean_set(1)) &
-                                                                      + u(ix,iy,iz,2)*(u(ix,iy,iz,2)-params_acm%u_mean_set(2)) &
-                                                                      + u(ix,iy,iz,3)*(u(ix,iy,iz,3)-params_acm%u_mean_set(3)) &
-                                                                      + u(ix,iy,iz,4)*(u(ix,iy,iz,4)-0.0_rk)/C_0**2 ) *chi_sponge 
-
                         ! forces acting on this color
-                        force_block(1:3, color) = force_block(1:3, color) - penal
+                        force_block(1:params_acm%dim, color) = force_block(1:params_acm%dim, color) - penal(1:params_acm%dim)
 
                         ! moment with color-dependent lever
                         x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
@@ -365,7 +302,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                             x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
                             moment_block(:,0)  = moment_block(:,0) - cross(x_lev, penal)
                         endif
-
                     enddo
                 enddo
             enddo
@@ -377,9 +313,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! should we ever use more than 1 scalar seriously, this has to be adopted
                 ! because it uses only the 1st one (:,:,:,5)
                 ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 5)) * C_eta_inv
+                scalar_removal_block = sum(mask(x1:x2, y1:y2, z1:z2, 1) * u(x1:x2, y1:y2, z1:z2, params_acm%dim+2)) * C_eta_inv
             endif
-
         endif
 
         ! we just computed the values on the current block, which we now add to the
@@ -402,17 +337,25 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call compute_vorticity(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim == 2) then
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1)**2)*dV
+            params_acm%max_vort = max( params_acm%max_vort, maxval( abs(work(x1:x2, y1:y2, z1:z2, 1)) ) )
         else
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
-            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1:3)**2)*dV
+            params_acm%max_vort = max( params_acm%max_vort, maxval( sqrt(sum( work(x1:x2, y1:y2, z1:z2, 1:3)**2, dim=4 )) ) )
+            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1:3) * u(x1:x2, y1:y2, z1:z2, 1:3))*dV
         end if
 
-        call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
-        if (params_acm%dim == 2) then
-            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
-        else
-            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
+        if (params_acm%nu > 0.0_rk) then
+            call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(x1:x2, y1:y2, z1:z2, 1)) * dV
+        endif
+
+        ! we want to output some measurements for the timestatistics, just to see if everything is in order
+        if (params_acm%time_statistics) then
+            do k = 1, params_acm%n_time_statistics
+                params_acm%time_statistics_mean(k) = params_acm%time_statistics_mean(k) + dV * sum( u(x1:x2, y1:y2, z1:z2,params_acm%dim+1+params_acm%N_scalars+k) )
+                params_acm%time_statistics_maxabs(k) = max( params_acm%time_statistics_maxabs(k), maxval(abs(u(x1:x2, y1:y2, z1:z2,params_acm%dim+1+params_acm%N_scalars+k))) )
+            enddo
         endif
 
     case ("post_stage")
@@ -420,11 +363,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! 3rd stage: post_stage.
         !-------------------------------------------------------------------------
         ! this stage is called only once, NOT for each block.
-
-        ! volume of mask (useful to see if it is properly generated)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        ! volume of sponge
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         ! mean flow (in entire domain)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -438,12 +376,20 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
         endif
 
-        ! force & moment
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        ! residual velocity in solid domain
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        if (params_acm%penalization .or. params_acm%use_sponge) then
+            !-------------------------------------------------------------------------
+            ! volume of mask (useful to see if it is properly generated)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            ! volume of sponge
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+            ! force & moment
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            ! residual velocity in solid domain
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         !-------------------------------------------------------------------------
         ! scalar removal
@@ -454,26 +400,32 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! kinetic energy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! divergence
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
-
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic enstrophy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%max_vort, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%helicity, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        if (params_acm%nu > 0.0_rk) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         ! minium spacing of current grid, not smallest possible one.
         call MPI_ALLREDUCE(MPI_IN_PLACE, dx_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+
+        ! time statistics
+        if (params_acm%time_statistics) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_mean, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            params_acm%time_statistics_mean = params_acm%time_statistics_mean / product(params_acm%domain_size(1:params_acm%dim))
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_maxabs, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        endif
 
         umag = params_acm%umag
 
@@ -594,20 +546,28 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call append_t_file( 'scalar_removal.t', (/time, params_acm%scalar_removal/) )
             endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin, params_acm%ACM_energy/) )
-            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy, params_acm%max_vort/) )
             if (params_acm%dim == 3) then
                 call append_t_file( 'helicity.t', (/time, params_acm%helicity/) )
             endif
-            call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
+            if (params_acm%nu > 0.0_rk)  then
+                call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
+            endif
 
             ! turbulent statistics - these are normed by the volume!
-            if (params_acm%nu*params_acm%enstrophy > 0.0_rk) then
+            if (params_acm%nu*params_acm%enstrophy > 0.0_rk .and. params_acm%HIT_linear_forcing) then
                 ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
                 dissipation = params_acm%dissipation/product(params_acm%domain_size(1:params_acm%dim))
                 u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
+            endif
+
+            ! time statistics
+            if (params_acm%time_statistics) then
+                call append_t_file( 'time_statistics_mean.t', (/time, params_acm%time_statistics_mean/) )
+                call append_t_file( 'time_statistics_maxabs.t', (/time, params_acm%time_statistics_maxabs/) )
             endif
 
             ! this file is to simply keep track of simulations, should they be restarted with different parameters.

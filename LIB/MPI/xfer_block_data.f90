@@ -7,7 +7,7 @@
 !!    2. Data is send / received via buffers, buffer is assumed to fit all data!
 !!    3. Data is send / received directly (for whole blocks)
 !> Before this step, all metadata and datasizes have to be prepared in send_counter and recv_counter
-subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter)
+subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, hvy_tmp_usage, REF_FLAG, ignore_Filter)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -22,7 +22,8 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status if we should always use hvy_tmp
+    character(len=*), optional, intent(in)  :: hvy_tmp_usage       !< string indicating how to use hvy_tmp
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status where we should use data from hvy_tmp
     logical, intent(in), optional  :: ignore_Filter                !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
@@ -64,7 +65,7 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
         real_pos(k) = 1 + meta_send_counter(k)*S_META_SEND  ! offset real data to beginning by metadata
     end do
 
-    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, &
+    call send_prepare_external(params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, hvy_tmp_usage, &
     REF_FLAG, ignore_Filter=ignoreFilter)
     call toc( "xfer_block_data (prepare data)", 70, MPI_wtime()-t0 )
 
@@ -81,7 +82,7 @@ subroutine xfer_block_data(params, hvy_data, tree_ID, count_send_total, verbose_
     ! process-internal ghost points (direct copy)
     t0 = MPI_wtime()
     call unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, &
-    hvy_tmp, REF_FLAG, ignore_Filter=ignoreFilter)
+    hvy_tmp, hvy_tmp_usage, REF_FLAG, ignore_Filter=ignoreFilter)
     call toc( "xfer_block_data (unpack internal)", 72, MPI_wtime()-t0 )
 
     ! before unpacking the data we received from other ranks, we wait for the transfer
@@ -102,7 +103,7 @@ end subroutine xfer_block_data
 !> \brief Prepare data to be sent with MPI \n
 !! This already applies res_pre so that the recver only has to sort in the data correctly. \n
 !! Fills the send buffer
-subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter )
+subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, hvy_tmp_usage, REF_FLAG, ignore_Filter )
     implicit none
 
     type (type_params), intent(in) :: params
@@ -113,7 +114,8 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+    character(len=*), optional, intent(in)  :: hvy_tmp_usage       !< string indicating how to use hvy_tmp
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status where we should use data from hvy_tmp
     logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
@@ -123,7 +125,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
     ! merged information of level diff and an indicator that we have a historic finer sender
     integer(kind=ik)   :: buffer_offset, buffer_size, data_offset
     integer(kind=ik)   :: patch_ijk(2,3), size_buff(4), nc, k_patch
-    logical            :: use_hvy_TMP, ignoreFilter
+    logical            :: use_hvy_TMP_rest_pred, use_hvy_tmp_same_lvl, ignoreFilter
 
     ignoreFilter = .false.
     if (present(ignore_Filter)) ignoreFilter = ignore_Filter
@@ -159,10 +161,23 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
         lvl_diff = meta_send_all(S_META_FULL*k_patch + 6)
         patch_size = meta_send_all(S_META_FULL*k_patch + 7)
 
-        ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
-        use_hvy_TMP = .false.
-        if (present(hvy_tmp) .and. present(REF_FLAG)) then
-            if (sender_ref /= REF_FLAG) use_hvy_TMP = .true.
+        ! check if to use hvy_temp, this is used in decomposition, there we need to use hvy_tmp if the sender is already decomposed
+        use_hvy_TMP_rest_pred = .false.
+        use_hvy_tmp_same_lvl = .false.
+        if (present(hvy_tmp) .and. present(hvy_tmp_usage)) then
+            if (hvy_tmp_usage == "not_flag_is_decomposed") then
+                if (.not. present(REF_FLAG)) then
+                    call abort(251117, "ERROR: REF_FLAG has to be provided if hvy_tmp_usage is 'not_flag_is_decomposed'")
+                endif
+                if (sender_ref /= REF_FLAG) then
+                    use_hvy_TMP_rest_pred = .true.
+                    use_hvy_tmp_same_lvl = .true.
+                endif
+            elseif (hvy_tmp_usage == "block_is_decomposed") then
+                use_hvy_TMP_rest_pred = .true.
+            else
+                call abort(251117, "ERROR: hvy_tmp_usage string not recognized in send_prepare_external: " // hvy_tmp_usage)
+            endif
         endif
 
         ! NOTE: the indices of ghost nodes data chunks are stored globally in the ijkPatches array (see module_MPI).
@@ -173,7 +188,7 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
             ! we will send to our neighbor mpirank
             patch_ijk = ijkPatches(:,:, relation, SENDER)
 
-            if (use_hvy_TMP) then
+            if (use_hvy_tmp_same_lvl) then
                 call Patch2Line( params, line_buffer, buffer_size, &
                 hvy_tmp( patch_ijk(1,1):patch_ijk(2,1), patch_ijk(1,2):patch_ijk(2,2), patch_ijk(1,3):patch_ijk(2,3), 1:nc, sender_hvyID) )
             else
@@ -185,8 +200,9 @@ subroutine send_prepare_external( params, hvy_data, tree_ID, count_send_total, v
             ! up/downsample data first for neighbor relations, then flatten to 1D buffer
             patch_ijk = ijkPatches(:,:, relation, SENDER)
 
-            ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
-            if (use_hvy_TMP .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
+            ! for synching the SC from coarser neighbors, we always need to predict using hvy_tmp as there the original data is wavelet decomposed
+            ! there we do not sync from finer neighbors, as full tree is assumed, so restriction should not occur then
+            if (use_hvy_TMP_rest_pred) then
                 call restrict_predict_data( params, res_pre_data, patch_ijk, relation, lvl_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
             else
                 call restrict_predict_data( params, res_pre_data, patch_ijk, relation, lvl_diff, hvy_data, nc, sender_hvyID, ignoreFilter)
@@ -302,7 +318,7 @@ end subroutine unpack_ghostlayers_external
 
 !> \brief Unpack all internal patches which do not have to be sent
 !! This simply copies from hvy_data, applies res_pre and then copies it back into the correct position
-subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, REF_FLAG, ignore_Filter )
+subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_total, verbose_check, hvy_tmp, hvy_tmp_usage, REF_FLAG, ignore_Filter )
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -312,7 +328,8 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status when to use hvy_tmp
+    character(len=*), optional, intent(in)  :: hvy_tmp_usage       !< string indicating how to use hvy_tmp
+    integer(kind=ik), intent(in), optional :: REF_FLAG             !< Flag in refinement status where we should use data from hvy_tmp
     logical, intent(in), optional  :: ignore_Filter                  !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
 
 
@@ -320,7 +337,7 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
     integer(kind=ik) :: relation, i_relation  !< neighborhood 1:56*3, full block 0, family -1:-8
     integer(kind=ik) :: sender_hvyID, lvl_diff, i_lvl_diff
     integer(kind=ik) :: recv_ijk(2,3), send_ijk(2,3), buffer_ijk(2,3), nc, myrank
-    logical          :: use_hvy_tmp, ignoreFilter
+    logical          :: use_hvy_tmp_same_lvl, use_hvy_TMP_rest_pred, ignoreFilter
 
     ignoreFilter = .false.
     if (present(ignore_Filter)) ignoreFilter = ignore_Filter
@@ -346,10 +363,23 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
             call hvy2lgt( sender_lgtID, sender_hvyID, myrank, params%number_blocks )
             call hvy2lgt( recver_lgtID, recver_hvyID, myrank, params%number_blocks )
 
-            ! check if to use hvy_temp, for CVS it was prepared so that we always use hvy_tmp for decomposition, but normal adapt_tree is not adapted yet
-            use_hvy_tmp = .false.
-            if (present(hvy_tmp) .and. present(REF_FLAG)) then
-                if (sender_ref /= REF_FLAG) use_hvy_tmp = .true.
+            ! check if to use hvy_temp, this is used in decomposition, there we need to use hvy_tmp if the sender is already decomposed
+            use_hvy_TMP_rest_pred = .false.
+            use_hvy_tmp_same_lvl = .false.
+            if (present(hvy_tmp) .and. present(hvy_tmp_usage)) then
+                if (hvy_tmp_usage == "not_flag_is_decomposed") then
+                    if (.not. present(REF_FLAG)) then
+                        call abort(251117, "ERROR: REF_FLAG has to be provided if hvy_tmp_usage is 'not_flag_is_decomposed'")
+                    endif
+                    if (sender_ref /= REF_FLAG) then
+                        use_hvy_TMP_rest_pred = .true.
+                        use_hvy_tmp_same_lvl = .true.
+                    endif
+                elseif (hvy_tmp_usage == "block_is_decomposed") then
+                    use_hvy_TMP_rest_pred = .true.
+                else
+                    call abort(251117, "ERROR: hvy_tmp_usage string not recognized in send_prepare_external: " // hvy_tmp_usage)
+                endif
             endif
 
 
@@ -361,7 +391,7 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
                 recv_ijk = ijkPatches(:,:, i_relation, RECVER)
                 send_ijk = ijkPatches(:,:,   relation, SENDER)
 
-                if (use_hvy_tmp) then
+                if (use_hvy_tmp_same_lvl) then
                     hvy_data( recv_ijk(1,1):recv_ijk(2,1), recv_ijk(1,2):recv_ijk(2,2), recv_ijk(1,3):recv_ijk(2,3), 1:nc, recver_hvyID ) = &
                     hvy_tmp( send_ijk(1,1):send_ijk(2,1), send_ijk(1,2):send_ijk(2,2), send_ijk(1,3):send_ijk(2,3), 1:nc, sender_hvyID)
                 else
@@ -376,7 +406,7 @@ subroutine unpack_ghostlayers_internal( params, hvy_data, tree_ID, count_send_to
             else
                 ! interpolation or restriction before inserting
                 ! when hvy_temp is given but not ref_flag the mode is to use hvy_temp for prediction, this is needed for synching the SC from coarser neighbors
-                if (use_hvy_tmp .or. (present(hvy_tmp) .and. .not. present(REF_FLAG))) then
+                if (use_hvy_TMP_rest_pred) then
                     call restrict_predict_data( params, res_pre_data, ijkPatches(1:2,1:3, relation, SENDER), &
                     relation, lvl_diff, hvy_tmp, nc, sender_hvyID, ignoreFilter )
                 else
@@ -576,7 +606,7 @@ end subroutine
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_val, sync_debug_name)
+subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case, ncomponents, s_level, s_ref, sync_debug_name)
 
     implicit none
 
@@ -588,7 +618,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
     character(len=*)                    :: sync_case           !< String representing which kind of syncing we want to do
 
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, dependend on sync case
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in), optional  :: s_level, s_ref
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! Following are global data used but defined in module_mpi:
@@ -633,9 +663,18 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
     if (index(sync_case, "D2M") > 0) sync_id = 1
     if (index(sync_case, "M2D") > 0) sync_id = 2
 
-    ! now lets treat the special restrictions, set to the second digit
-    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
-    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+    ! now lets treat the special restrictions, set to the second digit, make sure they don't override each other
+    if (index(sync_case, "ref") > 0 .and. index(sync_case, "level") > 0) then
+        if (.not. present(s_ref)) call abort(251114, "Sync case " // sync_case // " requires s_ref to be set!")
+        if (.not. present(s_level)) call abort(251114, "Sync case " // sync_case // " requires s_level to be set!")
+        sync_id = sync_id + 10*3
+    elseif (index(sync_case, "ref") > 0) then
+        if (.not. present(s_ref)) call abort(251114, "Sync case " // sync_case // " requires s_ref to be set!")
+        sync_id = sync_id + 10*1
+    elseif (index(sync_case, "level") > 0) then
+        if (.not. present(s_level)) call abort(251114, "Sync case " // sync_case // " requires s_level to be set!")
+        sync_id = sync_id + 10*2
+    endif
 
     if (sync_id == 0) then
         call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
@@ -670,8 +709,9 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
             b_send = .false.
             if (mod(sync_id,10) == 1) b_send = .true.
             ! special cases, first ref check and then level check, situated in second digit
-            if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
-            if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
+            if (sync_id/10 == 1 .and. b_send) b_send = s_ref == ref ! disable sync if I (sender) have wrong ref value
+            if (sync_id/10 == 2 .and. b_send) b_send = s_level == level  ! disable sync if I (sender) have wrong level
+            if (sync_id/10 == 3 .and. b_send) b_send = s_level == level .and. s_ref == ref  ! disable sync if I (sender) have wrong level or ref value
 
             if (b_send) then
                 ijk = ijkPatches(:, :, -1 - mylastdigit, SENDER)
@@ -709,8 +749,9 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
                 b_recv = .false.
                 if (mod(sync_id,10) == 2) b_recv = .true.
                 ! special cases, first ref check and then level check, situated in second digit
-                if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
-                if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
+                if (sync_id/10 == 1 .and. b_recv) b_recv = s_ref == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                if (sync_id/10 == 2 .and. b_recv) b_recv = s_level == level_n  ! disable sync if neighbor (sender) has wrong level
+                if (sync_id/10 == 3 .and. b_recv) b_recv = s_level == level_n .and. s_ref == ref_n  ! disable sync if neighbor (sender) has wrong level or ref value
 
                 if (b_recv) then
                     ijk = ijkPatches(:, :, -1 - mylastdigit -8, RECVER)  ! -8 for lvl_diff=-1
@@ -754,8 +795,9 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
                 b_send = .false.
                 if (mod(sync_id,10) == 2) b_send = .true.
                 ! special cases, first ref check and then level check, situated in second digit
-                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref ! disable sync if I (sender) have wrong ref value
-                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level  ! disable sync if I (sender) have wrong level
+                if (sync_id/10 == 1 .and. b_send) b_send = s_ref == ref ! disable sync if I (sender) have wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_level == level  ! disable sync if I (sender) have wrong level
+                if (sync_id/10 == 3 .and. b_send) b_send = s_level == level .and. s_ref == ref  ! disable sync if I (sender) have wrong level or ref value
 
                 if (b_send) then
 
@@ -794,8 +836,9 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
                     b_recv = .false.
                     if (mod(sync_id,10) == 1) b_recv = .true.
                     ! special cases, first ref check and then level check, situated in second digit
-                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref_n ! disable sync if neighbor (sender) has wrong ref value
-                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level_n  ! disable sync if neighbor (sender) has wrong level
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_ref == ref_n ! disable sync if neighbor (sender) has wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_level == level_n  ! disable sync if neighbor (sender) has wrong level
+                    if (sync_id/10 == 3 .and. b_recv) b_recv = s_level == level_n .and. s_ref == ref_n  ! disable sync if neighbor (sender) has wrong level or ref value
 
                     if (b_recv) then
                         ijk = ijkPatches(:, :, -family, RECVER)

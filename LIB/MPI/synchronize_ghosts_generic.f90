@@ -18,7 +18,7 @@ subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus,
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="Monly_level", &
-        s_val=level, sync_debug_name=sync_debug_name)
+        s_level=level, sync_debug_name=sync_debug_name)
 
 end subroutine sync_level_from_M
 
@@ -45,7 +45,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_mi
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="MoF_ref", &
-        s_val=ref_check, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
+        s_ref=ref_check, hvy_tmp=hvy_tmp, hvy_tmp_usage="not_flag_is_decomposed", sync_debug_name=sync_debug_name)
 
 end subroutine sync_TMP_from_MF
 
@@ -73,7 +73,7 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_m
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="full_ref", &
-        s_val=ref_check, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
+        s_ref=ref_check, hvy_tmp=hvy_tmp, hvy_tmp_usage="not_flag_is_decomposed", sync_debug_name=sync_debug_name)
 
 end subroutine sync_TMP_from_all
 
@@ -81,7 +81,7 @@ end subroutine sync_TMP_from_all
 
 !> Wrapper to synch from coarser neighbours and same-level neighbors
 !! Used after coarse extension to update SC and WC, coarse neighbours need to be synched from hvy_tmp
-subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus, level, sync_debug_name)
+subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus, level, ref_check, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -89,7 +89,7 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level
+    integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level, ref_check
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
@@ -100,12 +100,18 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     if (present(g_plus))      gplus = g_plus
 
     ! if we passed on the level then sync is level-wise
-    if (present(level)) then
+    if (present(level) .and. present(ref_check)) then
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC_level_ref", &
+                s_level=level, s_ref=ref_check, hvy_tmp=hvy_tmp, hvy_tmp_usage="block_is_decomposed", sync_debug_name=sync_debug_name)
+    elseif (present(level)) then
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC_level", &
-            s_val=level, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
+            s_level=level, hvy_tmp=hvy_tmp, hvy_tmp_usage="block_is_decomposed", sync_debug_name=sync_debug_name)
+    elseif (present(ref_check)) then
+        call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC_ref", &
+            s_ref=ref_check, hvy_tmp=hvy_tmp, hvy_tmp_usage="block_is_decomposed", sync_debug_name=sync_debug_name)
     else
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC", &
-            hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
+            hvy_tmp=hvy_tmp, hvy_tmp_usage="block_is_decomposed", sync_debug_name=sync_debug_name)
     endif
 
 end subroutine sync_SCWC_from_MC
@@ -173,7 +179,7 @@ end subroutine
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
 subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti_form, &
-    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter, sync_debug_name)
+    g_minus, g_plus, s_ref, s_level, hvy_tmp, hvy_tmp_usage, verbose_check, ignore_Filter, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -188,9 +194,10 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
 
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
+    character(len=*), optional, intent(in)  :: hvy_tmp_usage        !< string indicating how to use hvy_tmp, see xfer_block_data for details
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in), optional  :: s_ref, s_level
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
@@ -265,27 +272,23 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
         ! internal nodes are included in metadata but not counted
         t1 = MPI_wtime()  ! stage duration
         call prepare_ghost_synch_metadata(params, tree_ID, count_send_total, &
-            istage, sync_case, ncomponents=size(hvy_block,4), s_val=s_val, verbose_check=verbose_check)
+            istage, sync_case, ncomponents=size(hvy_block,4), s_ref=s_ref, s_level=s_level, verbose_check=verbose_check)
         call toc( "sync ghosts (prepare metadata)", 81, MPI_wtime()-t1 )
 
         !***************************************************************************
         ! (ii) sending handled by xfer_block_data
-        ! If hvy_temp is present then xfer_block_data has to decide from where to grab the data
-        !    - with ref in case: we decide after refinement flag present in s_val if we want to use hvy_temp
-        !    - elsewise: use hvy_tmp for prediction (used in updating SC from coarser neighbours)
+        ! If hvy_temp is present we assume that some of the data might be in decomposed form, hvy_tmp then contains the original data
+        ! There are two different cases, so that xfer_block_data has to decide from where to grab the data
+        !    - with ref in case: we decide after refinement flag present in s_ref if we want to use hvy_temp
+        !    - elsewise: use hvy_tmp for prediction (used in updating SC from coarser neighbours, where the original data is decomposed)
         !***************************************************************************
         t2 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
             call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignore_Filter, &
             verbose_check=verbose_check)
         else
-            if (index(sync_case, "ref") > 0) then
-                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
-            else
-                call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                ignore_Filter=ignore_Filter, verbose_check=verbose_check)
-            endif
+            call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, hvy_tmp_usage=hvy_tmp_usage, &
+                REF_FLAG=s_ref, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )
 
@@ -295,7 +298,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
         t2 = MPI_wtime()
         ! For all blocks that do not have a neighbor at the borders due to non-periodic BC, we have to set the ghost patch values explicitly
         ! After stage 2 and 3 we only need to update the edges with mirrored values from ghost layers, as the faces are already set
-        call bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_val=s_val, edges_only=istage>=2)
+        call bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_ref=s_ref, s_level=s_level, edges_only=istage>=2)
         call toc( "sync ghosts (bound_cond_generic)", 83, MPI_wtime()-t2 )
 
         !***************************************************************************
@@ -346,7 +349,7 @@ end subroutine sync_ghosts_generic
 !    - saving of all metadata
 !    - computing of buffer sizes for metadata for both sending and receiving
 ! This is done strictly locally so no MPI needed here
-subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_Val, verbose_check)
+subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, sync_case, ncomponents, s_level, s_ref, verbose_check)
 
     implicit none
 
@@ -361,7 +364,7 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     character(len=*)                :: sync_case
 
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in), optional  :: s_ref, s_level
     logical, optional, intent(in)  :: verbose_check  ! Output verbose flag
 
     ! Following are global data used but defined in module_mpi:
@@ -400,9 +403,18 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
     if (index(sync_case, "MoF") > 0) sync_id = 4
     if (index(sync_case, "Monly") > 0) sync_id = 5
 
-    ! now lets treat the special restrictions, set to the second digit
-    if (index(sync_case, "ref") > 0) sync_id = sync_id + 10*1
-    if (index(sync_case, "level") > 0) sync_id = sync_id + 10*2
+    ! now lets treat the special restrictions, set to the second digit, make sure they don't override each other
+    if (index(sync_case, "ref") > 0 .and. index(sync_case, "level") > 0) then
+        if (.not. present(s_ref)) call abort(251114, "Sync case " // sync_case // " requires s_ref to be set!")
+        if (.not. present(s_level)) call abort(251114, "Sync case " // sync_case // " requires s_level to be set!")
+        sync_id = sync_id + 10*3
+    elseif (index(sync_case, "ref") > 0) then
+        if (.not. present(s_ref)) call abort(251114, "Sync case " // sync_case // " requires s_ref to be set!")
+        sync_id = sync_id + 10*1
+    elseif (index(sync_case, "level") > 0) then
+        if (.not. present(s_level)) call abort(251114, "Sync case " // sync_case // " requires s_level to be set!")
+        sync_id = sync_id + 10*2
+    endif
 
     if (sync_id == 0) then
         call abort(240805, "No, we don't trade that here! Please ensure the sync_case is valid.")
@@ -446,8 +458,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 ! Send logic, I am sender and neighbor is receiver:
                 ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=+1; stage=3 && lvl_diff=-1
                 ! Some special cases:
-                !    REF   - only sync if the refinement value matches s_val for the neighbor
-                !    Level - only send if the neighbor level matches s_val
+                !    REF   - only sync if the refinement value matches s_ref for the neighbor
+                !    Level - only send if the neighbor level matches s_level
+                !    REF & Level - only send if both refinement value and level match s_ref and s_level
                 !    Unlifted wavelets - stage 2 and 3 will be translated to 1 and 2 respectively to merge stage 2 and 1
 
                 ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
@@ -510,8 +523,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 endif
 
                 ! special cases, first ref check and then level check, situated in second digit
-                if (sync_id/10 == 1 .and. b_send) b_send = s_val == ref_n ! disable sync if neighbor has wrong ref value
-                if (sync_id/10 == 2 .and. b_send) b_send = s_val == level_n  ! disable sync if neighbor has wrong level
+                if (sync_id/10 == 1 .and. b_send) b_send = s_ref == ref_n ! disable sync if neighbor has wrong ref value
+                if (sync_id/10 == 2 .and. b_send) b_send = s_level == level_n  ! disable sync if neighbor has wrong level
+                if (sync_id/10 == 3 .and. b_send) b_send = (s_ref == ref_n) .and. (s_level == level_n)  ! disable sync if neighbor has wrong ref value or wrong level
 
                 if (b_send) then
                     ! choose correct size that will be send, for lvl_diff /= 0 restriction or prediction will be applied
@@ -551,8 +565,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                 !
                 ! stage=1 && lvl_diff = 0; stage=2 && lvl_diff=-1; stage=3 && lvl_diff=+1
                 ! Some special cases:
-                !    REF   - only sync if the refinement value matches s_val for the receiver
-                !    Level - only send if the receiver level matches s_val
+                !    REF   - only sync if the refinement value matches s_ref for the receiver
+                !    Level - only send if the receiver level matches s_level
+                !    REF & Level - only send if both refinement value and level match s_ref and s_level
                 !    Unlifted wavelets - stage 2 and 3 will be translated to 1 and 2 respectively to merge stage 2 and 1
 
                 ! CVS grids can have medium, fine and coarse neighbors for same patches, grid is assumed to be fully updated
@@ -630,8 +645,9 @@ subroutine prepare_ghost_synch_metadata(params, tree_ID, count_send, istage, syn
                     endif
 
                     ! special cases, first ref check and then level check
-                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_val == ref ! disable sync if I have wrong ref value
-                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_val == level  ! disable sync if I have wrong level
+                    if (sync_id/10 == 1 .and. b_recv) b_recv = s_ref == ref ! disable sync if I have wrong ref value
+                    if (sync_id/10 == 2 .and. b_recv) b_recv = s_level == level  ! disable sync if I have wrong level
+                    if (sync_id/10 == 3 .and. b_recv) b_recv = (s_ref == ref) .and. (s_level == level)  ! disable sync if I have wrong ref value or wrong level
 
                     if (b_recv) then
                         ijk = ijkPatches(:, :, i_n, RECVER)

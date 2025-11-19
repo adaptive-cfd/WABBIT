@@ -109,7 +109,7 @@ subroutine operator_reconstruction(params)
 
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,"dir=",A," g=",i1," Bs=",i2," nu=",es8.2," refine=",L1,1x,A," cExt=",L1,1x,L1)') trim(params%order_discretization), &
+    write(17,'(A,1x,"dir=",A," g=",i1," Bs=",i2," nu=",es9.2," refine=",L1,1x,A," cExt=",L1,1x,L1)') trim(params%order_discretization), &
     dir, params%g, params%Bs(1), nu, refine, trim(adjustl(params%wavelet)), params%useCoarseExtension, params%useSecurityZone 
     close(17)
 

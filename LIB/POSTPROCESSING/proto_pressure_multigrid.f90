@@ -281,11 +281,11 @@ subroutine proto_pressure_multigrid(params)
             enddo
             ! compute norms
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "L2", norm(1:1), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L2: ", norm(1), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L2: ", norm(1), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "L1", norm(2:2), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L1: ", norm(2), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L1: ", norm(2), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "Linfty", norm(3:3), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral Linfty: ", norm(3), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral Linfty: ", norm(3), " ---"
 
             call append_t_file('multigrid-compare.t', (/dble(i_cycle), norm(1), norm(2), norm(3)/))
         endif

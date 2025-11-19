@@ -279,7 +279,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement, b
                 endif
                 string_prepare = trim(adjustl(string_prepare))//trim(adjustl(string_kind(i_var)))//","
                 if (present(time)) then
-                    write(string_prepare,'(A,es12.6,",")') trim(adjustl(string_prepare)), time
+                    write(string_prepare,'(A,es12.5,",")') trim(adjustl(string_prepare)), time
                 else
                     string_prepare = trim(adjustl(string_prepare))//"-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
                 endif

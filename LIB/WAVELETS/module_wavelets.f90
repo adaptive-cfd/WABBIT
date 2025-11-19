@@ -1282,10 +1282,12 @@ contains
         params%Nscl    = max(abs(lbound(params%HD, dim=1)) - 1, 0)
         params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
         params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
+        params%Ndep2l  = params%Nreconl + max((abs(lbound(params%HR, dim=1))+1)/2 - 1, 0)
 
         params%Nscr    = ubound(params%HD, dim=1)
         params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
         params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
+        params%Ndep2r  = params%Nreconr + (ubound(params%HR, dim=1)+1)/2
 
         ! ! for unlifted wavelets no SC are copied, however some WC do have to be wiped in case we need to reconstruct (CVS and image denoising)
         ! ! This is, because at a coarse-fine interface the filter to compute the WC stretches over the border, creating the same dilemma as for the CE
@@ -1297,7 +1299,7 @@ contains
         !     params%Nreconr = params%Nreconr + 2
         ! endif
 
-        ! for wavelets with regularity higher than the wavelets NWC needs to be increased, the reasoning for me is yet unclear
+        ! for wavelets with regularity higher than the wavelets (Y>X in CDFXY), NWC needs to be increased, the reasoning for me is yet unclear
         ! this was investigated and found using the invertibility test
         if (params%isLiftedWavelet) then
             a = 0
@@ -1308,6 +1310,8 @@ contains
             params%Nwcr = params%Nwcr + a
             params%Nreconl = params%Nreconl + a
             params%Nreconr = params%Nreconr + a
+            params%Ndep2l  = params%Ndep2l + a
+            params%Ndep2r  = params%Ndep2r + a
         endif
 
         !--------------------------------------------------------------------------------------------------------
@@ -1319,11 +1323,13 @@ contains
         diff_L         = max(i - params%Nwcl, 0)
         params%Nwcl    = params%Nwcl + diff_L
         params%Nreconl = params%Nreconl + diff_L
+        params%Ndep2l  = params%Ndep2l + diff_L
         
         diff_R         = max(i - params%Nwcr, 0)
         params%Nwcr    = params%Nwcr + diff_R
         params%Nreconr = params%Nreconr + diff_R
-
+        params%Ndep2r  = params%Ndep2r + diff_R
+        
         if (params%rank==0) then
             write(*,'(A)') "Wavelet setup is adjusted to discretization: "//trim(adjustl(params%order_discretization))
         endif
@@ -1371,8 +1377,19 @@ contains
 
         if (params%rank==0 .and. verbose1) then
             if (params%useCoarseExtension) then
-                write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
-                write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
+                write(*,'(A55, i4, i4)') "Coarse extension will copy SC (L,R):", params%Nscl, params%Nscr
+                write(*,'(A55, i4, i4)') "Coarse extension will delete WC (L,R):", params%Nwcl, params%Nwcr
+                write(*,'(A55, i4, i4)') "Coarse extension will influence (L,R):", params%Nreconl, params%Nreconr
+                write(*,'(A55, i4, i4)') "CE minimum BS for decoupling reconstruction:", params%Ndep2l, params%Ndep2r
+                if (maxval(params%Bs(:)) /= 0) then
+                    if (all(params%Bs(:params%dim) >= max(params%Ndep2l, params%Ndep2r))) then
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " >= Ndep2=", max(params%Ndep2l, params%Ndep2r),", Reconstruction fully optimized for CE. Reconstructing only fine block at coarse-fine interfaces in one go."
+                    elseif (all(params%Bs(:params%dim) >= max(params%Nreconl, params%Nreconr))) then
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " >= Nrecon=", max(params%Nreconl, params%Nreconr),", Reconstruction partially optimized for CE. Reconstructing only fine block at coarse-fine interfaces, but doing it level-wise."
+                    else
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " < Nrecon=", max(params%Nreconl, params%Nreconr),", Reconstruction weakly optimized for CE. Reconstructing fine block at coarse-fine interfaces as well as their same-lvl neighbors and doing that level-wise."
+                    endif
+                endif
             endif
 
             ! For the leaf-first loop, we need 3*h as minimum blocksize, as we have an upwards dependency for the leaf-decomposition

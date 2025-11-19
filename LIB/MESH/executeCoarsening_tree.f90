@@ -122,7 +122,7 @@ end subroutine executeCoarsening_tree
 
 
 !> For CVS decomposition we need to update mothers from decomposed daughter values, this does exactly that
-subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_name)
+subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_level, s_ref, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -133,7 +133,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
-    integer(kind=ik), intent(in)        :: s_val
+    integer(kind=ik), optional, intent(in) :: s_level, s_ref
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
@@ -154,6 +154,8 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         sync_case_id = 1
     case("ref")
         sync_case_id = 2
+    case("level_ref")
+        sync_case_id = 3
     case default
         call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
     end select
@@ -168,9 +170,11 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
         ! skip some blocks
         if (sync_case_ID == 1) then
-            if (level_me /= s_val) cycle
+            if (level_me /= s_level) cycle
         elseif (sync_case_ID == 2) then
-            if (ref_me /= s_val) cycle
+            if (ref_me /= s_ref) cycle
+        elseif (sync_case_ID == 3) then
+            if (level_me /= s_level .or. ref_me /= s_ref) cycle
         endif
 
         ! check if block exists and actually has a mother
@@ -192,7 +196,7 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_" // sync_case, ncomponents=nc, s_val=s_val, sync_debug_name=sync_debug_name)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="D2M_" // sync_case, ncomponents=nc, s_level=s_level, s_ref=s_ref, sync_debug_name=sync_debug_name)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer, verbose_check=.true.)
 
     ! now the daughter blocks need to be retransformed to spaghetti
@@ -203,9 +207,11 @@ subroutine sync_D2M(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         ref_me   = lgt_block( lgt_ID, IDX_REFINE_STS)
         ! skip some blocks
         if (sync_case_ID == 1) then
-            if (level_me /= s_val) cycle
+            if (level_me /= s_level) cycle
         elseif (sync_case_ID == 2) then
-            if (ref_me /= s_val) cycle
+            if (ref_me /= s_ref) cycle
+        elseif (sync_case_ID == 3) then
+            if (level_me /= s_level .or. ref_me /= s_ref) cycle
         endif
 
         ! check if block exists and actually has a mother
@@ -222,7 +228,7 @@ end subroutine sync_D2M
 
 
 !> For CVS reconstruction we need to update daughters from reconstructed mothers, this does exactly that
-subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_name)
+subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_level, s_ref, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -233,7 +239,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
     integer(kind=ik), intent(in)        :: tree_ID                      !< tree_id to be coarsened
     character(len=*)                    :: sync_case                    !< String representing which kind of syncing we want to do
     !> Additional value to be considered for syncing logic, can be level or refinement status from which should be synced, dependend on sync case
-    integer(kind=ik), intent(in)        :: s_val
+    integer(kind=ik), optional, intent(in) :: s_level, s_ref
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     ! loop variables
@@ -255,6 +261,8 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
         sync_case_id = 1
     case("ref")
         sync_case_id = 2
+    case("level_ref")
+        sync_case_id = 3
     case default
         call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
     end select
@@ -275,9 +283,11 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
             ref_m = lgt_block( lgt_ID_m, IDX_REFINE_STS)
             ! for some calls we don't want to work on whole tree so skip some blocks
             if (sync_case_ID == 1) then
-                if (level_m == s_val) change_form = .true.
+                if (level_m == s_level) change_form = .true.
             elseif (sync_case_ID == 2) then
-                if (ref_m == s_val) change_form = .true.
+                if (ref_m == s_ref) change_form = .true.
+            elseif (sync_case_ID == 3) then
+                if (level_m == s_level .and. ref_m == s_ref) change_form = .true.
             endif
         endif
 
@@ -299,7 +309,7 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
 
     ! actual xfer, this works on all blocks that are on this level and have a daughter
     n_xfer = 0  ! transfer counter
-    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_val=s_val, sync_debug_name=sync_debug_name)
+    call prepare_update_family_metadata(params, tree_ID, n_xfer, sync_case="M2D_" // sync_case, ncomponents=nc, s_level=s_level, s_ref=s_ref, sync_debug_name=sync_debug_name)
     call xfer_block_data(params, hvy_block, tree_ID, n_xfer)
 
     !---------------------------------------------------------------------------
@@ -318,9 +328,11 @@ subroutine sync_M2D(params, hvy_block, tree_ID, sync_case, s_val, sync_debug_nam
             ref_m = lgt_block( lgt_ID_m, IDX_REFINE_STS)
             ! for some calls we don't want to work on whole tree so skip some blocks
             if (sync_case_ID == 1) then
-                if (level_m == s_val) change_form = .true.
+                if (level_m == s_level) change_form = .true.
             elseif (sync_case_ID == 2) then
-                if (ref_m == s_val) change_form = .true.
+                if (ref_m == s_ref) change_form = .true.
+            elseif (sync_case_ID == 3) then
+                if (level_m == s_level .and. ref_m == s_ref) change_form = .true.
             endif
         endif
 

@@ -62,7 +62,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
         call multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, residual_out=residual(1:3*size(hvy_sol,4)), verbose=verbose_apply)
         ! now the residuals are stored as: Linfty, L2, L1, but L2 and L1 are only computed with verbose_apply
 
-        ! if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, i0, A, 10(es10.4, 1x))') "   it ", i_cycle, "/", params%poisson_cycle_it, " Residual Linfty: ", residual(1:size(hvy_sol,4))
+        ! if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, i0, A, 10(es10.3, 1x))') "   it ", i_cycle, "/", params%poisson_cycle_it, " Residual Linfty: ", residual(1:size(hvy_sol,4))
 
         ! choose between different end criteria:
         ! fixed_iterations - do a set number of V-cycles
@@ -93,7 +93,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     enddo
     if (params%rank == 0 .and. verbose_apply) write(*, '(A, 10(es10.3, 1x))') "--- Mean value: ", residual(3*size(hvy_sol,4)+1:4*size(hvy_sol,4))
 
-    if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, 10(es10.4, 1x))') "   Final Residual after ", i_cycle, " it, Linfty: ", residual(1:size(hvy_sol,4))
+    if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, 10(es10.3, 1x))') "   Final Residual after ", i_cycle, " it, Linfty: ", residual(1:size(hvy_sol,4))
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     call prune_fulltree2leafs(params, tree_ID)
@@ -319,11 +319,11 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
 
     if (verbose_apply) then
         call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", residual_out(nc+1:2*nc), threshold_state_vector=.false.)
-        if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L2: ", residual_out(nc+1), " ---"
+        if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Residual L2: ", residual_out(nc+1), " ---"
         call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L1", residual_out(2*nc+1:3*nc), threshold_state_vector=.false.)
-        ! if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual L1: ", residual_out(2*nc+1), " ---"
+        ! if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Residual L1: ", residual_out(2*nc+1), " ---"
 
-        if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Residual Linfty: ", residual_out(1), " ---"
+        if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Residual Linfty: ", residual_out(1), " ---"
 
 
         t_print = MPI_Wtime()-t_cycle
@@ -428,7 +428,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
 
         ! do upwards sync of solution field, this then needs to be interpolated
         t_block = MPI_Wtime()
-        call sync_M2D(params, hvy_sol(:,:,:,1:nc,:), tree_ID, sync_case="ref", s_val=-1)
+        call sync_M2D(params, hvy_sol(:,:,:,1:nc,:), tree_ID, sync_case="ref", s_ref=-1)
         call toc( "Sync M2D", 10012, MPI_Wtime()-t_block )
 
         ! reordering of refinement flags:
@@ -598,7 +598,7 @@ subroutine multigrid_coarsest(params, hvy_sol, hvy_RHS, tree_ID, i_level, Jmax_a
             call toc( "fft solve poisson", 10004, MPI_Wtime()-t_block )
         elseif (params%poisson_coarsest == "CG") then
             ! conjugent gradient method for lowest block if level = 0
-            if (params%rank == 0 .and. verbose_apply) write(*, '(A, 2(A, i0), A, es7.1)') repeat('  ', i_level+1), 'Coarsest CG lvl ', i_level, ' it max ', it_sweep, ' tol ', tol_cg
+            if (params%rank == 0 .and. verbose_apply) write(*, '(A, 2(A, i0), A, es8.1)') repeat('  ', i_level+1), 'Coarsest CG lvl ', i_level, ' it max ', it_sweep, ' tol ', tol_cg
             t_block = MPI_Wtime()
             do k_block = 1, hvy_n(tree_ID)
                 hvy_id = hvy_active(k_block, tree_ID)

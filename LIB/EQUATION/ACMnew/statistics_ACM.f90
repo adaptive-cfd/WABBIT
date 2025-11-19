@@ -143,7 +143,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
         do k = 1, size(u,4)
             if (maxval(abs(u(:,:,:,k))) > 1.0e12_rk) then
-                write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
+                write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.3, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es9.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
 
                 call dump_block_fancy(u(:,:,:,k:k), "block_ACM_diverged_statistics.txt", Bs, g)
 

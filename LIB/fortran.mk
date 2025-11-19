@@ -73,12 +73,15 @@ FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
-FFLAGS += -O3
-FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -pedantic
-FFLAGS += -Wall -Wextra -Wconversion -fbacktrace -ffpe-trap=zero,invalid 
-FFLAGS += -g3 -g -ggdb  # debugging flags
-FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
+FFLAGS += -O3  # optimization flag
+# compiler warnings
+FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -fimplicit-none -pedantic
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
+# error-catching flags
+FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid
+FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
+# debugging flags
+FFLAGS += -g3 -g -ggdb
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
@@ -115,9 +118,19 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
 FFLAGS += -O3 -FR -heap-arrays
-##FFLAGS += -xcore-avx2  # use avx2
-# timing flags: attention they might disable all optimization!
-##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
+# specific optimization for tgcc rome partition
+ifeq ($(shell hostname | head -c 5),irene)
+#   Interprocedural optimization (slower compile, faster run)
+FFLAGS += -ipo
+#   Baseline AVX2 for AMD Rome          
+FFLAGS += -mavx2
+# FFLAGS += -axCORE-AVX2,CORE-AVX512  # Add Intel-optimized paths, enable if we have intel partitions again
+endif
+# timing or error catching flags: attention they might disable all optimization!
+FFLAGS += -traceback
+ifdef DEV
+FFLAGS += -g -warn all,nounused -check bounds -check all,noarg_temp_created -fpe0 -ftrapuv
+endif
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled

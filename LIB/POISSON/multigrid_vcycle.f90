@@ -12,6 +12,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     real(kind=rk)                      :: dx(1:3), x0(1:3), residual(1:4*size(hvy_sol,4)), norm_sol(1:size(hvy_sol,4))
     real(kind=rk)                      :: t_block
     logical                            :: verbose_apply, init0
+    character(len=cshort)              :: fname
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
@@ -93,7 +94,10 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     enddo
     if (params%rank == 0 .and. verbose_apply) write(*, '(A, 10(es10.3, 1x))') "--- Mean value: ", residual(3*size(hvy_sol,4)+1:4*size(hvy_sol,4))
 
-    if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, 10(es10.3, 1x))') "   Final Residual after ", i_cycle, " it, Linfty: ", residual(1:size(hvy_sol,4))
+    if (params%rank == 0 .and. .not. verbose_apply) then
+        write(fname, '(A, i0, A, i0, A)') "(A, i0, A, ", size(hvy_sol,4), "(es10.3, 1x), A, ", size(hvy_sol,4), "(es10.3, 1x))"
+        write(*, fname) "   Final Residual after ", i_cycle, " it, Linfty: ", residual(1:size(hvy_sol,4)), " , rel to RHS: ", residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4))
+    endif
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     call prune_fulltree2leafs(params, tree_ID)

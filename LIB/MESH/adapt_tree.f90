@@ -418,21 +418,21 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
         write(string_prepare, '(A, i0)') "wavelet_decompose_syncN_lvl", level  !< prepare format string for sync debug
 
-        ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
-        ! if (params%isLiftedWavelet) then
-        !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
-        !     call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block)
+        ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
+        if (params%useCoarseExtension) then
+            call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
+            call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block)
 
-        !     write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
-        !     call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
-        ! ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
-        ! else
+            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
+            call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
+        ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
+        else
             call sync_TMP_from_all( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
             call toc( "decompose_tree (sync TMP <- all)", 111, MPI_Wtime()-t_block)
 
             write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- all)"
             call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
-        ! endif
+        endif
 
         ! Wavelet-transform all blocks which are untreated
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form for these blocks
@@ -832,6 +832,7 @@ subroutine wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block, hvy_tmp,
         t_loop = MPI_Wtime()
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
+        ! Usually we cannot sync from coarse without syncing same and fine level first, as interpolation cannot be applied, but here we only need SC from coarser neighbors
         write(string_prepare, '(A, i0)') "wavelet_reconstruct_syncN_lvl", level  !< prepare format string for sync debug
         t_block = MPI_Wtime()
         call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=params%g, g_plus=params%g, ref_check=-1, sync_debug_name=string_prepare)
@@ -910,6 +911,7 @@ subroutine wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block, hvy_tmp,
 
             ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
             ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
+            ! Usually we cannot sync from coarse without syncing same and fine level first, as interpolation cannot be applied, but here we only need SC from coarser neighbors
             write(string_prepare, '(A, i0)') "wavelet_reconstruct_syncN_lvl", level  !< prepare format string for sync debug
             t_block = MPI_Wtime()
             call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=params%g, g_plus=params%g, level=level, ref_check=-1, sync_debug_name=string_prepare)

@@ -93,7 +93,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         if (params%use_iteration_as_fileid) then
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
         else
-          write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+          write( fname,'(a, "_", i6.6, i6.6, ".h5")') trim(adjustl(tmp)), int(time), nint((time-int(time))*1.0e6_rk)
         endif
 
         ! actual writing

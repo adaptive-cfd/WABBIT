@@ -196,6 +196,7 @@ module module_params
         ! save filter strength sigma
         logical :: save_filter_strength
         logical :: filter_only_maxlevel = .false., filter_all_except_maxlevel = .false.
+        logical, allocatable :: filter_component(:)
 
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions

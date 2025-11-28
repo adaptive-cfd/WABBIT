@@ -235,7 +235,7 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
-	inicond_NStokes.f90 filter_block.f90 $(OBJDIR)/module_params.o
+	inicond_NStokes.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\
@@ -268,7 +268,7 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D_wingsection.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \

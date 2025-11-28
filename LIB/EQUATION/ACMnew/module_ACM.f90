@@ -26,7 +26,7 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
+  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
   !**********************************************************************************************
@@ -104,7 +104,7 @@ module module_acm
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder"
+    character(len=cshort) :: inicond="", discretization="", geometry="cylinder"
     character(len=cshort) :: sponge_type=""
     character(len=cshort) :: p_eqn_model="acm"
     character(len=cshort) :: coarsening_indicator=""
@@ -151,7 +151,6 @@ contains
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
 #include "time_statistics_ACM.f90"
-#include "filter_ACM.f90"
 #include "2D_wingsection.f90"
 
 ! this routine is public, even though it is non-standard for all physics modules.
@@ -283,7 +282,6 @@ end subroutine
 
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
 
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")

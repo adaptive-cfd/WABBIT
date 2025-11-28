@@ -115,9 +115,11 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
    call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
    call read_param_mpi(FILE, 'Discretization', 'filter_all_except_maxlevel', params%filter_all_except_maxlevel, .false. )
-
    if (params%filter_type /= "no_filter") then
       call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+      allocate(params%filter_component(1:params%n_eqn))
+      params%filter_component(:) = .true.
+      call read_param_mpi(FILE, 'Discretization', 'filter_component', params%filter_component, params%filter_component )
    endif
 
    !***************************************************************************
@@ -449,9 +451,7 @@ subroutine ini_blocks(params, FILE )
    if ((params%adapt_tree .and. params%coarsening_indicator=="threshold-state-vector") .or. (params%adapt_inicond .and. params%coarsening_indicator_inicond=="threshold-state-vector")) then
       call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
    end if
-   do i = 1, params%n_eqn
-      params%threshold_state_vector_component(i) = nint(tmp(i))
-   enddo
+   params%threshold_state_vector_component(1:params%n_eqn) = nint(tmp(1:params%n_eqn))
    deallocate(tmp)
 
    if (params%Jini > params%Jmax) then

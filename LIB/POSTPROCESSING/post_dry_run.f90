@@ -273,22 +273,22 @@ subroutine post_dry_run
             !***********************************************************************
             ! Write fields to HDF5 file
             !***********************************************************************
-            write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
+            write( fname,'(a, "_", i6.6, i6.6, ".h5")') "mask", int(time), nint((time-int(time))*1.0e6_rk)
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
             if (save_us) then
-                write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usx", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-                write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usy", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-                write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usz", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
             if (save_color) then
-                write( fname,'(a, "_", i12.12, ".h5")') "color", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "color", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
@@ -314,22 +314,22 @@ subroutine post_dry_run
             ! as we intend to create the mask on a given grid, pruning makes no sense
 
             ! store mask file
-            write( fname,'(a, "_", i12.12, ".h5")') "mask", nint(time * 1.0e6_rk)
+            write( fname,'(a, "_", i6.6, i6.6, ".h5")') "mask", int(time), nint((time-int(time))*1.0e6_rk)
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
             if (save_us) then
-                write( fname,'(a, "_", i12.12, ".h5")') "usx", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usx", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
-                write( fname,'(a, "_", i12.12, ".h5")') "usy", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usy", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
-                write( fname,'(a, "_", i12.12, ".h5")') "usz", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usz", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=.false.)
             endif
 
             if (save_color) then
-                write( fname,'(a, "_", i12.12, ".h5")') "color", nint(time * 1.0e6_rk)
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "color", int(time), nint((time-int(time))*1.0e6_rk)
                 call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
         enddo

@@ -8,7 +8,7 @@
 !
 !> \note It is well possible to start with a very fine mesh and end up with only one active
 !! block after this routine. You do *NOT* have to call it several times.
-subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, init_full_tree_grid, neqn_adapt )
+subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy_work, hvy_mask, ignore_coarsening, ignore_maxlevel, init_full_tree_grid )
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -36,16 +36,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     logical, intent(in), optional       :: ignore_maxlevel
     !> Maybe we already have a full tree grid, so we do not need to initialize it
     logical, intent(in), optional       :: init_full_tree_grid
-    !> In some cases, not all component of the state vector need to be wavelet decomposed, and in those cases
-    !> excluding those saves a lot of extra work. If present, the code wavelet decomposes the first [1:neqn_adapt components] of 
-    !> the vector. For the remaining ones [neqn_adapt+1:neqn], only scaling function coefficients are computed (and no WC); reconstruction
-    !> is done by simple copying. If neqn_adapt is not present, all components are fully decomposed (SC AND WC computed).
-    integer(kind=ik), optional, intent(in) :: neqn_adapt
     
     ! loop variables
     integer(kind=ik)                    :: iteration, k, lgt_id
     real(kind=rk)                       :: t_block, t_all, t_loop
-    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id, neqn_adapt_apply
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level, ierr, k1, hvy_id
     logical                             :: ignore_coarsening_apply, ignore_maxlevel_apply, initFullTreeGrid, iterate, toBeManipulated
     integer(kind=ik)                    :: level_me, ref_stat, Jmin, lgt_n_old, g_this
     character(len=clong)                :: format_string
@@ -83,8 +78,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     if (present(ignore_maxlevel)) ignore_maxlevel_apply = ignore_maxlevel
     initFullTreeGrid = .true.
     if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
-    neqn_adapt_apply = size(hvy_block, 4)
-    if (present(neqn_adapt)) neqn_adapt_apply = neqn_adapt
 
 
     ! To avoid that the incoming hvy_neighbor array and active lists are outdated
@@ -99,7 +92,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Blocks always pass their SC to their mother (pendant to excuteCoarsening of old function), new blocks only synch from medium neighbors to avoid CE
     ! This is repeated until all blocks on the layer JMin are present with wavelet decomposed values
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, neqn_adapt=neqn_adapt_apply, Jmin_set=Jmin, time=time)
+    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, Jmin_set=Jmin, time=time)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -235,17 +228,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     else
         ! In a special case reconstruction can be skipped as it has already been done, therefore the if-condition
         if (.not. ((indicator == "threshold-cvs" .or. indicator == "threshold-image-denoise") .and. ignore_coarsening_apply)) then
-            ! generally, we wavelet reconstruct all equations. In some rare cases, only a subset is required, for example for time statistics
-            ! in this case, we reconstruct only the first neqn_adapt_apply equations and the rest is copied from the backup
-            ! Note that hvy_tmp contains the original values, so we copy them back after reconstructing the first neqn_adapt_apply equations
-            ! call wavelet_reconstruct_full_tree(params, hvy_block(:,:,:,1:neqn_adapt_apply,:), hvy_tmp(:,:,:,1:neqn_adapt_apply,:), tree_ID, Jmin_set=Jmin, time=time)
-            call wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block(:,:,:,1:neqn_adapt_apply,:), hvy_tmp(:,:,:,1:neqn_adapt_apply,:), tree_ID, Jmin_set=Jmin, time=time)
-            if (neqn_adapt_apply < size(hvy_block, 4)) then
-                do k = 1, hvy_n(tree_ID)
-                    hvy_ID = hvy_active(k, tree_ID)
-                    hvy_block(:, :, : ,neqn_adapt_apply+1:size(hvy_block, 4), hvy_ID) = hvy_tmp(:, :, : ,neqn_adapt_apply+1:size(hvy_block, 4), hvy_ID)  ! restore original values
-                enddo
-            endif
+            ! call wavelet_reconstruct_full_tree(params, hvy_block(:,:,:,1:size(hvy_block, 4),:), hvy_tmp(:,:,:,1:size(hvy_block, 4),:), tree_ID, Jmin_set=Jmin, time=time)
+            call wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block(:,:,:,1:size(hvy_block, 4),:), hvy_tmp(:,:,:,1:size(hvy_block, 4),:), tree_ID, Jmin_set=Jmin, time=time)
         endif
     endif
     call toc( "adapt_tree (reconstruct_tree)", 105, MPI_Wtime()-t_block )
@@ -277,7 +261,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, neqn_adapt, Jmin_set, time, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, Jmin_set, time, verbose_check)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -290,15 +274,12 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     logical, intent(in), optional       :: compute_SC_only  !< only apply scaling function filter, defaults to false
     real(kind=rk), optional :: scaling_filter(:)  !< filter to be used for the SC, only used with compute_SC_only=T, defaults to params%HD
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
-    !> In rare cases, not all equations need to be wavelet decomposed, this saves a lot of extra work.
-    !> If not present, all equations are used. Applying this decomposes only SC and reconstructs by copying
-    integer(kind=ik), optional, intent(in) :: neqn_adapt
     !> In some cases, we like to set a different Jmin for the decomposition than the one active in the tree
     integer(kind=ik), optional, intent(in) :: Jmin_set
     !> current simulation time, only used for development debugging output
     real(kind=rk), intent(in), optional  :: time
 
-    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level, neqn_adapt_apply, ierr, Jmin
+    integer(kind=ik)     :: k, lgt_ID, hvy_ID, lgt_n_old, g_this, level_me, ref_stat, iteration, level, ierr, Jmin
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: format_string, string_prepare
     logical              :: iterate, use_leaf_first, initFullTreeGrid, computeSCOnly
@@ -320,8 +301,6 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         allocate(scalingFilter(lbound(params%HD, dim=1):ubound(params%HD, dim=1)))
         scalingFilter(:) = params%HD(:)
     endif
-    neqn_adapt_apply = size(hvy_block, 4)
-    if (present(neqn_adapt)) neqn_adapt_apply = neqn_adapt
     Jmin = params%Jmin
     if (present(Jmin_set)) Jmin = Jmin_set
 
@@ -462,13 +441,8 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
                     call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID), params%HD, &
                         lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
                 else
-                    ! generally, we wavelet decompose all equations. In some rare cases, only a subset is required, for example for time statistics
-                    ! in this case, we decompose only the first neqn_adapt_apply equations and the rest only with the scaling function
-                    ! call waveletDecomposition_block(params, hvy_block(:,:,:,1:neqn_adapt_apply,hvy_ID))
-                    call waveletDecomposition_optimized_block(params, hvy_tmp(:,:,:,1:neqn_adapt_apply,hvy_ID), hvy_block(:,:,:,1:neqn_adapt_apply,hvy_ID))
-                    if (neqn_adapt_apply < size(hvy_block, 4)) then
-                        call blockFilterXYZ_vct( params, hvy_tmp(:,:,:,neqn_adapt_apply+1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,neqn_adapt_apply+1:size(hvy_block, 4),hvy_ID), params%HD, lbound(params%HD, dim=1), ubound(params%HD, dim=1), do_restriction=.true.)
-                    endif
+                    ! call waveletDecomposition_block(params, hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID))
+                    call waveletDecomposition_optimized_block(params, hvy_tmp(:,:,:,1:size(hvy_block, 4),hvy_ID), hvy_block(:,:,:,1:size(hvy_block, 4),hvy_ID))
                 endif
             endif
         end do

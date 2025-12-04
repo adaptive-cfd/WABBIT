@@ -393,38 +393,12 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-
-                ! High-level optimization for time statistics:
-                ! Check if any time statistics components should be adapted (threshold_state_vector_component > 0)
-                ! Time statistics are always at the end of the state vector
-                ! If we do not want to adapt them, we can reduce the workload of adapt_tree significantly.
-                if (params%time_statistics .and. params%N_time_statistics > 0 .and. &
-                    any(params%threshold_state_vector_component(params%n_eqn-params%N_time_statistics+1:params%n_eqn) > 0)) then
-                    ! Include time statistics in adaptation
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_adapt=params%n_eqn)
-                else
-                    ! Exclude time statistics from adaptation to reduce workload
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_adapt=params%n_eqn-params%N_time_statistics)
-                endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_mask=hvy_mask, hvy_work=hvy_work)
             else
                 ! actual coarsening (no mask function is required)
-
-                ! High-level optimization for time statistics:
-                ! Check if any time statistics components should be adapted (threshold_state_vector_component > 0)
-                ! Time statistics are always at the end of the state vector
-                ! If we do not want to adapt them, we can reduce the workload of adapt_tree significantly.
-                if (params%time_statistics .and. params%N_time_statistics > 0 .and. &
-                    any(params%threshold_state_vector_component(params%n_eqn-params%N_time_statistics+1:params%n_eqn) > 0)) then
-                    ! Include time statistics in adaptation
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_work=hvy_work, neqn_adapt=params%n_eqn)
-                else
-                    ! Exclude time statistics from adaptation to reduce workload
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_work=hvy_work, neqn_adapt=params%n_eqn-params%N_time_statistics)
-                endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_work=hvy_work)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)

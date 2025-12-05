@@ -145,7 +145,7 @@ subroutine adaption_test(params)
 
     if (save_all) then
       do j = 1, n_components
-          write( file_out, '("u",i1,"-eps", A,"_",i6.6,i6.6 ,".h5")') j, trim(adjustl(eps_str_list(i))), int(time), nint((time-int(time))*1.0e6_rk)
+          write( file_out, '("u",i1,"-eps", A,"_",i6.6,i6.6 ,".h5")') j, trim(adjustl(eps_str_list(i))), int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
           call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_adapt)
       end do

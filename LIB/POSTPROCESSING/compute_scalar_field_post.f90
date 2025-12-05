@@ -135,14 +135,14 @@ subroutine compute_scalar_field_post(params)
     end do
 
     if (operator=="--gradient") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'gradx', int(time), nint((time-int(time))*1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'gradx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'grady', int(time), nint((time-int(time))*1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'grady', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID )
 
         if (params%dim == 3) then
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'gradz', int(time), nint((time-int(time))*1.0e6_rk)
+            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'gradz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
             call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID )
         end if
     endif

@@ -576,10 +576,9 @@ subroutine proto_NSI_EE(params)
     ! Write fields to HDF5 file
     !***********************************************************************
     ! do not save any output before this time (so maybe revoke the previous decision)
-    if (time>=params%write_time_first) then
+    if (time+1e-12_rk>=params%write_time_first) then
         call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
     endif
-    params%next_write_time = params%next_write_time + params%write_time
 
     ! ------------------------------------------------------------
     ! Explicit Euler timestepping
@@ -726,11 +725,11 @@ subroutine proto_NSI_EE(params)
         ! determine if it is time to save data
         it_is_time_to_save_data = .false.
         if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
+            (params%write_method=='fixed_time' .and. abs(mod(time, params%write_time))<1.0e-12_rk)) then
             it_is_time_to_save_data = .true.
         endif
         ! do not save any output before this time (so maybe revoke the previous decision)
-        if (time<params%write_time_first) then
+        if (time+1e-12_rk<params%write_time_first) then
             it_is_time_to_save_data = .false.
         endif
         ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
@@ -761,7 +760,7 @@ subroutine proto_NSI_EE(params)
         endif
 
         ! we reconstruct the pressure if we do statistics or save data to have it in respective accuracy
-        if (it_is_time_to_save_data .or. (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk)) then
+        if (it_is_time_to_save_data .or. (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time, params%tsave_stats))<1e-12_rk)) then
             t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
             call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
@@ -791,16 +790,13 @@ subroutine proto_NSI_EE(params)
         !*******************************************************************
         ! statistics
         !*******************************************************************
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) .or. abs(time - params%time_max) < 1e-12_rk ) then
+        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time, params%tsave_stats))<1e-12_rk) .or. abs(time - params%time_max) < 1e-12_rk ) then
             t4 = MPI_wtime()
             ! we need to sync ghost nodes for some derived qtys, for sure
             call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
             call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
-
-            ! update next stats time
-            if (abs(time - params%next_stats_time)<1e-12_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
 
         !***********************************************************************
@@ -836,8 +832,6 @@ subroutine proto_NSI_EE(params)
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
             call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
-
-            params%next_write_time = params%next_write_time + params%write_time
         endif
 
         ! output on screen

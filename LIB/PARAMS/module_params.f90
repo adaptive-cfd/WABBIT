@@ -38,8 +38,6 @@ module module_params
         character(len=cshort) :: write_method="fixed_time"
         ! data writing frequency
         real(kind=rk) :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk, write_time_first=0.0_rk
-        ! data next write time, store here the next time for output data
-        real(kind=rk) :: next_write_time=0.0_rk
         ! this number is used when generating random grids.
         ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
         real(kind=rk) :: max_grid_density = 0.1_rk
@@ -136,7 +134,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
+        real(kind=rk) :: tsave_stats=99999999.9_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
 
         ! -------------------------------------------------------------------------------------

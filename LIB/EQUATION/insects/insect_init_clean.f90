@@ -68,14 +68,17 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     endif
     if (root) write(*,'("n_ghosts=",i2)') g
 
-    ! is the insect periodic?
-    ! attention: this functionality is not for free, so if you do not need it - disable it.
-    if (present(periodic)) then
-        periodic_insect = periodic
-    else
-        periodic_insect = .false.
-    endif
-    if (root) write(*,'("periodic_insect=",L1)') periodic_insect
+    ! 2025-11-07: insect periodization disabled, TE. It can be tricky to compute the properly periodized mask function 
+    ! (eg bounding boxes) and in WABBIT, we'd just use a large enough domain in most cases. In particular, also STL periodization
+    ! is probably painful.
+    ! ! is the insect periodic?
+    ! ! attention: this functionality is not for free, so if you do not need it - disable it.
+    ! if (present(periodic)) then
+    !     periodic_insect = periodic
+    ! else
+    !     periodic_insect = .true.
+    ! endif
+    ! if (root) write(*,'("periodic_insect=",L1)') periodic_insect
 
     !-----------------------------------------------------------------------------
     ! read in parameters form ini file
@@ -112,39 +115,18 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     if ( index(Insect%FlappingMotion_right,"from_file::") /= 0 ) then
         ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
         Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 12:clong  )
-        Insect%FlappingMotion_right = "from_file"
-
-    elseif ( index(Insect%FlappingMotion_right,"kinematics_loader::") /= 0 ) then
-        ! new syntax, uses the kinematics loader for non-periodic kinematics
-        Insect%kine_wing_r%infile = Insect%FlappingMotion_right( 20:clong )
-        Insect%FlappingMotion_right = "kinematics_loader"
-
+        Insect%FlappingMotion_right = "from_file"        
     elseif ( Insect%FlappingMotion_right == "from_file" ) then
         ! old syntax, implies symmetric periodic motion, read from *.ini file
         Insect%kine_wing_r%infile = Insect%infile
-
-    elseif ( Insect%FlappingMotion_right == "kinematics_loader" ) then
-        ! old syntax, implies symmetric non-periodic motion, read from *.dat file
-        Insect%kine_wing_r%infile = Insect%infile
     endif
-
 
     if ( index(Insect%FlappingMotion_left,"from_file::") /= 0 ) then
         ! new syntax, uses fourier/hermite periodic kinematics read from *.ini file
         Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 12:clong  )
         Insect%FlappingMotion_left = "from_file"
-
-    elseif ( index(Insect%FlappingMotion_left,"kinematics_loader::") /= 0 ) then
-        ! new syntax, uses the kinematics loader for non-periodic kinematics
-        Insect%kine_wing_l%infile = Insect%FlappingMotion_left( 20:clong )
-        Insect%FlappingMotion_left = "kinematics_loader"
-
     elseif ( Insect%FlappingMotion_left == "from_file" ) then
         ! old syntax, implies symmetric periodic motion, read from *.ini file
-        Insect%kine_wing_l%infile = Insect%infile
-
-    elseif ( Insect%FlappingMotion_left == "kinematics_loader" ) then
-        ! old syntax, implies symmetric non-periodic motion, read from *.dat file
         Insect%kine_wing_l%infile = Insect%infile
     endif
 
@@ -227,6 +209,9 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
 
     call read_param_mpi(PARAMS,"Insects","BodyType",Insect%BodyType,"ellipsoid")
     call read_param_mpi(PARAMS,"Insects","BodyMotion",Insect%BodyMotion,"tethered")
+    ! this one file contains all the kinematics (four wings and body)
+    call read_param_mpi(PARAMS,"Insects","infile_kineloader",Insect%infile_kineloader,"none")
+
     call read_param_mpi(PARAMS,"Insects","LeftWing",Insect%LeftWing,"yes")
     call read_param_mpi(PARAMS,"Insects","RightWing",Insect%RightWing,"yes")
     call read_param_mpi(PARAMS,"Insects","mass",Insect%mass, 1._rk)
@@ -240,12 +225,9 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
     Insect%Jpitch_body = defaultvec(2)
     call read_param_mpi(PARAMS,"Insects","x0",Insect%x0, (/0.5_rk*xl,0.5_rk*yl,0.5_rk*zl/))
     call read_param_mpi(PARAMS,"Insects","v0",Insect%v0, (/0.0_rk, 0.0_rk, 0.0_rk/))
-    call read_param_mpi(PARAMS,"Insects","yawpitchroll_0",Insect%yawpitchroll_0,&
-    (/0.0_rk, 0.0_rk, 0.0_rk/))
-    call read_param_mpi(PARAMS,"Insects","yawpitchroll_a1",Insect%yawpitchroll_a1,&
-    (/0.0_rk, 0.0_rk, 0.0_rk/))
-    call read_param_mpi(PARAMS,"Insects","yawpitchroll_b1",Insect%yawpitchroll_b1,&
-    (/0.0_rk, 0.0_rk, 0.0_rk/))
+    call read_param_mpi(PARAMS,"Insects","yawpitchroll_0",Insect%yawpitchroll_0,(/0.0_rk, 0.0_rk, 0.0_rk/))
+    call read_param_mpi(PARAMS,"Insects","yawpitchroll_a1",Insect%yawpitchroll_a1,(/0.0_rk, 0.0_rk, 0.0_rk/))
+    call read_param_mpi(PARAMS,"Insects","yawpitchroll_b1",Insect%yawpitchroll_b1,(/0.0_rk, 0.0_rk, 0.0_rk/))
     ! convert yawpitchroll to radiants
     Insect%yawpitchroll_0 = Insect%yawpitchroll_0 * (pi/180.0_rk)
     Insect%yawpitchroll_a1 = Insect%yawpitchroll_a1 * (pi/180.0_rk)
@@ -266,7 +248,6 @@ subroutine insect_init(time, fname_ini, Insect, resume_backup, fname_backup, box
         Insect%DoF_on_off(j) = dble(tmp)
     enddo
     if (root) write(*,'(6(f4.2,1x))') Insect%DoF_on_off
-
 
     ! section for additional fractal tree
     call read_param_mpi(PARAMS, "Insects", "fractal_tree", Insect%fractal_tree, .false.)
@@ -437,7 +418,6 @@ subroutine insect_clean(Insect)
     if (allocated(wing_thickness_profile)) deallocate ( wing_thickness_profile )
     if (allocated(corrugation_profile)) deallocate ( corrugation_profile )
     if (allocated(mask_wing_complete)) deallocate(mask_wing_complete)
-
-    call load_kine_clean( Insect%kine_wing_l )
-    call load_kine_clean( Insect%kine_wing_r )
+    if (allocated(Insect%data_kineloader)) deallocate(Insect%data_kineloader)
+   
 end subroutine insect_clean

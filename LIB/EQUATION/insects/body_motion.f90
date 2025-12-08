@@ -214,6 +214,28 @@ subroutine BodyMotion(time, Insect)
         beta_dt  = 0.0_rk
         gamma_dt = 0.0_rk
 
+    case ('kinematics_loader')
+        !--------------------------------------------------
+        ! kinematics loader for non-periodic kinematics
+        !--------------------------------------------------
+        if (.not. Insect%kineloader_initialized) then
+            call load_kine_init(Insect)
+        endif   
+
+        ! fetch current wingkinematics from the data file, using hermite interpolation.
+        ! NOTE: unlike earlier implementations, we assume here the file contains RADIANT and is in FLUSI 
+        ! convention, and that time and velocities are in appropriate units (i.e. normalized externally
+        ! during the generation of the data file)
+        call body_kine_interp(time, Insect, gamma, beta, psi, gamma_dt, beta_dt, psi_dt, xc(1), xc(2), xc(3), vc(1), vc(2), vc(3))
+
+        ! the x0 is the start of the motion now:
+        xc = xc + Insect%x0
+        Insect%body_moves = "yes"
+
+        if (((xc(1) < 0.0_rk).or.(xc(1)>xl)).or.((xc(2) < 0.0_rk).or.(xc(2)>yl)).or.((xc(3) < 0.0_rk).or.(xc(3)>zl))) then
+            call abort(071120253, "Insect outside of domain, periodization not available at the moment!")
+        endif
+
     case default
         if (Insect%BodyMotion(1:11) == "from_file::") then
             ! use body state from a pre-existing simulation, which was probably an FSI
@@ -241,7 +263,7 @@ subroutine BodyMotion(time, Insect)
             psi_dt   = 0.0_rk
             beta_dt  = 0.0_rk
             gamma_dt = 0.0_rk
-
+        
         else
             call abort(220918, "body_motion.f90::BodyMotion: motion case &
             &(Insect%BodyMotion) undefined: "//trim(adjustl(Insect%BodyMotion)))

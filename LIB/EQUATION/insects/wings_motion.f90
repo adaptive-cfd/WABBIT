@@ -14,22 +14,22 @@ subroutine FlappingMotionWrap ( time, Insect, wingID )
   case (1) !("left")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_left, &
       Insect%phi_l, Insect%alpha_l, Insect%theta_l, Insect%phi_dt_l,&
-      Insect%alpha_dt_l, Insect%theta_dt_l, Insect%kine_wing_l )
+      Insect%alpha_dt_l, Insect%theta_dt_l, Insect%kine_wing_l, wingID )
 
   case (2) !("right")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_right, &
       Insect%phi_r, Insect%alpha_r, Insect%theta_r, Insect%phi_dt_r, &
-      Insect%alpha_dt_r, Insect%theta_dt_r, Insect%kine_wing_r )
+      Insect%alpha_dt_r, Insect%theta_dt_r, Insect%kine_wing_r, wingID )
 
   case (3) !("left2")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_left2, &
       Insect%phi_l2, Insect%alpha_l2, Insect%theta_l2, Insect%phi_dt_l2,&
-      Insect%alpha_dt_l2, Insect%theta_dt_l2, Insect%kine_wing_l2 )
+      Insect%alpha_dt_l2, Insect%theta_dt_l2, Insect%kine_wing_l2, wingID )
 
   case (4) !("right2")
       call FlappingMotion ( time, Insect, Insect%FlappingMotion_right2, &
       Insect%phi_r2, Insect%alpha_r2, Insect%theta_r2, Insect%phi_dt_r2, &
-      Insect%alpha_dt_r2, Insect%theta_dt_r2, Insect%kine_wing_r2 )
+      Insect%alpha_dt_r2, Insect%theta_dt_r2, Insect%kine_wing_r2, wingID )
 
   case default
     call abort(77744, "not a valid wing identifier")
@@ -54,11 +54,11 @@ end subroutine FlappingMotionWrap
 !       kine: a Fourier series object, as described in insects.f90
 ! The actual motion depends on the choices in the parameter file, namely
 ! Insect%WingMotion, and sub-parameters that may further precise a given motion
-! protocoll. Note we allow both wings to follow a differen motion, but they both
+! protocoll. Note we allow all four wings to follow a different motion, but they all
 ! call this routine here.
 !-------------------------------------------------------------------------------
 subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
-           alpha_dt, theta_dt, kine)
+           alpha_dt, theta_dt, kine, wingID)
   implicit none
 
   real(kind=rk), intent(in) :: time
@@ -66,6 +66,9 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
   real(kind=rk), intent(out) :: phi, alpha, theta, phi_dt, alpha_dt, theta_dt
   character (len=*), intent(in) :: protocoll
   type(wingkinematics), intent(inout) :: kine
+  ! wingID is used for kineloader (to figure out which columsn to use from the data array)
+  integer(kind=2), intent(in) :: wingID
+
   real(kind=rk) :: phi_max,alpha_max, phase,f
   real(kind=rk) :: bi_alpha_flapper(1:29) ! For comparison with Sane&Dickinson
   real(kind=rk) :: ai_phi_flapper(1:31) ! For comparison with Sane&Dickinson
@@ -225,24 +228,15 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
     !--------------------------------------------------
     ! kinematics loader for non-periodic kinematics
     !--------------------------------------------------
-    if (kine%initialized .eqv. .false.) then
-      call load_kine_init(kine)
-      kine%initialized = .true.
+    if (.not. Insect%kineloader_initialized) then
+      call load_kine_init(Insect)
     endif
 
-    ! fetch current wingkinematics from the data file, using hermite interpolation
-    call wing_kine_interp(time,kine,phi,alpha,theta,phi_dt,alpha_dt,theta_dt)
-    ! position angle
-    phi = deg2rad(phi)
-    phi_dt = deg2rad(phi_dt)
-    ! feathering angle
-    alpha = deg2rad(alpha)
-    alpha_dt = deg2rad(alpha_dt)
-    ! elevation angle in flusi coordinates
-    theta = -theta
-    theta_dt = - theta_dt
-    theta = deg2rad(theta)
-    theta_dt = deg2rad(theta_dt)
+    ! fetch current wingkinematics from the data file, using hermite interpolation.
+    ! NOTE: unlike earlier implementations, we assume here the file contains RADIANT and is in FLUSI 
+    ! convention, and that time and velocities are in appropriate units (i.e. normalized externally
+    ! during the generation of the data file)
+    call wing_kine_interp(time, Insect, wingID, phi, alpha, theta, phi_dt, alpha_dt, theta_dt)
 
   case ("revolving-set1")
     ! revolving wing kinematics, pre-defined set. We fix alpha to 45deg and increase

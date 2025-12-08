@@ -351,7 +351,7 @@ program main
                 if (modulo(iteration, params%filter_freq) == 0 .and. params%filter_freq > 0 .or. it_is_time_to_save_data) then
                     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-                    call filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
+                    call filter_wrapper(time, params, hvy_block, tree_ID_flow)
                 end if
             end if
             call toc( "TOPLEVEL: filter", 12, MPI_wtime()-t4)

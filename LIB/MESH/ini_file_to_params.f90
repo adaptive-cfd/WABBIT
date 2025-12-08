@@ -174,7 +174,7 @@ subroutine ini_file_to_params( params, filename )
    end if
    if ( (params%g < 3 .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central')) .or. &
         (params%g < 2 .and. params%order_discretization == 'FD_4th_central') .or. &
-        (params%g < 1 .and. params%order_discretization == 'FD_2th_central') ) then
+        (params%g < 1 .and. params%order_discretization == 'FD_2nd_central') ) then
       call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
@@ -183,7 +183,7 @@ subroutine ini_file_to_params( params, filename )
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
    if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central' ) g_RHS_min = 3
    if ( params%order_discretization == 'FD_4th_central' ) g_RHS_min = 2
-   if ( params%order_discretization == 'FD_2th_central' ) g_RHS_min = 1
+   if ( params%order_discretization == 'FD_2nd_central' ) g_RHS_min = 1
    if (params%g_RHS < g_RHS_min) then
       if (params%rank==0) then
          write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for FD scheme, adapting it from ", params%g_RHS, " to ", g_RHS_min, " (ignore this if it was not explicitly set)"

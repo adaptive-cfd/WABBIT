@@ -377,7 +377,7 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     type (type_params), intent(inout)                   :: params
     !> heavy data array - block data
     real(kind=rk), allocatable, intent(out)             :: hvy_block(:, :, :, :, :)
-    real(kind=rk), allocatable, intent(out)             :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
     !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
 
@@ -389,6 +389,9 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     if (allocated(hvy_block)) deallocate( hvy_block )
     if (present(hvy_work)) then
         if (allocated(hvy_work)) deallocate( hvy_work )
+    endif
+    if (present(hvy_tmp)) then
+        if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     endif
     if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )

@@ -1342,7 +1342,7 @@ contains
             if ( (g_RHS < 4) .and. (params%order_discretization == 'FD_8th_central') ) g_RHS = 4
             if ( (g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) g_RHS = 3
             if ( (g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) g_RHS = 2
-            if ( (g_RHS < 1) .and. (params%order_discretization == 'FD_2th_central') ) g_RHS = 1
+            if ( (g_RHS < 1) .and. (params%order_discretization == 'FD_2nd_central') ) g_RHS = 1
         endif
 
         ! compute coarse extension parameters. (see inkscape drawing 1d-ghostnodes-coarseextension-V2.svg)

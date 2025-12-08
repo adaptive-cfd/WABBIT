@@ -91,11 +91,11 @@ module module_ini_files_parser
             do while (io_error==0)
                 ! read a line from file
                 read (14,'(A)',iostat=io_error) dummy
+
                 i = i + 1
                 ! if we're past the header AND the read worked (i.e. not end of file)
                 if (i > n_header .and. io_error==0) then
-                    read(dummy,*) array(i-n_header,:)
-                    !        write(*,fmt) array(i-n_header,:)
+                    read(dummy,*,iostat=io_error) array(i-n_header,:)
                 endif
             enddo
             close (14)

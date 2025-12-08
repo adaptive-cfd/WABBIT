@@ -1,14 +1,10 @@
-subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
+subroutine filter_wrapper(time, params, hvy_block, tree_ID)
     implicit none
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(inout)   :: params                       !> user defined parameter structure, hvy_active
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
-    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> hvy_mask are qty that depend on the grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in)        :: tree_ID      
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
     integer(kind=ik)                    :: k, dF, neqn, lgt_id, i       ! loop variables
     integer(kind=ik)                    :: g, a, nx, ny, nz, nc
@@ -41,6 +37,13 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
             ! 
             ! Table I, case 1
+            !
+            ! If you look closely, you'll realize that those filters are the same as
+            ! higher order viscosity terms (hyperviscosity) with some given numerical 
+            ! dissipation. 
+            ! The 3pt filter corresponds to D2, the 5pt to D4 (with a coefficient of 
+            ! nu_num = -dx**4 / (16*dt) (yes, its a negative sign because it's 1i**4) )
+            ! and the 7pt to a 6th derivative (D6, central, 2nd order) with a diffusion of (dx**6/64*dt).
 
             stencil_size = 3
             a = (stencil_size-1)/2
@@ -56,12 +59,13 @@ subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/ -1.0_rk/ 16.0_rk, &
             1.0_rk/  4.0_rk, &
-            -3.0_rk/  8.0_rk, &
+            -3.0_rk/  8.0_rk, & ! 1-3/8 = 5/8
             1.0_rk/  4.0_rk, &
             -1.0_rk/ 16.0_rk/)
 
         case('explicit_7pt')
             ! same as above case 10
+            ! Corresponds to a 6th derivative hyperviscosity term (2nd order central FD)
             stencil_size = 7
             a = (stencil_size-1)/2
             stencil(-a:+a) = (/  1.0_rk/ 64.0_rk, &

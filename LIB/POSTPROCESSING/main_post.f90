@@ -45,6 +45,9 @@ program main_post
     if (rank==0) write(*,'("Starting postprocessing in ", a20, " mode")') mode
 
     select case(mode)
+    case ("--wing-pressure-interpolation")
+        call post_pressure_interpolation(params)
+        
     case ("--extract-slice")
         call post_extract_slice(params)
 

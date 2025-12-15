@@ -398,18 +398,19 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         write(string_prepare, '(A, i0)') "wavelet_decompose_syncN_lvl", level  !< prepare format string for sync debug
 
         ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
-        if (params%useCoarseExtension) then
+        ! the leaf-first algorithm needs to sync all values in first loop, as we do not assume all medium neighbors exist
+        if (params%useCoarseExtension .and. (.not. use_leaf_first .or. (use_leaf_first .and. iteration > 0))) then
             call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
-            call toc( "decompose_tree (sync TMP <- MF)", 111, MPI_Wtime()-t_block)
+            call toc( "decompose_tree (sync TMP)", 111, MPI_Wtime()-t_block)
 
-            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- MF)"
+            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync TMP)"
             call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
         ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
         else
             call sync_TMP_from_all( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
-            call toc( "decompose_tree (sync TMP <- all)", 111, MPI_Wtime()-t_block)
+            call toc( "decompose_tree (sync TMP)", 111, MPI_Wtime()-t_block)
 
-            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync lvl <- all)"
+            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync TMP)"
             call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
         endif
 

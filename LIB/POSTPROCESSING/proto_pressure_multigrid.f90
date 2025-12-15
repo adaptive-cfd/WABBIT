@@ -642,7 +642,13 @@ subroutine proto_NSI_EE(params)
         call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
         call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
         t3 = MPI_wtime()
-        call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        ! if the grid doesn't change, then we can reuse the previous solution as initial guess
+        ! if not, then we should start from zero, as blocks might have been moved or new ones activated, resulting in rubbish initial guess
+        if (params%adapt_tree) then
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+        else
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.false., verbose=.false.)
+        endif
         call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
         t3 = MPI_wtime()
         call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)

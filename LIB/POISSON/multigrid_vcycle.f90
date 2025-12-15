@@ -47,7 +47,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     ! blocks are practically empty, but we fill them along the way so ref flag will be set to 0 to allow synching
     call init_full_tree(params, tree_ID, Jmin_set=params%poisson_Jmin, set_ref=0)
 
-    ! init solution on lower levels as zero, elsewise it is that from last time-step
+    ! init solution on lower levels as zero, leaf is that from input array (reuses last time-step for example) or also set to zero
     do k_block = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k_block, tree_ID)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )

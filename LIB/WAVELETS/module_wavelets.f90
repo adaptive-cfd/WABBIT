@@ -1713,12 +1713,6 @@ contains
         if (.not. allocated(params%HD)) call abort(1717229, "Wavelet setup not called?!")
         if (.not. allocated(params%GD)) call abort(1717231, "Wavelet setup not called?!")
 
-        ! For the reconstruction of the wavelets all points are shifted by one one the SC positions
-        ! therefore, if the first point in the ghost layer would be a WC, it is ignored
-        ! This is done to align the WC with the correct positions. However, as the left bound of the GR filter defines the minimum g,
-        ! we apply a trick here, to ignore the first point in order to reduce the ghost point size, because it is always zero
-        ! The respecting buffers are zero-padded in order to account for this shift.
-
         maxn = maxval((/ nx, ny, nz /))
         if (allocated(buffer1)) then
             if (size(buffer1, dim=1)<maxn) deallocate(buffer1)

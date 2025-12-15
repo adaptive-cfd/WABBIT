@@ -369,7 +369,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_dbl
 
@@ -420,7 +420,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_sgl
 
@@ -470,7 +470,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_str
 
@@ -538,7 +538,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_vct
 
@@ -627,7 +627,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_vct_str
 
@@ -665,7 +665,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_int
 
@@ -709,7 +709,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_bool
 
@@ -783,7 +783,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_vct_bool
 

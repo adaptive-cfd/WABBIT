@@ -201,7 +201,7 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik) :: neqn, nwork, i_var, k
+    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -212,8 +212,12 @@ contains
     do k = 1, size(params_convdiff%names,1)
         name = params_convdiff%names(k)
         
-        ! saving of phi
-        if (name(1:3) == "phi") then
+        ! saving of phi, read if it starts with "phi" and has no "-" in there for time statistics
+        if (name(1:3) == "phi" .and. index(name, "-") == 0) then
+            ! check if the 4th character is actually a digit
+            if (.not. (name(4:4) >= '0' .and. name(4:4) <= '9')) then
+                call abort(250929, "CONVDIFF: field_name '"//trim(name)//"' has invalid format. Expected 'phiX' where X is a digit (1-9), but found '"//name(4:4)//"' at position 4.")
+            end if
             read( name(4:4), * ) i_var
             if (i_var >=1 .and. i_var <= params_convdiff%N_scalars) then
                 work(:,:,:,k) = u(:,:,:,i_var)
@@ -222,26 +226,23 @@ contains
             endif
         endif
 
-        ! saving of velocity field
+        ! saving of velocity field, this is done similar to save_data_ACM
         if (name(1:2) == 'ux' .or. name(1:2) == 'uy' .or. name(1:2) == 'uz') then
             read( name(4:4), * ) i_var
             if (params_convdiff%dim == 2) then
+                ! let's save a 2D velocity field, for this we need two work arrays
                 if (size(work,4) - k < 1) then
-                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast one other save variable afterwards.")
                 endif
-                if (k > params_convdiff%N_scalars+2) then
-                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
-                endif
-                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,:,k), i_var, u(:,:,1,i_var) )
+                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,k:k+1), i_var, u(:,:,1,i_var) )
             elseif (params_convdiff%dim == 3) then
+                ! let's save a 3D velocity field, for this we need three work arrays
                 if (size(work,4) - k < 2) then
-                    call abort(250922,"CONVDIFF: Not enough space to compute velocity")
-                endif
-                if (k > params_convdiff%N_scalars+3) then
-                    call abort(250922, "CONVDIFF: You try to save a variable that does not exist " // trim(name) )
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast two other save variables afterwards.")
                 endif
                 call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,k:k+2), i_var )
             endif
+            ! now copy the correct component to the correct place
             if (name(1:2) == 'uy') then
                 work(:,:,:,k) = work(:,:,:,k+1)
             elseif (name(1:2) == 'uz') then
@@ -252,34 +253,22 @@ contains
             endif
         endif
 
-        ! saving of time statistics
-        if (name(1:14) == "timestatistics") then
-            read( name(15:15), * ) i_var
-            if (i_var >=1 .and. i_var <= params_convdiff%N_time_statistics) then
-                if (.not. params_convdiff%time_statistics) then
-                    call abort(250922, "CONVDIFF: You try to save time statistics but did not activate it in the ini file")
-                endif
-                work(:,:,:,k) = u(:,:,:,params_convdiff%N_scalars + i_var)
-            else
-                call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
+        ! if any of those endings is in the name, then it is a timestatistics variable
+        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
+            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
+            ! now we have to find the index of it
+            do i_time_statistics = 1, params_convdiff%N_time_statistics
+                if (name == trim(params_convdiff%time_statistics_names(i_time_statistics))) exit
+            end do
+
+            ! safety check if the name was found
+            if (i_time_statistics > params_convdiff%N_time_statistics) then
+                call abort(250929, "CONV_DIFF: field_name " // trim(name) // " not found in time_statistics_names")
             endif
+
+            work(:,:,:,k) = u(:,:,:,params_convdiff%N_scalars + i_time_statistics)
         endif
     enddo
-
-    ! ! copy state vector
-    ! work(:,:,:,1:size(u,4)) = u(:,:,:,:)
-
-    ! if (params_convdiff%dim == 2) then
-    !     if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
-    !         call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1, u(:,:,1,1) )
-    !     endif
-    ! elseif (params_convdiff%dim == 3) then
-    !     if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
-    !         call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
-    !     endif
-    ! endif
-
-    ! ! ToDo: Adapt to naming conventions as in ACM module, incorporate time statistics as well
 
   end subroutine
 
@@ -407,7 +396,7 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz
+    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
@@ -549,6 +538,13 @@ contains
         end select
 
     enddo
+
+    ! initialize time statistics
+    if (params_convdiff%N_time_statistics > 0) then
+        do i_time_statistics = 1, params_convdiff%N_time_statistics
+            u(:,:,:, params_convdiff%N_scalars + i_time_statistics) = 0.0_rk
+        end do
+    endif
 
 
   end subroutine INICOND_convdiff

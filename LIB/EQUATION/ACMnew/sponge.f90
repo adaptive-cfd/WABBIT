@@ -78,22 +78,30 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
 
 
     if (params_acm%sponge_type == "rect") then
-        ! rectangular sponge with 45deg edges
-        do iz = g+1, Bs(3)+g
-            z = dble(iz-(g+1)) * dx(3) + x0(3)
-            do iy = g+1, Bs(2)+g
-                y = dble(iy-(g+1)) * dx(2) + x0(2)
-                do ix = g+1, Bs(1)+g
-                    x = dble(ix-(g+1)) * dx(1) + x0(1)
 
-                    ! distance to borders of domain
-                    tmp = minval( (/x,y,z,-(x-params_acm%domain_size(1)),&
-                         -(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
+        ! check if this block is in sponge layer
+        ! find the point in the block closest to the domain boundary
+        tmp = min(minval(x0), minval(params_acm%domain_size - (x0 + dx*dble(Bs))))
+        if (tmp > params_acm%L_sponge) then
+            sponge = 0.0_rk
+        else
+            ! rectangular sponge with 45deg edges
+            do iz = g+1, Bs(3)+g
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                do iy = g+1, Bs(2)+g
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    do ix = g+1, Bs(1)+g
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
 
-                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                        ! distance to borders of domain
+                        tmp = minval( (/x,y,z,-(x-params_acm%domain_size(1)),&
+                            -(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
+
+                        sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                    end do
                 end do
             end do
-        end do
+        endif
 
         ! sponge for using with symmetry_BC
         ! insect is supposed to be at y=0
@@ -149,6 +157,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         ! p-norm sponge. The shape of the sponge is dictated as the p-norm
         ! https://de.wikipedia.org/wiki/P-Norm
         ! which is a nice and simple way to get a rectangle with round corners.
+        ! For 2 it is the eucledian norm (circle), for infinity it is a rectangle and for everything in between a rounded rectangle
 
         if ( maxval(abs(params_acm%domain_size-params_acm%domain_size(1))) > 1.0e-10_rk) then
             call abort(1610184,"ERROR: for the p-norm sponge, the domain has to be same size in all directions.")
@@ -158,21 +167,31 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         pinv = 1.0_rk / p
         offset = 0.5_rk * params_acm%domain_size(1)
 
-        do iz = g+1, Bs(3)+g
-            z = (dble(iz-(g+1)) * dx(3) + x0(3) - offset)**p
-            do iy = g+1, Bs(2)+g
-                y = (dble(iy-(g+1)) * dx(2) + x0(2) - offset)**p
-                do ix = g+1, Bs(1)+g
-                    x = (dble(ix-(g+1)) * dx(1) + x0(1) - offset)**p
+        ! check if this block is in sponge layer
+        ! Find the point in the block furthest from the domain center
+        x = max(abs(x0(1)-offset), abs(x0(1)+dx(1)*dble(Bs(1))-offset))**p
+        y = max(abs(x0(2)-offset), abs(x0(2)+dx(2)*dble(Bs(2))-offset))**p
+        z = max(abs(x0(3)-offset), abs(x0(3)+dx(3)*dble(Bs(3))-offset))**p
+        tmp = offset - (x + y + z)**pinv  ! we invert distance to center to distance from boundary
+        if (tmp > params_acm%L_sponge) then
+            sponge = 0.0_rk
+        else
+            do iz = g+1, Bs(3)+g
+                z = (dble(iz-(g+1)) * dx(3) + x0(3) - offset)**p
+                do iy = g+1, Bs(2)+g
+                    y = (dble(iy-(g+1)) * dx(2) + x0(2) - offset)**p
+                    do ix = g+1, Bs(1)+g
+                        x = (dble(ix-(g+1)) * dx(1) + x0(1) - offset)**p
 
-                    ! distance to borders of domain
-                    tmp = -( (x + y + z)**pinv - offset)
+                        ! distance to borders of domain
+                        tmp = -( (x + y + z)**pinv - offset)
 
-                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
-                    0.5_rk*params_acm%L_sponge)
+                        sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
+                        0.5_rk*params_acm%L_sponge)
+                    end do
                 end do
             end do
-        end do
+        endif
 
     elseif (params_acm%sponge_type == "p-norm-insect-centered") then
         ! p-norm sponge. The shape of the sponge is dictated as the p-norm

@@ -67,5 +67,5 @@ subroutine createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init, verbos
         dble(lgt_n(tree_ID)) / dble(size(lgt_block, 1)), params%max_grid_density
     endif
 
-    call balanceLoad_tree( params, hvy_block, tree_ID)
+    call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='createRandomGrid', time=0.0_rk )
 end subroutine createRandomGrid_tree

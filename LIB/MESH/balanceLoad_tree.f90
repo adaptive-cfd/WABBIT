@@ -1,6 +1,6 @@
 !> \image html balancing.svg "Load balancing" width=400
 ! ********************************************************************************************
-subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
+subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement, balance_name, time)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -12,16 +12,22 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
     ! If true, we look at the refinement flags of each bock for distribution: blocks that have status +1
     ! wil be refined to eight blocks, all others will just remain unchanged. 
     logical, intent(in), optional       :: balanceForRefinement
+    !> balanceLoad is always the same, however we want to differentiate between them, so we can assign a name
+    character(len=*), intent(in), optional :: balance_name
+    !> current simulation time, used for development output only
+    real(kind=rk), intent(in), optional :: time
     !=============================================================================
 
     integer(kind=ik)  :: rank, mpirank_shouldBe, mpirank_currently, ierr, number_procs, &
-                         k, N, l, com_i, com_N, sfc_id, &
-                         lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), lgt_ID, Nblocks_toDistribute
+        k, N, l, com_i, com_N, sfc_id, lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), lgt_ID, Nblocks_toDistribute, &
+        num_blocks_count(3), i_var
     integer(kind=tsize) :: treecode, hilbertcode2
     ! block distribution lists
     integer(kind=ik), allocatable, save :: blocksPerRank_balanced(:), sfc_com_list(:,:), sfc_sorted_list(:,:)
     real(kind=rk) :: t0, t1
     logical :: balanceForRefinement2
+    character(len=cshort) :: format_string, string_prepare
+    character(len=4) :: string_kind(3)
 
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -44,6 +50,9 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
     if (present(balanceForRefinement)) then
         balanceForRefinement2 = balanceForRefinement
     endif
+
+    ! development counters, just to see how many blocks are send/received/kept
+    num_blocks_count(1:3) = 0
 
     ! allocate block to proc lists
     if (.not.allocated(blocksPerRank_balanced)) allocate( blocksPerRank_balanced(1:number_procs))
@@ -210,6 +219,20 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
             sfc_com_list(3, com_i) = sfc_sorted_list(1,k)   ! light id of block
         end if
 
+        if (params%debug_balanceLoad) then
+            ! Development checks - count how many blocks are send, received or kept
+            if ( params%rank == mpirank_currently .and. mpirank_currently /= mpirank_shouldBe ) then
+                ! block is send away from this mpirank
+                num_blocks_count(1) = num_blocks_count(1) + 1
+            elseif ( params%rank == mpirank_currently .and. mpirank_currently == mpirank_shouldBe ) then
+                ! block is kept on this mpirank
+                num_blocks_count(2) = num_blocks_count(2) + 1
+            elseif ( params%rank == mpirank_shouldBe .and. mpirank_currently /= mpirank_shouldBe ) then
+                ! block is received by this mpirank
+                num_blocks_count(3) = num_blocks_count(3) + 1
+            endif
+        endif
+
         ! The blocksPerRank_balanced defines how many blocks this rank should have, and
         ! we just treated one (which either already was on the mpirank or will be on
         ! it after communication), so remove one item from the blocksPerRank_balanced
@@ -239,6 +262,39 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement)
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     call updateMetadata_tree(params, tree_ID)
+
+    ! development output, gather information on rank 0 and print to file
+    ! reuse blocksPerRank_balanced for this
+    if (params%debug_balanceLoad) then
+        string_kind = (/ "send", "keep", "recv" /)
+        
+        do i_var = 1, 3
+            ! gather number of blocks send/received/kept on rank 0
+            call MPI_GATHER(num_blocks_count(i_var), 1, MPI_INTEGER, blocksPerRank_balanced, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            if (params%rank == 0) then
+                if (present(balance_name)) then
+                    string_prepare = trim(adjustl(balance_name))//","
+                else
+                    string_prepare = "balanceLoad,"
+                endif
+                string_prepare = trim(adjustl(string_prepare))//trim(adjustl(string_kind(i_var)))//","
+                if (present(time)) then
+                    write(string_prepare,'(A,es12.6,",")') trim(adjustl(string_prepare)), time
+                else
+                    string_prepare = trim(adjustl(string_prepare))//"-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
+                endif
+                ! Single IO operation with dynamic format
+                open(unit=99, file='debug_balanceLoad.csv', status="unknown", position="append")
+                if (params%number_procs == 1) then
+                    write(99, '(A, i0)') trim(adjustl(string_prepare)), blocksPerRank_balanced(1)
+                else
+                    write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs - 1
+                    write(99, format_string) trim(adjustl(string_prepare)), blocksPerRank_balanced(1), blocksPerRank_balanced(2:params%number_procs)
+                endif
+                close(99)
+            endif
+        enddo
+    endif
 
     ! timing
     call toc( "balanceLoad_tree (TOTAL)", 90, MPI_wtime()-t0 )

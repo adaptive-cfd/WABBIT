@@ -34,8 +34,9 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: iB, ix, iy, iz, Bs(3), i_ts, N_offset
+    integer(kind=ik) :: iB, ix, iy, iz, Bs(3), i_ts, N_offset, i_scalar, mean_idx1
     real(kind=rk) :: time_diff
+    character(len=cshort) :: name_phi, stat_name
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -52,25 +53,45 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
             cycle
         end if
 
-        select case (trim(params_convdiff%time_statistics_names(i_ts)))
-        case ("phi-int")
+        ! store the trimmed statistic name for easier comparison
+        stat_name = trim(params_convdiff%time_statistics_names(i_ts))
+
+        ! we need to know which scalar we are working on, it is in the form phiX-var or phidx-avg etc.
+        ! so we read the number after "phi" and before "-"
+        i_scalar = 0
+        if (stat_name(1:3) == "phi") then
+            ! check if the 4th character is actually a digit
+            if (.not. (stat_name(4:4) >= '0' .and. stat_name(4:4) <= '9')) then
+                call abort(250931, "[TIME_STATISTICS_CONVDIFF]: time_statistics_name '"//trim(stat_name)//"' has invalid format. Expected 'phiX-[statistic]' where X is a digit (1-9), but found '"//stat_name(4:4)//"' at position 4.")
+            end if
+            
+            read( stat_name(4:4), * ) i_scalar
+            if (i_scalar < 1 .or. i_scalar > params_convdiff%N_scalars) call abort(250929, "[TIME_STATISTICS_CONVDIFF]: In time_statistics_names, the scalar index after 'phi' is out of range.")
+        end if
+        write( name_phi, '(A,I0)' ) "phi", i_scalar
+
+        if (stat_name == trim(name_phi) // "-int") then
             ! compute the integral of phi over time
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)
-        case ("phi-avg", "phi-mean")
+        elseif (stat_name == trim(name_phi) // "-avg" .or. &
+                stat_name == trim(name_phi) // "-mean") then
             ! compute the average of phi over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
-        case ("phi-var")
+        elseif (stat_name == trim(name_phi) // "-var") then
             ! compute the variance of phi over time using Welford's method
-            ! This needs the computation of the average in the variable afterwards to work
-            if (i_ts == params_convdiff%N_time_statistics .or. (trim(params_convdiff%time_statistics_names(i_ts+1)) /= "phi-avg" .and. trim(params_convdiff%time_statistics_names(i_ts+1)) /= "phi-mean")) then
-                call abort(2153001, "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert 'phi-avg' right after 'phi-var' in time_statistics_names.")
-            end if
+            ! This needs the computation of the average somewhere after this field
+            call find_single_mean_index(i_ts, trim(name_phi)//"-avg", trim(name_phi)//"-mean", mean_idx1, &
+                "[TIME_STATISTICS_CONVDIFF]: You need to compute the variance together with the mean value. Insert '"//trim(name_phi)//"-avg' or '"//trim(name_phi)//"-mean' somewhere after '"//trim(name_phi)//"-var' in time_statistics_names.", 251023_ik)
             ! var_new = (time_diff-dt)/time_diff*var_old + dt/time_diff*(x - mean_old)*(x - mean_new)
             ! mean_new = (time_diff-dt)/time_diff*mean_old + dt/time_diff*x
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff) * &
-                 (u(:,:,:,1) - u(:,:,:,N_offset + i_ts + 1)) * &
-                 (u(:,:,:,1) - ((time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts + 1) + dt/(time_diff)*u(:,:,:,1)))
-        case ("phi-minmax")
+                 (u(:,:,:,1) - u(:,:,:,N_offset + mean_idx1)) * &
+                 (u(:,:,:,1) - (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + mean_idx1) - dt/(time_diff)*u(:,:,:,1))
+            elseif (stat_name == trim(name_phi) // "-avg" .or. &
+                    stat_name == trim(name_phi) // "-mean") then
+                ! compute the average of phi over time (required for variance)
+                u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)
+        elseif (stat_name == trim(name_phi) // "-minmax") then
             ! compute the minmax of phi over time
             do iz = merge(1,g+1,params_convdiff%dim==2), merge(1,Bs(3)+g,params_convdiff%dim==2)
                 do iy = g+1, Bs(2)+g
@@ -80,79 +101,121 @@ subroutine TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, m
                 end do
             end do
 
-        case ("phi2-int")
+        elseif (stat_name == trim(name_phi) // "-2-int") then
             ! compute the integral of phi² over time
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* u(:,:,:,1)**2
-        case ("phi2-avg", "phi2-mean")
+        elseif (stat_name == trim(name_phi) // "-2-avg" .or. &
+                stat_name == trim(name_phi) // "-2-mean") then
             ! compute the average of phi² over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* u(:,:,:,1)**2
         
         ! Phi derivative cases
-        case ("phidx-int")
+        elseif (stat_name == trim(name_phi) // "dx-int") then
             ! compute the integral of ∂phi/∂x over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidx-avg", "phidx-mean")
+        elseif (stat_name == trim(name_phi) // "dx-avg" .or. &
+                stat_name == trim(name_phi) // "dx-mean") then
             ! compute the average of ∂phi/∂x over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        case ("phidy-int")
+        elseif (stat_name == trim(name_phi) // "dy-int") then
             ! compute the integral of ∂phi/∂y over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidy-avg", "phidy-mean")
+        elseif (stat_name == trim(name_phi) // "dy-avg" .or. &
+                stat_name == trim(name_phi) // "dy-mean") then
             ! compute the average of ∂phi/∂y over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        case ("phidz-int")
+        elseif (stat_name == trim(name_phi) // "dz-int") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
             ! compute the integral of ∂phi/∂z over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidz-avg", "phidz-mean")
+        elseif (stat_name == trim(name_phi) // "dz-avg" .or. &
+                stat_name == trim(name_phi) // "dz-mean") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz not available in 2D simulations.")
             ! compute the average of ∂phi/∂z over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
         
         ! Squared phi derivative cases
-        case ("phidx2-int")
+        elseif (stat_name == trim(name_phi) // "dx2-int") then
             ! compute the integral of (∂phi/∂x)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidx2-avg", "phidx2-mean")
+        elseif (stat_name == trim(name_phi) // "dx2-avg" .or. &
+                stat_name == trim(name_phi) // "dx2-mean") then
             ! compute the average of (∂phi/∂x)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        case ("phidy2-int")
+        elseif (stat_name == trim(name_phi) // "dy2-int") then
             ! compute the integral of (∂phi/∂y)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidy2-avg", "phidy2-mean")
+        elseif (stat_name == trim(name_phi) // "dy2-avg" .or. &
+                stat_name == trim(name_phi) // "dy2-mean") then
             ! compute the average of (∂phi/∂y)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
-        case ("phidz2-int")
+        elseif (stat_name == trim(name_phi) // "dz2-int") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
             ! compute the integral of (∂phi/∂z)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = u(:,:,:,N_offset + i_ts) + dt* work(:,:,:,1)
-        case ("phidz2-avg", "phidz2-mean")
+        elseif (stat_name == trim(name_phi) // "dz2-avg" .or. &
+                stat_name == trim(name_phi) // "dz2-mean") then
             if (params_convdiff%dim == 2) call abort(250916, "[TIME_STATISTICS_CONVDIFF]: phidz2 not available in 2D simulations.")
             ! compute the average of (∂phi/∂z)² over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_convdiff%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/(time_diff)*u(:,:,:,N_offset + i_ts) + dt/(time_diff)* work(:,:,:,1)
+        
+        ! ToDo: Implement cases for velocity
 
-        case default
+        else
             call abort(2153000, "[TIME_STATISTICS_CONVDIFF]: time_statistics_name "// &
-                 trim(params_convdiff%time_statistics_names(i_ts))//" not recognized.")
-        end select
+                 stat_name//" not recognized.")
+        end if
     end do
 
 end subroutine TIME_STATISTICS_convdiff
+
+
+!----------------------------------------------------------------------------- 
+! Helper subroutine, returns the index of the AVERAGE of a quantity in the list of variables to save.
+! For example, if the vector is
+!        params_convdiff%time_statistics_names = [phi1, ux, ux-mean ....] 
+! then the call to this routine
+!        call find_single_mean_index(2, 'mean', 'avg', mean_idx, "Did not find it", 17)
+! will return the index "3".
+! Note: oddly, the same search on the array
+!        params_convdiff%time_statistics_names = [ux-mean, ux, phi1 ....]
+! will fail.
+!----------------------------------------------------------------------------- 
+subroutine find_single_mean_index(current_idx, mean_name1, mean_name2, mean_idx, error_message, error_code)
+    implicit none
+    integer(kind=ik), intent(in) :: current_idx
+    character(len=*), intent(in) :: mean_name1, mean_name2
+    integer(kind=ik), intent(out) :: mean_idx
+    character(len=*), intent(in) :: error_message
+    integer(kind=ik), intent(in) :: error_code
+    integer(kind=ik) :: j
+    mean_idx = -1
+    do j = current_idx + 1, params_convdiff%N_time_statistics
+        if (trim(params_convdiff%time_statistics_names(j)) == trim(mean_name1) .or. &
+            trim(params_convdiff%time_statistics_names(j)) == trim(mean_name2)) then
+            mean_idx = j
+            exit
+        end if
+    end do
+    if (mean_idx == -1) then
+        call abort(error_code, error_message)
+    end if
+end subroutine find_single_mean_index

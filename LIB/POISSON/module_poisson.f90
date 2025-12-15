@@ -14,6 +14,10 @@ module module_poisson
     use module_forestMetaData
     use module_timing               ! debug module
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
+    use module_mesh                 ! needed for multigrid
+    use module_mpi                  ! needed for multigrid
+    use module_fft                  ! needed for multigrid
+    use module_operators, only: setup_FD2_stencil  ! for finite difference stencils
 
     implicit none
 
@@ -34,7 +38,7 @@ module module_poisson
         ! different stencils, either for one-dimensional cross-stencil form or tensorial form
         real(kind=rk), allocatable  :: stencil(:), stencil_tensor_2D(:,:), stencil_tensor_3D(:,:,:), stencil_RHS_tensor_2D(:,:), stencil_RHS_tensor_3D(:,:,:)
         real(kind=rk)  :: stencil_RHS
-        integer(kind=ik) :: stencil_size, stencil_RHS_size
+        integer(kind=ik) :: stencil_RHS_size
         logical :: use_tensor
 
 
@@ -42,16 +46,21 @@ module module_poisson
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
     
-    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils
+    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils, multigrid_vcycle, multigrid_solve
 
 
 contains
+
+#include "multigrid_vcycle.f90"
 
     subroutine setup_Laplacian_stencils(params, g)
         implicit none
         !> parameter struct
         type (type_params), intent(inout)  :: params
         integer(kind=ik), intent(inout), optional :: g  ! ghost points, if present then we set it if we require more points
+
+        ! local variables for setup_FD2_stencil
+        integer(kind=ik) :: fd2_start, fd2_end
 
         ! prepare stencil
         if (allocated(stencil)) deallocate(stencil)
@@ -60,95 +69,19 @@ contains
         if (allocated(stencil_RHS_tensor_2D)) deallocate(stencil_RHS_tensor_2D)
         if (allocated(stencil_RHS_tensor_3D)) deallocate(stencil_RHS_tensor_3D)
 
-        if (params%poisson_order == "FD_2nd_central") then
-            allocate(stencil(-1:1))
-            stencil = (/  1.0_rk, -2.0_rk,    1.0_rk /)
+        ! check if we have a standard stencil (1D cross-shaped) or the special Mehrstellenverfahren
+        if (.not. params%poisson_order == "FD_6th_mehrstellen") then
+            ! use standard 1D stencils via module_operators setup_FD2_stencil
+            ! for Poisson solver, we want to use exact discretizations for composite stencils to preserve compatibility between operators
+            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_exact_discretization=.true.)
+            
+            ! set module variables for compatibility with existing code
             stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 1
-            stencil_size = 1
+            params%poisson_stencil_size = max(abs(fd2_start), abs(fd2_end))
             stencil_RHS_size = 0
             use_tensor = .false.
-        elseif (params%poisson_order == "FD_4th_central") then
-            allocate(stencil(-2:2))
-            stencil = (/ -1.0_rk,  16.0_rk,  -30.0_rk,   16.0_rk,   -1.0_rk /) / 12.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 2
-            stencil_size = 2
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_central") then
-            allocate(stencil(-3:3))
-            stencil = (/  2.0_rk, -27.0_rk,   270.0_rk, -490.0_rk,   270.0_rk,  -27.0_rk,    2.0_rk/) / 180.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 3
-            stencil_size = 3
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_8th_central") then
-            allocate(stencil(-4:4))
-            stencil = (/ -9.0_rk,  128.0_rk, -1008.0_rk, 8064.0_rk, -14350.0_rk, 8064.0_rk, -1008.0_rk, 128.0_rk, -9.0_rk /) / 5040_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 4
-            stencil_size = 4
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_4th_comp_0_4") then
-            allocate(stencil(-4:4))
-            stencil = (/  -75.0_rk, 544.0_rk, -1776.0_rk, 3552.0_rk, -4490.0_rk, 3552.0_rk, -1776.0_rk, 544.0_rk, -75.0_rk /) / 144.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 4
-            stencil_size = 4
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_4th_comp_2_2") then
-            allocate(stencil(-4:4))
-            stencil = (/  1.0_rk, -16.0_rk, 64.0_rk, 16.0_rk, -130.0_rk, 16.0_rk, 64.0_rk, -16.0_rk, 1.0_rk /) / 144.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 4
-            stencil_size = 4
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_4th_comp_1_3") then
-            allocate(stencil(-4:4))
-            stencil = (/  3.0_rk, -8.0_rk, -24.0_rk, 264.0_rk, -470.0_rk, 264.0_rk, -24.0_rk, -8.0_rk, 3.0_rk /) / 144.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 4
-            stencil_size = 4
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_comp_3_3") then
-            allocate(stencil(-6:6))
-            stencil = (/  1.0_rk, -18.0_rk, 171.0_rk, -810.0_rk, 1935.0_rk, 828.0_rk, -4214.0_rk, 828.0_rk, 1935.0_rk, -810.0_rk, 171.0_rk, -18.0_rk, 1.0_rk /) / 3600.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 6
-            stencil_size = 6
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_comp_2_4") then
-            allocate(stencil(-6:6))
-            stencil = (/  2.0_rk, -40.0_rk, 217.0_rk, -520.0_rk, 270.0_rk, 4656.0_rk, -9170.0_rk, 4656.0_rk, 270.0_rk, -520.0_rk, 217.0_rk, -40.0_rk, 2.0_rk /) / 3600.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 6
-            stencil_size = 6
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_comp_1_5") then
-            allocate(stencil(-6:6))
-            stencil = (/  20.0_rk, 4.0_rk, -955.0_rk, 5300.0_rk, -15300.0_rk, 31560.0_rk, -41258.0_rk, 31560.0_rk, -15300.0_rk, 5300.0_rk, -955.0_rk, 4.0_rk, 20.0_rk /) / 3600.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 6
-            stencil_size = 6
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_comp_0_6") then
-            allocate(stencil(-6:6))
-            stencil = (/  -1470.0_rk, 14184.0_rk, -63495.0_rk, 176200.0_rk, -342450.0_rk, 501840.0_rk, -569618.0_rk, 501840.0_rk, -342450.0_rk, 176200.0_rk, -63495.0_rk, 14184.0_rk, -1470.0_rk /) / 3600.0_rk
-            stencil_RHS = 1.0_rk
-            params%poisson_stencil_size = 6
-            stencil_size = 6
-            stencil_RHS_size = 0
-            use_tensor = .false.
-        elseif (params%poisson_order == "FD_6th_mehrstellen") then
+        else
+            ! handle the special Mehrstellenverfahren case with tensor stencils
             if (params%dim == 2) then
                 allocate(stencil_tensor_2D(-1:1, -1:1))
                 allocate(stencil_RHS_tensor_2D(-2:2, -2:2))
@@ -201,11 +134,8 @@ contains
                 0.0_rk,  0.0_rk,   0.0_rk,  0.0_rk,  0.0_rk /), (/5,5,5/) ) / 720.0_rk
             endif
             params%poisson_stencil_size = 1
-            stencil_size = 1
             stencil_RHS_size = 2
             use_tensor = .true.
-        else
-            call abort(250612, "I don't know about this laplacian discretization order: "//trim(adjustl(params%poisson_order))//" in GS_compute_residual")
         endif
 
         if (present(g)) then
@@ -320,19 +250,163 @@ contains
         do ic = 1, size(u,4)
             if (.not. use_tensor) then
                 if (params%dim == 2) then
-                    do iy = is(2), ie(2), dir
-                        do ix = is(1), ie(1), dir
-                            u(ix,iy,1,ic) = (-sum(stencil * u(ix-a:ix+a,iy,1,ic)) - sum(stencil * u(ix,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,1,ic)) / (stencil(0)*params%dim)
-                        enddo
-                    enddo
+                    select case(a)
+                    case(1)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-1)*u(ix-1,iy,1,ic) - stencil(1)*u(ix+1,iy,1,ic) &
+                                - stencil(-1)*u(ix,iy-1,1,ic) - stencil(1)*u(ix,iy+1,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(2)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) &
+                                - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(3)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) &
+                                - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(4)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-4)*u(ix-4,iy,1,ic) - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) - stencil(4)*u(ix+4,iy,1,ic) &
+                                - stencil(-4)*u(ix,iy-4,1,ic) - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) - stencil(4)*u(ix,iy+4,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(5)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-5)*u(ix-5,iy,1,ic) - stencil(-4)*u(ix-4,iy,1,ic) - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) &
+                                - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) - stencil(4)*u(ix+4,iy,1,ic) - stencil(5)*u(ix+5,iy,1,ic) &
+                                - stencil(-5)*u(ix,iy-5,1,ic) - stencil(-4)*u(ix,iy-4,1,ic) - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) &
+                                - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) - stencil(4)*u(ix,iy+4,1,ic) - stencil(5)*u(ix,iy+5,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(6)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-6)*u(ix-6,iy,1,ic) - stencil(-5)*u(ix-5,iy,1,ic) - stencil(-4)*u(ix-4,iy,1,ic) - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) &
+                                - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) - stencil(4)*u(ix+4,iy,1,ic) - stencil(5)*u(ix+5,iy,1,ic) - stencil(6)*u(ix+6,iy,1,ic) &
+                                - stencil(-6)*u(ix,iy-6,1,ic) - stencil(-5)*u(ix,iy-5,1,ic) - stencil(-4)*u(ix,iy-4,1,ic) - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) &
+                                - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) - stencil(4)*u(ix,iy+4,1,ic) - stencil(5)*u(ix,iy+5,1,ic) - stencil(6)*u(ix,iy+6,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(7)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-7)*u(ix-7,iy,1,ic) - stencil(-6)*u(ix-6,iy,1,ic) - stencil(-5)*u(ix-5,iy,1,ic) - stencil(-4)*u(ix-4,iy,1,ic) - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) &
+                                - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) - stencil(4)*u(ix+4,iy,1,ic) - stencil(5)*u(ix+5,iy,1,ic) - stencil(6)*u(ix+6,iy,1,ic) - stencil(7)*u(ix+7,iy,1,ic) &
+                                - stencil(-7)*u(ix,iy-7,1,ic) - stencil(-6)*u(ix,iy-6,1,ic) - stencil(-5)*u(ix,iy-5,1,ic) - stencil(-4)*u(ix,iy-4,1,ic) - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) &
+                                - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) - stencil(4)*u(ix,iy+4,1,ic) - stencil(5)*u(ix,iy+5,1,ic) - stencil(6)*u(ix,iy+6,1,ic) - stencil(7)*u(ix,iy+7,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case(8)
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,1,ic) = ( &
+                                - stencil(-8)*u(ix-8,iy,1,ic) - stencil(-7)*u(ix-7,iy,1,ic) - stencil(-6)*u(ix-6,iy,1,ic) - stencil(-5)*u(ix-5,iy,1,ic) - stencil(-4)*u(ix-4,iy,1,ic) - stencil(-3)*u(ix-3,iy,1,ic) - stencil(-2)*u(ix-2,iy,1,ic) - stencil(-1)*u(ix-1,iy,1,ic) &
+                                - stencil(1)*u(ix+1,iy,1,ic) - stencil(2)*u(ix+2,iy,1,ic) - stencil(3)*u(ix+3,iy,1,ic) - stencil(4)*u(ix+4,iy,1,ic) - stencil(5)*u(ix+5,iy,1,ic) - stencil(6)*u(ix+6,iy,1,ic) - stencil(7)*u(ix+7,iy,1,ic) - stencil(8)*u(ix+8,iy,1,ic) &
+                                - stencil(-8)*u(ix,iy-8,1,ic) - stencil(-7)*u(ix,iy-7,1,ic) - stencil(-6)*u(ix,iy-6,1,ic) - stencil(-5)*u(ix,iy-5,1,ic) - stencil(-4)*u(ix,iy-4,1,ic) - stencil(-3)*u(ix,iy-3,1,ic) - stencil(-2)*u(ix,iy-2,1,ic) - stencil(-1)*u(ix,iy-1,1,ic) &
+                                - stencil(1)*u(ix,iy+1,1,ic) - stencil(2)*u(ix,iy+2,1,ic) - stencil(3)*u(ix,iy+3,1,ic) - stencil(4)*u(ix,iy+4,1,ic) - stencil(5)*u(ix,iy+5,1,ic) - stencil(6)*u(ix,iy+6,1,ic) - stencil(7)*u(ix,iy+7,1,ic) - stencil(8)*u(ix,iy+8,1,ic) &
+                                + b(ix,iy,1,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    case default
+                        do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                                u(ix,iy,1,ic) = (-sum(stencil * u(ix-a:ix+a,iy,1,ic)) - sum(stencil * u(ix,iy-a:iy+a,1,ic)) + b(ix,iy,1,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,1,ic)) / (stencil(0)*params%dim)
+                        enddo; enddo
+                    end select
                 else
-                    do iz = is(3), ie(3), dir
-                        do iy = is(2), ie(2), dir
-                            do ix = is(1), ie(1), dir
-                                u(ix,iy,iz,ic) = (-sum(stencil * u(ix-a:ix+a,iy,iz,ic)) - sum(stencil * u(ix,iy-a:iy+a,iz,ic)) - sum(stencil * u(ix,iy,iz-a:iz+a,ic)) + b(ix,iy,iz,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,iz,ic)) / (stencil(0)*params%dim)
-                            enddo
-                        enddo
-                    enddo
+                    ! hardcoding of several stencil sizes, as this is critical for performance
+                    select case(a)
+                    case(1)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-1) * u(ix-1,iy,iz,ic) + stencil(1) * u(ix+1,iy,iz,ic)) &
+                                - (stencil(-1) * u(ix,iy-1,iz,ic) + stencil(1) * u(ix,iy+1,iz,ic)) &
+                                - (stencil(-1) * u(ix,iy,iz-1,ic) + stencil(1) * u(ix,iy,iz+1,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(2)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic)) &
+                                - (stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic)) &
+                                - (stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(3)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic)) &
+                                - (stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic)) &
+                                - (stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(4)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-4) * u(ix-4,iy,iz,ic) + stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + &
+                                   stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic) + stencil(4) * u(ix+4,iy,iz,ic)) &
+                                - (stencil(-4) * u(ix,iy-4,iz,ic) + stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + &
+                                   stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic) + stencil(4) * u(ix,iy+4,iz,ic)) &
+                                - (stencil(-4) * u(ix,iy,iz-4,ic) + stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + &
+                                   stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic) + stencil(4) * u(ix,iy,iz+4,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(5)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-5) * u(ix-5,iy,iz,ic) + stencil(-4) * u(ix-4,iy,iz,ic) + stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + &
+                                   stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic) + stencil(4) * u(ix+4,iy,iz,ic) + stencil(5) * u(ix+5,iy,iz,ic)) &
+                                - (stencil(-5) * u(ix,iy-5,iz,ic) + stencil(-4) * u(ix,iy-4,iz,ic) + stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + &
+                                   stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic) + stencil(4) * u(ix,iy+4,iz,ic) + stencil(5) * u(ix,iy+5,iz,ic)) &
+                                - (stencil(-5) * u(ix,iy,iz-5,ic) + stencil(-4) * u(ix,iy,iz-4,ic) + stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + &
+                                   stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic) + stencil(4) * u(ix,iy,iz+4,ic) + stencil(5) * u(ix,iy,iz+5,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(6)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-6) * u(ix-6,iy,iz,ic) + stencil(-5) * u(ix-5,iy,iz,ic) + stencil(-4) * u(ix-4,iy,iz,ic) + stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + &
+                                   stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic) + stencil(4) * u(ix+4,iy,iz,ic) + stencil(5) * u(ix+5,iy,iz,ic) + stencil(6) * u(ix+6,iy,iz,ic)) &
+                                - (stencil(-6) * u(ix,iy-6,iz,ic) + stencil(-5) * u(ix,iy-5,iz,ic) + stencil(-4) * u(ix,iy-4,iz,ic) + stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + &
+                                   stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic) + stencil(4) * u(ix,iy+4,iz,ic) + stencil(5) * u(ix,iy+5,iz,ic) + stencil(6) * u(ix,iy+6,iz,ic)) &
+                                - (stencil(-6) * u(ix,iy,iz-6,ic) + stencil(-5) * u(ix,iy,iz-5,ic) + stencil(-4) * u(ix,iy,iz-4,ic) + stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + &
+                                   stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic) + stencil(4) * u(ix,iy,iz+4,ic) + stencil(5) * u(ix,iy,iz+5,ic) + stencil(6) * u(ix,iy,iz+6,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(7)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-7) * u(ix-7,iy,iz,ic) + stencil(-6) * u(ix-6,iy,iz,ic) + stencil(-5) * u(ix-5,iy,iz,ic) + stencil(-4) * u(ix-4,iy,iz,ic) + stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + &
+                                   stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic) + stencil(4) * u(ix+4,iy,iz,ic) + stencil(5) * u(ix+5,iy,iz,ic) + stencil(6) * u(ix+6,iy,iz,ic) + stencil(7) * u(ix+7,iy,iz,ic)) &
+                                - (stencil(-7) * u(ix,iy-7,iz,ic) + stencil(-6) * u(ix,iy-6,iz,ic) + stencil(-5) * u(ix,iy-5,iz,ic) + stencil(-4) * u(ix,iy-4,iz,ic) + stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + &
+                                   stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic) + stencil(4) * u(ix,iy+4,iz,ic) + stencil(5) * u(ix,iy+5,iz,ic) + stencil(6) * u(ix,iy+6,iz,ic) + stencil(7) * u(ix,iy+7,iz,ic)) &
+                                - (stencil(-7) * u(ix,iy,iz-7,ic) + stencil(-6) * u(ix,iy,iz-6,ic) + stencil(-5) * u(ix,iy,iz-5,ic) + stencil(-4) * u(ix,iy,iz-4,ic) + stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + &
+                                   stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic) + stencil(4) * u(ix,iy,iz+4,ic) + stencil(5) * u(ix,iy,iz+5,ic) + stencil(6) * u(ix,iy,iz+6,ic) + stencil(7) * u(ix,iy,iz+7,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case(8)
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = ( &
+                                - (stencil(-8) * u(ix-8,iy,iz,ic) + stencil(-7) * u(ix-7,iy,iz,ic) + stencil(-6) * u(ix-6,iy,iz,ic) + stencil(-5) * u(ix-5,iy,iz,ic) + stencil(-4) * u(ix-4,iy,iz,ic) + stencil(-3) * u(ix-3,iy,iz,ic) + stencil(-2) * u(ix-2,iy,iz,ic) + stencil(-1) * u(ix-1,iy,iz,ic) + &
+                                   stencil(1) * u(ix+1,iy,iz,ic) + stencil(2) * u(ix+2,iy,iz,ic) + stencil(3) * u(ix+3,iy,iz,ic) + stencil(4) * u(ix+4,iy,iz,ic) + stencil(5) * u(ix+5,iy,iz,ic) + stencil(6) * u(ix+6,iy,iz,ic) + stencil(7) * u(ix+7,iy,iz,ic) + stencil(8) * u(ix+8,iy,iz,ic)) &
+                                - (stencil(-8) * u(ix,iy-8,iz,ic) + stencil(-7) * u(ix,iy-7,iz,ic) + stencil(-6) * u(ix,iy-6,iz,ic) + stencil(-5) * u(ix,iy-5,iz,ic) + stencil(-4) * u(ix,iy-4,iz,ic) + stencil(-3) * u(ix,iy-3,iz,ic) + stencil(-2) * u(ix,iy-2,iz,ic) + stencil(-1) * u(ix,iy-1,iz,ic) + &
+                                   stencil(1) * u(ix,iy+1,iz,ic) + stencil(2) * u(ix,iy+2,iz,ic) + stencil(3) * u(ix,iy+3,iz,ic) + stencil(4) * u(ix,iy+4,iz,ic) + stencil(5) * u(ix,iy+5,iz,ic) + stencil(6) * u(ix,iy+6,iz,ic) + stencil(7) * u(ix,iy+7,iz,ic) + stencil(8) * u(ix,iy+8,iz,ic)) &
+                                - (stencil(-8) * u(ix,iy,iz-8,ic) + stencil(-7) * u(ix,iy,iz-7,ic) + stencil(-6) * u(ix,iy,iz-6,ic) + stencil(-5) * u(ix,iy,iz-5,ic) + stencil(-4) * u(ix,iy,iz-4,ic) + stencil(-3) * u(ix,iy,iz-3,ic) + stencil(-2) * u(ix,iy,iz-2,ic) + stencil(-1) * u(ix,iy,iz-1,ic) + &
+                                   stencil(1) * u(ix,iy,iz+1,ic) + stencil(2) * u(ix,iy,iz+2,ic) + stencil(3) * u(ix,iy,iz+3,ic) + stencil(4) * u(ix,iy,iz+4,ic) + stencil(5) * u(ix,iy,iz+5,ic) + stencil(6) * u(ix,iy,iz+6,ic) + stencil(7) * u(ix,iy,iz+7,ic) + stencil(8) * u(ix,iy,iz+8,ic)) &
+                                + b(ix,iy,iz,ic)*dx(1)*dx(1)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    case default
+                        do iz = is(3), ie(3), dir; do iy = is(2), ie(2), dir; do ix = is(1), ie(1), dir
+                            u(ix,iy,iz,ic) = (-sum(stencil * u(ix-a:ix+a,iy,iz,ic)) - sum(stencil * u(ix,iy-a:iy+a,iz,ic)) - sum(stencil * u(ix,iy,iz-a:iz+a,ic)) + b(ix,iy,iz,ic)*dx(1)*dx(1) + params%dim*stencil(0)*u(ix,iy,iz,ic)) / (stencil(0)*params%dim)
+                        enddo; enddo; enddo
+                    end select
                 endif
             else
                 if (params%dim == 2) then
@@ -386,7 +460,7 @@ contains
                 if (params%dim == 2) then
                     do iy = params%g+1, params%g+params%bs(2)
                         do ix = params%g+1, params%g+params%bs(1)
-                            r(ix,iy,1,ic) = b(ix,iy,1,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,1,ic)) / (dx(1)*dx(1)) \
+                            r(ix,iy,1,ic) = b(ix,iy,1,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,1,ic)) / (dx(1)*dx(1)) &
                                 + sum(stencil * u(ix,iy-a:iy+a,1,ic))  / (dx(2)*dx(2)))
                         enddo
                     enddo
@@ -394,7 +468,7 @@ contains
                     do iz = params%g+1, params%g+params%bs(3)
                         do iy = params%g+1, params%g+params%bs(2)
                             do ix = params%g+1, params%g+params%bs(1)
-                                r(ix,iy,iz,ic) = b(ix,iy,iz,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,iz,ic)) / (dx(1)*dx(1)) \
+                                r(ix,iy,iz,ic) = b(ix,iy,iz,ic) + Ax_factor * (sum(stencil * u(ix-a:ix+a,iy,iz,ic)) / (dx(1)*dx(1)) &
                                     + sum(stencil * u(ix,iy-a:iy+a,iz,ic)) / (dx(2)*dx(2)) + sum(stencil * u(ix,iy,iz-a:iz+a,ic)) / (dx(3)*dx(3)))
                             enddo
                         enddo
@@ -513,7 +587,6 @@ contains
 
 
     subroutine CG_solve_poisson_level0(params, u, f, dx, tol, max_iter)
-        use module_params
         implicit none
 
         ! Arguments
@@ -589,7 +662,6 @@ contains
 
     ! synch routine for block on lowest level
     subroutine sync_block_level0(params, u, sync_sides_only)
-        use module_params
         implicit none
 
         ! Arguments

@@ -1,6 +1,6 @@
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
-subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus)
+subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -8,6 +8,7 @@ subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus)
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     integer(kind=ik), intent(in)   :: level                         !< level value to be checked against
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     gminus = params%g
@@ -17,14 +18,14 @@ subroutine sync_level_from_M(params, hvy_block, tree_ID, level, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="Monly_level", &
-        s_val=level)
+        s_val=level, sync_debug_name=sync_debug_name)
 
 end subroutine sync_level_from_M
 
 
 !> Wrapper to synch blocks with temporary flag from finer neighbours and same-level neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -34,6 +35,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_mi
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     gminus = params%g
@@ -43,7 +45,7 @@ subroutine sync_TMP_from_MF(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_mi
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="MoF_ref", &
-        s_val=ref_check, hvy_tmp=hvy_tmp)
+        s_val=ref_check, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
 
 end subroutine sync_TMP_from_MF
 
@@ -51,7 +53,7 @@ end subroutine sync_TMP_from_MF
 
 !> Wrapper to synch blocks with temporary flag from all neighbors
 !> Used before wavelet decomposition
-subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus)
+subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_minus, g_plus, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -61,6 +63,7 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_m
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus         !< Boundary sizes in case we want to send less values
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     gminus = params%g
@@ -70,7 +73,7 @@ subroutine sync_TMP_from_all(params, hvy_block, tree_ID, ref_check, hvy_tmp, g_m
     if (present(g_plus))   gplus = g_plus
 
     call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.false., sync_case="full_ref", &
-        s_val=ref_check, hvy_tmp=hvy_tmp)
+        s_val=ref_check, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
 
 end subroutine sync_TMP_from_all
 
@@ -78,7 +81,7 @@ end subroutine sync_TMP_from_all
 
 !> Wrapper to synch from coarser neighbours and same-level neighbors
 !! Used after coarse extension to update SC and WC, coarse neighbours need to be synched from hvy_tmp
-subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus, level)
+subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plus, level, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -87,6 +90,7 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     !> heavy temp data array - block data of preserved values before the WD, used in adapt_tree as neighbours already might be wavelet decomposed
     real(kind=rk), intent(inout)   :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus, level
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     gminus = params%g
@@ -98,17 +102,17 @@ subroutine sync_SCWC_from_MC(params, hvy_block, tree_ID, hvy_tmp, g_minus, g_plu
     ! if we passed on the level then sync is level-wise
     if (present(level)) then
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC_level", &
-            s_val=level, hvy_tmp=hvy_tmp)
+            s_val=level, hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
     else
         call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, spaghetti_form=.true., sync_case="MoC", &
-            hvy_tmp=hvy_tmp)
+            hvy_tmp=hvy_tmp, sync_debug_name=sync_debug_name)
     endif
 
 end subroutine sync_SCWC_from_MC
 
 
 !> Wrapper to synch all ghost-point patches
-subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus, ignore_Filter)
+subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus, ignore_Filter, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
@@ -116,6 +120,7 @@ subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus, ignore_
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< set specific ghost node sizes to be synced
     logical, optional, intent(in) :: ignore_Filter                  !< ignore restriction filter, defaults to false
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     logical :: do_ignore_Filter
@@ -128,7 +133,7 @@ subroutine sync_ghosts_tree(params, hvy_block, tree_ID, g_minus, g_plus, ignore_
     if (present(ignore_Filter)) do_ignore_Filter = ignore_Filter
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full", spaghetti_form=.false., ignore_Filter=do_ignore_Filter)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full", spaghetti_form=.false., ignore_Filter=do_ignore_Filter, sync_debug_name=sync_debug_name)
 
 end subroutine sync_ghosts_tree
 
@@ -141,13 +146,14 @@ end subroutine sync_ghosts_tree
 !
 !  One might ask, why for RHS with only +-shaped stencils we still synch the diagonals (edges/corners) as well?
 !  This is, because within the synching we apply the coarsening and interpolation filters at the interfaces, which need the other stencils as well!
-subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
+subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus, sync_debug_name)
     implicit none
 
     type (type_params), intent(in) :: params
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :)      !< heavy data array - block data
     integer(kind=ik), intent(in)   :: tree_ID                       !< which tree to study
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
     integer(kind=ik) :: gminus, gplus
     gminus = params%g
@@ -157,7 +163,7 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus)
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", spaghetti_form=.false., ignore_Filter=.true.)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", spaghetti_form=.false., ignore_Filter=.true., sync_debug_name=sync_debug_name)
 
 end subroutine
 
@@ -167,7 +173,7 @@ end subroutine
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
 subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti_form, &
-    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter)
+    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter, sync_debug_name)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -187,11 +193,15 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
     integer(kind=ik), intent(in), optional  :: s_val
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
+    character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
 
-    integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus, k, hvy_id, lgt_id, i_dim
+    integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus, k, hvy_id, lgt_id, i_dim, ierr
     real(kind=rk) :: t0, t1, t2, x0(1:3), dx(1:3), tolerance
     character(len=clong) :: toc_statement
     integer(kind=2) :: n_domain(1:3)
+    character(len=clong) :: format_string, string_prepare
+    integer(kind=ik)                    :: points_synched
+    integer(kind=ik), allocatable, save :: points_synched_list(:)
 
     t0 = MPI_wtime()
 
@@ -278,6 +288,38 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
         ! After stage 2 and 3 we only need to update the edges with mirrored values from ghost layers, as the faces are already set
         call bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_val=s_val, edges_only=istage>=2)
         call toc( "sync ghosts (bound_cond_generic)", 83, MPI_wtime()-t2 )
+
+        !***************************************************************************
+        ! (iv) debugging output (optional) - print to files how many data was sent/received
+        !***************************************************************************
+        if (params%debug_sync .and. present(sync_debug_name)) then
+            if (.not. allocated(points_synched_list)) allocate(points_synched_list(1:params%number_procs))
+
+            ! debug send volume
+            call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            if (params%rank == 0) then
+                open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
+                if (params%number_procs == 1) then
+                    write(99,'(A, i0, ",", i0)') trim(adjustl(sync_debug_name))//",send,", istage, points_synched_list(1)
+                else
+                    write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                    write(99,format_string) trim(adjustl(sync_debug_name))//",send,", istage, points_synched_list(1), points_synched_list(2:params%number_procs)
+                endif
+                close(99)
+            endif
+            ! debug recv volume
+            call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            if (params%rank == 0) then
+                open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
+                if (params%number_procs == 1) then
+                    write(99,'(A, i0, ",", i0)') trim(adjustl(sync_debug_name))//",recv,", istage, points_synched_list(1)
+                else
+                    write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                    write(99,format_string) trim(adjustl(sync_debug_name))//",recv,", istage, points_synched_list(1), points_synched_list(2:params%number_procs)
+                endif
+                close(99)
+            endif
+        endif
 
         write(toc_statement, '(A, i0, A)') "sync ghosts (stage ", istage, " TOTAL)"
         call toc( toc_statement, 83+istage, MPI_wtime()-t1 )

@@ -5,12 +5,12 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
 
     !--------------------------------------------------------------
     implicit none
-    type (type_params), intent(in):: params                    !< user defined parameter structure
-    real(kind=rk), intent(in)     :: time                      !< current time of the simulation
-    integer(kind=ik), intent(in)  :: iteration
-    real(kind=rk), intent(in)     :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
-    integer(kind=ik), intent(in)  :: tree_ID
-    real(kind=rk), intent(out)    :: dt                         !< time step dt
+    type (type_params), intent(inout) :: params                    !< user defined parameter structure
+    real(kind=rk), intent(in)         :: time                      !< current time of the simulation
+    integer(kind=ik), intent(in)      :: iteration
+    real(kind=rk), intent(in)         :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
+    integer(kind=ik), intent(in)      :: tree_ID
+    real(kind=rk), intent(out)        :: dt                         !< time step dt
     !--------------------------------------------------------------
     ! MPI error variable
     integer(kind=ik) :: ierr, Jmax, k, lgt_id, hvy_id
@@ -74,6 +74,12 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
         end if
     end if
 
+    if ( params%time_statistics) then
+        ! time step should hit time_statistics_start_time exactly
+        if ( time+dt > params%time_statistics_start_time .and. time<params%time_statistics_start_time ) then
+            dt = params%time_statistics_start_time - time
+        end if
+    end if
 
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time

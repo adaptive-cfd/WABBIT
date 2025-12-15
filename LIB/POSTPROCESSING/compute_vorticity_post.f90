@@ -97,35 +97,50 @@ subroutine compute_vorticity_post(params)
     ! is used in ghost nodes sync'ing
     if (order == "2") then
         params%order_discretization = "FD_2nd_central"
+        params%wavelet = "CDF20"  ! wavelet used for adaptive syncing
         params%g = 2_ik
     elseif (order == "4") then
         params%order_discretization = "FD_4th_central"
-        params%g = 2_ik
+        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
+        params%g = 3_ik
     elseif (order == "4op") then
         params%order_discretization = "FD_4th_central_optimized"
+        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
         params%g = 3_ik
     elseif (order == "4_comp_13") then
         params%order_discretization = "FD_4th_comp_1_3"
+        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
         params%g = 3_ik
+        if (operator == "--dissipation") params%g = 4_ik  ! dissipation uses L=DG with different stencil width
     elseif (order == "4_comp_04") then
         params%order_discretization = "FD_4th_comp_0_4"
+        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
         params%g = 4_ik
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
+        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
         params%g = 3_ik
     elseif (order == "6_comp_24") then
         params%order_discretization = "FD_6th_comp_2_4"
+        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
         params%g = 4_ik
+        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
     elseif (order == "6_comp_15") then
         params%order_discretization = "FD_6th_comp_1_5"
+        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
         params%g = 5_ik
+        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
     elseif (order == "6_comp_06") then
         params%order_discretization = "FD_6th_comp_0_6"
+        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
         params%g = 6_ik
+    elseif (order == "8") then
+        params%order_discretization = "FD_8th_central"
+        params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
+        params%g = 4_ik
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 6 (FD_6th_central), 4 (FD_4th_central), 4op (FD_4th_central_optimized), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5), 6_comp_06 (FD_6th_comp_0_6) and 2 (FD_2nd_central)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 2 (FD_2nd_central), 4 (FD_4th_central), 6 (FD_6th_central), 4op (FD_4th_central_optimized), 4_comp_13 (FD_4th_comp_1_3), 4_comp_04 (FD_4th_comp_0_4), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5) and 6_comp_06 (FD_6th_comp_0_6)")
     end if
-    params%wavelet="CDF20"  ! wavelet is not used
 
     params%Jmax = tc_length
     params%n_eqn = params%dim
@@ -209,6 +224,10 @@ subroutine compute_vorticity_post(params)
 
         elseif (operator == "--copy") then
             hvy_tmp(:,:,:,1,hvyID) = hvy_block(:,:,:,1,hvyID)
+        
+        elseif (operator == "--dissipation") then
+            call compute_dissipation( hvy_block(:,:,:,1:params%dim,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         else
             call abort(1812011, "operator is neither --vorticity --vor-abs --divergence --Q")
@@ -252,6 +271,11 @@ subroutine compute_vorticity_post(params)
 
     elseif (operator=="--Q") then
         write( fname,'(a, "_", i12.12, ".h5")') 'Qcrit', nint(time * 1.0e6_rk)
+
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    
+    elseif (operator=="--dissipation") then
+        write( fname,'(a, "_", i12.12, ".h5")') 'dissipation', nint(time * 1.0e6_rk)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 

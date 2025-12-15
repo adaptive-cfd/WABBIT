@@ -144,5 +144,5 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
 
     ! the grid we created above is not at all balanced - on the contrary, it fills up CPU1, then CPU2
     ! correct this by balancing:
-    call balanceLoad_tree(params, hvy_block, tree_ID)
+    call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='createEquidistantGrid', time=0.0_rk )
 end subroutine createEquidistantGrid_tree

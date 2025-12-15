@@ -89,7 +89,8 @@ module module_params
         integer(kind=ik)      :: poisson_stencil_size=0
         character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
         integer(kind=ik)      :: poisson_cycle_it=0
-        real(kind=rk)         :: poisson_cycle_tol=0.0_rk
+        real(kind=rk)         :: poisson_cycle_tol_abs=0.0_rk
+        real(kind=rk)         :: poisson_cycle_tol_rel=0.0_rk
         integer(kind=ik)      :: poisson_cycle_max_it=0
         integer(kind=ik)      :: poisson_GS_it=0
         integer(kind=ik)      :: poisson_Sync_it=0
@@ -141,6 +142,8 @@ module module_params
         logical :: time_statistics = .false.
         integer(kind=ik) :: N_time_statistics = 0
         character(len=cshort), allocatable :: time_statistics_names(:)
+        logical :: read_from_files_time_statistics = .false.
+        real(kind=rk) :: time_statistics_start_time = 0.0_rk
 
         ! -------------------------------------------------------------------------------------
         ! MPI
@@ -173,9 +176,12 @@ module module_params
         logical :: use_iteration_as_fileid = .false.
 
         ! -------------------------------------------------------------------------------------
-        ! unit test
+        ! unit tests and debugging
         ! -------------------------------------------------------------------------------------
         logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
+
+        logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
+        logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
 
         ! -------------------------------------------------------------------------------------
         ! filter

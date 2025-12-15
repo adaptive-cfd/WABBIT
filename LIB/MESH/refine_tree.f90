@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_full_tree)
+subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_full_tree, time)
     use module_indicators
 
     implicit none
@@ -23,6 +23,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     integer(kind=ik), intent(in)   :: tree_ID
     logical, intent(out)   :: error_OOM !> Out-of-memory error, causes the main time loop to exit.
     logical, intent(in), optional :: check_full_tree  !> if true, checks if a full tree can be created in deterministic fashion
+    real(kind=rk), intent(in), optional :: time  !> current simulation time, used for development output only
 
 
     ! cpu time variables for running time calculation
@@ -75,7 +76,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     ! which means 2**D blocks after refinement), but is better than before.
     ! To ensure perfect balancing, a second step is done after the actual refinement.
     if (indicator /= "everywhere") then
-        call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true.)
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true., balance_name='refine_pre', time=time )
     endif
 
     !---------------------------------------------------------------------------
@@ -93,7 +94,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !> (d) execute refinement, interpolate the new mesh. Blocks with status=+1 are refined, often
     !! that means all blocks are refined.
     t1 = MPI_Wtime()
-    call refinement_execute_tree( params, hvy_block, tree_ID )
+    call refinement_execute_tree( params, hvy_block, tree_ID, time=time )
     call toc( "refine_tree (refinement_execute)", 144, MPI_Wtime()-t1 )
 
 
@@ -115,7 +116,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !! This of course implies any other indicator than "everywhere" requires balancing here.
     if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
         t1 = MPI_Wtime()
-        call balanceLoad_tree( params, hvy_block, tree_ID )
+        call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='refine_post', time=time )
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 
@@ -153,6 +154,8 @@ subroutine check_oom(params, tree_id, error_OOM, check_full_tree, check_ref)
     if (present(check_ref)) checkRef = check_ref
 
     ! Attention: This logic has to be in line with the logic in init_full_tree
+
+    ! ToDo: Change loop over hvy_n to loop over lgt_n and omit allreduce call
 
     ! check if the refinement step will succeed or if we will run out of memory
     hvy_n_afterRefinement = 0

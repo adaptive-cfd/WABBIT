@@ -86,9 +86,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.false.)
     call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
-    call componentWiseNorm_tree(params, hvy_block(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
-    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm before adaption:", norm(:)
-
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet decomposition
     ! This rountine first create the full tree grid and then starts from leaf-layer and continues downwards with wavelet decomposition
@@ -98,9 +95,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, Jmin_set=Jmin, time=time)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
-    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after decomposition:", norm(:)
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Iterative loop to estimate thresholding
@@ -220,9 +214,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
-    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after coarsening:", norm(:)
-
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet reconstruction of blocks
     ! Reconstruct all blocks, this is done level-wise and scaling coefficients of daughter blocks are updated along the way
@@ -242,9 +233,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     call toc( "adapt_tree (reconstruct_tree)", 105, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    call componentWiseNorm_tree(params, hvy_block(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
-    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after reconstruction:", norm(:)
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     call prune_fulltree2leafs(params, tree_ID)

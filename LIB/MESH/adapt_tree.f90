@@ -86,6 +86,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.false.)
     call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
+    call componentWiseNorm_tree(params, hvy_block(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
+    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm before adaption:", norm(:)
+
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet decomposition
     ! This rountine first create the full tree grid and then starts from leaf-layer and continues downwards with wavelet decomposition
@@ -96,6 +99,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
+    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after decomposition:", norm(:)
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Iterative loop to estimate thresholding
@@ -215,6 +220,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    call componentWiseNorm_tree(params, hvy_tmp(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
+    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after coarsening:", norm(:)
+
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     !      Wavelet reconstruction of blocks
     ! Reconstruct all blocks, this is done level-wise and scaling coefficients of daughter blocks are updated along the way
@@ -234,6 +242,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     endif
     call toc( "adapt_tree (reconstruct_tree)", 105, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    call componentWiseNorm_tree(params, hvy_block(:,:,:,1:size(hvy_block,4),:), tree_ID, "L2", norm, norm_case="leaf")
+    if (params%rank == 0) write(*, '(A, 10(1x, es12.4))') "Norm after reconstruction:", norm(:)
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     call prune_fulltree2leafs(params, tree_ID)
@@ -397,22 +408,22 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
         write(string_prepare, '(A, i0)') "wavelet_decompose_syncN_lvl", level  !< prepare format string for sync debug
 
-        ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
-        ! the leaf-first algorithm needs to sync all values in first loop, as we do not assume all medium neighbors exist
-        if (params%useCoarseExtension .and. (.not. use_leaf_first .or. (use_leaf_first .and. iteration > 0))) then
-            call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
-            call toc( "decompose_tree (sync TMP)", 111, MPI_Wtime()-t_block)
+        ! ! for coarse extension we are not dependend on coarser neighbors so lets skip the syncing
+        ! ! the leaf-first algorithm needs to sync all values in first loop, as we do not assume all medium neighbors exist
+        ! if (params%useCoarseExtension .and. (.not. use_leaf_first .or. (use_leaf_first .and. iteration > 0))) then
+        !     call sync_TMP_from_MF( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
+        !     call toc( "decompose_tree (sync TMP)", 111, MPI_Wtime()-t_block)
 
-            write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync TMP)"
-            call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
-        ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
-        else
+        !     write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync TMP)"
+        !     call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
+        ! ! unlifted wavelets need coarser neighbor values for their WC so we need to sync them too
+        ! else
             call sync_TMP_from_all( params, hvy_block, tree_ID, -1, g_minus=g_this, g_plus=g_this, hvy_tmp=hvy_tmp, sync_debug_name=string_prepare)
             call toc( "decompose_tree (sync TMP)", 111, MPI_Wtime()-t_block)
 
             write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " sync TMP)"
             call toc( format_string, 1100+iteration, MPI_Wtime()-t_block )
-        endif
+        ! endif
 
         ! Wavelet-transform all blocks which are untreated
         ! From now on until wavelet retransform hvy_block will hold the wavelet decomposed values in spaghetti form for these blocks

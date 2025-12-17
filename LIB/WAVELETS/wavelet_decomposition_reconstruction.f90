@@ -480,116 +480,116 @@
 
             select case(params%wavelet)
             case ("CDF20")
-                ! Unlifted case - we copy all values and only add interpolated values from odd indices
+                ! Unlifted case - we copy all values and only add from odd indices interpolated values to even indices
                 u_r(:,:,:,ic) = u(:,:,:,ic)  ! copy values once, this is like applying center value of HR and full GR
                 ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do iy = g(2)+1-f_size_max(2), Bs(2)+g(2)+f_size_max(2)
-                    do ix = g(1)+1+io(1), Bs(1)+g(1), 2
+                    do ix = g(1)+2, Bs(1)+g(1), 2
                         buffer_out(ix) = u_r(ix,iy,iz,ic) + u(ix-1,iy,iz,ic) * params%HR(-1) + u(ix+1,iy,iz,ic) * params%HR( 1)
                     enddo
-                    u_r(g(1)+1+io(1):Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+1+io(1):Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
+                    u_r(g(1)+2:Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+2:Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do ix = g(1)+1, Bs(1)+g(1)
-                    do iy = g(2)+1+io(2), Bs(2)+g(2), 2
+                    do iy = g(2)+2, Bs(2)+g(2), 2
                         buffer_out(iy) = u_r(ix,iy,iz,ic) + u_r(ix,iy-1,iz,ic) * params%HR(-1) + u_r(ix,iy+1,iz,ic) * params%HR( 1)
                     enddo
-                    u_r(ix,g(2)+1+io(2):Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+1+io(2):Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
+                    u_r(ix,g(2)+2:Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+2:Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 if (params%dim == 3) then
                     do iy = g(2)+1, Bs(2)+g(2); do ix = g(1)+1, Bs(1)+g(1)
-                        do iz = g(3)+1+io(3), Bs(3)+g(3), 2
+                        do iz = g(3)+2, Bs(3)+g(3), 2
                             buffer_out(iz) = u_r(ix,iy,iz,ic) + u_r(ix,iy,iz-1,ic) * params%HR(-1) + u_r(ix,iy,iz+1,ic) * params%HR( 1)
                         enddo
-                        u_r(ix,iy,g(3)+1+io(3):Bs(3)+g(3):2,ic) = buffer_out(g(3)+1+io(3):Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
+                        u_r(ix,iy,g(3)+2:Bs(3)+g(3):2,ic) = buffer_out(g(3)+2:Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
                     enddo; enddo
                 endif
             case ("CDF40")
-                ! Unlifted case - we copy all values and only add interpolated values from odd indices
+                ! Unlifted case - we copy all values and only add from odd indices interpolated values to even indices
                 u_r(:,:,:,ic) = u(:,:,:,ic)  ! copy values once, this is like applying center value of HR and full GR
                 ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do iy = g(2)+1-f_size_max(2), Bs(2)+g(2)+f_size_max(2)
-                    do ix = g(1)+1+io(1), Bs(1)+g(1), 2
+                    do ix = g(1)+2, Bs(1)+g(1), 2
                         buffer_out(ix) = u_r(ix,iy,iz,ic) + u(ix-3,iy,iz,ic) * params%HR(-3) + u(ix-1,iy,iz,ic) * params%HR(-1) &
                                                           + u(ix+1,iy,iz,ic) * params%HR( 1) + u(ix+3,iy,iz,ic) * params%HR( 3)
                     enddo
-                    u_r(g(1)+1+io(1):Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+1+io(1):Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
+                    u_r(g(1)+2:Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+2:Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do ix = g(1)+1, Bs(1)+g(1)
-                    do iy = g(2)+1+io(2), Bs(2)+g(2), 2
+                    do iy = g(2)+2, Bs(2)+g(2), 2
                         buffer_out(iy) = u_r(ix,iy,iz,ic) + u_r(ix,iy-3,iz,ic) * params%HR(-3) + u_r(ix,iy-1,iz,ic) * params%HR(-1) &
                                                           + u_r(ix,iy+1,iz,ic) * params%HR( 1) + u_r(ix,iy+3,iz,ic) * params%HR( 3)
                     enddo
-                    u_r(ix,g(2)+1+io(2):Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+1+io(2):Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
+                    u_r(ix,g(2)+2:Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+2:Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 if (params%dim == 3) then
                     do iy = g(2)+1, Bs(2)+g(2); do ix = g(1)+1, Bs(1)+g(1)
-                        do iz = g(3)+1+io(3), Bs(3)+g(3), 2
+                        do iz = g(3)+2, Bs(3)+g(3), 2
                             buffer_out(iz) = u_r(ix,iy,iz,ic) + u_r(ix,iy,iz-3,ic) * params%HR(-3) + u_r(ix,iy,iz-1,ic) * params%HR(-1) &
                                                               + u_r(ix,iy,iz+1,ic) * params%HR( 1) + u_r(ix,iy,iz+3,ic) * params%HR( 3)
                         enddo
-                        u_r(ix,iy,g(3)+1+io(3):Bs(3)+g(3):2,ic) = buffer_out(g(3)+1+io(3):Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
+                        u_r(ix,iy,g(3)+2:Bs(3)+g(3):2,ic) = buffer_out(g(3)+2:Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
                     enddo; enddo
                 endif
             case ("CDF60")
-                ! Unlifted case - we copy all values and only add interpolated values from odd indices
+                ! Unlifted case - we copy all values and only add from odd indices interpolated values to even indices
                 u_r(:,:,:,ic) = u(:,:,:,ic)  ! copy values once, this is like applying center value of HR and full GR
                 ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do iy = g(2)+1-f_size_max(2), Bs(2)+g(2)+f_size_max(2)
-                    do ix = g(1)+1+io(1), Bs(1)+g(1), 2
+                    do ix = g(1)+2, Bs(1)+g(1), 2
                         buffer_out(ix) = u_r(ix,iy,iz,ic) + u(ix-5,iy,iz,ic) * params%HR(-5) + u(ix-3,iy,iz,ic) * params%HR(-3) + u(ix-1,iy,iz,ic) * params%HR(-1) &
                                                           + u(ix+1,iy,iz,ic) * params%HR( 1) + u(ix+3,iy,iz,ic) * params%HR( 3) + u(ix+5,iy,iz,ic) * params%HR( 5)
                     enddo
-                    u_r(g(1)+1+io(1):Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+1+io(1):Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
+                    u_r(g(1)+2:Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+2:Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do ix = g(1)+1, Bs(1)+g(1)
-                    do iy = g(2)+1+io(2), Bs(2)+g(2), 2
+                    do iy = g(2)+2, Bs(2)+g(2), 2
                         buffer_out(iy) = u_r(ix,iy,iz,ic) + u_r(ix,iy-5,iz,ic) * params%HR(-5) + u_r(ix,iy-3,iz,ic) * params%HR(-3) + u_r(ix,iy-1,iz,ic) * params%HR(-1) &
                                                           + u_r(ix,iy+1,iz,ic) * params%HR( 1) + u_r(ix,iy+3,iz,ic) * params%HR( 3) + u_r(ix,iy+5,iz,ic) * params%HR( 5)
                     enddo
-                    u_r(ix,g(2)+1+io(2):Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+1+io(2):Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
+                    u_r(ix,g(2)+2:Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+2:Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 if (params%dim == 3) then
                     do iy = g(2)+1, Bs(2)+g(2); do ix = g(1)+1, Bs(1)+g(1)
-                        do iz = g(3)+1+io(3), Bs(3)+g(3), 2
+                        do iz = g(3)+2, Bs(3)+g(3), 2
                             buffer_out(iz) = u_r(ix,iy,iz,ic) + u_r(ix,iy,iz-5,ic) * params%HR(-5) + u_r(ix,iy,iz-3,ic) * params%HR(-3) + u_r(ix,iy,iz-1,ic) * params%HR(-1) &
                                                               + u_r(ix,iy,iz+1,ic) * params%HR( 1) + u_r(ix,iy,iz+3,ic) * params%HR( 3) + u_r(ix,iy,iz+5,ic) * params%HR( 5)
                         enddo
-                        u_r(ix,iy,g(3)+1+io(3):Bs(3)+g(3):2,ic) = buffer_out(g(3)+1+io(3):Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
+                        u_r(ix,iy,g(3)+2:Bs(3)+g(3):2,ic) = buffer_out(g(3)+2:Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
                     enddo; enddo
                 endif
             case ("CDF80")
-                ! Unlifted case - we copy all values and only add interpolated values from odd indices
+                ! Unlifted case - we copy all values and only add from odd indices interpolated values to even indices
                 u_r(:,:,:,ic) = u(:,:,:,ic)  ! copy values once, this is like applying center value of HR and full GR
                 ! ~~~~~~~~~~~~~~~~~~~~~~ X ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do iy = g(2)+1-f_size_max(2), Bs(2)+g(2)+f_size_max(2)
-                    do ix = g(1)+1+io(1), Bs(1)+g(1), 2
+                    do ix = g(1)+2, Bs(1)+g(1), 2
                         buffer_out(ix) = u_r(ix,iy,iz,ic) + u(ix-7,iy,iz,ic) * params%HR(-7) + u(ix-5,iy,iz,ic) * params%HR(-5) + u(ix-3,iy,iz,ic) * params%HR(-3) + u(ix-1,iy,iz,ic) * params%HR(-1) &
                                                           + u(ix+1,iy,iz,ic) * params%HR( 1) + u(ix+3,iy,iz,ic) * params%HR( 3) + u(ix+5,iy,iz,ic) * params%HR( 5) + u(ix+7,iy,iz,ic) * params%HR( 7)
                     enddo
-                    u_r(g(1)+1+io(1):Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+1+io(1):Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
+                    u_r(g(1)+2:Bs(1)+g(1):2,iy,iz,ic) = buffer_out(g(1)+2:Bs(1)+g(1):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Y ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 do iz = g(3)+1-f_size_max(3), Bs(3)+g(3)+f_size_max(3); do ix = g(1)+1, Bs(1)+g(1)
-                    do iy = g(2)+1+io(2), Bs(2)+g(2), 2
+                    do iy = g(2)+2, Bs(2)+g(2), 2
                         buffer_out(iy) = u_r(ix,iy,iz,ic) + u_r(ix,iy-7,iz,ic) * params%HR(-7) + u_r(ix,iy-5,iz,ic) * params%HR(-5) + u_r(ix,iy-3,iz,ic) * params%HR(-3) + u_r(ix,iy-1,iz,ic) * params%HR(-1) &
                                                           + u_r(ix,iy+1,iz,ic) * params%HR( 1) + u_r(ix,iy+3,iz,ic) * params%HR( 3) + u_r(ix,iy+5,iz,ic) * params%HR( 5) + u_r(ix,iy+7,iz,ic) * params%HR( 7)
                     enddo
-                    u_r(ix,g(2)+1+io(2):Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+1+io(2):Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
+                    u_r(ix,g(2)+2:Bs(2)+g(2):2,iz,ic) = buffer_out(g(2)+2:Bs(2)+g(2):2)  ! insert values from buffer to avoid overwriting
                 enddo; enddo
                 ! ~~~~~~~~~~~~~~~~~~~~~~ Z ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 if (params%dim == 3) then
                     do iy = g(2)+1, Bs(2)+g(2); do ix = g(1)+1, Bs(1)+g(1)
-                        do iz = g(3)+1+io(3), Bs(3)+g(3), 2
+                        do iz = g(3)+2, Bs(3)+g(3), 2
                             buffer_out(iz) = u_r(ix,iy,iz,ic) + u_r(ix,iy,iz-7,ic) * params%HR(-7) + u_r(ix,iy,iz-5,ic) * params%HR(-5) + u_r(ix,iy,iz-3,ic) * params%HR(-3) + u_r(ix,iy,iz-1,ic) * params%HR(-1) &
                                                               + u_r(ix,iy,iz+1,ic) * params%HR( 1) + u_r(ix,iy,iz+3,ic) * params%HR( 3) + u_r(ix,iy,iz+5,ic) * params%HR( 5) + u_r(ix,iy,iz+7,ic) * params%HR( 7)
                         enddo
-                        u_r(ix,iy,g(3)+1+io(3):Bs(3)+g(3):2,ic) = buffer_out(g(3)+1+io(3):Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
+                        u_r(ix,iy,g(3)+2:Bs(3)+g(3):2,ic) = buffer_out(g(3)+2:Bs(3)+g(3):2)  ! insert values from buffer to avoid overwriting
                     enddo; enddo
                 endif
             case ("CDF22")

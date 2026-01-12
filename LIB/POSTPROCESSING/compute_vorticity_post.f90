@@ -93,67 +93,54 @@ subroutine compute_vorticity_post(params)
         call get_command_argument(4, order)
     end if
 
+    call get_cmd_arg( "--wavelet", params%wavelet, default="---" )
+
     ! decide which order for discretization and predictor is used. Note predictor
     ! is used in ghost nodes sync'ing
     if (order == "2") then
         params%order_discretization = "FD_2nd_central"
-        params%wavelet = "CDF20"  ! wavelet used for adaptive syncing
-        params%g = 1_ik  ! 1 from stencil, 1 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF20"  ! wavelet used for adaptive syncing
     elseif (order == "3_comp_12") then
         params%order_discretization = "FD_3rd_comp_1_2"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik  ! 2 from stencil, 3 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4") then
         params%order_discretization = "FD_4th_central"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik  ! 2 from stencil, 3 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4op") then
         params%order_discretization = "FD_4th_central_optimized"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik  ! 3 from stencil, 3 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4_comp_13") then
         params%order_discretization = "FD_4th_comp_1_3"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
         params%g = 3_ik  ! 3 from stencil, 3 from wavelet
         if (operator == "--dissipation") params%g = 4_ik  ! dissipation uses L=DG with different stencil width
     elseif (order == "4_comp_04") then
         params%order_discretization = "FD_4th_comp_0_4"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 4_ik  ! 4 from stencil, 3 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "5_comp_23") then
         params%order_discretization = "FD_5th_comp_2_3"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 5_ik  ! 3 from stencil, 5 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 5_ik  ! 3 from stencil, 5 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_24") then
         params%order_discretization = "FD_6th_comp_2_4"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 5_ik  ! 4 from stencil, 5 from wavelet
-        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_15") then
         params%order_discretization = "FD_6th_comp_1_5"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 5_ik  ! 5 from stencil, 5 from wavelet
-        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_06") then
         params%order_discretization = "FD_6th_comp_0_6"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 6_ik  ! 6 from stencil, 5 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "7_comp_34") then
         params%order_discretization = "FD_7th_comp_3_4"
-        params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
-        params%g = 7_ik  ! 4 from stencil, 7 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
     elseif (order == "8") then
         params%order_discretization = "FD_8th_central"
-        params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
-        params%g = 7_ik  ! 4 from stencil, 7 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
     elseif (order == "8_comp_35") then
         params%order_discretization = "FD_8th_comp_3_5"
-        params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
-        params%g = 7_ik  ! 5 from stencil, 7 from wavelet
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
     else
         call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 2 (FD_2nd_central), 4 (FD_4th_central), 6 (FD_6th_central), 4op (FD_4th_central_optimized), 3_comp_12 (FD_3rd_cop_1_2), 4_comp_13 (FD_4th_comp_1_3), 4_comp_04 (FD_4th_comp_0_4), 5_comp_23 (FD_5th_comp_2_3), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5), 6_comp_06 (FD_6th_comp_0_6), 7_comp_34 (FD_7th_comp_3_4), 8 (FD_8th_central), 8_comp_35 (FD_8th_comp_3_5)")
     end if
@@ -173,11 +160,10 @@ subroutine compute_vorticity_post(params)
         params%symmetry_vector_component(3) = "z"
     endif
 
+    call setup_wavelet(params, params%g)
+
     Bs = params%Bs
     g  = params%g
-
-
-    call setup_wavelet(params)
 
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)

@@ -451,7 +451,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         write(format_string, '(A, i0, A)') "decompose_tree (it ", iteration, " FWT)"
         call toc( format_string, 1150+iteration, MPI_Wtime()-t_block )
 
-            ! debug output to see how many blocks have been decomposed, gather information on rank 0 and print to file
+        ! debug output to see how many blocks have been decomposed, gather information on rank 0 and print to file
         if (params%debug_wavelet_decompose) then
             if (.not. allocated(blocks_decomposed_list)) allocate(blocks_decomposed_list(1:params%number_procs))
 

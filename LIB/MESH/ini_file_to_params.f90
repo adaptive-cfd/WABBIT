@@ -154,6 +154,7 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'debug_wavelet_reconstruct', params%debug_wavelet_reconstruct, .false.)
    call read_param_mpi(FILE, 'Debug', 'debug_sync', params%debug_sync, .false.)
    call read_param_mpi(FILE, 'Debug', 'debug_pruned2full', params%debug_pruned2full, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_poisson', params%debug_poisson, .false.)
 
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.

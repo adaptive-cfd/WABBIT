@@ -508,7 +508,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 endif
 
                 ! blocks on this iteration do a GS-sweep, they have refinement status 0 or 1
-                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g)
+                call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=params%g, sweep_number=i_sweep, multigrid_level=i_level)
                 ! call GS_iteration_ref(params, tree_id, (/ 1, 0 /), hvy_sol(:,:,:,1:nc,:), hvy_RHS(:,:,:,1:nc,:), sweep_forward, filter_offset=max(0,params%g-(sync_freq-1)*params%poisson_stencil_size))
 
                 sweep_forward = .not. sweep_forward

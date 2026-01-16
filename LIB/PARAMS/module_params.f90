@@ -96,6 +96,7 @@ module module_params
         integer(kind=ik)      :: poisson_GS_it=0
         integer(kind=ik)      :: poisson_Sync_it=0
         character(len=cshort) :: poisson_coarsest="FFT"
+        logical               :: poisson_balanceLoad=.false.
         integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
         character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"

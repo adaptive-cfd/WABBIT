@@ -170,7 +170,7 @@ subroutine compute_vorticity_post(params)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     nwork = 1
-    if (operator == "--vorticity") then
+    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
         nwork = 3
     endif
 
@@ -193,7 +193,7 @@ subroutine compute_vorticity_post(params)
         call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgtID, x0, dx )
 
-        if (operator == "--vorticity") then
+        if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
             call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
 
@@ -237,16 +237,21 @@ subroutine compute_vorticity_post(params)
         endif
     end do
 
-    if (operator == "--vorticity") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
-
-        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
+        if (operator /= "--vory" .and. operator /= "--vorz") then
+            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+            call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+        end if
 
         if (params%dim == 3) then
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vory', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
-            call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
-            call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
+            if (operator /= "--vorx" .and. operator /= "--vorz") then
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vory', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
+            end if
+            if (operator /= "--vorx" .and. operator /= "--vory") then
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
+            end if
         end if
 
     elseif (operator == "--vor-abs") then

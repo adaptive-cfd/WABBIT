@@ -90,3 +90,65 @@ subroutine doesBlockExist_tree(tcBlock, exists, lgtID, dim, max_level, level, tr
     ! write(*, '("treecode - id=", i0)') lgtID
 
 end subroutine doesBlockExist_tree
+
+
+!> \brief Search for treecode in sorted array and return corresponding id from column 1
+! ********************************************************************************************
+!> This helper function performs binary search on a sorted array (sorted by treecode in columns 2-3)
+!> and returns the id stored in column 1 of the matching entry. 
+!> Used for mapping blocks after loadbalancing by treecode.
+!>
+!> @param[in]    tc_array        Sorted array with structure: (id, tc_part1, tc_part2, ...)
+!> @param[in]    n_entries       Number of valid entries in tc_array
+!> @param[in]    tcBlock         Treecode to search for
+!> @param[out]   found_id        ID from column 1 if found, -1 otherwise
+!> @param[out]   exists          .true. if treecode was found
+subroutine find_id_by_treecode(tc_array, n_entries, tcBlock, found_id, exists)
+    
+    implicit none
+    
+    !-----------------------------------------------------------------
+    integer(kind=ik), intent(in)        :: tc_array(:,:)    !< sorted array (id, tc1, tc2)
+    integer(kind=ik), intent(in)        :: n_entries        !< number of valid entries
+    integer(kind=tsize), intent(in)     :: tcBlock          !< treecode to search for
+    integer(kind=ik), intent(out)       :: found_id         !< id from column 1 if found
+    logical, intent(out)                :: exists           !< true if treecode found
+    !-----------------------------------------------------------------
+    
+    integer(kind=ik)                    :: i1, i2, imid     ! binary search indices
+    
+    exists = .false.
+    found_id = -1
+    
+    if (n_entries <= 0) return
+    
+    ! binary search: start with entire interval
+    i1 = 1
+    i2 = n_entries
+    
+    ! binary search loop
+    do while ( abs(i2-i1) >= 2 )
+        ! cut interval in two parts
+        imid = (i1+i2) / 2
+        ! compare treecode directly
+        if (get_tc(tc_array(2:3, imid)) < tcBlock) then
+            i1 = imid
+        else
+            i2 = imid
+        end if
+    end do
+    
+    ! check the two remaining candidates
+    if (get_tc(tc_array(2:3, i1)) == tcBlock .and. tc_array(1, i1) > 0) then
+        exists = .true.
+        found_id = tc_array(1, i1)
+        return
+    end if
+    
+    if (get_tc(tc_array(2:3, i2)) == tcBlock .and. tc_array(1, i2) > 0) then
+        exists = .true.
+        found_id = tc_array(1, i2)
+        return
+    end if
+    
+end subroutine find_id_by_treecode

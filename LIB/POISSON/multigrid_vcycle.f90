@@ -545,7 +545,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 ! This ensures consistent ordering across processors and eliminates the need for treecode lookup
                 if (i_level == Jmax_a) then
                     t_block = MPI_Wtime()
-                    call reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves, nc)
+                    call reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves)
                     call toc( "Reorder hvy arrays after balancing", 10051, MPI_Wtime()-t_block )
                 endif
 
@@ -644,16 +644,16 @@ end subroutine multigrid_upwards
 !! - Original ordering: where hvy_work has backed up data (encoded in tc_map_old before load balance)
 !! - Current ordering: where hvy_sol/hvy_RHS are after load balancing
 !! - Desired ordering: same as original ordering (goal of this routine)
-subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves, nc)
+subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves)
     implicit none
     
     type (type_params), intent(inout)  :: params
     real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
     integer(kind=ik), intent(inout)    :: tc_map_old(:, :)
-    integer(kind=ik), intent(in)       :: n_leaves, nc
+    integer(kind=ik), intent(in)       :: n_leaves
     
-    integer(kind=ik) :: k_block, hvy_id, lgt_id, original_hvy_id, next_lgt_id, i, j, start_idx, current_idx, next_idx, last_unassigned
+    integer(kind=ik) :: k_block, hvy_id, lgt_id, original_hvy_id, next_lgt_id, i, j, start_idx, current_idx, next_idx, last_unassigned, nc
     integer(kind=tsize) :: treecode
     logical :: tc_found
     logical, allocatable, save :: visited(:)
@@ -664,6 +664,7 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
     ! Get grid parameters
     Bs = params%Bs
     g = params%g
+    nc = size(hvy_sol, 4)
     
     ! ============================================================================
     ! Build mapping between original and current positions
@@ -713,9 +714,13 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
     enddo
 
     ! Allocate temporary storage for one block only
-    if (size(tmp_block_sol, 4) /= nc) deallocate(tmp_block_sol)
+    if (allocated(tmp_block_sol)) then
+        if (size(tmp_block_sol, 4) /= nc) deallocate(tmp_block_sol)
+    endif
     if (.not. allocated(tmp_block_sol)) allocate(tmp_block_sol(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc))
-    if (size(tmp_block_rhs, 4) /= nc) deallocate(tmp_block_rhs)
+    if (allocated(tmp_block_rhs)) then
+        if (size(tmp_block_rhs, 4) /= nc) deallocate(tmp_block_rhs)
+    endif
     if (.not. allocated(tmp_block_rhs)) allocate(tmp_block_rhs(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc))
     if (.not. allocated(tmp_lgt_block)) allocate(tmp_lgt_block(size(lgt_block, 2)))
 

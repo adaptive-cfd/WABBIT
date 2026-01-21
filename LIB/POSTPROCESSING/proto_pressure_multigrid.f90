@@ -580,6 +580,17 @@ subroutine proto_NSI_EE(params)
         call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
     endif
 
+    !---------------------------------------------------------------------------
+    ! main time loop
+    !---------------------------------------------------------------------------
+    if (params%rank==0) then
+        write(*,*) ""
+        write(*,'(10(" "), "╔", 48("═"), "╗")') 
+        write(*,'(10(" "), A)') "║ On your marks, ready, starting main time loop! ║"
+        write(*,'(10(" "), "╚", 48("═"), "╝")')
+        write(*,*) ""
+    endif
+
     ! ------------------------------------------------------------
     ! Explicit Euler timestepping
     !    we assume equidistant grid for now, so no REC loop
@@ -646,7 +657,7 @@ subroutine proto_NSI_EE(params)
         ! if the grid doesn't change, then we can reuse the previous solution as initial guess
         ! if not, then we should start from zero, as blocks might have been moved or new ones activated, resulting in rubbish initial guess
         if (params%adapt_tree) then
-            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.true.)
         else
             call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.false., verbose=.false.)
         endif

@@ -13,6 +13,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     real(kind=rk)                      :: t_block
     logical                            :: verbose_apply, init0
     character(len=cshort)              :: fname
+    integer(kind=ik), dimension(:), allocatable, save :: lgt_refinementStatus_backup
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
@@ -42,6 +43,16 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
 
     ! compute norm of RHS for relative tolerances
     call componentWiseNorm_tree(params, hvy_RHS(:,:,:,1:size(hvy_RHS,4),:), tree_ID, "Linfty", norm_sol(1:size(hvy_RHS,4)), threshold_state_vector=.false.)
+
+    ! the refinement_status is used in multigrid routines for things other than the refinement_status
+    ! but that may be problematic if we have set the refinement_status externally and like to keep it.
+    ! This happens for example when using significant refinement. We make a backup, and copy the original
+    ! status (when entering this routine) back to lgt_block at the end
+    if (.not. allocated(lgt_refinementStatus_backup)) allocate(lgt_refinementStatus_backup(1:size(lgt_block,1)))
+    lgt_refinementStatus_backup(:) = 0  ! reset back-up every time
+    do k_block = 1, lgt_n(tree_ID)
+        lgt_refinementStatus_backup(lgt_active(k_block, tree_ID)) = lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS)
+    enddo
 
     ! prepare full tree grid, this will be populated along the way
     ! blocks are practically empty, but we fill them along the way so ref flag will be set to 0 to allow synching
@@ -101,6 +112,11 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
     call prune_fulltree2leafs(params, tree_ID)
+
+    ! copy the original refinement_status (when entering this routine) back to lgt_block
+    do k_block = 1, lgt_n(tree_ID)
+        lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS) = lgt_refinementStatus_backup(lgt_active(k_block, tree_ID))
+    enddo
 
 end subroutine multigrid_solve
 
@@ -209,6 +225,14 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
 
     enddo
     call toc( "MG Downwards - Compute residual", 10021, MPI_Wtime()-t_block )
+
+    ! ! debug input residual
+    ! if (verbose_apply) then
+    !     call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "Linfty", residual_out, threshold_state_vector=.false.)
+    !     call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, "L2", residual_out(nc+1:2*nc), threshold_state_vector=.false.)
+    !     if (params%rank == 0) write(*, '(A, es10.3, A)') "--- In Residual L2: ", residual_out(nc+1), " ---"
+    !     if (params%rank == 0) write(*, '(A, es10.3, A)') "--- In Residual Linfty: ", residual_out(1), " ---"
+    ! endif
 
     ! we use the decompose function to pass down the residual to all levels
     ! this overwrites b of the leaf layer, but we will recover it later
@@ -424,23 +448,12 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     real(kind=rk)      :: dx(1:3), x0(1:3)
     logical            :: verbose_apply, balance_load_needed
     integer (kind=ik)  :: num_leaf, num_operate
-    integer(kind=ik), dimension(:), allocatable, save :: lgt_refinementStatus_backup
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
     balance_load_needed = .false.
 
     nc = size(hvy_sol,4)
-
-    ! the refinement_status is used in this routine for things other than the refinement_status
-    ! but that may be problematic if we have set the refinement_status externally and like to keep it.
-    ! This happens for example in postprocessing (--grid1-to-grid2). In this case, the indicator is
-    ! "nothing (external)" and we should not overwrite it. Hence, we make a backup, and copy the original
-    ! status (when entering this routine) back to lgt_block
-    if (.not. allocated(lgt_refinementStatus_backup)) then
-        allocate(lgt_refinementStatus_backup(1:size(lgt_block,1)))
-    endif
-    lgt_refinementStatus_backup(:) = 0  ! reset back-up to be sure
 
     i_g = 0
     i_g(1:params%dim) = mod(params%g, 2)
@@ -451,7 +464,6 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     do k_block = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k_block, tree_ID)
         level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
-        lgt_refinementStatus_backup(lgt_active(k_block, tree_ID)) = lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS)
         if (level_me == Jmin) then
             lgt_block(lgt_ID, IDX_REFINE_STS) = 1
         else
@@ -642,11 +654,6 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
         endif
 
         call toc( "MG Upwards - full sweep", 10005, MPI_Wtime()-t_loop )
-    enddo
-
-    ! copy the original refinement_status (when entering this routine) back to lgt_block
-    do k_block = 1, lgt_n(tree_ID)
-        lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS) = lgt_refinementStatus_backup(lgt_active(k_block, tree_ID))
     enddo
 
 end subroutine multigrid_upwards

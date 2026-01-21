@@ -188,7 +188,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     !     ! store b
     !     hvy_work(:,:,:,nc+1:2*nc,hvy_id) = hvy_RHS(:,:,:,1:nc,hvy_id)
     ! enddo
-    ! call toc( "GS Downwards - Store b", 10020, MPI_Wtime()-t_block )
+    ! call toc( "MG Downwards - Store b", 10020, MPI_Wtime()-t_block )
 
 
     ! downwards - no sweeps are done, we only restrict the residual down to the lowest level
@@ -208,14 +208,14 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
         call GS_compute_residual(params, hvy_sol(:,:,:,1:nc,hvy_id), hvy_RHS(:,:,:,1:nc,hvy_id), hvy_work(:,:,:,1:nc,hvy_id), dx)
 
     enddo
-    call toc( "GS Downwards - Compute residual", 10021, MPI_Wtime()-t_block )
+    call toc( "MG Downwards - Compute residual", 10021, MPI_Wtime()-t_block )
 
     ! we use the decompose function to pass down the residual to all levels
     ! this overwrites b of the leaf layer, but we will recover it later
     ! solution in non-decomposed form is present in hvy_RHS
     t_block = MPI_Wtime()
     call wavelet_decompose_full_tree(params, hvy_work(:,:,:,1:nc,:), tree_ID, hvy_RHS, Jmin_set=params%poisson_Jmin, init_full_tree_grid=.false., compute_SC_only=.true., scaling_filter=params%MGR)
-    call toc( "GS Downwards - full sweep", 10002, MPI_Wtime()-t_block )
+    call toc( "MG Downwards - full sweep", 10002, MPI_Wtime()-t_block )
     if (verbose_apply) then
         t_block = MPI_Wtime()-t_block
         call MPI_ALLREDUCE(MPI_IN_PLACE, t_block, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
@@ -286,7 +286,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
         enddo
     endif
     
-    call toc( "GS Downwards - Backup solution", 10022, MPI_Wtime()-t_block )
+    call toc( "MG Downwards - Backup solution", 10022, MPI_Wtime()-t_block )
 
     ! lowest block is treated differently, here we try to solve more thoroughly. Following options exist:
     !    - Conjugent gradient method : only for level 0 for now
@@ -328,7 +328,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     t_block = MPI_Wtime()
     call sync_ghosts_tree(params, hvy_RHS(:,:,:,1:nc,:), tree_ID)
     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
-    call toc( "GS - RHS and solution restoration", 10032, MPI_Wtime()-t_block )
+    call toc( "MG - RHS and solution restoration", 10032, MPI_Wtime()-t_block )
 
     ! sync before computing final residual
     call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, params%poisson_stencil_size, params%poisson_stencil_size)
@@ -424,12 +424,23 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     real(kind=rk)      :: dx(1:3), x0(1:3)
     logical            :: verbose_apply, balance_load_needed
     integer (kind=ik)  :: num_leaf, num_operate
+    integer(kind=ik), dimension(:), allocatable, save :: lgt_refinementStatus_backup
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
     balance_load_needed = .false.
 
     nc = size(hvy_sol,4)
+
+    ! the refinement_status is used in this routine for things other than the refinement_status
+    ! but that may be problematic if we have set the refinement_status externally and like to keep it.
+    ! This happens for example in postprocessing (--grid1-to-grid2). In this case, the indicator is
+    ! "nothing (external)" and we should not overwrite it. Hence, we make a backup, and copy the original
+    ! status (when entering this routine) back to lgt_block
+    if (.not. allocated(lgt_refinementStatus_backup)) then
+        allocate(lgt_refinementStatus_backup(1:size(lgt_block,1)))
+    endif
+    lgt_refinementStatus_backup(:) = 0  ! reset back-up to be sure
 
     i_g = 0
     i_g(1:params%dim) = mod(params%g, 2)
@@ -440,6 +451,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     do k_block = 1, lgt_n(tree_ID)
         lgt_ID = lgt_active(k_block, tree_ID)
         level_me = lgt_block( lgt_ID, IDX_MESH_LVL )
+        lgt_refinementStatus_backup(lgt_active(k_block, tree_ID)) = lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS)
         if (level_me == Jmin) then
             lgt_block(lgt_ID, IDX_REFINE_STS) = 1
         else
@@ -491,7 +503,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
         enddo
         ! synch the refinement stati
         call synchronize_lgt_data( params, refinement_status_only=.true.)
-        call toc( "GS Upwards - Level definition", 10030, MPI_Wtime()-t_block )
+        call toc( "MG Upwards - Level definition", 10030, MPI_Wtime()-t_block )
 
         ! do upwards sync of solution field, this then needs to be interpolated
         t_block = MPI_Wtime()
@@ -539,14 +551,14 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 t_block = MPI_Wtime()
                 call balanceLoad_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, balanceMode="selective", &
                                     balance_ref=(/ 0_ik, 1_ik /), balance_name=fname, hvy_tmp=hvy_RHS(:,:,:,1:nc,:), Jmin_set=params%poisson_Jmin, full_tree_grid=.true.)
-                call toc( "balanceLoad_tree (multigrid upwards)", 10050, MPI_Wtime()-t_block )
+                call toc( "MG Upwards - balanceLoad_tree", 10050, MPI_Wtime()-t_block )
 
                 ! Reorder data arrays after load balancing at the finest level
                 ! This ensures consistent ordering across processors and eliminates the need for treecode lookup
                 if (i_level == Jmax_a) then
                     t_block = MPI_Wtime()
                     call reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves)
-                    call toc( "Reorder hvy arrays after balancing", 10051, MPI_Wtime()-t_block )
+                    call toc( "MG upwards - Reorder hvy arrays after balancing", 10051, MPI_Wtime()-t_block )
                 endif
 
             endif
@@ -587,7 +599,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
             ! call dump_block_fancy(hvy_work(:,:,:,hvy_depth(k_block)*nc+1:hvy_depth(k_block)*nc+nc,hvy_id,1), fname, params%Bs, params%g, digits=2, print_ghosts=.false.)
             ! call dump_block_fancy(hvy_sol(:,:,:,1:nc,hvy_id), fname, params%Bs, params%g, digits=2, print_ghosts=.false.)
         enddo
-        call toc( "GS Upwards - Solution prolongation", 10031, MPI_Wtime()-t_block )
+        call toc( "MG Upwards - Solution prolongation", 10031, MPI_Wtime()-t_block )
 
         ! laplacian is invariant to shifts of constant values
         ! our values are defined with zero mean for comparison
@@ -629,7 +641,12 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
             call append_t_file('multigrid-iteration.t', (/1.0_rk, dble(i_level), t_print/))
         endif
 
-        call toc( "GS Upwards - full sweep", 10005, MPI_Wtime()-t_loop )
+        call toc( "MG Upwards - full sweep", 10005, MPI_Wtime()-t_loop )
+    enddo
+
+    ! copy the original refinement_status (when entering this routine) back to lgt_block
+    do k_block = 1, lgt_n(tree_ID)
+        lgt_block(lgt_active(k_block, tree_ID), IDX_REFINE_STS) = lgt_refinementStatus_backup(lgt_active(k_block, tree_ID))
     enddo
 
 end subroutine multigrid_upwards

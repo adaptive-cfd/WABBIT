@@ -1,192 +1,195 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name module_params.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief params data structure, define all constant parameters for global use
 !
 !> \todo module actually only works for specific RHS, split between RHS parameters and program
-!!       parameters in future versions
-!
-!> \details
-!> = log ======================================================================================
-!! \n
-!! 04/11/16 - switch to v0.4, merge old block_params structure with new structure
+!! parameters in future versions
 ! ********************************************************************************************
 
 module module_params
     use mpi
-    ! ini file parser module
     use module_ini_files_parser_mpi
-    ! MPI general bridge module
-    use module_bridge
+    use module_bridge                       ! MPI general bridge module
     use module_helpers
     use module_t_files
 
     implicit none
 
 
-
     ! global user defined data structure for time independent variables
     type type_params
 
         ! maximal time for main time loop
-        real(kind=rk)                                :: time_max=0.0_rk, walltime_max=1760.0_rk
+        real(kind=rk) :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
-        real(kind=rk)                                :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
-        character(len=80)                            :: time_step_method="RungeKuttaGeneric"
-        character(len=80)                            :: krylov_subspace_dimension="fixed"
+        real(kind=rk) :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
+        character(len=cshort) :: time_step_method="RungeKuttaGeneric"
+        character(len=cshort) :: krylov_subspace_dimension="fixed"
         logical :: RKC_custom_scheme=.false.
         real(kind=rk), dimension(1:60) :: RKC_mu=0.0_rk, RKC_mu_tilde=0.0_rk, RKC_nu=0.0_rk, RKC_gamma_tilde=0.0_rk, RKC_c=0.0_rk
-         ! dt
-        real(kind=rk)                                :: dt_fixed=0.0_rk, dt_max=0.0_rk
+        ! dt
+        real(kind=rk) :: dt_fixed=0.0_rk, dt_max=0.0_rk
         ! number of allowed time steps
-        integer(kind=ik)                             :: nt=99999999, inicond_refinements=0
+        integer(kind=ik) :: nt=99999999, inicond_refinements=0
         ! number of stages "s" for the RungeKuttaChebychev method. Memory is always 6 registers
         ! independent of stages.
-        integer(kind=ik)                             :: M_krylov = 12, N_dt_per_grid = 1, s = 4
+        integer(kind=ik) :: M_krylov = 12, N_dt_per_grid = 1, s = 4
         ! data writing frequency
-        integer(kind=ik)                             :: write_freq=0
+        integer(kind=ik) :: write_freq=0
         ! data writing frequency
-        character(len=80)                            :: write_method="fixed_time"
+        character(len=cshort) :: write_method="fixed_time"
         ! data writing frequency
-        real(kind=rk)                                :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk
+        real(kind=rk) :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk, write_time_first=0.0_rk
         ! data next write time, store here the next time for output data
-        real(kind=rk)                                :: next_write_time=0.0_rk
+        real(kind=rk) :: next_write_time=0.0_rk
         ! this number is used when generating random grids.
-        ! the default of 75% is useful for ghost node unit tests, but we sometimes
-        ! have to create random grids that have no more than 1/8 active blocks so that
-        ! we can still refine them by one level.
-        real(kind=rk) :: max_grid_density = 0.75_rk
+        ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
+        real(kind=rk) :: max_grid_density = 0.1_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
-        real(kind=rk), dimension(:,:), allocatable   :: butcher_tableau
+        real(kind=rk), dimension(:,:), allocatable :: butcher_tableau
 
         logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false., dont_use_pruned_tree_mask=.false.
 
         character(len=1), dimension(:), ALLOCATABLE :: symmetry_vector_component
 
         ! threshold for wavelet indicator
-        real(kind=rk)                                :: eps=0.0_rk
-        logical                                      :: eps_normalized=.false.
-        character(len=80) :: eps_norm="Linfty"
+        real(kind=rk) :: eps=0.0_rk
+        logical :: eps_normalized = .false.
+        integer :: azzalini_iterations = 1
+        logical :: threshold_wc = .false.
+        character(len=cshort) :: eps_norm="Linfty"
         logical :: force_maxlevel_dealiasing = .false.
         logical :: threshold_mask = .false.
-        logical :: harten_multiresolution = .true.
-        character(len=80) :: wavelet="none", wavelet_transform_type="harten-multiresolution"
+        logical :: useCoarseExtension = .true.
+        logical :: useSecurityZone = .true.
+        logical :: isLiftedWavelet = .false.
+        character(len=cshort) :: wavelet="not-initialized"
+        ! the wavelet filter banks:
+        ! HD - low pass decomposition filter, H_TILDE
+        ! GD - high pass decomposition filter, G_TILDE
+        ! HR - low pass reconstruction filter, H
+        ! GR - high pass reconstruction filter, G
+        real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
+        ! filters for multigrid method - restriction prediction filter, HD for lifted wavelets and low-pass filter for unlifted wavelets
+        real(kind=rk), dimension(:), allocatable :: MGR
+        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+
+
         ! minimal level for blocks in data tree
-        integer(kind=ik)                             :: min_treelevel=0
+        integer(kind=ik) :: Jmin=0
         ! maximal level for blocks in data tree
-        integer(kind=ik)                             :: max_treelevel=0
+        integer(kind=ik) :: Jmax=0
+        integer(kind=ik) :: Jini=-1
         ! maximal numbers of trees in the forest
-        integer(kind=ik)                             :: forest_size=1
+        integer(kind=ik) :: forest_size=1
         ! order of refinement predictor
-        character(len=80)                            :: order_predictor=""
+        character(len=cshort) :: order_predictor="not-initialized", inicond_grid_from_file="no"
         ! order of spatial discretization
-        character(len=80)                            :: order_discretization=""
-        character(len=80)                            :: coarsening_indicator="threshold-state-vector"
-        logical, allocatable                         :: threshold_state_vector_component(:)
-        ! deside if WABBIT should start from input files
-        logical                                       :: read_from_files
+        character(len=cshort) :: order_discretization="not-initialized"
+        character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_stencil_size=0
+        character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
+        integer(kind=ik)      :: poisson_cycle_it=0
+        real(kind=rk)         :: poisson_cycle_tol_abs=0.0_rk
+        real(kind=rk)         :: poisson_cycle_tol_rel=0.0_rk
+        integer(kind=ik)      :: poisson_cycle_max_it=0
+        integer(kind=ik)      :: poisson_GS_it=0
+        integer(kind=ik)      :: poisson_Sync_it=0
+        character(len=cshort) :: poisson_coarsest="FFT"
+        integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
+        character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
+        character(len=cshort) :: refinement_indicator="everywhere"
+        character(len=cshort) :: coarsening_indicator="threshold-state-vector"
+        character(len=cshort) :: coarsening_indicator_inicond="threshold-state-vector"
+        integer, allocatable :: threshold_state_vector_component(:)
+        ! decide if WABBIT should start from input files
+        logical :: read_from_files
         ! files we want to read for inital cond.
-        character(len=80), dimension(:), allocatable  :: input_files
+        character(len=cshort), dimension(:), allocatable :: input_files
 
-
-        ! grid parameter
-        integer(kind=ik), dimension(3)               :: Bs=(/ 0, 0, 0 /)      ! number of block nodes
-        integer(kind=ik)                             :: n_ghosts=0 ! number of ghost nodes
-
-        ! In our grid definition with redundant points, at the coarse-fine interface values of one of the
-        ! blocks need to be overwritten with the values from the other one. There are two choices:
-        !   (1) overwrite coarser block with (decimated) fine block values (the solution until April 2020)
-        !   (2) overwrite fine block with (interpolated) coarser block values (the new solution)
-        ! In both cases, a redundant point exists. The solution (2) appears to be better with CDF44 wavelets, but
-        ! in a purely hyperbolic test case without adaptation (static, non-equidistant grid), (2) diverges
-        ! and (1) appears to be more stable.
-        logical :: ghost_nodes_redundant_point_coarseWins = .true.
+        integer(kind=ik), dimension(3) :: Bs=(/ 0, 0, 0 /)! number of block nodes
+        integer(kind=ik) :: g=0 ! number of ghost nodes
+        integer(kind=ik) :: g_rhs=0 ! number of ghost nodes
 
         ! switch for mesh adaption
-        logical :: adapt_mesh=.false., adapt_inicond=.false.
-        logical :: out_of_memory = .false.
+        logical :: adapt_tree=.false., adapt_inicond=.false.
         ! number of allocated heavy data fields per process
-        integer(kind=ik)                             :: number_blocks=0_ik
+        integer(kind=ik) :: number_blocks = -1_ik
         ! number of allocated data fields in heavy data array, number of fields
         ! in heavy work data (depend from time step scheme, ...)
         integer(kind=ik) :: n_eqn = 0_ik
+        integer(kind=ik) :: n_eqn_rhs = 0_ik
         integer(kind=ik) :: N_mask_components = 0_ik
 
         ! block distribution for load balancing (also used for start distribution)
-        character(len=80)                            :: block_distribution=""
+        character(len=cshort) :: block_distribution="sfc_hilbert"
 
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------
-        ! physics type
-        character(len=80) :: physics_type=""
-
-        ! domain length
-        real(kind=rk)     :: domain_size(3)=0.0_rk
-
-        ! use third dimension
-        integer(kind=ik)  :: dim=2 ! can be 2 or 3
+        character(len=cshort) :: physics_type="not-initialized"
+        real(kind=rk) :: domain_size(3)=0.0_rk
+        integer(kind=ik) :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk)    :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
+        real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
+
+        ! -------------------------------------------------------------------------------------
+        ! time statistics (averaging or similar)
+        ! -------------------------------------------------------------------------------------
+        logical :: time_statistics = .false.
+        integer(kind=ik) :: N_time_statistics = 0
+        character(len=cshort), allocatable :: time_statistics_names(:)
+        logical :: read_from_files_time_statistics = .false.
+        real(kind=rk) :: time_statistics_start_time = 0.0_rk
 
         ! -------------------------------------------------------------------------------------
         ! MPI
         ! -------------------------------------------------------------------------------------
-        ! process rank
         integer(kind=ik) :: rank=-1
-        ! number of processes
         integer(kind=ik) :: number_procs=-1
+
         ! -------------------------------------------------------------------------------------
         ! bridge
         ! -------------------------------------------------------------------------------------
         ! bridge for connecting WABBIT to outdoor MPI_WORLD
-        type(bridgeMPI)  :: bridge
-        !
-        logical          :: bridge_exists = .false.
+        type(bridgeMPI) :: bridge
+        logical :: bridge_exists = .false.
+
         !--------------------------------------------------------------------------------------
-               !! particle connection
+        !! particle connection
         !--------------------------------------------------------------------------------------
         !! - command to use for the particle program (over bridge)
-        character(len=100)               :: particleCommand=""
+        character(len=100) :: particleCommand=""
         !! - Usage of a common myWorld_comm
-        logical                          :: bridgeCommonMPI
+        logical :: bridgeCommonMPI
         !! - Consideration of the fluid side as master in case of several myWorld_comms
-        logical                          :: bridgeFluidMaster
-
-
+        logical :: bridgeFluidMaster
 
         ! -------------------------------------------------------------------------------------
         ! saving
         ! -------------------------------------------------------------------------------------
         integer(kind=ik) :: N_fields_saved=0
-        character(len=80), allocatable, dimension(:) :: field_names
-        logical ::use_iteration_as_fileid = .false.
-
-
+        character(len=cshort), allocatable, dimension(:) :: field_names
+        logical :: use_iteration_as_fileid = .false.
 
         ! -------------------------------------------------------------------------------------
-        ! unit test
+        ! unit tests and debugging
         ! -------------------------------------------------------------------------------------
-        logical :: test_treecode=.false., test_ghost_nodes_synch=.false., check_redundant_nodes=.false.
+        logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
+
+        logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
+        logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
 
         ! -------------------------------------------------------------------------------------
         ! filter
         ! -------------------------------------------------------------------------------------
         ! type
-        character(len=80)                           :: filter_type="no_filter"
+        character(len=cshort) :: filter_type="no_filter"
         ! frequency
-        integer(kind=ik)                            :: filter_freq=-1
+        integer(kind=ik) :: filter_freq=-1
         ! save filter strength sigma
         logical :: save_filter_strength
         logical :: filter_only_maxlevel = .false., filter_all_except_maxlevel = .false.
@@ -194,18 +197,11 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions
         ! -------------------------------------------------------------------------------------
-        logical,dimension(3) :: periodic_BC = .true., symmetry_BC = .false.
+        logical, dimension(3) :: periodic_BC = .true., symmetry_BC = .false.
 
     end type type_params
 
-
-
-
-! main body
 contains
 
-    ! this file reads the ini file and distributes all the parameters to the
-    ! various structs holding them
-#include "ini_file_to_params.f90"
 
 end module module_params

@@ -4,11 +4,13 @@
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
 subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
+    use module_globals
     implicit none
 
     ! grid
     integer(kind=ik), intent(in) :: Bs(3), g
     !> mask term for every grid point of this block
+    ! components: mask, usx, usy, usz, color, sponge
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
     !     stage == "time-independent-part"
     !     stage == "time-dependent-part"
@@ -29,24 +31,35 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
     ! check if the array has the right dimension, if not, put money in swear jar.
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
-        write(*,*) shape(mask)
+        write(*,'(A)') shape(mask)
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
     if (size(mask,4) < 5 ) then
-        write(*,*) shape(mask)
+        write(*,'(A)') shape(mask)
         call abort(777108, "mask: wrong number of components (5), there's pirates, captain!")
     endif
 
 
     if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
 
-    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_3D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_3D_ACM called but ACM not initialized"
 
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ! mask function and boundary values
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     select case (params_acm%geometry)
+
+    case ('sphere-fixed')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_fixed_sphere(x0, dx, Bs, g, mask )
+        endif
+
+    case ('sphere-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_free_sphere(x0, dx, Bs, g, mask )
+        endif
+
     case ('fractal_tree')
         !-----------------------------------------------------------------------
         ! FRACTAL TREE
@@ -80,9 +93,14 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
         !-----------------------------------------------------------------------
         ! the insects require us to determine their state vector before they can be drawn
         ! as this is to do only once, not for all blocks
-        if ( abs(time-Insect%time) >= 1.0e-13_rk) then
-            call Update_Insect(time, Insect)
-        endif
+        ! 18 Feb 2021: deactivated the call here because it is (more efficiently) done in module_mask.f90
+        ! This is important as for FSI problems the mask function at TIME may have to be recomputed even if we
+        ! already computed it at this time!! Think of RK substeps, where several RHS evaluations are to be done
+        ! at the same time level but with different input data. Hence, the check below is NOT sufficient in those
+        ! cases.
+        ! if (abs(time-Insect%time) >= 1.0e-13_rk) then
+        !     call Update_Insect(time, Insect)
+        ! endif
 
         select case(stage)
         case ("time-independent-part")
@@ -135,6 +153,10 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
         end select
 
+    case ('channel_3D')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_channel(x0, dx, Bs, g, mask )
+        endif
 
     case ('none')
         mask = 0.0_rk
@@ -189,15 +211,40 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! happens, do nothing.
     if (.not. params_acm%penalization) return
 
-    if (.not. params_acm%initialized) write(*,*) "WARNING: create_mask_2D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_2D_ACM called but ACM not initialized"
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values
     !---------------------------------------------------------------------------
     select case (params_acm%geometry)
+    case ('rotating-rod')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_rotating_rod( time, mask, x0, dx, Bs, g )
+        endif
+
     case ('cylinder')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             call draw_cylinder( mask, x0, dx, Bs, g )
+        endif
+
+    case ('lamballais')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_lamballais( mask, x0, dx, Bs, g )
+        endif
+
+    case ('lamballais-local')
+    if (stage == "time-independent-part" .or. stage == "all-parts") then
+        call draw_lamballais_local_variation(mask, x0, dx, Bs, g )
+    endif
+
+    case ('plate-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_plate_free( mask, x0, dx, Bs, g )
+        endif
+
+    case ('cylinder-free')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_free_cylinder( mask, x0, dx, Bs, g )
         endif
 
     case ('rotating_cylinder')
@@ -223,6 +270,11 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     case ('cavity')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
             call draw_cavity( mask, x0, dx, Bs, g )
+        endif
+
+    case ('2D-wingsection')
+        if (stage == "time-dependent-part" .or. stage == "all-parts") then
+            call draw_2d_wingsections( time, mask, x0, dx, Bs, g )
         endif
 
     case ('none')
@@ -253,7 +305,7 @@ end subroutine create_mask_2D_ACM
 subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -278,7 +330,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
     mask = 0.0_rk
 
     ! parameter for smoothing function (width)
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
 
     ! Note: this basic mask function is set on the ghost nodes as well.
@@ -301,12 +353,819 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 end subroutine draw_cylinder
 
+
+
+
+subroutine draw_lamballais(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi
+    ! loop variables
+    integer(kind=ik) :: ix, iy, ix_global, iy_global
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! a mask for the reproduction of the following paper:
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
+    ! Computers & Fluids 75, 103–111, 2013 
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_acm%dx_min
+    h = 1.5_rk * dx_min
+
+    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
+    safety = 5.0_rk * epsilon
+    delta = 2.64822828_rk
+
+    if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
+
+    select case(params_acm%smoothing_type)
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= 0.5_rk*(params_acm%R0+params_acm%R1)) then
+                    ! inner cylinder
+                    xi = (r-params_acm%R0) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! inner part of ring
+                    xi = -1.0_rk*(r-params_acm%R1) / epsilon
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                    ! outer part of ring
+                    xi = (r-params_acm%R2) / epsilon
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("discontinuous", "dis")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= params_acm%R0) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = 1.0_rk
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ((r >= params_acm%R1).and.(r <= params_acm%R2)) then
+                    ! ring
+                    mask(ix,iy,6) = 1.0_rk
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("cos")
+    !--------------------------------
+        safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_acm%R0+safety) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = smoothstep(r, params_acm%R0, params_acm%C_smooth*params_acm%dx_min)
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! inner part of ring
+                    mask(ix,iy,6) = smoothstep( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then                
+                    ! outer part of ring
+                    mask(ix,iy,6) = smoothstep(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    end select
+
+end subroutine draw_lamballais
+
+subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi, epsilon_ring, xi_ring
+    ! loop variables
+    integer(kind=ik) :: ix, iy, ix_global, iy_global
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! a mask for the reproduction of the following paper:
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
+    ! Computers & Fluids 75, 103–111, 2013 
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_acm%dx_min
+    h = 1.5_rk * dx_min
+
+    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
+    safety = 5.0_rk * epsilon
+    delta = 2.64822828_rk
+
+    epsilon_ring = sqrt(params_acm%nu * params_acm%C_eta_ring)
+
+    if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
+
+    select case(params_acm%smoothing_type)
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= 0.5_rk*(params_acm%R0+params_acm%R1)) then
+                    ! inner cylinder
+                    !xi = (r-params_acm%R0) / epsilon
+                    !mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    xi = (r-params_acm%R0) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                    ! outer part of ring
+                    xi_ring = (r-params_acm%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("discontinuous", "dis")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= params_acm%R0) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = 1.0_rk
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+                    
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then 
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                
+                    ! outer part of ring
+                    xi_ring = (r-params_acm%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                endif
+
+
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("cos")
+    !--------------------------------
+        safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_acm%R0+safety) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = smoothstep(r, params_acm%R0, params_acm%C_smooth*params_acm%dx_min)
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                    ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                
+                    ! outer part of ring
+                    xi_ring = (r-params_acm%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                endif
+                
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    end select
+
+end subroutine draw_lamballais_local_variation
+
+!-------------------------------------------------------------------------------
+! The "free cylinder" is a 2D mask function that is coupled with the insect module
+! it is used for debuging and development (hence the coupling)
+subroutine draw_free_cylinder(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! The vertical (y) position and velocity is taken from the insect module free-flight
+    ! solver (and the corresponding degree of freedom can be disabled, in which case this
+    ! mask function is an impulsively started cylinder)
+    !
+    ! ini-parameters:
+    ! [FreeFlightSolver]::use_free_flight_solver=1
+    params_acm%u_vert = Insect%STATE(5)
+    params_acm%z_vert = Insect%STATE(2)
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%z_vert
+        do ix = 1, Bs(1)+2*g
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_acm%domain_size(1)
+            ! distance from center of cylinder
+            r = dsqrt(x*x + y*y)
+
+            tmp = smoothstep(r, params_acm%R_cyl, h)
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = params_acm%u_vert
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_free_cylinder
+
+!-------------------------------------------------------------------------------
+! as above draw_free_cylinder, but draws a thin, rectangular plate with width "length"
+! and thickness "thickness"
+subroutine draw_plate_free(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmpy, tmpx, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    params_acm%u_vert = Insect%STATE(5)
+    params_acm%z_vert = Insect%STATE(2)
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%z_vert
+
+        do ix = 1, Bs(1)+2*g
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_acm%domain_size(1)
+
+            tmpx = smoothstep( abs(x), 0.5_rk*params_acm%length, h)
+            tmpy = smoothstep( abs(y), 0.5_rk*params_acm%thickness, h)
+
+            tmp = tmpy*tmpx
+
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = params_acm%u_vert
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_free_sphere(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx)
+
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - Insect%STATE(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - Insect%STATE(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - Insect%STATE(1)
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y + z*z)
+
+                mask(ix,iy,iz,1) = smoothstep(r, params_acm%R_cyl, h)
+                mask(ix,iy,iz,2) = Insect%STATE(4)
+                mask(ix,iy,iz,3) = Insect%STATE(5)
+                mask(ix,iy,iz,4) = Insect%STATE(6)
+                ! color
+                mask(ix,iy,iz,5) = 1.0_rk
+            end do
+        end do
+    end do
+
+end subroutine draw_free_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+
+    !h = 2*minval(dx)
+    dx_min = params_acm%dx_min
+    h = 1.5_rk * dx_min
+
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%x_cntr(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y + z*z)
+
+                tmp = smoothstep(r, params_acm%R_cyl, h)
+
+                if (tmp >= mask(ix,iy,iz,1)) then
+                    mask(ix,iy,iz,1) = tmp
+                    ! color
+                    mask(ix,iy,iz,5) = 1.0_rk
+                endif
+            end do
+        end do
+    end do
+
+end subroutine draw_fixed_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_channel(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min, H_fluid, safety, epsilon, xi, delta
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+     ! parameter for smoothing function (width)
+    dx_min = params_acm%dx_min
+
+    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
+    delta = 2.64822828_rk
+
+    ! Fluid domain
+    H_fluid = params_acm%domain_size(2) - 2*params_acm%h_channel
+
+    ! | h_channel
+    ! |____
+    ! |
+    ! | H_fluid
+    ! |____
+    ! |
+    ! | h_channel
+
+    select case(params_acm%smoothing_type)
+    !--------------------------------
+    case ("discontinuous", "dis")
+    !--------------------------------
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif ((y >= (params_acm%h_channel+H_fluid)).and.(y <=  params_acm%domain_size(2))) then
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("cos", "cosine")
+    !--------------------------------
+    safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel+safety) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = smoothstep(y, params_acm%h_channel, params_acm%C_smooth*params_acm%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif (y >= (params_acm%h_channel+H_fluid-safety)) then 
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = 1 - smoothstep(y, (params_acm%h_channel+H_fluid), params_acm%C_smooth*params_acm%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+    safety = 5.0_rk*epsilon
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_acm%h_channel+safety) then
+                    ! lower wall
+                    xi = (y-params_acm%h_channel) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif (y >= (params_acm%h_channel+H_fluid-safety)) then
+                    ! upper wall
+                    xi = -1.0_rk*(y-(params_acm%h_channel+H_fluid)) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+    
+    
+    end select
+    
+
+end subroutine draw_channel
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_cylinderz(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insect%C_smooth*minval(dx)
+
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_acm%domain_size(3)/2.0
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%domain_size(1)/2.0
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                mask(ix,iy,iz,1) = smoothstep(r, params_acm%R_cyl, h)
+                ! color
+                mask(ix,iy,iz,5) = 1.0_rk
+            end do
+        end do
+    end do
+
+end subroutine draw_cylinderz
+
 !-------------------------------------------------------------------------------
 
 subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -341,7 +1200,7 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
     mask = 0.0_rk
 
     ! parameter for smoothing function (width)
-    dx_min = 2.0_rk**(-params_acm%Jmax) * params_acm%domain_size(1) / real(params_acm%Bs(1)-1, kind=rk)
+    dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
 
     ! Note: this basic mask function is set on the ghost nodes as well.
@@ -374,7 +1233,7 @@ end subroutine draw_rotating_cylinder
 subroutine draw_cavity(mask, x0, dx, Bs, g )
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -442,7 +1301,7 @@ end subroutine draw_cavity
 subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -513,15 +1372,13 @@ subroutine draw_two_cylinders( mask, x0, dx, Bs, g)
             end if
         end do
     end do
-
-
 end subroutine draw_two_cylinders
 
 
 subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -537,16 +1394,18 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! auxiliary variables
     real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
     cy2, r_1, r_2, h, mask1, mask2, freq, vy2
+    real(kind=rk), allocatable, save :: mu(:)
     !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
     ! loop variables
-    integer(kind=ik)      :: ix, iy
+    integer(kind=ik)      :: ix, iy, k, nfft_y0
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
-
+    nfft_y0 = wingsections(1)%nfft_y0
+    if (.not. allocated(mu)) allocate(mu(nfft_y0))
     ! reset mask array
     mask = 0.0_rk
     mask1 = 0.0_rk
@@ -555,7 +1414,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! main body
     ! radius of the cylinders
     R1 = 1.0_rk * params_acm%R_cyl
-    R2 = 0.5_rk * params_acm%R_cyl
+    R2 = 1.0_rk * params_acm%R_cyl
     ! Here we set the frequency of the 2. cylinder oscillating up and down behind
     ! the 1. cyl. It should be choosen such that the characteristic time scale of
     ! the vortex shedding is larger then the movement!
@@ -569,16 +1428,21 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! f1 = St1*params_acm%u_mean_set(1)/(2*R1)
     ! f2 = St2*params_acm%u_mean_set(1)/(2*R2)
     ! ! make cylinder movement slow in comparison to vortex shedding frequency:
-    ! freq = min(f1,f2) / 50
-    freq = 2e-3
+    ! freq = min(f1,f2) / 10
+    freq = 0.2e-2
+    mu = wingsections(1)%ai_y0
     ! center of the first cylinder
-    cx1 = 0.125_rk * params_acm%domain_size(1)
-    cy1 = 0.500_rk * params_acm%domain_size(2)
+    cx1 = 0.250_rk * params_acm%domain_size(1)
+    cy1 = 0.250_rk * params_acm%domain_size(2)
     ! center of the second cylinder (oscillates behind 1. cylinder)
-    cx2 = 4*cx1
-    cy2 = cy1 + 0.25_rk*params_acm%domain_size(2) * sin(2*pi*freq * time)
-    ! velocity of moving cylinder
-    vy2 = 0.25_rk * params_acm%domain_size(2) * 2 * pi * freq * cos(2*pi*freq*time)
+    cx2 = 0.500_rk * params_acm%domain_size(1)
+    cy2 = 0.500_rk * params_acm%domain_size(2)
+    vy2 = 0
+    do k = 1, nfft_y0
+        cy2 = cy2 + mu(k) * cos(2*k*pi*freq*time)
+        ! velocity of moving cylinder
+        vy2 = vy2 - mu(k) * 2 * pi * freq * k * sin(2*k*pi*freq*time)
+    end do
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
@@ -595,16 +1459,24 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
             if (params_acm%smooth_mask) then
                 mask1 = smoothstep( r_1, R1, h)
                 mask2 = smoothstep( r_2, R2, h)
-                if (mask2>0.0) mask(ix,iy,3) = vy2
+                if (mask2>0.0) then
+                  mask(ix,iy,3) = vy2
+                  mask(ix,iy,5) = 2.0_rk
+                end if
+                if (mask1>0.0) then
+                  mask(ix,iy,5) = 1.0_rk
+                end if
                 mask(ix,iy,1) = mask1 + mask2
             else
                 ! if point is inside one of the cylinders, set mask to 1
                 if (r_1 <= R1) then
                     mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,5) = 1.0_rk
                 elseif ( r_2 <= R2) then
                     mask(ix,iy,1) = 1.0_rk
                     mask(ix,iy,2) = 0.0_rk
                     mask(ix,iy,3) = vy2
+                    mask(ix,iy,5) = 2.0_rk
                 else
                     mask(ix,iy,:) = 0.0_rk
                 end if
@@ -635,7 +1507,7 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
     !                body
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     use module_params
-    use module_precision
+    use module_globals
 
     implicit none
 
@@ -765,3 +1637,76 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
 
 
 end subroutine draw_2d_flapping_wings
+
+subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+
+    integer :: ix, iy, iz, mpicode
+    real (kind=rk) :: x2, y2, vx2, vy2, vx2t, vy2t, anglez2, omz2, omz2t, x00, y00
+    real (kind=rk) :: x, y, xref, yref, xlev, ylev, tmp, N, rref, rmax, hsmth, Am, alpham
+    real (kind=rk) :: Af, Sxf, Syf, Jf, forcex, forcey, torquez
+
+    ! reset everything
+    mask = 0.0_rk
+
+    N = Insect%C_smooth ! smoothing coefficient
+    hsmth = N*minval(dx) ! smoothing layer thickness
+    rmax = 0.5d0
+
+    x00 = params_acm%domain_size(1)/2.0_rk
+    y00 = params_acm%domain_size(2)/2.0_rk
+
+    ! Flapping parameters
+    Am = 1.00d0
+    alpham = 0.25d0*pi
+
+    ! Update kinematics
+    x2 = x00 + Am * dcos(time/Am)
+    y2 = y00
+    anglez2 = 0.5d0*pi + alpham * dsin(time/Am)
+    vx2 = - dsin(time/Am)
+    vy2 = 0.0d0
+    omz2 = alpham/Am * dcos(time/Am)
+    vx2t = - 1.0/Am * cos(time/Am)
+    vy2t = 0.0d0
+    omz2t = - alpham/Am**2 * sin(time/Am)
+
+    ! For all grid points of this subdomain
+    do iy = g+1, Bs(2)+g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - y2
+
+        do ix = g+1, Bs(1)+g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - x2
+
+            xref = x*dcos(anglez2) + y*dsin(anglez2)
+            yref = y*dcos(anglez2) - x*dsin(anglez2)
+            rref = dsqrt( xref**2 + 4.0d0**2 * yref**2 ) ! Radius in cylindrical coordinates
+
+            tmp = smoothstep(rref, rmax-0.0d0*hsmth, hsmth)
+            ! call SmoothStep (tmp, rref, rmax-0.0d0*hsmth, hsmth)
+
+
+            mask(ix,iy,1) = tmp
+            mask(ix,iy,2) = -omz2*y + vx2
+            mask(ix,iy,3) = +omz2*x + vy2
+            mask(ix,iy,4) = 0.0_rk
+            mask(ix,iy,5) = 1.0_rk
+
+        enddo
+    enddo
+
+
+end subroutine draw_rotating_rod

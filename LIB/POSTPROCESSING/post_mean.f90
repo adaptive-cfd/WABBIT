@@ -1,48 +1,24 @@
-!> \file
-! WABBIT
-!> \name keyvalues.f90
-!> \version 0.5
-!> \author sm, engels
-!
-!> \brief loads the specified *.h5 file and creates a *.key file that contains
-!! min / max / mean / L2 norm of the field data. This is used for testing
-!! so that we don't need to store entire fields but rather the *.key only
-!! \version 10/1/18 - create commit b2719e1aa2339f4f1f83fb29bd2e4e5e81d05a2a
-!*********************************************************************************************
-
 subroutine post_mean(params)
-    use module_IO
-    use module_precision
+    use module_globals
     use module_params
+    use module_operators
     use module_mesh
     use mpi
+    use module_forestMetaData
 
     implicit none
-    !> name of the file
-    character(len=80)            :: fname, fname_out
-    !> parameter struct
-    type (type_params), intent(inout)       :: params
-    integer(kind=ik), allocatable           :: lgt_block(:, :)
-    real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
-    integer(kind=ik), allocatable           :: hvy_neighbor(:,:)
-    integer(kind=ik), allocatable           :: lgt_active(:), hvy_active(:)
-    integer(kind=tsize), allocatable        :: lgt_sortednumlist(:,:)
-    integer(hsize_t), dimension(4)          :: size_field
-    integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, lgt_n, hvy_n, dim, g
-    integer(kind=ik), dimension(3)          :: Bs
-    real(kind=rk), dimension(3)             :: x0, dx
-    real(kind=rk), dimension(3)             :: domain
-    real(kind=rk)                           :: time
-    integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:)
+    character(len=cshort)                   :: fname, fname_out                 !> name of the file
+    type (type_params), intent(inout)       :: params                           !> parameter struct
 
-    real(kind=rk)    :: x,y,z
-    real(kind=rk)    :: maxi,mini,squari,meani,qi,inti
-    real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, rank, i, tc_length
+    real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
+    integer(kind=ik)                   :: tree_ID=1
+    integer(kind=ik)                   :: rank, iteration
+    real(kind=rk)                      :: time
+    real(kind=rk)                      :: norms(1:5)
+    logical                            :: exist
 
-
+    ! this routine works only on one tree
+    allocate( hvy_n(1), lgt_n(1) )
 
     !-----------------------------------------------------------------------------------------------------
     rank = params%rank
@@ -50,8 +26,7 @@ subroutine post_mean(params)
     call get_command_argument(2,fname)
     if (fname =='--help' .or. fname=='--h') then
         if (rank==0) then
-            write(*,*) "WABBIT postprocessing: compute mean value of field. We also output the volume integral"
-            write(*,*) "(Lx*Ly*Lz*mean(field) to the file results.txt"
+            write(*,*) "WABBIT postprocessing: compute mean value of field. We output all values to a file."
             write(*,*) "mpi_command -n number_procs ./wabbit-post --mean filename.h5 result.txt"
         end if
         return
@@ -61,72 +36,45 @@ subroutine post_mean(params)
     call check_file_exists( fname )
 
     ! add some parameters from the file
-    call read_attributes(fname, lgt_n, time, iteration, domain, Bs, tc_length, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+    call read_attributes(fname, lgt_n(tree_ID), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
+    periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    params%Bs = Bs
     params%n_eqn = 1
-    params%n_ghosts = 2_ik
+    params%g = 2_ik
     params%order_predictor = "multiresolution_2nd"
-    params%max_treelevel = tc_length
-    params%domain_size(1) = domain(1)
-    params%domain_size(2) = domain(2)
-    params%domain_size(3) = domain(3)
-    params%number_blocks = 2_ik*lgt_n/params%number_procs
+    params%number_blocks = ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
+    allocate(params%threshold_state_vector_component(1:params%n_eqn))
+    params%threshold_state_vector_component = 1
 
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-    hvy_active, lgt_sortednumlist)
+    call allocate_forest(params, hvy_block)
 
-    call read_mesh(fname, params, lgt_n, hvy_n, lgt_block)
-    call read_field(fname, 1, params, hvy_block, hvy_n )
+    ! read input data
+    call readHDF5vct_tree( (/fname/), params, hvy_block, tree_ID)
 
-    ! create lists of active blocks (light and heavy data)
-    ! update list of sorted nunmerical treecodes, used for finding blocks
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_ID=1)
-    ! update neighbor relations
-    call update_neighbors( params, lgt_block, hvy_neighbor, lgt_active, &
-    lgt_n, lgt_sortednumlist, hvy_active, hvy_n )
-
-    ! compute an additional quantity that depends also on the position
-    ! (the others are translation invariant)
-    if (params%dim == 3) then
-        nz = Bs(3)
-    else
-        nz = 1
-    end if
-
-    meanl = 0.0_rk
-
-    g = params%n_ghosts
-    do k = 1, hvy_n
-        call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-        call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-
-        if (params%dim == 3) then
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, g+1:Bs(3)+g-1, 1, hvy_active(k)))*dx(1)*dx(2)*dx(3)
-        else
-            meanl = meanl + sum( hvy_block(g+1:Bs(1)+g-1, g+1:Bs(2)+g-1, 1, 1, hvy_active(k)))*dx(1)*dx(2)
-        endif
-    end do
-
-    call MPI_REDUCE(meanl,meani,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,WABBIT_COMM,mpicode)
-
-    if (params%dim == 3) then
-        meani = meani / (params%domain_size(1)*params%domain_size(2)*params%domain_size(3))
-        inti = meani*product(domain)
-    else
-        meani = meani / (params%domain_size(1)*params%domain_size(2))
-        inti = meani*product(domain(1:2))
-    endif
+    ! use functions from module_operators
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "Mean", norms(1:1), threshold_state_vector=.false.)
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "L1", norms(2:2), threshold_state_vector=.false.)
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "L2", norms(3:3), threshold_state_vector=.false.)
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "Linfty", norms(4:4), threshold_state_vector=.false.)
+    call componentWiseNorm_tree(params, hvy_block, tree_ID, "H1", norms(5:5), threshold_state_vector=.false.)
 
     if (rank == 0) then
-        write(*,*) "Computed mean value is: ", meani
-        write(*,*) "Computed integral value is: ", inti
+        write(*,'(A, es16.8)') "Mean:        ", norms(1)
+        write(*,'(A, es16.8)') "L1 norm:     ", norms(2)
+        write(*,'(A, es16.8)') "L2 norm:     ", norms(3)
+        write(*,'(A, es16.8)') "LInfty norm: ", norms(4)
+        write(*,'(A, es16.8)') "H1 norm:     ", norms(5)
 
         ! write volume integral to disk
         call get_command_argument(3,fname_out)
-        open(14,file=fname_out, status='replace')
-        write(14,*) inti
-        close(14)
+        inquire ( file=fname_out, exist=exist )
+        if (exist) then
+            open(14,file=fname_out, status='replace')
+            write(14,'(A)') "# Mean, L1 norm, L2 norm, LInfty norm, H1 norm" 
+            write(14,'(5(es16.8, ", "))') norms(1), norms(2), norms(3), norms(4), norms(5)
+            close(14)
+        else
+            write(*,'(A)') "Output file "//trim(adjustl(fname_out))//" does not exist. Not writing output. Use e.g. touch"
+        endif
     endif
 end subroutine post_mean

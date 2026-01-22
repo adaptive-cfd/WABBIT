@@ -1,8 +1,7 @@
 subroutine post_stl2dist(params)
-    use module_precision
+    use module_globals
     use module_mesh
     use module_params
-    use module_IO
     use module_mpi
     use module_operators
     use module_physics_metamodule
@@ -10,11 +9,12 @@ subroutine post_stl2dist(params)
     use module_stl_file_reader
     use module_helpers
     use module_ini_files_parser_mpi
+    use module_forestMetaData
 
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=80) :: fname_ini, fname_stl, fname_out, dummy
+    character(len=cshort) :: fname_ini, fname_stl, fname_out, dummy
     integer :: i, Bs(1:3), g, ntri, k, iter, skips, a
     integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax, safety, mpicode
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal, vertex2_normal, &
@@ -23,14 +23,10 @@ subroutine post_stl2dist(params)
     ! origin and spacing of blocks
     real(kind=rk) :: x0(1:3), dx(1:3), x,y,z,tmp
 
-    integer(kind=ik), allocatable      :: lgt_block(:, :)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
-    real(kind=rk), allocatable         :: xyz_nxnynz(:, :)
-    integer(kind=ik), allocatable      :: hvy_neighbor(:,:), hvy_n(:), lgt_n(:)
-    integer(kind=ik), allocatable      :: lgt_active(:,:), hvy_active(:,:)
-    integer(kind=tsize), allocatable   :: lgt_sortednumlist(:,:,:)
-    integer :: hvy_id, lgt_id
-    integer :: c_plus, c_minus,res, tree_n
+    real(kind=rk), allocatable         :: body_superSTL_b(:, :)
+    integer :: hvy_id, lgt_id, tree_ID=1
+    integer :: c_plus, c_minus, res
     integer :: ix1,iy1,iz1
     logical :: done, array_compare_real, pruning
 
@@ -105,12 +101,11 @@ subroutine post_stl2dist(params)
 
     ! one field for the result, one field to tag error points where we have trouble determining the sign.
     params%n_eqn = 1
-    N_MAX_COMPONENTS = params%n_eqn
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    params%threshold_state_vector_component = .false.
-    params%threshold_state_vector_component(1) = .true.
-    ! params%n_ghosts =
+    params%threshold_state_vector_component = 0
+    params%threshold_state_vector_component(1) = 1
+    ! params%g =
 
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
     ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
@@ -118,18 +113,15 @@ subroutine post_stl2dist(params)
     allocate(params%butcher_tableau(1,1))
 
     Bs = params%Bs
-    g = params%n_ghosts
+    g = params%g
 
     ! allocate data
-    call allocate_forest(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-    hvy_active, lgt_sortednumlist, hvy_n=hvy_n, lgt_n=lgt_n)
+    call allocate_forest(params, hvy_block)
 
-    call reset_tree( params, lgt_block, lgt_active(:,1), &
-    lgt_n(1), hvy_active(:,1), hvy_n(1), lgt_sortednumlist(:,:,1), .true., tree_ID=1)
+    call reset_tree( params, .true., tree_ID)
 
     ! start with an equidistant grid on coarsest level
-    call create_equidistant_grid( params, lgt_block, hvy_neighbor, lgt_active(:,1), lgt_n(1), &
-    lgt_sortednumlist(:,:,1), hvy_active(:,1), hvy_n(1), params%min_treelevel, .true., tree_ID=1 )
+    call createEquidistantGrid_tree( params, hvy_block, params%Jmin, .true., tree_ID)
 
     ! reset grid to zeros
     do k = 1, hvy_n(1)
@@ -138,29 +130,29 @@ subroutine post_stl2dist(params)
 
 
     call count_lines_in_ascii_file_mpi(fname_stl, ntri, 0)
-    allocate( xyz_nxnynz(1:ntri,1:30) )
+    allocate( body_superSTL_b(1:ntri,1:30) )
 
-    call read_array_from_ascii_file_mpi(fname_stl, xyz_nxnynz, 0)
-    xyz_nxnynz(:,1:9) = xyz_nxnynz(:,1:9) / scale
-    xyz_nxnynz(:,1) = xyz_nxnynz(:,1) +  origin(1)
-    xyz_nxnynz(:,4) = xyz_nxnynz(:,4) +  origin(1)
-    xyz_nxnynz(:,7) = xyz_nxnynz(:,7) +  origin(1)
+    call read_array_from_ascii_file_mpi(fname_stl, body_superSTL_b, 0)
+    body_superSTL_b(:,1:9) = body_superSTL_b(:,1:9) / scale
+    body_superSTL_b(:,1) = body_superSTL_b(:,1) +  origin(1)
+    body_superSTL_b(:,4) = body_superSTL_b(:,4) +  origin(1)
+    body_superSTL_b(:,7) = body_superSTL_b(:,7) +  origin(1)
 
-    xyz_nxnynz(:,2) = xyz_nxnynz(:,2) +  origin(2)
-    xyz_nxnynz(:,5) = xyz_nxnynz(:,5) +  origin(2)
-    xyz_nxnynz(:,8) = xyz_nxnynz(:,8) +  origin(2)
+    body_superSTL_b(:,2) = body_superSTL_b(:,2) +  origin(2)
+    body_superSTL_b(:,5) = body_superSTL_b(:,5) +  origin(2)
+    body_superSTL_b(:,8) = body_superSTL_b(:,8) +  origin(2)
 
-    xyz_nxnynz(:,3) = xyz_nxnynz(:,3) +  origin(3)
-    xyz_nxnynz(:,6) = xyz_nxnynz(:,6) +  origin(3)
-    xyz_nxnynz(:,9) = xyz_nxnynz(:,9) +  origin(3)
+    body_superSTL_b(:,3) = body_superSTL_b(:,3) +  origin(3)
+    body_superSTL_b(:,6) = body_superSTL_b(:,6) +  origin(3)
+    body_superSTL_b(:,9) = body_superSTL_b(:,9) +  origin(3)
 
 
     safety = 6 !Bs(1)
-    do iter = params%min_treelevel, params%max_treelevel
+    do iter = params%Jmin, params%Jmax
 
         ! refine the mesh where the mask function is interesting
-        call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,1), lgt_n(1), &
-        lgt_sortednumlist(:,:,1), hvy_active(:,1), hvy_n(1), "mask-threshold", tree_ID=1 )
+        call abort(99999, "need to adapt refine_tree call to include hvy_tmp")
+        ! call refine_tree( params, hvy_block, "mask-threshold", tree_ID )
 
         skips = 0
 
@@ -173,7 +165,7 @@ subroutine post_stl2dist(params)
             ! nodes as well. Then, a refined block should always end up with nonzero values
             ! only if its mother had nonzero values.
             ! That implies: if the block is zero, we can skip it
-            if ( maxval(hvy_block(:,:,:,1,hvy_id)) <= 1.0e-6 .and. iter>params%min_treelevel ) then
+            if ( maxval(hvy_block(:,:,:,1,hvy_id)) <= 1.0e-6 .and. iter>params%Jmin ) then
                 hvy_block(:,:,:,1,hvy_id) = 9e8_rk ! distance as far away
                 skips = skips + 1
                 cycle
@@ -183,31 +175,31 @@ subroutine post_stl2dist(params)
 
 
             ! compute block spacing and origin from treecode
-            call hvy_id_to_lgt_id( lgt_id, hvy_id, params%rank, params%number_blocks )
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
 
             ! shift origin to take ghost nodes into account
             x0 = x0 - dble(g)*dx
 
             do i = 1, ntri
-                vertex1        = xyz_nxnynz(i, 1:3)
-                vertex2        = xyz_nxnynz(i, 4:6)
-                vertex3        = xyz_nxnynz(i, 7:9)
-                face_normal    = xyz_nxnynz(i, 10:12)
-                vertex1_normal = xyz_nxnynz(i, 13:15)
-                vertex2_normal = xyz_nxnynz(i, 16:18)
-                vertex3_normal = xyz_nxnynz(i, 19:21)
-                edge1_normal   = xyz_nxnynz(i, 22:24)
-                edge2_normal   = xyz_nxnynz(i, 25:27)
-                edge3_normal   = xyz_nxnynz(i, 28:30)
+                vertex1        = body_superSTL_b(i, 1:3)
+                vertex2        = body_superSTL_b(i, 4:6)
+                vertex3        = body_superSTL_b(i, 7:9)
+                face_normal    = body_superSTL_b(i, 10:12)
+                vertex1_normal = body_superSTL_b(i, 13:15)
+                vertex2_normal = body_superSTL_b(i, 16:18)
+                vertex3_normal = body_superSTL_b(i, 19:21)
+                edge1_normal   = body_superSTL_b(i, 22:24)
+                edge2_normal   = body_superSTL_b(i, 25:27)
+                edge3_normal   = body_superSTL_b(i, 28:30)
 
-                xmin = floor( ( minval((/xyz_nxnynz(i,1),xyz_nxnynz(i,4),xyz_nxnynz(i,7)/)) - x0(1) ) / dx(1)) - safety
-                ymin = floor( ( minval((/xyz_nxnynz(i,2),xyz_nxnynz(i,5),xyz_nxnynz(i,8)/)) - x0(2) ) / dx(2)) - safety
-                zmin = floor( ( minval((/xyz_nxnynz(i,3),xyz_nxnynz(i,6),xyz_nxnynz(i,9)/)) - x0(3) ) / dx(3)) - safety
+                xmin = floor( ( minval((/body_superSTL_b(i,1),body_superSTL_b(i,4),body_superSTL_b(i,7)/)) - x0(1) ) / dx(1)) - safety
+                ymin = floor( ( minval((/body_superSTL_b(i,2),body_superSTL_b(i,5),body_superSTL_b(i,8)/)) - x0(2) ) / dx(2)) - safety
+                zmin = floor( ( minval((/body_superSTL_b(i,3),body_superSTL_b(i,6),body_superSTL_b(i,9)/)) - x0(3) ) / dx(3)) - safety
 
-                xmax = ceiling( ( maxval((/xyz_nxnynz(i,1),xyz_nxnynz(i,4),xyz_nxnynz(i,7)/)) - x0(1) ) / dx(1)) + safety
-                ymax = ceiling( ( maxval((/xyz_nxnynz(i,2),xyz_nxnynz(i,5),xyz_nxnynz(i,8)/)) - x0(2) ) / dx(2)) + safety
-                zmax = ceiling( ( maxval((/xyz_nxnynz(i,3),xyz_nxnynz(i,6),xyz_nxnynz(i,9)/)) - x0(3) ) / dx(3)) + safety
+                xmax = ceiling( ( maxval((/body_superSTL_b(i,1),body_superSTL_b(i,4),body_superSTL_b(i,7)/)) - x0(1) ) / dx(1)) + safety
+                ymax = ceiling( ( maxval((/body_superSTL_b(i,2),body_superSTL_b(i,5),body_superSTL_b(i,8)/)) - x0(2) ) / dx(2)) + safety
+                zmax = ceiling( ( maxval((/body_superSTL_b(i,3),body_superSTL_b(i,6),body_superSTL_b(i,9)/)) - x0(3) ) / dx(3)) + safety
 
                 xmin = max(xmin, 1)
                 ymin = max(ymin, 1)
@@ -273,8 +265,8 @@ subroutine post_stl2dist(params)
 
         if (params%rank==0) then
             write(*, '("Nb=",i6," Jmin=",i2," Jmax=",i2)') &
-            lgt_n(1), min_active_level( lgt_block, lgt_active(:,1), lgt_n(1) ), &
-            max_active_level( lgt_block, lgt_active(:,1), lgt_n(1) )
+            lgt_n(1), minActiveLevel_tree(1), &
+            maxActiveLevel_tree(1)
         endif
 
     enddo ! loop over level
@@ -282,22 +274,16 @@ subroutine post_stl2dist(params)
     !=======================================================================
     ! coarsening of blocks with constant values
     !=======================================================================
-    call adapt_mesh( 0.0_rk, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,1), &
-    lgt_n(1), lgt_sortednumlist(:,:,1), hvy_active(:,1), &
-    hvy_n(1), 1, params%coarsening_indicator, hvy_block )
+    call adapt_tree( 0.0_rk, params, hvy_block, 1, params%coarsening_indicator, hvy_block )
 
 
-    call create_active_and_sorted_lists( params, lgt_block, lgt_active, &
-    lgt_n, hvy_active, hvy_n, lgt_sortednumlist, tree_n)
+    call createActiveSortedLists_forest(params)
 
     if (pruning) then
         if (params%rank==0) write(*,*) "now pruning!"
 
-        call prune_tree( params, tree_n, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_block, hvy_active, hvy_n, hvy_neighbor, tree_id=1)
+        call prune_tree( params, hvy_block, tree_ID=1)
     endif
 
-    call write_tree_field(fname_out, params, lgt_block, lgt_active, hvy_block, &
-    lgt_n, hvy_n, hvy_active, dF=1, tree_id=1, time=0.0_rk, iteration=-1 )
-
+    call saveHDF5_tree(fname_out, 0.0_rk, -1_ik, 1, params, hvy_block, 1)
 end subroutine

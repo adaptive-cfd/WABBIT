@@ -3,7 +3,6 @@
 !> This module contains all functions which WABBIT provides to
 !> implement your physics module
 !> \details
-!> \version 0.5
 !> \author engels
 !----------------------------------------------------------------
 module module_physics_metamodule
@@ -15,6 +14,7 @@ module module_physics_metamodule
     use module_ConvDiff_new
     use module_acm
     use module_navier_stokes
+    use module_t_files
 
     implicit none
 
@@ -27,7 +27,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, FILTER_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta
+    STATISTICS_meta, TIME_STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
     !**********************************************************************************************
 
 contains
@@ -65,6 +65,7 @@ contains
 
         case ('navier_stokes')
             call create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
+
         case default
             call abort(1212,'unknown physics...say whaaat?')
 
@@ -77,11 +78,14 @@ contains
     !> \brief main level wrapper routine to read parameters in the physics module. It reads
     !> from the same ini file as wabbit, and it reads all it has to know. note in physics modules
     !> the parameter struct for wabbit is not available.
-    subroutine READ_PARAMETERS_meta( physics, filename, N_mask_components )
+    subroutine READ_PARAMETERS_meta( physics, filename, N_mask_components, g )
         implicit none
         character(len=*), intent(in) :: physics
         ! number of grid-dependent (and not time-dependend qtys) is decided by the physics modules
         integer(kind=ik), intent(out) :: N_mask_components
+        ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
+        ! automatically depending on the wavelet). Therefore, we pass the number.
+        integer(kind=ik), intent(in) :: g
         character(len=*), intent(in) :: filename
 
         ! default is none (for navier-stokes and convection-diffusion)
@@ -89,13 +93,13 @@ contains
 
         select case ( physics )
         case ('ACM-new')
-            call READ_PARAMETERS_ACM( filename, N_mask_components )
+            call READ_PARAMETERS_ACM( filename, N_mask_components, g )
 
         case ('ConvDiff-new')
-            call READ_PARAMETERS_convdiff( filename )
+            call READ_PARAMETERS_convdiff( filename, g )
 
         case ('navier_stokes')
-            call READ_PARAMETERS_NStokes( filename, N_mask_components )
+            call READ_PARAMETERS_NStokes( filename, N_mask_components, g )
 
         case default
             call abort(1212,'unknown physics...say whaaat?')
@@ -185,7 +189,7 @@ contains
         ! component index
         integer(kind=ik), intent(in) :: N
         ! returns the name
-        character(len=80), intent(out) :: name
+        character(len=cshort), intent(out) :: name
 
         select case(physics)
         case ('ACM-new')
@@ -321,16 +325,16 @@ contains
 
         select case(physics)
         case ("ACM-new")
-            call PREPARE_THRESHOLDFIELD_ACM( u, g, x0, dx, thresholdfield_block, &
-                               N_thresholding_components)
+            call abort(2105289, "Thresholding of derived qtys not implemented for this module")
 
         case ("ConvDiff-new")
+            call abort(2105288, "Thresholding of derived qtys not implemented for this module")
 
         case ("navier_stokes")
             call PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, thresholdfield_block, &
                                N_thresholding_components)
         case default
-            call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+            call abort(2152000, "[PREPARE_THRESHOLDFIELD_meta]: physics_type is unknown"//physics)
 
         end select
 
@@ -383,18 +387,68 @@ contains
             call STATISTICS_ACM( time, dt, u, g, x0, dx, stage, rhs, mask )
 
         case ("ConvDiff-new")
-            ! not implemented yet.
-            !  call STATISTICS_convdiff( time, u, g, x0, dx, rhs, stage )
+            call STATISTICS_convdiff( time, dt, u, g, x0, dx, stage )
 
         case ("navier_stokes")
             call STATISTICS_NStokes( time, u, g, x0, dx, stage )
 
         case default
-            call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
+            call abort(2152000, "[STATISTICS_meta]: physics_type is unknown"//physics)
 
         end select
 
     end subroutine STATISTICS_meta
+
+
+    !-----------------------------------------------------------------------------
+    ! main level wrapper to compute local statistics over time, like average or minmax of specific quantities
+    ! these are then also adapted over time
+    !-----------------------------------------------------------------------------
+    subroutine TIME_STATISTICS_meta(physics, time, dt, time_start, u, g, x0, dx, work, mask)
+        implicit none
+
+        character(len=*), intent(in) :: physics
+        ! it may happen that some source terms have an explicit time-dependency
+        ! therefore the general call has to pass time
+        real(kind=rk), intent (in) :: time, dt, time_start
+
+        ! block data, containg the state vector. In general a 4D field (3 dims+components)
+        ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+        real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
+
+        ! as you are allowed to compute anything only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
+        integer, intent(in) :: g
+
+        ! for each block, you'll need to know where it lies in physical space. The first
+        ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+        real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+        ! work array
+        real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+
+        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+        ! block level) so the physics modules have to provide an interface to create the mask at a tree
+        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
+
+        select case(physics)
+        case ("ACM-new")
+            call TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
+
+        case ("ConvDiff-new")
+            call TIME_STATISTICS_convdiff( time, dt, time_start, u, g, x0, dx, work, mask )
+
+        case ("navier_stokes")
+            call abort(250915, "time statistics not implemented for Navier-Stokes")
+
+        case default
+            call abort(2152000, "[TIME_STATISTICS_meta]: physics_type is unknown"//physics)
+
+        end select
+    end subroutine
 
     ! the statistics are written to ascii files (usually *.t files) with the help
     ! of module_t_files. In any case, the files have to be intialized: ideally, they
@@ -415,8 +469,7 @@ contains
             call INITIALIZE_ASCII_FILES_ACM( time, overwrite )
 
         case ("ConvDiff-new")
-            ! not implemented yet.
-            !  call INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
+            call init_t_file('scalar_integral.t', overwrite)
 
         case ("navier_stokes")
             call INITIALIZE_ASCII_FILES_NStokes( time, overwrite )
@@ -524,42 +577,36 @@ contains
             call INICOND_NStokes( time, u, g, x0, dx, n_domain )
 
         case default
-            call abort(999,"[INICOND (metamodule):] unkown physics. Its getting hard to find qualified personel.")
+            call abort(999,"[INICOND (metamodule):] unknown physics. Its getting hard to find qualified personel.")
 
         end select
 
     end subroutine INICOND_meta
 
 
-
-    !-----------------------------------------------------------------------------
-    ! wrapper for filter u -> u_tilde
-    ! Note this function is completely
-    ! independent of the grid and any MPI formalism, neighboring relations and the like.
-    ! You just get a block data (e.g. ux, uy, uz, p) and apply your filter to it.
-    ! Ghost nodes are assumed to be sync'ed.
-    !-----------------------------------------------------------------------------
-    subroutine FILTER_meta(physics, time, u, g, x0, dx, work_array, n_domain)
+    !> \brief Set boundary conditions for non-periodic boundary patches
+    !> \details For periodic ghost patches we synch the ghost values, for non-periodic however
+    !! we have to set the values at the ghost patches depending on the boundary type. This differs for each physics type
+    subroutine BOUNDCOND_META(physics, time, u, g, x0, dx, n_domain, spaghetti_form, edges_only)
         implicit none
-        !> physics type
+
         character(len=*), intent(in) :: physics
-        !> time in physical units
+        ! it may happen that some BCs have an explicit time-dependency
+        ! therefore the general call has to pass time
         real(kind=rk), intent (in) :: time
 
         ! block data, containg the state vector. In general a 4D field (3 dims+components)
         ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: u(1:,1:,1:,1:)
 
-        !> number of ghost nodes
+        ! as you are allowed to compute the RHS only in the interior of the field
+        ! you also need to know where 'interior' starts: so we pass the number of ghost points
         integer, intent(in) :: g
 
         ! for each block, you'll need to know where it lies in physical space. The first
         ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
         real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-        ! the work array is an additional array which can be used to store temporal
-        ! values of the statevector field
-        real(kind=rk), intent(inout) :: work_array(1:,1:,1:,1:)
         ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
         ! The n_domain tells you if the local field is adjacent to a domain boundary:
@@ -568,24 +615,32 @@ contains
         !  1: boundary in the direction +e_i
         ! -1: boundary in the direction - e_i
         ! currently only acessible in the local stage
-        integer(kind=2), optional, intent(in):: n_domain(3)
+        integer(kind=2), intent(in) :: n_domain(3)
 
-        select case(physics)
+        ! sometimes we sync data that is decomposed in spaghetti form of SC WC, this can alter the way we set the BCs
+        logical , intent(in) :: spaghetti_form
+
+        logical, intent(in), optional  :: edges_only                    !< if true, only set the boundary condition on the edges of the domain, default is false
+        logical :: edgesOnly
+        edgesOnly = .false.
+        if (present(edges_only)) edgesOnly = edges_only
+
+        select case (physics)
         case ("ACM-new")
-            call filter_ACM( time, u, g, x0, dx,  work_array)
+            call BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edgesOnly)
 
-        case ("ConvDiff-new")
-            call abort(1009181817, "filter not implemented for convection-diffusion.")
+        ! case ("ConvDiff-new")
+        !     call BOUNDCOND_ConvDiff( time, u, g, x0, dx )
 
-        case ("navier_stokes")
-            call filter_NStokes( time, u, g, x0, dx, work_array, n_domain)
+        ! case ("navier_stokes")
+        !     call BOUNDCOND_NStokes( time, u, g, x0, dx, n_domain )
 
         case default
-            call abort(2152001, "ERROR [filter_wrapper.f90]: physics_type is unknown "//trim(adjustl(physics)))
+            call abort(999,"[BOUNDCOND (metamodule):] unknown physics. Its getting hard to find qualified personel.")
 
         end select
 
-    end subroutine FILTER_meta
+    end subroutine BOUNDCOND_META
 
 
 

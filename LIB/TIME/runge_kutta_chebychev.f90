@@ -3,9 +3,8 @@
 !   Sommeijer et al. RKC: An explicit solver for parabolic PDEs (J comp appl math 1997)
 !   Verwer et al. RKC time-stepping for advection-diffusion-reaction problems (JCP 2004)
 
-subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block, hvy_work, &
-    hvy_mask, hvy_tmp, hvy_neighbor, hvy_active, lgt_active, lgt_n, hvy_n, lgt_sortednumlist)
-    ! use module_blas
+subroutine RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
+
     implicit none
 
     !---------------------------------------------------------------------------
@@ -13,9 +12,7 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     real(kind=rk), intent(inout)        :: time, dt
     integer(kind=ik), intent(in)        :: iteration
     !> user defined parameter structure
-    type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
+    type (type_params), intent(inout)   :: params
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     !> heavy work data array - block data
@@ -23,24 +20,13 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     !> hvy_tmp are qty that depend on the grid and not explicitly on time.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    !> heavy data array - neighbor data
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_active(:,:)
-    !> list of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_active(:,:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(inout)     :: hvy_n(:)
-    !> number of active blocks (light data)
-    integer(kind=ik), intent(inout)     :: lgt_n(:)
-    !> sorted list of numerical treecodes, used for block finding
-    integer(kind=tsize), intent(inout)  :: lgt_sortednumlist(:,:,:)
+    integer(kind=ik), intent(in)        :: tree_ID
 
     ! in fortran, we work with indices:
     integer :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
     integer, parameter :: y00=1, F0=2
-    integer :: i, k, s, hvy_id
-    real(kind=rk) :: tau
+    integer :: i, k, s, hvy_id, grhs, Neqn_RHS
+    real(kind=rk) :: tau, t_call, t_stage
     logical, save :: setup_complete = .false.
     logical, save :: informed = .false.
 
@@ -48,6 +34,8 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
         call setup_RKC_coefficients(params)
         setup_complete = .true.
     endif
+    grhs = params%g_rhs
+    Neqn_RHS = params%n_eqn_rhs
 
 
     ! s is the number of stages
@@ -55,10 +43,10 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
 
     if (.not. informed) then
         if (params%rank==0) then
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,*) "Runge-Kutta-Chebychev method"
             write(*,'("Using s=",i2," stages")') s
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         endif
         informed = .true.
     endif
@@ -72,54 +60,64 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
     if (s<4) call abort(1715929,"runge-kutta-chebychev: s cannot be less than 4")
 
     ! synchronize ghost nodes
-    call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+    t_call = MPI_wtime()
+    call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs  )
+    call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
 
     ! calculate time step
-    call calculate_time_step(params, time, iteration, hvy_block, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), lgt_block, &
-    lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), dt)
+    call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
-    do k = 1, hvy_n(tree_ID_flow)
-        hvy_id = hvy_active(k,tree_ID_flow)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
         ! Y0 = u (in matlab: y00 = u;)
-        hvy_work(:,:,:,:,hvy_id, y00 ) = hvy_block(:,:,:,:,hvy_id)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y00 ) = hvy_block(:,:,:,1:Neqn_RHS,hvy_id)
         ! we need two copies (one is an iteration variable, the other (above) is kept constant)
-        hvy_work(:,:,:,:,hvy_id, y0  ) = hvy_block(:,:,:,:,hvy_id)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0  ) = hvy_block(:,:,:,1:Neqn_RHS,hvy_id)
     enddo
 
     ! F0 (RHS at initial time, old time level)
     ! note: call sync_ghosts on input data before
-    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, lgt_block, &
-    lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
+    t_call = MPI_wtime()
+    call RHS_wrapper( time, params, hvy_block, hvy_work(:,:,:,:,:,F0), hvy_mask, hvy_tmp, tree_ID )
+    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
     ! euler step
-    do k = 1, hvy_n(tree_ID_flow)
-        hvy_id = hvy_active(k,tree_ID_flow)
+    t_call = MPI_wtime()
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
         ! y1 = y0 + mu_tilde(1) * dt * F0;
-        hvy_work(:,:,:,:,hvy_id, y1 ) = hvy_work(:,:,:,:,hvy_id, y0) &
-        + mu_tilde(s,1) * dt * hvy_work(:,:,:,:,hvy_id, F0)
+        hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y1 ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0) &
+        + mu_tilde(s,1) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0)
     enddo
+    call toc( "timestep (Euler step)", 22, MPI_wtime()-t_call)
 
     ! runge-kutta-chebychev stages
     do i = 2, s
+        t_stage = MPI_wtime()
         ! for explicitly time-dependend RHS [tau = time + c(i-1)*dt;]
         tau = time + c(s,i-1)*dt
 
         ! F1 = rhs(y1);
         ! note: call sync_ghosts on input data before
-        call sync_ghosts( params, lgt_block, hvy_work(:,:,:,:,:,y1), hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
-        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, lgt_block, &
-        lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, hvy_neighbor )
+        t_call = MPI_wtime()
+        call sync_ghosts_RHS_tree( params, hvy_work(:,:,:,1:Neqn_RHS,:,y1), tree_ID, g_minus=grhs, g_plus=grhs  )
+        call toc( "timestep (sync ghosts)", 20, MPI_wtime()-t_call)
+
+        t_call = MPI_wtime()
+        call RHS_wrapper( tau, params, hvy_work(:,:,:,:,:,y1), hvy_work(:,:,:,:,:,F1), hvy_mask, hvy_tmp, tree_ID )
+        call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
+
 
         ! main formula
         ! y2 = (1-mu(i)-nu(i)) * y00 + mu(i) * y1 + nu(i) * y0 + mu_tilde(i)*dt*F1 + gamma_tilde(i)*dt*F0;
-        do k = 1, hvy_n(tree_ID_flow)
-            hvy_id = hvy_active(k,tree_ID_flow)
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k,tree_ID)
 
-            hvy_work(:,:,:,:,hvy_id, y2 ) = (1.0_rk-mu(s,i)-nu(s,i))*hvy_work(:,:,:,:,hvy_id, y00) &
-            + mu(s,i) * hvy_work(:,:,:,:,hvy_id, y1 ) &
-            + nu(s,i) * hvy_work(:,:,:,:,hvy_id, y0 ) &
-            + mu_tilde(s,i) * dt * hvy_work(:,:,:,:,hvy_id, F1 ) &
-            + gamma_tilde(s,i) * dt * hvy_work(:,:,:,:,hvy_id, F0 )
+            hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y2 ) = (1.0_rk-mu(s,i)-nu(s,i))*hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y00) &
+            + mu(s,i) * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y1 ) &
+            + nu(s,i) * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0 ) &
+            + mu_tilde(s,i) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F1 ) &
+            + gamma_tilde(s,i) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0 )
         enddo
 
         ! iteration. note in last stage, do not iterate (we return y0 otherwise)
@@ -130,14 +128,16 @@ subroutine RungeKuttaChebychev(time, dt, iteration, params, lgt_block, hvy_block
             y2 = tmp(1)
         endif
         ! write(*,*) i, ":", y0, y1, y2
+
+        call toc( "timestep (RKC stage)", 23, MPI_wtime()-t_stage)
     end do
 
     ! return result
     !!     u = y2;
-    do k = 1, hvy_n(tree_ID_flow)
-        hvy_id = hvy_active(k,tree_ID_flow)
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k,tree_ID)
 
-        hvy_block(:,:,:,:,hvy_id ) = hvy_work(:,:,:,:,hvy_id, y2 )
+        hvy_block(:,:,:,1:Neqn_RHS,hvy_id ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y2 )
     enddo
 
 

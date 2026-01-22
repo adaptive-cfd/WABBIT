@@ -2,15 +2,12 @@
 !> This module implements different shock tests to validate the
 !> euler equations of NS and to test the filters in a multiresolution
 !> framework.
-!> \details
-!> \author PKrah
-!> \date 10.08.2018 - creation of the module
 !----------------------------------------------------------------
 
 module module_shock
 
     use module_navier_stokes_params
-    use module_precision
+    use module_globals
     use module_ini_files_parser_mpi
     use module_ns_penalization
 
@@ -26,8 +23,6 @@ module module_shock
               shock_tube_penalization2D, shock_tube_penalization3D
     !**********************************************************************************************
 
-  !> \file
-  !> \details
   !> Available shock tubes
   !! ------------------------
   !!
@@ -40,7 +35,7 @@ module module_shock
 
 
   type :: type_shock_params
-      character(len=80) :: name                      !< name of the shock (sod_shock_tube,moving-shock,etc.)
+      character(len=cshort) :: name                      !< name of the shock (sod_shock_tube,moving-shock,etc.)
       real(kind=rk)     :: rho_left,u_left,p_left    !< left values (behind the shock front)
       real(kind=rk)     :: rho_right,u_right,p_right !< right values of the shock front
       real(kind=rk)     :: machnumber     !< machnumber of a moving shock
@@ -230,7 +225,6 @@ end subroutine read_params_shock_tube
 
 
 
-
 !==========================================================================
 !> \brief Compute mask function of sod shock tube
 subroutine draw_simple_shock(mask, x0, dx, Bs, g )
@@ -340,7 +334,7 @@ subroutine shock_tube_penalization3D(Bs, g, x0, dx, mask, phi_ref)
 
                 !default is 0
                 phi_ref(ix,iy,iz,:)=0.0_rk
-                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                 if (X(alpha)<domain_size(alpha)*0.5_rk) then
                   phi_ref(ix,iy,iz,rhoF)   = rho_L
                   phi_ref(ix,iy,iz,pF)     = p_L
@@ -441,7 +435,7 @@ subroutine shock_tube_penalization2D(Bs, g, x0, dx, mask, phi_ref)
 
                 !default is 0
                 phi_ref(ix,iy,:)=0.0_rk
-                ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                 if (X(alpha)<domain_size(alpha)*0.5_rk) then
                   phi_ref(ix,iy,rhoF)   = rho_L
                   phi_ref(ix,iy,pF)     = p_L
@@ -517,7 +511,7 @@ end subroutine shock_tube_penalization2D
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0
                   phi(ix,iy,iz,nF)=0.0_rk
-                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                   b      = smoothstep(x0_shock -X(alpha),h)
                   phi(ix,iy,iz,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix
@@ -535,7 +529,7 @@ end subroutine shock_tube_penalization2D
                   X(1) = dble(ix-(g+1)) * dx(1) + x0(1)
                   !default is 0
                   phi(ix,iy,1,nF)=0.0_rk
-                  ! at this stage we deside which coordinate x_alpha (alpha=1,2,3) the shock front travels along
+                  ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
                   b      = smoothstep(x0_shock -X(alpha),h)
                   phi(ix,iy,1,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix
@@ -546,8 +540,6 @@ end subroutine shock_tube_penalization2D
 
 end subroutine set_shock_in_direction
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 
 
 end module module_shock

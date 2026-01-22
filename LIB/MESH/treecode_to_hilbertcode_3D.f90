@@ -1,91 +1,62 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name treecode_to_hilbertcode_3D.f90
-!> \version 0.5
-!> \author sm
 !> \brief convert given treecode to code in hilbert curve
-!
-!> 
 !! algorithm from: Michael Bader. "Space-Filling Curves: An Introduction With Applications in Scientific Computing."
 !! Springer Science & Business Media, 2012. p. 115
-!! \n
-!! input:   
-!!           - treecode
+!! input:    - treecode
 !!           - size of treecode
-!!
-!! output:   
-!!           - hilbert code
-!!
-!! = log ======================================================================================
-!! \n
-!! 02/05/17 - create 
+!! output:   - hilbert code
 ! ********************************************************************************************
-!
 !> \image html 3dhilbert.svg "The 12 Basic Patterns for the Hilbert Curve in 3D" width=400
 !> \image latex 3dhilbert.eps "The 12 Basic Patterns for the Hilbert Curve in 3D"
 
-subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, n)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-!---------------------------------------------------------------------------------------------
-! variables
+subroutine treecode_to_hilbertcode_3D(treecode, hilbertcode, dim, level, max_level)
 
     implicit none
-
-    !> treecode size
-    integer(kind=ik), intent(in)        :: n
-
-    !> treecode
-    integer(kind=ik), intent(in)        :: treecode(n)
-
-    !> hilbert code
-    integer(kind=ik), intent(out)       :: hilbertcode(n)
-
-    ! loop variable
-    integer(kind=ik)                    :: k
-
-    ! treecode number
-    integer(kind=ik)                    :: tree_i, prev_tree_i
-
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional, intent(in)    :: dim  
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Position on 2D hilbert curve
+    integer(kind=tsize), intent(out)    :: hilbertcode
+    integer(kind=ik)                    :: k                                    ! loop variable
+    integer(kind=ik)                    :: tree_i, prev_tree_i                  ! treecode number
+    ! hilbert pattern, note: use integer
+    ! pattern : A B C D
+    ! integer : 1 2 3 4
     integer(kind=ik)                    :: hilbert_pattern, prev_hilbert_pattern
+    integer(kind=ik)                    :: hilbert_i
+    integer(kind=ik)                    :: n_dim, n_level, max_tclevel          ! for optional setting
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    ! Set defaults for dimension, level and max_level
+    n_dim = 3; if (present(dim)) n_dim = dim
+    max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
+    n_level = max_tclevel; if (present(level)) n_level = level
+    if (n_level < 0) n_level = max_tclevel + n_level + 1
 
+    ! init
     prev_tree_i          = 0
     prev_hilbert_pattern = 0
-    hilbert_pattern      = 0
-
-!---------------------------------------------------------------------------------------------
-! main body
+    hilbert_pattern      = 1
+    hilbert_i            = 0
+    hilbertcode          = 0_tsize
 
     ! loop over treecode
-    do k = 1, n
+    do k = 1, n_level
 
-        ! read treecode number
-        ! -1 is used as 0
-        if ( treecode(k) == -1 ) then
-            tree_i = 0
-        else
-            tree_i = treecode(k)
-        end if
+        tree_i = tc_get_digit_at_level_b(treecode, dim=n_dim, level=k, max_level=max_tclevel)
 
         ! set hilbert pattern, in first step: always start with first pattern
-        if ( k == 1 ) then
-            ! first step
-            hilbert_pattern = 1
-        else
-            ! calculate pattern
+        if ( k > 1 ) then
             call prev_pattern_to_pattern_3D( prev_hilbert_pattern, hilbert_pattern, prev_tree_i )
         end if
 
         ! position in new pattern
-        call pattern_pos_3D( hilbert_pattern, tree_i, hilbertcode(k) )
+        call pattern_pos_3D( hilbert_pattern, tree_i, hilbert_i )
+
+        hilbertcode = tc_set_digit_at_level_b(hilbertcode, hilbert_i, dim=n_dim, level=k, max_level=max_tclevel)
 
         ! save previous pattern and treecode
         prev_hilbert_pattern    = hilbert_pattern

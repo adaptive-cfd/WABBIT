@@ -6,6 +6,7 @@ module module_ini_files_parser_mpi
 ! use the serial ini files parser. the present module is just a wrapper for mpi codes
 ! since the original ini files parser is serial
 use module_ini_files_parser
+use module_helpers, only : count_entries
 use mpi
 
 
@@ -179,9 +180,8 @@ contains
             inquire ( file=file, exist=exists )
 
             ! check if the specified file exists
-            if (.not. exists) then
-              write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-              call abort(30302020,"INI file not found")
+            if ( exists .eqv. .false.) then
+                call abort(250922, "INIFILES ERROR: Ini-file not found! " // trim(adjustl(file)) )
             endif
 
             if (present(remove_comments)) then
@@ -206,7 +206,7 @@ contains
     ! Output:
     !       params_real: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_dbl_mpi (PARAMS, section, keyword, params_real, defaultvalue)
+    subroutine param_dbl_mpi(PARAMS, section, keyword, params_real, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -221,7 +221,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_real, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_real, defaultvalue)
         endif
 
         ! And then broadcast
@@ -247,7 +247,7 @@ contains
     ! Output:
     !       params_string: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_str_mpi (PARAMS, section, keyword, params_string, defaultvalue)
+    subroutine param_str_mpi(PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
         implicit none
 
         ! Contains the ascii-params file
@@ -256,6 +256,7 @@ contains
         character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
         character(len=*), intent (inout) :: params_string
         character(len=*), intent (in) :: defaultvalue
+        logical, optional, intent(in) :: check_file_exists
         integer :: mpicode
         integer :: mpirank
 
@@ -264,7 +265,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_string, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
         endif
 
         ! And then broadcast
@@ -290,7 +291,7 @@ contains
     ! Output:
     !       params_vector: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_vct_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_vct_mpi(PARAMS, section, keyword, params_vector, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -311,9 +312,9 @@ contains
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
             if (present(defaultvalue)) then
-                call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+                call read_param(PARAMS, section, keyword, params_vector, defaultvalue)
             else
-                call read_param (PARAMS, section, keyword, params_vector)
+                call read_param(PARAMS, section, keyword, params_vector)
             endif
         endif
 
@@ -338,7 +339,7 @@ contains
     ! Output:
     !       params_string: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_vct_str_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_vct_str_mpi(PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout)    :: PARAMS
@@ -346,6 +347,7 @@ contains
         character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
         character(len=*), intent(inout) :: params_vector(1:)
         character(len=*), intent(in)    :: defaultvalue(1:)
+        logical, optional, intent(in)   :: check_file_exists
 
         integer :: n
         integer :: mpicode
@@ -358,7 +360,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
         endif
 
         call MPI_BCAST( params_vector, len(params_vector(1))*n, MPI_CHARACTER, 0, WABBIT_COMM, mpicode )
@@ -372,18 +374,18 @@ contains
 
 
     !-------------------------------------------------------------------------------
-    ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+    ! Fetches a MATRIX VALUED parameter from the PARAMS.ini file.
     ! Displays what it does on stdout (so you can see whats going on)
     ! Input:
     !       PARAMS: the complete *.ini file
     !       section: the section we're looking for
     !       keyword: the keyword we're looking for
-    !       defaultvalue: if the we can't find a vector, we return this and warn
-    !       n: length of vector
+    !       defaultvalue: if the we can't find a matrix, we return this and warn
+    !       n: length of matrix
     ! Output:
-    !       params_vector: this is the parameter you were looking for
+    !       params_matrix: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_mpi (PARAMS, section, keyword, matrix, defaultvalue)
+    subroutine param_matrix_mpi(PARAMS, section, keyword, matrix, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -401,7 +403,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, matrix, defaultvalue)
+            call read_param(PARAMS, section, keyword, matrix, defaultvalue)
             n = size(matrix,1)
             m = size(matrix,2)
         endif
@@ -511,7 +513,7 @@ contains
     ! Output:
     !       params_vector: this is the parameter you were looking for
     !-------------------------------------------------------------------------------
-    subroutine param_boolvct_mpi (PARAMS, section, keyword, params_vector, defaultvalue)
+    subroutine param_boolvct_mpi(PARAMS, section, keyword, params_vector, defaultvalue)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -531,7 +533,7 @@ contains
 
         ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
         if (mpirank==0) then
-            call read_param (PARAMS, section, keyword, params_vector, defaultvalue)
+            call read_param(PARAMS, section, keyword, params_vector, defaultvalue)
         endif
 
         ! And then broadcast
@@ -575,7 +577,7 @@ contains
     !   allocate(matrix(1:a,1:b))
     !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_size_mpi (PARAMS, section, keyword, matrixlines, matrixcols)
+    subroutine param_matrix_size_mpi(PARAMS, section, keyword, matrixlines, matrixcols)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -624,7 +626,7 @@ contains
     !   allocate(matrix(1:a,1:b))
     !   call param_matrix_read_mpi(PARAMS,"Stuff","matrix",matrix)
     !-------------------------------------------------------------------------------
-    subroutine param_matrix_read_mpi (PARAMS, section, keyword, matrix)
+    subroutine param_matrix_read_mpi(PARAMS, section, keyword, matrix)
         implicit none
         ! Contains the ascii-params file
         type(inifile), intent(inout) :: PARAMS
@@ -655,5 +657,49 @@ contains
         call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
 
     end subroutine param_matrix_read_mpi
+
+
+    !-------------------------------------------------------------------------!
+    !> @brief Read Bs from inifile for unknown number of Bs in inifile
+    function read_Bs(FILE, section, keyword, default_Bs, dims, rank) result(Bs)
+        implicit none
+        type(inifile) ,intent(inout)     :: FILE
+        character(len=*), intent(in)    :: section ! What section do you look for? for example [Resolution]
+        character(len=*), intent(in)    :: keyword ! what keyword do you
+        integer(kind=ik), intent(in)    :: default_Bs(:)
+        integer(kind=ik), intent(in)    :: dims !number of dimensions
+        integer(kind=ik), intent(in)    :: rank !used for printing warnings
+        integer(kind=ik):: Bs(3)
+        integer(kind=ik):: i, n_entries
+        character(len=cshort):: output
+
+        Bs = 1
+        ! read number_block_nodes
+        call read_param_mpi(FILE, section, keyword, output, "empty")
+
+        if (trim(output) .eq. "empty") then
+            if (rank == 0) write(*,'("Warning!! ", A, "[",A,"] is empty! Using default! ")') keyword, section
+            Bs = default_Bs
+
+        else
+            call count_entries(output, n_entries)
+
+            ! check if the number of entries is valid
+            if (n_entries > dims) call abort(10519,"Dimensions and number of Bs entries dissagree!")
+
+            ! Cast the output string into the integer
+            read(output,*) (Bs(i), i=1,n_entries)
+
+            ! If only one Bs is given in the ini file, we duplicate it
+            ! for the rest of the Bs array:
+            if (n_entries==1) then
+                Bs(1:dims) = Bs(1)
+            endif
+        endif
+
+        if (any(mod(Bs(1:dims), 2) /= 0)) then
+            call abort(202392929, "Block-size must be EVEN number")
+        end if
+    end function
 
 end module

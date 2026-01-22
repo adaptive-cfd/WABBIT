@@ -69,7 +69,7 @@ subroutine mask_from_pointcloud(points, normals, xx0, ddx, mask, safety, h_smoot
                         sign = (x-points(i,1))*normals(i,1) + (y-points(i,2))*normals(i,2) &
                         + (z-points(i,3))*normals(i,3)
                         ! is interior?
-                        if (sign < 0.0d0) then
+                        if (sign < 0.0_rk) then
                             tmp = -tmp
                         endif
                         ! use this value now
@@ -90,15 +90,15 @@ subroutine mask_from_pointcloud(points, normals, xx0, ddx, mask, safety, h_smoot
             do ix = lbounds(1), ubounds(1)
                 tmp = mask(ix,iy,iz)
                 ! exclude area that has not been altered:
-                if (tmp<1.0d7) then
-                    if (tmp >= 0.0d0) then
+                if (tmp<1.0e7_rk) then
+                    if (tmp >= 0.0_rk) then
                         tmp = dsqrt(tmp)
                     else
                         tmp = -dsqrt(-tmp)
                     endif
-                    mask(ix,iy,iz) = steps( tmp-d0, 0.d0, h_smooth )
+                    mask(ix,iy,iz) = steps( tmp-d0, 0.0_rk, h_smooth )
                 else
-                    mask(ix,iy,iz) = 0.0d0
+                    mask(ix,iy,iz) = 0.0_rk
                 endif
             enddo
         enddo

@@ -1,10 +1,3 @@
-
-!----------------------------------------------------------------
-!> Implementation of all the case studies in Navier Stokes
-!> \details
-!> \author PKrah
-!> \date 10.08.2018 - creation of the module
-!----------------------------------------------------------------
 module module_navier_stokes_cases
 
     use module_navier_stokes_params
@@ -54,8 +47,6 @@ contains
 
 end subroutine read_case_parameters
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 
 
  !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -157,7 +148,6 @@ end subroutine read_case_parameters
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
-
  !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  !> Computes the mask field.
  !> \details Many routines depend on the geometry and need to know the
@@ -193,9 +183,6 @@ end subroutine read_case_parameters
 
   end subroutine get_mask
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
 
 
 end module module_navier_stokes_cases

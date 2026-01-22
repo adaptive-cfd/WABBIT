@@ -1,27 +1,14 @@
-!> \dir
 !> \brief Implementation of 3d/2d Convection Diffusion Equations
-! ********************************************************************************************
-!> \file
-!> \brief Module for 2D/3D convdiff physics
-! ********************************************************************************************
-!! \brief Module for 2D/3D convdiff physics
-!> \callgraph
-!> \version 0.5
-!> \author engels
 ! ********************************************************************************************
 module module_convdiff_new
 
-  !---------------------------------------------------------------------------------------------
-  ! modules
-
-  use module_precision
+  use module_globals
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.
   use module_ini_files_parser_mpi
   use mpi
-  !---------------------------------------------------------------------------------------------
-  ! variables
+  use module_t_files
 
   implicit none
 
@@ -32,18 +19,22 @@ module module_convdiff_new
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, INICOND_convdiff, FIELD_NAMES_convdiff
+  PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
+  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
-    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094
-    real(kind=rk) :: domain_size(3)=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,blob_width,x0,y0,z0,phi_boundary
-    integer(kind=ik) :: dim, N_scalars, N_fields_saved
-    character(len=80), allocatable :: names(:), inicond(:), velocity(:)
-    character(len=80) :: discretization,boundary_type
+    real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
+    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
+    real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
+    integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
+    logical :: time_statistics = .false.
+    integer(kind=ik) :: N_time_statistics = 0
+    character(len=cshort), allocatable :: names(:), inicond(:), velocity(:), time_statistics_names(:)
+    character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
   end type type_paramsb
 
@@ -55,56 +46,94 @@ module module_convdiff_new
 
 contains
 
+#include "statistics_convdiff.f90"
+#include "time_statistics_convdiff.f90"
 #include "rhs_convdiff.f90"
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
   ! from the same ini file as wabbit, and it reads all it has to know. note in physics modules
   ! the parameter struct for wabbit is not available.
-  subroutine READ_PARAMETERS_convdiff( filename )
+  subroutine READ_PARAMETERS_convdiff( filename, g )
     implicit none
 
     character(len=*), intent(in) :: filename
+    integer(kind=ik), intent(in) :: g
+
     real(kind=rk), dimension(3)      :: domain_size=0.0_rk
+    real(kind=rk), allocatable, dimension(:,:) :: matr_dummy
     ! inifile structure
     type(inifile) :: FILE
-    integer(kind=ik):: number_ghost_nodes
     ! read the file, only process 0 should create output on screen
     call set_lattice_spacing_mpi(1.0d0)
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_convdiff%N_scalars, 1  )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
+
+    ! nu, and u0 are used for the velocity of the convection, they are per scalar
     allocate( params_convdiff%nu(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0x(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0y(1:params_convdiff%N_scalars))
     allocate( params_convdiff%u0z(1:params_convdiff%N_scalars))
 
-    allocate( params_convdiff%x0(1:params_convdiff%N_scalars))
-    allocate( params_convdiff%y0(1:params_convdiff%N_scalars))
-    allocate( params_convdiff%z0(1:params_convdiff%N_scalars))
+    ! x0, y0 and z0 and blob width are used for the initial conditions, they are per scalar and possibly blob in a matrix
+    ! as a matrix, they have to be in form like the butcher tableau
+    allocate( params_convdiff%x0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%y0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%z0(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs))
+    allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs) )
+    allocate( matr_dummy(1:params_convdiff%N_scalars, 1:params_convdiff%Nblobs) )
+    matr_dummy = 0.0_rk
 
+    ! following are string names for which condition to choose
     allocate( params_convdiff%inicond(1:params_convdiff%N_scalars))
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
 
 
-    allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0x', params_convdiff%u0x )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0y', params_convdiff%u0y )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'u0z', params_convdiff%u0z )
 
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%x0 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%y0 )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%z0 )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'gamma', params_convdiff%gamma, 0.0_rk ) ! reaction constant
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'tau', params_convdiff%tau , 0.0_rk)
 
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width )
-    call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'gauss_blob'/) )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%x0, matr_dummy )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%y0, matr_dummy )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%z0, matr_dummy )
+    matr_dummy = 1.0_rk  ! avoid 0 division by default for blob_width
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'blob_width', params_convdiff%blob_width, matr_dummy )
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'inicond', params_convdiff%inicond, (/'blob'/) )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'velocity', params_convdiff%velocity, (/'constant'/) )
+
+    ! allocate( params_convdiff%blob_width(1:params_convdiff%N_scalars))
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'Nblobs', params_convdiff%Nblobs, 1 )
+    ! allocate( params_convdiff%blobs_width(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_x0(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_y0(1:params_convdiff%Nblobs) )
+    ! allocate( params_convdiff%blobs_z0(1:params_convdiff%Nblobs) )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'blobs_width', params_convdiff%blobs_width )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'x0', params_convdiff%blobs_x0 )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'y0', params_convdiff%blobs_y0 )
+    ! call read_param_mpi(FILE, 'ConvectionDiffusion', 'z0', params_convdiff%blobs_z0 )
+
+    ! time statistics (averaging or similar)
+    call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics', params_convdiff%time_statistics, .false.)
+    if (params_convdiff%time_statistics) then
+        call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_convdiff%N_time_statistics, 1)
+        allocate( params_convdiff%time_statistics_names(1:params_convdiff%N_time_statistics) )
+        call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_convdiff%time_statistics_names, (/"none"/))
+    endif
+
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'u_const', params_convdiff%u_const, 0.0_rk )
 
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    call read_param_mpi(FILE, 'ConvectionDiffusion', 'w0', params_convdiff%w0(1:params_convdiff%dim) )
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim) )
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_convdiff%periodic_BC(1:params_convdiff%dim), &
                                                        params_convdiff%periodic_BC(1:params_convdiff%dim) )
     if ( .not. All(params_convdiff%periodic_BC) ) then
@@ -115,14 +144,14 @@ contains
 
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_convdiff%discretization, "FD_2nd_central")
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes',number_ghost_nodes, 0_ik )
-    if ( params_convdiff%discretization=='FD_4th_central_optimized' .and. number_ghost_nodes<=2  ) then
+
+    if ( params_convdiff%discretization=='FD_4th_central_optimized' .and. g<=2  ) then
       call abort(91020181, "Number of ghost nodes for this scheme is 3!")
     endif
 
     call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params_convdiff%N_fields_saved, 1 )
     allocate( params_convdiff%names(1:params_convdiff%N_fields_saved))
-    call read_param_mpi(FILE, 'Saving', 'field_names', params_convdiff%names, (/"phi1","phi2","phi3"/) )
+    call read_param_mpi(FILE, 'Saving', 'field_names', params_convdiff%names, (/"phi1"/) )
 
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_convdiff%CFL, 1.0_rk)
@@ -132,7 +161,10 @@ contains
 
     call clean_ini_file_mpi( FILE )
 
-    if ( params_convdiff%dim == 2) params_convdiff%u0z=0.0_rk
+    if ( params_convdiff%dim == 2) then
+        params_convdiff%u0z=0.0_rk
+        params_convdiff%z0=0.0_rk
+    endif
   end subroutine READ_PARAMETERS_convdiff
 
 
@@ -169,25 +201,74 @@ contains
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
     ! local variables
-    integer(kind=ik) :: neqn, nwork
+    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
+    character(len=cshort) :: name
 
     Bs(1) = size(u,1) - 2*g
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    ! copy state vector
-    work(:,:,:,1:size(u,4)) = u(:,:,:,:)
+    do k = 1, size(params_convdiff%names,1)
+        name = params_convdiff%names(k)
+        
+        ! saving of phi, read if it starts with "phi" and has no "-" in there for time statistics
+        if (name(1:3) == "phi" .and. index(name, "-") == 0) then
+            ! check if the 4th character is actually a digit
+            if (.not. (name(4:4) >= '0' .and. name(4:4) <= '9')) then
+                call abort(250929, "CONVDIFF: field_name '"//trim(name)//"' has invalid format. Expected 'phiX' where X is a digit (1-9), but found '"//name(4:4)//"' at position 4.")
+            end if
+            read( name(4:4), * ) i_var
+            if (i_var >=1 .and. i_var <= params_convdiff%N_scalars) then
+                work(:,:,:,k) = u(:,:,:,i_var)
+            else
+                call abort(250922, "CONVDIFF: You try to save a variable that does not exist")
+            endif
+        endif
 
-    if (params_convdiff%dim == 2) then
-        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+2 ) then
-            call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,2:3), 1 )
+        ! saving of velocity field, this is done similar to save_data_ACM
+        if (name(1:2) == 'ux' .or. name(1:2) == 'uy' .or. name(1:2) == 'uz') then
+            read( name(4:4), * ) i_var
+            if (params_convdiff%dim == 2) then
+                ! let's save a 2D velocity field, for this we need two work arrays
+                if (size(work,4) - k < 1) then
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast one other save variable afterwards.")
+                endif
+                call create_velocity_field_2d( time, g, Bs, dx, x0, work(:,:,1,k:k+1), i_var, u(:,:,1,i_var) )
+            elseif (params_convdiff%dim == 3) then
+                ! let's save a 3D velocity field, for this we need three work arrays
+                if (size(work,4) - k < 2) then
+                    call abort(250922,"CONVDIFF: Not enough space to compute velocity, put atleast two other save variables afterwards.")
+                endif
+                call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,k:k+2), i_var )
+            endif
+            ! now copy the correct component to the correct place
+            if (name(1:2) == 'uy') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (name(1:2) == 'uz') then
+                if (params_convdiff%dim == 2) then
+                    call abort(250922, "CONVDIFF: You try to save uz in 2d!")
+                endif
+                work(:,:,:,k) = work(:,:,:,k+2)
+            endif
         endif
-    elseif (params_convdiff%dim == 3) then
-        if (params_convdiff%N_fields_saved >= params_convdiff%N_scalars+3 ) then
-            call create_velocity_field_3d( time, g, Bs, dx, x0, work(:,:,:,2:4), 1 )
+
+        ! if any of those endings is in the name, then it is a timestatistics variable
+        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
+            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
+            ! now we have to find the index of it
+            do i_time_statistics = 1, params_convdiff%N_time_statistics
+                if (name == trim(params_convdiff%time_statistics_names(i_time_statistics))) exit
+            end do
+
+            ! safety check if the name was found
+            if (i_time_statistics > params_convdiff%N_time_statistics) then
+                call abort(250929, "CONV_DIFF: field_name " // trim(name) // " not found in time_statistics_names")
+            endif
+
+            work(:,:,:,k) = u(:,:,:,params_convdiff%N_scalars + i_time_statistics)
         endif
-    endif
+    enddo
 
   end subroutine
 
@@ -204,7 +285,7 @@ contains
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=80), intent(out) :: name
+    character(len=cshort), intent(out) :: name
 
     if (allocated(params_convdiff%names)) then
       name = params_convdiff%names(N)
@@ -253,14 +334,14 @@ contains
     ! TODO: make this global and allocatable
     real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
     integer(kind=ik) :: i, ix, iy
-    real(kind=rk) :: x,y,unorm
+    real(kind=rk) :: x,y,unorm,c_react
 
     dt = 9.9e9_rk
 
 
     do i = 1, params_convdiff%N_scalars
         if (params_convdiff%dim == 2) then
-            call create_velocity_field_2d( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            call create_velocity_field_2d( time, g, Bs, dx, x0, u0(:,:,1,1:2), i, u(:,:,1,1) )
             unorm = maxval( u0(:,:,1,1)*u0(:,:,1,1) + u0(:,:,1,2)*u0(:,:,1,2) )
         else
             call create_velocity_field_3d( time, g, Bs, dx, x0, u0, i )
@@ -281,7 +362,11 @@ contains
         endif
 
         if (params_convdiff%nu(i) > 1.0e-13_rk) then
-            dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          dt = min(dt,  params_convdiff%CFL_nu * minval(dx(1:params_convdiff%dim))**2 / params_convdiff%nu(i))
+          if (params_convdiff%gamma>1.0e-13_rk) then
+            c_react = 0.15*params_convdiff%gamma
+            dt = min(dt,params_convdiff%CFL_nu/c_react * minval(dx(1:params_convdiff%dim)) )
+          endif
         endif
 
     enddo
@@ -311,9 +396,9 @@ contains
     ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
 
-    integer(kind=ik) :: ix, iy, iz, i
+    integer(kind=ik) :: ix, iy, iz, i, iblob, bx, by, bz, i_time_statistics
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: x,y,c0x,c0y,z,c0z
+    real(kind=rk) :: x, y, c0x, c0y, z, c0z, lambd, delta
 
     ! compute the size of blocks
     Bs(1) = size(u,1) - 2*g
@@ -323,83 +408,143 @@ contains
     u = 0.0_rk
 
     do i = 1, params_convdiff%N_scalars
-      c0x = params_convdiff%x0(i)
-      c0y = params_convdiff%y0(i)
-      c0z = params_convdiff%z0(i)
+    c0x = params_convdiff%x0(i,1)
+    c0y = params_convdiff%y0(i,1)
+    c0z = params_convdiff%z0(i,1)
 
-      select case (params_convdiff%inicond(i))
-      case ("zero")
-          u(:,:,:,i) = 0.0_rk
+    select case (params_convdiff%inicond(i))
+        case ("noise")
+            do ix = 1, Bs(1)+2*g
+                do iy = 1, Bs(2)+2*g
+                    u(ix,iy,:,i) = rand_nbr()
+                end do
+            end do
 
-      case ("cyclogenesis")
-          if (params_convdiff%dim==2) then
-              do ix = 1, Bs(1)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        case ("zero")
+            u(:,:,:,i) = 0.0_rk
 
-                      u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i) )
-                  end do
-              end do
-          else
-              call abort(66273,"this inicond is 2d only..")
-          endif
+        case ("const")
+            u(:,:,:,i) = params_convdiff%blob_width(i,1)
 
-      case("blob")
-          if (params_convdiff%dim==2) then
-              ! create gauss pulse. Note we loop over the entire block, incl. ghost nodes.
-              do iy = 1, Bs(2)+2*g
-                  do ix = 1, Bs(1)+2*g
-                      ! compute x,y coordinates from spacing and origin
-                      x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                      y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+        case ("sin")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
 
-                      if (params_convdiff%periodic_BC(1)) then
-                        if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                        if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-                      endif
-                      if (params_convdiff%periodic_BC(2)) then
-                        if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                        if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-                      endif
-                      ! set actual inicond gauss blob
-                      u(ix,iy,:,i) = dexp( -( (x)**2 + (y)**2 ) / params_convdiff%blob_width(i) )
-                  end do
-              end do
-          else
-              ! create gauss pulse
-              do iz = 1, Bs(3)+2*g
-                  do iy = 1, Bs(2)+2*g
-                      do ix = 1, Bs(1)+2*g
-                          ! compute x,y coordinates from spacing and origin
-                          x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
-                          y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
-                          z = dble(iz-(g+1)) * dx(3) + x0(3) - c0z
+                        u(ix,iy,:,i) = sin(2.0_rk*pi*x)
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
 
-                          if (params_convdiff%periodic_BC(1)) then
-                            if (x<-params_convdiff%domain_size(1)/2.0) x = x + params_convdiff%domain_size(1)
-                            if (x>params_convdiff%domain_size(1)/2.0) x = x - params_convdiff%domain_size(1)
-                          endif
-                          if (params_convdiff%periodic_BC(2)) then
-                            if (y<-params_convdiff%domain_size(2)/2.0) y = y + params_convdiff%domain_size(2)
-                            if (y>params_convdiff%domain_size(2)/2.0) y = y - params_convdiff%domain_size(2)
-                          endif
-                          if (params_convdiff%periodic_BC(3)) then
-                            if (z<-params_convdiff%domain_size(3)/2.0) z = z + params_convdiff%domain_size(3)
-                            if (z>params_convdiff%domain_size(3)/2.0) z = z - params_convdiff%domain_size(3)
-                          endif
-                          ! set actual inicond gauss blob
-                          u(ix,iy,iz,i) = dexp( -( (x)**2 + (y)**2 + (z)**2 ) / params_convdiff%blob_width(i) )
-                      end do
-                  end do
-              end do
-          end if
-      case default
-          call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
-      end select
+        case ("sin+1")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                        u(ix,iy,:,i) = sin(2.0_rk*pi*x) + 1.0_rk
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
+
+        case ("cyclogenesis")
+            if (params_convdiff%dim==2) then
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+
+                        u(ix,iy,:,i) = -tanh( y / params_convdiff%blob_width(i,1) )
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
+
+        case ("circle")
+            if (params_convdiff%dim==2) then
+                lambd = 0.005 *maxval(params_convdiff%domain_size)
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - c0x
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - c0y
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i,1) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i,1) ) /lambd))
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
+        case ("1D-bump")
+            if (params_convdiff%dim==2) then
+                delta = dsqrt(8/params_convdiff%gamma)
+                do ix = 1, Bs(1)+2*g
+                    do iy = 1, Bs(2)+2*g
+                        ! compute x,y coordinates from spacing and origin
+                        x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk * params_convdiff%domain_size(1)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2)
+                        !u(ix,iy,:,i) =  1/(1+dexp( (dsqrt(x**2 + y**2) - params_convdiff%blob_width(i) ) /lambd))
+                        u(ix,iy,:,i) = 0.5*(1-dtanh( (abs(x) - params_convdiff%blob_width(i,1) ) / delta))
+                    end do
+                end do
+            else
+                call abort(66273,"this inicond is 2d only..")
+            endif
+
+
+        case ("blob")
+            u = 0.0_rk
+            ! loop over all points and compute x,y,z coordinates from spacing and origin
+            do iz = merge(1, g+1, params_convdiff%dim==2), merge(1, Bs(3)+g, params_convdiff%dim==2)
+                z = 0.0_rk
+                if (params_convdiff%dim == 3) z = dble(iz-(g+1)) * dx(3) + x0(3)
+                do iy = 1, Bs(2)+2*g
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    do ix = 1, Bs(1)+2*g
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                        ! set actual inicond gauss blob for each blob
+                        do iblob = 1, params_convdiff%Nblobs
+                            ! if a blob is close to the domain border but has a large width, periodicity effects may impact the flow on the other periodic side
+                            ! in order to incorporate this, we add the periodic effect by adding blobs shifted by domain size
+                            ! as this initial condition is only executed once, this "more expensive" but more exact approach is chosen
+                            do bx = merge(-1, 0, params_convdiff%periodic_BC(1)), merge(1, 0, params_convdiff%periodic_BC(1))
+                                do by = merge(-1, 0, params_convdiff%periodic_BC(2)), merge(1, 0, params_convdiff%periodic_BC(2))
+                                    do bz = merge(-1, 0, params_convdiff%periodic_BC(3) .and. params_convdiff%dim == 3), &
+                                            merge( 1, 0, params_convdiff%periodic_BC(3) .and. params_convdiff%dim == 3)
+                                        u(ix,iy,iz,i) = u(ix,iy,iz,i) + dexp( -((x-params_convdiff%x0(i, iblob)+bx*params_convdiff%domain_size(1))**2 &
+                                            + (y-params_convdiff%y0(i, iblob)+by*params_convdiff%domain_size(2))**2 &
+                                            + (z-params_convdiff%z0(i, iblob)+bz*params_convdiff%domain_size(3))**2) / params_convdiff%blob_width(i,iblob) )
+                                    enddo
+                                enddo
+                            enddo
+                        enddo
+                    end do
+                end do
+            enddo
+        case default
+            call abort(72637,"Error. Inital conditon for conv-diff is unkown: "//trim(adjustl(params_convdiff%inicond(i))))
+        end select
 
     enddo
+
+    ! initialize time statistics
+    if (params_convdiff%N_time_statistics > 0) then
+        do i_time_statistics = 1, params_convdiff%N_time_statistics
+            u(:,:,:, params_convdiff%N_scalars + i_time_statistics) = 0.0_rk
+        end do
+    endif
 
 
   end subroutine INICOND_convdiff

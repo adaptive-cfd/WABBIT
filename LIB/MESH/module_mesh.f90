@@ -1,310 +1,235 @@
-!> \file
-!
 !> \brief module for all mesh subroutines
-!
-!> \details
-!> \author msr
-!! \date 24/11/16 - create
 ! ********************************************************************************************
 
 module module_mesh
 
     use mpi
-    ! global parameters
-    use module_params
-    ! debug module
-    use module_timing
-    ! interpolation routines
-    use module_interpolation
+    use module_hdf5_wrapper
+    use module_forestMetaData
+    use module_params               ! global parameters
+    use module_timing               ! debug module
+    use module_wavelets        ! interpolation routines
     ! use MPI module, since threshold_block needs to synch ghosts
     use module_MPI
-    ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
-    use module_treelib
-    use module_operators, only: component_wise_tree_norm
-    ! used in coarse_mesh
-    use module_helpers, only: most_common_element
+    use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
+    use module_operators
+    ! used in executeCoarsening_tree
+    use module_helpers
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
     use module_physics_metamodule
 
     implicit none
 
-    ! interface generalising the mono-tree to multi-trees
-    interface create_active_and_sorted_lists
-        module procedure create_active_and_sorted_lists_tree_old, &
-                         create_active_and_sorted_lists_forest
-    end interface
-
-    interface set_desired_num_blocks_per_rank
-        module procedure set_desired_num_blocks_per_rank1, &
-                         set_desired_num_blocks_per_rank2
-    end interface
-
-    interface allocate_grid
-        module procedure allocate_forest, allocate_tree
-    end interface
-
-    interface deallocate_grid
-        module procedure deallocate_forest, deallocate_tree
-    end interface
-
 contains
 
-    ! create all active (lgt/hvy) lists, create also sorted lgt data list
+#include "securityZone_tree.f90"
+#include "coarseExtensionUpdate_tree.f90"
+#include "refineToEquidistant_tree.f90"
+#include "InputOutput_Flusi.f90"
+#include "InputOutput.f90"
 #include "create_active_and_sorted_lists.f90"
-
+#include "createMask_tree.f90"
 #include "block_xfer_nonblocking.f90"
-
-    ! update neighbors, 2D/3D
-#include "update_neighbors.f90"
-#include "update_neighbors_2D.f90"
-#include "update_neighbors_3D.f90"
-    ! neighbor search, edge
-#include "find_neighbor_edge_2D.f90"
-#include "find_neighbor_edge_3D.f90"
-
-    ! neighbor search, corner
-#include "find_neighbor_corner_2D.f90"
-#include "find_neighbor_corner_3D.f90"
-    ! neighbor search, face
-#include "find_neighbor_face_3D.f90"
-
-    ! search routine to find light data id corresponding to treecode
-#include "does_block_exist.f90"
-
-    ! block refinement subroutine
-#include "refine_mesh.f90"
-
-    ! check treelevel restrictions
-#include "respect_min_max_treelevel.f90"
-
-    ! check treelevel restrictions
-#include "refinement_execute_2D.f90"
-#include "refinement_execute_3D.f90"
-
-    ! adapt the mesh
-#include "adapt_mesh.f90"
-#include "grid_coarsening_indicator.f90"
-
-    ! gradedness check
-#include "ensure_gradedness.f90"
-
-    ! completeness check
-#include "ensure_completeness.f90"
-
-    ! coarse mesh
-#include "coarse_mesh.f90"
+#include "updateNeighbors_tree.f90"
+#include "find_neighbors.f90"
+#include "doesBlockExist_tree.f90"
+#include "refine_tree.f90"
+#include "respectJmaxJmin_tree.f90"
+#include "refinementExecute.f90"
+#include "adapt_tree.f90"
+#include "coarseningIndicator_tree.f90"
+#include "ensureGradedness_tree.f90"
+#include "ensure_completeness_block.f90"
+#include "executeCoarsening_tree.f90"
 #include "merge_blocks.f90"
-
-    ! balance the load
-#include "balance_load.f90"
-
-    ! create list with number of blocks per rank
-#include "set_desired_num_blocks_per_rank.f90"
-
-    ! treecode to 2D z-sfc position
+#include "balanceLoad_tree.f90"
 #include "treecode_to_sfc_id_2D.f90"
-
-    ! treecode to 3D z-sfc position
 #include "treecode_to_sfc_id_3D.f90"
-
-    ! transfer treecode to 2D hilbert code
 #include "treecode_to_hilbertcode_2D.f90"
-
-    ! transfer treecode to 3D hilbert code
 #include "treecode_to_hilbertcode_3D.f90"
-
-    ! goes back from a treecode to xyz cartesian coordinates
 #include "get_block_spacing_origin.f90"
-
-    ! find sisters to a given block
-#include "find_sisters.f90"
-
-    ! find globally coarsest / finest levels
-#include "max_active_level.f90"
-#include "min_active_level.f90"
+#include "updateFamily_tree.f90"
+#include "find_family.f90"
+#include "ActiveLevel_tree.f90"
 #include "get_free_local_light_id.f90"
 #include "quicksort.f90"
-#include "update_grid_metadata.f90"
-
-    ! routines for creation of an initial grid
-#include "create_equidistant_grid.f90"
-#include "create_random_grid.f90"
-
-    ! allocate and reset all memory required for the gird
-#include "reset_grid.f90"
-#include "allocate_grid.f90"
-
+#include "updateMetadata_tree.f90"
+#include "createEquidistantGrid_tree.f90"
+#include "createRandomGrid_tree.f90"
+#include "reset_tree.f90"
+#include "allocate_forest.f90"
 #include "write_block_distribution.f90"
-
-    ! lgt_block synchronization
 #include "check_lgt_block_synchronization.f90"
 #include "remove_nonperiodic_neighbors.f90"
+#include "forest.f90"
 
-! check if we still have enough memory left: for very large simulations
-! we cannot affort to have them fail without the possibility to resume them
-logical function not_enough_memory(params, lgt_block, lgt_active, lgt_n)
+! former module_initialization
+#include "setInitialCondition_tree.f90"
+#include "setInicondBlocks_tree.f90"
+! previously in module_params (but then cannot call setup_wavelet, c'est chiant.)
+#include "ini_file_to_params.f90"
+
+! analytical data used for wavelet compression test
+subroutine set_block_testing_data(params, u, x0, dx)
+    use module_globals
+
     implicit none
-    integer, intent(in) :: lgt_n(:)
-    integer(kind=ik), intent(in) :: lgt_block(:, :)
-    integer(kind=ik), intent(in) :: lgt_active(:,:)
-    type (type_params), intent(inout) :: params
 
-    integer :: lgt_n_max, k, lgt_n_afterRefinement
+    type (type_params), intent(inout)  :: params
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    real(kind=rk), intent(inout) :: u(:,:,:)
 
-    not_enough_memory = .false.
-    params%out_of_memory = .false.
+    integer(kind=ik) :: ix, iy, iz, Bs(1:3), g
+    real(kind=rk) :: sigma0, x00, y00, z00, ampli, x, y, z
 
-    ! without adaptivity, this routine makes no sense, as the memory is constant
-    ! the run either crashes right away or never
-    if (params%adapt_mesh .eqv. .false.) then
-        not_enough_memory = .false.
-        return
-    endif
-
-    ! this is the available maximum number of active blocks.
-    lgt_n_max = params%number_blocks*params%number_procs
-
-    ! remove blocks already used for mask etc
-    lgt_n_max = lgt_n_max - sum(lgt_n(2:size(lgt_n)))
-
-    ! safety margin. inhomogenoeus distribution
-    ! of blocks can make trouble. Therefore, we raise the alarm earlier.
-    lgt_n_max = lgt_n_max * 9 / 10
-
-
-    ! however, this routine is called BEFORE refinement. figure out how many blocks
-    ! that we be after refinement
-    if (params%force_maxlevel_dealiasing) then
-        ! with dealiasing, the relation is very simple.
-        lgt_n_afterRefinement = lgt_n(tree_ID_flow) * (2**params%dim)
+    Bs = params%Bs
+    g  = params%g
+    
+    sigma0 = 0.3_rk / 15.0_rk
+    x00 = params%domain_size(1)/2.0_rk
+    y00 = params%domain_size(2)/2.0_rk
+    z00 = params%domain_size(3)/2.0_rk
+    ampli = 4.0_rk
+    
+    if (params%dim==2) then
+        ! create gauss pulse. 
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                ! compute x,y coordinates from spacing and origin
+                x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                
+                if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                
+                if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                
+                ! set actual inicond gauss blob
+                ! here only for the pressure.
+                u(ix,iy,:) = 1.0_rk + ampli*exp( -( (x)**2 + (y)**2 ) / (2.0*sigma0**2) )
+            end do
+        end do
     else
-        lgt_n_afterRefinement = 0
-        do k = 1, lgt_n(tree_ID_flow)
-            if (lgt_block( lgt_active(k, tree_ID_flow), params%max_treelevel + IDX_MESH_LVL ) < params%max_treelevel) then
-                ! this block can be refined (and will be) (it is refined to it has 8 children
-                ! but disappears, so 7 new blocks)
-                lgt_n_afterRefinement = lgt_n_afterRefinement + (2**params%dim)-1
-            else
-                ! this block is at maximum refinement and will not be refined, but not be deleted neither
-                lgt_n_afterRefinement = lgt_n_afterRefinement + 1
+        ! create gauss pulse
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! compute x,y coordinates from spacing and origin
+                    x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                    y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                    z = real(iz-(g+1), kind=rk) * dx(3) + x0(3) - z00
+                    
+                    if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                    if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                    
+                    if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                    if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                    
+                    if (z<-params%domain_size(3)/2.0) z = z + params%domain_size(3)
+                    if (z>params%domain_size(3)/2.0) z = z - params%domain_size(3)
+                    
+                    ! set actual inicond gauss blob
+                    u(ix,iy,iz) = 1.0_rk + ampli*exp( -( (x)**2 + (y)**2 + (z)**2 ) / (2.0*sigma0**2) )
+                end do
+            end do
+        end do
+    end if
+
+
+    sigma0 = 0.4_rk
+    x00 = params%domain_size(1)/4.1_rk
+    y00 = params%domain_size(2)/4.1_rk
+    z00 = params%domain_size(3)/4.1_rk
+    ampli = 2.0_rk
+    
+    if (params%dim==2) then
+        ! create gauss pulse. 
+        do iy = g+1, Bs(2)+g
+            do ix = g+1, Bs(1)+g
+                ! compute x,y coordinates from spacing and origin
+                x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                
+                if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                
+                if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                
+                ! set actual inicond gauss blob
+                ! here only for the pressure.
+                u(ix,iy,:) = u(ix,iy,:) + ampli*exp( -( (x)**2 + (y)**2 ) / (2.0*sigma0**2) )
+            end do
+        end do
+    else
+        ! create gauss pulse
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! compute x,y coordinates from spacing and origin
+                    x = real(ix-(g+1), kind=rk) * dx(1) + x0(1) - x00
+                    y = real(iy-(g+1), kind=rk) * dx(2) + x0(2) - y00
+                    z = real(iz-(g+1), kind=rk) * dx(3) + x0(3) - z00
+                    
+                    if (x<-params%domain_size(1)/2.0) x = x + params%domain_size(1)
+                    if (x>params%domain_size(1)/2.0) x = x - params%domain_size(1)
+                    
+                    if (y<-params%domain_size(2)/2.0) y = y + params%domain_size(2)
+                    if (y>params%domain_size(2)/2.0) y = y - params%domain_size(2)
+                    
+                    if (z<-params%domain_size(3)/2.0) z = z + params%domain_size(3)
+                    if (z>params%domain_size(3)/2.0) z = z - params%domain_size(3)
+                    
+                    ! set actual inicond gauss blob
+                    u(ix,iy,iz) = u(ix,iy,iz) + ampli*exp( -( (x)**2 + (y)**2 + (z)**2 ) / (2.0*sigma0**2) )
+                end do
+            end do
+        end do
+    end if
+end subroutine
+
+
+    logical function runtime_control_stop(  )
+        ! reads runtime control command
+        use module_ini_files_parser_mpi
+        implicit none
+        character(len=cshort) :: command
+        character(len=cshort) :: file
+        type(inifile) :: CTRL_FILE
+        logical :: exists
+        integer :: mpirank, mpicode
+
+        file ="runtime_control"
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        if (mpirank==0) then
+            inquire(file=file, exist=exists)
+            if (.not. exists) then
+                call Initialize_runtime_control_file()
             endif
-        enddo
-
-    endif
-
-
-    if ( lgt_n_afterRefinement > lgt_n_max) then
-        ! oh-oh.
-        not_enough_memory = .true.
-
-        if (params%rank==0) then
-            write(*,'("-----------OUT OF MEMORY--------------")')
-            write(*,'("-----------OUT OF MEMORY--------------")')
-            write(*,'("Nblocks_total=",i7," Nblocks_fluid=",i7)') sum(lgt_n), lgt_n(tree_ID_flow)
-            write(*,'("Nblocks_allocated=",i7," Nblocks_fluid_available=",i7)') params%number_blocks*params%number_procs, lgt_n_max
-            write(*,'("Nblocks_after_refinement=",i7)') lgt_n_afterRefinement
-            write(*,'("Nblocks_after_refinement=",i7)') lgt_n_afterRefinement
-            write(*,'("-------------_> oh-oh.")')
-            write(*,'("-----------OUT OF MEMORY--------------")')
-            write(*,'("-----------OUT OF MEMORY--------------")')
         endif
 
-        params%out_of_memory = .true.
-    endif
+        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+        if (.not. exists) then
+            runtime_control_stop = .false.
+            return
+        endif
 
+        ! root reads in the control file
+        ! and fetched the command
+        call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
+        call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
+        call clean_ini_file_mpi( CTRL_FILE )
 
-end function
-
-
-!##############################################################
-! This routine refines/coarsens to given target_level.
-! If target_level is not passed, then max_treelevel is assumed
-subroutine to_dense_mesh(params, lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
-    hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, target_level, verbosity)
-
-    implicit none
-    !-----------------------------------------------------------------
-    type (type_params), intent(inout) :: params   !< params structure
-    integer(kind=ik), intent(inout)   :: hvy_n    !< number of active heavy blocks
-    integer(kind=ik), intent(inout)   :: lgt_n !< number of light active blocks
-    integer(kind=ik), intent(inout)   :: lgt_block(:, : )  !< light data array
-    real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
-    integer(kind=ik), intent(inout)   :: hvy_neighbor(:,:)!< neighbor array
-    integer(kind=ik), intent(inout)   :: lgt_active(:), hvy_active(:) !< active lists
-    integer(kind=tsize), intent(inout):: lgt_sortednumlist(:,:)
-    real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
-    integer(kind=ik), intent(in), optional :: target_level
-    logical, intent(in),optional      :: verbosity !< if true: additional information of processing
-    !-----------------------------------------------------------------
-    integer(kind=ik):: level, tree_id,k,treecode_size
-    logical :: verbose=.false.
-
-    if (present(verbosity)) verbose=verbosity
-    if (present(target_level)) then
-        level=target_level
-    else
-        level = params%max_treelevel
-    endif
-
-    ! get tree_id form lgt data
-    tree_id = lgt_block(lgt_active(1),params%max_treelevel+IDX_TREE_ID)
-
-    ! refine/coarse to attain desired level, respectively
-    !coarsen
-    do while (max_active_level( lgt_block, lgt_active, lgt_n )>level)
-        ! check where coarsening is actually needed and set refinement status to -1 (coarsen)
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) > level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = -1
-        end do
-        ! this might not be necessary since we start from an admissible grid
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
-
-        call coarse_mesh( params, lgt_block, hvy_block, lgt_active, lgt_n, lgt_sortednumlist, &
-        hvy_active, hvy_n, tree_ID=1)
-
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_id)
-    end do
-
-    ! refine
-    do while (min_active_level( lgt_block, lgt_active, lgt_n )<level)
-        ! check where refinement is actually needed
-        do k = 1, lgt_n
-            if (treecode_size(lgt_block(lgt_active(k),:), params%max_treelevel) < level)&
-                lgt_block(lgt_active(k), params%max_treelevel + IDX_REFINE_STS) = 1
-        end do
-        call ensure_gradedness( params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-        lgt_sortednumlist, hvy_active, hvy_n )
-        if ( params%dim == 3 ) then
-            ! 3D:
-            call refinement_execute_3D( params, lgt_block, hvy_block, hvy_active, hvy_n )
+        if (command == "save_stop") then
+            runtime_control_stop = .true.
         else
-            ! 2D:
-            call refinement_execute_2D( params, lgt_block, hvy_block(:,:,1,:,:),&
-                hvy_active, hvy_n )
-        end if
+            runtime_control_stop = .false.
+        endif
 
-        call update_grid_metadata(params, lgt_block, hvy_neighbor, lgt_active, lgt_n, &
-            lgt_sortednumlist, hvy_active, hvy_n, tree_id)
-
-        call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active, hvy_n )
-    end do
-
-    call balance_load( params, lgt_block, hvy_block, &
-        hvy_neighbor, lgt_active, lgt_n, lgt_sortednumlist, hvy_active, hvy_n, tree_id )
-end subroutine
-!##############################################################
-
-
-
-
-
-
-
-
+    end function runtime_control_stop
 
 
 end module module_mesh

@@ -8,6 +8,7 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
     real(kind=rk) :: x1(1:3), x2(1:3), R
+    integer(kind=2) :: color
     integer ::  i
 
     ! check if the global treedata is already filled = initialization is done
@@ -22,8 +23,8 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
     ! Insect%smoothing_thickness=="local"  : smoothing_layer = c_sm * 2**-J * L/(BS-1)
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     if (Insect%smoothing_thickness == "local") then
-        Insect%smooth = 1.50d0*maxval(ddx)
-        Insect%safety = 3.5d0*Insect%smooth
+        Insect%smooth = Insect%C_smooth*maxval(ddx)
+        Insect%safety = 3.5_rk*Insect%smooth
     endif
 
     !*****************************************************************************
@@ -37,7 +38,16 @@ subroutine draw_fractal_tree(Insect, xx0, ddx, mask, mask_color, us)
         ! the file containes the radius of the cylinder
         R = treedata(i,7)*Insect%fractal_tree_scaling
 
-        call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, int(1,kind=2), bounding_box=treedata_boundingbox(i,1:6))
+        ! color of the tree (for force computation)
+        color = 0_2
+
+        if (Insect%fractal_tree_spheres) then
+            ! cylinders with endpoint spheres
+            call draw_cylinder_new( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, color, bounding_box=treedata_boundingbox(i,1:6))
+        else
+            ! cylinders without entdpoint spheres
+            call draw_cylinder_SD_nospheres( x1, x2, R, xx0, ddx, mask, mask_color, us, Insect, color, bounding_box=treedata_boundingbox(i,1:6))
+        endif
     end do
 
 end subroutine draw_fractal_tree
@@ -62,7 +72,7 @@ subroutine fractal_tree_init(Insect)
         !*****************************************************************************
         call count_lines_in_ascii_file_mpi(Insect%fractal_tree_file, nlines, 0)
 
-        if (root) write(*,'(80("-"))')
+        if (root) write(*,'(80("─"))')
         if (root) write(*,'("Building a fractal tree with ",i5," rigid cylinders")') nlines
         if (root) write(*,'("Fractal tree scaling factor is ",g16.4)') Insect%fractal_tree_scaling
         if (root) write(*,'("Fractal tree scaling root point is ",3(g16.4,1x))') Insect%fractal_tree_x0
@@ -97,7 +107,7 @@ subroutine fractal_tree_init(Insect)
             ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
             ! it does not really matter which one. however, we must be sure that the vector
             ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-            e_r = (/0.d0, 0.d0, 0.d0/)
+            e_r = (/0.0_rk, 0.0_rk, 0.0_rk/)
             do while ( norm2(e_r) <= 1.0d-12 )
                 e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
             enddo
@@ -137,7 +147,7 @@ subroutine fractal_tree_init(Insect)
             treedata_boundingbox(icyl, 1:6) = (/xmin, ymin, zmin, xmax, ymax, zmax/)
         enddo
 
-        if (root) write(*,'("Computing static bounding done.")')
+        if (root) write(*,'("Computing static bounding boxes done.")')
 
     else
         call abort(20200504, "fractal_tree_init seems to be called twice.")

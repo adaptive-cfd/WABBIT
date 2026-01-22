@@ -1,183 +1,83 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name quicksort.f90
-!> \version 0.5
-!> \author engels, msr
-!
-!> \brief quicksort subroutine
-!
-!>
-!! input:    -
-!! output:   -
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 14/06/17 - create
-!!
-! ********************************************************************************************
-recursive subroutine quicksort(a, first, last, sortdim)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
+!> \brief Quicksort algorithm sorting after one or several numbers
+!> \details This algorithm sorts the array a from position first
+!! to position last. Sortsize defines the size (3 or 4 currently
+!! supported). The actual comparison in tc_id_lower defines the
+!! order of the elements. Currently two modi are implemented:
+!!   -  sortsize=3, sort after a(:, 2) and a(:, 3) which are
+!!      combined to one treecode
+!!   -  sortsize=4, sort after treecode a(:, 2) and a(:, 3)
+!!      as well as a(:, 4) which is level and tree_id together.
+!!      Sorting will be done after tree_id, then level then TC
+recursive subroutine quicksort(a, first, last, sortsize)
     use module_params
-
-!---------------------------------------------------------------------------------------------
-! variables
 
     implicit none
 
-    integer(kind=tsize), intent(inout) ::  a(:,:)
-    integer(kind=ik), intent(in) :: sortdim
-    integer(kind=tsize), dimension(2) :: x, t
-    integer(kind=ik) :: first, last
-    integer(kind=ik) :: i, j
+    integer(kind=ik), intent(inout)    :: a(:,:)
+    integer(kind=ik), intent(in)       :: sortsize
+    integer(kind=ik), dimension(sortsize)     :: x, t
+    integer(kind=ik)                   :: first, last
+    integer(kind=ik)                   :: i, j
 
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    x = a( (first+last) / 2 , sortdim)
+    x = a( :, (first+last) / 2 )
     i = first
     j = last
 
-!---------------------------------------------------------------------------------------------
-! main body
-
     ! if we've arrived at small lists, call interchange sort and return
     if ( j-i < 6) then
-        call interchange_sort(a, first, last, sortdim)
+        call interchange_sort(a, first, last, sortsize)
         return
     endif
 
     ! otherwise do recursive quicksort
     do
-        do while (a(i,sortdim) < x(sortdim))
+        ! do while (a(i,sortdim) < x(sortdim))
+        do while (tc_id_lower(a(2:sortsize, i), x(2:sortsize), sortsize>=4))
             i=i+1
         end do
-        do while (x(sortdim) < a(j,sortdim))
+        ! do while (x(sortdim) < a(j,sortdim))
+        do while (tc_id_lower(x(2:sortsize), a(2:sortsize, j), sortsize>=4))
             j=j-1
         end do
         if (i >= j) exit
-        t = a(i,:);  a(i,:) = a(j,:);  a(j,:) = t
+        t = a(:,i);  a(:,i) = a(:,j);  a(:,j) = t
         i=i+1
         j=j-1
     end do
-    if (first < i-1) call quicksort(a, first, i-1, sortdim)
-    if (j+1 < last)  call quicksort(a, j+1, last, sortdim)
+    if (first < i-1) call quicksort(a, first, i-1, sortsize)
+    if (j+1 < last)  call quicksort(a, j+1, last, sortsize)
 
 end subroutine quicksort
 
-subroutine interchange_sort(a, left_end, right_end, sortdim)
-   use module_params
-   implicit none
-   integer(kind=tsize), intent(inout) ::  a(:,:)
-   integer(kind=ik) :: left_end, right_end
-   integer(kind=ik), intent(in) :: sortdim
+!> \brief Interchange algorithm sorting after one or several numbers
+!> \details This algorithm sorts the array a from position first
+!! to position last. Sortsize defines the size (3 or 4 currently
+!! supported). The actual comparison in tc_id_lower defines the
+!! order of the elements. Currently two modi are implemented:
+!!   -  sortsize=3, sort after a(:, 2) and a(:, 3) which are
+!!      combined to one treecode
+!!   -  sortsize=4, sort after treecode a(:, 2) and a(:, 3)
+!!      as well as a(:, 4) which is level and tree_id together.
+!!      Sorting will be done after tree_id, then level then TC
+subroutine interchange_sort(a, left_end, right_end, sortsize)
+    use module_params
+    implicit none
+    integer(kind=ik), intent(inout) ::  a(:,:)
+    integer(kind=ik) :: left_end, right_end
+    integer(kind=ik), intent(in) :: sortsize
 
-   integer(kind=ik) :: i, j
-   integer(kind=tsize), dimension(2) :: temp
+    integer(kind=ik) :: i, j
+    integer(kind=ik), dimension(sortsize) :: temp
 
-   do i = left_end, right_end - 1
-      do j = i+1, right_end
-         if (a(i,sortdim) > a(j,sortdim)) then
-            temp = a(i,:)
-            a(i,:) = a(j,:)
-            a(j,:) = temp
-         end if
-      end do
-   end do
+    do i = left_end, right_end - 1
+        do j = i+1, right_end
+        ! if (a(sortdim, j) < a(sortdim, i)) then
+        if (tc_id_lower(a(2:sortsize, j), a(2:sortsize, i), sortsize>=4)) then
+            temp = a(:,i)
+            a(:,i) = a(:,j)
+            a(:,j) = temp
+            end if
+        end do
+    end do
 
  end subroutine interchange_sort
-
-
-
-
-
-! ------------------------------------------------------------------------------
-! Sort a 2d array (: x dim) according to "sortdims" entry in the second dimension
-! ------------------------------------------------------------------------------
- recursive subroutine quicksort_ik(a, first, last, sortdim, dim)
-
-!---------------------------------------------------------------------------------------------
-! modules
-
-    ! global parameters
-    use module_params
-
-!---------------------------------------------------------------------------------------------
-! variables
-
-    implicit none
-
-    integer(kind=ik), intent(inout) ::  a(:,:)
-    ! which index is used for sorting?
-    integer(kind=ik), intent(in) :: sortdim
-    ! how many indices are there?
-    integer(kind=ik), intent(in) :: dim
-    integer(kind=ik), dimension(dim) :: x, t
-    integer(kind=ik) :: first, last
-    integer(kind=ik) :: i, j
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
-
-    x = a( (first+last) / 2 , sortdim)
-    i = first
-    j = last
-
-!---------------------------------------------------------------------------------------------
-! main body
-
-    ! if we've arrived at small lists, call interchange sort and return
-    if ( j-i < 6) then
-        call interchange_sort_ik(a, first, last, sortdim, dim)
-        return
-    endif
-
-    ! otherwise do recursive quicksort
-    do
-        do while (a(i,sortdim) < x(sortdim))
-            i=i+1
-        end do
-        do while (x(sortdim) < a(j,sortdim))
-            j=j-1
-        end do
-        if (i >= j) exit
-        t = a(i,:);  a(i,:) = a(j,:);  a(j,:) = t
-        i=i+1
-        j=j-1
-    end do
-    if (first < i-1) call quicksort_ik(a, first, i-1, sortdim, dim)
-    if (j+1 < last)  call quicksort_ik(a, j+1, last, sortdim, dim)
-
-end subroutine quicksort_ik
-
-subroutine interchange_sort_ik(a, left_end, right_end, sortdim, dim)
-   use module_params
-   implicit none
-   integer(kind=ik), intent(inout) ::  a(:,:)
-   integer(kind=ik) :: left_end, right_end
-   ! which index is used for sorting?
-   integer(kind=ik), intent(in) :: sortdim
-   ! how many indices are there?
-   integer(kind=ik), intent(in) :: dim
-
-   integer(kind=ik) :: i, j
-   integer(kind=ik), dimension(dim) :: temp
-
-   do i = left_end, right_end - 1
-      do j = i+1, right_end
-         if (a(i,sortdim) > a(j,sortdim)) then
-            temp = a(i,:)
-            a(i,:) = a(j,:)
-            a(j,:) = temp
-         end if
-      end do
-   end do
-
- end subroutine interchange_sort_ik

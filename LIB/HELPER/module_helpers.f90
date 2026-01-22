@@ -22,6 +22,115 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
+
+! delta function for interpolation
+    ! $$D(\xi) =
+    ! \begin{cases}
+    ! \dfrac{3}{8} + \dfrac{\pi}{32} - \dfrac{\xi^2}{4}, & |\xi| \leq 0.5, \\[6pt]
+    ! \dfrac{1}{4} + \dfrac{1 - |\xi|}{8} \sqrt{-2 + 8|\xi| - 4\xi^2}
+    ! -\dfrac{1}{8}\arcsin\!\bigl(\sqrt{2(|\xi|-1)}\bigr), & 0.5 \leq |\xi| \leq 1.5, \\[6pt]
+    ! \dfrac{17}{16} - \dfrac{\pi}{64} - \dfrac{3|\xi|}{4} + \dfrac{\xi^2}{8}
+    ! + \dfrac{|\xi|-2}{16}\sqrt{16|\xi| - 4\xi^2 - 14}
+    ! + \dfrac{1}{16}\arcsin\!\bigl(\sqrt{2(|\xi|-2)}\bigr), & 1.5 \leq |\xi| \leq 2.5, \\[6pt]
+    ! 0, & 2.5 \leq |\xi|.
+    ! \end{cases}$$
+    real (kind=rk) function delta_interpolation(x,dx1)
+        ! use vars
+        real(kind=rk), intent(in) :: x, dx1
+        real(kind=rk) :: r
+        !----------------------------------
+        ! This function returns a delta kernel
+        ! see Yang, Zhang, Li: A smoothing technique for discrete delta functions [...] JCP 228 (2009)
+        !----------------------------------
+        r = abs(x/dx1)
+
+        if (r<0.5_rk) then
+            delta_interpolation = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
+        elseif ( (r>=0.50_rk) .and. (r<=1.50_rk)   ) then
+            delta_interpolation = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
+        elseif ( (r>=1.5_rk) .and. (r<=2.5_rk)   ) then
+            delta_interpolation = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
+                    (r-2.0_rk)*sqrt(-14.0_rk + 16.0_rk*r - 4.0_rk*r**2)/16.0_rk +asin(sqrt(2.0_rk)*(r-2.0_rk))/16.0_rk
+        elseif ( (r>=2.5_rk)    ) then
+            delta_interpolation = 0.0_rk
+        endif
+    end function
+
+    ! linear function for interpolation
+    real (kind=rk) function linear_interpolation(x,dx1)
+        ! use vars
+        real(kind=rk), intent(in) :: x, dx1
+        real(kind=rk) :: r
+        r = abs(x/dx1)
+
+        if (r < 1.0_rk) then
+            linear_interpolation = 1.0_rk - r
+        else
+            linear_interpolation = 0.0_rk
+        endif
+    end function
+
+
+    ! Based on the (exact) signed distance function of a cylinder segment
+    ! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
+    function signed_distance_cylinder(p, a, b, r) result(d)
+        implicit none
+        real(kind=rk), dimension(3), intent(in) :: p, a, b
+        real(kind=rk), intent(in) :: r
+        real(kind=rk) :: d
+        real(kind=rk), dimension(3) :: ba, pa, tmp
+        real(kind=rk) :: baba, paba, x, y, x2, y2
+
+        ba = b - a
+        pa = p - a
+        baba = dot_product(ba, ba)
+        paba = dot_product(pa, ba)
+        
+        tmp = pa * baba - ba * paba
+        x = norm2(tmp) - r * baba
+        y = abs(paba - baba * 0.5_rk) - baba * 0.5_rk
+
+        x2 = x * x
+        y2 = y * y * baba
+
+        if (max(x, y) < 0.0_rk) then
+            ! d = -sqrt(min(x2, y2))
+            d = -min(x2,y2)
+        else
+            ! d = sqrt((merge(x2, 0.0_rk, x > 0.0_rk) + merge(y2, 0.0_rk, y > 0.0_rk)))
+            d = 0.0_rk
+            if (x > 0.0_rk) then
+                d = d + x2
+            end if
+            if (y > 0.0_rk) then
+                d = d + y2
+            end if
+        end if
+
+        d = sign(1.0_rk, d) * sqrt(abs(d)) / baba
+        ! d = sign(1.0_rk, d) * d / baba
+    end function 
+
+    ! https://de.wikipedia.org/wiki/Polynominterpolation#Lagrangesche_Interpolationsformel
+    ! Returns the value of $\ell_j(x)$ with nodes $x_i$
+    function lagrange_polynomial(x, xi, j) result(result)
+        implicit none
+        real(kind=rk), intent(in) :: x
+        real(kind=rk), intent(in) :: xi(1:)
+        integer(kind=ik), intent(in) :: j
+        real(kind=rk) :: result
+        integer(kind=ik) :: m
+
+        result = 1.0_rk
+
+        do m = 1, size(xi)
+            if (m /= j) then
+                result = result * (x-xi(m))/(xi(j)-xi(m))
+            endif
+        enddo
+
+    end function
+
     !-----------------------------------------------------------------------------
     !> This function computes the factorial of n
     !-----------------------------------------------------------------------------
@@ -71,7 +180,7 @@ contains
     ! This function returns, to a given filename, the corresponding dataset name
     ! in the hdf5 file, following flusi conventions (folder/ux_0000.h5 -> "ux")
     !-----------------------------------------------------------------------------
-    character(len=strlen)  function get_dsetname(fname)
+    character(len=clong)  function get_dsetname(fname)
         implicit none
         character(len=*), intent(in) :: fname
         ! extract dsetname (from "/" until "_", excluding both)
@@ -86,30 +195,41 @@ contains
     ! at the time "time", return the function value "u" and its
     ! time derivative "u_dt". Uses assumed-shaped arrays, requires an interface.
     !-------------------------------------------------------------------------------
-    subroutine fseries_eval(time,u,u_dt,a0,ai,bi)
+    ! nfft=1 means we expect one value for each of ai,bi (and the constant a0)
+    ! The Fourier series evaluation in WABBIT/FLUSI is :
+    ! Q = a0_Q / 2 + ( a1_Q*sin(1*2*pi*t) + b1_Q*sin(1*2*pi*t) )
+    !              + ( a2_Q*sin(2*2*pi*t) + b2_Q*sin(2*2*pi*t) )
+    !              + ....
+    ! Note the unfortunate division of a0 by 2, which is an historic artifact.
+    !-------------------------------------------------------------------------------
+    subroutine fseries_eval(time, u, u_dt, a0, ai, bi)
         implicit none
 
         real(kind=rk), intent(in) :: a0, time
         real(kind=rk), intent(in), dimension(:) :: ai,bi
         real(kind=rk), intent(out) :: u, u_dt
-        real(kind=rk) :: c,s,f
+        real(kind=rk) :: c, s, f
         integer :: nfft, i
 
-        nfft=size(ai)
+        nfft = size(ai)
+        ! mean values
+        ! Note the unfortunate division of a0 by 2, which is an historic artifact.
+        u = 0.5_rk*a0
+        ! mean derivative of any periodic function is zero.
+        u_dt = 0.0_rk
 
-        ! frequency factor
-        f = 2.d0*pi
+        do i = 1, nfft
+            ! angular frequency of this mode
+            f = 2.0_rk * pi * real(i, kind=rk)
 
-        u = 0.5d0*a0
-        u_dt = 0.d0
+            s = sin(f*time)
+            c = cos(f*time)
 
-        do i=1,nfft
-            s = dsin(f*dble(i)*time)
-            c = dcos(f*dble(i)*time)
             ! function value
-            u    = u + ai(i)*c + bi(i)*s
-            ! derivative (in time)
-            u_dt = u_dt + f*dble(i)*(-ai(i)*s + bi(i)*c)
+            u = u + ai(i)*c + bi(i)*s
+
+            ! derivative value (in time)
+            u_dt = u_dt + f*(-ai(i)*s + bi(i)*c)
         enddo
     end subroutine fseries_eval
 
@@ -119,6 +239,14 @@ contains
     ! and bi (derivative values) at the locations x. Note that x is assumed periodic;
     ! do not include x=1.0.
     ! a valid example is x=(0:N-1)/N
+    !
+    ! This function is used to describe the kinematics of insects, in cases where the fourier
+    ! series does not converge well, or simply if you like it better. We therefore assume 
+    ! implicitly that the coefficients ai (function values) and bi (derivatives) are samples
+    ! equidistanly between 0 and 1 (excluding 1), as described above. Therefore, no time 
+    ! vector for the samples is passed. If you request the data at say t=4.2334, then we return
+    ! the same as t=0.2334. An alternative to this method is the "kineloader", which handles
+    ! also non-periodic kinematics (however, it is less well tested).
     !-------------------------------------------------------------------------------
     subroutine hermite_eval(time, u, u_dt, ai, bi)
         implicit none
@@ -132,7 +260,7 @@ contains
         n = size(ai)
 
         time_periodized = time
-        do while (time_periodized > 1.0_rk )
+        do while (time_periodized >= 1.0_rk )
             time_periodized = time_periodized - 1.0_rk
         enddo
 
@@ -247,18 +375,12 @@ contains
 
     real(kind=rk) function startup_conditioner(time, time_release, tau)
 
-        !---------------------------------------------------------------------------------------------
-        ! modules
-        use module_precision
-        !---------------------------------------------------------------------------------------------
-        ! variables
+        use module_globals
 
         implicit none
 
         real(kind=rk), intent(in)  :: time,time_release, tau
         real(kind=rk)              :: dt
-        !---------------------------------------------------------------------------------------------
-        ! main body
 
         dt = time-time_release
 
@@ -273,6 +395,7 @@ contains
         return
     end function startup_conditioner
 
+    
     !==========================================================================
     !> \brief This subroutine returns the value f of a smooth step function \n
     !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
@@ -284,7 +407,7 @@ contains
     !> \image html maskfunction.bmp "plot of chi(delta)"
     !> \image latex maskfunction.eps "plot of chi(delta)"
     function smoothstep1(delta,h)
-        use module_precision
+        use module_globals
         implicit none
         real(kind=rk), intent(in)  :: delta,h
         real(kind=rk)              :: smoothstep1,f
@@ -304,16 +427,18 @@ contains
     !==========================================================================
 
 
+
+    !-------------------------------------------------------------------------------
+    !> This subroutine returns the value f of a smooth step function \n
+    !> The sharp step function would be 1 if x<=t and 0 if x>t \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if x<=t-h \n
+    !> f is 0 if x>t+h \n
+    !> f is variable (smooth) in between
+    !-------------------------------------------------------------------------------
     function smoothstep2(x,t,h)
-        !-------------------------------------------------------------------------------
-        !> This subroutine returns the value f of a smooth step function \n
-        !> The sharp step function would be 1 if x<=t and 0 if x>t \n
-        !> h is the semi-size of the smoothing area, so \n
-        !> f is 1 if x<=t-h \n
-        !> f is 0 if x>t+h \n
-        !> f is variable (smooth) in between
-        !-------------------------------------------------------------------------------
-        use module_precision
+        
+        use module_globals
 
         implicit none
         real(kind=rk), intent(in)  :: x,t,h
@@ -332,7 +457,9 @@ contains
 
     end function smoothstep2
 
-    ! abort program if file does not exist
+
+
+    !> \brief abort program if file does not exist
     subroutine check_file_exists(fname)
         implicit none
 
@@ -352,18 +479,20 @@ contains
 
     end subroutine check_file_exists
 
-    !---------------------------------------------------------------------------
-    ! wrapper for NaN checking (this may be compiler dependent)
-    !---------------------------------------------------------------------------
+
+
+    !> \brief wrapper for NaN checking (this may be compiler dependent)
     logical function is_nan( x )
         implicit none
-        real(kind=rk) :: x
+        real(kind=rk) :: x  !< value to be checked
         is_nan = .false.
         if (.not. (x.eq.x)) is_nan=.true.
     end function is_nan
 
+
+
+    !> \brief check for one block if a certain datafield contains NaNs
     logical function block_contains_NaN(data)
-        ! check for one block if a certain datafield contains NaNs
         implicit none
         real(kind=rk), intent(in)       :: data(:,:,:)
         integer(kind=ik)                :: nx, ny, nz, ix, iy, iz
@@ -382,9 +511,13 @@ contains
         end do
     end function block_contains_NaN
 
-    ! fill a 4D array of any size with random numbers
+
+
+    !> \brief Fill a 4D array of any size with random numbers
+    !  For redundant grids, this does not have coinciding values for the overlapping points, so make sure to call with those excluded (g+2:BS(i)+g-1)!
     subroutine random_data( field )
-        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)
+        implicit none
+        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)  !> input field
         integer :: ix,iy,iz,id
 
         do id = 1, size(field,4)
@@ -399,6 +532,71 @@ contains
     end subroutine
 
 
+    !> \brief Fill a 4D array of any size with random numbers for a given position
+    !> This computes a position to a given tolerance (which is computed by dx_min), set this position as the seed and then computes the random number.
+    !! This way, points with the same position will have the same value. However, it computes really many seeds, so it might be expensive.
+    subroutine random_data_unique( field, x0, dx, g_origin, domain_size, Jmax, BS)
+        implicit none
+        real(kind=rk), intent(inout) :: field(1:,1:,1:,1:)  !> input field
+        real(kind=rk), intent(in) :: x0(1:3)  !> coords origin of the block
+        real(kind=rk), intent(in) :: dx(1:3)  !> grid size of the block
+        integer(kind=ik), intent(in) :: g_origin(1:3)  !> how many grid points are before the origin? Should be (/params%g, params%g, params%g/) normally
+        real(kind=rk), intent(in) :: domain_size(1:3)  !> size of the domain
+        integer(kind=ik), intent(in) :: Jmax  !> max level of the grid
+        integer(kind=ik), intent(in) :: BS(1:3)    !> block size (assumed scalar for all dims)
+        integer :: ix,iy,iz,id,ir
+        real(kind=rk) :: x,y,z, dx_min(1:3)
+        integer, allocatable :: seed(:)
+        integer :: nseed
+        integer(kind=8) :: hashval
+
+        ! compute position tolerance with the minima dx in the whole domain
+        dx_min = 1.0e-3_rk * domain_size / (dble(2**Jmax) * BS)
+        if (size(field,3) == 1) then
+            dx_min(3) = 1.0_rk
+        endif
+
+        call random_seed(size=nseed)
+        allocate(seed(nseed))
+
+        do id = 1, size(field,4)
+            do iz = 1, size(field,3)
+                z = 0.0
+                if (size(field,3) > 1) then
+                    z = x0(3) + (iz - g_origin(3) - 1) * dx(3)
+                    z = modulo(z, domain_size(3))
+                endif
+                do iy = 1, size(field,2)
+                    y = x0(2) + (iy - g_origin(2) - 1) * dx(2)
+                    y = modulo(y, domain_size(2))
+                    do ix = 1, size(field,1)
+                        x = x0(1) + (ix - g_origin(1) - 1) * dx(1)
+                        x = modulo(x, domain_size(1))
+
+                        ! Compute a unique hash for the position and id
+                        hashval = int(nint(x/dx_min(1))) * 6364136223846793005_8
+                        hashval = ieor(hashval, int(nint(y/dx_min(2))) * 1442695040888963407_8)
+                        hashval = ieor(hashval, int(nint(z/dx_min(3))) * 22695477_8)
+                        hashval = ieor(hashval, int(id,kind=8) * 69069_8)
+
+                        ! Fill the seed array with the hash value, split into integers
+                        seed = 0
+                        seed(1) = int(ishft(hashval, -32))
+                        if (nseed > 1) seed(2) = int(iand(hashval, Z'FFFFFFFF'))
+
+                        ! Set the random seed based on the position and id
+                        call random_seed(put=seed)
+                        ! random number generator needs to "warm up" apparently, so let's call it a few times
+                        do ir = 1,10
+                            field(ix,iy,iz,id) = rand_nbr()
+                        enddo
+                    enddo
+                enddo
+            enddo
+        enddo
+
+        deallocate(seed)
+    end subroutine
 
 
     !-------------------------------------------------------------------------------
@@ -410,7 +608,7 @@ contains
         ! overwrites the file again with the standard runtime_control file
         implicit none
         integer :: mpirank, mpicode
-        character(len=80) :: file
+        character(len=cshort) :: file
 
         file = "runtime_control"
         call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
@@ -428,47 +626,6 @@ contains
         endif
 
     end subroutine Initialize_runtime_control_file
-
-
-    logical function runtime_control_stop(  )
-        ! reads runtime control command
-        use module_ini_files_parser_mpi
-        implicit none
-        character(len=80) :: command
-        character(len=80) :: file
-        type(inifile) :: CTRL_FILE
-        logical :: exists
-        integer :: mpirank, mpicode
-
-        file ="runtime_control"
-        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
-
-        if (mpirank==0) then
-            inquire(file=file, exist=exists)
-            if (.not. exists) then
-                call Initialize_runtime_control_file()
-            endif
-        endif
-
-        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
-        if (.not. exists) then
-            runtime_control_stop = .false.
-            return
-        endif
-
-        ! root reads in the control file
-        ! and fetched the command
-        call read_ini_file_mpi( CTRL_FILE, file, .false. ) ! false = non-verbose
-        call read_param_mpi(CTRL_FILE, "runtime_control","runtime_control", command, "none")
-        call clean_ini_file_mpi( CTRL_FILE )
-
-        if (command == "save_stop") then
-            runtime_control_stop = .true.
-        else
-            runtime_control_stop = .false.
-        endif
-
-    end function runtime_control_stop
 
 
     ! source: http://fortranwiki.org/fortran/show/String_Functions
@@ -628,10 +785,10 @@ contains
         implicit none
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: default
-        character(len=80), intent(out) :: value
+        character(len=cshort), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
 
         value = default
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -650,7 +807,7 @@ contains
                 value = str_replace_text( value, '"', '')
 
                 if (rank == 0) then
-                    write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))
                 endif
 
                 return
@@ -659,7 +816,7 @@ contains
         enddo
 
         if (rank == 0) then
-            write(*,*) "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
+            write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(value))//" THIS IS THE DEFAULT!"
         endif
 
     end subroutine
@@ -683,7 +840,7 @@ contains
     subroutine get_cmd_arg_str_vct( name, value )
         implicit none
         character(len=*), intent(in) :: name
-        character(len=80), intent(out), ALLOCATABLE :: value(:)
+        character(len=cshort), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
         character(len=600) :: args
@@ -751,7 +908,7 @@ contains
         integer(kind=ik), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -766,7 +923,7 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302018, "Failed to convert to INTEGER.")
                 endif
 
@@ -809,7 +966,7 @@ contains
         real(kind=rk), intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -824,7 +981,7 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to DOUBLE.")
                 endif
 
@@ -875,7 +1032,7 @@ contains
         logical, intent(out) :: value
 
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
         integer :: iostat
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -894,12 +1051,12 @@ contains
                 args = str_replace_text( args, '"', '')
                 ! now args is just the substring left of the '=' sign.
 
-                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.") then
+                if (args=="true".or.args=="1".or.args=="yes".or.args=="TRUE".or.args=="y".or.args==".true.".or.args=="T".or.args=="t") then
                     value = .true.
-                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.") then
+                elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.".or.args=="F".or.args=="f") then
                     value = .false.
                 else
-                    write(*,*) " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to LOGICAL.")
                 endif
 
@@ -937,21 +1094,22 @@ contains
     subroutine print_command_line_arguments()
         implicit none
         integer :: i, rank, ierr
-        character(len=120) :: args
+        character(len=clong) :: args
 
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
         if (rank == 0) then
-            write(*,'(80("~"))')
-            write(*,*) "INFORMATION: The command line call was:"
-            write(*,'(80("~"))')
+
+            write(*,'("╔", 78("═"), "╗")')
+            write(*,'("║", 10(" "), A, A32)') "INFORMATION: The command line call was:", "║"
+            write(*,'("╚", 78("═"), "╝")')
 
             do i = 0, command_argument_count()
                 call get_command_argument(i,args)
                 write(*,'(A,1x)', advance="no") trim(adjustl(args))
             enddo
-            write(*,*) " "
+            write(*,*) " "  ! newline
 
-            write(*,'(80("~"))')
+            write(*,'(80("─"))')
         endif
 
     end subroutine
@@ -974,6 +1132,146 @@ contains
 
       if (iostat /= 0) write(*,*) a, str
     end function
+
+
+
+    ! for debugging, prints block or array in 2D to file
+    subroutine dump_block(u, file, to_int, digits, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block (or array)
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append
+        character(len=120) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        do ii = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+            if (toInt) then
+                write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                write(32, formatter) nint(u(:, ii, 1, 1))
+            else
+                write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                write(32, formatter) u(:, ii, 1, 1)
+            endif
+        enddo
+        close(32)
+    end subroutine
+
+
+
+    ! for debugging, prints block with border for interior and ghost points to see whats going on inside
+    subroutine dump_block_fancy(u, file, Bs, g, to_int, digits, print_ghosts, append)
+        real(kind=rk), dimension(:, :, :, :), intent(in) :: u  ! block
+        character(len=*), intent(in) :: file                   ! file name
+        logical, optional, intent(in) :: to_int                ! if true, numbers are converted to ints
+        logical, optional, intent(in) :: print_ghosts          ! if false, only interior points are printed
+        integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
+        logical, optional, intent(in) :: append                ! if true, data is appended to file
+
+        integer(kind=ik), intent(in)           :: Bs(3), g
+        integer :: ii, apply_digits
+        logical :: toInt, apply_append, apply_print_ghosts
+        character(len=140) :: formatter
+
+        toInt = .false.
+        ! some presets for how many digits should be printed
+        if (present(to_int)) toInt = to_int
+        if (toInt) then
+            apply_digits = 6
+        else
+            apply_digits = 5
+        endif
+        if (present(digits)) apply_digits = digits
+        apply_append = .false.
+        if (present(append)) apply_append = append
+        apply_print_ghosts = .true.
+        if (present(print_ghosts)) apply_print_ghosts = print_ghosts
+
+        if (.not. apply_append) then
+            ! write(*,*) "Dumping block to "//file
+            open(unit=32, file=file, status="replace")
+        else
+            open(unit=32, file=file, status='unknown', position='append')
+            write(32, '(A)') ""  ! empty line
+        endif
+        if (apply_print_ghosts) then
+            ! print ghost block lines
+            do ii = Bs(2)+2*g, Bs(2)+g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(",i0,"(i",i0,","",""),""   "",",i0,"(i", i0, ","",""),""   "",",i0,"(i",i0,","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
+            ! print divider
+            if (toInt) then
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+            else
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+            endif
+            ! print interior block lines with divider for left and right ghost points
+            do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""),"" | "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""),"" | "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
+            ! print divider
+            if (toInt) then
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+1)*g+1), repeat("-", (apply_digits+1)*Bs(1)+4), repeat(" ", (apply_digits+1)*g+1)
+            else
+                write(32, '(A, A, A)') repeat(" ", (apply_digits+8)*g+1), repeat("-", (apply_digits+8)*Bs(1)+4), repeat(" ", (apply_digits+8)*g+1)
+            endif
+            ! print ghost block lines
+            do ii = g, 1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""),""   "",", i0, "(i", i0, ","",""))")') g, apply_digits, Bs(1), apply_digits, g, apply_digits
+                    write(32, formatter) nint(u(:, ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""),""   "",",i0,"(es",i0,".", i0,","",""))")') g, apply_digits+7, apply_digits, Bs(1), apply_digits+7, apply_digits, g, apply_digits+7, apply_digits
+                    write(32, formatter) u(:, ii, 1, 1)
+                endif
+            enddo
+        else
+            ! print only interior block lines without ghost points
+            do ii = Bs(2)+g, g+1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(",i0, "(i", i0, ","",""))")') Bs(1), apply_digits
+                    write(32, formatter) nint(u(g+1:g+Bs(1), ii, 1, 1))
+                else
+                    write(formatter, '("(",i0,"(es",i0,".", i0,","",""))")') Bs(1), apply_digits+7, apply_digits
+                    write(32, formatter) u(g+1:g+Bs(1), ii, 1, 1)
+                endif
+            enddo
+        endif
+        close(32)
+    end subroutine
 
 
 end module module_helpers

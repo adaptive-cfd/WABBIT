@@ -1,30 +1,18 @@
-! ********************************************************************************************
-! WABBIT
 ! ============================================================================================
-!> \file
-!> \brief rhs for 2D convection diffusion equation
-!>        ---------------------------------------------
 !> The right hand side for the convection diffusion equations is implemented as follows:
 !>\f{eqnarray*}{
 !! \partial_t \phi &=& -u_0 \cdot \nabla \phi + \nu \nabla^2 \phi
 !!\f}
-!
-!> \name RHS_2D_convdiff_new.f90
-!> \version 0.5
-!> \author msr, engels
-! = log ======================================================================================
-!> \version 10/11/16 - switch to v0.4
-!! \version 12/17 - new convection diffusion module (new physics structure)
 ! ********************************************************************************************
 
 
-  !-----------------------------------------------------------------------------
-  ! main level wrapper to set the right hand side on a block. Note this is completely
-  ! independent of the grid and any MPI formalism, neighboring relations and the like.
-  ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
-  ! from that. Ghost nodes are assumed to be sync'ed.
-  !-----------------------------------------------------------------------------
-  subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag  )
+!-----------------------------------------------------------------------------
+! main level wrapper to set the right hand side on a block. Note this is completely
+! independent of the grid and any MPI formalism, neighboring relations and the like.
+! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
+! from that. Ghost nodes are assumed to be sync'ed.
+!-----------------------------------------------------------------------------
+subroutine RHS_convdiff( time, u, g, x0, dx, rhs, stage, boundary_flag  )
     implicit none
 
     ! it may happen that some source terms have an explicit time-dependency
@@ -74,57 +62,53 @@
 
     select case(stage)
     case ("init_stage")
-      !-------------------------------------------------------------------------
-      ! 1st stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
-      ! performs initializations in the RHS module, such as resetting integrals
+        !-------------------------------------------------------------------------
+        ! 1st stage: init_stage.
+        !-------------------------------------------------------------------------
+        ! this stage is called only once, not for each block.
+        ! performs initializations in the RHS module, such as resetting integrals
 
-      return
+        return
 
     case ("integral_stage")
-      !-------------------------------------------------------------------------
-      ! 2nd stage: init_stage.
-      !-------------------------------------------------------------------------
-      ! For some RHS, the eqn depend not only on local, block based qtys, such as
-      ! the state vector, but also on the entire grid, for example to compute a
-      ! global forcing term (e.g. in FSI the forces on bodies). As the physics
-      ! modules cannot see the grid, (they only see blocks), in order to encapsulate
-      ! them nicer, two RHS stages have to be defined: integral / local stage.
-      !
-      ! called for each block.
+        !-------------------------------------------------------------------------
+        ! 2nd stage: init_stage.
+        !-------------------------------------------------------------------------
+        ! For some RHS, the eqn depend not only on local, block based qtys, such as
+        ! the state vector, but also on the entire grid, for example to compute a
+        ! global forcing term (e.g. in FSI the forces on bodies). As the physics
+        ! modules cannot see the grid, (they only see blocks), in order to encapsulate
+        ! them nicer, two RHS stages have to be defined: integral / local stage.
+        !if abs(params_convdiff%gamma)>0
+        ! called for each block.
 
-      return
+        return
 
     case ("post_stage")
-      !-------------------------------------------------------------------------
-      ! 3rd stage: post_stage.
-      !-------------------------------------------------------------------------
-      ! this stage is called only once, not for each block.
+        !-------------------------------------------------------------------------
+        ! 3rd stage: post_stage.
+        !-------------------------------------------------------------------------
+        ! this stage is called only once, not for each block.
 
-      return
+        return
 
     case ("local_stage")
-      !-------------------------------------------------------------------------
-      ! 4th stage: local evaluation of RHS on all blocks
-      !-------------------------------------------------------------------------
-      ! the second stage then is what you would usually do: evaluate local differential
-      ! operators etc.
-      !
-      ! called for each block.
-
-      call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
+        !-------------------------------------------------------------------------
+        ! 4th stage: local evaluation of RHS on all blocks
+        !-------------------------------------------------------------------------
+        ! the second stage then is what you would usually do: evaluate local differential
+        ! operators etc.
+        !
+        ! called for each block.
+        call RHS_convdiff_new(time, g, Bs, dx, x0, u, rhs, boundary_flag)
 
 
     case default
-      call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
+        call abort(7771,"the RHS wrapper requests a stage this physics module cannot handle.")
     end select
 
 
-  end subroutine RHS_convdiff
-
-
-
+end subroutine RHS_convdiff
 
 
 
@@ -156,25 +140,28 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
     ! real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:2)
     real(kind=rk) :: u0(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g, 1:3)
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, nu, gamma
     real(kind=rk) :: u_dx, u_dy, u_dz
     real(kind=rk) :: u_dxdx, u_dydy, u_dzdz
-    real(kind=rk) :: xcb, ycb, beta, x,y, sech,bc
+    real(kind=rk) :: xcb, ycb, beta, x,y, sech,bc, phi_max
     ! loop variables
     integer(kind=ik) :: ix, iy, iz, i, N, ia1, ia2, ib1, ib2, ia, ib
     ! coefficients for Tam&Webb
     real(kind=rk)                                  :: a(-3:3)
     real(kind=rk)                                  :: b(-2:2)
-
+    ! coefficients for a standard centered 4th order 1st derivative
+    real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
 
     ! set parameters for readability
     N = params_convdiff%N_scalars
     u0 = 0.0_rk
     rhs = 0.0_rk
 
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,4)/=N) then
-        call abort(66233,"wrong size. The door rings, I'll leave u to it.")
+#ifdef DEV
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,4)/=N+params_convdiff%N_time_statistics) then
+        call abort(2804231,"wrong size. There's someone at the door, I'll leave u to it.")
     endif
+#endif
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
@@ -188,21 +175,21 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     ! 4th order coefficients for second derivative
     b = (/ -1.0_rk/12.0_rk, 4.0_rk/3.0_rk, -5.0_rk/2.0_rk, 4.0_rk/3.0_rk, -1.0_rk/12.0_rk /)
 
+    phi_max = 0.0_rk
 
-
+    gamma = params_convdiff%gamma
     ! looop over components - they are independent scalars
     do i = 1, N
 
         ! because p%nu might load the entire params in the cache and thus be slower:
         nu = params_convdiff%nu(i)
-
         !!!!!!!!!!!!
         ! 2D
         !!!!!!!!!!!!
         if (params_convdiff%dim == 2) then
             ! create the advection velocity field, which may be time and space dependent
             u0 = 0.0_rk
-            call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i )
+            call create_velocity_field_2D( time, g, Bs, dx, x0, u0(:,:,1,1:2), i, phi(:,:,1,i) )
 
             select case(params_convdiff%discretization)
             case("FD_2nd_central")
@@ -228,6 +215,7 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                         do ix = g+1, Bs(1)+g
                             u_dx = (phi(ix+1,iy,1,i)-phi(ix-1,iy,1,i))*dx_inv*0.5_rk
                             u_dy = (phi(ix,iy+1,1,i)-phi(ix,iy-1,1,i))*dy_inv*0.5_rk
+
                             rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy
                         end do
                     end do
@@ -267,6 +255,27 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                     end do
                 endif
 
+            case("FD_4th_central")
+                !-----------------------------------------------------------------------
+                ! 2D, 4th order (standard scheme not the TW)
+                !-----------------------------------------------------------------------
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! gradient
+                        u_dx = (a_FD4(-2)*phi(ix-2,iy,1,i) + a_FD4(-1)*phi(ix-1,iy,1,i) &
+                             +  a_FD4(+2)*phi(ix+2,iy,1,i) + a_FD4(+1)*phi(ix+1,iy,1,i))*dx_inv
+                        u_dy = (a_FD4(-2)*phi(ix,iy-2,1,i) + a_FD4(-1)*phi(ix,iy-1,1,i) &
+                             +  a_FD4(+2)*phi(ix,iy+2,1,i) + a_FD4(+1)*phi(ix,iy+1,1,i))*dy_inv
+
+                        u_dxdx = (b(-2)*phi(ix-2,iy,1,1) + b(-1)*phi(ix-1,iy,1,1) + b(0)*phi(ix,iy,1,1)&
+                               +  b(+1)*phi(ix+1,iy,1,1) + b(+2)*phi(ix+2,iy,1,1))*dx2_inv
+                        u_dydy = (b(-2)*phi(ix,iy-2,1,1) + b(-1)*phi(ix,iy-1,1,1) + b(0)*phi(ix,iy,1,1)&
+                               +  b(+1)*phi(ix,iy+1,1,1) + b(+2)*phi(ix,iy+2,1,1))*dy2_inv
+
+                        rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
+                    end do
+                end do
+
 
             case default
                 call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
@@ -276,12 +285,12 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             if (params_convdiff%velocity(i)=="cyclogenesis") then
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
-                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i)
-                        y = y / params_convdiff%blob_width(i)
+                        y = dble(iy-(g+1)) * dx(2) + x0(2) - params_convdiff%y0(i,1)
+                        y = y / params_convdiff%blob_width(i,1)
                         ! sech(x) = 1.0 / cosh(x)
                         sech = 1.0_rk / cosh(y)
                         ! source term
-                        rhs(ix,iy,1,i) = rhs(ix,iy,1,i) - u0(ix,iy,1,2)*(-sech**2 / params_convdiff%blob_width(i) )
+                        rhs(ix,iy,1,i) = rhs(ix,iy,1,i) - u0(ix,iy,1,2)*(-sech**2 / params_convdiff%blob_width(i,1) )
                     end do
                 end do
             endif
@@ -354,7 +363,6 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                        +  b(+1)*phi(ix,iy,iz+1,i) + b(+2)*phi(ix,iy,iz+2,i))*dy2_inv
 
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz + nu*(u_dxdx+u_dydy+u_dzdz)
-
                             end do
                         end do
                     end do
@@ -370,6 +378,16 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                                 u_dz = (a(-3)*phi(ix,iy,iz-3,i) + a(-2)*phi(ix,iy,iz-2,i) + a(-1)*phi(ix,iy,iz-1,i) + a(0)*phi(ix,iy,iz,i)&
                                      +  a(+3)*phi(ix,iy,iz+3,i) + a(+2)*phi(ix,iy,iz+2,i) + a(+1)*phi(ix,iy,iz+1,i))*dz_inv
 
+                                ! ! vectorized implementation, simple tests were ~15% slower - codes left to show what was tested
+                                ! u_dx   = sum(a * phi(ix-3:ix+3,iy,iz,1))*dx_inv
+                                ! u_dy   = sum(a * phi(ix,iy-3:iy+3,iz,1))*dy_inv
+                                ! u_dz   = sum(a * phi(ix,iy,iz-3:iz+3,1))*dz_inv
+
+                                ! ! blas implementation, needs to declare "real(kind=rk) :: ddot", tests were 3xslower - codes left to show what was tested
+                                ! u_dx = ddot(7, a, 1, phi(ix-3:ix+3,iy,iz,1), 1)*dx_inv
+                                ! u_dy = ddot(7, a, 1, phi(ix,iy-3:iy+3,iz,1), 1)*dy_inv
+                                ! u_dz = ddot(7, a, 1, phi(ix,iy,iz-3:iz+3,1), 1)*dz_inv
+
                                 rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
                             end do
                         end do
@@ -381,48 +399,64 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
             end select
         endif
 
-        if (maxval(phi(:,:,:,i))>20.0_rk) call abort(666,"large values in phi. that cannot be good.")
+        if (params_convdiff%dim == 2) then
+            phi_max = maxval(phi(g+1:Bs(1)+g, g+1:Bs(2)+g, :, i))
+        else
+            phi_max = maxval(phi(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, i))
+        endif
+        if (phi_max>2000.0_rk) then
+            write(*,'("Phi_max: ", es10.3)') phi_max
+            call abort(280420232,"Large values in phi. That cannot be good.")
+        endif
     end do
 
+    ! reaction
+    if (gamma>=1.0e-10) then
+      rhs = rhs - gamma * (phi-1) * phi**2
+    endif
 
 end subroutine RHS_convdiff_new
 
 
 
-subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
+!> Create a 2D velocity field for advecting a scalar field
+subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i, u )
     implicit none
-    real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, i
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)
-    real(kind=rk), intent(inout) :: u0(:,:,:)
+    real(kind=rk), intent(in) :: time  !< current time
+    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index (in case we solve several transport equations which different scalars)
+    integer(kind=ik), dimension(3), intent(in) :: Bs  !< block size
+    real(kind=rk), intent(in) :: dx(1:2), x0(1:2)  !< grid spacing and origin of the block
+    real(kind=rk), intent(inout) :: u0(:,:,:)  !< output velocity field
+    real(kind=rk), intent(in) :: u(:,:)  !< scalar input field (for some velocity fields)
     ! note you cannot change these values without recomputing the coefficients
     real(kind=rk), parameter :: tau= 0.30_rk, t0=0.0_rk, t1=0.55_rk, t2=1.0_rk, u1=1.0_rk, u2=-1.2221975311385904
     real(kind=rk) :: u_this
 
     integer(kind=ik) :: ix,iy
     real(kind=rk) :: x,y,c0x,c0y, T, c0,c1,c2,c3, phi, r, ut
+    real(kind=rk) :: x1,y1,x2,y2,r1,r2,r0,w0(2)
 
     u0 = 0.0_rk
-
-
     c0x = 0.5_rk*params_convdiff%domain_size(1)
     c0y = 0.5_rk*params_convdiff%domain_size(2)
     T = params_convdiff%T_swirl
 
 
     select case(params_convdiff%velocity(i))
+    case ("nonlinear")
+        u0(:,:,1) = u+params_convdiff%u_const
+
     case ("cyclogenesis")
         do iy = 1, Bs(2) + 2*g
             do ix = 1, Bs(1) + 2*g
                 x = dble(ix-(g+1)) * dx(1) + x0(1)
                 y = dble(iy-(g+1)) * dx(2) + x0(2)
                 ! radius
-                r = dsqrt( (x-params_convdiff%x0(i))**2 + (y-params_convdiff%y0(i))**2 )
+                r = dsqrt( (x-params_convdiff%x0(i,1))**2 + (y-params_convdiff%y0(i,1))**2 )
                 ! tangential velocity
                 ut = 1.0d0 * (1.d0 / (cosh(r))) * (tanh(r))
                 ! angle phi
-                phi = atan2(y-params_convdiff%y0(i),x-params_convdiff%x0(i))
+                phi = atan2(y-params_convdiff%y0(i,1),x-params_convdiff%x0(i,1))
 
                 u0(ix,iy,1) = -sin(phi) * ut
                 u0(ix,iy,2) =  cos(phi) * ut
@@ -445,6 +479,43 @@ subroutine create_velocity_field_2D( time, g, Bs, dx, x0, u0, i )
         u0(:,:,1) = params_convdiff%u0x(i)
         u0(:,:,2) = params_convdiff%u0y(i)
 
+    case("circular")
+          u0(:,:,1) = -params_convdiff%domain_size(1) * pi * 0.5 * sin(2*pi*time)
+          u0(:,:,2) = params_convdiff%domain_size(2) * pi * 0.5 * cos(2*pi*time)
+
+    case("vortex-pair")
+      x1 = 0.6 -  params_convdiff%u0x(i) * time
+      y1 = 0.49 * params_convdiff%domain_size(2)
+      x2 = 0.6 -  params_convdiff%u0x(i) * time
+      y2 = 0.51 * params_convdiff%domain_size(2)
+      w0(1:2) = params_convdiff%w0(1:params_convdiff%dim)
+      r0 = 0.005   ! initial size of vortex
+      do iy = 1, Bs(2) + 2*g
+          do ix = 1, Bs(1) + 2*g
+              x = dble(ix-(g+1)) * dx(1) + x0(1)
+              y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+              r1 = (x-x1)**2 + (y-y1)**2
+              r2 = (x-x2)**2 + (y-y2)**2
+
+              u0(ix,iy,1) = -w0(1) * (y - y1) * dexp(-(r1/r0)**2) + w0(2) * (y - y2) * dexp(-(r2/r0)**2)
+              u0(ix,iy,2) =  w0(1) * (x - x1) * dexp(-(r1/r0)**2) - w0(2) * (x - x2) * dexp(-(r2/r0)**2)
+          enddo
+      enddo
+      u0 = u0 * dexp(-(time / params_convdiff%tau) ** 2)
+    
+    case("center_expand")
+        ! this condition periodically expands and contracts the field from the center
+        do iy = 1, Bs(2) + 2*g
+            do ix = 1, Bs(1) + 2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+                y = dble(iy-(g+1)) * dx(2) + x0(2)
+
+                u0(ix,iy,1) = cos((pi*time)/T) * (sin(pi*x/c0x)) * params_convdiff%u0x(i)
+                u0(ix,iy,2) = cos((pi*time)/T) * (sin(pi*y/c0y)) * params_convdiff%u0y(i)
+            enddo
+        enddo
+
     case default
         call abort(77262,params_convdiff%velocity(i)//' is an unkown velocity field. It is time to go home.')
     end select
@@ -452,13 +523,14 @@ end subroutine
 
 
 
+!> Create a 3D velocity field for advecting a scalar field
 subroutine create_velocity_field_3D( time, g, Bs, dx, x0, u0, i )
     implicit none
-    real(kind=rk), intent(in) :: time
-    integer(kind=ik), intent(in) :: g, i
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    real(kind=rk), intent(in) :: dx(1:3), x0(1:3)
-    real(kind=rk), intent(inout) :: u0(:,:,:,1:)
+    real(kind=rk), intent(in) :: time  !< current time
+    integer(kind=ik), intent(in) :: g, i  !< ghost cells, scalar index
+    integer(kind=ik), dimension(3), intent(in) :: Bs  !< block size
+    real(kind=rk), intent(in) :: dx(1:3), x0(1:3)  !< grid spacing and origin of the block
+    real(kind=rk), intent(inout) :: u0(:,:,:,1:)  !< output velocity field
 
     integer(kind=ik) :: ix, iy, iz
     real(kind=rk) :: x, y, z, c0x, c0y, c0z, T

@@ -8,29 +8,29 @@ subroutine draw_active_grid_winglets(time, Insect, xx0, ddx, mask, mask_color, u
     real(kind=rk),intent(inout)  :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    real(kind=rk), parameter :: smoothing = 3.d0 ! 1.5d0
-    real(kind=rk), parameter :: offset = 4.0d0 / 20.0d0
-    ! real(kind=rk), parameter :: omega(1:4) = (/1.0d0, -1.0d0, +1.0d0, -1.0d0/)
+    real(kind=rk), parameter :: smoothing = 3._rk ! 1.5_rk
+    real(kind=rk), parameter :: offset = 4.0_rk / 20.0_rk
+    ! real(kind=rk), parameter :: omega(1:4) = (/1.0_rk, -1.0_rk, +1.0_rk, -1.0_rk/)
     real(kind=rk), parameter :: omega_z = 1.0_pr , omega_y = -1.0_pr, phase_z = 0.0_pr, phase_y = pi/2.0_pr
-    ! real(kind=rk), parameter :: alpha0(1:4)=(/0.0d0, 0.0d0, pi/2.0d0, pi/2.0d0/)
+    ! real(kind=rk), parameter :: alpha0(1:4)=(/0.0_rk, 0.0_rk, pi/2.0_rk, pi/2.0_rk/)
     integer(kind=2) :: color_val
     integer :: i
 
-    Insect%smooth = 1.0d0*maxval(ddx)
-    Insect%safety = 3.5d0*Insect%smooth
+    Insect%smooth = Insect%C_smooth*maxval(ddx)
+    Insect%safety = 3.5_rk*Insect%smooth
 
     ! color_val = 1
-    ! call draw_single_winglet( time, (/x0, 1.5d0, 0.0d0/), omega(1), alpha0(1), 'z', color_val,&
+    ! call draw_single_winglet( time, (/x0, 1.5_rk, 0.0_rk/), omega(1), alpha0(1), 'z', color_val,&
     ! xx0, ddx, mask, mask_color, us, smoothing*maxval(ddx))
     !
     ! color_val = 2
-    ! call draw_single_winglet( time, (/x0, 0.5d0, 0.0d0/), omega(2), alpha0(2), 'z', color_val,&
+    ! call draw_single_winglet( time, (/x0, 0.5_rk, 0.0_rk/), omega(2), alpha0(2), 'z', color_val,&
     ! xx0, ddx, mask, mask_color, us, smoothing*maxval(ddx))
 
     do i = 1, int(yl)
         color_val = 1_2 !int(i, kind=2)
 
-        call draw_single_winglet( time, (/x0, 0.5d0+dble(i-1), 0.0d0/), omega_z*(-1.0_pr)**i, phase_z, 'z', color_val,&
+        call draw_single_winglet( time, (/x0, 0.5_rk+dble(i-1), 0.0_rk/), omega_z*(-1.0_pr)**i, phase_z, 'z', color_val,&
         xx0, ddx, mask, mask_color, us, smoothing*maxval(ddx))
     enddo
 
@@ -42,11 +42,11 @@ subroutine draw_active_grid_winglets(time, Insect, xx0, ddx, mask, mask_color, u
     enddo
 
     ! color_val = 3
-    ! call draw_single_winglet( time, (/x0-offset, 0.0d0, 1.5d0/), omega(3), alpha0(3), 'y', color_val,&
+    ! call draw_single_winglet( time, (/x0-offset, 0.0_rk, 1.5_rk/), omega(3), alpha0(3), 'y', color_val,&
     ! xx0, ddx, mask, mask_color, us, smoothing*maxval(ddx))
     !
     ! color_val = 4
-    ! call draw_single_winglet( time, (/x0-offset, 0.0d0, 0.5d0/), omega(4), alpha0(4), 'y', color_val,&
+    ! call draw_single_winglet( time, (/x0-offset, 0.0_rk, 0.5_rk/), omega(4), alpha0(4), 'y', color_val,&
     ! xx0, ddx, mask, mask_color, us, smoothing*maxval(ddx))
 
 
@@ -64,7 +64,7 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
     real(kind=rk),intent(inout)  :: us(0:,0:,0:,1:)
     integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
 
-    real(kind=rk) :: x_glob(1:3), x_wing(1:3), H, h1, h2, h3, M=1.0d0, tmp, tmp2, MM(1:3,1:3), M2(1:3,1:3)
+    real(kind=rk) :: x_glob(1:3), x_wing(1:3), H, h1, h2, h3, M=1.0_rk, tmp, tmp2, MM(1:3,1:3), M2(1:3,1:3)
     real(kind=rk) :: alpha, sigma
 
     real(kind=rk), parameter :: scaling_winglet = 18.5/20.0

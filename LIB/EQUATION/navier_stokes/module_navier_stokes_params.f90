@@ -1,22 +1,14 @@
-!-----------------------------------------------------------------
-!> \brief parameters and variables of Navier_Stokes physics
-!-----------------------------------------------------------------
-!> \details
 !! This module contains all parameter types, and functions to init
 !! the params structure visible to the navier stokes modules.
-!> \details
 !!    * params_ns
 !!    * params_filter
-!> \date 23.1.2018 -creation
-!> \author P.Krah
 !-----------------------------------------------------------------
 
 module module_navier_stokes_params
 
-  use module_precision
+  use module_globals
   use module_ini_files_parser_mpi
   use mpi
-  use module_params, only: read_bs
 
   implicit none
 
@@ -34,7 +26,7 @@ module module_navier_stokes_params
       !                 + periodic (if ghostnodes in direction are periodically synched)
       !                 + symmetric-open (symmetric in -e_i and open in +e_i)
       !                 + open (open at both sides)
-      character(len=80), dimension(3)  :: name
+      character(len=cshort), dimension(3)  :: name
 
       ! Boundary values
       ! ----------------
@@ -57,11 +49,10 @@ module module_navier_stokes_params
       ! Boundary values can be initialiced with parameters red from
       ! parameter file (choose "paramsfile") or taken from the initial condition (choose "inicond")
       ! Currently not supported, but possible: choose new BC in every timestep (choose "time-dependent")
-      character(len=80)       :: ref_type
+      character(len=cshort)       :: ref_type
 
 end type type_boundary
   !=========================================================
-
 
 
 
@@ -71,7 +62,7 @@ end type type_boundary
   ! filter structure
   type :: type_params_filter
       ! name of filter
-      character(len=80)                  :: name
+      character(len=cshort)                  :: name
       ! number or data fields to filter
       integer(kind=ik)                   :: n_eqn
 
@@ -84,8 +75,6 @@ end type type_boundary
 
       !wavelet filter
       !---------------
-      ! fine/coarse predictor of wavelets
-      character(len=80)                  ::order_predictor
        ! threshold value for wavelets
       real(kind=rk)                     ::eps
 
@@ -94,9 +83,9 @@ end type type_boundary
       ! bogey shock detector threshold,
       real(kind=rk)                               :: r_th
       !  detector_method (divU,p),
-      character(len=80)                           :: detector_method
+      character(len=cshort)                           :: detector_method
       ! switch functio (tanh,abs)
-      character(len=80)                           :: sigma_switch
+      character(len=cshort)                           :: sigma_switch
       ! save filter strength sigma
       logical                                     :: save_filter_strength=.false.
 
@@ -110,7 +99,7 @@ end type type_boundary
   !---------------------------------------------------------
   type :: type_params_ns
         ! coordinate system
-        character(len=80)                           :: coordinates="cartesian"
+        character(len=cshort)                           :: coordinates="cartesian"
         ! Courant-Friedrichs-Lewy
         real(kind=rk)                               :: CFL, T_end
         ! spatial domain%number_data_fields
@@ -124,8 +113,8 @@ end type type_boundary
         integer(kind=ik), dimension(3)              :: Bs
         ! maximal tree level
         integer(kind=ik)                            :: Jmax
-        ! indicator for coarsening "treshold-vorticity", "primary-variables" etc. 
-        character(len=80)                           :: coarsening_indicator="primary-variables"
+        ! indicator for coarsening "threshold-vorticity", "primary-variables" etc.
+        character(len=cshort)                           :: coarsening_indicator="primary-variables"
         ! Courant-Friedrichs-Lewy
         ! dimension
         integer(kind=ik)                            :: dim, N_fields_saved
@@ -144,15 +133,15 @@ end type type_boundary
         ! dissipation switch
         logical                                     :: dissipation
         ! variable names
-        character(len=80), allocatable              :: names(:)
+        character(len=cshort), allocatable              :: names(:)
         ! type used for the spatial discretization
-        character(len=80)                           :: discretization
+        character(len=cshort)                           :: discretization
         !---------------------------------------------------------------------------------
         ! initial conditions
         !---------------------------------------------------------------------------------
         logical                                     :: read_from_files
         ! înitial condition
-        character(len=80)                           :: inicond
+        character(len=cshort)                           :: inicond
         ! width of initialcond
         real(kind=rk)                               :: inicond_width
         ! width of initialcond
@@ -170,7 +159,7 @@ end type type_boundary
         ! penalization parameter and sponge parameter
         real(kind=rk)                               :: C_eta,C_sp,L_sponge=-1.0_rk
         ! geometry to display
-        character(len=80)                           :: geometry="cylinder",case='--'
+        character(len=cshort)                           :: geometry="cylinder",case='--'
         ! geometric parameters for cylinder (x_0,r)
         real(kind=rk)                               :: x_cntr(1:3), R_cyl
         ! mean variables on domain
@@ -439,10 +428,7 @@ subroutine init_other_params( FILE )
 
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_ns%coarsening_indicator, "primary-variables" )
 
-    params_ns%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_ns%Bs, params_ns%dim)
-
-    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params_ns%g, 1   )
-
+    params_ns%Bs = read_bs(FILE,'Blocks', 'number_block_nodes', params_ns%Bs, params_ns%dim, params_ns%mpirank)
 
   end subroutine init_other_params
 
@@ -746,10 +732,6 @@ subroutine init_other_params( FILE )
           call convert_statevector3D(phi_out,format_out)
         endif
     end subroutine convert2format
-
-
-
-
 
 
 end module module_navier_stokes_params

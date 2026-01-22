@@ -1,77 +1,116 @@
+subroutine filter_wrapper(time, params, hvy_block, tree_ID)
+    implicit none
 
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \file
-!> \callgraph
-!> \brief wrapper for filter
-!> \version 0.5
-!> \author Pkrah
-!! \date 30/04/18 - create
-!!
-!
-!**********************************************************************************************
-
-subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, lgt_block, hvy_active, hvy_n)
-   implicit none
-
-    !> time variable
     real(kind=rk), intent(in)           :: time
-    !> user defined parameter structure, hvy_active
-    type (type_params), intent(in)      :: params
-    !> heavy data array - block data
-    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
-    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> light data array
-    integer(kind=ik), intent(in)        :: lgt_block(:, :)
-    !> list of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)        :: hvy_n
-
-    !> global integral
-    real(kind=rk), dimension(3)         :: volume_int
-
-    !> spacing and origin of a block
-    real(kind=rk), dimension(3)         :: dx, x0
-    ! loop variables
-    integer(kind=ik)                    :: k, dF, neqn, lgt_id
-    ! grid parameter, error variable
-    integer(kind=ik)                    :: g
+    type (type_params), intent(inout)   :: params                       !> user defined parameter structure, hvy_active
+    real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
+    integer(kind=ik), intent(in)        :: tree_ID      
+    real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
+    integer(kind=ik)                    :: k, dF, neqn, lgt_id, i       ! loop variables
+    integer(kind=ik)                    :: g, a, nx, ny, nz, nc
     integer(kind=ik), dimension(3)      :: Bs
-    !  surface normal
-    integer(kind=2) :: n_domain(1:3)
-    integer         :: level
+    integer(kind=2)                     :: n_domain(1:3)                ! surface normal
+    integer(kind=ik)                    :: level, hvy_id
+    real(kind=rk)                       :: stencil(-19:19)          ! stencil array, note: size is fixed
+    integer(kind=ik)                    :: stencil_size         ! filter position (array postion of value to filter)
+    real(kind=rk), allocatable, save    :: u_filtered(:,:,:,:)
 
-    Bs    = params%Bs
-    g     = params%n_ghosts
+    Bs = params%Bs
+    g  = params%g
     n_domain = 0
+    nx = size(hvy_block, 1)
+    ny = size(hvy_block, 2)
+    nz = size(hvy_block, 3)
+    nc = size(hvy_block, 4)
 
+    if (.not. allocated(u_filtered)) allocate( u_filtered(1:nx,1:ny,1:nz,1:nc) )
 
-    do k = 1, hvy_n
-        ! convert given hvy_id to lgt_id for block spacing routine
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
 
-        ! level of the block:
-        level = lgt_block(lgt_id, params%max_treelevel+IDX_MESH_LVL)
+        call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-        if ((params%filter_only_maxlevel .and. level==params%max_treelevel) &
-        .or. (.not.params%filter_only_maxlevel.and..not.params%filter_all_except_maxlevel) .or. &
-        (params%filter_all_except_maxlevel.and.(level/=params%max_treelevel)) ) then
+        select case(params%filter_type)
+        case('explicit_3pt')
+            ! This filter comes from
+            ! A general class of commutative filters for LES in complex geometries
+            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
+            ! 
+            ! Table I, case 1
+            !
+            ! If you look closely, you'll realize that those filters are the same as
+            ! higher order viscosity terms (hyperviscosity) with some given numerical 
+            ! dissipation. 
+            ! The 3pt filter corresponds to D2, the 5pt to D4 (with a coefficient of 
+            ! nu_num = -dx**4 / (16*dt) (yes, its a negative sign because it's 1i**4) )
+            ! and the 7pt to a 6th derivative (D6, central, 2nd order) with a diffusion of (dx**6/64*dt).
 
-            ! get block spacing for RHS
-            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+            stencil_size = 3
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ 1.0_rk/4.0_rk, -1.0_rk/2.0_rk, 1.0_rk/4.0_rk /)
 
-            if ( .not. All(params%periodic_BC) ) then
-                ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-                call get_adjacent_boundary_surface_normal( lgt_block(lgt_id, 1:lgt_block(lgt_id,params%max_treelevel+IDX_MESH_LVL)), &
-                params%domain_size, params%Bs, params%dim, n_domain )
-            endif
+        case('explicit_5pt')
+            ! This filter comes from
+            ! A general class of commutative filters for LES in complex geometries
+            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
+            ! 
+            ! Table I, case 5
+            stencil_size = 5
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/ 16.0_rk, &
+            1.0_rk/  4.0_rk, &
+            -3.0_rk/  8.0_rk, & ! 1-3/8 = 5/8
+            1.0_rk/  4.0_rk, &
+            -1.0_rk/ 16.0_rk/)
 
-            call filter_meta(params%physics_type, time, hvy_block(:,:,:,:, hvy_active(k)), g, x0, dx,&
-            hvy_tmp(:,:,:,:,hvy_active(k)), n_domain)
-        endif
+        case('explicit_7pt')
+            ! same as above case 10
+            ! Corresponds to a 6th derivative hyperviscosity term (2nd order central FD)
+            stencil_size = 7
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/  1.0_rk/ 64.0_rk, &
+            -3.0_rk/ 32.0_rk, &
+            15.0_rk/ 64.0_rk, &
+            -5.0_rk/ 16.0_rk, &
+            15.0_rk/ 64.0_rk, &
+            -3.0_rk/ 32.0_rk, &
+            1.0_rk/ 64.0_rk/)
+
+        case('explicit_9pt')
+            ! not included in Vasilyev 1998
+            stencil_size = 9
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/ -1.0_rk/256.0_rk, &
+            1.0_rk/ 32.0_rk, &
+            -7.0_rk/ 64.0_rk, &
+            7.0_rk/ 32.0_rk, &
+            -35.0_rk/128.0_rk, &
+            7.0_rk/ 32.0_rk, &
+            -7.0_rk/ 64.0_rk, &
+            1.0_rk/ 32.0_rk, &
+            -1.0_rk/256.0_rk/)
+
+        case('explicit_11pt')
+            ! not included in Vasilyev 1998
+            stencil_size = 11
+            a = (stencil_size-1)/2
+            stencil(-a:+a) = (/  1.0_rk/1024.0_rk, &
+            -5.0_rk/ 512.0_rk, &
+            45.0_rk/1024.0_rk, &
+            -15.0_rk/ 128.0_rk, &
+            105.0_rk/ 512.0_rk, &
+            -63.0_rk/ 256.0_rk, &
+            105.0_rk/ 512.0_rk, &
+            -15.0_rk/ 128.0_rk, &
+            45.0_rk/1024.0_rk, &
+            -5.0_rk/ 512.0_rk, &
+            1.0_rk/1024.0_rk/)
+        end select
+
+        stencil(0) = stencil(0) + 1.0_rk
+
+        call blockFilterXYZ_vct( params, hvy_block(:,:,:,:, hvy_id), u_filtered, stencil(-a:+a), -a, +a)
+        hvy_block(:,:,:,:, hvy_id) = u_filtered
+
     enddo
-
 end subroutine filter_wrapper

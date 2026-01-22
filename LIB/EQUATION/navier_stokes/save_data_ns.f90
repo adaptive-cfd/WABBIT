@@ -43,7 +43,7 @@
     integer(kind=ik)             ::  nvar, k
     integer(kind=ik), dimension(3) :: Bs
     ! variable name
-    character(len=80)            :: name
+    character(len=cshort)            :: name
 
 
     Bs(1) = size(u,1) - 2*g
@@ -52,7 +52,7 @@
     nvar = params_ns%n_eqn  ! number of variables describing the state of the fluid
     ! allocate temporary field
     if ( .not. allocated(tmp_u) ) call allocate_statevector_ns(tmp_u,Bs,g)
-    
+
     tmp_u  = u(:,:,:,:)
     work(:,:,:,1:nvar)=u
     if ( .not. ALL(params_ns%periodic_BC)) then
@@ -73,20 +73,14 @@
     if (  list_contains_name(params_ns%names,'vortx')>0 .or. &
           list_contains_name(params_ns%names,'vort') >0 ) then
       if ( .not. allocated(vort) ) allocate(vort(size(u,1),size(u,2),size(u,3),3))
-      call compute_vorticity(tmp_u(:,:,:,UxF), tmp_u(:,:,:,UyF), tmp_u(:,:,:,UzF), &
+      ! JB comment: compute_vorticity expects a 4D array, so we have to pass the full state vector
+      ! I assume here that UyF = UxF+1 and UzF = UxF+2
+      if (Uyf /= UxF+1 .or. (params_ns%dim == 3 .and. Uzf /= UxF+2)) then
+        call abort(250703, 'ERROR: UyF and UzF do not match the expected indices for vorticity computation, these should be UxF+1 and UxF+2.')
+      end if
+      call compute_vorticity(tmp_u(:,:,:,UxF:UxF+2), &
                             dx, Bs, g, params_ns%discretization, vort)
     end if
-
-    ! +++++++++++++++++
-    ! compute filter strength
-    ! +++++++++++++++++
-    if (params_ns%filter%name=="bogey_shock" .and. params_ns%filter%save_filter_strength ) then
-      if ( .not. allocated(sigma) ) allocate(sigma(size(u,1),size(u,2),size(u,3),3))
-      work(:,:,:,1:nvar)=u
-      tmp_u=u
-      call filter_block(params_ns%filter, time, tmp_u, g, Bs, x0, dx, work)
-      sigma(:,:,:,1:params_ns%dim)=work(:,:,:,nvar+1:nvar+params_ns%dim)
-    endif
 
     ! +++++++++++++++++++++++++++++++++
     ! compute mask and reference values
@@ -131,7 +125,7 @@
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=80), intent(out) :: name
+    character(len=cshort), intent(out) :: name
 
     if (allocated(params_ns%names)) then
       name = params_ns%names(N)

@@ -1,24 +1,19 @@
 !> \brief Get the time step according to the conditions of the physics module
-!> \details
-!> \author sm
-!> \date 18/04/17 - create
-!> \date 03/09/18 - removed unused variables (P.Krah) commit 0b79d945422eedda70fa5f874cd2889a10ef8287
-subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, hvy_n, lgt_block, lgt_active, lgt_n, dt )
+subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID )
 
     use module_physics_metamodule, only : GET_DT_BLOCK_meta
 
     !--------------------------------------------------------------
     implicit none
-    type (type_params), intent(in):: params                    !< user defined parameter structure
-    real(kind=rk), intent(in)     :: time                      !< current time of the simulation
-    integer(kind=ik), intent(in)  :: iteration
-    real(kind=rk), intent(in)     :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
-    integer(kind=ik), intent(in)  :: hvy_active(:),hvy_n       !< list of active blocks (heavy data) and number of active blocks
-    integer(kind=ik), intent(in)  :: lgt_block(:, :),lgt_active(:),lgt_n!< light data array,active list, number of active blocks
-    real(kind=rk), intent(out)    :: dt                         !< time step dt
+    type (type_params), intent(inout) :: params                    !< user defined parameter structure
+    real(kind=rk), intent(in)         :: time                      !< current time of the simulation
+    integer(kind=ik), intent(in)      :: iteration
+    real(kind=rk), intent(in)         :: hvy_block(:, :, :, :, :)  !< heavy data array contains the block data of the statevector
+    integer(kind=ik), intent(in)      :: tree_ID
+    real(kind=rk), intent(out)        :: dt                         !< time step dt
     !--------------------------------------------------------------
     ! MPI error variable
-    integer(kind=ik) :: ierr, Jmax, k, lgt_id
+    integer(kind=ik) :: ierr, Jmax, k, lgt_id, hvy_id
     reaL(kind=rk ) :: ddx(1:3), xx0(1:3), dt_tmp
 
     dt = 9.0e9_rk
@@ -30,17 +25,18 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
       ! --------------------------------------------------------------------------
       ! physics module restrictions on time step
       ! --------------------------------------------------------------------------
-      do k = 1, hvy_n
+      do k = 1, hvy_n(tree_ID)
+          hvy_id = hvy_active(k, tree_ID)
           ! as the local CFL condition depends on the blocks, we give the routine
           ! the block grid (origin/spacing)
-          call hvy_id_to_lgt_id(lgt_id, hvy_active(k), params%rank, params%number_blocks)
-          call get_block_spacing_origin( params, lgt_id, lgt_block, xx0, ddx )
+          call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+          call get_block_spacing_origin( params, lgt_id, xx0, ddx )
 
           ! physics modules dictate some restrictions due to CFL conditions, penalization
           ! or other operators. Everything that is physics-dependent goes here. it is
           ! computed for each block, then the minimum is used.
-          call GET_DT_BLOCK_meta( params%physics_type, time, iteration, hvy_block(:,:,:,:,hvy_active(k)), &
-              params%Bs,params%n_ghosts, xx0, ddx, dt_tmp)
+          call GET_DT_BLOCK_meta( params%physics_type, time, iteration, hvy_block(:,:,:,:,hvy_id), &
+              params%Bs,params%g, xx0, ddx, dt_tmp)
 
           dt = min( dt, dt_tmp )
       end do
@@ -78,6 +74,12 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, hvy_active, 
         end if
     end if
 
+    if ( params%time_statistics) then
+        ! time step should hit time_statistics_start_time exactly
+        if ( time+dt > params%time_statistics_start_time .and. time<params%time_statistics_start_time ) then
+            dt = params%time_statistics_start_time - time
+        end if
+    end if
 
     ! do not jump past final time
     if (time + dt > params%time_max .and. time<=params%time_max) dt = params%time_max - time

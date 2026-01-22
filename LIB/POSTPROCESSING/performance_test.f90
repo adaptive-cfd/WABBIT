@@ -2,53 +2,42 @@ subroutine performance_test(params)
     use mpi
     use module_helpers
     use module_MPI
-    ! global parameters
-    use module_params
-    ! timing module
+    use module_params           ! global parameters
     use module_timing
-    ! init data module
-    use module_initialization
-    ! mesh manipulation subroutines
-    use module_mesh
-    ! IO module
-    use module_IO
-    ! time step module
+    use module_mesh             ! mesh manipulation subroutines
     use module_time_step
-    ! unit test module
     use module_unit_test
-    ! bridge implementation of wabbit
-    use module_bridge_interface
-    use module_forest
-    use module_mask
+    use module_bridge_interface ! bridge implementation of wabbit
+    use module_forestMetaData
 
     implicit none
-    type (type_params), intent(inout)  :: params
+    type (type_params), intent(inout)   :: params
 
     ! perform 20 time steps per mesh.
-    integer, parameter :: N_timesteps = 15
-    integer, parameter :: N_grids = 50
-    real(kind=rk), parameter :: target_grid_density = 0.11
+    integer, parameter                  :: N_timesteps = 15
+    integer, parameter                  :: N_grids = 50
+    real(kind=rk), parameter            :: target_grid_density = 0.11
 
     integer(kind=ik)                    :: number_procs, ierr, rank
     real(kind=rk)                       :: t0_timesteps(1:N_timesteps)
 
-    integer(kind=ik), allocatable       :: lgt_block(:, :)
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
     real(kind=rk), allocatable          :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable          :: hvy_tmp(:, :, :, :, :)
-    integer(kind=ik), allocatable       :: hvy_neighbor(:,:)
-    integer(kind=tsize), allocatable    :: lgt_sortednumlist(:, :, :)
-    integer(kind=ik), allocatable       :: lgt_active(:, :)
-    integer(kind=ik), allocatable       :: lgt_n(:)
-    integer(kind=ik), allocatable       :: hvy_active(:, :)
-    integer(kind=ik), allocatable       :: hvy_n(:)
 
     real(kind=rk)                       :: time = 0.0_rk
     integer(kind=ik)                    :: iteration = 0
-    character(len=80)                   :: filename
-    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, tree_N, lgt_n_tmp, j, a
+    character(len=cshort)                   :: filename
+    integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, j, a
     real(kind=rk)                       :: t0, dt, t4
+    logical :: error_OOM
+
+    ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
+    ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
+    ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
+    ! the subroutine calls, and it is easier to include new variables (without having to pass them through from main
+    ! to the last subroutine.)  -Thomas
 
     call disable_all_t_files_output()
 
@@ -65,26 +54,29 @@ subroutine performance_test(params)
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active, &
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_mask, hvy_n, lgt_n)
+    call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_work=hvy_work, hvy_mask=hvy_mask)
+
 
     ! reset the grid: all blocks are inactive and empty
-    call reset_tree( params, lgt_block, lgt_active(:,tree_ID_flow), &
-    lgt_n(tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), &
-    lgt_sortednumlist(:,:,tree_ID_flow), .true., tree_ID=tree_ID_flow )
+    call reset_tree( params, .true., tree_ID=tree_ID_flow )
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
+    ! Test is as follows:
+    ! 1 Create a random grid with given density
+    ! 2 perform N_timesteps times: (for statistical results)
+    !   2.1 Refine everywhere
+    !   2.2 Evolve in time
+    !   2.3 Coarsen everhwyere
+    !
 
     params%max_grid_density = target_grid_density / real(N_grids)
 
     do a = 1, N_grids
 
-        call create_random_grid( params, lgt_block, hvy_block, hvy_tmp, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-        lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow),&
-        Jmin=1, verbosity=.true., iterations=10, tree_ID=tree_ID_flow )
+        call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=1, verbosity=.true., iterations=10, tree_ID=tree_ID_flow )
 
         ! on the grid, set some random data
         do k = 1, hvy_n(tree_ID_flow)
@@ -97,13 +89,12 @@ subroutine performance_test(params)
             t0 = MPI_wtime()
             ! refine everywhere
             t4 = MPI_wtime()
-            if ( params%adapt_mesh ) then
-                call sync_ghosts( params, lgt_block, hvy_block, hvy_neighbor, hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow) )
+            if ( params%adapt_tree ) then
+                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-                call refine_mesh( params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow), &
-                lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), hvy_n(tree_ID_flow), "everywhere", tree_ID=tree_ID_flow )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM )
             endif
-            call toc( "TOPLEVEL: refinement", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: refinement", 10, MPI_wtime()-t4)
             Nblocks_rhs = lgt_n(tree_ID_flow)
 
 
@@ -111,20 +102,17 @@ subroutine performance_test(params)
             ! before adapting the grid again
             do it = 1, params%N_dt_per_grid
                 t4 = MPI_wtime()
-                call time_stepper( time, dt, iteration, params, lgt_block, hvy_block, hvy_work, hvy_mask, hvy_tmp, hvy_neighbor, &
-                hvy_active, hvy_n, lgt_active, lgt_n, lgt_sortednumlist )
-                call toc( "TOPLEVEL: time stepper", MPI_wtime()-t4)
+                call timeStep_tree( time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID=tree_ID_flow )
+                call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
             enddo
 
             ! Adapt mesh (coarsening where possible)
             t4 = MPI_wtime()
-            if ( params%adapt_mesh ) then
+            if ( params%adapt_tree ) then
                 ! actual coarsening
-                call adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active(:,tree_ID_flow), &
-                lgt_n(tree_ID_flow), lgt_sortednumlist(:,:,tree_ID_flow), hvy_active(:,tree_ID_flow), &
-                hvy_n(tree_ID_flow), tree_ID_flow, "everywhere", hvy_tmp, external_loop=.true. )
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, "everywhere", hvy_tmp )
             endif
-            call toc( "TOPLEVEL: adapt mesh", MPI_wtime()-t4)
+            call toc( "TOPLEVEL: adapt mesh", 13, MPI_wtime()-t4)
             Nblocks = lgt_n(tree_ID_flow)
 
             t0_timesteps(j) = MPI_wtime() - t0
@@ -137,8 +125,8 @@ subroutine performance_test(params)
             Nblocks_rhs, Nblocks, &
             dble(params%number_procs)*sum(t0_timesteps) / dble(N_timesteps) / (dble(Nblocks_rhs)*product(params%Bs-1)), &
             params%number_procs, size(lgt_block, 1), params%max_grid_density, &
-            min_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) ), &
-            max_active_level( lgt_block, lgt_active(:,tree_ID_flow), lgt_n(tree_ID_flow) )
+            minActiveLevel_tree(tree_ID_flow), &
+            maxActiveLevel_tree(tree_ID_flow)
         endif
 
         call summarize_profiling( WABBIT_COMM )
@@ -148,6 +136,5 @@ subroutine performance_test(params)
     enddo
 
 
-    call deallocate_grid(params, lgt_block, hvy_block, hvy_neighbor, lgt_active,&
-        hvy_active, lgt_sortednumlist, hvy_work, hvy_tmp, hvy_n, lgt_n )
+    call deallocate_forest(params, hvy_block, hvy_work, hvy_tmp)
 end subroutine

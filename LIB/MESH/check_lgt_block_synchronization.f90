@@ -1,48 +1,22 @@
-!> \file
-!> \callgraph
-! ********************************************************************************************
-! WABBIT
-! ============================================================================================
-!> \name check_lgt_block_synchronization.f90
-!> \version 0.4
-!> \author msr
-!
 !> \brief debug lgt_block data
-!
-!>
 !!  proc 0 gather all data and compare the data to his own light data \n
 !!
 !!  is currently unused, very helpful routine for development of block structures, lgt/hvy data
 !!
 !! input:    - params, light data \n
 !! output:   - status of lgt_block synchronzation \n
-!!
-!!
-!! = log ======================================================================================
-!! \n
-!! 29/11/16 - create
 ! ********************************************************************************************
 
-subroutine check_lgt_block_synchronization( params, lgt_block)
-    !---------------------------------------------------------------------------------------------
+subroutine check_lgt_block_synchronization( params )
     implicit none
 
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)     :: lgt_block(:, :)
-
     ! local light data array
     integer(kind=ik)                    :: my_lgt_block( size(lgt_block,1) , size(lgt_block,2)), lgt_block_0( size(lgt_block,1) , size(lgt_block,2))
+    integer(kind=ik)                    :: ierr                                 ! MPI error variable
+    integer(kind=ik)                    :: k, l, lgt_start, a                   ! loop variables
+    integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)      ! lgt data
 
-    ! MPI error variable
-    integer(kind=ik)                    :: ierr
-    ! loop variables
-    integer(kind=ik)                    :: k, l, lgt_start, a
-    ! lgt data
-    integer(kind=ik), allocatable, save :: lgt_all(:,:,:), lgt_all2(:,:,:)
-
-    !---------------------------------------------------------------------------------------------
 
     if (.not. allocated(lgt_all)) Then
         allocate(lgt_all(1:params%number_procs, size(lgt_block,1), size(lgt_block,2)))
@@ -80,12 +54,9 @@ end subroutine check_lgt_block_synchronization
 
 
 
-subroutine write_lgt_data(params, lgt_block, file)
+subroutine write_lgt_data(params, file)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(in)     :: lgt_block(:, :)
     character(len=*), intent(in) :: file
     integer(kind=ik) :: k
 
@@ -101,12 +72,9 @@ end subroutine
 
 
 
-subroutine read_lgt_data(params, lgt_block, file)
+subroutine read_lgt_data(params, file)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: lgt_block(:, :)
     character(len=*), intent(in) :: file
     integer(kind=ik) :: num_lines, num_cols
 
@@ -115,16 +83,12 @@ end subroutine
 
 
 
-subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
+! This function works, but better use write_neighborhood_info(hvy_neighbor, dim) and loop over all heavy data as it is more descriptive
+subroutine write_neighbors(params, file, tree_ID)
     implicit none
-    !> user defined parameter structure
     type (type_params), intent(in)      :: params
-    !> light data array
-    integer(kind=ik), intent(inout)     :: hvy_neighbor(:,:)
     integer(kind=ik) , allocatable, save :: tmp(:,:), tmp2(:,:)
-    integer(kind=ik), intent(in)     :: hvy_active(:)
-    !> number of active blocks (heavy data)
-    integer(kind=ik), intent(in)     :: hvy_n
+    integer(kind=ik), intent(in) :: tree_ID
     character(len=*), intent(in) :: file
     integer(kind=ik) :: k, lgt_start, rank, lgt_id, N
 
@@ -135,9 +99,9 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
 
     tmp = 0
 
-    do k = 1, hvy_n
-        call hvy_id_to_lgt_id( lgt_id, hvy_active(k), params%rank, params%number_blocks )
-        tmp(lgt_id,:) = hvy_neighbor(hvy_active(k),:)
+    do k = 1, hvy_n(tree_ID)
+        call hvy2lgt( lgt_id, hvy_active(k,tree_ID), params%rank, params%number_blocks )
+        tmp(lgt_id,:) = hvy_neighbor(hvy_active(k,tree_ID),:)
     enddo
 
     call MPI_Allreduce(tmp, tmp2, size(tmp), MPI_INTEGER4, MPI_SUM, WABBIT_COMM, k)
@@ -146,7 +110,7 @@ subroutine write_neighbors(params, hvy_active, hvy_n, hvy_neighbor, file)
 
     open(14, file=file, status='replace')
     do k = 1, size(tmp2,1)
-        write(14,'(75(i6,1x))') tmp2(k,:)
+        write(14,'(178(i6,1x))') tmp2(k,:)
     enddo
     close(14)
 end subroutine

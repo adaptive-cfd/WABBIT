@@ -1,15 +1,7 @@
-
-!-----------------------------------------------------------------
-!> Implementation of simple penalized geometries (cylinder,triangle,rhombus)
-!> \details
-!> \version 23.2.2018
-!> \author P.Krah
-!-----------------------------------------------------------------
-
 module module_simple_geometry
 
   use module_navier_stokes_params
-  use module_precision
+  use module_globals
   use module_ini_files_parser_mpi
   use module_ns_penalization
   use module_helpers
@@ -24,11 +16,9 @@ module module_simple_geometry
   ! make everything private if not explicitly marked public
   PRIVATE
   !**********************************************************************************************
-  character(len=80),save  :: MASK_GEOMETRY
+  character(len=cshort),save  :: MASK_GEOMETRY
   logical,save            :: FREE_OUTLET_WALL=.false.
     !------------------------------------------------
-  !> \file
-  !> \details
   !> Available mask geometrys
   !! ------------------------
   !!
@@ -55,8 +45,6 @@ module module_simple_geometry
       real(kind=rk) :: rho_left,u_left,p_left
       real(kind=rk) :: rho_right,u_right,p_right
   end type type_shock_params
-
-
 
   !------------------------------------------------
   type(type_cylinder) , save :: cyl
@@ -288,7 +276,6 @@ end subroutine geometry_penalization2D
 
 
 
-
 !==========================================================================
 subroutine draw_geometry(x0, dx, Bs, g, mask)
     implicit none
@@ -310,8 +297,6 @@ subroutine draw_geometry(x0, dx, Bs, g, mask)
 
 end subroutine draw_geometry
 !==========================================================================
-
-
 
 
 
@@ -354,7 +339,6 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
 
 end subroutine draw_cylinder
 !==========================================================================
-
 
 
 
@@ -414,9 +398,6 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
    end do
 end subroutine draw_triangle
 !==========================================================================
-
-
-
 
 
 end module module_simple_geometry

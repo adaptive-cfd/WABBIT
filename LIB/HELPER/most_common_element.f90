@@ -1,21 +1,10 @@
-!> \brief from a list returns the most common element
-!
-!> \details
-!! input:    - list of integers \n
-!! output:   - most common element from list \n
-!! \author mtriebeck
-!! \date 18/9/18 - create
-! ********************************************************************************************
-
 function most_common_element( list )
 
   implicit none
 
-  !> input list of integers
-  integer(kind=ik), intent(in) :: list(:)
-  !> array of acummulated number of each element in list
-  integer(kind=ik) :: list_quantity(size(list))
-  integer(kind=ik) :: max_element_pos, i, j, N, most_common_element
+  integer(kind=ik), intent(in)  :: list(:)                      !> input list of integers
+  integer(kind=ik)              :: list_quantity(size(list))    !> array of acummulated number of each element in list
+  integer(kind=ik)              :: max_element_pos, i, j, N, most_common_element
 
   N = size(list)
 

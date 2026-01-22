@@ -1,8 +1,3 @@
-
-!--------------------------------------------------------------------------------------------------------------------------------------------------------
-!> \file
-!> \brief Right hand side for 2D navier stokes equation
-!>        ---------------------------------------------
 !> The right hand side of navier stokes in the skew symmetric form is implemented as follows:
 !>\f{eqnarray*}{
 !!     \partial_t \sqrt{\rho} &=& -\frac{1}{2J\sqrt{\rho}} \nabla \cdot (\rho \vec{u})-\frac{1}{\sqrt{\rho}}\frac{1}{C_{\rm SP} } (\rho-\rho^{\rm SP}) \\
@@ -23,54 +18,31 @@
 !!                                            \right]   -\frac{\gamma-1}{C_{\rm SP} } (p-p^{\rm SP})
 !!                                             -\frac{\chi}{C_\eta} (p -\rho R_s T)
 !!\f}
-!> \version 0.5
-!! \date 08/12/16 - create \n
-!!  \date 13/2/18 - include mask and sponge terms (commit 1cf9d2d53ea76e3fa52f887d593fad5826afec88)
-!> \author msr
 !--------------------------------------------------------------------------------------------------------------------------------------------------------
 
-!>\brief main function of RHS_2D_navier_stokes
 subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
-!---------------------------------------------------------------------------------------------
-!
     implicit none
 
-    !> grid parameter
-    integer(kind=ik), intent(in)                            :: g
+    integer(kind=ik), intent(in)                            :: g                !> grid parameter
     integer(kind=ik), dimension(3), intent(in)              :: Bs
-    !> origin and spacing of the block
-    real(kind=rk), dimension(2), intent(in)                 :: x0, delta_x
-    !> datafields
-    real(kind=rk), intent(in)                               :: phi(:, :, :)
-    !> rhs array
-    real(kind=rk), intent(inout)                            :: rhs(:, :, :)
-    ! adiabatic coefficient
-    real(kind=rk)                                           :: gamma_
-    ! specific gas constant
-    real(kind=rk)                                           :: Rs_inv
-    ! isochoric heat capacity
-    real(kind=rk)                                           :: Cv
-    ! isobaric heat capacity
-    real(kind=rk)                                           :: Cp
-    ! prandtl number
-    real(kind=rk)                                           :: Pr
-    ! dynamic viscosity
-    real(kind=rk)                                           :: mu0, mu_d, mu, lambda
-    ! dissipation switch
-    logical                                                 :: dissipation
-    ! spacing
-    real(kind=rk)                                           :: dx, dy
-
+    real(kind=rk), dimension(2), intent(in)                 :: x0, delta_x      !> origin and spacing of the block
+    real(kind=rk), intent(in)                               :: phi(:, :, :)     !> datafields
+    real(kind=rk), intent(inout)                            :: rhs(:, :, :)     !> rhs array
+    real(kind=rk)                                           :: gamma_           ! adiabatic coefficient
+    real(kind=rk)                                           :: Rs_inv           ! specific gas constant
+    real(kind=rk)                                           :: Cv               ! isochoric heat capacity
+    real(kind=rk)                                           :: Cp               ! isobaric heat capacity
+    real(kind=rk)                                           :: Pr               ! prandtl number
+    real(kind=rk)                                           :: mu0, mu_d, mu, lambda  ! dynamic viscosity
+    logical                                                 :: dissipation      ! dissipation switch
+    real(kind=rk)                                           :: dx, dy           ! spacing
     ! variables
     real(kind=rk)                                           :: rho(Bs(1)+2*g, Bs(2)+2*g), u(Bs(1)+2*g, Bs(2)+2*g), v(Bs(1)+2*g, Bs(2)+2*g), p(Bs(1)+2*g, Bs(2)+2*g), T(Bs(1)+2*g, Bs(2)+2*g), &
                                                                tau11(Bs(1)+2*g, Bs(2)+2*g), tau22(Bs(1)+2*g, Bs(2)+2*g), tau33(Bs(1)+2*g, Bs(2)+2*g), tau12(Bs(1)+2*g, Bs(2)+2*g)
     ! dummy field
     real(kind=rk)                                           :: dummy(Bs(1)+2*g, Bs(2)+2*g), dummy2(Bs(1)+2*g, Bs(2)+2*g), dummy3(Bs(1)+2*g, Bs(2)+2*g), dummy4(Bs(1)+2*g, Bs(2)+2*g)
-
-
     ! inverse sqrt(rho) field
     real(kind=rk)                                           :: phi1_inv(Bs(1)+2*g, Bs(2)+2*g)
-
     ! loop variables
     integer(kind=ik)                                        :: i, j,n_eqn
     ! inverse sqrt(rho) field
@@ -83,9 +55,6 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     ! - use multiplication instead of division
     ! - access array in column-major order
     ! - reduce number of additionaly variables -> lead to direct calculation of rhs terms after derivation
-
-!---------------------------------------------------------------------------------------------
-! variables initialization
 
     ! set physics parameters for readability
     gamma_      = params_ns%gamma_
@@ -123,9 +92,6 @@ subroutine RHS_2D_navier_stokes_periodic( g, Bs, x0, delta_x, phi, rhs)
     ! discretization constant
     dx = delta_x(1)
     dy = delta_x(2)
-
-!---------------------------------------------------------------------------------------------
-! main body
 
     ! derivatives
     ! u_x, u_y

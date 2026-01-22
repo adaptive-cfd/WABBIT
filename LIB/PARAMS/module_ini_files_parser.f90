@@ -47,7 +47,7 @@ module module_ini_files_parser
 
     ! the generic call "read_param" redirects to these routines, depending on the data
     ! type and the dimensionality. vectors can be read without setting a default.
-    interface read_param
+    interface read_param 
         module procedure param_sgl, param_dbl, param_int, param_vct, param_str, &
             param_bool, param_vct_str, param_vct_bool, param_matrix
         end interface
@@ -77,7 +77,7 @@ module module_ini_files_parser
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("INFO: reading ",i7," lines with ",i7," colums from ",A)') nlines, ncols, file
 
             ! set up format string
@@ -91,17 +91,17 @@ module module_ini_files_parser
             do while (io_error==0)
                 ! read a line from file
                 read (14,'(A)',iostat=io_error) dummy
+
                 i = i + 1
                 ! if we're past the header AND the read worked (i.e. not end of file)
                 if (i > n_header .and. io_error==0) then
-                    read(dummy,*) array(i-n_header,:)
-                    !        write(*,fmt) array(i-n_header,:)
+                    read(dummy,*,iostat=io_error) array(i-n_header,:)
                 endif
             enddo
             close (14)
 
             write(*,'("Done reading.")')
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
 
         end subroutine read_array_from_ascii_file
 
@@ -120,7 +120,7 @@ module module_ini_files_parser
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
             write(*,'("INFO: reading ",i5," lines with ",i3," colums from ",A)') nlines, ncols, file
 
             ! set up format string
@@ -144,7 +144,7 @@ module module_ini_files_parser
             close (14)
 
             write(*,'("Done reading.")')
-            write(*,'(80("-"))')
+            write(*,'(80("─"))')
         end subroutine read_intarray_from_ascii_file
 
 
@@ -257,8 +257,7 @@ module module_ini_files_parser
             ! check if the specified file exists
             inquire ( file=file, exist=exists )
             if ( exists .eqv. .false.) then
-                write (*,'("ERROR! file: ",A," not found")') trim(adjustl(file))
-                call abort(300320201, "INIFILES: File not found!")
+                call abort(300320201, "INIFILES ERROR: Ini-file not found! " // trim(adjustl(file)) )
             endif
 
             ! we set the module-global variable verbosity. if set to false, all routines
@@ -359,7 +358,7 @@ module module_ini_files_parser
                     params_real = params_real*dx
                     write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
                     if ( lattice_spacing_set .eqv. .false.) then
-                        call abort(300320201, "INIFILES: ERROR: you try to read relative values without setting dx first.")
+                        call abort(300320201, "INIFILES ERROR: you try to read relative values without setting dx first.")
                     endif
                 endif
             else
@@ -370,7 +369,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_dbl
 
@@ -409,7 +408,7 @@ module module_ini_files_parser
                     write (value,'(g10.3,"(=",g10.3,"*dx)")') params_real, params_real/dx
 
                     if ( lattice_spacing_set .eqv. .false.) then
-                        call abort(03030303, "INIFILES:  ERROR: you try to read relative values without setting dx first.")
+                        call abort(03030303, "INIFILES ERROR: you try to read relative values without setting dx first.")
                     endif
 
                 endif
@@ -421,7 +420,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_sgl
 
@@ -436,7 +435,7 @@ module module_ini_files_parser
         ! Output:
         !       params_string: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
-        subroutine param_str (PARAMS, section, keyword, params_string, defaultvalue)
+        subroutine param_str (PARAMS, section, keyword, params_string, defaultvalue, check_file_exists)
             implicit none
 
             ! Contains the ascii-params file
@@ -446,6 +445,9 @@ module module_ini_files_parser
             character(len=maxcolumns)  value    ! returns the value
             character(len=*), intent (inout) :: params_string
             character(len=*), intent (in) :: defaultvalue
+            logical, optional, intent(in) :: check_file_exists
+
+            logical :: exists
 
             call GetValue(PARAMS, section, keyword, value)
 
@@ -456,9 +458,19 @@ module module_ini_files_parser
                 params_string = defaultvalue
             endif
 
+            ! sometimes we read in file-names. If the file is not there, then quirky things happen, so lets check that here
+            if (present(check_file_exists)) then
+                if (check_file_exists) then
+                    ! check if the specified file exists
+                    inquire ( file=params_string, exist=exists )
+                    call abort(250922, "INIFILES ERROR: File was not found! "// &
+                        trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_string)) )
+                endif
+            endif
+
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_str
 
@@ -495,9 +507,6 @@ module module_ini_files_parser
 
             if ( present(defaultvalue) ) then
                 m = size(defaultvalue,1)
-                if (n/=m) then
-                    write(*,*) "error: vector and default value are not of the same length"
-                endif
             endif
 
             write(formatstring,'("(",i3.3,"(g10.3,1x))")') n
@@ -508,28 +517,28 @@ module module_ini_files_parser
                 ! read the n values from the vector string
                 read (value, *, iostat=iostat) params_vector
                 if (iostat /= 0) then
-                    write(*,*) "ERROR! The vector we try to read from "//trim(adjustl(section))//"::"//trim(adjustl(keyword))
-                    write(*,*) "does NOT have the right length (expected::",n,")"
-                    call abort(3003209, "INIFILES: vector has incompatible length!")
+                    write(value,'(A, I0, A)') "INIFILES ERROR: Vector " // trim(adjustl(section))//"::"//trim(adjustl(keyword))//" has incompatible length! (expected ",n," )"
+                    call abort(250922, trim(value))
                 endif
                 write (value, formatstring) params_vector
             else
-                if (present(defaultvalue)) then
+                if (present(defaultvalue) .or. n==m) then
                     ! return default
                     write (value,formatstring) defaultvalue
                     value = trim(adjustl(value))//" (default!)"
                     params_vector = defaultvalue
                 else
                     ! return zeros
-                    params_vector = 0.d0
+                    params_vector = 0.0_rk
                     write (value,formatstring) params_vector
-                    value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
+                    if (.not. present(defaultvalue)) value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
+                    if (n/=m) value = trim(adjustl(value))//" (RETURNING ZEROS - DEFAULT HAS WRONG LENGTH!)"
                 endif
             endif
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section), trim(keyword), adjustl(trim(value))
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_vct
 
@@ -546,7 +555,7 @@ module module_ini_files_parser
         !! Output:
         !!       params_string: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
-        subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue)
+        subroutine param_vct_str (PARAMS, section, keyword, params_vector, defaultvalue, check_file_exists)
             implicit none
             ! Contains the ascii-params file
             type(inifile), intent(inout)    :: PARAMS
@@ -554,37 +563,71 @@ module module_ini_files_parser
             character(len=*), intent(in)    :: keyword ! what keyword do you look for? for example nx=128
             character(len=*), intent (inout) :: params_vector(1:)
             character(len=*), intent (in) :: defaultvalue(1:)
+            logical, optional, intent(in) :: check_file_exists
 
-            integer :: n,m
+            integer :: n,m,iostat
             character(len=maxcolumns) :: value
-            character(len=14)::formatstring
+            logical :: exists
 
             n = size(params_vector,1)
             m = size(defaultvalue,1)
             if (n==0) return
 
-            if (n/=m) then
-                write(*,*) "error: vector and default value are not of the same length"
-            endif
-
-            write(formatstring,'("(",i2.2,"(g8.3,1x))")') n
-
             call GetValue(PARAMS, section, keyword, value)
 
             if (value .ne. '') then
-                ! read the three values from the vector string
-                read (value, *) params_vector
-                write (value,formatstring) params_vector
+                ! read the values from the vector string
+                read (value, *, iostat=iostat) params_vector
+                if (iostat /= 0) then
+                    write(value,'(A, I0, A)') "INIFILES ERROR: Vector " // trim(adjustl(section))//"::"//trim(adjustl(keyword))//" has incompatible length! (expected ",n," )"
+                    call abort(250922, trim(value))
+                endif
+                ! Build trimmed value string manually
+                value = ''
+                do n = 1, size(params_vector)
+                    if (n == 1) then
+                        value = trim(params_vector(n))
+                    else
+                        value = trim(value) // ' ' // trim(params_vector(n))
+                    endif
+                enddo
                 !params_vector = value
             else
-                write (value,formatstring) defaultvalue
+                if (n/=m) then
+                    call abort(250922, "INIFILES ERROR: Trying to set default, but vector and default value are not of the same length")
+                endif
+
+                ! Build trimmed default value string manually
+                value = ''
+                do n = 1, size(defaultvalue)
+                    if (n == 1) then
+                        value = trim(defaultvalue(n))
+                    else
+                        value = trim(value) // ' ' // trim(defaultvalue(n))
+                    endif
+                enddo
                 value = trim(adjustl(value))//" (default!)"
                 params_vector = defaultvalue
             endif
 
+            ! check for each entry in params_vector if the file exists, in case that is required
+            if (present(check_file_exists)) then
+                if (check_file_exists) then
+                    do n = 1, size(params_vector)
+                        ! check if the specified file exists
+                        inquire ( file=params_vector(n), exist=exists )
+                        if (.not. exists) then
+                            write(value,'(A, I0, A)') "INIFILES ERROR: File ", n, " was not found! "// &
+                                trim(adjustl(section))//"::"//trim(adjustl(keyword)) //" = "//trim(adjustl(params_vector(n)))
+                            call abort(250922, value)
+                        endif
+                    enddo
+                endif
+            endif
+
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_vct_str
 
@@ -622,7 +665,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_int
 
@@ -666,7 +709,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_bool
 
@@ -702,9 +745,6 @@ module module_ini_files_parser
             if (n==0) return
 
             m = size(defaultvalue,1)
-            if (n/=m) then
-                write(*,*) "error: vector and default value are not of the same length"
-            endif
 
             write(formatstring,'("(",i2.2,"(L1,1x))")') n
 
@@ -733,6 +773,9 @@ module module_ini_files_parser
                 end do
                 write (value,formatstring) params_vector
             else
+                if (n/=m) then
+                    call abort(250922, "INIFILES ERROR: Trying to set default, but vector and default value are not of the same length")
+                endif
                 write (value,formatstring) defaultvalue
                 value = trim(value)//" (default!)"
                 params_vector = defaultvalue
@@ -740,7 +783,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write (*,FORMAT1) trim(section),trim(keyword),adjustl(trim(value))
+                write (*,FORMAT1) trim(section),trim(keyword),trim(adjustl(value))
             endif
         end subroutine param_vct_bool
 
@@ -754,7 +797,7 @@ module module_ini_files_parser
         !       keyword: the keyword we're looking for
         !       defaultvalue: if the we can't find the parameter, we return this and warn
         ! Output:
-        !       params_int: this is the parameter you were looking for
+        !       params_matrix: this is the parameter you were looking for
         !-------------------------------------------------------------------------------
         subroutine param_matrix(PARAMS, section, keyword, matrix, defaultvalue)
             implicit none
@@ -775,7 +818,7 @@ module module_ini_files_parser
             value = ''
 
             if (allocated(matrix)) then
-                call abort(030320207, "INIFILES: ERROR: matrix already allocated")
+                call abort(030320207, "INIFILES ERROR: matrix already allocated")
             end if
 
             !-- loop over the lines of PARAMS.ini file
@@ -814,15 +857,19 @@ module module_ini_files_parser
                     ! 9 9 9 9/);
 
                     ! does this line contain the beginning of the keyword we're looking for ?
-                    if (index(line, keyword//'=(/')==1) then
-                        ! yes, it does.
-                        index1 = index( line, '=(/')+3
+                    if (index(line, keyword)==1) then
+                        ! in the rare case that we only want to write a one-line matrix, we also accept that (/ ... /) are not present
+                        if (index(line, '=(/')==0) then
+                            index1 = index( line, '=')+1
+                        else
+                            index1 = index( line, '=(/')+3
+                        endif
                         index2 = len_trim( line )
                         ! remove spaces between (/     and values
                         value = adjustl(line(index1:index2))
 
                         ! first we check how many columns we have, by looping over the first line
-                        ! containing the =(/ substring
+                        ! containing the =(/ or = substring
                         matrixcols = 1
                         do j = 1, len_trim(value)
                             ! count elements in the line by counting the separating spaces
@@ -832,18 +879,22 @@ module module_ini_files_parser
                         enddo
 
 
-                        ! now count lines in array, loop until you find /) substring (or = substring)
-                        matrixlines = 0
-                        do j = i, PARAMS%nlines
-                            matrixlines = matrixlines +1
-                            if (index(PARAMS%PARAMS(j),"/)") /= 0) then
-                                ! we found the terminal line of the matrix statement
-                                exit
-                            elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
-                                ! a = would mean we skipped past the matrix definition to the next variable..
-                                call abort(303020205, "INIFILES ERROR: you try to read relative values without setting dx first.")
-                            end if
-                        end do
+                        ! now count lines in array, loop until you find /) substring (or = substring), or if (//) not present, assume one line
+                        if (index(line, '=(/')==0) then
+                            matrixlines = 1
+                        else
+                            matrixlines = 0
+                            do j = i, PARAMS%nlines
+                                matrixlines = matrixlines +1
+                                if (index(PARAMS%PARAMS(j),"/)") /= 0) then
+                                    ! we found the terminal line of the matrix statement
+                                    exit
+                                elseif (index(PARAMS%PARAMS(j),"=") /= 0 .and. j>i) then
+                                    ! a = would mean we skipped past the matrix definition to the next variable..
+                                    call abort(303020205, "INIFILES ERROR: Did not find the correct end of the matrix.")
+                                end if
+                            end do
+                        endif
 
                         allocate( matrix(1:matrixlines,1:matrixcols) )
 
@@ -859,7 +910,12 @@ module module_ini_files_parser
                             if ( j == i ) then
                                 ! first line
                                 index1 = index(line2,"(/")+2
+                                ! handle case when for one line matrix (/ was omitted
+                                if (index(line2,"(/") == 0) index1 = index(line2,"=")+1
                                 index2 = len_trim(line2)
+                                ! handle case when for one line matrix /) was omitted
+                                if (index(line2,";") /= 0) index2 = index(line2,";")-1
+                                if (index(line2,"/)") /= 0) index2 = index(line2,"/)")-1
                             elseif (j == i+matrixlines-1) then
                                 ! last line
                                 index1 = 1
@@ -871,6 +927,7 @@ module module_ini_files_parser
                             endif
                             ! remove leading spaces, then read
                             value = adjustl(line2(index1:index2))
+                            ! write(*, '(A, A)') "Trying to read: ", trim(value)
                             read( value, * ) matrix(j-i+1,:)
                         enddo
 
@@ -891,7 +948,7 @@ module module_ini_files_parser
 
             ! in verbose mode, inform about what we did
             if (verbosity) then
-                write(*,'(" read [",A,"]",T30,A,T60,"as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
+                write(*,'("read [",A,"]",T30,A,T60,"as Matrix of size ",i4," x ",i4, a)') trim(section), trim(keyword), size(matrix,1) , size(matrix,2), trim(defaultmessage)
             end if
 
         end subroutine param_matrix
@@ -1087,7 +1144,7 @@ module module_ini_files_parser
                                 exit
                             elseif (index(line2, "=") /= 0 .and. j>i) then
                                 ! a = would mean we skipped past the matrix definition to the next variable..
-                                call abort(767626201, "INIFILES: ERROR: invalid ini matrix (closing characters not found!)" )
+                                call abort(767626201, "INIFILES ERROR: invalid ini matrix (closing characters not found!)" )
                             end if
                         end do
 

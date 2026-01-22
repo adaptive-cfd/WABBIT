@@ -1,139 +1,241 @@
 !> \brief compute vorticity for time step t (for saving it on disk)
-!
-!>\details
-!> \version 0.5
-!> \author sm
-!!\date 24/07/17 - create
-!
 ! ********************************************************************************************
-subroutine compute_vorticity(u, v, w, dx, Bs, g, discretization, vorticity)
-
-!---------------------------------------------------------------------------------------------
-! variables
+subroutine compute_vorticity(u, dx, Bs, g, discretization, vorticity)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
 
     implicit none
-    !> origin and spacing of the block
-    real(kind=rk), dimension(3), intent(in)        :: dx
-    !> local datafields
-    real(kind=rk), dimension(:,:,:), intent(in)    :: u, v, w
-    !> vorticity
+
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:,:), intent(in)  :: u                         !> local datafields
     real(kind=rk), dimension(:,:,:,:), intent(out) :: vorticity
     character(len=*), intent(in)                   :: discretization
-    !> grid parameters
-    integer(kind=ik), intent(in)                   :: g
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
     integer(kind=ik), dimension(3), intent(in)     :: Bs
     !> derivatives
     real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
-    !> inverse of dx, dy, dz
-    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv
-    ! loop variables
-    integer(kind=ik)                               :: ix, iy, iz
-    ! coefficients for Tam&Webb
-    real(kind=rk)                                  :: a(-3:3)
-!---------------------------------------------------------------------------------------------
-! variables initialization
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
+
+    !> parameters for FD1_l operator
+    real(kind=rk), allocatable, dimension(:) :: FD1_l
+    integer(kind=ik) :: FD1_ls, FD1_le
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+
 
     vorticity = 0.0_rk
-
-    ! Tam & Webb, 4th order optimized (for first derivative)
-    a = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, &
-        0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
 
     dx_inv = 1.0_rk / dx(1)
     dy_inv = 1.0_rk / dx(2)
 
-!---------------------------------------------------------------------------------------------
-! main body
-
     if (size(u,3)>2) then ! 3D case
         dz_inv = 1.0_rk / dx(3)
-        if (discretization == "FD_2nd_central" ) then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
-                        u_dy = (u(ix,iy+1,iz)-u(ix,iy-1,iz))*dy_inv*0.5_rk
-                        u_dz = (u(ix,iy,iz+1)-u(ix,iy,iz-1))*dz_inv*0.5_rk
-                        v_dx = (v(ix+1,iy,iz)-v(ix-1,iy,iz))*dx_inv*0.5_rk
-                        v_dz = (v(ix,iy,iz+1)-v(ix,iy,iz-1))*dz_inv*0.5_rk
-                        w_dx = (w(ix+1,iy,iz)-w(ix-1,iy,iz))*dx_inv*0.5_rk
-                        w_dy = (w(ix,iy+1,iz)-w(ix,iy-1,iz))*dy_inv*0.5_rk
 
-                        vorticity(ix,iy,iz,1) = w_dy - v_dz
-                        vorticity(ix,iy,iz,2) = u_dz - w_dx
-                        vorticity(ix,iy,iz,3) = v_dx - u_dy
-                    end do
-                 end do
-            end do
-        else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    do iz = g+1, Bs(3)+g
-                        u_dy = (a(-3)*u(ix,iy-3,iz) + a(-2)*u(ix,iy-2,iz) + &
-                            a(-1)*u(ix,iy-1,iz) + a(0)*u(ix,iy,iz)&
-                       +  a(+1)*u(ix,iy+1,iz) + a(+2)*u(ix,iy+2,iz) + &
-                       a(+3)*u(ix,iy+3,iz))*dy_inv
+        do iz = g+1, Bs(3)+g
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    u_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 1)) * dy_inv
+                    u_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 1)) * dz_inv
+                    v_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 2)) * dx_inv
+                    v_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 2)) * dz_inv
+                    w_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 3)) * dx_inv
+                    w_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 3)) * dy_inv
 
-                        u_dz = (a(-3)*u(ix,iy,iz-3) + a(-2)*u(ix,iy,iz-2) &
-                            + a(-1)*u(ix,iy,iz-1) + a(0)*u(ix,iy,iz)&
-                      +  a(+1)*u(ix,iy,iz+1) + a(+2)*u(ix,iy,iz+2) +&
-                      a(+3)*u(ix,iy,iz+3))*dz_inv
-
-                        v_dx = (a(-3)*v(ix-3,iy,iz) + a(-2)*v(ix-2,iy,iz) &
-                            + a(-1)*v(ix-1,iy,iz) + a(0)*v(ix,iy,iz)&
-                      +  a(+1)*v(ix+1,iy,iz) + a(+2)*v(ix+2,iy,iz) +&
-                      a(+3)*v(ix+3,iy,iz))*dx_inv
-
-                        v_dz = (a(-3)*v(ix,iy,iz-3) + a(-2)*v(ix,iy,iz-2) &
-                            + a(-1)*v(ix,iy,iz-1) + a(0)*v(ix,iy,iz)&
-                      +  a(+1)*v(ix,iy,iz+1) + a(+2)*v(ix,iy,iz+2) +&
-                      a(+3)*v(ix,iy,iz+3))*dz_inv
-
-                        w_dx = (a(-3)*w(ix-3,iy,iz) + a(-2)*w(ix-2,iy,iz)&
-                            + a(-1)*w(ix-1,iy,iz) + a(0)*w(ix,iy,iz)&
-                      +  a(+1)*w(ix+1,iy,iz) + a(+2)*w(ix+2,iy,iz) + &
-                      a(+3)*w(ix+3,iy,iz))*dx_inv
-                        w_dy = (a(-3)*w(ix,iy-3,iz) + a(-2)*w(ix,iy-2,iz)&
-                            + a(-1)*w(ix,iy-1,iz) + a(0)*w(ix,iy,iz)&
-                     +  a(+1)*w(ix,iy+1,iz) + a(+2)*w(ix,iy+2,iz) +&
-                     a(+3)*w(ix,iy+3,iz))*dy_inv
-
-                        vorticity(ix,iy,iz,1) = w_dy - v_dz
-                        vorticity(ix,iy,iz,2) = u_dz - w_dx
-                        vorticity(ix,iy,iz,3) = v_dx - u_dy
-                    end do
+                    vorticity(ix,iy,iz,1) = w_dy - v_dz
+                    vorticity(ix,iy,iz,2) = u_dz - w_dx
+                    vorticity(ix,iy,iz,3) = v_dx - u_dy
                 end do
             end do
-        else
-            write(*,*) "ERROR: discretization method in discretization is unknown"
-            write(*,*) discretization
-            call abort(19111, "ERROR: discretization method in discretization is unknown")
-        end if
+        end do
+
     else
-        if (discretization == "FD_2nd_central" ) then
+        do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    u_dy = (u(ix,iy+1,1)-u(ix,iy-1,1))*dy_inv*0.5_rk
-                    v_dx = (v(ix+1,iy,1)-v(ix-1,iy,1))*dx_inv*0.5_rk
-                    vorticity(ix,iy,1,1) = v_dx - u_dy
-                 end do
+                u_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, 1, 1)) * dy_inv
+                v_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, 1, 2)) * dx_inv
+
+                vorticity(ix,iy,1,1) = v_dx - u_dy
             end do
-        else if (discretization == "FD_4th_central_optimized") then
-            do ix = g+1, Bs(1)+g
-                do iy = g+1, Bs(2)+g
-                    u_dy = (a(-3)*u(ix,iy-3,1) + a(-2)*u(ix,iy-2,1) + &
-                        a(-1)*u(ix,iy-1,1) + a(0)*u(ix,iy,1)&
-                  +  a(+1)*u(ix,iy+1,1) + a(+2)*u(ix,iy+2,1) + a(+3)*u(ix,iy+3,1))*dy_inv
-                    v_dx = (a(-3)*v(ix-3,iy,1) + a(-2)*v(ix-2,iy,1) + &
-                        a(-1)*v(ix-1,iy,1) + a(0)*v(ix,iy,1)&
-                  +  a(+1)*v(ix+1,iy,1) + a(+2)*v(ix+2,iy,1) + a(+3)*v(ix+3,iy,1))*dx_inv
-                    vorticity(ix,iy,1,1) = v_dx - u_dy
-                end do
-            end do
-        else
-            write(*,*) "ERROR: discretization method in discretization is unknown"
-            write(*,*) discretization
-            call abort(19111, "ERROR: discretization method in discretization is unknown")
-        end if
+        end do
     end if
 
 end subroutine compute_vorticity
+
+
+subroutine compute_vorticity_abs(u, dx, Bs, g, discretization, vor_abs)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    implicit none
+
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:,:), intent(in)  :: u                         !> local datafields
+    real(kind=rk), dimension(:,:,:), intent(out)   :: vor_abs                   !> vorticity
+    character(len=*), intent(in)                   :: discretization
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
+    !> derivatives
+    real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
+
+    !> parameters for FD1_l operator
+    real(kind=rk), allocatable, dimension(:) :: FD1_l
+    integer(kind=ik) :: FD1_ls, FD1_le
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+
+
+    vor_abs = 0.0_rk
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+
+    if (size(u,3)>2) then ! 3D case
+        dz_inv = 1.0_rk / dx(3)
+        
+        do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g
+                do iz = g+1, Bs(3)+g
+                    u_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 1)) * dy_inv
+                    u_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 1)) * dz_inv
+                    v_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 2)) * dx_inv
+                    v_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 2)) * dz_inv
+                    w_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 3)) * dx_inv
+                    w_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 3)) * dy_inv
+
+                    vor_abs(ix,iy,iz) = sqrt( (w_dy - v_dz)**2 + (u_dz - w_dx)**2 + (v_dx - u_dy)**2)
+                end do
+            end do
+        end do
+    else
+        call abort(23321, "ERROR: vor-abs makes not much sense for 2D data.")
+    end if
+
+end subroutine compute_vorticity_abs
+
+
+subroutine compute_helicity(u, dx, Bs, g, discretization, helicity)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    implicit none
+
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:,:), intent(in)  :: u                         !> local datafields
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: helicity                 !> helicity vector field
+    character(len=*), intent(in)                   :: discretization
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
+    !> derivatives
+    real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
+    real(kind=rk)                                  :: vort_x, vort_y, vort_z    !> vorticity components
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
+
+    !> parameters for FD1_l operator
+    real(kind=rk), allocatable, dimension(:) :: FD1_l
+    integer(kind=ik) :: FD1_ls, FD1_le
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+
+    helicity = 0.0_rk
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+
+    if (size(u,3)>2) then ! 3D case
+        dz_inv = 1.0_rk / dx(3)
+        
+        do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g
+                do iz = g+1, Bs(3)+g
+                    ! Compute vorticity components
+                    u_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 1)) * dy_inv
+                    u_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 1)) * dz_inv
+                    v_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 2)) * dx_inv
+                    v_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 2)) * dz_inv
+                    w_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 3)) * dx_inv
+                    w_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 3)) * dy_inv
+
+                    vort_x = w_dy - v_dz
+                    vort_y = u_dz - w_dx
+                    vort_z = v_dx - u_dy
+
+                    ! Compute helicity vector: H = u × ω
+                    helicity(ix,iy,iz,1) = u(ix,iy,iz,1) * vort_x
+                    helicity(ix,iy,iz,2) = u(ix,iy,iz,2) * vort_y
+                    helicity(ix,iy,iz,3) = u(ix,iy,iz,3) * vort_z
+                end do
+            end do
+        end do
+    else
+        call abort(23322, "ERROR: helicity makes not much sense for 2D data.")
+    end if
+
+end subroutine compute_helicity
+
+
+subroutine compute_helicity_abs(u, dx, Bs, g, discretization, hel_abs)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    implicit none
+
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:,:), intent(in)  :: u                         !> local datafields
+    real(kind=rk), dimension(:,:,:), intent(out)   :: hel_abs                  !> helicity magnitude
+    character(len=*), intent(in)                   :: discretization
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
+    !> derivatives
+    real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
+    real(kind=rk)                                  :: vort_x, vort_y, vort_z    !> vorticity components
+    real(kind=rk)                                  :: helicity_val              !> helicity value
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    integer(kind=ik)                               :: ix, iy, iz                ! loop variables
+
+    !> parameters for FD1_l operator
+    real(kind=rk), allocatable, dimension(:) :: FD1_l
+    integer(kind=ik) :: FD1_ls, FD1_le
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+
+    hel_abs = 0.0_rk
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+
+    if (size(u,3)>2) then ! 3D case
+        dz_inv = 1.0_rk / dx(3)
+        
+        do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g
+                do iz = g+1, Bs(3)+g
+                    ! Compute vorticity components
+                    u_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 1)) * dy_inv
+                    u_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 1)) * dz_inv
+                    v_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 2)) * dx_inv
+                    v_dz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 2)) * dz_inv
+                    w_dx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 3)) * dx_inv
+                    w_dy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 3)) * dy_inv
+
+                    vort_x = w_dy - v_dz
+                    vort_y = u_dz - w_dx
+                    vort_z = v_dx - u_dy
+
+                    ! Compute helicity: H = u · ω
+                    helicity_val = u(ix,iy,iz,1) * vort_x + u(ix,iy,iz,2) * vort_y + u(ix,iy,iz,3) * vort_z
+                    
+                    ! Compute helicity magnitude
+                    hel_abs(ix,iy,iz) = abs(helicity_val)
+                end do
+            end do
+        end do
+    else
+        call abort(23323, "ERROR: helicity-abs makes not much sense for 2D data.")
+    end if
+
+end subroutine compute_helicity_abs

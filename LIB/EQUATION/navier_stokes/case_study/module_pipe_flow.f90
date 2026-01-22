@@ -1,15 +1,7 @@
-
-!-----------------------------------------------------------------
-!> Implementation of zylinder pipe flow
-!> \details
-!> \version 23.2.2018
-!> \author P.Krah
-!-----------------------------------------------------------------
-
 module module_pipe_flow
 
   use module_navier_stokes_params
-  use module_precision
+  use module_globals
   use module_ini_files_parser_mpi
   use module_ns_penalization
   use module_helpers
@@ -80,7 +72,6 @@ subroutine draw_pipe_sponges(mask, x0, dx, Bs, g )
 
 end subroutine draw_pipe_sponges
 !==========================================================================
-
 
 
 

@@ -3,7 +3,6 @@
 ! https://sukhbinder.wordpress.com/2011/08/07/stl-files-and-fortran/
 module module_stl_file_reader
 
-    use module_precision
     use module_globals
     use mpi
 
@@ -59,7 +58,7 @@ contains
         endif
 
 
-        write(*,*) "Rank", mpirank, "triangles:", npercpu, istart, iend
+        write(*,*) "Rank=", mpirank, "N_triangles_per_cpu:", npercpu, "(", istart, ":", iend, ")"
         call MPI_BARRIER(MPI_COMM_WORLD, mpicode)
 
         ! compute all normals for all triangles.
@@ -108,7 +107,7 @@ contains
         real(kind=rk), dimension(1:3) :: vertexnormal
         real(kind=rk), dimension(1:3) :: p1, p2, p3
         integer :: ntri, i,  k
-        integer :: faces1(1:20), faces2(1:20), faces3(1:20)
+        integer :: faces1(1:600), faces2(1:600), faces3(1:600)
         integer :: N1, N2, N3
         real(kind=rk) :: alpha
 
@@ -121,6 +120,8 @@ contains
         N3 = 0
         vertexnormal = 0.0_rk
 
+        ! expensive - to compute the vertexnormal of a point, we loop over all triangles and find the ones
+        ! that share this point
         do i = 1, ntri
             if (is_same_vector(x, points(i,1:3))) then
                 ! faces containing the vertex as 1st point
@@ -252,7 +253,7 @@ contains
         ! dimensionality is (3,ntri)
         real(kind=4), allocatable, dimension(:,:) :: triangles, normals
 
-        character(len=80) :: title
+        character(len=cshort) :: title
         integer :: iunit, irc, k, i, ierr
         integer*2 :: padding
         real*4 :: n(3),x1(3),x2(3),x3(3)
@@ -278,7 +279,7 @@ contains
 #ifdef TURING
             ! TURING's IBM XL compiler by default reads binary data in BIG ENDIAN exclusively
             ! while it is supposedly possible to modify this behavior with environment variables
-            ! I did not suceed in doing so. the following command ensures reading from unit 13
+            ! I did not succeed in doing so. the following command ensures reading from unit 13
             ! in little endian.
             ! see also:
             ! http://www.ibm.com/support/knowledgecenter/SS2MB5_14.1.0/com.ibm.xlf141.bg.doc/language_ref/sup-setrteopts.html%23sup-setrteopts
@@ -535,29 +536,29 @@ contains
         ! Terible tree of conditionals to determine in which region of the diagram
         ! shown above the projection of the point into the triangle-plane lies.
         if ((s+t) <= det) then
-            if (s < 0.d0) then
+            if (s < 0.0_rk) then
                     !-------------------------------------------------------
-                    if (t < 0.d0) then
+                    if (t < 0.0_rk) then
                         !region4 (vertex)
                         region = 4
-                        if (d < 0.d0) then
-                            t = 0.d0
+                        if (d < 0.0_rk) then
+                            t = 0.0_rk
                             if (-d >= a) then
                                 s = 1.d0
-                                sqrDistance = a + 2.d0*d + f
+                                sqrDistance = a + 2.0_rk*d + f
                             else
                                 s = -d/a
                                 sqrDistance = d*s + f
                             endif
                         else
-                            s = 0.d0
-                            if (e >= 0.d0) then
-                                t = 0.d0
+                            s = 0.0_rk
+                            if (e >= 0.0_rk) then
+                                t = 0.0_rk
                                 sqrDistance = f
                             else
                                 if (-e >= c) then
                                     t = 1.d0
-                                    sqrDistance = c + 2.d0*e + f
+                                    sqrDistance = c + 2.0_rk*e + f
                                 else
                                     t = -e/c
                                     sqrDistance = e*t + f
@@ -568,14 +569,14 @@ contains
                     else
                     ! region 3 (edge)
                     region = 3
-                    s = 0.d0
-                    if (e >= 0.d0) then
-                        t = 0.d0
+                    s = 0.0_rk
+                    if (e >= 0.0_rk) then
+                        t = 0.0_rk
                         sqrDistance = f
                     else
                         if (-e >= c) then
                             t = 1.d0
-                            sqrDistance = c + 2.d0*e +f
+                            sqrDistance = c + 2.0_rk*e +f
                         else
                             t = -e/c
                             sqrDistance = e*t + f
@@ -584,17 +585,17 @@ contains
                 endif !of region 3
                 !-------------------------------------------------------
             else
-                if (t < 0.d0) then
+                if (t < 0.0_rk) then
                     ! region 5
                     region = 5
-                    t = 0.d0
-                    if (d >= 0.d0) then
-                        s = 0.d0
+                    t = 0.0_rk
+                    if (d >= 0.0_rk) then
+                        s = 0.0_rk
                         sqrDistance = f
                     else
                         if (-d >= a) then
                             s = 1.d0
-                            sqrDistance = a + 2.d0*d + f! GF 20101013 fixed typo d*s ->2*d
+                            sqrDistance = a + 2.0_rk*d + f! GF 20101013 fixed typo d*s ->2*d
                         else
                             s = -d/a
                             sqrDistance = d*s + f
@@ -606,37 +607,37 @@ contains
                     invDet = 1.d0/det
                     s = s*invDet
                     t = t*invDet
-                    sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                    + t*(b*s + c*t + 2.d0*e) + f
+                    sqrDistance = s*(a*s + b*t + 2.0_rk*d) &
+                    + t*(b*s + c*t + 2.0_rk*e) + f
                 endif
             endif
         else
-            if (s < 0.d0) then
+            if (s < 0.0_rk) then
                 ! region 2
                 region = 2
                 tmp0 = b + d
                 tmp1 = c + e
                 if (tmp1 > tmp0) then ! minimum on edge s+t=1
                     numer = tmp1 - tmp0
-                    denom = a - 2.d0*b + c
+                    denom = a - 2.0_rk*b + c
                     if (numer >= denom) then
                         s = 1.d0
-                        t = 0.d0
-                        sqrDistance = a + 2.d0*d + f ! GF 20101014 fixed typo 2*b -> 2*d
+                        t = 0.0_rk
+                        sqrDistance = a + 2.0_rk*d + f ! GF 20101014 fixed typo 2*b -> 2*d
                     else
                         s = numer/denom
                         t = 1.d0-s
-                        sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                        + t*(b*s + c*t + 2.d0*e) + f
+                        sqrDistance = s*(a*s + b*t + 2.0_rk*d) &
+                        + t*(b*s + c*t + 2.0_rk*e) + f
                     endif
                 else          ! minimum on edge s=0
-                    s = 0.d0
-                    if (tmp1 <= 0.d0) then
+                    s = 0.0_rk
+                    if (tmp1 <= 0.0_rk) then
                         t = 1.d0
-                        sqrDistance = c + 2.d0*e + f
+                        sqrDistance = c + 2.0_rk*e + f
                     else
-                        if (e >= 0.d0) then
-                            t = 0.d0
+                        if (e >= 0.0_rk) then
+                            t = 0.0_rk
                             sqrDistance = f
                         else
                             t = -e/c
@@ -645,32 +646,32 @@ contains
                     endif
                 endif !of region 2
             else
-                if (t < 0.d0) then
+                if (t < 0.0_rk) then
                     region = 6
                     !region6
                     tmp0 = b + e
                     tmp1 = a + d
                     if (tmp1 > tmp0) then
                         numer = tmp1 - tmp0
-                        denom = a-2.d0*b+c
+                        denom = a-2.0_rk*b+c
                         if (numer >= denom) then
                             t = 1.d0
-                            s = 0.d0
-                            sqrDistance = c + 2.d0*e + f
+                            s = 0.0_rk
+                            sqrDistance = c + 2.0_rk*e + f
                         else
                             t = numer/denom
                             s = 1.d0 - t
-                            sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                            + t*(b*s + c*t + 2.d0*e) + f
+                            sqrDistance = s*(a*s + b*t + 2.0_rk*d) &
+                            + t*(b*s + c*t + 2.0_rk*e) + f
                         endif
                     else
-                        t = 0.d0
+                        t = 0.0_rk
                         if (tmp1 <= 0) then
                             s = 1.d0
-                            sqrDistance = a + 2.d0*d + f
+                            sqrDistance = a + 2.0_rk*d + f
                         else
-                            if (d >= 0.d0) then
-                                s = 0.d0
+                            if (d >= 0.0_rk) then
+                                s = 0.0_rk
                                 sqrDistance = f
                             else
                                 s = -d/a
@@ -683,21 +684,21 @@ contains
                     ! region 1
                     region = 1
                     numer = c + e - b - d
-                    if (numer <= 0.d0) then
-                        s = 0.d0
+                    if (numer <= 0.0_rk) then
+                        s = 0.0_rk
                         t = 1.d0
-                        sqrDistance = c + 2.d0*e + f
+                        sqrDistance = c + 2.0_rk*e + f
                     else
-                        denom = a - 2.d0*b + c
+                        denom = a - 2.0_rk*b + c
                         if (numer >= denom) then
                             s = 1.d0
-                            t = 0.d0
-                            sqrDistance = a + 2.d0*d + f
+                            t = 0.0_rk
+                            sqrDistance = a + 2.0_rk*d + f
                         else
                             s = numer/denom
                             t = 1-s
-                            sqrDistance = s*(a*s + b*t + 2.d0*d) &
-                            + t*(b*s + c*t + 2.d0*e) + f
+                            sqrDistance = s*(a*s + b*t + 2.0_rk*d) &
+                            + t*(b*s + c*t + 2.0_rk*e) + f
                         endif
                     endif !of region 1
                 endif
@@ -705,8 +706,8 @@ contains
         endif
 
         ! account for numerical round-off error
-        if (sqrDistance < 0.d0) then
-            sqrDistance = 0.d0
+        if (sqrDistance < 0.0_rk) then
+            sqrDistance = 0.0_rk
         endif
 
 
@@ -754,7 +755,7 @@ contains
         endif
 
 
-        if (t >= 0.d0) then
+        if (t >= 0.0_rk) then
             pointTriangleDistance = dsqrt(sqrDistance)
         else
             pointTriangleDistance = -dsqrt(sqrDistance)

@@ -167,7 +167,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             ! compute x,y coordinates from spacing and origin
             y = abs(dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk)
 
-            u(:,iy,:,1) = smoothstep( abs(y), 0.10_rk * params_acm%domain_size(2), params_acm%beta*dx(2) )
+            u(:,iy,:,1) = smoothstep( abs(y), 0.10_rk * params_acm%domain_size(2), &
+            params_acm%beta*params_acm%domain_size(2) )
         end do
         
         ! uy is a sin wave (that triggers the instability)

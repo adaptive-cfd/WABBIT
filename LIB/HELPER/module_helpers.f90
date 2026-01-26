@@ -22,6 +22,55 @@ contains
 #include "most_common_element.f90"
 #include "rotation_matrices.f90"
 
+
+! delta function for interpolation
+    ! $$D(\xi) =
+    ! \begin{cases}
+    ! \dfrac{3}{8} + \dfrac{\pi}{32} - \dfrac{\xi^2}{4}, & |\xi| \leq 0.5, \\[6pt]
+    ! \dfrac{1}{4} + \dfrac{1 - |\xi|}{8} \sqrt{-2 + 8|\xi| - 4\xi^2}
+    ! -\dfrac{1}{8}\arcsin\!\bigl(\sqrt{2(|\xi|-1)}\bigr), & 0.5 \leq |\xi| \leq 1.5, \\[6pt]
+    ! \dfrac{17}{16} - \dfrac{\pi}{64} - \dfrac{3|\xi|}{4} + \dfrac{\xi^2}{8}
+    ! + \dfrac{|\xi|-2}{16}\sqrt{16|\xi| - 4\xi^2 - 14}
+    ! + \dfrac{1}{16}\arcsin\!\bigl(\sqrt{2(|\xi|-2)}\bigr), & 1.5 \leq |\xi| \leq 2.5, \\[6pt]
+    ! 0, & 2.5 \leq |\xi|.
+    ! \end{cases}$$
+    real (kind=rk) function delta_interpolation(x,dx1)
+        ! use vars
+        real(kind=rk), intent(in) :: x, dx1
+        real(kind=rk) :: r
+        !----------------------------------
+        ! This function returns a delta kernel
+        ! see Yang, Zhang, Li: A smoothing technique for discrete delta functions [...] JCP 228 (2009)
+        !----------------------------------
+        r = abs(x/dx1)
+
+        if (r<0.5_rk) then
+            delta_interpolation = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
+        elseif ( (r>=0.50_rk) .and. (r<=1.50_rk)   ) then
+            delta_interpolation = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
+        elseif ( (r>=1.5_rk) .and. (r<=2.5_rk)   ) then
+            delta_interpolation = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
+                    (r-2.0_rk)*sqrt(-14.0_rk + 16.0_rk*r - 4.0_rk*r**2)/16.0_rk +asin(sqrt(2.0_rk)*(r-2.0_rk))/16.0_rk
+        elseif ( (r>=2.5_rk)    ) then
+            delta_interpolation = 0.0_rk
+        endif
+    end function
+
+    ! linear function for interpolation
+    real (kind=rk) function linear_interpolation(x,dx1)
+        ! use vars
+        real(kind=rk), intent(in) :: x, dx1
+        real(kind=rk) :: r
+        r = abs(x/dx1)
+
+        if (r < 1.0_rk) then
+            linear_interpolation = 1.0_rk - r
+        else
+            linear_interpolation = 0.0_rk
+        endif
+    end function
+
+
     ! Based on the (exact) signed distance function of a cylinder segment
     ! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
     function signed_distance_cylinder(p, a, b, r) result(d)

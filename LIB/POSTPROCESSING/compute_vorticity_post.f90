@@ -291,4 +291,6 @@ subroutine compute_vorticity_post(params)
         write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'copyUx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     endif
+
+    call deallocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 end subroutine compute_vorticity_post

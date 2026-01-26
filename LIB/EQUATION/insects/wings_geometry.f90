@@ -67,7 +67,7 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
   endif
 
   !-----------------------------------------------------------------------------
-  ! Stage I: mask + us field in wing system
+  ! Stage I: mask + us field in BODY system
   !-----------------------------------------------------------------------------
   if (Insect%RightWing == "yes") then
       call draw_wing(xx0, ddx, mask, mask_color, us, Insect, Insect%color_r, &
@@ -107,7 +107,8 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
               if (c==Insect%color_l .or. c==Insect%color_r .or. &
                   c==Insect%color_l2 .or. c==Insect%color_r2 ) then
 
-                  if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                  ! disabled
+                  ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
                   x_body = matmul(Insect%M_g2b, x_glob)
 
                   ! add solid body rotation in the body-reference frame, if color
@@ -272,7 +273,8 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
               x(1) = xx0(1)+dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+              ! disabled
+              ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
               x_body = matmul(M_g2b,x)
               x_wing = matmul(M_b2w,x_body-x_pivot_b)
 
@@ -436,7 +438,8 @@ subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_win
               x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+              ! disabled
+              ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
               x_body = matmul(M_g2b,x)
               x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -560,7 +563,8 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               x(1) = xx0(1)+dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+              ! disabled
+              ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
               x_body = matmul(M_g2b,x)
               x_wing = matmul(M_b2w,x_body-x_pivot_b)
 
@@ -718,7 +722,8 @@ subroutine draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
-        if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+        ! disabled
+        ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
         x_body = matmul(M_g2b,x)
         x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -779,7 +784,8 @@ subroutine draw_wing_pointcloud(xx0, ddx, mask, mask_color, us,Insect,color_wing
         ! if this point belong to the wing we just created
         if (mask_color(ix,iy,iz)==color_wing) then
           !-- define the various coordinate systems we are going to use
-          if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+          ! disabled
+          ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
           x_wing = matmul(M_b2w, matmul(M_g2b,x)-x_pivot_b)
 
           !------------------------------------------------
@@ -839,7 +845,8 @@ subroutine draw_wing_suzuki(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
                 !-- define the various coordinate systems we are going to use
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! disabled
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 x_body = matmul(M_g2b,x)
                 x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -931,7 +938,8 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
                 !-- define the various coordinate systems we are going to use
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! disabled
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 x_body = matmul(M_g2b,x)
                 x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -972,12 +980,15 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                                 ! coordinate system, not to the inertial frame. this is done in
                                 ! the main routine Draw_Insect
                                 !------------------------------------------------
+
+                                ! v_tmp is wing in wing reference frame
                                 v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
                                 v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
                                 v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
 
                                 ! note we set this only if it is a part of the wing
                                 us(ix,iy,iz,1:3) = matmul(transpose(M_b2w), v_tmp)
+                                ! the us velocity is now in the body system
                             endif
                         endif
                     endif
@@ -1020,7 +1031,8 @@ subroutine draw_wing_rectangular_suzuki_butterfly(xx0, ddx, mask, mask_color, us
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
                 !-- define the various coordinate systems we are going to use
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! disabled
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 x_body = matmul(M_g2b,x)
                 x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -1113,7 +1125,8 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
-        if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+        ! disabled
+        ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
         x_body = matmul(M_g2b,x)
         x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -1210,7 +1223,8 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
         x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
         !-- define the various coordinate systems we are going to use
-        if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+        ! disabled
+        ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
         x_body = matmul(M_g2b,x)
         x_wing = matmul(M_b2w,x_body-x_pivot_b)
@@ -1322,7 +1336,8 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               x(1) = xx0(1)+dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+              ! disabled
+              ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
               x_body = matmul(M_g2b,x)
               x_wing = matmul(M_b2w,x_body-x_pivot_b)
 
@@ -1987,11 +2002,11 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   Insect%wingsetup_done(wingID) = .true.
 
   ! for many cases, it is important that Lspan and Lchord are known, but that is
-  ! tedious for Fourier shapes, as the use cannot see it from the cooefficients.
+  ! tedious for Fourier shapes, as the use cannot see it from the coefficients.
   ! Therefore, we compute the max / min of x / y here and store the result
   call set_wing_bounding_box_fourier( Insect, wingID )
 
-  ! this is the old defaut value:
+  ! this is the old default value:
   if (maxval(Insect%corrugation_array_bbox(:,wingID)) == 0.0_rk) then
       Insect%corrugation_array_bbox(1:4,wingID) = Insect%wing_bounding_box(1:4,wingID)
   endif
@@ -2478,6 +2493,7 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
 
             do ix = max(xmin, lbounds(1)), min(xmax, ubounds(1))
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+                ! disabled
                 ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! cb is the distance to the cylinder mid-point
@@ -2550,7 +2566,8 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x(1) = xx0(1) + dble(ix)*ddx(1) - x2(1)
 
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! disabled
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 ! the bounding box check is incorporated in the loop bounds - no if clause!
                 ! compute radius
@@ -2611,7 +2628,8 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x(1) = xx0(1) + dble(ix)*ddx(1) - x1(1)
 
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! disabled
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 ! the bounding box check is incorporated in the loop bounds - no if clause!
                 ! compute radius
@@ -2687,7 +2705,8 @@ subroutine draw_triangle(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_g2b,
               x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
 
               !-- define the various coordinate systems we are going to use
-              if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+              ! disabled
+              ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
               x_body = matmul(M_g2b,x)
               x_wing = matmul(M_b2w,x_body-x_pivot_b)

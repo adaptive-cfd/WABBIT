@@ -25,7 +25,7 @@ subroutine post_dry_run
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
-    real(kind=rk) :: x0(1:3), dx(1:3)
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color
     type(inifile) :: FILE
 
@@ -63,12 +63,14 @@ subroutine post_dry_run
         write(*,*) ""
         write(*,*) " --pruned=1 (or simply --pruned) Uses tree-pruning, i.e. removes"
         write(*,*) "    blocks which do not contain the mask function. This option can"
-        write(*,*) "    speed up visualization, but the data is incomplete: you cannot"
+        write(*,*) "    speed up visualization, but the data are incomplete: you cannot"
         write(*,*) "    read those fields into wabbit."
         write(*,*) ""
         write(*,*) " --Jmin The minimum tree level, default is taken from INI file."
         write(*,*) ""
         write(*,*) " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
+        write(*,*) ""
+        write(*,*) " --tstart: Start mask generation at this time."
         write(*,*) ""
         write(*,*) " --grid-list=list.txt"
         write(*,*) "   If given, we read in the specified h5 files and create the mask"
@@ -92,11 +94,14 @@ subroutine post_dry_run
     call get_cmd_arg( "--save-us", save_us, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
+    call get_cmd_arg( "--tstart", time_start, default=0.0_rk )
     
 
     ! for the dry run we dont need to use the fancy wavelets
     params%wavelet = "CDF20"
     call setup_wavelet(params)
+    ! nor high-order discretization
+    params%order_discretization = "FD_2nd_central"
 
     ! modifications to parameters (because we use hvy_block instead of hvy_mask, NEQN set
     ! in ini file is not correct)
@@ -140,7 +145,7 @@ subroutine post_dry_run
     Jmax = params%Jmax
     Jmin = params%Jmin
     tree_n = params%forest_size ! used only for resetting at this point
-    time = 0.0_rk
+    time = time_start
 
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
@@ -253,6 +258,15 @@ subroutine post_dry_run
                 ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
                 if ((Jnow==Jmax) .and. (lgt_n_new==lgt_n_old)) iterate = .false.
                 iteration = iteration + 1
+
+                ! empty mask is created?
+                if ((Jnow==Jmin) .and. (iteration>2)) then
+                    ! we did some refinements, but the grid is still on Jmin - nothing did trigger the refinement. 
+                    ! This means no mask was created for some reason - maybe the object just moved out of the domain
+                    ! or it is a bug somewhere. Is also possible on huge domains with tiny resolution: the object covers
+                    ! then less than 1 grid point. 
+                    call abort(071120251, "Error: Dry run generated an empty mask. Possible causes: resolution too coarse, object out of domain, no mask defined.")
+                endif
             enddo
 
             ! on new grid, create the mask again

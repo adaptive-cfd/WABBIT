@@ -1,14 +1,10 @@
-subroutine filter_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
+subroutine filter_wrapper(time, params, hvy_block, tree_ID)
     implicit none
 
     real(kind=rk), intent(in)           :: time
     type (type_params), intent(inout)   :: params                       !> user defined parameter structure, hvy_active
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
-    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
-    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
-    !> hvy_mask are qty that depend on the grid and not explicitly on time
-    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)
-    integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in)        :: tree_ID      
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
     integer(kind=ik)                    :: k, lgt_id, ic       ! loop variables
     integer(kind=ik)                    :: g, a, nc

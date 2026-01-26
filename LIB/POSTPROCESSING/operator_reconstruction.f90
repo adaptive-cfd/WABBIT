@@ -11,7 +11,7 @@ subroutine operator_reconstruction(params)
 
     type (type_params), intent(inout)  :: params
     character(len=cshort) :: file, infile
-    real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in
+    real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in, sign
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level, j
     integer(kind=ik) :: ixx, iyy, ix2, iy2, nx_fine, ixx2,iyy2, n_nonzero
@@ -22,7 +22,7 @@ subroutine operator_reconstruction(params)
     real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
     real(kind=rk), allocatable         :: stencil1(:),stencil2(:)
 
-    integer(kind=ik)                   :: tree_ID=1, hvy_id, g1,g2, npoints=0
+    integer(kind=ik)                   :: tree_ID=1, hvy_id, g1,g2, npoints=0, g3
 
     character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
@@ -64,6 +64,9 @@ subroutine operator_reconstruction(params)
     call get_cmd_arg( "--refine-coarsen", refine, default=.false. )
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF40" )
     call get_cmd_arg( "--coarse-extension", params%useCoarseExtension, default=.true. )
+    call get_cmd_arg( "--filter", params%filter_type, default="no_filter" )
+    call get_cmd_arg( "--sign", sign, default=+1.0_rk )
+
     params%useSecurityZone = params%useCoarseExtension
 
 
@@ -75,7 +78,18 @@ subroutine operator_reconstruction(params)
     !---------------------------------------------------------------------------
 
     call setup_wavelet(params, g1, g2)
-    params%g = max(g1,g2)
+
+    if (params%filter_type == "explicit_5pt") then
+        g3 = (5-1)/2
+    elseif (params%filter_type == "explicit_3pt") then
+        g3 = (3-1)/2
+
+    elseif (params%filter_type == "explicit_7pt") then
+        g3 = (7-1)/2
+    else 
+        g3 = 3
+    endif
+    params%g = max(max(g1,g2), g3)
 
     select case(params%order_discretization)
     case("FD_6th_central")
@@ -109,8 +123,9 @@ subroutine operator_reconstruction(params)
 
 
     open(17, file=trim(adjustl(file))//'.info.txt', status='replace')
-    write(17,'(A,1x,"dir=",A," g=",i1," Bs=",i2," nu=",es9.2," refine=",L1,1x,A," cExt=",L1,1x,L1)') trim(params%order_discretization), &
-    dir, params%g, params%Bs(1), nu, refine, trim(adjustl(params%wavelet)), params%useCoarseExtension, params%useSecurityZone 
+    write(17,'(A,1x,"dir=",A," g=",i1," Bs=",i2," nu=",es8.2," refine=",L1,1x,A," cExt=",L1,1x,L1," sign=",f4.1, " filter=",A)') trim(params%order_discretization), &
+    dir, params%g, params%Bs(1), nu, refine, trim(adjustl(params%wavelet)), params%useCoarseExtension, params%useSecurityZone, &
+    sign, trim(adjustl(params%filter_type))
     close(17)
 
     !---------------------------------------------------------------------------
@@ -250,7 +265,6 @@ subroutine operator_reconstruction(params)
                 call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif
 
-
             !---------------------------------------------------------------
             ! Now compute the derivative
             do k = 1, hvy_n(tree_ID)
@@ -267,7 +281,9 @@ subroutine operator_reconstruction(params)
                         do ix2 = g+1, Bs(1)+g
                             u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_id) )*dx_inv
                             u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_id) )*dx_inv**2
-                            hvy_block(ix2,iy2,iz,2,hvy_id) = u_dx + nu*u_dxdx
+                            hvy_block(ix2,iy2,iz,2,hvy_id) = sign*u_dx + nu*u_dxdx &
+                            + 24.0_rk*(-1.0_rk/16.0_rk)* sum( (/1.0_rk, -4.0_rk, 6.0_rk, -4.0_rk, 1.0_rk/)*hvy_block(ix2-2:ix2+2, iy2, iz, 1, hvy_id) )
+                            !  + 24.0_rk*(1.0_rk/64.0_rk)* sum( (/1.0_rk, -6.0_rk, 15.0_rk, -20.0_rk, 15.0_rk, -6.0_rk, 1.0_rk/)*hvy_block(ix2-3:ix2+3, iy2, iz, 1, hvy_id) )
                         end do
                     end do
                 elseif (dir=='y') then
@@ -275,7 +291,7 @@ subroutine operator_reconstruction(params)
                         do ix2 = g+1, Bs(1)+g
                             u_dx   = sum( stencil1*hvy_block(ix2, iy2+a1:iy2+b1, iz, 1, hvy_id) )*dx_inv
                             u_dxdx = sum( stencil2*hvy_block(ix2, iy2+a2:iy2+b2, iz, 1, hvy_id) )*dx_inv**2
-                            hvy_block(ix2,iy2,iz,2,hvy_id) = u_dx + nu*u_dxdx
+                            hvy_block(ix2,iy2,iz,2,hvy_id) = sign*u_dx + nu*u_dxdx
                         end do
                     end do
                 else
@@ -286,6 +302,13 @@ subroutine operator_reconstruction(params)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             call sync_ghosts_tree(params, hvy_block, tree_ID)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            
+            if ((params%filter_type /= 'no_filter') .and. (params%filter_type /= "hyperviscosity")) then
+                write(*,*) "applying filter !!", params%filter_type
+                call filter_wrapper(time, params, hvy_block, tree_ID)
+                call sync_ghosts_tree(params, hvy_block, tree_ID)
+            endif
+
 
             if (refine) then
                 ! call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )

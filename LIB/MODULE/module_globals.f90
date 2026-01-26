@@ -249,7 +249,7 @@ module module_globals
 
         !-----------------------------------------------------------------------------
         ! given a point x, check if it lies in the computational domain centered at zero
-        ! (note: we assume [-xl/2...+xl/2] size this is useful for insects )
+        ! (note: we assume [-xl/2...+xl/2] since this is useful for insects )
         !-----------------------------------------------------------------------------
         function periodize_coordinate(x_glob, box)
             real(kind=rk),intent(in) :: x_glob(1:3), box(1:3)

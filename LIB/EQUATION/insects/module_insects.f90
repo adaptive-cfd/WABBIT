@@ -22,7 +22,11 @@ module module_insects
 
    ! we use this so only root prints write statements...
    logical :: root = .false.
-   logical :: periodic_insect = .false.
+
+   ! 2025-11-07: insect periodization disabled, TE. It can be tricky to compute the properly periodized mask function 
+   ! (eg bounding boxes) and in WABBIT, we'd just use a large enough domain in most cases. In particular, also STL periodization
+   ! is probably painful.
+   ! logical :: periodic_insect = .false.
 
    ! ghost nodes. If the insect module is used in a finite-differences code, then
    ! the data that we have often has ghost nodes, i.e. points that overlap and exist
@@ -81,7 +85,6 @@ module module_insects
    type wingkinematics
       ! Fourier coefficients
       real(kind=rk) :: a0_alpha=0.0_rk, a0_phi=0.0_rk, a0_theta=0.0_rk
-      ! JB: Made allocatable to avoid bloating the object file size
       real(kind=rk), allocatable :: ai_phi(:), bi_phi(:), ai_theta(:), &
          bi_theta(:), ai_alpha(:), bi_alpha(:)
       integer :: nfft_phi=0, nfft_alpha=0, nfft_theta=0
@@ -89,13 +92,6 @@ module module_insects
       logical :: initialized = .false.
       ! some details about the file, if reading from ini file
       character(len=clong) :: infile_convention="", infile_type="", infile_units="", infile=""
-      ! variables for kineloader (which uses non-periodic hermite interpolation)
-      integer :: nk=0
-      ! JB: Made allocatable to avoid bloating the object file size
-      real(kind=rk), allocatable :: vec_t(:), &
-         vec_phi(:),vec_alpha(:),vec_theta(:),vec_pitch(:),vec_vert(:),vec_horz(:),  &
-         vec_phi_dt(:),vec_alpha_dt(:),vec_theta_dt(:),vec_pitch_dt(:),vec_vert_dt(:), &
-         vec_horz_dt(:)
    end type
 
 
@@ -157,6 +153,60 @@ module module_insects
       logical :: body_already_drawn = .false.
       ! second wing pair exists or not
       logical :: second_wing_pair
+
+      !-------------------------------------------------------------
+      ! for kinematics loader 
+      !-------------------------------------------------------------
+      ! variables for kineloader (which uses non-periodic hermite interpolation)
+      ! Describes all four wings and the body 
+      integer :: nk = 0      
+      ! 1   0   time
+      ! 2   1   body_center_g_x
+      ! 3   2   body_center_g_x_dt
+      ! 4   3   body_center_g_y
+      ! 5   4   body_center_g_y_dt
+      ! 6   5   body_center_g_z
+      ! 7   6   body_center_g_z_dt
+      ! 8   7   currently unused
+      ! 9   8   currently unused
+      ! 10  9   currently unused
+      ! 11  10  currently unused
+      ! 12  11  currently unused
+      ! 13  12  currently unused
+      ! 14  13  psi
+      ! 15  14  psi_dt
+      ! 16  15  beta
+      ! 17  16  beta_dt
+      ! 18  17  gamma
+      ! 19  18  gamma_dt
+      ! 20  19  alpha_L
+      ! 21  20  alpha_L_dt
+      ! 22  21  phi_L
+      ! 23  22  phi_L_dt
+      ! 24  23  theta_L
+      ! 25  24  theta_L_dt
+      ! 26  25  alpha_R
+      ! 27  26  alpha_R_dt
+      ! 28  27  phi_R
+      ! 29  28  phi_R_dt
+      ! 30  29  theta_R
+      ! 31  30  theta_R_dt
+      ! 32  31  alpha_L2
+      ! 33  32  alpha_L2_dt
+      ! 34  33  phi_L2
+      ! 35  34  phi_L2_dt
+      ! 36  35  theta_L2
+      ! 37  36  theta_L2_dt
+      ! 38  37  alpha_R2
+      ! 39  38  alpha_R2_dt
+      ! 40  39  phi_R2
+      ! 41  40  phi_R2_dt
+      ! 42  41  theta_R2
+      ! 43  42  theta_R2_dt
+      real(kind=rk), dimension (:,:), allocatable :: data_kineloader
+      logical :: kineloader_initialized = .false.
+      character(len=clong) :: infile_kineloader = ""
+
       !-------------------------------------------------------------
       ! for free flight solver
       !-------------------------------------------------------------
@@ -196,11 +246,9 @@ module module_insects
       !-------------------------------------------------------------
       ! wing shape fourier coefficients. Note notation:
       ! R = a0/2 + SUM ( ai cos(2pi*i) + bi sin(2pi*i)  )
-      ! JB: Made allocatable to avoid bloating the object file size
       real(kind=rk), allocatable :: ai_wings(:,:), bi_wings(:,:)
       real(kind=rk), dimension(1:4) :: a0_wings=0.0_rk
       ! fill the R0(theta) array once, then only table-lookup instead of Fseries
-      ! JB: Made allocatable to avoid bloating the object file size
       real(kind=rk), allocatable :: R0_table(:,:)
       ! describes the origin of the wings system
       real(kind=rk), dimension(1:4) :: xc=0.0_rk, yc=0.0_rk

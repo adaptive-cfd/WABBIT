@@ -129,7 +129,12 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
                 ! skip all parts that do not belong to the body (ie they have a different color)
                 if ( mask_color(ix,iy,iz) == Insect%color_body .and. mask(ix,iy,iz) > 0.0_rk ) then
 
-                    if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                    ! 2025-11-07: insect periodization disabled, TE. It can be tricky to compute the properly periodized mask function 
+                    ! (eg bounding boxes) and in WABBIT, we'd just use a large enough domain in most cases. In particular, also STL periodization
+                    ! is probably painful.
+                    ! disabled (see comment in init_insect! 
+                    ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                    
                     x_body = matmul(Insect%M_g2b, x_glob)
 
                     ! add solid body rotation to the translational velocity field. Note
@@ -183,7 +188,9 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
 
@@ -267,7 +274,10 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                
                 x_body   = matmul(M_g2b,x_glob)
                 x_head   = x_body
 
@@ -406,7 +416,9 @@ subroutine draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
 
@@ -493,7 +505,9 @@ subroutine draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
                 x_head   = x_body
@@ -558,7 +572,9 @@ subroutine draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
 
@@ -653,7 +669,9 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
 
@@ -744,7 +762,9 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x_glob)
                 x_head   = x_body
@@ -792,7 +812,7 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     integer :: ix,iy,iz
 
     color_body = Insect%color_body
-    M_g2b     = Insect%M_g2b
+    M_g2b      = Insect%M_g2b
 
     ! the following are coordinates of specific points on the insect's body, for
     ! example the position of the head, its size etc. In older versions, these
@@ -802,16 +822,12 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     ! values here. the advantage is that we can set   BodyType=jerry;  and voilà!
     Insect%R_head = 0.125_rk
     Insect%R_eye = 0.0625_rk
-    Insect%x_pivot_r_b =(/ 0.05_rk, -0.2165_rk, 0.0_rk /)
-    Insect%x_pivot_l_b =(/ 0.05_rk, +0.2165_rk, 0.0_rk /)
-    Insect%x_pivot_r2_b =(/ 0.0_rk, -0.0_rk, 0.0_rk /)
-    Insect%x_pivot_l2_b =(/ 0.0_rk, +0.0_rk, 0.0_rk /)
     Insect%b_body = 0.1_rk
     Insect%L_body = 1.0_rk
     Insect%x_head = (/0.5_rk*Insect%L_body,0.0_rk,0.0_rk /)
-    Insect%x_eye_r = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head&
+    Insect%x_eye_r = Insect%x_head + sin(45._rk*pi/180.0_rk)*Insect%R_head&
     *0.8_rk*(/1._rk,+1._rk,1._rk/)
-    Insect%x_eye_l = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head&
+    Insect%x_eye_l = Insect%x_head + sin(45._rk*pi/180.0_rk)*Insect%R_head&
     *0.8_rk*(/1._rk,-1._rk,1._rk/)
 
     a_body = Insect%L_body / 2.0_rk
@@ -824,7 +840,8 @@ subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_g2b, x_glob)
@@ -999,7 +1016,9 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x)
@@ -1057,7 +1076,8 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
             x(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+
                 ! x_body is in the body coordinate system
                 x_body = matmul(M_g2b,x)
 
@@ -1113,7 +1133,8 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_g2b, x_glob)
@@ -1178,7 +1199,8 @@ subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_g2b, x_glob)
@@ -1285,7 +1307,8 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_g2b, x_glob)
@@ -1328,7 +1351,8 @@ subroutine draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul(M_g2b, x_glob)
@@ -1413,7 +1437,8 @@ subroutine draw_body_cone( xx0, ddx, mask, mask_color, us, Insect)
             x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
             do ix = g, size(mask,1)-1-g
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+                ! disabled (see comment in init_insect)
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
                 x_body = matmul( M_g2b, x_glob)
@@ -1465,7 +1490,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     ! (/xmin,ymin,zmin,xmax,ymax,zmax/) of cylinder (in global coordinates)
     real(kind=rk),optional,intent(in) :: bounding_box(1:6)
 
-    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
+    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp
     real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_3
     real(kind=rk),dimension(1:3,1:3) :: M_phi
     real(kind=rk):: R, RR0, clength, safety, t, phi
@@ -1475,7 +1500,7 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
     integer :: xmin,xmax,ymin,ymax,zmin,zmax
     integer :: Nsafety, i
 
-    safety = 1.5*Insect%safety
+    safety = 1.5_rk * Insect%safety
     Nsafety = ceiling(safety / minval(ddx))
 
     ! bounds of the current patch of data
@@ -1493,57 +1518,14 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
         zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
 
     else
+        xmin = nint( (min( x1(1), x2(1) )-xx0(1) -(R0+safety)) / ddx(1) )
+        ymin = nint( (min( x1(2), x2(2) )-xx0(2) -(R0+safety)) / ddx(2) )
+        zmin = nint( (min( x1(3), x2(3) )-xx0(3) -(R0+safety)) / ddx(3) )
 
-        ! unit vector in cylinder axis direction and cylinder length
-        e_x = x2 - x1
-        clength = norm2(e_x)
-        e_x = e_x / clength
-
-        ! radial unit vector
-        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
-        ! it does not really matter which one. however, we must be sure that the vector
-        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-        e_r = (/0.0_rk,0.0_rk,0.0_rk/)
-        do while ( norm2(e_r) <= 1.0d-12 )
-            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
-        enddo
-        e_r = e_r / norm2(e_r)
-
-        ! third (also radial) unit vector, simply the cross product of the others
-        e_3 = cross(e_x,e_r)
-        e_3 = e_3 / norm2(e_3)
-        RR0 = R0 + safety
-
-        ! bounding box of the vicinity of the cylinder.
-        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
-        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
-        ! we do it in preprocessing and only once per cylinder
-        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
-
-        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
-
-        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
-
-        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
-
-        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
-
-        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+        xmax = nint( (max( x1(1), x2(1) )-xx0(1) +(R0+safety)) / ddx(1) )
+        ymax = nint( (max( x1(2), x2(2) )-xx0(2) +(R0+safety)) / ddx(2) )
+        zmax = nint( (max( x1(3), x2(3) )-xx0(3) +(R0+safety)) / ddx(3) )
     endif
-
-
 
     ! first we draw the cylinder, then the endpoint spheres
     do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
@@ -1555,6 +1537,8 @@ subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x_glob(1) = xx0(1) + dble(ix)*ddx(1)
 
+                
+                ! disabled (see comment in init_insect)
                 ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
 
                 ! cb is the distance to the cylinder mid-point
@@ -1640,56 +1624,14 @@ subroutine draw_cylinder_SD_nospheres( x1, x2, R0, xx0, ddx, mask, mask_color, u
         xmax = nint( (bounding_box(4)-xx0(1))/ddx(1) ) + Nsafety
         ymax = nint( (bounding_box(5)-xx0(2))/ddx(2) ) + Nsafety
         zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
-
     else
+        xmin = nint( (min( x1(1), x2(1) )-xx0(1) -(R0+safety)) / ddx(1) )
+        ymin = nint( (min( x1(2), x2(2) )-xx0(2) -(R0+safety)) / ddx(2) )
+        zmin = nint( (min( x1(3), x2(3) )-xx0(3) -(R0+safety)) / ddx(3) )
 
-        ! unit vector in cylinder axis direction and cylinder length
-        e_x = x2 - x1
-        clength = norm2(e_x)
-        e_x = e_x / clength
-
-        ! radial unit vector
-        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
-        ! it does not really matter which one. however, we must be sure that the vector
-        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
-        e_r = (/0.0_rk,0.0_rk,0.0_rk/)
-        do while ( norm2(e_r) <= 1.0d-12 )
-            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
-        enddo
-        e_r = e_r / norm2(e_r)
-
-        ! third (also radial) unit vector, simply the cross product of the others
-        e_3 = cross(e_x,e_r)
-        e_3 = e_3 / norm2(e_3)
-        RR0 = R0 + safety
-
-        ! bounding box of the vicinity of the cylinder.
-        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
-        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
-        ! we do it in preprocessing and only once per cylinder
-        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
-
-        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
-                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
-        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
-
-        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
-
-        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
-                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
-        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
-
-        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
-
-        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
-                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
-        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+        xmax = nint( (max( x1(1), x2(1) )-xx0(1) +(R0+safety)) / ddx(1) )
+        ymax = nint( (max( x1(2), x2(2) )-xx0(2) +(R0+safety)) / ddx(2) )
+        zmax = nint( (max( x1(3), x2(3) )-xx0(3) +(R0+safety)) / ddx(3) )
     endif
 
 
@@ -1746,15 +1688,15 @@ subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
     integer :: Nsafety
 
     ! periodization: if the center point is out of the domain, then correct that
-    if (periodic_insect) then
-        if (xc(1)<0.0) xc(1)=xc(1)+xl
-        if (xc(2)<0.0) xc(2)=xc(2)+yl
-        if (xc(3)<0.0) xc(3)=xc(3)+zl
+    ! if (periodic_insect) then
+    !     if (xc(1)<0.0) xc(1)=xc(1)+xl
+    !     if (xc(2)<0.0) xc(2)=xc(2)+yl
+    !     if (xc(3)<0.0) xc(3)=xc(3)+zl
 
-        if (xc(1)>=xl) xc(1)=xc(1)-xl
-        if (xc(2)>=yl) xc(2)=xc(2)-yl
-        if (xc(3)>=zl) xc(3)=xc(3)-zl
-    endif
+    !     if (xc(1)>=xl) xc(1)=xc(1)-xl
+    !     if (xc(2)>=yl) xc(2)=xc(2)-yl
+    !     if (xc(3)>=zl) xc(3)=xc(3)-zl
+    ! endif
 
     Nsafety = nint( (R0+Insect%safety) / minval(ddx))
 
@@ -1779,7 +1721,7 @@ subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
 
             do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
                 x(1) = xx0(1) + dble(ix)*ddx(1) - xc(1)
-                if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
+                ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 ! the bounding box check is incorporated in the loop bounds - no if clause!
                 ! compute radius

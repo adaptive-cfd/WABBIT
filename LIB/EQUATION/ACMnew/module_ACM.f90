@@ -252,7 +252,6 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'nu', params_acm%nu, 1e-1_rk)
     call read_param_mpi(FILE, 'ACM-new', 'nu_p', params_acm%nu_p, 0.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'nu_bulk', params_acm%nu_bulk, 0.0_rk)
-    ! gamma_p
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )

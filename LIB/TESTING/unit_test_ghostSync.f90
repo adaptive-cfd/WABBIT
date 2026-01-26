@@ -212,10 +212,10 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
         write(*,'(A)') "      \    /`"
         write(*,'(A)') "    (__)  /"
         write(*,'(A)') "    `.__.'"
-        write(*,'("UNIT TEST:", " L2 convergence order: ",32(f6.4,3x))') sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))
-        write(*,'("UNIT TEST:", " L2 mean conv.  order: ",f6.4)') sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)
-        write(*,'("UNIT TEST:", " L∞ convergence order: ",32(f6.4,3x))') sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))
-        write(*,'("UNIT TEST:", " L∞ mean conv.  order: ",f6.4)') sum(sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))) / dble(JmaxA-JminA)
+        write(*,'("UNIT TEST:", " L2 convergence order: ",32(f7.3,2x))') sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))
+        write(*,'("UNIT TEST:", " L2 mean conv.  order: ",f7.3)') sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)
+        write(*,'("UNIT TEST:", " L∞ convergence order: ",32(f7.3,2x))') sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))
+        write(*,'("UNIT TEST:", " L∞ mean conv.  order: ",f7.3)') sum(sqrt(error2(2:JmaxA-JminA+1) / error2(1:JmaxA-JminA))) / dble(JmaxA-JminA)
         write(*,'(20("¯\_/"))')
 
     endif
@@ -234,6 +234,20 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
             if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 5.50_rk) then
                 call abort(70820231, "6th order convergence not satisfied")
             endif
+        case("multiresolution_8th")
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 7.50_rk) then
+                call abort(70820231, "8th order convergence not satisfied")
+            endif
+        case("multiresolution_10th")
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 9.50_rk) then
+                call abort(70820231, "10th order convergence not satisfied")
+            endif
+        case("multiresolution_12th")
+            if ((sum(sqrt(error1(2:JmaxA-JminA+1) / error1(1:JmaxA-JminA))) / dble(JmaxA-JminA)) < 11.50_rk) then
+                call abort(70820231, "12th order convergence not satisfied")
+            endif
+        case default
+            call abort(251103, "I do not know this predictor order: " // params%order_predictor)
         end select
     endif
 

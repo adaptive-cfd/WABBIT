@@ -17,6 +17,9 @@ subroutine ini_file_to_params( params, filename )
    ! string read from command line call
    character(len=cshort)                           :: memstring
    integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, N_files, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
+   ! some parameters for checking ghost node sizes with FD discretization
+   real(kind=rk), allocatable                      :: filter_dummy(:)
+   integer                                         :: FD_l, FD_r, FD1_size, FD2_size, FD_max_size
 
    rank         = params%rank
    number_procs = params%number_procs
@@ -96,6 +99,7 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
    ! poisson order
    call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_Jmin', params%poisson_Jmin, params%Jmin )
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_abs', params%poisson_cycle_tol_abs, 1.0e-6_rk)
@@ -104,6 +108,7 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'poisson_GS_it', params%poisson_GS_it, 8)
    call read_param_mpi(FILE, 'Discretization', 'poisson_Sync_it', params%poisson_Sync_it, 2)
    call read_param_mpi(FILE, 'Discretization', 'poisson_coarsest', params%poisson_coarsest, "FFT")
+   call read_param_mpi(FILE, 'Discretization', 'poisson_balanceLoad', params%poisson_balanceLoad, .false.)
    call read_param_mpi(FILE, 'Discretization', 'nprojection_NSI', params%nprojection_NSI, 1)
    call read_param_mpi(FILE, 'Discretization', 'FFT_accuracy', params%FFT_accuracy, "spectral")
 
@@ -111,9 +116,11 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'filter_type', params%filter_type, "no_filter" )
    call read_param_mpi(FILE, 'Discretization', 'filter_only_maxlevel', params%filter_only_maxlevel, .false. )
    call read_param_mpi(FILE, 'Discretization', 'filter_all_except_maxlevel', params%filter_all_except_maxlevel, .false. )
-
    if (params%filter_type /= "no_filter") then
       call read_param_mpi(FILE, 'Discretization', 'filter_freq', params%filter_freq, -1 )
+      allocate(params%filter_component(1:params%n_eqn))
+      params%filter_component(:) = .true.
+      call read_param_mpi(FILE, 'Discretization', 'filter_component', params%filter_component, params%filter_component )
    endif
 
    !***************************************************************************
@@ -148,6 +155,7 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'debug_wavelet_reconstruct', params%debug_wavelet_reconstruct, .false.)
    call read_param_mpi(FILE, 'Debug', 'debug_sync', params%debug_sync, .false.)
    call read_param_mpi(FILE, 'Debug', 'debug_pruned2full', params%debug_pruned2full, .false.)
+   call read_param_mpi(FILE, 'Debug', 'debug_poisson', params%debug_poisson, .false.)
 
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
@@ -164,6 +172,11 @@ subroutine ini_file_to_params( params, filename )
    endif
    if (params%rank==0) write(*, '(A, i0, A)') "INIT: Flushing t-files every ", flush_frequency, " appends."
 
+   ! For memory, we always calculate it very aggressively to fill the available memory
+   ! For default, we only allow 2% of memory for extra arrays that are created during the run (default set in module_params)
+   ! This could be too aggressive for some systems, so we allow the user to set a larger percentage
+   call read_param_mpi(FILE, 'Debug', 'memory_safety_percentage', params%memory_safety_percentage, params%memory_safety_percentage )
+
    !***************************************************************************
    ! read MPI parameters
    !
@@ -175,8 +188,14 @@ subroutine ini_file_to_params( params, filename )
    call clean_ini_file_mpi(FILE)
 
    ! initialize wavelet (needs to be after reading parameters because it also checks the discretization)
-    call setup_wavelet(params)
+   call setup_wavelet(params)
 
+   ! get FD stencil sizes for checking ghost node sizes
+   call setup_FD1_left_stencil(params%order_discretization, filter_dummy, FD_l, FD_r)
+   FD1_size = max(FD_l, FD_r)
+   call setup_FD2_stencil(params%order_discretization, filter_dummy, FD_l, FD_r)
+   FD2_size = max(FD_l, FD_r)
+   FD_max_size = max(FD1_size, FD2_size)
 
    ! check ghost nodes number
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
@@ -188,18 +207,15 @@ subroutine ini_file_to_params( params, filename )
         (params%g < 1 .and. params%order_predictor == 'multiresolution_2nd') ) then
       call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
-   if ( (params%g < 3 .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central')) .or. &
-        (params%g < 2 .and. params%order_discretization == 'FD_4th_central') .or. &
-        (params%g < 1 .and. params%order_discretization == 'FD_2nd_central') ) then
-      call abort("ERROR: need more ghost nodes for order of supplied finite distance scheme")
+   if ( params%g < FD_max_size ) then
+      write(*, "(A, i0, A, i0)") "ERROR: 'number_ghost_nodes' was set smaller as required for FD scheme, you have to adapt it from ", params%g, " to ", FD_max_size
+      call abort(251103, "ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
    ! g_RHS is also dependent on the wavelet due to how we synch each stage:
    ! the third stage (prediction) needs points from the boundary to correctly interpolate values
-   if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central' ) g_RHS_min = 3
-   if ( params%order_discretization == 'FD_4th_central' ) g_RHS_min = 2
-   if ( params%order_discretization == 'FD_2nd_central' ) g_RHS_min = 1
+   g_RHS_min = FD_max_size
    if (params%g_RHS < g_RHS_min) then
       if (params%rank==0) then
          write(*,  '(A, i0, A, i0, A)') "Warning!! 'number_ghost_nodes_rhs' was set smaller as required for FD scheme, adapting it from ", params%g_RHS, " to ", g_RHS_min, " (ignore this if it was not explicitly set)"
@@ -207,7 +223,7 @@ subroutine ini_file_to_params( params, filename )
       params%g_RHS = g_RHS_min
    endif
 
-   ! JB ToDo - correct once this is more settled
+   ! ! JB ToDo - correct once this is more settled
    ! ! we want to know the stencil size for laplacian schemes usually, so lets save this here
    ! if (params%poisson_order == 'CFD_2nd') then
    !    params%poisson_stencil_size = 1
@@ -317,7 +333,7 @@ subroutine ini_blocks(params, FILE )
    type(inifile) ,intent(inout)     :: FILE
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
-   integer(kind=ik) :: i, g_default, g_RHS_default
+   integer(kind=ik) :: i, g_default, g_RHS_default, CDFX, CDFY
    real(kind=rk), dimension(:), allocatable  :: tmp
    logical :: lifted_wavelet
 
@@ -335,41 +351,35 @@ subroutine ini_blocks(params, FILE )
    ! which use module_params it cannot be called here (circular dependency....)
    ! compute the number of ghost points, which for CDFXY is X for unlifted and X+Y-1 for lifted wavelets
    ! check if it is lifted or unlifted, which depends on Y (0 for unlifted and >0 for lifted wavelets)
-
-   ! check for X in CDFXY
-   ! g_RHS is also dependent on the wavelet due to how we synch each stage:
-   ! the third stage (prediction) needs points from the boundary to correctly interpolate values
-   if (params%wavelet(4:4) == "2") then
-      g_default = 1
-      g_RHS_default = 1
-   elseif (params%wavelet(4:4) == "4") then
-      g_default = 3
-      g_RHS_default = 2
-   elseif (params%wavelet(4:4) == "6") then
-      g_default = 5
-      g_RHS_default = 3
-   elseif (params%wavelet(4:4) == "8") then
-      g_default = 7
-      g_RHS_default = 4
-   else 
-      call abort(2320242, "no default specified for this wavelet...")
+   read(params%wavelet(4:4), *) CDFX
+   ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
+   if (CDFX == 1) then
+         read(params%wavelet(4:5), *) CDFX
    endif
-
-   ! check for Y in CDFXY
-   lifted_wavelet = params%wavelet(5:5) /= "0"
-   if (params%wavelet(5:5) == "0") then
-      ! g stays the same
-   elseif (params%wavelet(5:5) == "2") then
-      g_default = g_default + 1
-   elseif (params%wavelet(5:5) == "4") then
-      g_default = g_default + 3
-   elseif (params%wavelet(5:5) == "6") then
-      g_default = g_default + 5
-   elseif (params%wavelet(5:5) == "8") then
-      g_default = g_default + 7
+   if (all(CDFX /= (/2,4,6,8,10,12/))) then
+         call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+   endif
+   if (CDFX < 10) then
+         read(params%wavelet(5:5), *) CDFY
    else
-      call abort(2320243, "no default specified for this wavelet...")
+         read(params%wavelet(6:6), *) CDFY
    endif
+   if (CDFY == 1) then
+         if (CDFX < 10) then
+            read(params%wavelet(5:6), *) CDFY
+         else
+            read(params%wavelet(6:7), *) CDFY
+         endif
+   endif
+   if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
+         call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
+   endif
+
+   ! Now let's set the default ghost node numbers depending on the wavelet
+   g_default = CDFX-1 + max(CDFY-1,0)
+   g_RHS_default = CDFX/2
+   
+   lifted_wavelet = CDFY /= 0
 
    call read_param_mpi(FILE, 'Blocks', 'max_forest_size', params%forest_size, 3 )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes', params%g, g_default )
@@ -401,7 +411,7 @@ subroutine ini_blocks(params, FILE )
    endif
 
    if ( params%Jmax < params%Jmin ) then
-      call abort(2609181,"Error: Minimal Treelevel cant be larger then Max Treelevel! ")
+      call abort(2609181,"Error: Minimal Treelevel cannot be larger then Max Treelevel! ")
    end if
 
    if ( (params%dim==3 .and. params%Jmax > 21) .or. (params%dim==2 .and. params%Jmax > 32) ) then
@@ -443,9 +453,7 @@ subroutine ini_blocks(params, FILE )
    if ((params%adapt_tree .and. params%coarsening_indicator=="threshold-state-vector") .or. (params%adapt_inicond .and. params%coarsening_indicator_inicond=="threshold-state-vector")) then
       call read_param_mpi(FILE, 'Blocks', 'threshold_state_vector_component',  tmp, tmp )
    end if
-   do i = 1, params%n_eqn
-      params%threshold_state_vector_component(i) = nint(tmp(i))
-   enddo
+   params%threshold_state_vector_component(1:params%n_eqn) = nint(tmp(1:params%n_eqn))
    deallocate(tmp)
 
    if (params%Jini > params%Jmax) then

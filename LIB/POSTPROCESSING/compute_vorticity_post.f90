@@ -93,53 +93,56 @@ subroutine compute_vorticity_post(params)
         call get_command_argument(4, order)
     end if
 
+    call get_cmd_arg( "--wavelet", params%wavelet, default="---" )
+
     ! decide which order for discretization and predictor is used. Note predictor
     ! is used in ghost nodes sync'ing
     if (order == "2") then
         params%order_discretization = "FD_2nd_central"
-        params%wavelet = "CDF20"  ! wavelet used for adaptive syncing
-        params%g = 2_ik
+        if (params%wavelet == "---") params%wavelet = "CDF20"  ! wavelet used for adaptive syncing
+    elseif (order == "3_comp_12") then
+        params%order_discretization = "FD_3rd_comp_1_2"
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4") then
         params%order_discretization = "FD_4th_central"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4op") then
         params%order_discretization = "FD_4th_central_optimized"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
     elseif (order == "4_comp_13") then
         params%order_discretization = "FD_4th_comp_1_3"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 3_ik
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
+        params%g = 3_ik  ! 3 from stencil, 3 from wavelet
         if (operator == "--dissipation") params%g = 4_ik  ! dissipation uses L=DG with different stencil width
     elseif (order == "4_comp_04") then
         params%order_discretization = "FD_4th_comp_0_4"
-        params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
-        params%g = 4_ik
+        if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
+    elseif (order == "5_comp_23") then
+        params%order_discretization = "FD_5th_comp_2_3"
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 3_ik
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_24") then
         params%order_discretization = "FD_6th_comp_2_4"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 4_ik
-        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_15") then
         params%order_discretization = "FD_6th_comp_1_5"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 5_ik
-        if (operator == "--dissipation") params%g = 6_ik  ! dissipation uses L=DG with different stencil width
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "6_comp_06") then
         params%order_discretization = "FD_6th_comp_0_6"
-        params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 6_ik
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
+    elseif (order == "7_comp_34") then
+        params%order_discretization = "FD_7th_comp_3_4"
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
     elseif (order == "8") then
         params%order_discretization = "FD_8th_central"
-        params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
-        params%g = 4_ik
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
+    elseif (order == "8_comp_35") then
+        params%order_discretization = "FD_8th_comp_3_5"
+        if (params%wavelet == "---") params%wavelet = "CDF80"  ! wavelet used for adaptive syncing
     else
-        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 2 (FD_2nd_central), 4 (FD_4th_central), 6 (FD_6th_central), 4op (FD_4th_central_optimized), 4_comp_13 (FD_4th_comp_1_3), 4_comp_04 (FD_4th_comp_0_4), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5) and 6_comp_06 (FD_6th_comp_0_6)")
+        call abort(8765,"chosen discretization order invalid or not (yet) implemented. choose between 2 (FD_2nd_central), 4 (FD_4th_central), 6 (FD_6th_central), 4op (FD_4th_central_optimized), 3_comp_12 (FD_3rd_cop_1_2), 4_comp_13 (FD_4th_comp_1_3), 4_comp_04 (FD_4th_comp_0_4), 5_comp_23 (FD_5th_comp_2_3), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5), 6_comp_06 (FD_6th_comp_0_6), 7_comp_34 (FD_7th_comp_3_4), 8 (FD_8th_central), 8_comp_35 (FD_8th_comp_3_5)")
     end if
 
     params%Jmax = tc_length
@@ -157,18 +160,17 @@ subroutine compute_vorticity_post(params)
         params%symmetry_vector_component(3) = "z"
     endif
 
+    call setup_wavelet(params, params%g)
+
     Bs = params%Bs
     g  = params%g
-
-
-    call setup_wavelet(params)
 
     ! no refinement is made in this postprocessing tool; we therefore allocate about
     ! the number of blocks in the file (and not much more than that)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     nwork = 1
-    if (operator == "--vorticity") then
+    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
         nwork = 3
     endif
 
@@ -191,7 +193,7 @@ subroutine compute_vorticity_post(params)
         call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgtID, x0, dx )
 
-        if (operator == "--vorticity") then
+        if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
             call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
 
@@ -235,53 +237,58 @@ subroutine compute_vorticity_post(params)
         endif
     end do
 
-    if (operator == "--vorticity") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'vorx', nint(time * 1.0e6_rk)
-
-        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
+        if (operator /= "--vory" .and. operator /= "--vorz") then
+            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+            call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+        end if
 
         if (params%dim == 3) then
-            write( fname,'(a, "_", i12.12, ".h5")') 'vory', nint(time * 1.0e6_rk)
-            call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
-            write( fname,'(a, "_", i12.12, ".h5")') 'vorz', nint(time * 1.0e6_rk)
-            call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
+            if (operator /= "--vorx" .and. operator /= "--vorz") then
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vory', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
+            end if
+            if (operator /= "--vorx" .and. operator /= "--vory") then
+                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
+            end if
         end if
 
     elseif (operator == "--vor-abs") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'vorabs', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorabs', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--helicity") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'helx', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
-        write( fname,'(a, "_", i12.12, ".h5")') 'hely', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'hely', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID )
-        write( fname,'(a, "_", i12.12, ".h5")') 'helz', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--hel-abs") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'helabs', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helabs', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--divergence") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'divu', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'divu', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--Q") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'Qcrit', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'Qcrit', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--dissipation") then
-        write( fname,'(a, "_", i12.12, ".h5")') 'dissipation', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'dissipation', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--copy") then
 
-        write( fname,'(a, "_", i12.12, ".h5")') 'copyUx', nint(time * 1.0e6_rk)
+        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'copyUx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     endif
 

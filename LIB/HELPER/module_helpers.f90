@@ -1143,7 +1143,7 @@ contains
         integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
         logical, optional, intent(in) :: append                ! if true, data is appended to file
 
-        integer :: ii, apply_digits
+        integer :: iy, iz, apply_digits
         logical :: toInt, apply_append
         character(len=120) :: formatter
 
@@ -1166,15 +1166,33 @@ contains
             open(unit=32, file=file, status='unknown', position='append')
             write(32, '(A)') ""  ! empty line
         endif
-        do ii = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
-            if (toInt) then
-                write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
-                write(32, formatter) nint(u(:, ii, 1, 1))
-            else
-                write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
-                write(32, formatter) u(:, ii, 1, 1)
-            endif
-        enddo
+        if (size(u, 3) == 1) then
+            do iy = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                    write(32, formatter) nint(u(:, iy, 1, 1))
+                else
+                    write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                    write(32, formatter) u(:, iy, 1, 1)
+                endif
+            enddo
+        else
+            ! write 3D block by writing all slices one after another
+            do iz = 1, size(u, 3)
+                write(32, '(A, I0)') "iz = ", iz  ! indicate which slice is printed
+                write(32, '(A)') ""  ! empty line between slices
+                do iy = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+                    if (toInt) then
+                        write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                        write(32, formatter) nint(u(:, iy, iz, 1))
+                    else
+                        write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                        write(32, formatter) u(:, iy, iz, 1)
+                    endif
+                enddo
+                write(32, '(A)') ""  ! empty line between slices
+            enddo
+        endif
         close(32)
     end subroutine
 

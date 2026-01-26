@@ -15,8 +15,8 @@ module module_t_files
 
     ! precision statement
     integer(kind=ik), save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
-    integer(kind=ik), parameter :: max_parallel_files = 150
-    integer(kind=ik), parameter :: max_columns = 160
+    integer(kind=ik), parameter :: max_parallel_files = 80
+    integer(kind=ik), parameter :: max_columns = 80
     integer(kind=ik), save :: mpirank = 7
 
     ! variables
@@ -62,6 +62,7 @@ contains
         if (mpirank/=0) return
 
         if (.not. allocated(data_buffer) ) then
+            ! size of this array is not large, but not tiny either
             allocate(data_buffer(1:flush_frequency, 1:max_columns, 1:max_parallel_files))
             allocate(iteration(1:max_parallel_files))
             allocate(n_columns(1:max_parallel_files))

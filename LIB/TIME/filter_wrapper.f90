@@ -6,111 +6,114 @@ subroutine filter_wrapper(time, params, hvy_block, tree_ID)
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)     !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID      
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
-    integer(kind=ik)                    :: k, dF, neqn, lgt_id, i       ! loop variables
-    integer(kind=ik)                    :: g, a, nx, ny, nz, nc
+    integer(kind=ik)                    :: k, lgt_id, ic       ! loop variables
+    integer(kind=ik)                    :: g, a, nc
     integer(kind=ik), dimension(3)      :: Bs
     integer(kind=2)                     :: n_domain(1:3)                ! surface normal
-    integer(kind=ik)                    :: level, hvy_id
-    real(kind=rk)                       :: stencil(-19:19)          ! stencil array, note: size is fixed
+    integer(kind=ik)                    :: lvl, hvy_id
+    real(kind=rk), allocatable          :: stencil(:)
     integer(kind=ik)                    :: stencil_size         ! filter position (array postion of value to filter)
-    real(kind=rk), allocatable, save    :: u_filtered(:,:,:,:)
 
     Bs = params%Bs
     g  = params%g
     n_domain = 0
-    nx = size(hvy_block, 1)
-    ny = size(hvy_block, 2)
-    nz = size(hvy_block, 3)
     nc = size(hvy_block, 4)
 
-    if (.not. allocated(u_filtered)) allocate( u_filtered(1:nx,1:ny,1:nz,1:nc) )
+    if (params%filter_only_maxlevel .and. params%filter_all_except_maxlevel) then
+        call abort(251106,"ERROR: Do you want to filter only on max level or all except max level??? Choose one, not both.")
+    end if
+
+    select case(params%filter_type)
+    case('explicit_3pt', 'superviscosity_2nd')
+        call generate_superviscosity_stencil(stencil, a, 2)
+    case('explicit_5pt', 'superviscosity_4th')
+        call generate_superviscosity_stencil(stencil, a, 4)
+        stencil = -stencil  ! filters are defined to be negative at center?
+    case('explicit_7pt', 'superviscosity_6th')
+        call generate_superviscosity_stencil(stencil, a, 6)
+    case('explicit_9pt', 'superviscosity_8th')
+        call generate_superviscosity_stencil(stencil, a, 8)
+        stencil = -stencil  ! filters are defined to be negative at center?
+    case('explicit_11pt', 'superviscosity_10th')
+        call generate_superviscosity_stencil(stencil, a, 10)
+    case('explicit_13pt', 'superviscosity_12th')
+        call generate_superviscosity_stencil(stencil, a, 12)
+        stencil = -stencil  ! filters are defined to be negative at center?
+    case('explicit_15pt', 'superviscosity_14th')
+        call generate_superviscosity_stencil(stencil, a, 14)
+    case('explicit_17pt', 'superviscosity_16th')
+        call generate_superviscosity_stencil(stencil, a, 16)
+        stencil = -stencil  ! filters are defined to be negative at center?
+    case('explicit_19pt', 'superviscosity_18th')
+        call generate_superviscosity_stencil(stencil, a, 18)
+    case('explicit_21pt', 'superviscosity_20th')
+        call generate_superviscosity_stencil(stencil, a, 20)
+        stencil = -stencil  ! filters are defined to be negative at center?
+    case default
+        call abort(251107,"ERROR: Filter not known: "//params%filter_type)
+    end select
+
+    if (a > params%g) then
+        call abort(251108,"ERROR: Nice filter you've selected there, but its stencil size exceeds the ghost layer thickness. Increase g.")
+    end if
+
+    ! we sum the filter operation to the flow, so we need to add 1 at the center
+    stencil(0) = stencil(0) + 1.0_rk
 
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
-
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        lvl = lgt_block(lgt_id, IDX_MESH_LVL)
 
-        select case(params%filter_type)
-        case('explicit_3pt')
-            ! This filter comes from
-            ! A general class of commutative filters for LES in complex geometries
-            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
-            ! 
-            ! Table I, case 1
-            !
-            ! If you look closely, you'll realize that those filters are the same as
-            ! higher order viscosity terms (hyperviscosity) with some given numerical 
-            ! dissipation. 
-            ! The 3pt filter corresponds to D2, the 5pt to D4 (with a coefficient of 
-            ! nu_num = -dx**4 / (16*dt) (yes, its a negative sign because it's 1i**4) )
-            ! and the 7pt to a 6th derivative (D6, central, 2nd order) with a diffusion of (dx**6/64*dt).
+        ! we have some special filter settings to filter only parts of the domain
+        if (params%filter_only_maxlevel .and. lvl < params%Jmax) cycle
+        if (params%filter_all_except_maxlevel .and. lvl == params%Jmax) cycle
 
-            stencil_size = 3
-            a = (stencil_size-1)/2
-            stencil(-a:+a) = (/ 1.0_rk/4.0_rk, -1.0_rk/2.0_rk, 1.0_rk/4.0_rk /)
-
-        case('explicit_5pt')
-            ! This filter comes from
-            ! A general class of commutative filters for LES in complex geometries
-            ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
-            ! 
-            ! Table I, case 5
-            stencil_size = 5
-            a = (stencil_size-1)/2
-            stencil(-a:+a) = (/ -1.0_rk/ 16.0_rk, &
-            1.0_rk/  4.0_rk, &
-            -3.0_rk/  8.0_rk, & ! 1-3/8 = 5/8
-            1.0_rk/  4.0_rk, &
-            -1.0_rk/ 16.0_rk/)
-
-        case('explicit_7pt')
-            ! same as above case 10
-            ! Corresponds to a 6th derivative hyperviscosity term (2nd order central FD)
-            stencil_size = 7
-            a = (stencil_size-1)/2
-            stencil(-a:+a) = (/  1.0_rk/ 64.0_rk, &
-            -3.0_rk/ 32.0_rk, &
-            15.0_rk/ 64.0_rk, &
-            -5.0_rk/ 16.0_rk, &
-            15.0_rk/ 64.0_rk, &
-            -3.0_rk/ 32.0_rk, &
-            1.0_rk/ 64.0_rk/)
-
-        case('explicit_9pt')
-            ! not included in Vasilyev 1998
-            stencil_size = 9
-            a = (stencil_size-1)/2
-            stencil(-a:+a) = (/ -1.0_rk/256.0_rk, &
-            1.0_rk/ 32.0_rk, &
-            -7.0_rk/ 64.0_rk, &
-            7.0_rk/ 32.0_rk, &
-            -35.0_rk/128.0_rk, &
-            7.0_rk/ 32.0_rk, &
-            -7.0_rk/ 64.0_rk, &
-            1.0_rk/ 32.0_rk, &
-            -1.0_rk/256.0_rk/)
-
-        case('explicit_11pt')
-            ! not included in Vasilyev 1998
-            stencil_size = 11
-            a = (stencil_size-1)/2
-            stencil(-a:+a) = (/  1.0_rk/1024.0_rk, &
-            -5.0_rk/ 512.0_rk, &
-            45.0_rk/1024.0_rk, &
-            -15.0_rk/ 128.0_rk, &
-            105.0_rk/ 512.0_rk, &
-            -63.0_rk/ 256.0_rk, &
-            105.0_rk/ 512.0_rk, &
-            -15.0_rk/ 128.0_rk, &
-            45.0_rk/1024.0_rk, &
-            -5.0_rk/ 512.0_rk, &
-            1.0_rk/1024.0_rk/)
-        end select
-
-        stencil(0) = stencil(0) + 1.0_rk
-
-        call blockFilterXYZ_vct( params, hvy_block(:,:,:,:, hvy_id), u_filtered, stencil(-a:+a), -a, +a)
-        hvy_block(:,:,:,:, hvy_id) = u_filtered
+        ! we filter each component separately, depending on user choice (defaults to all components)
+        do ic = 1, params%n_eqn
+            if (.not. params%filter_component(ic)) cycle
+            call blockFilterXYZ_vct( params, hvy_block(:,:,:,ic:ic, hvy_id), hvy_block(:,:,:,ic:ic, hvy_id), stencil(-a:+a), -a, +a)
+        enddo
 
     enddo
 end subroutine filter_wrapper
+
+
+! creates the explicit filter stencils, which can be used for superviscosity
+! these have 2nd order accuracy and are of order 'order'
+subroutine generate_superviscosity_stencil(stencil, length, order)
+    real(kind=rk), intent(inout), allocatable :: stencil(:)
+    integer(kind=ik), intent(in) :: order
+    integer(kind=ik), intent(inout) :: length
+    integer(kind=ik) :: k
+    integer(kind=ik) :: binom
+
+    length = order/2
+    if (allocated(stencil)) then
+        if (lbound(stencil, dim=1) > -length .or. ubound(stencil, dim=1) < length) then
+            deallocate(stencil)
+        end if
+    end if
+    if (.not. allocated(stencil)) allocate( stencil(-length:length) )
+
+    do k = -length, length
+        binom = binomial_coeff(length*2, length+k)
+        stencil(k) = (-1.0d0)**(k+length) * dble(binom)
+    end do
+    ! normalize L1 norm to 1
+    stencil = stencil / sum(abs(stencil))
+end subroutine generate_superviscosity_stencil
+
+! Function to compute binomial coefficient n choose k
+integer function binomial_coeff(n, k)
+    integer, intent(in) :: n, k
+    integer :: i
+    if (k < 0 .or. k > n) then
+        binomial_coeff = 0
+    else
+        binomial_coeff = 1
+        do i = 1, k
+        binomial_coeff = binomial_coeff * (n - i + 1) / i
+        end do
+    end if
+end function binomial_coeff

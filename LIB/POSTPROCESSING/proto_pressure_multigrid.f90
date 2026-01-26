@@ -21,8 +21,8 @@ subroutine proto_pressure_multigrid(params)
             type(type_params), intent(in) :: params
             real(kind=rk), intent(inout) :: hvy_u(:,:,:,:,:)
             real(kind=rk), intent(out) :: hvy_NL(:,:,:,:,:)
-            character(len=*), intent(in) :: order_discretization
-            integer, intent(in) :: treeID
+            character(len=cshort), intent(in) :: order_discretization
+            integer(kind=ik), intent(in) :: treeID
         end subroutine compute_NonLinear
 
         subroutine compute_divergence_tree(params, hvy_u, hvy_div, order_discretization, treeID)
@@ -31,8 +31,8 @@ subroutine proto_pressure_multigrid(params)
             type(type_params), intent(in) :: params
             real(kind=rk), intent(in) :: hvy_u(:,:,:,:,:)
             real(kind=rk), intent(out) :: hvy_div(:,:,:,:)
-            character(len=*), intent(in) :: order_discretization
-            integer, intent(in) :: treeID
+            character(len=cshort), intent(in) :: order_discretization
+            integer(kind=ik), intent(in) :: treeID
         end subroutine compute_divergence_tree
     end interface
 
@@ -281,11 +281,11 @@ subroutine proto_pressure_multigrid(params)
             enddo
             ! compute norms
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "L2", norm(1:1), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L2: ", norm(1), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L2: ", norm(1), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "L1", norm(2:2), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L1: ", norm(2), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L1: ", norm(2), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:1,:,1), tree_ID, "Linfty", norm(3:3), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral Linfty: ", norm(3), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral Linfty: ", norm(3), " ---"
 
             call append_t_file('multigrid-compare.t', (/dble(i_cycle), norm(1), norm(2), norm(3)/))
         endif
@@ -350,8 +350,8 @@ subroutine proto_NSI_EE(params)
             type(type_params), intent(in) :: params
             real(kind=rk), intent(in) :: hvy_u(:,:,:,:,:)
             real(kind=rk), intent(out) :: hvy_div(:,:,:,:)
-            character(len=*), intent(in) :: order_discretization
-            integer, intent(in) :: treeID
+            character(len=cshort), intent(in) :: order_discretization
+            integer(kind=ik), intent(in) :: treeID
         end subroutine compute_divergence_tree
 
         subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretization, treeID, nu, C_eta)
@@ -361,8 +361,8 @@ subroutine proto_NSI_EE(params)
             real(kind=rk), intent(in) :: hvy_u(:,:,:,:,:)
             real(kind=rk), intent(in) :: hvy_mask(:,:,:,:,:)
             real(kind=rk), intent(out) :: hvy_RHS(:,:,:,:,:)
-            character(len=*), intent(in) :: order_discretization
-            integer, intent(in) :: treeID
+            character(len=cshort), intent(in) :: order_discretization
+            integer(kind=ik), intent(in) :: treeID
             real(kind=rk), intent(in), optional :: nu, C_eta
         end subroutine compute_NSI_RHS
 
@@ -373,8 +373,8 @@ subroutine proto_NSI_EE(params)
             real(kind=rk), intent(in) :: hvy_u(:,:,:,:,:)
             real(kind=rk), intent(in) :: hvy_p(:,:,:,:,:)
             real(kind=rk), intent(out) :: hvy_u_div0(:,:,:,:,:)
-            character(len=*), intent(in) :: order_discretization
-            integer, intent(in) :: treeID
+            character(len=cshort), intent(in) :: order_discretization
+            integer(kind=ik), intent(in) :: treeID
             real(kind=rk), intent(in) :: dt
         end subroutine compute_projection
     end interface
@@ -392,7 +392,7 @@ subroutine proto_NSI_EE(params)
     character(len=cshort)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:6), volume
     integer(kind=tsize)                :: treecode
-    logical                            :: it_is_time_to_save_data=.false., overwrite, error_OOM
+    logical                            :: it_is_time_to_save_data=.false., overwrite, error_OOM, is_equidistant
     integer(kind=ik)                   :: Nblocks_rhs, Nblocks, lgt_n_tmp, mpicode, Jmin1, Jmax1
 
     type(inifile) :: FILE
@@ -441,40 +441,22 @@ subroutine proto_NSI_EE(params)
     call init_physics_modules( params, file_params, params%N_mask_components  )
 
     order_laplacian = params%poisson_order
-    select case(params%poisson_order)
-    case ("FD_2nd_central", "FD_4th_central", "FD_6th_central", "FD_8th_central")
-        order_disc_nonlinear = params%poisson_order
-        order_disc_pressure = params%poisson_order
-        params%order_discretization = params%poisson_order
-    case ("FD_6th_mehrstellen")
+    order_disc_nonlinear = params%poisson_order
+    order_disc_pressure = params%poisson_order
+    params%order_discretization = params%poisson_order
+    
+    ! some special snowflakes
+    if (params%poisson_order == "FD_6th_mehrstellen") then
         order_disc_nonlinear = "FD_6th_central"
         order_disc_pressure = "FD_6th_central"
         params%order_discretization = "FD_6th_central"
-    case ("FD_4th_comp_0_4")
-        order_disc_nonlinear = "FD_4th_central"
-        order_disc_pressure = "FD_4th_comp_0_4"
-        params%order_discretization = "FD_4th_comp_0_4"
-    case ("FD_4th_comp_2_2")
-        order_disc_nonlinear = "FD_4th_central"
-        order_disc_pressure = "FD_4th_central"
-        params%order_discretization = "FD_4th_central"
-    case ("FD_4th_comp_1_3")
-        ! order_disc_nonlinear = "FD_4th_central"
-        order_disc_nonlinear = "FD_4th_comp_1_3"
-        order_disc_pressure = "FD_4th_comp_1_3"
-        ! order_disc_pressure = "FD_4th_central"
-        params%order_discretization = "FD_4th_comp_1_3"
-    case ("FD_6th_comp_3_3")
-        order_disc_nonlinear = "FD_6th_central"
-        order_disc_pressure = "FD_6th_central"
-        params%order_discretization = "FD_6th_central"
-    case ("FD_6th_comp_2_4")
-        order_disc_nonlinear = "FD_6th_comp_2_4"
-        order_disc_pressure = "FD_6th_comp_2_4"
-        params%order_discretization = "FD_6th_comp_2_4"
-    end select
+    ! elseif (params%poisson_order == "FD_4th_comp_1_3") then
+    !     order_disc_nonlinear = "FD_4th_comp_1_3"
+    !     order_disc_pressure = "FD_4th_comp_1_3"
+    !     params%order_discretization = "FD_4th_comp_1_3"
+    endif
 
-    ! HACK - read in values that are only read bu ACM module but that we need
+    ! HACK - read in values that are only read by ACM module but that we need
     call read_ini_file_mpi(FILE, file_params, .true.)
     call read_param_mpi(FILE, 'ACM-new', 'nu', nu, 5.0e-5_rk )
     call read_param_mpi(FILE, 'VPM', 'C_eta', C_eta, 1.0_rk )
@@ -490,6 +472,8 @@ subroutine proto_NSI_EE(params)
         params%order_predictor = "multiresolution_8th"
     elseif (params%wavelet(4:4) == "8") then
         params%order_predictor = "multiresolution_10th"
+    elseif (params%wavelet(4:5) == "10" .or. params%wavelet(4:5) == "12") then
+        params%order_predictor = "multiresolution_12th"
     endif
     call setup_laplacian_stencils(params, params%g)
 
@@ -546,7 +530,7 @@ subroutine proto_NSI_EE(params)
     call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
     call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
     call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-    call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+    call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false., hvy_full=hvy_tmp)
     call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
     call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
 
@@ -561,7 +545,7 @@ subroutine proto_NSI_EE(params)
     ! call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
     ! call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
     ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-    ! call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+    ! call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false., hvy_full=hvy_tmp)
     ! call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
     ! call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
 
@@ -578,7 +562,7 @@ subroutine proto_NSI_EE(params)
     call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
     call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+1,:), order_disc_pressure, tree_ID_flow)
     call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
-    call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow)
+    call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, hvy_full=hvy_tmp)
 
     !*******************************************************************
     ! statistics
@@ -592,10 +576,20 @@ subroutine proto_NSI_EE(params)
     ! Write fields to HDF5 file
     !***********************************************************************
     ! do not save any output before this time (so maybe revoke the previous decision)
-    if (time>=params%write_time_first) then
+    if (time+1e-12_rk>=params%write_time_first) then
         call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
     endif
-    params%next_write_time = params%next_write_time + params%write_time
+
+    !---------------------------------------------------------------------------
+    ! main time loop
+    !---------------------------------------------------------------------------
+    if (params%rank==0) then
+        write(*,*) ""
+        write(*,'(10(" "), "╔", 48("═"), "╗")') 
+        write(*,'(10(" "), A)') "║ On your marks, ready, starting main time loop! ║"
+        write(*,'(10(" "), "╚", 48("═"), "╝")')
+        write(*,*) ""
+    endif
 
     ! ------------------------------------------------------------
     ! Explicit Euler timestepping
@@ -632,6 +626,7 @@ subroutine proto_NSI_EE(params)
         Nblocks_rhs = lgt_n(tree_ID_flow)
         Jmin1 = minActiveLevel_tree(tree_ID_flow)
         Jmax1 = maxActiveLevel_tree(tree_ID_flow)
+        is_equidistant = Jmin1==Jmax1
 
         !***********************************************************************
         ! Timestep - Euler Explicit or RK2 / Heun's method
@@ -659,7 +654,17 @@ subroutine proto_NSI_EE(params)
         call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
         call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
         t3 = MPI_wtime()
-        call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+        ! if the grid doesn't change, then we can reuse the previous solution as initial guess
+        ! if not, then we should start from zero, as blocks might have been moved or new ones activated, resulting in rubbish initial guess
+        if (params%adapt_tree) then
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
+                                hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., &
+                                verbose=.true., hvy_full=hvy_tmp)
+        else
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
+                                hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.false., &
+                                verbose=.false., hvy_full=hvy_tmp)
+        endif
         call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
         t3 = MPI_wtime()
         call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
@@ -690,6 +695,10 @@ subroutine proto_NSI_EE(params)
             ! compute RHS for the current stage without pressure gradient
             t3 = MPI_wtime()
             call compute_NSI_RHS(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,j), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
+            ! incremental version, add old pressure gradient so that new pressure to be solved is only Dp - this reduces the amount of iterations for projection needed to converge, however it only really helps for adaptive grids
+            if (.not. is_equidistant) then
+                call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,j), order_disc_pressure, tree_ID_flow, 1.0_rk)
+            endif
             call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
             ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
             t3 = MPI_wtime()
@@ -699,7 +708,8 @@ subroutine proto_NSI_EE(params)
             call compute_divergence_tree(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,1,:), order_disc_pressure, tree_ID_flow)
             call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
             t3 = MPI_wtime()
-            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, verbose=.false.)
+            ! interestingly, for adaptive grids we better initialize with zero, as it needs less iterations to converge
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0= .not. is_equidistant, verbose=.false., hvy_full=hvy_tmp)
             call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
             t3 = MPI_wtime()
             call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,j), order_disc_pressure, tree_ID_flow, 1.0_rk)
@@ -742,11 +752,11 @@ subroutine proto_NSI_EE(params)
         ! determine if it is time to save data
         it_is_time_to_save_data = .false.
         if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-            (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
+            (params%write_method=='fixed_time' .and. abs(mod(time, params%write_time))<1.0e-12_rk)) then
             it_is_time_to_save_data = .true.
         endif
         ! do not save any output before this time (so maybe revoke the previous decision)
-        if (time<params%write_time_first) then
+        if (time+1e-12_rk<params%write_time_first) then
             it_is_time_to_save_data = .false.
         endif
         ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
@@ -766,7 +776,7 @@ subroutine proto_NSI_EE(params)
             call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
             call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
             t3 = MPI_wtime()
-            call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false.)
+            call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false., hvy_full=hvy_tmp)
             call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
             t3 = MPI_wtime()
             call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
@@ -776,47 +786,46 @@ subroutine proto_NSI_EE(params)
             call toc( "timestep: compute_projection", 25, MPI_wtime()-t3)
         endif
 
-        ! we reconstruct the pressure if we do statistics or save data to have it in respective accuracy
-        if (it_is_time_to_save_data .or. (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk)) then
-            t3 = MPI_wtime()
-            call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
-            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
-            t3 = MPI_wtime()
-            call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_tmp(:,:,:,1:params%dim,:), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
-            call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
-            t3 = MPI_wtime()
-            call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
-            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
-            t3 = MPI_wtime()
-            call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
-            call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
-            t3 = MPI_wtime()
-            call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
-            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
-            t3 = MPI_wtime()
-            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow)
-            call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
-            do k_block = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k_block, tree_ID)
-                hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),params%dim+1,hvy_id) = hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),4,hvy_id)
-            enddo
-        endif
+        ! ! we reconstruct the pressure if we do statistics or save data to have it in respective accuracy
+        ! ! if (it_is_time_to_save_data .or. (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time, params%tsave_stats))<1e-12_rk)) then
+        ! ! pressure is not needed in statistics, so we skip it here
+        ! if (it_is_time_to_save_data) then
+        !     t3 = MPI_wtime()
+        !     call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+        !     call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+        !     t3 = MPI_wtime()
+        !     call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_tmp(:,:,:,1:params%dim,:), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
+        !     call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
+        !     t3 = MPI_wtime()
+        !     call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+        !     call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+        !     t3 = MPI_wtime()
+        !     call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
+        !     call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+        !     t3 = MPI_wtime()
+        !     call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
+        !     call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+        !     t3 = MPI_wtime()
+        !     call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, hvy_full=hvy_tmp)
+        !     call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+        !     do k_block = 1, hvy_n(tree_ID)
+        !         hvy_id = hvy_active(k_block, tree_ID)
+        !         hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),params%dim+1,hvy_id) = hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),4,hvy_id)
+        !     enddo
+        ! endif
 
         call toc( "TOPLEVEL: time stepper", 11, MPI_wtime()-t4)
 
         !*******************************************************************
         ! statistics
         !*******************************************************************
-        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) .or. abs(time - params%time_max) < 1e-12_rk ) then
+        if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time, params%tsave_stats))<1e-12_rk) .or. abs(time - params%time_max) < 1e-12_rk ) then
             t4 = MPI_wtime()
             ! we need to sync ghost nodes for some derived qtys, for sure
             call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
             call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
             call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
-
-            ! update next stats time
-            if (abs(time - params%next_stats_time)<1e-12_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
         endif
 
         !***********************************************************************
@@ -848,12 +857,59 @@ subroutine proto_NSI_EE(params)
         ! Write fields to HDF5 file
         !***********************************************************************
         if (it_is_time_to_save_data) then
+            ! JB comment: Tests show, that this will not affec the solution, but it breaks the significant refinement somehow, so it is disabled for now
+            ! ------------------------------------------------------------
+            ! ! before saving, we will do another projection to make sure the velocity field is as divergence free as possible
+            ! ! this should get rid of divergence error from adaptive mesh changes
+            ! ! Maybe u is not completely divergence free in the discrete sense, so we do one projection in order to get a divergence free velocity field
+            ! t3 = MPI_wtime()
+            ! call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+            ! call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            ! t3 = MPI_wtime()
+            ! call compute_divergence_tree(params, hvy_block(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
+            ! call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+            ! t3 = MPI_wtime()
+            ! call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
+            ! call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            ! t3 = MPI_wtime()
+            ! call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false., hvy_full=hvy_tmp)
+            ! call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+            ! t3 = MPI_wtime()
+            ! call sync_ghosts_tree( params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), tree_ID_flow )
+            ! call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            ! t3 = MPI_wtime()
+            ! call compute_projection(params, hvy_block(:,:,:,1:params%dim,:), hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:params%dim,:), order_disc_pressure, tree_ID_flow, 1.0_rk)
+            ! call toc( "timestep: compute_projection", 25, MPI_wtime()-t3)
+
+            ! now at this position we compute the pressure field to have it in the saved data
+            t3 = MPI_wtime()
+            call sync_ghosts_tree( params, hvy_block(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
+            call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_tmp(:,:,:,1:params%dim,:), order_disc_nonlinear, tree_ID_flow, nu, C_eta)
+            call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
+            t3 = MPI_wtime()
+            call sync_ghosts_tree( params, hvy_tmp(:,:,:,1:params%dim,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
+            call compute_divergence_tree(params, hvy_tmp(:,:,:,1:params%dim,:), hvy_tmp(:,:,:,params%dim+2,:), order_disc_pressure, tree_ID_flow)
+            call toc( "timestep: compute_divergence_tree", 23, MPI_wtime()-t3)
+            t3 = MPI_wtime()
+            call sync_ghosts_tree( params, hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), tree_ID_flow )
+            call toc( "timestep: sync_ghost_tree", 21, MPI_wtime()-t3)
+            t3 = MPI_wtime()
+            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,params%dim+2:params%dim+2,:), hvy_tmp(:,:,:,params%dim+3:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., verbose=.false., hvy_full=hvy_tmp)
+            call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
+            do k_block = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k_block, tree_ID)
+                hvy_block(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),params%dim+1,hvy_id) = hvy_tmp(g(1)+1:g(1)+bs(1),g(2)+1:g(2)+bs(2),g(3)+1:g(3)+bs(3),4,hvy_id)
+            enddo
+
+
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.
             call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
-
-            params%next_write_time = params%next_write_time + params%write_time
         endif
 
         ! output on screen
@@ -938,18 +994,18 @@ subroutine compute_NonLinear(params, hvy_u, hvy_NL, order_discretization, treeID
             do iy = params%g+1, params%Bs(2)+params%g
                 do ix = params%g+1, params%Bs(1)+params%g
                     ! First derivatives
-                    u_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
-                    v_dx   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id)) * dx_inv
+                    u_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
+                    v_dx   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id)) * dx_inv
 
-                    u_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id)) * dy_inv
-                    v_dy   = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
+                    u_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id)) * dy_inv
+                    v_dy   = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
 
                     ! Non-linear energy terms
-                    uu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    uv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,1,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    uu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    uv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,1,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
-                    vu_dx = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,2,hvy_id) * hvy_u(ix+FD1_ls:ix+FD1_le,iy,1,1,hvy_id)) * dx_inv
-                    vv_dy = sum(FD1_l(FD1_ls:FD1_le) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id) * hvy_u(ix,iy+FD1_ls:iy+FD1_le,1,2,hvy_id)) * dy_inv
+                    vu_dx = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,2,hvy_id) * hvy_u(ix+FD1_rs:ix+FD1_re,iy,1,1,hvy_id)) * dx_inv
+                    vv_dy = sum(FD1_r(FD1_rs:FD1_re) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id) * hvy_u(ix,iy+FD1_rs:iy+FD1_re,1,2,hvy_id)) * dy_inv
 
                     hvy_NL(ix,iy,1,1,hvy_id) = -0.5_rk*(uu_dx + uv_dy   + hvy_u(ix,iy,1,1,hvy_id)*u_dx + hvy_u(ix,iy,1,2,hvy_id)*u_dy )
                     hvy_NL(ix,iy,1,2,hvy_id) = -0.5_rk*(vu_dx + vv_dy   + hvy_u(ix,iy,1,1,hvy_id)*v_dx + hvy_u(ix,iy,1,2,hvy_id)*v_dy )
@@ -1064,10 +1120,26 @@ subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretizatio
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re, FD2_s, FD2_e
 
+    ! Determine the viscosity value to use
+    if (present(nu)) then
+        nu_set = nu
+    else
+        nu_set = 1.0e-5_rk
+    endif
+
     ! Setup stencils using the unified interface from module_operators
     call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
     call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
-    call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+    
+    ! Performance optimization: skip FD2 setup if viscosity is zero
+    if (abs(nu_set) < 1.0e-14_rk) then
+        allocate(FD2(0:0))
+        FD2(0) = 0.0_rk
+        FD2_s = 0
+        FD2_e = 0
+    else
+        call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+    endif
     
     ! loop over all blocks
     do k_block = 1, hvy_n(treeID)
@@ -1092,11 +1164,6 @@ subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretizatio
             C_eta_inv = 1.0_rk / C_eta
         else
             C_eta_inv = 1.0_rk
-        endif
-        if (present(nu)) then
-            nu_set = nu
-        else
-            nu_set = 1.0e-5_rk
         endif
 
         ! compute RHS -1/2 (\nabla \cdot u + u \cdot \nabla) u + \nu \Delta u - mask/C_eta (u - u_s)

@@ -1,12 +1,31 @@
 module module_wavelets
     use module_params
     use module_treelib
+    use module_operators, only : setup_FD1_left_stencil, setup_FD2_stencil
 
     implicit none
+
+    ! Everything is public by default
+    PUBLIC
+    SAVE
+
+    ! Private interpolation stencils with added zeros
+    private :: Stencil_Int_2nd, Stencil_Int_4th, Stencil_Int_6th, Stencil_Int_8th, Stencil_Int_10th, Stencil_Int_12th
+    real(kind=rk), parameter :: Stencil_Int_2nd(-1:1) = (/ 1.0_rk, 2.0_rk, 1.0_rk /) / 2.0_rk
+    real(kind=rk), parameter :: Stencil_Int_4th(-3:3) = (/ -1.0_rk, 0.0_rk, 9.0_rk, 16.0_rk, 9.0_rk, 0.0_rk, -1.0_rk /) / 2.0_rk**4
+    real(kind=rk), parameter :: Stencil_Int_6th(-5:5) = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 2.0_rk**8, &
+        150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 2.0_rk**8
+    real(kind=rk), parameter :: Stencil_Int_8th(-7:7) = (/ -5.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 1225.0_rk, &
+        2.0_rk**11, 1225.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -5.0_rk /) / 2.0_rk**11
+    real(kind=rk), parameter :: Stencil_Int_10th(-9:9) = (/ 35.0_rk, 0.0_rk, -405.0_rk, 0.0_rk, 2268.0_rk, 0.0_rk, -8820.0_rk, 0.0_rk, 39690.0_rk, &
+        2.0_rk**16, 39690.0_rk, 0.0_rk, -8820.0_rk, 0.0_rk, 2268.0_rk, 0.0_rk, -405.0_rk, 0.0_rk, 35.0_rk /) / 2.0_rk**16
+    real(kind=rk), parameter :: Stencil_Int_12th(-11:11) = (/ -63.0_rk, 0.0_rk, 847.0_rk, 0.0_rk, -5445.0_rk, 0.0_rk, 22869.0_rk, 0.0_rk, -76230.0_rk, 0.0_rk, 320166.0_rk, &
+        2.0_rk**19, 320166.0_rk, 0.0_rk, -76230.0_rk, 0.0_rk, 22869.0_rk, 0.0_rk, -5445.0_rk, 0.0_rk, 847.0_rk, 0.0_rk, -63.0_rk /) / 2.0_rk**19
 
 contains
 
 #include "conversion_routines.f90"
+#include "wavelet_decomposition_reconstruction.f90"
 
 
     ! this function is only used in merge_blocks, we could remove it
@@ -201,72 +220,6 @@ contains
     end subroutine
 
 
-    ! ! Please note applying a filter requires also manipulating the ghost nodes
-    ! ! Version without vectors
-    ! subroutine blockFilterXYZ( params, u, u_filtered, coefs_filter, a, b )
-    !     implicit none
-    !     type (type_params), intent(in) :: params
-    !     real(kind=rk), dimension(:,:,:), intent(in) :: u
-    !     real(kind=rk), dimension(:,:,:), intent(inout) :: u_filtered
-    !     integer(kind=ik) :: a, b
-    !     real(kind=rk), intent(in) :: coefs_filter(a:b)
-    !     integer(kind=ik) :: ix, iy, iz, nx, ny, nz, shift, g, Bs(1:3)
-    !     real(kind=rk), allocatable, save :: u_tmp(:,:,:)
-
-    !     ! if the filter is just 1, then we copy and we're done.
-    !     ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
-    !     if (a==0 .and. b==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
-    !         u_filtered = u
-    !         return
-    !     endif
-
-    !     nx = size(u, 1)
-    !     ny = size(u, 2)
-    !     nz = size(u, 3)
-    !     g  = params%g
-    !     Bs = params%Bs
-
-    !     if ((abs(a) > g).or.(b>g)) then
-    !         write(*,*) a, b, "but g=", g
-    !         call abort(202302209, "For applying the filter, not enough ghost nodes")
-    !     endif
-
-    !     if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz) )
-    !     u_tmp = u
-
-    !     u_filtered = u_tmp
-    !     u_filtered(g+1:Bs(1)+g, :, :) = 0.0_rk
-    !     do ix = g+1, Bs(1)+g
-    !         ! do ix = -a+1, nx-b
-    !         do shift = a, b
-    !             u_filtered(ix, :, :) = u_filtered(ix, :, :) + u_tmp(ix+shift, :, :)*coefs_filter(shift)
-    !         enddo
-    !     enddo
-
-    !     u_tmp = u_filtered
-    !     u_filtered = u_tmp
-    !     u_filtered(:, g+1:Bs(2)+g, :) = 0.0_rk
-    !     do iy = g+1, Bs(2)+g
-    !         ! do iy = -a+1, ny-b
-    !         do shift = a, b
-    !             u_filtered(:, iy, :) = u_filtered(:, iy, :) + u_tmp(:, iy+shift, :)*coefs_filter(shift)
-    !         enddo
-    !     enddo
-
-    !     if (nz == 1) return
-
-    !     u_tmp = u_filtered
-    !     u_filtered = u_tmp
-    !     u_filtered(:, :, g+1:Bs(3)+g) = 0.0_rk
-    !     do iz = g+1, Bs(3)+g
-    !         do shift = a, b
-    !             u_filtered(:, :, iz) = u_filtered(:, :, iz) + u_tmp(:, :, iz+shift)*coefs_filter(shift)
-    !         enddo
-    !     enddo
-
-    ! end subroutine
-
-
     ! Filters a block, all internal nodes, assuming g >= support of filter (crashes otherwise)
     ! Bs=6, g=2, HD=[-1:1]
     ! g g g g g g g g g g          g g g g g g g g g g          g g g g g g g g g g
@@ -291,17 +244,17 @@ contains
         implicit none
         type (type_params), intent(in) :: params
         real(kind=rk), dimension(:,:,:,:), intent(in) :: u
-        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered
+        real(kind=rk), dimension(:,:,:,:), intent(inout) :: u_filtered  !< output, can also be inplace
         integer(kind=ik), intent(in) :: fl_l, fl_r  !< Filter length left and right
         real(kind=rk), intent(in) :: coefs_filter(fl_l:fl_r)
         logical, intent(in), optional :: do_restriction  !< when we do restriction anyways we can skip every second point
 
-        integer(kind=ik) :: ix, iy, iz, nx, ny, nz, nc, shift, g, Bs(1:3)
-        real(kind=rk), allocatable, save :: u_tmp(:,:,:,:)
+        integer(kind=ik) :: ix, iy, iz, ic, nx, ny, nz, nc, shift, ifs(1:3), ife(1:3), ils(1:3), ile(1:3)
+        real(kind=rk), allocatable, save :: u_tmp(:,:,:)
         integer(kind=ik) :: s  ! sample_num, is either 1 or 2
 
         ! if the filter is just 1, then we copy and we're done.
-        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4)
+        ! Yes, we use such stupid filters. They are in the CDFX0 wavelets (X=2,4,6,8,10,12)
         if (fl_l==0 .and. fl_r==0 .and. abs(coefs_filter(0)-1.0_rk)<=1.0e-10_rk) then
             u_filtered = u
             return
@@ -312,79 +265,70 @@ contains
         ny = size(u, 2)
         nz = size(u, 3)
         nc = size(u, 4)
-        g  = params%g
-        Bs = params%Bs
 
-        if ((abs(fl_l) > g).or.(fl_r>g)) then
-            write(*,'(A, i0, A, i0, A, i0)') "Filter size: ", fl_l, " / ", fl_r, ", but g= ", g
+        ! compute loop boundaries - we have two different loop boundaries that we use
+        ! 1) Filter has not yet been applied, we need g+1+fl_l and Bs+g+fl_r
+        ! 2) Filter has already been applied for this dimension, we need only g+1 and Bs+g
+        ifs = params%g+1+fl_l
+        ife = params%Bs+params%g+fl_r
+        ils = params%g+1
+        ile = params%Bs+params%g
+        if (params%dim == 2) then
+            ifs(3) = 1
+            ife(3) = 1
+            ils(3) = 1
+            ile(3) = 1
+        endif
+
+        if ((abs(fl_l) > params%g).or.(fl_r>params%g)) then
+            write(*,'(A, i0, A, i0, A, i0)') "Filter size: ", fl_l, " / ", fl_r, ", but g= ", params%g
             call abort(202302208, "For applying the filter, not enough ghost nodes")
         endif
 
+        ! stride, used if we do restriction
         s = 1
         if (present(do_restriction)) then
             if (do_restriction) s = 2
         endif
 
-        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
-        u_tmp = u
+        ! it would be tempting to parallelize over ic here, but the temporary work array can become quite large.
+        ! It is no benefit to parallelize anyway, as in memory they are very far apart.
+        if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz) )
 
-        u_filtered = u_tmp
-        if (nz == 1) then
+        do ic = 1, nc
+            
+            u_tmp(:,:,:) = u(:,:,:,ic)
+            u_filtered(:,:,:,ic) = u_tmp(:,:,:)
+
             ! filter results are consecutively added so we need to set to 0 at the beginning
-            u_filtered(g+1:Bs(1)+g:s, g+1+fl_l:Bs(2)+g+fl_r, :, :) = 0.0_rk
-            do ix = g+1, Bs(1)+g, s
+            u_filtered(ils(1):ile(1):s, ifs(2):ife(2), ifs(3):ife(3), ic) = 0.0_rk
+            do ix = ils(1), ile(1), s
                 do shift = fl_l, fl_r
-                    ! ignore the edge parts where we do not need a filter value from for further dimensions: g+1+fl_l:Bs+g+fl_r
-                    u_filtered(ix, g+1+fl_l:Bs(2)+g+fl_r, :, :) = u_filtered(ix, g+1+fl_l:Bs(2)+g+fl_r, :, :) &
-                    + u_tmp(ix+shift, g+1+fl_l:Bs(2)+g+fl_r, :, :)*coefs_filter(shift)
+                    u_filtered(ix, ifs(2):ife(2), ifs(3):ife(3), ic) = u_filtered(ix, ifs(2):ife(2), ifs(3):ife(3), ic) &
+                    + u_tmp(ix+shift, ifs(2):ife(2), ifs(3):ife(3))*coefs_filter(shift)
                 enddo
             enddo
-        else
+
+            u_tmp(:,:,:) = u_filtered(:,:,:,ic)
             ! filter results are consecutively added so we need to set to 0 at the beginning
-            u_filtered(g+1:Bs(1)+g:s, g+1+fl_l:Bs(2)+g+fl_r, g+1+fl_l:Bs(3)+g+fl_r, :) = 0.0_rk
-            do ix = g+1, Bs(1)+g, s
+            u_filtered(ils(1):ile(1):s, ils(2):ile(2):s, ifs(3):ife(3), ic) = 0.0_rk
+            do iy = ils(2), ile(2), s
                 do shift = fl_l, fl_r
-                    ! ignore the edge parts where we do not need a filter value from for further dimensions: g+1+fl_l:Bs+g+fl_r
-                    u_filtered(ix, g+1+fl_l:Bs(2)+g+fl_r, g+1+fl_l:Bs(3)+g+fl_r, :) = u_filtered(ix, g+1+fl_l:Bs(2)+g+fl_r, g+1+fl_l:Bs(3)+g+fl_r, :) &
-                    + u_tmp(ix+shift, g+1+fl_l:Bs(2)+g+fl_r, g+1+fl_l:Bs(3)+g+fl_r, :)*coefs_filter(shift)
+                    u_filtered(ils(1):ile(1):s, iy, ifs(3):ife(3), ic) = u_filtered(ils(1):ile(1):s, iy, ifs(3):ife(3), ic) &
+                    + u_tmp(ils(1):ile(1):s, iy+shift, ifs(3):ife(3))*coefs_filter(shift)
                 enddo
             enddo
-        endif
 
-        u_tmp = u_filtered
-        if (nz == 1) then
-            ! filter results are consecutively added so we need to set to 0 at the beginning
-            u_filtered(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, :, :) = 0.0_rk
-            do iy = g+1, Bs(2)+g, s
-                do shift = fl_l, fl_r
-                    ! ignore the edge parts where we do not need a filter value from for further dimensions: g+1+fl_l:Bs+g+fl_r
-                    u_filtered(g+1:Bs(1)+g:s, iy, :, :) = u_filtered(g+1:Bs(1)+g:s, iy, :, :) &
-                       + u_tmp(g+1:Bs(1)+g:s, iy+shift, :, :)*coefs_filter(shift)
+            if (params%dim == 3) then
+                u_tmp(:,:,:) = u_filtered(:,:,:,ic)
+                u_filtered(ils(1):ile(1):s, ils(2):ile(2):s, ils(3):ile(3):s, ic) = 0.0_rk
+                do iz = ils(3), ile(3), s
+                    do shift = fl_l, fl_r
+                        u_filtered(ils(1):ile(1):s, ils(2):ile(2):s, iz, ic) = u_filtered(ils(1):ile(1):s, ils(2):ile(2):s, iz, ic) &
+                        + u_tmp(ils(1):ile(1):s, ils(2):ile(2):s, iz+shift)*coefs_filter(shift)
+                    enddo
                 enddo
-            enddo
-        else
-            ! filter results are consecutively added so we need to set to 0 at the beginning
-            u_filtered(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, g+1+fl_l:Bs(3)+g+fl_r, :) = 0.0_rk
-            do iy = g+1, Bs(2)+g, s
-                do shift = fl_l, fl_r
-                    ! ignore the edge parts where we do not need a filter value from for further dimensions: g+1+fl_l:Bs+g+fl_r
-                    u_filtered(g+1:Bs(1)+g:s, iy, g+1+fl_l:Bs(3)+g+fl_r, :) = u_filtered(g+1:Bs(1)+g:s, iy, g+1+fl_l:Bs(3)+g+fl_r, :) &
-                       + u_tmp(g+1:Bs(1)+g:s, iy+shift, g+1+fl_l:Bs(3)+g+fl_r, :)*coefs_filter(shift)
-                enddo
-            enddo
-        endif
-
-
-        if (nz == 1) return
-
-        u_tmp = u_filtered
-        ! filter results are consecutively added so we need to set to 0 at the beginning
-        u_filtered(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, g+1:Bs(3)+g:s, :) = 0.0_rk
-        do iz = g+1, Bs(3)+g, s
-            do shift = fl_l, fl_r
-                u_filtered(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, iz, :) = u_filtered(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, iz, :) &
-                   + u_tmp(g+1:Bs(1)+g:s, g+1:Bs(2)+g:s, iz+shift, :)*coefs_filter(shift)
-            enddo
+            endif
         enddo
 
     end subroutine
@@ -470,18 +414,20 @@ contains
         enddo
 
 
-        if (nz == 1) return
+        if (nz /= 1) then
 
-        u_tmp = u_filtered
-        ! u_filtered = u_tmp  ! not necessary
-        u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, -fl_l+1:nz-fl_r:s, :) = 0.0_rk  ! these values will be filtered and overwritten again
-        do iz = -fl_l+1, nz-fl_r, s
-            do shift = fl_l, fl_r
-                ! after previous filtering we can ignore some x- and y-values which were not effected to decrease the computational load
-                u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) = u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) &
-                   + u_tmp(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz+shift, :)*coefs_filter(shift)
-            enddo
-        enddo
+            u_tmp = u_filtered
+            ! u_filtered = u_tmp  ! not necessary
+            u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, -fl_l+1:nz-fl_r:s, :) = 0.0_rk  ! these values will be filtered and overwritten again
+            do iz = -fl_l+1, nz-fl_r, s
+                do shift = fl_l, fl_r
+                    ! after previous filtering we can ignore some x- and y-values which were not effected to decrease the computational load
+                    u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) = u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) &
+                    + u_tmp(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz+shift, :)*coefs_filter(shift)
+                enddo
+            enddo\
+
+        endif
 
     end subroutine
 
@@ -1015,7 +961,10 @@ contains
         integer(kind=ik), intent(out), optional :: g_wavelet, g_RHS
         logical, intent(in), optional :: verbose
         logical :: verbose1
-        integer(kind=ik) :: i, g_min, a, block_min, diff_L, diff_R
+        integer(kind=ik) :: i, j, g_min, a, block_min, diff_L, diff_R
+
+        integer(kind=ik) :: CDFX, CDFY, FD1_size, FD2_size, FD_max_size
+        real(kind=rk), allocatable :: h_ntilde(:)
 
         character(len=80) :: debug_file_name
         integer :: idx(2,3)
@@ -1077,6 +1026,7 @@ contains
             ! As the coiflets are *not* strictly interpolating, only "almost-interpolating", the combination with 
             ! a fourth order interpolation in the ghost nodes is questionable. The "predictor" is used in the ghost nodes interpolation.
             params%order_predictor = "multiresolution_4th"
+            CDFX = 4  ! This wavelet is quasi-interpolating of order 4
 
             do i = 1, 100
                 write(*,*) "Warning: COIFLET12 is not yet fully tested and implemented, do not use for production runs!"
@@ -1091,198 +1041,158 @@ contains
             if (params%wavelet(1:3) /= "CDF") then
                 call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
             endif
-            
-            ! The HR filter is always defined by the first number of the CDFXY filter
-            ! The HD filter changes depending on both numbers
-            if (params%wavelet(4:4) == "2") then
-                ! H TILDE filter
+
+            ! Now read out the order
+            read(params%wavelet(4:4), *) CDFX
+            ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
+            if (CDFX == 1) then
+                read(params%wavelet(4:5), *) CDFX
+            endif
+            if (all(CDFX /= (/2,4,6,8,10,12/))) then
+                call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
+            if (CDFX < 10) then
+                read(params%wavelet(5:5), *) CDFY
+            else
+                read(params%wavelet(6:6), *) CDFY
+            endif
+            if (CDFY == 1) then
+                if (CDFX < 10) then
+                    read(params%wavelet(5:6), *) CDFY
+                else
+                    read(params%wavelet(6:7), *) CDFY
+                endif
+            endif
+            if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
+                call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
+            ! Yes, Thomas, We could implement a CDF1212 with this, even though I doubt the filter convolution will be well representable with double precision
+            ! But well, if someone wants to try it out, why not...
+
+            if (params%rank==0) then
+                write(*,'(A, I2, A, I2, A)') "Selected wavelet: CDF with interpolation order ", CDFX, " and ", CDFY, " vanishing moments."
+            endif
+
+            !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            ! The X in CDFXY specifies the H TILDE (HR) filter
+            ! This will always be the same, taken from the interpolation stencils
+            if (CDFX == 2) then
                 allocate( params%HR(-1:1) )
-                params%HR = (/ 0.5_rk, 1.0_rk, 0.5_rk  /)
-
-                ! H filter
-                if (params%wavelet(5:5) .eq. "0") then
-                    allocate( params%HD(0:0) )
-                    params%HD = (/1.0_rk/)
-                    ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
-                elseif (params%wavelet(5:5) == "2") then
-                    allocate( params%HD(-2:2) )
-                    params%HD = (/-1.0_rk, +2.0_rk, +6.0_rk, +2.0_rk, -1.0_rk/) / 8.0_rk
-                    allocate( params%MGR(-2:2) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "4") then
-                    allocate( params%HD(-4:4) )
-                    ! from Daubechies - Ten lectures on wavelets, Table 8.2
-                    params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
-                    allocate( params%MGR(-4:4) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "6") then
-                    allocate( params%HD(-6:6) )
-                    ! from Daubechies - Ten lectures on wavelets, Table 8.2
-                    params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "8") then
-                    allocate( params%HD(-8:8) )
-                    ! from Daubechies - Ten lectures on wavelets, Table 8.2
-                    params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
-                        10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
-                    allocate( params%MGR(-8:8) )
-                    params%MGR(:) = params%HD(:)
-                else
-                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-                endif
-
-            elseif (params%wavelet(4:4) == "4") then
-                ! H TILDE filter
+                params%HR(:) = Stencil_Int_2nd(:)
+            elseif (CDFX == 4) then
                 allocate( params%HR(-3:3) )
-                params%HR = (/ -1.0_rk/16.0_rk, 0.0_rk, 9.0_rk/16.0_rk, 1.0_rk, 9.0_rk/16.0_rk, 0.0_rk, -1.0_rk/16.0_rk  /)
-
-                ! H filter
-                if (params%wavelet(5:5) == "0") then
-                    allocate( params%HD(0:0) )
-                    params%HD = (/1.0_rk/)
-                    ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
-
-                    ! hack - second order cell average
-                    ! allocate( params%MGR(0:1) )
-                    ! params%MGR = (/0.5_rk, 0.5_rk/)
-
-                    ! ! hack - second order central average
-                    ! allocate( params%MGR(-1:1) )
-                    ! params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
-
-                    ! ! hack - fourth order cell average
-                    ! allocate( params%MGR(-1:2) )
-                    ! params%MGR = (/-1.0_rk/6.0_rk, 2.0_rk/3.0_rk, 2.0_rk/3.0_rk, -1.0_rk/6.0_rk/)
-
-                    ! ! hack - fourth order cell average
-                    ! allocate( params%MGR(-2:2) )
-                    ! params%MGR = (/1.0_rk/16.0_rk, 1.0_rk/4.0_rk, 3.0_rk/8.0_rk, 1.0_rk/4.0_rk, 1.0_rk/16.0_rk/)
-                elseif (params%wavelet(5:5) == "2") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
-                    allocate( params%HD(-4:4) )
-                    params%HD = (/ 2.0_rk**(-6.0_rk), 0.0_rk, &
-                                  -2.0_rk**(-3.0_rk), 2.0_rk**(-2.0_rk), &
-                           23.0_rk*2.0_rk**(-5.0_rk), 2.0_rk**(-2.0_rk), &
-                                  -2.0_rk**(-3.0_rk), 0.0_rk, &
-                                   2.0_rk**(-6.0_rk) /)
-                    allocate( params%MGR(-4:4) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "4") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
-                    allocate( params%HD(-6:6) )
-                    params%HD = (/ -2.0_rk**(-9.0_rk),         0.0_rk, &
-                             9.0_rk*2.0_rk**(-8.0_rk),        -2.0_rk**(-5.0_rk), &
-                           -63.0_rk*2.0_rk**(-9.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
-                            87.0_rk*2.0_rk**(-7.0_rk),  9.0_rk*2.0_rk**(-5.0_rk), &
-                           -63.0_rk*2.0_rk**(-9.0_rk),        -2.0_rk**(-5.0_rk), &
-                             9.0_rk*2.0_rk**(-8.0_rk),         0.0_rk, &
-                                   -2.0_rk**(-9.0_rk)/)
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "6") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
-                    allocate( params%HD(-8:8) )
-                    params%HD = (/ 9.0_rk*2.0_rk**(-14.0_rk),          0.0_rk, &
-                                 -35.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
-                                 189.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
-                                -477.0_rk*2.0_rk**(-12.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
-                                5379.0_rk*2.0_rk**(-13.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
-                                -477.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
-                                 189.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
-                                 -35.0_rk*2.0_rk**(-12.0_rk),          0.0_rk, &
-                                   9.0_rk*2.0_rk**(-14.0_rk) /)  
-                    allocate( params%MGR(-8:8) )
-                    params%MGR(:) = params%HD(:)
-                else
-                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )      
-                endif
-            elseif (params%wavelet(4:4) == "6") then
-                ! H TILDE filter  
+                params%HR(:) = Stencil_Int_4th(:)
+            elseif (CDFX == 6) then
                 allocate( params%HR(-5:5) )
-                params%HR = (/ 3.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 150.0_rk, 256.0_rk, 150.0_rk, 0.0_rk, -25.0_rk, 0.0_rk, 3.0_rk /) / 256.0_rk
-
-                ! H filter
-                if (params%wavelet(5:5) == "0") then
-                    allocate( params%HD(0:0) )
-                    params%HD = (/1.0_rk/)
-                    ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
-                elseif (params%wavelet(5:5) == "2") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
-                    allocate( params%HD(-6:6) )
-                    params%HD = (/ -3.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
-                                   11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
-                                 -125.0_rk*2.0_rk**(-10.0_rk), 2.0_rk**(-2.0_rk), &
-                                  181.0_rk*2.0_rk**( -8.0_rk), 2.0_rk**(-2.0_rk), &
-                                 -125.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
-                                   11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
-                                   -3.0_rk*2.0_rk**(-10.0_rk)/)
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "4") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=4
-                    allocate( params%HD(-8:8) )
-                    params%HD = (/ 3.0_rk*2.0_rk**(-13.0_rk),        0.0_rk, &
-                                 -13.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
-                                  87.0_rk*2.0_rk**(-11.0_rk),       -2.0_rk**(-5.0_rk), &
-                                -243.0_rk*2.0_rk**(-11.0_rk), 9.0_rk*2.0_rk**(-5.0_rk), &
-                                2721.0_rk*2.0_rk**(-12.0_rk), 9.0_rk*2.0_rk**(-5.0_rk), &
-                                -243.0_rk*2.0_rk**(-11.0_rk),       -2.0_rk**(-5.0_rk), &
-                                  87.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
-                                 -13.0_rk*2.0_rk**(-11.0_rk),        0.0_rk, &
-                                   3.0_rk*2.0_rk**(-13.0_rk) /)  
-                    allocate( params%MGR(-8:8) )
-                    params%MGR(:) = params%HD(:)
-                elseif (params%wavelet(5:5) == "6") then
-                    ! Sweldens paper, "The Lifting Scheme: A Custom-Design
-                    ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=6
-                    allocate( params%HD(-10:10) )
-                    params%HD = (/ -9.0_rk*2.0_rk**(-17.0_rk),          0.0_rk, &
-                                   75.0_rk*2.0_rk**(-16.0_rk),          0.0_rk, &
-                                -1525.0_rk*2.0_rk**(-17.0_rk),   3.0_rk*2.0_rk**(-9.0_rk), &
-                                  825.0_rk*2.0_rk**(-14.0_rk), -25.0_rk*2.0_rk**(-9.0_rk), &
-                                -7425.0_rk*2.0_rk**(-16.0_rk),  75.0_rk*2.0_rk**(-8.0_rk), &
-                                21201.0_rk*2.0_rk**(-15.0_rk),  75.0_rk*2.0_rk**(-8.0_rk), &
-                                -7425.0_rk*2.0_rk**(-16.0_rk), -25.0_rk*2.0_rk**(-9.0_rk), &
-                                  825.0_rk*2.0_rk**(-14.0_rk),   3.0_rk*2.0_rk**(-9.0_rk), &
-                                -1525.0_rk*2.0_rk**(-17.0_rk),          0.0_rk, &
-                                   75.0_rk*2.0_rk**(-16.0_rk),          0.0_rk, &
-                                   -9.0_rk*2.0_rk**(-17.0_rk) /)
-                    allocate( params%MGR(-10:10) )
-                    params%MGR(:) = params%HD(:)
-                else
-                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-                endif    
-            elseif (params%wavelet(4:4) == "8") then
-                ! H TILDE filter  
+                params%HR(:) = Stencil_Int_6th(:)
+            elseif (CDFX == 8) then
                 allocate( params%HR(-7:7) )
-                params%HR = (/ -5.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 1225.0_rk, 2048.0_rk, 1225.0_rk, 0.0_rk, -245.0_rk, 0.0_rk, 49.0_rk, 0.0_rk, -5.0_rk /) / 2048.0_rk
-
-                ! H filter
-                if (params%wavelet(5:5) == "0") then
-                    allocate( params%HD(0:0) )
-                    params%HD = (/1.0_rk/)
-                    ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
-                else
-                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-                endif   
+                params%HR(:) = Stencil_Int_8th(:)
+            elseif (CDFX == 10) then
+                allocate( params%HR(-9:9) )
+                params%HR(:) = Stencil_Int_10th(:)
+            elseif (CDFX == 12) then
+                allocate( params%HR(-11:11) )
+                params%HR(:) = Stencil_Int_12th(:)
             else
                 call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
             endif
 
+            ! The Y in CDFXY specifies the H (HD) filter
+            ! For unlifted wavelets, this is 1,
+            ! For lifted wavelets, it is a convolution of H TILDE with X and a H TILDE with Y, in case X <= Y
+            if (CDFY == 0) then
+                ! unlifted wavelets, H is just 1 or simple downpass
+                allocate( params%HD(0:0) )
+                params%HD = (/1.0_rk/)
+                ! multigrid restriction - second order central average for lowpass filtering
+                allocate( params%MGR(-1:1) )
+                params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+            elseif (CDFX >= CDFY) then
+                ! lifted wavelets
+                ! For lifted wavelets, in case X <= Y, it is a convolution of H TILDE with X and a H TILDE with Y
+                ! For Y > X, we only have hardcoded stencils for CDF24, CDF26, CDF28, CDF46
+
+                ! At first, we will initialize the second H TILDE filter and set the center coefficient to 0
+                allocate(h_ntilde(-(CDFY-1):CDFY-1))
+                if (CDFY == 2) then
+                    h_ntilde = Stencil_Int_2nd(:)
+                elseif (CDFY == 4) then
+                    h_ntilde = Stencil_Int_4th(:)
+                elseif (CDFY == 6) then
+                    h_ntilde = Stencil_Int_6th(:)
+                elseif (CDFY == 8) then
+                    h_ntilde = Stencil_Int_8th(:)
+                elseif (CDFY == 10) then
+                    h_ntilde = Stencil_Int_10th(:)
+                elseif (CDFY == 12) then
+                    h_ntilde = Stencil_Int_12th(:)
+                else
+                    call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+                endif
+                h_ntilde(0) = 0.0_rk
+
+                ! now initialize H filter filter (which is HD)
+                allocate( params%HD( lbound(params%HR, dim=1) + lbound(h_ntilde, dim=1) : ubound(params%HR, dim=1) + ubound(h_ntilde, dim=1) ) )
+
+                ! convolve both H TILDE filters to get H and add delta function
+                ! h_k = \delta_{k,0} + \frac12\sum_m -1^{m}\cdot \tilde{h}_{N}(m) \cdot \tilde{h}_{\tilde{N}}(m-k)
+                do i = lbound(params%HD, dim=1), ubound(params%HD, dim=1)
+                    ! Initialize with delta function, this is only 1 on center and 0 anywhere else
+                    if (i == 0) then
+                        params%HD(i) = 1.0_rk
+                    else
+                        params%HD(i) = 0.0_rk
+                    endif
+
+                    ! now add the convolved part with second H TILDE
+                    do j = lbound(params%HR, dim=1), ubound(params%HR, dim=1)
+                        ! see if this contribution is inside bounds of h_ntilde
+                        if (i-j < lbound(h_ntilde, dim=1) .or. i-j > ubound(h_ntilde, dim=1)) cycle
+
+                        ! add contribution, we have to alternate the sign and multiply by 1/2
+                        params%HD(i) = params%HD(i) + (-1.0_rk)**j * params%HR(j) * h_ntilde(i - j) / 2.0_rk
+                    end do
+                end do
+            ! Now follows some hardcoded stencils for Y > X
+            ! These are lifted wavelets, but I have no clue how they are constructed
+            elseif (params%wavelet == "CDF24") then
+                allocate( params%HD(-4:4) )
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
+                params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
+            elseif (params%wavelet == "CDF26") then
+                allocate( params%HD(-6:6) )
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
+                params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
+            elseif (params%wavelet == "CDF28") then
+                allocate( params%HD(-8:8) )
+                ! from Daubechies - Ten lectures on wavelets, Table 8.2
+                params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
+                    10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
+            elseif (params%wavelet == "CDF46") then
+                ! Sweldens paper, "The Lifting Scheme: A Custom-Design
+                ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
+                allocate( params%HD(-8:8) )
+                params%HD = (/ 9.0_rk*2.0_rk**(-14.0_rk),          0.0_rk, &
+                            -35.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
+                            189.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
+                            -477.0_rk*2.0_rk**(-12.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
+                            5379.0_rk*2.0_rk**(-13.0_rk), 153.0_rk*2.0_rk**( -9.0_rk), &
+                            -477.0_rk*2.0_rk**(-12.0_rk), -59.0_rk*2.0_rk**(-10.0_rk), &
+                            189.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
+                            -35.0_rk*2.0_rk**(-12.0_rk),          0.0_rk, &
+                            9.0_rk*2.0_rk**(-14.0_rk) /)  
+            else 
+                call abort( 3006221, "For lifted CDF wavelets, first number must be smaller or equal to second number or you use CDF24, CDF26, CDF28 or CDF46. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
+                
+            ! for multigrid restriction, we use the same filter as HD if not an unlifted wavelet
+            if (CDFY /= 0) then
+                allocate( params%MGR( lbound(params%HD, dim=1) : ubound(params%HD, dim=1) ) )
+                params%MGR(:) = params%HD(:)
+            endif
+
+            !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             ! G TILDE filter - HR filter with different sign for every second off-center value
             allocate( params%GD( lbound(params%HR, dim=1):ubound(params%HR, dim=1)) )
             do i = lbound(params%GD, dim=1), ubound(params%GD, dim=1)
@@ -1301,23 +1211,37 @@ contains
             ! endif
 
             ! Unlifted or lifted - every CDFX0er wavelet is considered unlifted and the rest lifted
-            params%isLiftedWavelet = params%wavelet(5:5) /= "0"
+            params%isLiftedWavelet = CDFY /= 0
 
             ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually)
-            if (params%wavelet(4:4) == "2") then
+            if (CDFX == 2) then
                 params%order_predictor = "multiresolution_2nd"
-            elseif (params%wavelet(4:4) == "4") then
+            elseif (CDFX == 4) then
                 params%order_predictor = "multiresolution_4th"
-            elseif (params%wavelet(4:4) == "6") then
+            elseif (CDFX == 6) then
                 params%order_predictor = "multiresolution_6th"
-            elseif (params%wavelet(4:4) == "8") then
+            elseif (CDFX == 8) then
                 params%order_predictor = "multiresolution_8th"
+            elseif (CDFX == 10) then
+                params%order_predictor = "multiresolution_10th"
+            elseif (CDFX == 12) then
+                params%order_predictor = "multiresolution_12th"
             endif
         end select
 
+        ! retrieve FD operator stencil sizes as needed for some setups, use h_ntilde as dummy variable and i,j as temporary integers
+        if (params%order_discretization /= "not-initialized") then
+            call setup_FD1_left_stencil(params%order_discretization, h_ntilde, i,j)
+            FD1_size = max(i,j)
+            call setup_FD2_stencil(params%order_discretization, h_ntilde, i,j)
+            FD2_size = max(i,j)
+            FD_max_size = max(FD1_size, FD2_size)
+        else
+            FD_max_size = 0
+        endif
 
         ! minimum number of ghost nodes required for this wavelet
-        ! value is determined by largest filter bank
+        ! value is determined by largest filter bank, let's write all out for clarity
         g_min = 0
         g_min = max(g_min, abs(lbound(params%HD, dim=1)))
         g_min = max(g_min, abs(ubound(params%HD, dim=1)))
@@ -1328,21 +1252,14 @@ contains
         g_min = max(g_min, abs(lbound(params%GR, dim=1)))
         g_min = max(g_min, abs(ubound(params%GR, dim=1)))
 
-        ! g_RHS is decided by X in CDFXY or by FD order
-        ! g_RHS is also dependent on the wavelet due to how we synch each stage:
+        ! g_RHS is usually decided by FD order
+        ! g_RHS is also dependent on X in CDFXY of the wavelet due to how we synch each stage:
         ! the third stage (prediction) needs points from the boundary to correctly interpolate values
         if (present(g_RHS)) then
-            if (params%wavelet(4:4) == "2") then
-                g_RHS = 1
-            elseif (params%wavelet(4:4) == "4") then
-                g_RHS = 2
-            elseif (params%wavelet(4:4) == "6") then
-                g_RHS = 3
+            g_RHS = CDFX / 2
+            if (g_RHS < FD_max_size) then
+                g_RHS = FD_max_size
             endif
-            if ( (g_RHS < 4) .and. (params%order_discretization == 'FD_8th_central') ) g_RHS = 4
-            if ( (g_RHS < 3) .and. (params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') ) g_RHS = 3
-            if ( (g_RHS < 2) .and. (params%order_discretization == 'FD_4th_central') ) g_RHS = 2
-            if ( (g_RHS < 1) .and. (params%order_discretization == 'FD_2nd_central') ) g_RHS = 1
         endif
 
         ! compute coarse extension parameters. (see inkscape drawing 1d-ghostnodes-coarseextension-V2.svg)
@@ -1365,10 +1282,12 @@ contains
         params%Nscl    = max(abs(lbound(params%HD, dim=1)) - 1, 0)
         params%Nwcl    = params%Nscl + abs(lbound(params%GD, dim=1))
         params%Nreconl = params%Nwcl + abs(lbound(params%GR, dim=1))
+        params%Ndep2l  = params%Nreconl + max((abs(lbound(params%HR, dim=1))+1)/2 - 1, 0)
 
         params%Nscr    = ubound(params%HD, dim=1)
         params%Nwcr    = params%Nscr + ubound(params%GD, dim=1)
         params%Nreconr = params%Nwcr + ubound(params%GR, dim=1)
+        params%Ndep2r  = params%Nreconr + (ubound(params%HR, dim=1)+1)/2
 
         ! ! for unlifted wavelets no SC are copied, however some WC do have to be wiped in case we need to reconstruct (CVS and image denoising)
         ! ! This is, because at a coarse-fine interface the filter to compute the WC stretches over the border, creating the same dilemma as for the CE
@@ -1380,7 +1299,7 @@ contains
         !     params%Nreconr = params%Nreconr + 2
         ! endif
 
-        ! for wavelets with regularity higher than the wavelets NWC needs to be increased, the reasing for me is yet unclear
+        ! for wavelets with regularity higher than the wavelets (Y>X in CDFXY), NWC needs to be increased, the reasoning for me is yet unclear
         ! this was investigated and found using the invertibility test
         if (params%isLiftedWavelet) then
             a = 0
@@ -1391,28 +1310,28 @@ contains
             params%Nwcr = params%Nwcr + a
             params%Nreconl = params%Nreconl + a
             params%Nreconr = params%Nreconr + a
+            params%Ndep2l  = params%Ndep2l + a
+            params%Ndep2r  = params%Ndep2r + a
         endif
 
         !--------------------------------------------------------------------------------------------------------
         ! If NWC of CE is smaller than the size of the FD-stencils, this can create strong divergence peaks.
         ! In order to reduce this, we set the minimum Nwc to the size of the FD stencils.
-        ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD6C or FD4CO, you weirdo)
-        i = 0
-        if ( params%order_discretization == 'FD_8th_central') i = 8
-        if ( params%order_discretization == 'FD_4th_central_optimized' .or. params%order_discretization == 'FD_6th_central') i = 6
-        if ( params%order_discretization == 'FD_4th_central' ) i = 4
-        if ( params%order_discretization == 'FD_2nd_central') i = 2
+        ! This mainly affects the unlifted wavelets (or you pair CDF22 with FD >= 6th order, you weirdo)
+        i = 2*FD_max_size
 
         diff_L         = max(i - params%Nwcl, 0)
         params%Nwcl    = params%Nwcl + diff_L
         params%Nreconl = params%Nreconl + diff_L
+        params%Ndep2l  = params%Ndep2l + diff_L
         
         diff_R         = max(i - params%Nwcr, 0)
         params%Nwcr    = params%Nwcr + diff_R
         params%Nreconr = params%Nreconr + diff_R
-
+        params%Ndep2r  = params%Ndep2r + diff_R
+        
         if (params%rank==0) then
-            write(*,'(A)') "Wavelet setup uses discretization: "//trim(adjustl(params%order_discretization))
+            write(*,'(A)') "Wavelet setup is adjusted to discretization: "//trim(adjustl(params%order_discretization))
         endif
         
         
@@ -1458,8 +1377,19 @@ contains
 
         if (params%rank==0 .and. verbose1) then
             if (params%useCoarseExtension) then
-                write(*,'(A55, i4, i4)') "During coarse extension, we will copy SC (L,R):", params%Nscl, params%Nscr
-                write(*,'(A55, i4, i4)') "During coarse extension, we will delete WC (L,R):", params%Nwcl, params%Nwcr
+                write(*,'(A55, i4, i4)') "Coarse extension will copy SC (L,R):", params%Nscl, params%Nscr
+                write(*,'(A55, i4, i4)') "Coarse extension will delete WC (L,R):", params%Nwcl, params%Nwcr
+                write(*,'(A55, i4, i4)') "Coarse extension will influence (L,R):", params%Nreconl, params%Nreconr
+                write(*,'(A55, i4, i4)') "CE minimum BS for decoupling reconstruction:", params%Ndep2l, params%Ndep2r
+                if (maxval(params%Bs(:)) /= 0) then
+                    if (all(params%Bs(:params%dim) >= max(params%Ndep2l, params%Ndep2r))) then
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " >= Ndep2=", max(params%Ndep2l, params%Ndep2r),", Reconstruction fully optimized for CE. Reconstructing only fine block at coarse-fine interfaces in one go."
+                    elseif (all(params%Bs(:params%dim) >= max(params%Nreconl, params%Nreconr))) then
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " >= Nrecon=", max(params%Nreconl, params%Nreconr),", Reconstruction partially optimized for CE. Reconstructing only fine block at coarse-fine interfaces, but doing it level-wise."
+                    else
+                        write(*,'(A, i3, A, i3, A)') "Bs=", minval(params%Bs(1:params%dim)), " < Nrecon=", max(params%Nreconl, params%Nreconr),", Reconstruction weakly optimized for CE. Reconstructing fine block at coarse-fine interfaces as well as their same-lvl neighbors and doing that level-wise."
+                    endif
+                endif
             endif
 
             ! For the leaf-first loop, we need 3*h as minimum blocksize, as we have an upwards dependency for the leaf-decomposition
@@ -1532,10 +1462,10 @@ contains
             enddo
             write(*,'(A)') "]"
 
-            write(*,'("sum(",A2,")=",es15.8)') "HD", sum(params%HD)
-            write(*,'("sum(",A2,")=",es15.8)') "GD", sum(params%GD)
-            write(*,'("sum(",A2,")=",es15.8)') "HR", sum(params%HR)
-            write(*,'("sum(",A2,")=",es15.8)') "GR", sum(params%GR)
+            write(*,'("sum(",A2,")=",es15.8, A, es10.3)') "HD", sum(params%HD), "  , Diff to 1.0=", sum(params%HD)-1.0_rk
+            write(*,'("sum(",A2,")=",es15.8)')            "GD", sum(params%GD)
+            write(*,'("sum(",A2,")=",es15.8, A, es10.3)') "HR", sum(params%HR), "  , Diff to 2.0=", sum(params%HR)-2.0_rk
+            write(*,'("sum(",A2,")=",es15.8)')            "GR", sum(params%GR)
 
             write(*, '(20("╭─╮ "))')
             write(*, '(20("╯ ╰─"))')
@@ -1570,7 +1500,7 @@ contains
         !     enddo
         ! enddo
 
-        ! vectorized filter
+        ! vectorized filter with sum
         do i =  1+skip_g(1), N-skip_g(2), sampling
             u_filtered(i) = sum(u(i+fl_l:i+fl_r) * filter(:))
         enddo
@@ -1581,7 +1511,6 @@ contains
         !     u_filtered(1+skip_g: N-skip_g: sampling) = u_filtered(1+skip_g: N-skip_g: sampling) + u(1+skip_g+j: N-skip_g+j: sampling) * filter(j)
         ! enddo
     end subroutine
-
 
 
     ! multi-dimensional FWT using 1D non-periodic filtering routines

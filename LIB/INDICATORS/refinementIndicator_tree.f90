@@ -125,10 +125,11 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, lgt_n(tree_ID)
             lgt_ID = lgt_active(k, tree_ID)
 
-            ! set 0 (significant) to +1 (refine), -1 (non-significant) to 0 (stay as it is)
+            ! 1 and -1 should not exist here
+            if (any(lgt_block( lgt_id, IDX_REFINE_STS ) == (/ -1, 1/))) call abort(241119, "I am very confused by what is going on here and do not like it!")
+            ! set 0 (significant) to +1 (refine), -9 (non-significant) to 0 (stay as it is)
             if (lgt_block( lgt_id, IDX_REFINE_STS ) == 0) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
             if (lgt_block( lgt_id, IDX_REFINE_STS ) == REF_UNSIGNIFICANT_STAY) lgt_block( lgt_id, IDX_REFINE_STS ) = 0
-            if (lgt_block( lgt_id, IDX_REFINE_STS ) == -1) call abort(241119, "I am very confused by what is going on here and do not like it!")
         enddo
 
     case ("everywhere")

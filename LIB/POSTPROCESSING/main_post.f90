@@ -113,7 +113,7 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--vorticity", "--divergence", "--vor-abs", "--helicity", "--hel-abs", "--Q", "--dissipation", "--copy")
+    case("--vorticity", "--vorx", "--vory", "--vorz", "--divergence", "--vor-abs", "--helicity", "--hel-abs", "--Q", "--dissipation", "--copy")
         call compute_vorticity_post(params)
 
     case("--derivative")

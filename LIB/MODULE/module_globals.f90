@@ -45,6 +45,7 @@ module module_globals
     integer, parameter, public :: rk=dble_prec
     integer, parameter, public :: ik=int_prec
     real(kind=rk),parameter, public :: pi  = 4.0_rk * atan(1.0_rk)
+    real(kind=rk),parameter, public :: LIM_DIVERGED = 1.0e12_rk
     !> global communicator for WABBIT! Dont use MPI_COMM_WORLD!!!!!
     integer(kind=ik) ::  WABBIT_COMM
 

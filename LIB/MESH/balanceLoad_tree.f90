@@ -36,7 +36,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceMode, balance_re
     !=============================================================================
 
     integer(kind=ik)  :: rank, mpirank_shouldBe, mpirank_currently, ierr, number_procs, &
-        k, N, l, com_i, com_N, sfc_id, lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), lgt_ID, Nblocks_toDistribute, &
+        k, N, l, com_i, com_N, sfc_id, lgt_free_id, hvy_free_id, hilbertcode(params%Jmax), hvy_id, lgt_ID, Nblocks_toDistribute, &
         num_blocks_count(3), i_var, balance_id, sfc_i, Jmin_set_apply
     integer(kind=tsize) :: treecode, hilbertcode2
     character(len=cshort) :: mode
@@ -126,6 +126,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceMode, balance_re
 
     ! allocate space filling curve list, number of elements is the number of active blocks
     ! and for each block, we store the space-filling-curve-index and the lgt ID
+    ! NOTE: it is not necessary or wise to reset this array (it is large!)
     if (.not.allocated(sfc_sorted_list)) allocate( sfc_sorted_list( 3, size(lgt_block,1)) )
 
     ! number of blocks
@@ -198,8 +199,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceMode, balance_re
     ! 2nd: calculate space filling curve index for blocks to be balanced
     !---------------------------------------------------------------------------------
     t1 = MPI_wtime()
-    sfc_i = 0  ! counter for blocks added to SFC list
-    
+    sfc_i = 0  ! counter for blocks added to SFC list    
     select case (params%block_distribution)
     case("sfc_z")
         !-----------------------------------------------------------
@@ -389,6 +389,7 @@ contains
         allocate(overflow_or_free(0:mpisize-1))
         
         blocks_assigned_per_rank = 0
+        overflow_or_free = 0  ! Initialize explicitly for safety
         com_N = 0
         
         !-------------------------------------------------------------------------
@@ -488,8 +489,8 @@ contains
             overflow_block_counter = 0         ! how many overflow blocks we've placed so far (0-indexed)
             free_index_cumulative = 0          ! accumulated free space as we crawl through ranks
             target_rank = 0                    ! current rank we're examining (increments only, never resets)
-            i_overflow = 0                     ! overflow blocks remaining on current rank
-            i_proc = -1                        ! track current rank in block loop
+            i_overflow = 0                     ! overflow blocks remaining on current rank (initialized to 0)
+            i_proc = -1                        ! track current rank in block loop (initialized to invalid rank)
             
             ! Loop over all blocks in lgt_active order to find unassigned blocks on overflowing ranks
             do k = 1, lgt_n(tree_ID)

@@ -807,7 +807,7 @@ subroutine wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block, hvy_tmp,
         ! synch SC and WC from coarser neighbours and same-level neighbours in order to apply the correct wavelet reconstruction
         ! Attention: This uses hvy_temp for coarser neighbors to predict the data, as we want the correct SC from coarser neighbors
         ! Usually we cannot sync from coarse without syncing same and fine level first, as interpolation cannot be applied, but here we only need SC from coarser neighbors
-        write(string_prepare, '(A, i0)') "wavelet_reconstruct_syncN_lvl", level  !< prepare format string for sync debug
+        write(string_prepare, '(A, i0)') "wavelet_reconstruct_syncN_lvl", -1 !< prepare format string for sync debug
         t_block = MPI_Wtime()
         call sync_SCWC_from_MC( params, hvy_block, tree_ID, hvy_tmp, g_minus=params%g, g_plus=params%g, ref_check=-1, sync_debug_name=string_prepare)
         call toc( "reconstruct_tree (sync lvl <- MC)", 115, MPI_Wtime()-t_block)
@@ -1026,6 +1026,7 @@ subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
     ! Attention: In refine_tree/check_oom we check after the same logic if we run oom, so if you change anything here, also change the logic there
 
     ! just loop until hvy_n does not change anymore, that means all possible mothers have been created
+    hvy_n_old = -1
     do while( hvy_n_old /= hvy_n(tree_ID) )
         !---------------------------------------------------------------------------
         ! create new empty blocks on rank with block with digit = 2**dim-1 (7 or 3)

@@ -1,12 +1,19 @@
-subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, verbose)
+subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, verbose, hvy_full)
     implicit none
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    !> data array containing the solution data
+    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :)
+    !> data array containing the RHS data
+    real(kind=rk), intent(inout)       :: hvy_RHS(:, :, :, :, :)
+    !> work array, needed for storing and restoring the input solution
+    real(kind=rk), intent(inout)       :: hvy_work(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
     logical, intent(in), optional      :: init_0  !< Initialize solution to zero
     logical, intent(in), optional      :: verbose
+    !> full physically allocated contiguous array to avoid Intel compiler issues with array sections
+    real(kind=rk), intent(inout), optional :: hvy_full(:, :, :, :, :)
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, ic, i_cycle
     real(kind=rk)                      :: dx(1:3), x0(1:3), residual(1:4*size(hvy_sol,4)), norm_sol(1:size(hvy_sol,4))
@@ -71,7 +78,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     do i_cycle = 1,params%poisson_cycle_max_it
 
         ! Call the multigrid vcycle function
-        call multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, residual_out=residual(1:3*size(hvy_sol,4)), verbose=verbose_apply)
+        call multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, residual_out=residual(1:3*size(hvy_sol,4)), verbose=verbose_apply, hvy_full=hvy_full)
         ! now the residuals are stored as: Linfty, L2, L1, but L2 and L1 are only computed with verbose_apply
 
         ! if (params%rank == 0 .and. .not. verbose_apply) write(*, '(A, i0, A, i0, A, 10(es10.3, 1x))') "   it ", i_cycle, "/", params%poisson_cycle_it, " Residual Linfty: ", residual(1:size(hvy_sol,4))
@@ -86,6 +93,11 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
             if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel) .and. all(norm_sol(1:size(hvy_sol,4)) > 1e-8)) exit
         else
             call abort(250903, "Don't know how to stop! Please choose between 'fixed_iterations' and 'tolerance', thank you :)")
+        endif
+
+        if (any(residual(1:size(hvy_sol,4)) > LIM_DIVERGED)) then
+            write(fname, '(A, i0, A, es10.3)') "Poisson solver diverged, aborting at it ", i_cycle, ", Max Res Linfty: ", maxval(residual(1:size(hvy_sol,4)))
+            call abort(260121, fname)
         endif
 
     enddo
@@ -137,15 +149,22 @@ end subroutine multigrid_solve
 ! c - coarsest level solve (FFT, CG or GS)
 ! u - upwards prolongation and Gauss-Seidel sweeps with it_GS
 ! d - Decomposition with restriction filter
-subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose, residual_out)
+subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose, residual_out, hvy_full)
     implicit none
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    !> data array containing the solution data
+    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :)
+    !> data array containing the RHS data
+    real(kind=rk), intent(inout)       :: hvy_RHS(:, :, :, :, :)
+    !> work array, needed for storing and restoring the input solution
+    real(kind=rk), intent(inout)       :: hvy_work(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
     real(kind=rk), intent(inout)       :: residual_out(:)
     logical, intent(in), optional      :: verbose
+    !> full physically allocated contiguous array to avoid Intel compiler issues with array sections
+    real(kind=rk), intent(inout), optional :: hvy_full(:, :, :, :, :)
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, old_hvy_id, n_leaves
     integer(kind=ik)                   :: i_level, Jmax_a, it_coarsest, i_sweep, nc, ic, mpierr
@@ -322,7 +341,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     ! do i_level = params%poisson_Jmin+1, Jmax_a
     !     call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, i_level, Jmax_a, hvy_depth)
     ! enddo
-    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%poisson_Jmin, Jmax_a, tc_map_old, n_leaves, verbose_apply)
+    call multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, params%poisson_Jmin, Jmax_a, tc_map_old, n_leaves, verbose_apply, hvy_full=hvy_full)
 
     ! We do not solve Ae=r but Au=b and we need to restore the old solution as well as the RHS b
     ! this is happening for all leaf-blocks
@@ -425,18 +444,25 @@ end subroutine multigrid_vcycle
 !> Does three things:
 !>   - sync the coarser solution from the lower lewel as WD decomposed values, reconstruct the coarser solution
 !>   - do GS sweeps on this level
-subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, Jmax_a, tc_map_old, n_leaves, verbose)
+subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, Jmax_a, tc_map_old, n_leaves, verbose, hvy_full)
     implicit none
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :), hvy_work(:, :, :, :, :)
+    !> data array containing the solution data
+    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :)
+    !> data array containing the RHS data
+    real(kind=rk), intent(inout)       :: hvy_RHS(:, :, :, :, :)
+    !> work array, currently not used in this routine
+    real(kind=rk), intent(inout)       :: hvy_work(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
     integer(kind=ik), intent(in)       :: Jmin
     integer(kind=ik), intent(in)       :: Jmax_a
     integer(kind=ik), intent(inout)    :: tc_map_old(:, :)
     integer(kind=ik), intent(in)       :: n_leaves
     logical, intent(in), optional      :: verbose
+    !> full physically allocated contiguous array to avoid Intel compiler issues with array sections
+    real(kind=rk), intent(inout), optional :: hvy_full(:, :, :, :, :)
 
     character(len=cshort)              :: fname
     integer(kind=tsize)                :: treecode
@@ -557,12 +583,19 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
 
             if (balance_load_needed) then
 
+                if (.not. present(hvy_full)) then
+                    call abort(1, "Error: multigrid_upwards: Load balancing requested but hvy_full not provided.")
+                endif
+
                 ! balance load for blocks with ref status 0 and 1 (leaf blocks and new blocks on current level)
                 ! transfer both hvy_sol and hvy_RHS together
                 write(fname, '(A, i0)') "MultiGrid_upwards_L", i_level
                 t_block = MPI_Wtime()
-                call balanceLoad_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, balanceMode="selective", &
-                                    balance_ref=(/ 0_ik, 1_ik /), balance_name=fname, hvy_tmp=hvy_RHS(:,:,:,1:nc,:), Jmin_set=params%poisson_Jmin, full_tree_grid=.true.)
+
+                ! Important! balanceLoad_tree needs as input a physically allocated array. The input cannot be a slice of an array. This is why currently I am passing hvy_full here. This is overkill (as all components are moved), but for now I only want to test the performance of load balancing in multigrid.
+                call balanceLoad_tree(params, hvy_full, tree_ID, balanceMode="selective", &
+                                    balance_ref=(/ 0_ik, 1_ik /), balance_name=fname, Jmin_set=params%poisson_Jmin, full_tree_grid=.true.)
+                
                 call toc( "MG Upwards - balanceLoad_tree", 10050, MPI_Wtime()-t_block )
 
                 ! Reorder data arrays after load balancing at the finest level

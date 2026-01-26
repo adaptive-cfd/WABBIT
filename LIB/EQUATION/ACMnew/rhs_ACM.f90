@@ -120,7 +120,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         !
         ! called for each block.
         do i = 1, size(u,4)
-            if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e12_rk) then
+            if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > LIM_DIVERGED) then
                 write(*,'("RHS: maxval in u(",i2,") = ", es10.3, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es9.2))') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))), x0, dx
 
                 ! call dump_block_fancy(u(:,:,:,i:i), "block_ACM_diverged_RHS.txt", Bs, g)

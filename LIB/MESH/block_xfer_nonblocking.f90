@@ -33,7 +33,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg, hvy_tmp )
     logical, allocatable, save :: xfer_started(:), source_block_deleted(:)
 
     ! array of mpi requests
-    integer(kind=ik), allocatable, save :: requests(:)
+    integer, allocatable, save :: requests(:)
     integer(kind=ik) :: ireq
 
     logical :: not_enough_memory
@@ -121,6 +121,10 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg, hvy_tmp )
             tag = 2*k ! use unique tag for each message
 
             ! open channel to receive one block.
+
+            ! VERY IMPORTANT NOTE FOR MPI_IRECV:
+            ! hvy_block neets to be contiguous in memory! You cannot slice the fourth component (like, hvy_block cannot stem from for example physical allocated array hvy_tmp(:,:,:,4:4,:)!
+            ! Otherwise, this appears to not work with some compilation chains (on Irene??)
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, &
                 mpirank_sender, tag, WABBIT_COMM, requests(ireq), ierr)
 
@@ -150,6 +154,10 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg, hvy_tmp )
 
             ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
             ! we have to wait for the MPI_REQUEST to be finnished.
+
+            ! VERY IMPORTANT NOTE FOR MPI_ISEND:
+            ! hvy_block neets to be contiguous in memory! You cannot slice the fourth component (like, hvy_block cannot stem from for example physical allocated array hvy_tmp(:,:,:,4:4,:)!
+            ! Otherwise, this appears to not work with some compilation chains (on Irene??)
             call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, &
                 mpirank_recver, tag, WABBIT_COMM, requests(ireq), ierr)
 
@@ -157,6 +165,7 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg, hvy_tmp )
             
             ! if hvy_tmp present, send it with same pattern
             if (present(hvy_tmp)) then
+
                 ireq = ireq + 1
                 tag = 2*k + 1 ! same different tag as recv
                 

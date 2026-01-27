@@ -659,7 +659,7 @@ subroutine proto_NSI_EE(params)
         if (params%adapt_tree) then
             call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
                                 hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., &
-                                verbose=.true., hvy_full=hvy_tmp)
+                                verbose=.false., hvy_full=hvy_tmp)
         else
             call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
                                 hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.false., &

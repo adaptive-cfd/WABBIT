@@ -600,9 +600,10 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
 
                 ! Reorder data arrays after load balancing at the finest level
                 ! This ensures consistent ordering across processors and eliminates the need for treecode lookup
+                ! Since balanceLoad_tree reorders the full allocated hvy_tmp array, we want to reorder the whole array to match with physically allocated hvy_block and hvy_work outside of the multigrid routines
                 if (i_level == Jmax_a) then
                     t_block = MPI_Wtime()
-                    call reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves)
+                    call reorder_hvy_arrays(params, hvy_full, tree_ID, tc_map_old, n_leaves)
                     call toc( "MG upwards - Reorder hvy arrays after balancing", 10051, MPI_Wtime()-t_block )
                 endif
 
@@ -694,34 +695,43 @@ end subroutine multigrid_upwards
 
 !> \brief Reorder heavy data arrays to restore original ordering after load balancing
 !> \details Uses cycle-following algorithm to permute data in-place with minimal memory overhead.
-!! After load balancing, hvy_sol and hvy_RHS are reordered but hvy_work (backup) is not.
-!! This routine reorders hvy_sol and hvy_RHS back to the original ordering (matching hvy_work).
+!! 
+!! Context: During multigrid, load balancing in upwards part of the v-cycle redistributes blocks across MPI ranks, changing their hvy_id positions.
+!! The input arrays (hvy_data, hvy_data_2) are reordered during this process - they all lie on physically attributed hvy_tmp.
+!! However, other physically allocated data structures outside the multigrid scope (e.g., hvy_block, hvy_work) retain the original ordering.
+!! This routine restores the original ordering of hvy_data and hvy_data_2 so they align with external arrays that were not load-balanced.
 !! 
 !! Ordering terminology:
-!! - Original ordering: where hvy_work has backed up data (encoded in tc_map_old before load balance)
-!! - Current ordering: where hvy_sol/hvy_RHS are after load balancing
-!! - Desired ordering: same as original ordering (goal of this routine)
-subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_leaves)
+!! - Original ordering: Block positions before load balancing in v-cycle (encoded in tc_map_old)
+!! - Current ordering: Block positions after load balancing (current hvy_id values)
+!! - Desired ordering: Restore to original ordering (goal of this routine)
+subroutine reorder_hvy_arrays(params, hvy_data, tree_ID, tc_map_old, n_leaves, hvy_data_2)
     implicit none
     
     type (type_params), intent(inout)  :: params
-    real(kind=rk), intent(inout)       :: hvy_sol(:, :, :, :, :), hvy_RHS(:, :, :, :, :)
+    !> Input data that will be ordered
+    real(kind=rk), intent(inout)       :: hvy_data(:, :, :, :, :)
     integer(kind=ik), intent(in)       :: tree_ID
+    !> Sorted treecode mapping before load balancing: (hvy_id_old, treecode_part1, treecode_part2)
     integer(kind=ik), intent(inout)    :: tc_map_old(:, :)
+    !> Number of blocks in tc_map_old
     integer(kind=ik), intent(in)       :: n_leaves
+    !> Second possible input data, that will be ordered
+    real(kind=rk), intent(inout), optional :: hvy_data_2(:, :, :, :, :)
     
-    integer(kind=ik) :: k_block, hvy_id, lgt_id, original_hvy_id, next_lgt_id, i, j, start_idx, current_idx, next_idx, last_unassigned, nc
+    integer(kind=ik) :: k_block, hvy_id, lgt_id, original_hvy_id, next_lgt_id, i, j, start_idx, current_idx, next_idx, last_unassigned, nc, nc_2
     integer(kind=tsize) :: treecode
     logical :: tc_found
     logical, allocatable, save :: visited(:)
-    real(kind=rk), allocatable, save :: tmp_block_sol(:,:,:,:), tmp_block_rhs(:,:,:,:)
+    real(kind=rk), allocatable, save :: tmp_data(:,:,:,:), tmp_data_2(:,:,:,:)
     integer(kind=ik), allocatable, save :: current_to_original(:), original_to_current(:), tmp_lgt_block(:)
     integer(kind=ik) :: Bs(1:3), g
     
     ! Get grid parameters
     Bs = params%Bs
     g = params%g
-    nc = size(hvy_sol, 4)
+    nc = size(hvy_data, 4)
+    if (present(hvy_data_2)) nc_2 = size(hvy_data_2, 4)
     
     ! ============================================================================
     ! Build mapping between original and current positions
@@ -771,50 +781,51 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
     enddo
 
     ! Allocate temporary storage for one block only
-    if (allocated(tmp_block_sol)) then
-        if (size(tmp_block_sol, 4) /= nc) deallocate(tmp_block_sol)
+    if (allocated(tmp_data)) then
+        if (size(tmp_data, 4) /= nc) deallocate(tmp_data)
     endif
-    if (.not. allocated(tmp_block_sol)) allocate(tmp_block_sol(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc))
-    if (allocated(tmp_block_rhs)) then
-        if (size(tmp_block_rhs, 4) /= nc) deallocate(tmp_block_rhs)
+    if (.not. allocated(tmp_data)) allocate(tmp_data(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc))
+    if (allocated(tmp_data_2) .and. present(hvy_data_2)) then
+        if (size(tmp_data_2, 4) /= nc_2) deallocate(tmp_data_2)
     endif
-    if (.not. allocated(tmp_block_rhs)) allocate(tmp_block_rhs(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc))
+    if (.not. allocated(tmp_data_2) .and. present(hvy_data_2)) allocate(tmp_data_2(Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc_2))
     if (.not. allocated(tmp_lgt_block)) allocate(tmp_lgt_block(size(lgt_block, 2)))
 
     ! ============================================================================
     ! Cycle-following algorithm for in-place data reordering
     ! ============================================================================
-    ! Goal: Move data from current positions back to original (desired) positions
-    !       to align hvy_sol/hvy_RHS with hvy_work
+    ! Goal: Move data from current positions (after load balancing in v-cycle) back to 
+    !       original positions (start of v-cycle) to match ordering of 
+    !       external arrays like hvy_work that were not redistributed.
     !
     ! Strategy: Use original_to_current mapping to follow permutation cycles.
     !   For each original position:
-    !     - Find where its data currently is (original_to_current)
-    !     - Pull that data to the desired position
-    !     - Continue following the cycle
+    !     - Find where its data currently resides (via original_to_current)
+    !     - Pull that data to the desired (original) position
+    !     - Continue following the cycle until it closes
     !
     ! Example cycle:
-    !   Original pos 2 wants data currently at pos 5 (original_to_current(2)=5)
-    !   Original pos 5 wants data currently at pos 3 (original_to_current(5)=3)
-    !   Original pos 3 wants data currently at pos 2 (original_to_current(3)=2)
+    !   Original position 2 needs data from current position 5 (original_to_current(2)=5)
+    !   Original position 5 needs data from current position 3 (original_to_current(5)=3)
+    !   Original position 3 needs data from current position 2 (original_to_current(3)=2)
     !   This forms cycle: 2→5→3→2
     !
-    ! Algorithm:
-    !   1. Start at unvisited original position, save its current data
+    ! Algorithm steps:
+    !   1. Start at unvisited original position, save its current data to tmp_data
     !   2. Follow chain: next_pos = original_to_current(current_original_pos)
-    !   3. Pull data from next_pos to current position
-    !   4. If we return to start: close cycle, write saved data
-    !   5. If original_to_current(pos) = 0: position is unassigned
+    !   3. Copy data from next_pos to current position
+    !   4. If next_pos returns to start: close cycle by writing saved tmp_data
+    !   5. If original_to_current(pos) = 0: position has no assigned data (non-leaf)
     !      - Search for an unassigned waypoint position to continue cycle
     !      - Waypoint criteria: current_to_original=0 AND original_to_current≠0
-    !      - Handle inactive blocks (lgt_block < 0) by setting current to -1
+    !      - Handle inactive blocks (lgt_block < 0) by propagating empty marker
     !      - Mark truly unused positions (both mappings = 0) as visited
     !
     ! Special cases:
-    !   - Unassigned start positions: not marked visited until cycle completes
+    !   - Unassigned start positions: marked visited only when cycle completes
     !   - Infinite loop protection: bounded by params%number_blocks iterations
     !
-    ! Minimal memory: Only 1 temporary block needed for the start of each cycle
+    ! Memory efficiency: Only 1 temporary block needed per cycle (not per swap)
     ! ============================================================================
     
     ! Apply cycle-following with original_to_current mapping
@@ -836,8 +847,8 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
         next_lgt_id = lgt_id
         
         ! Save the data currently at the start position (will be overwritten)
-        tmp_block_sol = hvy_sol(:,:,:,1:nc,current_idx)
-        tmp_block_rhs = hvy_RHS(:,:,:,1:nc,current_idx)
+        tmp_data = hvy_data(:,:,:,1:nc,current_idx)
+        if (present(hvy_data_2)) tmp_data_2 = hvy_data_2(:,:,:,1:nc_2,current_idx)
         tmp_lgt_block = lgt_block(lgt_id, :)
         
         ! Follow the cycle: pull data from current locations to original positions
@@ -868,13 +879,13 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
                             ! Active block: pull data from waypoint
                             if (next_idx == start_idx) then
                                 ! Special case: looped back to start, write saved data and finish
-                                hvy_sol(:,:,:,1:nc,current_idx) = tmp_block_sol
-                                hvy_RHS(:,:,:,1:nc,current_idx) = tmp_block_rhs
+                                hvy_data(:,:,:,1:nc,current_idx) = tmp_data
+                                if (present(hvy_data_2)) hvy_data_2(:,:,:,1:nc_2,current_idx) = tmp_data_2
                                 lgt_block(lgt_id, :) = tmp_lgt_block
                             else
                                 ! Normal case: pull from waypoint to current
-                                hvy_sol(:,:,:,1:nc,current_idx) = hvy_sol(:,:,:,1:nc,next_idx)
-                                hvy_RHS(:,:,:,1:nc,current_idx) = hvy_RHS(:,:,:,1:nc,next_idx)
+                                hvy_data(:,:,:,1:nc,current_idx) = hvy_data(:,:,:,1:nc,next_idx)
+                                if (present(hvy_data_2)) hvy_data_2(:,:,:,1:nc_2,current_idx) = hvy_data_2(:,:,:,1:nc_2,next_idx)
                                 lgt_block(lgt_id, :) = lgt_block(next_lgt_id, :)
                             endif
                         else
@@ -903,8 +914,8 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
                 ! Cycle complete - returned to start
                 ! ====================================================================
                 ! Write the saved data from the start of the cycle to current position
-                hvy_sol(:,:,:,1:nc,current_idx) = tmp_block_sol
-                hvy_RHS(:,:,:,1:nc,current_idx) = tmp_block_rhs
+                hvy_data(:,:,:,1:nc,current_idx) = tmp_data
+                if (present(hvy_data_2)) hvy_data_2(:,:,:,1:nc_2,current_idx) = tmp_data_2
                 lgt_block(lgt_id, :) = tmp_lgt_block
                 visited(current_idx) = .true.
                 exit  ! Cycle complete
@@ -913,8 +924,8 @@ subroutine reorder_hvy_arrays(params, hvy_sol, hvy_RHS, tree_ID, tc_map_old, n_l
                 ! Continue following the cycle (normal case)
                 ! ====================================================================
                 ! Pull data from next_idx (current location) to current_idx (original/desired location)
-                hvy_sol(:,:,:,1:nc,current_idx) = hvy_sol(:,:,:,1:nc,next_idx)
-                hvy_RHS(:,:,:,1:nc,current_idx) = hvy_RHS(:,:,:,1:nc,next_idx)
+                hvy_data(:,:,:,1:nc,current_idx) = hvy_data(:,:,:,1:nc,next_idx)
+                if (present(hvy_data_2)) hvy_data_2(:,:,:,1:nc_2,current_idx) = hvy_data_2(:,:,:,1:nc_2,next_idx)
                 lgt_block(lgt_id, :) = lgt_block(next_lgt_id, :)
                 
                 ! Mark as visited, except for unassigned start positions (handled at cycle completion)

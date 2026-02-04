@@ -59,6 +59,7 @@ module module_insects
    ! wing damage mask array dimensions
    integer, dimension(1:4), save :: damage_a, damage_b
    !KVN-2025>>>>>
+   ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
    real(kind=rk), allocatable, dimension(:,:,:) :: deformations
    real(kind=rk), allocatable, dimension(:,:,:) :: deformation_profile
    integer, dimension(1:4), save :: deformation_a, deformation_b, deformation_c
@@ -274,9 +275,13 @@ module module_insects
       logical :: corrugated(1:4) = .false.
       real(kind=rk) :: corrugation_array_bbox(1:4,1:4)
       !KVN-2025>>>>>
-      logical :: bristles3D(1:4) = .false.
+      ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
       logical :: deformable(1:4) = .false.
       real(kind=rk) :: deformation_array_bbox(1:4,1:4)
+      !KVN-2025<<<<<
+      ! stuff for bristles
+      !KVN-2025>>>>>
+      logical :: bristles3D(1:4) = .false.
       !KVN-2025<<<<<
       logical :: bristles(1:4) = .false.
       logical :: bristles_simplex(1:4) = .false.
@@ -404,6 +409,7 @@ contains
             endif
          endif
        !KVN-2025>>>>>
+       ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
        case ("deformations")
          if (.not.allocated(deformations)) then
             allocate(deformations(1:a,1:b,1:4))

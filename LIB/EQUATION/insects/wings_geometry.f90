@@ -536,6 +536,7 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
   real(kind=rk) :: rblade, ylte, xte, xle, wsign
   !KVN-2025>>>>>
+  ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
   integer :: i, j, k, a, b, c
   real(kind=rk) :: tt, t1, t2, def1, def2
   !KVN-2025<<<<<
@@ -608,6 +609,7 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
                             
                             !KVN-2025>>>>>
                             ! wing deformation
+                            ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
                             if ( Insect%deformable(wingID) ) then
                               a = deformation_a(wingID)
                               b = deformation_b(wingID)
@@ -1448,7 +1450,8 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               zz0 = 0.0_pr
           endif
 
-          !KVN-2025>>>>>                  
+          !KVN-2025>>>>>   
+          ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
           if ( Insect%deformable(wingID) ) then
             ! wing deformation
             zz0 = interp2_nonper(Insect%bristles_coords(wingID,j,1), &
@@ -2338,10 +2341,12 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     !-----------------------------------------------------------------------------
     ! 3D-bristles
     !-----------------------------------------------------------------------------
-    call read_param_mpi(ifile,"Wing","bristles3D",Insect%bristles3D(wingID), .false.)
+    call read_param_mpi(ifile, "Wing", "bristles3D", Insect%bristles3D(wingID), .false.)
+    
     !-----------------------------------------------------------------------------
     ! wing deformation
     !-----------------------------------------------------------------------------
+    ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
     call read_param_mpi(ifile,"Wing","deformable",Insect%deformable(wingID), .false.)
     if (Insect%deformable(wingID)) then
         if (root) write(*,*) "wing is deformable z=z(x,y,t)"

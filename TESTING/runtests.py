@@ -99,6 +99,7 @@ tests = [
         {"test_name":"dry_dipteraBodyRotation", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_paratuposaComplete", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_butterflyKineloaderV2", "wavelet":"CDF22", "dim":3},
+        {"test_name":"dry_3Dbristles", "wavelet":"CDF22", "dim":3},
 
 #        f"---{group_names[8]}---",  # group identifier
 #        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},
@@ -179,7 +180,7 @@ class WabbitTest:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", 
                                 "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete",
-                                "dry_butterflyKineloaderV2"]:
+                                "dry_butterflyKineloaderV2", "dry_3Dbristles"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", f"{self.test_name}_{self.wavelet}")
         elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"{self.test_name}_{self.wavelet}")
@@ -291,7 +292,7 @@ class WabbitTest:
             return result1
         
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", 
-                                "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete", "dry_butterflyKineloaderV2"]:
+                                "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete", "dry_butterflyKineloaderV2", "dry_3Dbristles"]:
             ini_file = os.path.join("..", "PARAMS_dry_run.ini")  # relative to tmp_dir
 
             # change to directory to tmp
@@ -301,7 +302,7 @@ class WabbitTest:
 
             save_us = ""
             if self.test_name in ["dry_emundus_4wings", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", 
-                                  "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2"]:
+                                  "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2", "dry_3Dbristles"]:
                 save_us = "--save-us"
 
             if self.test_name == "dry_butterflyKineloaderV2":
@@ -377,7 +378,8 @@ class WabbitTest:
         elif self.test_name == ["acm", "acm_norm", "acm_significant"]:
             self.log_file = os.path.join(self.test_dir, "acm_cyl.log")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_bumblebee", 
-                                "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2"]:
+                                "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2",
+                                "dry_3Dbristles"]:
             self.log_file = os.path.join(self.test_dir, "dry_run.log")
         elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
             self.log_file = os.path.join(self.test_dir, "denoise.log")

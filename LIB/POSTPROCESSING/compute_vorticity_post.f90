@@ -119,7 +119,7 @@ subroutine compute_vorticity_post(params)
     elseif (order == "6") then
         params%order_discretization = "FD_6th_central"
         params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
-        params%g = 3_ik
+        params%g = 5_ik
     elseif (order == "6_comp_24") then
         params%order_discretization = "FD_6th_comp_2_4"
         params%wavelet = "CDF60"  ! wavelet used for adaptive syncing

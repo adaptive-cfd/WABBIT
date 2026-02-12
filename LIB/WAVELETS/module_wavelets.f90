@@ -165,22 +165,83 @@ contains
         ! Sometimes called checkerboard copying
         fine(1:nxfine:2, 1:nyfine:2, 1:nzfine:2) = coarse(:, :, :)
 
-        ! matrix operation version
-        ! x-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) = fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) + c(shift)*fine(2*N+shift_fine:nxfine-(2*N-1)+shift_fine:2,1:nyfine:2,1:nzfine:2)
-        end do
-        ! y-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) = fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) + c(shift)*fine(:,2*N+shift_fine:nyfine-(2*N-1)+shift_fine:2,1:nzfine:2)
-        end do
-        ! z-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(:,:,2*N:nzfine-(2*N-1):2) = fine(:,:,2*N:nzfine-(2*N-1):2) + c(shift)*fine(:,:,2*N+shift_fine:nzfine-(2*N-1)+shift_fine:2)
-        end do
+        ! hardcoding stencils as this is performance critical code
+        select case(size(c,1))
+        case (2)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 2, nxfine-1, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-1,iyfine,izfine) + c(2)*fine(ixfine+1,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 2, nyfine-1, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-1,izfine) + c(2)*fine(ixfine,iyfine+1,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 2, nzfine-1, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-1) + c(2)*fine(:,:,izfine+1)
+            end do
+        case (4)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 4, nxfine-3, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-3,iyfine,izfine) + c(2)*fine(ixfine-1,iyfine,izfine) + &
+                                                 c(3)*fine(ixfine+1,iyfine,izfine) + c(4)*fine(ixfine+3,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 4, nyfine-3, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-3,izfine) + c(2)*fine(ixfine,iyfine-1,izfine) + &
+                                                 c(3)*fine(ixfine,iyfine+1,izfine) + c(4)*fine(ixfine,iyfine+3,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 4, nzfine-3, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-3) + c(2)*fine(:,:,izfine-1) + &
+                                   c(3)*fine(:,:,izfine+1) + c(4)*fine(:,:,izfine+3)
+            end do
+        case (6)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 6, nxfine-5, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-5,iyfine,izfine) + c(2)*fine(ixfine-3,iyfine,izfine) + &
+                                                 c(3)*fine(ixfine-1,iyfine,izfine) + c(4)*fine(ixfine+1,iyfine,izfine) + &
+                                                 c(5)*fine(ixfine+3,iyfine,izfine) + c(6)*fine(ixfine+5,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 6, nyfine-5, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-5,izfine) + c(2)*fine(ixfine,iyfine-3,izfine) + &
+                                                 c(3)*fine(ixfine,iyfine-1,izfine) + c(4)*fine(ixfine,iyfine+1,izfine) + &
+                                                 c(5)*fine(ixfine,iyfine+3,izfine) + c(6)*fine(ixfine,iyfine+5,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 6, nzfine-5, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-5) + c(2)*fine(:,:,izfine-3) + &
+                                   c(3)*fine(:,:,izfine-1) + c(4)*fine(:,:,izfine+1) + &
+                                   c(5)*fine(:,:,izfine+3) + c(6)*fine(:,:,izfine+5)
+            end do
+        case default
+            ! for higher order stencils, we fall back to the general matrix operation version
+            ! x-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) = fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) + c(shift)*fine(2*N+shift_fine:nxfine-(2*N-1)+shift_fine:2,1:nyfine:2,1:nzfine:2)
+            end do
+            ! y-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) = fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) + c(shift)*fine(:,2*N+shift_fine:nyfine-(2*N-1)+shift_fine:2,1:nzfine:2)
+            end do
+            ! z-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(:,:,2*N:nzfine-(2*N-1):2) = fine(:,:,2*N:nzfine-(2*N-1):2) + c(shift)*fine(:,:,2*N+shift_fine:nzfine-(2*N-1)+shift_fine:2)
+            end do
+        end select
 
         ! do izfine = 1, nzfine, 2
         !     ! in the z=const planes, we execute the 2D code.

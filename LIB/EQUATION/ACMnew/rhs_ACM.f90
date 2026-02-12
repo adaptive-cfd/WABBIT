@@ -762,7 +762,15 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     case default
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Flexible operator version for 2D ACM using generalized stencils
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Here, the stencils are defined as 1D arrays and their application is written in a generalized form;
+        ! any 1D stencil can be used with this code. However, note, it is significantly faster to explicitly
+        ! write the stencils as is done above! Therefore, the most frequently used cases are NOT to be generalized
+        ! even though that may be tempting from an aesthetics point of view.
+
+        ! define the stencils
         call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
         call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
         
@@ -828,6 +836,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1)) * dy_inv
                     v_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
 
+                    ! for the non-skew symmetric formulation, we just use the same stencils as in the 
+                    ! skew symmetric one, i.e., right stencil for the pressure
                     p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,3)) * dx_inv
                     p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,3)) * dy_inv
 
@@ -1546,10 +1556,19 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     case default
-        ! call abort(44167, "3d Discretization unknown "// trim(order_discretization)//", I'll walk into the light now.")
-
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Flexible operator version for 3D ACM using generalized stencils
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Here, the stencils are defined as 1D arrays and their application is written in a generalized form;
+        ! any 1D stencil can be used with this code. However, note, it is significantly faster to explicitly
+        ! write the stencils as is done above! Therefore, the most frequently used cases are NOT to be generalized
+        ! even though that may be tempting from an aesthetics point of view.
 
+        ! Setup stencils. The left and right stencils are for the skew-symmetric formulation
+        ! see [J. Reiss 2015], used for the convective part of the nonlinear term and the divergence
+        ! part, respectively. Often, these are one-sided stencils. However, it is also possible
+        ! to set up the code using symmetric stencils here, in which case they're both identical.
+        !
         call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
         call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
         
@@ -1578,7 +1597,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
 
-                        ! Generalized first derivatives
+                        ! Generalized first derivatives (convective part - right stencil)
                         u_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,1)) * dx_inv
                         u_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,1)) * dy_inv
                         u_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,1)) * dz_inv
@@ -1596,7 +1615,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,4)) * dy_inv
                         p_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,4)) * dz_inv
 
-                        ! Generalized nonlinear terms
+                        ! Generalized nonlinear terms (divergence part - left stencil)
                         uu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
                         uv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
                         uw_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
@@ -1662,6 +1681,8 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)) * dy_inv
                         w_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
 
+                        ! for the non-skew symmetric formulation, we just use the same stencils as in the 
+                        ! skew symmetric one, i.e., right stencil for the pressure
                         p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,4)) * dx_inv
                         p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,4)) * dy_inv
                         p_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,4)) * dz_inv

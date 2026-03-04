@@ -76,7 +76,7 @@ subroutine threshold_block( params, u, refinement_status, level, input_is_WD, no
 
     ! thresholding of some of the state vector components should be done together, as for example the velocity 
     ! components ux, uy, uz. This means: we do not threshold ux,uy,uz separately, but treat them as one vector.
-    ! In this code, this is calle a norm-equivalent. The thresholding is guided by the array params%threshold_state_vector_component
+    ! In this code, this is called "norm-equivalence". The thresholding is guided by the array params%threshold_state_vector_component
     ! which is set in the params.ini file by the user. If the entry is >1, then this component belongs to a vector and is treated as such
     ! (as opposed to individual thresholding per component). For example, in ACM, we would use params%threshold_state_vector_component=(/2,2,2,1/)
     ! if we were to treat the velocity as one vector, and the pressure as a scalar. If we ever have more than one vector (which 

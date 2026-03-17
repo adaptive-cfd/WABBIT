@@ -53,6 +53,15 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         call random_data(u)
         u = u * params_acm%beta
 
+    case ("noise2")
+        call random_data(u)
+        u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
+
+    case ("noise_unique")
+	! Random data, but results in the same random data on a given grid every time it is called
+        call random_data_unique(u, x0, dx, (/g,g,g/), params_acm%domain_size, params_acm%Jmax, Bs )
+        u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
+
     case ("lamballais")
         if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
 

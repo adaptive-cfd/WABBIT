@@ -56,15 +56,20 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
 
     ! reset refinement status to "stay" on all active blocks
     ! caution: if the code will ever be adapted again to not work on whole tree then this needs to be adapted
-    do k_b = 1, lgt_n(tree_ID)
-        lgt_ID = lgt_active(k_b, tree_ID)
-        lgt_block( lgt_ID, IDX_REFINE_STS ) = 0
-    enddo
+    if( indicator /= 'undo_refinement') then
+        ! The inidicator "undo_refinement" does pretty much what it says: If the grid has previously been refined, newly created
+        ! blocks have the status REF_FRESHLY_REFINED. Those blocks are coarsened again if "undo_refinement" is used. Useful
+        ! for development. Do not reset all blocks when using this indicator.
+        do k_b = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k_b, tree_ID)
+            lgt_block( lgt_ID, IDX_REFINE_STS ) = 0
+        enddo
+    endif
 
     ! construct mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except for dealiasing, because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random") then
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and.indicator/='undo_refinement') then
 
         t0 = MPI_Wtime()
         ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
@@ -143,7 +148,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     norm = -99999  ! reset as random value
 
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
-    if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/="threshold-cvs" .and. indicator/="threshold-image-denoise") then
+    if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/="threshold-cvs" .and. indicator/="threshold-image-denoise" .and. indicator/="undo_refinement") then
         t0 = MPI_Wtime()
         if ( .not. consider_hvy_tmp .and. .not. input_is_WD) then
             ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
@@ -191,6 +196,43 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! the indicator "random" requires special treatment below (it does not pass via
     ! coarseningIndicator_block)
     select case(indicator)
+    case ("origin")
+        ! set only one block at the origin to coarsen
+        ! Used for development only.
+
+        do k_b = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k_b, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+            if (get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 )) == 0 .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == params%Jmax) then
+                ! instead of setting the refinement status, let's set a hack that set's the WC to 0 for Thomas
+                hvy_block(params%g+2:params%g+params%BS(1):2,:,:,:,hvy_ID) = 0.0_rk
+                hvy_block(:,params%g+2:params%g+params%BS(2):2,:,:,hvy_ID) = 0.0_rk
+                if (params%dim == 3) then
+                    hvy_block(:,:,params%g+2:params%g+params%BS(3):2,:,hvy_ID) = 0.0_rk
+                endif
+            else
+                lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            endif
+        enddo
+
+    case ("undo_refinement")
+        ! The inidicator "undo_refinement" does pretty much what it says: If the grid has previously been refined, newly created
+        ! blocks have the status REF_FRESHLY_REFINED. Those blocks are coarsened again if "undo_refinement" is used. Useful
+        ! for development. 
+        do k_b = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k_b, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+
+            ! leaf-blocks only are being set
+            if (.not. block_is_leaf(params, hvy_ID)) cycle
+
+            ! flag for coarsening
+            if ( lgt_block(lgt_ID, IDX_REFINE_STS) == REF_FRESHLY_REFINED ) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
+            else
+                lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            endif
+        enddo
     case ("everywhere")
         ! Coarsen all leaf blocks. Note: it is not always possible (i.e. with any grid) to do that!
         ! This is because the flag may be removed again (completeness, Jmin, gradedness).

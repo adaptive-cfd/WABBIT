@@ -88,7 +88,7 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
         ! new block is on (level + 1)
         lgt_block( lgt_free_id, IDX_MESH_LVL ) = level+1
         ! new blocks have refinement_status==0 (STAY)
-        lgt_block( lgt_free_id, idx_refine_sts ) = 0
+        lgt_block( lgt_free_id, idx_refine_sts ) = REF_FRESHLY_REFINED
         ! the tree_ID is the same as the one of the mother block
         lgt_block( lgt_free_id, IDX_TREE_ID ) = tree_ID
 

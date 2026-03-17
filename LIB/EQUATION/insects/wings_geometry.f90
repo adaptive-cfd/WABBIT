@@ -535,7 +535,11 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta
   real(kind=rk) :: rblade, ylte, xte, xle, wsign
-
+  !KVN-2025>>>>>
+  ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+  integer :: i, j, k, a, b, c
+  real(kind=rk) :: tt, t1, t2, def1, def2
+  !KVN-2025<<<<<
 
   !-- wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   wingID = color_wing-1
@@ -603,8 +607,63 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
                               zz0 = 0.0_pr
                             endif
                             
+                            !KVN-2025>>>>>
+                            ! wing deformation
+                            ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+                            if ( Insect%deformable(wingID) ) then
+                              a = deformation_a(wingID)
+                              b = deformation_b(wingID)
+                              c = deformation_c(wingID)
+                              tt = mod(Insect%time, deformations(a*c,1,wingID))
+                              do k = 1, c-1
+                                t1 = deformations(a*k-1,1,wingID)
+                                t2 = deformations(a*k+1,1,wingID)
+                                !if (Insect%time >= t1 .AND. Insect%time <= t2) then
+                                if (tt >= t1 .AND. tt <= t2) then
+                                  exit
+                                endif
+                              enddo
+                              !if (k == c-1) then
+                              !       t1 = deformations(a*c,1,wingID)
+                              !       k = mod(k,c)
+                              !       t1 = t1 + deformations(a*k-1,1,wingID)
+                              !       t2 = t1 + deformations(a*k+1,1,wingID)
+                              !end if
+                              do j = 1, b
+                                do i = 1, a
+                                  if (k>=c-1) then
+                                    deformation_profile(i,j,wingID) = deformations(a*k-1,j+1,wingID)
+                                  else
+                                    def1 = deformations(a*k-1,j+1,wingID)
+                                    def2 = deformations(a*k+1,j+1,wingID)
+                                    deformation_profile(i,j,wingID) = def1 + (tt-t1)/(t2-t1)*(def2-def1)
+                                    !deformation_profile(i,j,wingID) = def1 + (Insect%time-t1)/(t2-t1)*(def2-def1)
+                                    !deformation_profile(i,j,wingID) = (deformations(a*k-1,j+1,wingID)+deformations(a*k+1,j+1,wingID))/2_rk
+                                  endif
+                                enddo
+                              enddo
+                              zz0 = interp2_nonper( x_wing(1), x_wing(2), deformation_profile(:,:,wingID), Insect%deformation_array_bbox(1:4,wingID), a, b )
+                              Insect%wing_bounding_box(5,wingID) = min(Insect%wing_bounding_box(5,wingID), zz0 - Insect%WingThickness / 2.0_pr)
+                              Insect%wing_bounding_box(6,wingID) = max(Insect%wing_bounding_box(6,wingID), zz0 + Insect%WingThickness / 2.0_pr)
+                              !write(*,*) "x_wing(1)=",x_wing(1),"x_wing(2)=",x_wing(2),"array=",Insect%deformation_array_bbox(:,wingID)
+                              !v_a = corrugation_a(wingID)
+                              !v_b = corrugation_b(wingID)
+                              !v_xmin = Insect%corrugation_array_bbox(1,wingID)
+                              !v_xmax = Insect%corrugation_array_bbox(2,wingID)
+                              !v_dx = (v_xmax-v_xmin)/(v_b-1)
+                              !do j = 1, v_b
+                              !       v_x = v_xmin + (j-1)*v_dx
+                              !       do i = 1, v_a
+                              !               !corrugation_profile(i,j,wingID) = (1.0_pr+dsin(Insect%time/0.1_rk*2_rk*pi))/20.0_pr*dsin((v_x-v_xmin)/(v_xmax-v_xmin)*2_rk*pi)
+                              !               corrugation_profile(i,j,wingID) = dsin(Insect%time/0.01_rk*2_rk*pi)/20.0_pr*dsin((v_x-v_xmin)/(v_xmax-v_xmin)*2_rk*pi)
+                              !       enddo
+                              !enddo
+                              !zz0 = interp2_nonper( x_wing(1), x_wing(2), corrugation_profile(:,:,wingID), Insect%corrugation_array_bbox(1:4,wingID), corrugation_a(wingID), corrugation_b(wingID) )
+                            endif
+                            !KVN-2025<<<<<
+
                             zz0 = zz0 * wsign
-                            
+
                             ! wing thickness
                             if ( Insect%wing_thickness_distribution(wingID)=="variable") then
                                 ! variable wing thickness is read from an array in the wing.ini file
@@ -1391,12 +1450,33 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,M
               zz0 = 0.0_pr
           endif
 
+          !KVN-2025>>>>>   
+          ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+          if ( Insect%deformable(wingID) ) then
+            ! wing deformation
+            zz0 = interp2_nonper(Insect%bristles_coords(wingID,j,1), &
+                        Insect%bristles_coords(wingID,j,2), &
+                        deformation_profile(:,:,wingID), &
+                        Insect%deformation_array_bbox(1:4,wingID), &
+                        deformation_a(wingID), &
+                        deformation_b(wingID))
+          endif
+          !KVN-2025>>>>>
+
           zz0 = zz0 * wsign
 
           ! start / end point (in wing coordinate system)
-          xa = (/Insect%bristles_coords(wingID,j,1), Insect%bristles_coords(wingID,j,2), zz0/)
-          xb = (/Insect%bristles_coords(wingID,j,3), Insect%bristles_coords(wingID,j,4), zz0/)
-          R = Insect%bristles_coords(wingID,j,5)
+          !KVN-2025>>>>>
+          if ( Insect%bristles3D(wingID) ) then
+             xa = (/Insect%bristles_coords(wingID,j,1), Insect%bristles_coords(wingID,j,2), zz0+wsign*Insect%bristles_coords(wingID,j,3)/)
+             xb = (/Insect%bristles_coords(wingID,j,4), Insect%bristles_coords(wingID,j,5), zz0+wsign*Insect%bristles_coords(wingID,j,6)/)
+             R = Insect%bristles_coords(wingID,j,7)
+          else
+             xa = (/Insect%bristles_coords(wingID,j,1), Insect%bristles_coords(wingID,j,2), zz0/)
+             xb = (/Insect%bristles_coords(wingID,j,3), Insect%bristles_coords(wingID,j,4), zz0/)
+             R = Insect%bristles_coords(wingID,j,5)
+          endif
+          !KVN-2025<<<<<  
 
           ! note input to draw_bristle in in wing coordinates
           call draw_bristle(xa, xb, R, xx0, ddx, mask, mask_color, us, Insect, color_wing, M_g2b, M_b2w, x_pivot_b, rot_rel_wing_w)
@@ -2043,6 +2123,10 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     integer(kind=2), intent(in) :: wingID ! wing id number
     real(kind=rk) :: init_thickness, dphi, theta2
     integer(kind=ik) :: i, j, n_radius
+    !KVN-2025>>>>>
+    integer(kind=ik) :: a1,b1,c
+    !KVN-2025<<<<<
+
 
     if (root) then
         write(*,'(80("─"))')
@@ -2253,6 +2337,38 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
         call param_matrix_read_mpi( ifile, "Wing", "bristles_coords", Insect%bristles_coords(wingID, 1:a, 1:b))
     endif
 
+    !KVN-2025>>>>>
+    !-----------------------------------------------------------------------------
+    ! 3D-bristles
+    !-----------------------------------------------------------------------------
+    call read_param_mpi(ifile, "Wing", "bristles3D", Insect%bristles3D(wingID), .false.)
+    
+    !-----------------------------------------------------------------------------
+    ! wing deformation
+    !-----------------------------------------------------------------------------
+    ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+    call read_param_mpi(ifile,"Wing","deformable",Insect%deformable(wingID), .false.)
+    if (Insect%deformable(wingID)) then
+        if (root) write(*,*) "wing is deformable z=z(x,y,t)"
+        call read_param_mpi(ifile,"Wing","deformation_array_bbox",Insect%deformation_array_bbox(1:4,wingID), (/0.0_rk,0.0_rk,0.0_rk,0.0_rk/))
+        call param_matrix_size_mpi(ifile,"Wing","deformations",a1,b1)
+        call Allocate_Arrays(Insect,"deformations",a1,b1)
+        call param_matrix_read_mpi(ifile,"Wing","deformations",deformations(:,:,wingID))
+        do a = 1, a1
+          if ( deformations(a,1,wingID) /= deformations(a+1,1,wingID) ) then
+            exit
+          end if
+        end do
+        b = b1 - 1
+        c = a1/a
+        deformation_a(wingID) = a
+        deformation_b(wingID) = b
+        deformation_c(wingID) = c
+        call Allocate_Arrays(Insect,"deformation_profile",a,b)
+    else
+        if (root) write(*,*) "wing is non-deformable"
+    endif
+    !KVN-2025<<<<<
 
     !-----------------------------------------------------------------------------
     ! wing corrugation

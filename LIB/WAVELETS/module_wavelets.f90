@@ -1211,7 +1211,7 @@ contains
             ! endif
 
             ! Unlifted or lifted - every CDFX0er wavelet is considered unlifted and the rest lifted
-            params%isLiftedWavelet = CDFY /= 0
+            params%isLiftedWavelet = (CDFY /= 0)
 
             ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually)
             if (CDFX == 2) then

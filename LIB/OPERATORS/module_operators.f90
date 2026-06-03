@@ -89,6 +89,7 @@ contains
 #include "compute_laplacian.f90"
 #include "componentWiseNorm_tree.f90"
 
+
 !**********************************************************************************************
 !> \brief setup the left-side FD1 stencils
 !> \details This routine sets up the left-side first derivative stencils based on the discretization order
@@ -122,7 +123,17 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 4
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_C8(:)
-        case("FD_3th_comp_1_2")
+        case("FD_4th_central_optimized")
+            l_start = -3
+            l_end = 3
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = FD1_CTW4(:)
+        case("FD_4th_central_optimized_revised")
+            l_start = -3
+            l_end = 3
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = FD1_CTWR4(:)
+        case("FD_3rd_comp_1_2")
             l_start = -2
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
@@ -200,7 +211,17 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 4
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_C8(:)
-        case("FD_3th_comp_1_2")
+        case("FD_4th_central_optimized")
+            r_start = -3
+            r_end = 3
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_CTW4(:)
+        case("FD_4th_central_optimized_revised")
+            r_start = -3
+            r_end = 3
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_CTWR4(:)
+        case("FD_3rd_comp_1_2")
             r_start = -1
             r_end = 2
             allocate(FD1_r_array(r_start:r_end))
@@ -248,24 +269,24 @@ end subroutine setup_FD1_right_stencil
 !**********************************************************************************************
 !> \brief setup the FD2 stencils
 !> \details This routine sets up the second derivative stencils based on the discretization order
-subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, fd2_end, use_exact_discretization)
+subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, fd2_end, use_composite_stencils)
     implicit none
     
     character(len=*), intent(in) :: FD2_order_discretization_in !> order of the second derivative discretization
     real(kind=rk), allocatable, intent(inout) :: FD2_array(:) !> second derivative stencil array
     integer(kind=ik), intent(inout) :: fd2_start, fd2_end !> second derivative stencil bounds
-    logical, intent(in), optional :: use_exact_discretization !> if true, use exact composite stencils; if false (default), use central stencils for composite orders
+    logical, intent(in), optional :: use_composite_stencils !> if true, use exact composite stencils; if false (default), use central stencils for composite orders
     
-    logical :: use_exact
+    logical :: use_composite
     
     ! We need the second order stencils for two reasons:
     ! 1) to compute the diffusion term
     ! 2) to solve the pressure-poisson equation
     ! For the first case, operator compatibility is not too important and we choose the best available stencil (central one)
     ! For the second case, operator compatibility is crucial and we need the correct stencils
-    ! default behaviour is dictated by RHS, so for now we need to set use_exact_discretization = .true. when wanting to choose the coinciding stencil
-    use_exact = .false.
-    if (present(use_exact_discretization)) use_exact = use_exact_discretization
+    ! default behaviour is dictated by RHS, so for now we need to set use_composite_stencils = .true. when wanting to choose the coinciding stencil
+    use_composite = .false.
+    if (present(use_composite_stencils)) use_composite = use_composite_stencils
     
     if (allocated(FD2_array)) deallocate(FD2_array)
     
@@ -276,7 +297,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
         case("FD_3rd_comp_1_2")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -3
                 fd2_end = 3
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -288,13 +309,13 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 allocate(FD2_array(fd2_start:fd2_end))
                 FD2_array(:) = FD2_C4(:)
             endif
-        case("FD_4th_central")
+        case("FD_4th_central", "FD_4th_central_optimized", "FD_4th_central_optimized_revised")
             fd2_start = -2
             fd2_end = 2
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C4(:)
         case("FD_4th_comp_0_4")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -4
                 fd2_end = 4
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -307,7 +328,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C4(:)
             endif
         case("FD_4th_comp_2_2")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -4
                 fd2_end = 4
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -320,7 +341,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C4(:)
             endif
         case("FD_4th_comp_1_3")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -4
                 fd2_end = 4
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -333,7 +354,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C4(:)
             endif
         case("FD_5th_comp_2_3")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -5
                 fd2_end = 5
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -351,7 +372,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C6(:)
         case("FD_6th_comp_3_3")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -6
                 fd2_end = 6
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -364,7 +385,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C6(:)
             endif
         case("FD_6th_comp_2_4")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -6
                 fd2_end = 6
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -377,7 +398,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C6(:)
             endif
         case("FD_6th_comp_1_5")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -6
                 fd2_end = 6
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -390,7 +411,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C6(:)
             endif
         case("FD_6th_comp_0_6")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -6
                 fd2_end = 6
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -403,7 +424,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 FD2_array(:) = FD2_C6(:)
             endif
         case("FD_7th_comp_3_4")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -7
                 fd2_end = 7
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -421,7 +442,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C8(:)
         case("FD_8th_comp_3_5")
-            if (use_exact) then
+            if (use_composite) then
                 fd2_start = -8
                 fd2_end = 8
                 allocate(FD2_array(fd2_start:fd2_end))
@@ -460,15 +481,14 @@ subroutine setup_FD1X_stencil(FD1_order_discretization_in, FD1X_array, fd1x_star
             fd1x_end = 2
             allocate(FD1X_array(fd1x_start:fd1x_end))
             FD1X_array(:) = FD1X_C4(:)
-        case("FD_6th_central", "FD_8th_central", "FD_4th_comp_0_4", "FD_4th_comp_1_3", "FD_4th_comp_2_2", &
-             "FD_6th_comp_0_6", "FD_6th_comp_1_5", "FD_6th_comp_2_4")
-            ! For higher orders, default to 4th order cross derivatives for now
+        case default
+            ! For all others, default to 4th order cross derivatives for now
             fd1x_start = -2
             fd1x_end = 2
             allocate(FD1X_array(fd1x_start:fd1x_end))
             FD1X_array(:) = FD1X_C4(:)
-        case default
-            call abort(250617, "ERROR: order of FD1X (cross derivative) discretization not known: " // trim(FD1_order_discretization_in))
+        ! case default
+        !     call abort(250617, "ERROR: order of FD1X (cross derivative) discretization not known: " // trim(FD1_order_discretization_in))
     end select
 end subroutine setup_FD1X_stencil
 

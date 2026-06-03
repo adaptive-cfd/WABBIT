@@ -115,7 +115,7 @@ end subroutine RHS_convdiff
 
 !> Actual implementation of the 2d/3d convdiff RHS
 subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
-
+    use module_operators
     implicit none
 
     !> time
@@ -151,6 +151,9 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
     real(kind=rk)                                  :: b(-2:2)
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
+    ! coefficients and indices for generalized FD stencils
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
     ! set parameters for readability
     N = params_convdiff%N_scalars
@@ -278,7 +281,23 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
 
 
             case default
-                call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
+                ! Flexible operator version for 2D convdiff using generalized stencils
+                call setup_FD1_left_stencil(params_convdiff%discretization, FD1_l, FD1_ls, FD1_le)
+                call setup_FD2_stencil(params_convdiff%discretization, FD2, FD2_s, FD2_e)
+
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! Generalized first derivatives
+                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1,i)) * dx_inv
+                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1,i)) * dy_inv
+
+                        ! Generalized second derivatives
+                        u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,1,i)) * dx2_inv
+                        u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,1,i)) * dy2_inv
+
+                        rhs(ix,iy,1,i) = -u0(ix,iy,1,1)*u_dx -u0(ix,iy,1,2)*u_dy + nu*(u_dxdx+u_dydy)
+                    end do
+                end do
             end select
 
 
@@ -395,7 +414,42 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
                 endif
 
             case default
-                call abort(442161, params_convdiff%discretization//" discretization unkown, goto hell.")
+                ! Flexible operator version for 3D convdiff using generalized stencils
+                call setup_FD1_left_stencil(params_convdiff%discretization, FD1_l, FD1_ls, FD1_le)
+                call setup_FD2_stencil(params_convdiff%discretization, FD2, FD2_s, FD2_e)
+
+                if (nu>=1.0e-10) then ! with viscosity
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
+                                ! Generalized first derivatives
+                                u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,i)) * dx_inv
+                                u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,i)) * dy_inv
+                                u_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,i)) * dz_inv
+
+                                ! Generalized second derivatives
+                                u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,i)) * dx2_inv
+                                u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,i)) * dy2_inv
+                                u_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,i)) * dz2_inv
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz + nu*(u_dxdx+u_dydy+u_dzdz)
+                            end do
+                        end do
+                    end do
+                else ! no viscosity
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
+                                ! Generalized first derivatives
+                                u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,i)) * dx_inv
+                                u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,i)) * dy_inv
+                                u_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,i)) * dz_inv
+
+                                rhs(ix,iy,iz,i) = -u0(ix,iy,iz,1)*u_dx -u0(ix,iy,iz,2)*u_dy -u0(ix,iy,iz,3)*u_dz
+                            end do
+                        end do
+                    end do
+                endif
             end select
         endif
 

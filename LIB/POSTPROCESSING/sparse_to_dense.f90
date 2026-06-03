@@ -94,8 +94,8 @@ subroutine sparse_to_dense(params)
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
     call setup_wavelet(params, params%g, params%g_rhs)
 
-    params%useCoarseExtension = params%isLiftedWavelet
-    params%useSecurityZone = params%isLiftedWavelet
+    call get_cmd_arg( "--useCoarseExtension", params%useCoarseExtension, default=params%isLiftedWavelet )
+    params%useSecurityZone = params%useCoarseExtension
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,

@@ -76,7 +76,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     ! which means 2**D blocks after refinement), but is better than before.
     ! To ensure perfect balancing, a second step is done after the actual refinement.
     if (indicator /= "everywhere") then
-        call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true., balance_name='refine_pre', time=time )
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", balance_name='refine_pre', time=time )
     endif
 
     !---------------------------------------------------------------------------

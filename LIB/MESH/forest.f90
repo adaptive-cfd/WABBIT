@@ -1524,7 +1524,7 @@ subroutine tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1, tree_
 
     t_elapse = MPI_Wtime()
 
-    !!! Attention we should not use prefilter of CDF44 wavelets here. Because
+    !!! Attention we should not use prefilter of lifted wavelets here. Because
     !!! it will change the original data!!!
     MR = params%wavelet
     params%wavelet = "CDF40"
@@ -1904,7 +1904,7 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
     sprod_block = sprod
     call MPI_ALLREDUCE(sprod_block, sprod, 1, MPI_DOUBLE, &
     MPI_SUM,WABBIT_COMM, mpierr)
-    !!! Attention we should not use prefilter of CDF44 wavelets here. Because
+    !!! Attention we should not use prefilter of lifted wavelets here. Because
     !!! it will change the original data!!!
     MR = params%wavelet
     params%wavelet = "CDF40"

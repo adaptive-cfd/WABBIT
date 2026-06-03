@@ -27,6 +27,9 @@ tests = [
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":2},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF64", "dim":2},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF66", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF80", "dim":2},
+        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF82", "dim":2},
+
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":3},
         {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":3},
@@ -39,6 +42,7 @@ tests = [
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":2},
+        {"test_name":"ghost_nodes", "wavelet":"CDF80", "dim":2},
         {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
         {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
@@ -56,6 +60,9 @@ tests = [
         {"test_name":"invertibility", "wavelet":"CDF60", "dim":2},
         {"test_name":"invertibility", "wavelet":"CDF62", "dim":2},
         {"test_name":"invertibility", "wavelet":"CDF64", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF66", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF80", "dim":2},
+        {"test_name":"invertibility", "wavelet":"CDF82", "dim":2},
 
         f"---{group_names[4]}---",  # group identifier
         {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},

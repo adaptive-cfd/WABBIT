@@ -94,7 +94,7 @@ subroutine post_rhs(params)
 
     ! save result to disk
     do k = 1, params%n_eqn
-        write( fname,'("rhs",i1,"_", i12.12, ".h5")') k, nint(time * 1.0e6_rk)
+        write( fname,'("rhs",i1,"_", i6.6, i6.6, ".h5")') k, int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
 
         call saveHDF5_tree(fname, time, iteration, k, params, hvy_work(:,:,:,:,:,1), tree_ID)
     enddo

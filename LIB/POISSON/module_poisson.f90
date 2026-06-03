@@ -73,7 +73,7 @@ contains
         if (.not. params%poisson_order == "FD_6th_mehrstellen") then
             ! use standard 1D stencils via module_operators setup_FD2_stencil
             ! for Poisson solver, we want to use exact discretizations for composite stencils to preserve compatibility between operators
-            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_exact_discretization=.true.)
+            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_composite_stencils=.true.)
             
             ! set module variables for compatibility with existing code
             stencil_RHS = 1.0_rk
@@ -179,7 +179,7 @@ contains
 
 
     !> \brief Gauss-Seidel iteration for a given tree_id and refinement level
-    subroutine GS_iteration_ref(params, tree_id, ref, u, b, sweep_forward, filter_offset)
+    subroutine GS_iteration_ref(params, tree_id, ref, u, b, sweep_forward, filter_offset, sweep_number, multigrid_level)
         implicit none
 
         !> parameter struct
@@ -190,29 +190,60 @@ contains
         real(kind=rk), intent(in)          :: b(:, :, :, :, :)
         logical, intent(in)                :: sweep_forward
         integer(kind=ik), intent(in), optional  :: filter_offset  ! where to apply the filter, default is params%g resulting in only interior points
+        integer(kind=ik), intent(in), optional  :: sweep_number   ! for debug output
+        integer(kind=ik), intent(in), optional  :: multigrid_level ! for debug output
 
-        integer(kind=ik)     :: k, hvy_id, lgt_id, filterOffset
+        integer(kind=ik)     :: k, hvy_id, lgt_id, filterOffset, blocks_iterated, ierr
+        integer(kind=ik), allocatable, save :: blocks_iterated_list(:)
         real(kind=rk)        :: t_block, x0(1:3), dx(1:3)
+        character(len=clong) :: format_string, string_prepare
 
         filterOffset = params%g
         if (present(filter_offset)) filterOffset = filter_offset
+
+        blocks_iterated = 0
 
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! skip blocks not on this level
+            ! skip blocks not with this refinement status
             if (all(lgt_block(lgt_id,IDX_REFINE_STS) /= ref)) cycle
 
             ! get spacing
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
             params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
-            ! blocks on this level do a GS-sweep
+            ! blocks with this refinement status do a GS-sweep
             call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), dx, sweep_forward, filterOffset)
+
+            ! debugging: count blocks operated on
+            blocks_iterated = blocks_iterated + 1
         enddo
         call toc( "Gauss-Seidel iteration", 10006, MPI_Wtime()-t_block )
+
+        ! debug output to see how many blocks have been decomposed, gather information on rank 0 and print to file
+        if (params%debug_poisson .and. present(sweep_number) .and. present(multigrid_level)) then
+            ! only one sweep reports on load balancing
+            if (sweep_number == 1) then
+                if (.not. allocated(blocks_iterated_list)) allocate(blocks_iterated_list(1:params%number_procs))
+
+                call MPI_GATHER(blocks_iterated, 1, MPI_INTEGER, blocks_iterated_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+                if (params%rank == 0) then
+                    open(unit=99, file=trim("debug_poisson.csv"), status="unknown", position="append")
+                    string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
+                    ! if (present(time)) write(string_prepare,'(es16.6,",")') time
+                    if (params%number_procs == 1) then
+                        write(99,'(A, i0, ",", i0)') trim(adjustl(string_prepare)), multigrid_level, blocks_iterated_list(1)
+                    else
+                        write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                        write(99,format_string) trim(adjustl(string_prepare)), multigrid_level, blocks_iterated_list(1), blocks_iterated_list(2:params%number_procs)
+                    endif
+                    close(99)
+                endif
+            endif
+        endif
     end subroutine
 
     ! do one Gauss Seidel iteration, either in backwards or forwards fashion, to solve Ax=b

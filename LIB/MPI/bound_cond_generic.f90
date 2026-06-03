@@ -1,5 +1,5 @@
 !> \brief Wrapper, that applies boundary conditions on whole tree or only on parts of it
-subroutine bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_val, edges_only)
+subroutine bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_form, s_level, s_ref, edges_only)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -12,7 +12,7 @@ subroutine bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_f
     character(len=*), intent(in)   :: sync_case
     logical, intent(in)            :: spaghetti_form                !< if true, hvy_block is in spaghetti form
     !> Additional value to be considered for syncing logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
-    integer(kind=ik), intent(in), optional  :: s_val
+    integer(kind=ik), intent(in), optional  :: s_level, s_ref
     logical, intent(in), optional  :: edges_only                    !< if true, only set the boundary condition on the edges of the domain, default is false
 
     integer(kind=ik) :: i_dim, k, hvy_id, lgt_id, sync_id
@@ -35,8 +35,8 @@ subroutine bound_cond_generic(params, hvy_block, tree_ID, sync_case, spaghetti_f
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            if (sync_id == 1 .and. lgt_block(lgt_id, IDX_MESH_LVL) /= s_val) cycle
-            if (sync_id == 2 .and. lgt_block(lgt_id, IDX_REFINE_STS) /= s_val) cycle
+            if (sync_id == 1 .and. lgt_block(lgt_id, IDX_MESH_LVL) /= s_level) cycle
+            if (sync_id == 2 .and. lgt_block(lgt_id, IDX_REFINE_STS) /= s_ref) cycle
             if (sync_id == 3 .and. .not. block_is_leaf(params, hvy_id)) cycle
             if (sync_id == 4 .and. .not. block_is_root(params, hvy_id)) cycle
 

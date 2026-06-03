@@ -469,7 +469,7 @@ contains
             call INITIALIZE_ASCII_FILES_ACM( time, overwrite )
 
         case ("ConvDiff-new")
-            call init_t_file('scalar_integral.t', overwrite)
+            call INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
 
         case ("navier_stokes")
             call INITIALIZE_ASCII_FILES_NStokes( time, overwrite )

@@ -177,7 +177,7 @@ program main
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
     call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
 
-    if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time>=params%write_time_first)) then
+    if ((.not. params%read_from_files .or. params%adapt_inicond).and.(time+1e-12_rk>params%write_time_first)) then
         ! NOTE: new versions (>16/12/2017) call physics module routines call prepare_save_data. These
         ! routines create the fields to be stored in the work array hvy_work in the first 1:params%N_fields_saved
         ! slots. the state vector (hvy_block) is copied if desired.
@@ -198,35 +198,22 @@ program main
 
     ! a few files have to be intialized by wabbit, because they are logfiles produced
     ! by wabbit independent of the physics modules.
-    call init_t_file('dt.t', overwrite)
-    call init_t_file('performance.t', overwrite)
+    call init_t_file('dt.t', overwrite, (/ "           time", "             dt" /))
+    call init_t_file('performance.t', overwrite, (/ "           time", "      iteration", "      t_stepper", "   N_blocks_rhs", "       N_blocks", &
+        "           Jmin", "           Jmax", "        N_procs", " N_blocks_total" /))
     call init_t_file('eps_norm.t', overwrite)
-    call init_t_file('krylov_err.t', overwrite)
-    call init_t_file('balancing.t', overwrite)
-    call init_t_file('block_xfer.t', overwrite)
+    call init_t_file('krylov_err.t', overwrite, (/ "           time", "             dt", "            err", "         M_iter", "          M_max" /))
+    call init_t_file('block_xfer.t', overwrite, (/ "             t0", "        counter", "    Nxfer_total", "     Nxfer_done", "Nxfer_notPosNow" /))
     call init_t_file('thresholding.t', overwrite)
 
     if (rank==0) then
         call Initialize_runtime_control_file()
     endif
 
-    ! next write time for reloaded data
-    if (params%write_method == 'fixed_time') then
-        params%next_write_time = real(floor(time/params%write_time), kind=rk)*params%write_time + params%write_time
-        params%next_stats_time = real(floor(time/params%tsave_stats), kind=rk)*params%tsave_stats + params%tsave_stats
-
-        ! sometimes, rarely, floor can be tricky: say we resume a run at t=2.26 and write_time is 0.01. if the h5 file
-        ! is exactly at 2.26 but maybe the last digit flips (machine precision) it happens very rarely that
-        ! floor(2.26/0.01) = 225 (and not 226). Then, WABBIT misses the next write time (and produces no output anymore...)
-        ! correct for this mistake:
-        if (abs(params%next_write_time-time)<=1.0e-10_rk) params%next_write_time = params%next_write_time + params%write_time
-        if (abs(params%next_stats_time-time)<=1.0e-10_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
-    end if
-
     !*******************************************************************
     ! initial statistics (usefull for checking IC)
     !*******************************************************************
-    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+    if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time, params%tsave_stats))<1e-12_rk) ) then
         t4 = MPI_wtime()
         ! we need to sync ghost nodes for some derived qtys, for sure
         call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
@@ -243,8 +230,6 @@ program main
     ! main time loop
     !---------------------------------------------------------------------------
     if (rank==0) then
-        write(*,*) "params%next_write_time=", params%next_write_time
-        write(*,*) "params%next_stats_time=", params%next_stats_time
         write(*,*) ""
         write(*,'(10(" "), "╔", 48("═"), "╗")') 
         write(*,'(10(" "), A)') "║ On your marks, ready, starting main time loop! ║"
@@ -316,12 +301,12 @@ program main
             ! determine if it is time to save data
             it_is_time_to_save_data = .false.
             if ((params%write_method=='fixed_freq' .and. modulo(iteration, params%write_freq)==0) .or. &
-                (params%write_method=='fixed_time' .and. abs(time - params%next_write_time)<1.0e-12_rk)) then
+                (params%write_method=='fixed_time' .and. abs(mod(time, params%write_time))<1.0e-12_rk)) then
                 it_is_time_to_save_data = .true.
             endif
 
             ! do not save any output before this time (so maybe revoke the previous decision)
-            if (time<=params%write_time_first) then
+            if (time+1e-12_rk<params%write_time_first) then
                 it_is_time_to_save_data = .false.
             endif
             ! save after walltime unit is not affected by write_time_first
@@ -360,16 +345,13 @@ program main
             !*******************************************************************
             ! statistics
             !*******************************************************************
-            if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(time - params%next_stats_time)<1e-12_rk) ) then
+            if ( (modulo(iteration, params%nsave_stats)==0).or.(abs(mod(time,params%tsave_stats))<1e-12_rk) ) then
                 t4 = MPI_wtime()
                 ! we need to sync ghost nodes for some derived qtys, for sure
                 call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow )
 
                 call statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
                 call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
-
-                ! update next stats time
-                if (abs(time - params%next_stats_time)<1e-12_rk) params%next_stats_time = params%next_stats_time + params%tsave_stats
             endif
 
             ! if multiple time steps are performed on the same grid, we have to be careful
@@ -393,38 +375,12 @@ program main
                 call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
                 ! actual coarsening (including the mask function)
-
-                ! High-level optimization for time statistics:
-                ! Check if any time statistics components should be adapted (threshold_state_vector_component > 0)
-                ! Time statistics are always at the end of the state vector
-                ! If we do not want to adapt them, we can reduce the workload of adapt_tree significantly.
-                if (params%time_statistics .and. params%N_time_statistics > 0 .and. &
-                    any(params%threshold_state_vector_component(params%n_eqn-params%N_time_statistics+1:params%n_eqn) > 0)) then
-                    ! Include time statistics in adaptation
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_adapt=params%n_eqn)
-                else
-                    ! Exclude time statistics from adaptation to reduce workload
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_adapt=params%n_eqn-params%N_time_statistics)
-                endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_mask=hvy_mask, hvy_work=hvy_work)
             else
                 ! actual coarsening (no mask function is required)
-
-                ! High-level optimization for time statistics:
-                ! Check if any time statistics components should be adapted (threshold_state_vector_component > 0)
-                ! Time statistics are always at the end of the state vector
-                ! If we do not want to adapt them, we can reduce the workload of adapt_tree significantly.
-                if (params%time_statistics .and. params%N_time_statistics > 0 .and. &
-                    any(params%threshold_state_vector_component(params%n_eqn-params%N_time_statistics+1:params%n_eqn) > 0)) then
-                    ! Include time statistics in adaptation
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_work=hvy_work, neqn_adapt=params%n_eqn)
-                else
-                    ! Exclude time statistics from adaptation to reduce workload
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                        hvy_work=hvy_work, neqn_adapt=params%n_eqn-params%N_time_statistics)
-                endif
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                    hvy_work=hvy_work)
             endif
         endif
         call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)
@@ -440,7 +396,6 @@ program main
             call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
 
             output_time = time
-            params%next_write_time = params%next_write_time + params%write_time
         endif
 
         t2 = MPI_wtime() - t2
@@ -505,7 +460,7 @@ program main
     ! statistics ( last time - always done if statistics is enabled, but skipped if it was already done at this time to prevent duplicates )
     !*******************************************************************
     if ( (params%nsave_stats /= 99999999_ik .or. (abs(params%tsave_stats - 9999999.9_rk) > 1e-12)) &
-        .and. .not. (modulo(iteration, params%nsave_stats) == 0 .or. abs(time - params%next_stats_time + params%tsave_stats)<1e-12_rk ) ) then
+        .and. .not. (modulo(iteration, params%nsave_stats) == 0 .or. abs(mod(time, params%tsave_stats))<1e-12_rk ) ) then
         t4 = MPI_wtime()
         ! we need to sync ghost nodes for some derived qtys, for sure
         call sync_ghosts_RHS_tree( params, hvy_block, tree_ID_flow)

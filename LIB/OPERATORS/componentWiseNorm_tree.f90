@@ -313,7 +313,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
 end subroutine
 
 !> Prototype, will probably be deleted later and is not up to latest formulations
-subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, norm_case, n_val)
+subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
@@ -321,11 +321,6 @@ subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, 
     integer(kind=ik), intent(in)        :: lgt_id                               !> lgt_ID of this block
     character(len=*), intent(in)        :: which_norm                           !> which norm to use ? "L2", "Linfty"
     real(kind=rk), intent(inout)        :: norm                                 !> the computed norm for each component of the vector
-    !> String representing to choose special norm cases, can be tree (default), level or ref and additionally
-    !! if we add "SC" to the norm case logic, we treat the input as wavelet decomposed and only compute the norms over the SCs
-    character(len=*), intent(in), optional  :: norm_case
-    !> Additional value to be considered for norm logic, can be level or refinement status to which should be synced, used if sync case includes ref or level
-    integer(kind=ik), intent(in), optional  :: n_val
 
     real(kind=rk)                       :: x0(1:3), dx(1:3), volume
     integer(kind=ik) :: k, n_eqn, Bs(1:3), g(1:3), p, p_norm, l, mpierr, level_me, ref_me, norm_case_id
@@ -334,22 +329,6 @@ subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, 
     Bs = params%Bs
     g = 0
     g(1:params%dim) = params%g
-
-    if (.not. present(norm_case)) then
-        norm_case_id = 1
-    else
-        ! treat the norm computations as for SC
-        ! with this, we will skip every second point in each direction and multiply the L2norms for the fields by 2^d, as the cells are larger
-        if (index(norm_case, "SC") > 0) then
-            norm_case_id = 2
-        else 
-            norm_case_id = 1
-        endif
-    
-        ! now lets treat the special restrictions, set to the second digit
-        if (index(norm_case, "level") > 0) norm_case_id = norm_case_id + 10*1
-        if (index(norm_case, "ref") > 0) norm_case_id = norm_case_id + 10*2
-    endif
 
     select case (which_norm)
     case ("Energy_Prototype")
@@ -365,6 +344,10 @@ subroutine componentWiseNorm_block(params, hvy_block, lgt_id, which_norm, norm, 
 
         ! we have to compute cell weighted values, which for uniform grids is the mean so divide by amount of points
         norm = norm / dble(product(params%Bs(1:params%dim)))
+    case ("L2")
+        norm = sqrt( sum( hvy_block(g(1)+1:Bs(1)+g(1), g(2)+1:Bs(2)+g(2), g(3)+1:Bs(3)+g(3), : )**2 ) )
+    case ("Linfty")
+        norm = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1), g(2)+1:Bs(2)+g(2), g(3)+1:Bs(3)+g(3), : ) ) )
     case default
         write(*,'(A)') which_norm
         call abort(20030201, "The tree norm you desire is not implemented. How dare you.")

@@ -1,4 +1,4 @@
-subroutine post_pressure_interpolation
+subroutine post_pressure_interpolation(params)
 
     use mpi
     use module_helpers
@@ -17,9 +17,10 @@ subroutine post_pressure_interpolation
 
     implicit none
 
+    type (type_params), intent(inout)   :: params           ! user defined parameter structure
+
     integer(kind=ik)                    :: number_procs     ! number of processes
     ! real(kind=rk)                       :: t0, t1, t2       ! cpu time variables for running time calculation
-    type (type_params)                  :: params           ! user defined parameter structure
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_block(:, :, :, :, :)
     real(kind=rk)                       :: time, xx, yy, zz, delx, dely, delz, tmp           ! time loop variables

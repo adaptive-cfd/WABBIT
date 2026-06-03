@@ -79,7 +79,16 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
         endif
 
         ! Wavelet decomposition
-        call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_id))
+
+        ! old code for reference
+        ! call waveletDecomposition_block(params, hvy_block(:,:,:,:,hvy_id))
+        ! if (apply_verbose) then
+        !     ! debug before WD
+        !     write(debug_name, '(A,i0,A)') 'block_CD_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        !     call dump_block_fancy(hvy_block(:,:,:,1:nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+        ! endif
+
+        call waveletDecomposition_optimized_block(params, hvy_block(:,:,:,1:nc,hvy_id), hvy_block(:,:,:,1:nc,hvy_id))
     end do
 
     call sync_ghosts_tree( params, hvy_block, tree_ID )
@@ -117,7 +126,17 @@ subroutine unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp,
         endif
 
         ! Wavelet reconstruction
-        call waveletReconstruction_block(params, hvy_block(:,:,:,:,hvy_id))
+
+        ! old code for reference
+        ! hvy_tmp(:,:,:,nc+1:2*nc,hvy_id) = hvy_block(:,:,:,1:nc,hvy_id)
+        ! call waveletReconstruction_block(params, hvy_tmp(:,:,:,nc+1:2*nc,hvy_id))
+        ! if (apply_verbose) then
+        !     ! debug after WR
+        !     write(debug_name, '(A,i0,A)') 'block_CR_TC', lgt_block(lgt_id, IDX_TC_2), '.dat'
+        !     call dump_block_fancy(hvy_tmp(:,:,:,nc+1:2*nc,hvy_id), debug_name, params%Bs, params%g, digits=2)
+        ! endif
+
+        call waveletReconstruction_optimized_block(params, hvy_block(:,:,:,1:nc,hvy_id), hvy_block(:,:,:,1:nc,hvy_id))
 
         if (apply_verbose) then
             ! debug after WR

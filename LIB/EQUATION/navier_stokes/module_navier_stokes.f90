@@ -39,7 +39,6 @@ contains
 
 #include "RHS_2D_navier_stokes_periodic.f90"
 #include "RHS_3D_navier_stokes.f90"
-#include "filter_block.f90"
 #include "inicond_NStokes.f90"
 #include "save_data_ns.f90"
 #ifdef SBLAS

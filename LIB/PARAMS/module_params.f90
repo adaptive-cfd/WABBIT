@@ -38,11 +38,11 @@ module module_params
         character(len=cshort) :: write_method="fixed_time"
         ! data writing frequency
         real(kind=rk) :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk, write_time_first=0.0_rk
-        ! data next write time, store here the next time for output data
-        real(kind=rk) :: next_write_time=0.0_rk
         ! this number is used when generating random grids.
         ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
         real(kind=rk) :: max_grid_density = 0.1_rk
+        ! percentage of memory we leave free for miscellaneous arrays that are created during the run
+        real(kind=rk) :: memory_safety_percentage = 2.0_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable :: butcher_tableau
@@ -71,7 +71,7 @@ module module_params
         real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
         ! filters for multigrid method - restriction prediction filter, HD for lifted wavelets and low-pass filter for unlifted wavelets
         real(kind=rk), dimension(:), allocatable :: MGR
-        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr, Ndep2l, Ndep2r
 
 
         ! minimal level for blocks in data tree
@@ -86,6 +86,7 @@ module module_params
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
         character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_Jmin=0
         integer(kind=ik)      :: poisson_stencil_size=0
         character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
         integer(kind=ik)      :: poisson_cycle_it=0
@@ -95,6 +96,7 @@ module module_params
         integer(kind=ik)      :: poisson_GS_it=0
         integer(kind=ik)      :: poisson_Sync_it=0
         character(len=cshort) :: poisson_coarsest="FFT"
+        logical               :: poisson_balanceLoad=.false.
         integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
         character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
@@ -133,7 +135,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
+        real(kind=rk) :: tsave_stats=99999999.9_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
 
         ! -------------------------------------------------------------------------------------
@@ -182,6 +184,7 @@ module module_params
 
         logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
         logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
+        logical :: debug_poisson = .false.
 
         ! -------------------------------------------------------------------------------------
         ! filter
@@ -193,6 +196,7 @@ module module_params
         ! save filter strength sigma
         logical :: save_filter_strength
         logical :: filter_only_maxlevel = .false., filter_all_except_maxlevel = .false.
+        logical, allocatable :: filter_component(:)
 
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions

@@ -11,7 +11,7 @@ subroutine post_dry_run
     use module_bridge_interface     ! bridge implementation of wabbit
     ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
     ! to dump kinematics data.
-    use module_ACM
+    use module_insects
     use module_forestMetaData
 
     implicit none
@@ -25,7 +25,7 @@ subroutine post_dry_run
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
-    real(kind=rk) :: x0(1:3), dx(1:3), time_start
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color
     type(inifile) :: FILE
 
@@ -69,8 +69,10 @@ subroutine post_dry_run
         write(*,*) " --Jmin The minimum tree level, default is taken from INI file."
         write(*,*) ""
         write(*,*) " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
+        write(*,*) " --save-color Save, in addition to mask_*.h5, also the color field (a scalar field)"
         write(*,*) ""
         write(*,*) " --tstart: Start mask generation at this time."
+        write(*,*) " --tfinal: End mask generation at this time, overwriting that from INI file"
         write(*,*) ""
         write(*,*) " --grid-list=list.txt"
         write(*,*) "   If given, we read in the specified h5 files and create the mask"
@@ -95,6 +97,8 @@ subroutine post_dry_run
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
     call get_cmd_arg( "--tstart", time_start, default=0.0_rk )
+    call get_cmd_arg( "--tfinal", time_final, default=params%time_max )
+    params%time_max = time_final
     
 
     ! for the dry run we dont need to use the fancy wavelets
@@ -152,8 +156,6 @@ subroutine post_dry_run
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
 
-
-
     ! allocate memory for heavy, light, work and neighbor data
     call allocate_forest(params, hvy_mask, hvy_tmp=hvy_tmp, neqn_hvy_tmp=6)
 
@@ -163,33 +165,7 @@ subroutine post_dry_run
 
 
     !-----------------------------------
-    call init_t_file('kinematics.t', .true., (/ &
-    "           time", &
-    "    xc_body_g_x", &
-    "    xc_body_g_y", &
-    "    xc_body_g_z", &
-    "            psi", &
-    "           beta", &
-    "          gamma", &
-    "     eta_stroke", &
-    "        alpha_l", &
-    "          phi_l", &
-    "        theta_l", &
-    "        alpha_r", &
-    "          phi_r", &
-    "        theta_r", &
-    "  rot_rel_l_w_x", &
-    "  rot_rel_l_w_y", &
-    "  rot_rel_l_w_z", &
-    "  rot_rel_r_w_x", &
-    "  rot_rel_r_w_y", &
-    "  rot_rel_r_w_z", &
-    "   rot_dt_l_w_x", &
-    "   rot_dt_l_w_y", &
-    "   rot_dt_l_w_z", &
-    "   rot_dt_r_w_x", &
-    "   rot_dt_r_w_y", &
-    "   rot_dt_r_w_z"/) )
+    call init_insect_data(overwrite=.true.)
     !-----------------------------------
 
     if (grid_list == "none" ) then
@@ -197,7 +173,7 @@ subroutine post_dry_run
         ! traditional mode: create the grid AND the mask, possibly with pruning.
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 
-        do while ( time < params%time_max )
+        do while ( time <= params%time_max )
             ! start with an equidistant grid on coarsest level.
             ! routine also deletes any existing mesh in the tree.
             call createEquidistantGrid_tree( params, hvy_mask, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
@@ -273,7 +249,8 @@ subroutine post_dry_run
             call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
             Nmask = lgt_n(tree_ID_flow)
 
-            call WRITE_INSECT_DATA(time)
+            ! write the kinematics file for the insects
+            call write_insect_data(time)
 
             ! before (possible) pruning, we sync the ghosts
             call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
@@ -287,22 +264,22 @@ subroutine post_dry_run
             !***********************************************************************
             ! Write fields to HDF5 file
             !***********************************************************************
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') "mask", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+            write( fname,'(a, "_", a, ".h5")') "mask", trim(adjustl(timestr(time)))
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
             if (save_us) then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usx", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usx", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usy", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usy", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=pruned)
 
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usz", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usz", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
             if (save_color) then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "color", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "color", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
@@ -328,22 +305,22 @@ subroutine post_dry_run
             ! as we intend to create the mask on a given grid, pruning makes no sense
 
             ! store mask file
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') "mask", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+            write( fname,'(a, "_", a, ".h5")') "mask", trim(adjustl(timestr(time)))
             call saveHDF5_tree(fname, time, -1_ik, 1, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
             if (save_us) then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usx", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usx", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 2, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usy", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usy", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 3, params, hvy_mask, tree_ID_flow, no_sync=.false.)
 
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "usz", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "usz", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 4, params, hvy_mask, tree_ID_flow, no_sync=.false.)
             endif
 
             if (save_color) then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') "color", int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') "color", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
         enddo

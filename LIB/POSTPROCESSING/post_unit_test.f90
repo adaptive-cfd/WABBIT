@@ -95,37 +95,45 @@ subroutine post_unit_test(params)
     ! initialize block size dynamically, make it BSmin for every wavelet
     if (Bs == -1) then
         ! we set BS to minimum for each wavelet, but first we have to read in the wavelet
-        read(params%wavelet(4:4), *) CDFX
-        ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
-        if (CDFX == 1) then
-                read(params%wavelet(4:5), *) CDFX
-        endif
-        if (all(CDFX /= (/2,4,6,8,10,12/))) then
-                call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-        endif
-        if (CDFX < 10) then
-                read(params%wavelet(5:5), *) CDFY
+        if (params%wavelet(1:3) /= "CDF") then
+            if (params%wavelet == "coiflet12") then
+                CDFX = 4
+                CDFY = 4
+                Bs = 16  ! Let's just set this to 16 for now
+            endif
         else
-                read(params%wavelet(6:6), *) CDFY
-        endif
-        if (CDFY == 1) then
-                if (CDFX < 10) then
-                read(params%wavelet(5:6), *) CDFY
-                else
-                read(params%wavelet(6:7), *) CDFY
-                endif
-        endif
-        if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
-                call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
-        endif
+            read(params%wavelet(4:4), *) CDFX
+            ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
+            if (CDFX == 1) then
+                    read(params%wavelet(4:5), *) CDFX
+            endif
+            if (all(CDFX /= (/2,4,6,8,10,12/))) then
+                    call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
+            if (CDFX < 10) then
+                    read(params%wavelet(5:5), *) CDFY
+            else
+                    read(params%wavelet(6:6), *) CDFY
+            endif
+            if (CDFY == 1) then
+                    if (CDFX < 10) then
+                    read(params%wavelet(5:6), *) CDFY
+                    else
+                    read(params%wavelet(6:7), *) CDFY
+                    endif
+            endif
+            if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
+                    call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
+            endif
 
-        if (CDFY == 0) then
-            ! unlifted wavelets, +4 per increase in X of CDFX0
-            Bs = 2*CDFX
-        else
-            ! lifted wavelets, +4 per increase in X or Y of CDFXY, for leaf-first decomposition optimization we'd have +6
-            Bs = (CDFX + CDFY) * 2 - 2
-        end if
+            if (CDFY == 0) then
+                ! unlifted wavelets, +4 per increase in X of CDFX0
+                Bs = 2*CDFX
+            else
+                ! lifted wavelets, +4 per increase in X or Y of CDFXY, for leaf-first decomposition optimization we'd have +6
+                Bs = (CDFX + CDFY) * 2 - 2
+            end if
+        endif
     endif
     params%Bs(1:3) = 1
     params%Bs(1:params%dim) = Bs

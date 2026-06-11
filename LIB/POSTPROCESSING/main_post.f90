@@ -57,8 +57,14 @@ program main_post
     case ("--wavelet-decompose", "--wavelet-reconstruct")
         call post_wavelet_transform(params)
 
+    case ("--wavelet-contributions")
+        call post_wavelet_contributions(params)
+
     case ("--dump-neighbors")
         call post_dump_neighbors(params)
+
+    case ("--analyse-sisters", "--analyse-levels")
+        call post_meta_analyse(params)
 
     case ("--OP")
         call operator_reconstruction(params)
@@ -72,7 +78,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add-two-masks", "--add", "--subtract", "--multiply", "--test_operations", "--grid1-to-grid2", "--noise-like-grid1")
+    case ("--add", "--subtract", "--multiply", "--divide", "--add-same-grid", "--subtract-same-grid", "--multiply-same-grid", "--divide-same-grid", "--test_operations", "--grid1-to-grid2", "--noise-like-grid1")
         call post_add_two_masks(params)
 
     case ("--stl2dist")
@@ -95,6 +101,9 @@ program main_post
     case("--sparse-to-dense", "--refine-everywhere", "--refine-everywhere-forced", "--coarsen-everywhere")
         call sparse_to_dense(params)
 
+    case ("--external-refine", "--external-coarsen")
+        call external_adapt(params)
+
     case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")
         call post_unit_test(params)
 
@@ -113,8 +122,11 @@ program main_post
     case("--dry-run")
         call post_dry_run()
 
-    case("--vorticity", "--vorx", "--vory", "--vorz", "--divergence", "--vor-abs", "--helicity", "--hel-abs", "--Q", "--dissipation", "--copy")
+    case("--vorticity", "--vorx", "--vory", "--vorz", "--divergence", "--vor-abs", "--helicity", "--hel-abs", "--Q", "--dissipation", "--copy", "--vorticity-stretching", "--energy")
         call compute_vorticity_post(params)
+
+    case("--press-from-vel", "--vel-from-vor")
+        call compute_poisson_post(params)
 
     case("--derivative")
         call post_derivative(params)
@@ -154,6 +166,9 @@ program main_post
     case ("--generate_forest")
         call post_generate_forest(params)
 
+    case ("--create-grid")
+        call post_create_grid(params)
+
     case ("--denoise")
         call post_denoising(params)
 
@@ -171,6 +186,9 @@ program main_post
 
     case ("--proto-NSI-EE")
         call proto_NSI_EE(params)
+    
+    case ("--sort")
+        call post_sort(params)
         
     case default
 
@@ -186,6 +204,8 @@ program main_post
             write(*, '(A)') "--divergence"
             write(*, '(A)') "--dissipation"
             write(*, '(A)') "--Q"
+            write(*, '(A)') "--press-from-vel"
+            write(*, '(A)') "--vel-from-vor"
             write(*, '(A)') "--OP-rhs"
             write(*, '(A)') "--OP"
             write(*, '(A)') "--gradient"
@@ -198,19 +218,30 @@ program main_post
             write(*, '(A)') "--POD-error"
             write(*, '(A)') "--POD-time"
             write(*, '(A)') "--stl2dist"
-            write(*, '(A)') "--add-two-masks"
+            write(*, '(A)') "--add"
+            write(*, '(A)') "--subtract"
+            write(*, '(A)') "--multiply"
+            write(*, '(A)') "--divide"
+            write(*, '(A)') "--add-same-grid"
+            write(*, '(A)') "--subtract-same-grid"
+            write(*, '(A)') "--multiply-same-grid"
+            write(*, '(A)') "--divide-same-grid"
             write(*, '(A)') "--mult-mask"
             write(*, '(A)') "--mult-mask-direct"
             write(*, '(A)') "--mult-mask-inverse"
             write(*, '(A)') "--post_rhs"
             write(*, '(A)') "--average"
             write(*, '(A)') "--generate_forest"
+            write(*, '(A)') "--create-grid"
             write(*, '(A)') "--evaluate-wavelet-thresholding"
             write(*, '(A)') "--refine-everywhere"
             write(*, '(A)') "--denoise"
+            write(*, '(A)') "--analyse-sisters"
+            write(*, '(A)') "--analyse-levels"
+            write(*, '(A)') "--sort"
             ! tests
             write(*, '(A)') "--compression-unit-test"
-            write(*, '(A)') "--performance_test"
+            write(*, '(A)') "--performance-test"
             write(*, '(A)') "--adaption-test"
             write(*, '(A)') "--refine-coarsen-test"
             write(*, '(A)') "--ghost-nodes-test"

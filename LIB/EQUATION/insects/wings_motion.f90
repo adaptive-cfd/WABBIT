@@ -66,7 +66,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
   real(kind=rk), intent(out) :: phi, alpha, theta, phi_dt, alpha_dt, theta_dt
   character (len=*), intent(in) :: protocoll
   type(wingkinematics), intent(inout) :: kine
-  ! wingID is used for kineloader (to figure out which columsn to use from the data array)
+  ! wingID is used for kineloader (to figure out which columns to use from the data array)
   integer(kind=2), intent(in) :: wingID
 
   real(kind=rk) :: phi_max,alpha_max, phase,f

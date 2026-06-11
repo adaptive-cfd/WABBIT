@@ -151,6 +151,17 @@ subroutine proto_pressure_multigrid(params)
     call setup_wavelet(params, params%g)
     call setup_laplacian_stencils(params, params%g)
 
+    if (params%rank==0) write(*,'("INIT: checking if g and predictor for Poisson equation work together")')
+    read(params%poisson_order_predictor(17:17), *) i_cycle
+    if (i_cycle == 1) read(params%poisson_order_predictor(17:18), *) i_cycle
+    if (params%g < i_cycle/2) then
+        if (params%rank==0) then
+        write(*, "(A, i0, A, i0)") "WARNING: 'number_ghost_nodes' was set smaller as required for Poisson predictor, adapting it from ", params%g, " to ", i_cycle/2
+        endif
+        params%g = i_cycle/2
+    end if
+    ! params%order_predictor = params%poisson_order_predictor  ! hack
+
     t_block = MPI_Wtime()
     call fft_initialize(params)
     call toc( "fft initialize", 10101, MPI_Wtime()-t_block )
@@ -182,6 +193,8 @@ subroutine proto_pressure_multigrid(params)
     !    for now I assume equidistant grid, so I loop level-wise
     !    in order to avoid leaf-wise refinement status hacking for now
     ! ------------------------------------------------------------
+
+    call init_t_file('poisson_solver.t', .true., (/ "           time", "        i_cycle", "  residual_Linf", "   residual_rel" /))
 
     call init_t_file('multigrid-cycle.t', .true., (/'    residual L2', '    residual L1', 'residual Linfty', '           time'/))
     call init_t_file('multigrid-iteration.t', .true., (/'direction', 'iteration', '     time'/))
@@ -251,6 +264,8 @@ subroutine proto_pressure_multigrid(params)
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         hvy_tmp(:,:,:,1,hvy_id) = 0.0_rk
     enddo
+
+    ! params%order_predictor = params%poisson_order_predictor  ! hack
 
     ! compute several v- or f-cycles
     do i_cycle = 1, params%poisson_cycle_it
@@ -463,19 +478,17 @@ subroutine proto_NSI_EE(params)
     call read_param_mpi(FILE, 'VPM', 'penalization', penalization, .false.)
 
     call setup_wavelet(params, params%g)
-    ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually) - but should be 2 higher for poisson solver
-    if (params%wavelet(4:4) == "2") then
-        params%order_predictor = "multiresolution_4th"
-    elseif (params%wavelet(4:4) == "4") then
-        params%order_predictor = "multiresolution_6th"
-    elseif (params%wavelet(4:4) == "6") then
-        params%order_predictor = "multiresolution_8th"
-    elseif (params%wavelet(4:4) == "8") then
-        params%order_predictor = "multiresolution_10th"
-    elseif (params%wavelet(4:5) == "10" .or. params%wavelet(4:5) == "12") then
-        params%order_predictor = "multiresolution_12th"
-    endif
     call setup_laplacian_stencils(params, params%g)
+
+    if (params%rank==0) write(*,'("INIT: checking if g and predictor for Poisson equation work together")')
+    read(params%poisson_order_predictor(17:17), *) i_cycle
+    if (i_cycle == 1) read(params%poisson_order_predictor(17:18), *) i_cycle
+    if (params%g < i_cycle/2) then
+        if (params%rank==0) then
+        write(*, "(A, i0, A, i0)") "WARNING: 'number_ghost_nodes' was set smaller as required for Poisson predictor, adapting it from ", params%g, " to ", i_cycle/2
+        endif
+        params%g = i_cycle/2
+    end if
 
     t_block = MPI_Wtime()
     call fft_initialize(params)
@@ -485,7 +498,7 @@ subroutine proto_NSI_EE(params)
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work, neqn_hvy_tmp=8)
 
     ! On all blocks, set the initial condition (incl. synchronize ghosts)
-    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_mask, hvy_tmp, hvy_work=hvy_work)
+    call setInitialCondition_tree( params, hvy_block, tree_ID_flow, params%adapt_inicond, time, iteration, hvy_tmp=hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
 
 
     ! initialize t-files
@@ -507,6 +520,7 @@ subroutine proto_NSI_EE(params)
     call init_t_file('balancing.t', overwrite)
     call init_t_file('block_xfer.t', overwrite)
     call init_t_file('thresholding.t', overwrite)
+    call init_t_file('poisson_solver.t', overwrite, (/ "           time", "        i_cycle", "  residual_Linf", "   residual_rel" /))
 
     if (params%rank==0) then
         call Initialize_runtime_control_file()
@@ -651,6 +665,8 @@ subroutine proto_NSI_EE(params)
         t3 = MPI_wtime()
         call compute_NSI_RHS(params, hvy_block(:,:,:,1:params%dim,:), hvy_mask, hvy_work(:,:,:,1:params%dim,:,1), order_disc_nonlinear, tree_ID_flow, nu, C_eta )
         call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
+        call componentWiseNorm_tree(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID, "L2", norm(1:1), threshold_state_vector=.false.)
+        if (params%rank == 0) write(*,'(A, i0, A, 1(1X, E12.4))') "Pressure norm for stage ", 1, ": ", norm(1:1)
 
         ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
         t3 = MPI_wtime()
@@ -662,15 +678,8 @@ subroutine proto_NSI_EE(params)
         t3 = MPI_wtime()
         ! if the grid doesn't change, then we can reuse the previous solution as initial guess
         ! if not, then we should start from zero, as blocks might have been moved or new ones activated, resulting in rubbish initial guess
-        if (params%adapt_tree) then
-            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
-                                hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.true., &
-                                verbose=.false., hvy_full=hvy_tmp)
-        else
-            call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
-                                hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=.false., &
-                                verbose=.false., hvy_full=hvy_tmp)
-        endif
+        call multigrid_solve(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_tmp(:,:,:,1:1,:), &
+            hvy_tmp(:,:,:,params%dim+2:size(hvy_tmp,4),:), tree_ID_flow, init_0=params%adapt_tree, verbose=.false., hvy_full=hvy_tmp)
         call toc( "timestep: multigrid_solve", 24, MPI_wtime()-t3)
         t3 = MPI_wtime()
         call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,1), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,1), order_disc_pressure, tree_ID_flow, 1.0_rk)
@@ -705,6 +714,8 @@ subroutine proto_NSI_EE(params)
             if (.not. is_equidistant) then
                 call compute_projection(params, hvy_work(:,:,:,1:params%dim,:,j), hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), hvy_work(:,:,:,1:params%dim,:,j), order_disc_pressure, tree_ID_flow, 1.0_rk)
             endif
+            call componentWiseNorm_tree(params, hvy_tmp(:,:,:,params%dim+1:params%dim+1,:), tree_ID, "L2", norm(1:1), threshold_state_vector=.false.)
+            if (params%rank == 0) write(*,'(A, i0, A, 1(1X, E12.4))') "Pressure norm for stage ", j, ": ", norm(1:1)
             call toc( "timestep: compute_NSI_RHS", 22, MPI_wtime()-t3)
             ! compute RHS for the pressure Poisson equation, solve the Poisson equation and add pressure gradient
             t3 = MPI_wtime()

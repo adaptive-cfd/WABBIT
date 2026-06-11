@@ -45,12 +45,16 @@ module module_ini_files_parser
         integer :: nlines
     end type
 
+    interface read_array_from_ascii_file
+        module procedure read_dblearray_from_ascii_file, read_intarray_from_ascii_file, read_chararray_from_ascii_file
+    end interface
+
     ! the generic call "read_param" redirects to these routines, depending on the data
     ! type and the dimensionality. vectors can be read without setting a default.
     interface read_param 
         module procedure param_sgl, param_dbl, param_int, param_vct, param_str, &
-            param_bool, param_vct_str, param_vct_bool, param_matrix
-        end interface
+            param_bool, param_vct_str, param_vct_int, param_vct_bool, param_matrix
+    end interface
 
 
         !!!!!!!!
@@ -63,22 +67,29 @@ module module_ini_files_parser
         ! note: array is assumed-shape and its size defines what we try to read
         ! --> MPI wrapper in the MPI parser module
         !-----------------------------------------------------------------------------
-        subroutine read_array_from_ascii_file(file, array, n_header)
+        subroutine read_dblearray_from_ascii_file(file, array, n_header, n_lines, verbose)
             implicit none
             character(len=*), intent(in) :: file
-            integer, intent(in) :: n_header
             real(kind=rk), intent(inout) :: array (1:,1:)
+            integer, intent(in) :: n_header
+            integer, intent(in), optional :: n_lines
+            logical, intent(in), optional :: verbose
             integer :: nlines, ncols, i, io_error
             character(len=maxcolumns) :: dummy
             character(len=16) :: fmt
             character(len=3) :: ncols_str
+            logical :: verbose_apply
 
+            verbose_apply = .true.
+            if (present(verbose)) verbose_apply = verbose
 
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("─"))')
-            write(*,'("INFO: reading ",i7," lines with ",i7," colums from ",A)') nlines, ncols, file
+            if (verbose_apply) then
+                write(*,'(80("─"))')
+                write(*,'("INFO: reading ",i7," lines with ",i7," columns from ",A)') nlines, ncols, trim(adjustl(file))
+            endif
 
             ! set up format string
             write(ncols_str,'(i3.3)') ncols
@@ -97,31 +108,44 @@ module module_ini_files_parser
                 if (i > n_header .and. io_error==0) then
                     read(dummy,*,iostat=io_error) array(i-n_header,:)
                 endif
+
+                if (present(n_lines)) then
+                    if (i >= n_header + n_lines) exit
+                endif
             enddo
             close (14)
 
-            write(*,'("Done reading.")')
-            write(*,'(80("─"))')
+            if (verbose_apply) then
+                write(*,'("Done reading.")')
+                write(*,'(80("─"))')
+            endif
 
-        end subroutine read_array_from_ascii_file
+        end subroutine read_dblearray_from_ascii_file
 
 
-        subroutine read_intarray_from_ascii_file(file, array, n_header)
+        subroutine read_intarray_from_ascii_file(file, array, n_header, n_lines, verbose)
             implicit none
             character(len=*), intent(in) :: file
-            integer, intent(in) :: n_header
             integer(kind=ik), intent(inout) :: array (1:,1:)
+            integer, intent(in) :: n_header
+            integer, intent(in), optional :: n_lines
+            logical, intent(in), optional :: verbose
             integer :: nlines, ncols, i, io_error
             character(len=maxcolumns) :: dummy
             character(len=16) :: fmt
             character(len=3) :: ncols_str
+            logical :: verbose_apply
 
+            verbose_apply = .true.
+            if (present(verbose)) verbose_apply = verbose
 
             nlines = size(array,1)
             ncols = size(array,2)
 
-            write(*,'(80("─"))')
-            write(*,'("INFO: reading ",i5," lines with ",i3," colums from ",A)') nlines, ncols, file
+            if (verbose_apply) then
+                write(*,'(80("─"))')
+                write(*,'("INFO: reading ",i5," lines with ",i3," columns from ",A)') nlines, ncols, trim(adjustl(file))
+            endif
 
             ! set up format string
             write(ncols_str,'(i3.3)') ncols
@@ -140,12 +164,80 @@ module module_ini_files_parser
                     read(dummy,*) array(i-n_header,:)
                     !        write(*,fmt) array(i-n_header,:)
                 endif
+
+                if (present(n_lines)) then
+                    if (i >= n_header + n_lines) exit
+                endif
             enddo
             close (14)
 
-            write(*,'("Done reading.")')
-            write(*,'(80("─"))')
+            if (verbose_apply) then
+                write(*,'("Done reading.")')
+                write(*,'(80("─"))')
+            endif
         end subroutine read_intarray_from_ascii_file
+
+
+        subroutine read_chararray_from_ascii_file(file, array, n_header, n_lines, verbose)
+            implicit none
+            character(len=*), intent(in) :: file
+            character(len=*), intent(inout) :: array (1:,1:)
+            integer, intent(in) :: n_header
+            integer, intent(in), optional :: n_lines
+            logical, optional, intent(in) :: verbose
+            integer :: nlines, ncols, i, io_error
+            character(len=maxcolumns) :: dummy
+            character(len=16) :: fmt
+            character(len=3) :: ncols_str
+            logical :: verbose_apply
+
+            verbose_apply = .true.
+            if (present(verbose)) verbose_apply = verbose
+
+
+            nlines = size(array,1)
+            ncols = size(array,2)
+
+            if (verbose_apply) then
+                write(*,'(80("─"))')
+                write(*,'("INFO: reading ",i5," lines with ",i3," columns from ",A)') nlines, ncols, trim(adjustl(file))
+            endif
+
+            ! set up format string
+            write(ncols_str,'(i3.3)') ncols
+            fmt = '('//ncols_str//'(A))'
+
+            io_error = 0
+            i = 0
+
+            open(unit=14,file=trim(adjustl(file)),action='read',status='old')
+            do while (io_error==0)
+                ! read a line from file
+                read (14,'(A)',iostat=io_error) dummy
+
+                i = i + 1
+                ! if we're past the header AND the read worked (i.e. not end of file)
+                if (i > n_header .and. io_error==0) then
+                    ! for char arrays we can have the special case of reading only one column
+                    ! this sounds dumb as it just reads the entire line, but then we do not have to write another routine for this
+                    if (ncols == 1) then
+                        array(i-n_header,1) = trim(adjustl(dummy))
+                    else
+                        read(dummy,*,iostat=io_error) array(i-n_header,:)
+                    endif
+                endif
+
+                if (present(n_lines)) then
+                    if (i >= n_header + n_lines) exit
+                endif
+            enddo
+            close (14)
+
+            if (verbose_apply) then
+                write(*,'("Done reading.")')
+                write(*,'(80("─"))')
+            endif
+        end subroutine read_chararray_from_ascii_file
 
 
         !-----------------------------------------------------------------------------
@@ -178,13 +270,18 @@ module module_ini_files_parser
         ! count the number of columns in an ascii file, skip n_header lines
         ! --> MPI wrapper in the MPI parser module
         !-----------------------------------------------------------------------------
-        subroutine count_cols_in_ascii_file(file, num_cols, n_header)
+        subroutine count_cols_in_ascii_file(file, num_cols, n_header, delimiter)
             implicit none
             character(len=*), intent(in) :: file
             integer, intent(out) :: num_cols
             integer, intent(in) :: n_header
+            character(len=1), intent(in), optional :: delimiter
             integer :: io_error, i
             character(len=maxcolumns) :: line
+            character(len=1) :: delimiter_apply
+
+            delimiter_apply = " "
+            if (present(delimiter)) delimiter_apply = delimiter
 
             ! count the lines
             io_error = 0
@@ -205,7 +302,7 @@ module module_ini_files_parser
             num_cols = 1
             do i = 1, len_trim(line)
                 ! count elements in the line by counting the separating blanks
-                if ( line(i:i) == " " ) then
+                if ( line(i:i) == delimiter_apply ) then
                     num_cols = num_cols + 1
                 end if
             enddo
@@ -541,6 +638,74 @@ module module_ini_files_parser
                 write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
             endif
         end subroutine param_vct
+
+
+        !-------------------------------------------------------------------------------
+        ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+        ! Displays what it does on stdout (so you can see whats going on)
+        ! Input:
+        !       PARAMS: the complete *.ini file
+        !       section: the section we're looking for
+        !       keyword: the keyword we're looking for
+        !       defaultvalue: if the we can't find a vector, we return this and warn
+        !       n: length of vector
+        ! Output:
+        !       params_vector: this is the parameter you were looking for
+        !-------------------------------------------------------------------------------
+        subroutine param_vct_int (PARAMS, section, keyword, params_vector, defaultvalue)
+            implicit none
+            ! Contains the ascii-params file
+            type(inifile), intent(inout) :: PARAMS
+            character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+            character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+            integer(kind=ik) :: params_vector(1:)
+            integer(kind=ik), optional, intent(in) :: defaultvalue(1:)
+
+            integer :: n, m, iostat
+            character(len=maxcolumns) :: value
+            character(len=15)::formatstring
+
+            n = size(params_vector,1)
+            ! empty vector??
+            if (n==0) return
+
+            if ( present(defaultvalue) ) then
+                m = size(defaultvalue,1)
+            endif
+
+            write(formatstring,'("(",i3.3,"(g10.3,1x))")') n
+
+            call GetValue(PARAMS, section, keyword, value)
+
+            if (value .ne. '') then
+                ! read the n values from the vector string
+                read (value, *, iostat=iostat) params_vector
+                if (iostat /= 0) then
+                    write(value,'(A, I0, A)') "INIFILES ERROR: Vector " // trim(adjustl(section))//"::"//trim(adjustl(keyword))//" has incompatible length! (expected ",n," )"
+                    call abort(250922, trim(value))
+                endif
+                write (value, formatstring) params_vector
+            else
+                if (present(defaultvalue) .or. n==m) then
+                    ! return default
+                    write (value,formatstring) defaultvalue
+                    value = trim(adjustl(value))//" (default!)"
+                    params_vector = defaultvalue
+                else
+                    ! return zeros
+                    params_vector = 0_ik
+                    write (value,formatstring) params_vector
+                    if (.not. present(defaultvalue)) value = trim(adjustl(value))//" (RETURNING ZEROS - NO DEFAULT SET!)"
+                    if (n/=m) value = trim(adjustl(value))//" (RETURNING ZEROS - DEFAULT HAS WRONG LENGTH!)"
+                endif
+            endif
+
+            ! in verbose mode, inform about what we did
+            if (verbosity) then
+                write (*,FORMAT1) trim(section), trim(keyword), trim(adjustl(value))
+            endif
+        end subroutine param_vct_int
+
 
         !-------------------------------------------------------------------------------
         !! \brief
@@ -955,6 +1120,46 @@ module module_ini_files_parser
 
 
         !-------------------------------------------------------------------------------
+        ! Just check if section exists in the PARAMS.ini file. Returns .true. if it does, .false. if it doesn't
+        ! Input:
+        !       PARAMS: the complete *.ini file
+        !       section: the section we're looking for
+        ! Output:
+        !       exists: .true. if section exists, .false. if it doesn't
+        subroutine param_section_exists (PARAMS, section, exists)
+            implicit none
+            type(inifile), intent(inout) :: PARAMS
+            character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+            character(len=maxcolumns) ::  line
+            logical :: exists
+
+            integer :: i
+
+            exists = .false.
+
+            !-- loop over the lines of PARAMS.ini file
+            do i = 1, PARAMS%nlines
+                ! extract line & remove leading spaces
+                line = adjustl(PARAMS%PARAMS(i))
+                call merge_blanks(line)
+
+                ! ignore commented lines completely, if first non-blank character is one of #,!,;,%
+                ! shouldn't happen anymore since inifile-preprocessing while reading should remove those
+                if (line(1:1)=='#') cycle
+                if (line(1:1)==';') cycle
+                if (line(1:1)=='!') cycle
+                if (line(1:1)=='%') cycle
+
+                ! extract line & remove leading spaces
+                if (index(adjustl(PARAMS%PARAMS(i)),'['//trim(adjustl(section))//']')==1) then
+                    exists = .true.
+                    exit
+                endif
+            enddo
+        end subroutine param_section_exists
+
+
+        !-------------------------------------------------------------------------------
         ! Extracts a value from the PARAMS.ini file, which is in "section" and
         ! which is named "keyword"
         ! Input:
@@ -995,7 +1200,7 @@ module module_ini_files_parser
                 if (line(1:1)=='%') cycle
 
                 !-- does this line contain the "[section]" statement?
-                if (index(line,'['//section//']')==1) then
+                if (index(line,'['//trim(adjustl(section))//']')==1) then
                     ! yes, it does
                     foundsection = .true.
                 elseif (line(1:1) == '[') then

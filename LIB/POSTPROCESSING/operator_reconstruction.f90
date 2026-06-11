@@ -130,7 +130,7 @@ subroutine operator_reconstruction(params)
 
     !---------------------------------------------------------------------------
 
-    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<4)) then
+    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<3)) then
         call abort(33,"not enough g")
     endif
 

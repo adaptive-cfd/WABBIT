@@ -22,9 +22,10 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     integer(kind=ik), intent(in)        :: tree_ID
 
     integer(kind=ik), dimension(3) :: Bs
-    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, l, grhs, Neqn_RHS
+    integer(kind=ik) :: j, k, hvy_id, z1, z2, g, l, grhs, Neqn_RHS, i_insect
     real(kind=rk) :: t, t_call, t_stage
-    ! array containing Runge-Kutta coefficients
+    real(kind=rk), allocatable, save    :: state_vector_write(:)
+! array containing Runge-Kutta coefficients
     real(kind=rk), allocatable, save  :: rk_coeffs(:,:)
 
     Bs   = params%Bs
@@ -40,13 +41,17 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         z2 = Bs(3)+g
     endif
 
+    ! ToDo: Make this possible for NSPP as well, we should move the forces and stuff to the insects for that
     if (.not. params%physics_type=="ACM-new") then
         call abort(1202211,"this special FSI time stepper works only with the ACM")
     endif
+    if (.not. allocated(state_vector_write)) allocate(state_vector_write(1:23 * n_insects + 1))
 
-    if (.not. allocated(Insect%rhs)) then
-        allocate(Insect%rhs(1:20, 1:size(hvy_work,6)))
-    endif
+    do i_insect = 1,n_insects
+        if (.not. allocated(Insects(i_insect)%rhs)) then
+            allocate(Insects(i_insect)%rhs(1:20, 1:size(hvy_work,6)))
+        endif
+    enddo
 
     if (.not.allocated(rk_coeffs)) allocate(rk_coeffs(size(params%butcher_tableau,1),size(params%butcher_tableau,2)) )
     dt = 9.0e9_rk
@@ -61,6 +66,22 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
+    ! save data at time t to heavy work array
+    ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
+    ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
+    ! if the copy part is above, the changes in state vector are ignored
+    ! NOTE: 02/02/2026 by JB: I moved it back before, because we would like to re-use the space in hvy_block for projection methods
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+
+        ! first slot in hvy_work is previous time step (time level at start of time step)
+        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, 1 ) = &
+        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id )
+    end do
+    do i_insect = 1, n_insects
+        Insects(i_insect)%rhs(:,1) = Insects(i_insect)%STATE
+    enddo
+
     ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
     ! slot after the copy of the state vector (hence 2)
     t_call = MPI_wtime()
@@ -69,24 +90,11 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
 
     ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
     t_call = MPI_wtime()
-    call rigid_solid_rhs(time + dt*rk_coeffs(1,1), iteration, Insect%STATE, Insect%rhs(:,2), &
-    params_acm%force_insect_g, params_acm%moment_insect_g, Insect)
+    do i_insect = 1, n_insects
+        call rigid_solid_rhs( time + dt*rk_coeffs(1,1), iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,2), &
+        params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect) )
+    enddo
     call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
-
-    ! save data at time t to heavy work array
-    ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
-    ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
-    ! if the copy part is above, the changes in state vector are ignored
-    do k = 1, hvy_n(tree_ID)
-        hvy_id = hvy_active(k, tree_ID)
-
-        ! first slot in hvy_work is previous time step (time level at start of time step)
-        hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, 1 ) = &
-        hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id )
-    end do
-    Insect%rhs(:,1) = Insect%STATE(:)
-
-
 
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1) - 1
@@ -108,7 +116,9 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
             hvy_block(g+1:Bs(1)+g,g+1:Bs(2)+g,z1:z2,1:Neqn_RHS,hvy_id) = &
             hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g,z1:z2,1:Neqn_RHS,hvy_id,1)
         end do
-        Insect%STATE(:) = Insect%rhs(:,1)
+        do i_insect = 1, n_insects
+            Insects(i_insect)%STATE = Insects(i_insect)%rhs(:,1)
+        enddo
 
         do l = 2, j
             ! check if coefficient is zero - if so, avoid loop over all components and active blocks
@@ -126,7 +136,9 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
                 + dt * rk_coeffs(j,l) * hvy_work(g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, l)
             end do
 
-            Insect%STATE(:) = Insect%STATE(:) + dt * rk_coeffs(j,l) * Insect%rhs(:,l)
+            do i_insect = 1, n_insects
+                Insects(i_insect)%STATE(:) = Insects(i_insect)%STATE(:) + dt * rk_coeffs(j,l) * Insects(i_insect)%rhs(:,l)
+            enddo
         end do
 
         !-----------------------------------------------------------------------
@@ -147,8 +159,10 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
 
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
         t_call = MPI_wtime()
-        call rigid_solid_rhs(t, iteration, Insect%STATE, Insect%rhs(:,j+1), &
-        params_acm%force_insect_g, params_acm%moment_insect_g, Insect)
+        do i_insect = 1, n_insects
+            call rigid_solid_rhs(t, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,j+1), &
+            params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect))
+        enddo
         call toc( "timestep (RHS rigid solid)", 22, MPI_wtime()-t_call)
 
         call toc( "timestep (RK stage)", 23, MPI_wtime()-t_stage)
@@ -180,15 +194,28 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         end do
     end do
 
-    Insect%STATE(:) = Insect%rhs(:,1)
+    do i_insect = 1, n_insects
+        Insects(i_insect)%STATE(:) = Insects(i_insect)%rhs(:,1)
+    enddo
     do j = 2, size(rk_coeffs, 2)
         if ( abs(rk_coeffs(size(rk_coeffs, 1),j)) < 1.0e-8_rk) then
             cycle
         endif
-        Insect%STATE = Insect%STATE + dt*rk_coeffs(size(rk_coeffs,1),j)*Insect%rhs(:,j)
+        do i_insect = 1, n_insects
+            Insects(i_insect)%STATE = Insects(i_insect)%STATE + dt*rk_coeffs(size(rk_coeffs,1),j)*Insects(i_insect)%rhs(:,j)
+        enddo
     enddo
 
-    call append_t_file( 'insect_state_vector.t', (/time+dt, Insect%STATE, params_acm%force_insect_g/) )
+    ! We write the insect state vector
+    ! in order to avoid writing many files, everything is set into one, we only have to write the exact data
+    state_vector_write = 0.0_rk
+    state_vector_write(1) = time + dt
+    do i_insect = 1, n_insects
+        state_vector_write( (i_insect-1)*23 + 2 : i_insect*23 + 1) = (/ Insects(i_insect)%STATE, params_acm%force_insect_g(:,i_insect) /)
+    enddo
+    call append_t_file( 'insect_state_vector.t', state_vector_write )
 
-    Insect%time = Insect%time+dt
+    do i_insect = 1, n_insects
+        Insects(i_insect)%time = Insects(i_insect)%time + dt
+    enddo
 end subroutine RungeKuttaGeneric_FSI

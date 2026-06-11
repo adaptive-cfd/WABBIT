@@ -6,16 +6,22 @@ module module_helpers
     use mpi
     implicit none
 
-    interface smoothstep
-        module procedure smoothstep1, smoothstep2
+    interface step_cosine
+        module procedure step_cosine2, step_cosine3, step_cosine4
+    end interface
+    interface step_hester
+        module procedure step_hester3, step_hester4
+    end interface
+    interface step_disc
+        module procedure step_disc2, step_disc4
     end interface
 
     interface get_cmd_arg
         module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
 
-    ! routines of the interface should be private to hide them from outside this module
-    private :: smoothstep1, smoothstep2
+    ! ! routines of the interface should be private to hide them from outside this module
+    ! private :: step_cosine1, step_cosine2
 
 contains
 
@@ -23,7 +29,7 @@ contains
 #include "rotation_matrices.f90"
 
 
-! delta function for interpolation
+    ! delta function for interpolation
     ! $$D(\xi) =
     ! \begin{cases}
     ! \dfrac{3}{8} + \dfrac{\pi}{32} - \dfrac{\xi^2}{4}, & |\xi| \leq 0.5, \\[6pt]
@@ -70,46 +76,6 @@ contains
         endif
     end function
 
-
-    ! Based on the (exact) signed distance function of a cylinder segment
-    ! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
-    function signed_distance_cylinder(p, a, b, r) result(d)
-        implicit none
-        real(kind=rk), dimension(3), intent(in) :: p, a, b
-        real(kind=rk), intent(in) :: r
-        real(kind=rk) :: d
-        real(kind=rk), dimension(3) :: ba, pa, tmp
-        real(kind=rk) :: baba, paba, x, y, x2, y2
-
-        ba = b - a
-        pa = p - a
-        baba = dot_product(ba, ba)
-        paba = dot_product(pa, ba)
-        
-        tmp = pa * baba - ba * paba
-        x = norm2(tmp) - r * baba
-        y = abs(paba - baba * 0.5_rk) - baba * 0.5_rk
-
-        x2 = x * x
-        y2 = y * y * baba
-
-        if (max(x, y) < 0.0_rk) then
-            ! d = -sqrt(min(x2, y2))
-            d = -min(x2,y2)
-        else
-            ! d = sqrt((merge(x2, 0.0_rk, x > 0.0_rk) + merge(y2, 0.0_rk, y > 0.0_rk)))
-            d = 0.0_rk
-            if (x > 0.0_rk) then
-                d = d + x2
-            end if
-            if (y > 0.0_rk) then
-                d = d + y2
-            end if
-        end if
-
-        d = sign(1.0_rk, d) * sqrt(abs(d)) / baba
-        ! d = sign(1.0_rk, d) * d / baba
-    end function 
 
     ! https://de.wikipedia.org/wiki/Polynominterpolation#Lagrangesche_Interpolationsformel
     ! Returns the value of $\ell_j(x)$ with nodes $x_i$
@@ -397,7 +363,7 @@ contains
 
     
     !==========================================================================
-    !> \brief This subroutine returns the value f of a smooth step function \n
+    !> \brief This subroutine returns the value f of a smooth step function using a cosine function \n
     !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
     !> h is the semi-size of the smoothing area, so \n
     !> f is 1 if delta<=0-h \n
@@ -406,11 +372,11 @@ contains
     !> \details
     !> \image html maskfunction.bmp "plot of chi(delta)"
     !> \image latex maskfunction.eps "plot of chi(delta)"
-    function smoothstep1(delta,h)
+    function step_cosine2(delta,h)
         use module_globals
         implicit none
         real(kind=rk), intent(in)  :: delta,h
-        real(kind=rk)              :: smoothstep1,f
+        real(kind=rk)              :: step_cosine2,f
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
@@ -422,40 +388,156 @@ contains
             f = 0.0_rk
         endif
 
-        smoothstep1=f
-    end function smoothstep1
-    !==========================================================================
-
+        step_cosine2=f
+    end function step_cosine2
+    !=======================================================================
 
 
     !-------------------------------------------------------------------------------
-    !> This subroutine returns the value f of a smooth step function \n
+    !> This subroutine returns the value f of a smooth step function using a cosine function \n
     !> The sharp step function would be 1 if x<=t and 0 if x>t \n
     !> h is the semi-size of the smoothing area, so \n
     !> f is 1 if x<=t-h \n
     !> f is 0 if x>t+h \n
     !> f is variable (smooth) in between
     !-------------------------------------------------------------------------------
-    function smoothstep2(x,t,h)
+    function step_cosine3(x,t,h)
         
         use module_globals
 
         implicit none
         real(kind=rk), intent(in)  :: x,t,h
-        real(kind=rk)              :: smoothstep2
+        real(kind=rk)              :: step_cosine3
 
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
         if (x<=t-h) then
-            smoothstep2 = 1.0_rk
+            step_cosine3 = 1.0_rk
         elseif (((t-h)<x).and.(x<(t+h))) then
-            smoothstep2 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
+            step_cosine3 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
         else
-            smoothstep2 = 0.0_rk
+            step_cosine3 = 0.0_rk
         endif
 
-    end function smoothstep2
+    end function step_cosine3
+
+
+    !-------------------------------------------------------------------------------
+    !> This subroutine returns the value f of a smooth step function using a cosine function \n
+    !> The sharp step function would be 1 if x<=t and 0 if x>t \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if x<=t-h \n
+    !> f is 0 if x>t+h \n
+    !> f is variable (smooth) in between
+    !-------------------------------------------------------------------------------
+    function step_cosine4(x,t,h,safety)
+        
+        use module_globals
+
+        implicit none
+        real(kind=rk), intent(in)  :: x,t,h,safety  ! safety ignored for cosine, has to be h but is passed for interfacing
+        real(kind=rk)              :: step_cosine4
+
+        !-------------------------------------------------
+        ! cos shaped smoothing (compact in phys.space)
+        !-------------------------------------------------
+        if (x<=t-h) then
+            step_cosine4 = 1.0_rk
+        elseif (((t-h)<x).and.(x<(t+h))) then
+            step_cosine4 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
+        else
+            step_cosine4 = 0.0_rk
+        endif
+
+    end function step_cosine4
+
+
+    !-------------------------------------------------------
+    ! Hester-style smooth step function (tanh-based).
+    ! Matches the form used in draw_channel/draw_lamballais:
+    !   chi = 0.5 * (1 - tanh( 2 * (x - t) / (delta * epsilon) ))
+    !
+    ! Here, epsilon controls the transition thickness.
+    ! In the discontinuous limit (epsilon <= 0), returns a sharp step.
+    !-------------------------------------------------------
+    real(kind=rk) function step_hester3(x, epsilon_hester, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, epsilon_hester, safety
+        real(kind=rk) :: xi
+        real(kind=rk), parameter :: delta = 2.64822828_rk
+
+        ! safety disabled for now, as for low K_eta values possibly safety < dx
+        if (x > safety) then
+            step_hester3 = 0.0_rk
+        elseif (x < -safety) then
+            step_hester3 = 1.0_rk
+        else
+            xi = (x) / epsilon_hester
+            step_hester3 = 0.5_rk * (1.0_rk - tanh(2.0_rk*xi/delta))
+        endif
+    end function step_hester3
+
+
+    !-------------------------------------------------------
+    ! Hester-style smooth step function (tanh-based).
+    ! Matches the form used in draw_channel/draw_lamballais:
+    !   chi = 0.5 * (1 - tanh( 2 * (x - t) / (delta * epsilon) ))
+    !
+    ! Here, epsilon controls the transition thickness.
+    ! In the discontinuous limit (epsilon <= 0), returns a sharp step.
+    !-------------------------------------------------------
+    real(kind=rk) function step_hester4(x, t, epsilon_hester, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, t, epsilon_hester, safety
+        real(kind=rk) :: xi
+        real(kind=rk), parameter :: delta = 2.64822828_rk
+
+        ! safety disabled for now, as for low K_eta values possibly safety < dx
+        if (x - t > safety) then
+            step_hester4 = 0.0_rk
+        elseif (x - t < -safety) then
+            step_hester4 = 1.0_rk
+        else
+            xi = (x - t) / epsilon_hester
+            step_hester4 = 0.5_rk * (1.0_rk - tanh(2.0_rk*xi/delta))
+        endif
+    end function step_hester4
+
+
+    !-------------------------------------------------------
+    ! Discontinuous step function
+    ! Returns 1 if x <= t, and 0 otherwise.
+    ! The small tolerance is to avoid numerical issues with floating point comparisons. The boundary itself is included in the step, i.e. step_disc(t,t) = 1.
+    !-------------------------------------------------------
+    real(kind=rk) function step_disc2(x, t)
+        implicit none
+        real(kind=rk), intent(in) :: x, t
+
+        if (x <= t + 1e-12) then
+            step_disc2 = 1.0_rk
+        else
+            step_disc2 = 0.0_rk
+        endif
+        return
+    end function step_disc2
+
+    !-------------------------------------------------------
+    ! Discontinuous step function
+    ! Returns 1 if x <= t, and 0 otherwise.
+    ! The small tolerance is to avoid numerical issues with floating point comparisons. The boundary itself is included in the step, i.e. step_disc(t,t) = 1.
+    !-------------------------------------------------------
+    real(kind=rk) function step_disc4(x, t, h, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, t, h, safety  ! smoothing h and safety ignored for disc, but needed for interfacing
+
+        if (x <= t + 1e-12) then
+            step_disc4 = 1.0_rk
+        else
+            step_disc4 = 0.0_rk
+        endif
+        return
+    end function step_disc4
 
 
 
@@ -647,6 +729,17 @@ contains
             strOutput = strOutput(:i-1) // strReplace // strOutput(i+nt:)
         END DO
     END FUNCTION str_replace_text
+
+
+    !> We have timestamps for our files that have length 12 for 12.6f.
+    !! This can overflow for the string if using i12.12, so we decompose it into two parts. This is a helper-wrapper function for that
+    function timestr(time) result (timestamp_str)
+        implicit none
+        character(len=cshort) :: timestamp_str
+        real(kind=rk), intent(in) :: time
+
+        write (timestamp_str, '(i6.6, i6.6)') int(time+1.0e-12_rk, kind=ik), nint(max((time-floor(time+1.0e-12_rk))*1.0e6_rk, 0.0_rk), kind=ik)
+    end function timestr
 
 
     !-------------------------------------------------------------------------!

@@ -52,6 +52,15 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     case ("noise")
         call random_data(u)
         u = u * params_acm%beta
+    
+    case ("noise2")
+        call random_data(u)
+        u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
+
+    case ("noise_unique")
+	! Random data, but results in the same random data on a given grid every time it is called
+        call random_data_unique(u, x0, dx, (/g,g,g/), params_acm%domain_size, params_acm%Jmax, Bs )
+        u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
 
     case ("lamballais")
         if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
@@ -167,7 +176,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             ! compute x,y coordinates from spacing and origin
             y = abs(dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%domain_size(2)/2.0_rk)
 
-            u(:,iy,:,1) = smoothstep( abs(y), 0.10_rk * params_acm%domain_size(2), &
+            u(:,iy,:,1) = step_cosine( abs(y), 0.10_rk * params_acm%domain_size(2), &
             params_acm%beta*params_acm%domain_size(2) )
         end do
         
@@ -522,6 +531,46 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                     u(ix,iy,iz,2) = 0.05_rk * sin((x - params_acm%domain_size(2)/4.0_rk)*2.0_rk*pi)
 
                 enddo
+            enddo
+        enddo
+
+    case ("three-vortices")
+        ! Three vortices test case - requires vorticity formulation
+        if (params_acm%dim /= 2) call abort(260202, "ERROR: 'three-vortices' is a 2D flow! set dim=2")
+        if (.not. params_acm%inicond_vorticity_formulation) then
+            call abort(260202, "ERROR: 'three-vortices' requires inicond_vorticity_formulation=yes")
+        endif
+        if (.not. params_acm%inicond_pressure_from_velocity) then
+            call abort(260202, "ERROR: 'three-vortices' requires inicond_pressure_from_velocity=yes")
+        endif
+
+        ! Define vorticity field (will be transformed to velocity later)
+        ! Vortex positions are relative to domain size
+        do iy = 1, Bs(2)+2*g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = 1, Bs(1)+2*g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                ! Store vorticity in first component (will be transformed to velocity)
+                u(ix,iy,:,:) = 0.0_rk
+
+                ! First vortex: gamma = +1.0, center at (0.75/2*Lx, 1.0/2*Ly), width = 1/pi
+                u(ix,iy,:,1) = (+1.0_rk/(pi*(1.0_rk/pi)**2)) * &
+                        exp(-((x-(0.75_rk/2.0_rk)*params_acm%domain_size(1))**2 + &
+                             (y-(1.0_rk/2.0_rk)*params_acm%domain_size(2))**2) / &
+                            ((1.0_rk/pi)**2))
+
+                ! Second vortex: gamma = +1.0, center at (1.25/2*Lx, 1.0/2*Ly), width = 1/pi
+                u(ix,iy,:,1) = u(ix,iy,:,1) + (+1.0_rk/(pi*(1.0_rk/pi)**2)) * &
+                        exp(-((x-(1.25_rk/2.0_rk)*params_acm%domain_size(1))**2 + &
+                             (y-(1.0_rk/2.0_rk)*params_acm%domain_size(2))**2) / &
+                            ((1.0_rk/pi)**2))
+
+                ! Third vortex: gamma = -0.5, center at (1.25/2*Lx, (1.0/2 + 1/(4*sqrt(2)))*Ly), width = 1/pi
+                u(ix,iy,:,1) = u(ix,iy,:,1) + (-0.5_rk/(pi*(1.0_rk/pi)**2)) * &
+                        exp(-((x-(1.25_rk/2.0_rk)*params_acm%domain_size(1))**2 + &
+                             (y-((1.0_rk/2.0_rk + 1.0_rk/(4.0_rk*sqrt(2.0_rk)))*params_acm%domain_size(2)))**2) / &
+                            ((1.0_rk/pi)**2))
             enddo
         enddo
 

@@ -9,7 +9,7 @@
 ! NOTE that as we have way more work arrays than actual state variables (typically
 ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
 !-----------------------------------------------------------------------------
-subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
+subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, names_override )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -48,8 +48,11 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
     integer(kind=2), intent(in) :: n_domain(3)
 
+    ! if you want to save something that is not in the default list of variables, you can specify a list of names here.
+    character(len=*), optional, intent(in) :: names_override(:)
+
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics, n_names
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -64,14 +67,26 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" ) then
-        call Update_Insect(time, Insect)
+    ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+    call Update_All_Insects(time)
+
+
+    if (present(names_override)) then
+        n_names = size(names_override)
+    else
+        n_names = size(params_acm%names,1)
     endif
 
+    if (size(work,4) < n_names) then
+        call abort(2505201, "ACM: PREPARE_SAVE_DATA_ACM: work array has insufficient components for requested names list")
+    endif
 
-
-    do k = 1, size(params_acm%names,1)
-        name = params_acm%names(k)
+    do k = 1, n_names
+        if (present(names_override)) then
+            name = names_override(k)
+        else
+            name = params_acm%names(k)
+        endif
         select case(name)
         case('ux', 'Ux', 'UX')
             ! copy state vector
@@ -152,7 +167,8 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
         
         case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
-            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz')
+            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz', &
+            'pdx', 'Pdx', 'pdy', 'Pdy', 'pdz', 'Pdz')
             ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
             if (INDEX(name, 'x') > 0) then
                 call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k))
@@ -164,6 +180,83 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
                 else
                     call abort(19101812,"ACM: Gradient of p in z-direction is not defined for 2D runs")
                 endif
+            endif
+        
+        case('uxdx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dx
+        case('uxdy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dy
+        case('uxdz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dz
+            else
+                call abort(19101812,"ACM: derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dx
+        case('uydy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dy
+        case('uydz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dz
+            else
+                call abort(19101812,"ACM: derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdx')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dx
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdy')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dy
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dz
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uxdxx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dx^2
+        case('uxdyy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dy^2
+        case('uxdzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydxx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dx^2
+        case('uydyy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dy^2
+        case('uydzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdxx')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dx^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdyy')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dy^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dz^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
             endif  
 
         case('mask')
@@ -228,7 +321,7 @@ subroutine FIELD_NAMES_ACM( N, name )
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=cshort), intent(out) :: name
+    character(len=clong), intent(out) :: name
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: FIELD_NAMES_ACM called but ACM not initialized"
 

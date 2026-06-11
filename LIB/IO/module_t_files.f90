@@ -188,7 +188,7 @@ contains
 
         do i = 1, iteration(fileID)-1
             ! make format string
-            write(format, '(A,i3.3,A)') "(", n_columns(fileID), "(es15.8,1x))"
+            write(format, '(A,i3.3,A)') "(", n_columns(fileID)-1, '(es15.8,","),es15.8)'  ! note: last column is written without comma at the end
             ! write data
             write(14,format) data_buffer( i, 1:n_columns(fileID), fileID  )
         enddo

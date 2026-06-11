@@ -46,7 +46,7 @@ contains
     end subroutine
 
     ! List of codes that I somewhat arbitrarily set just to have some kind of sorting for toc calls
-    !    9-  17 TOPLEVEL
+    !    9-  18 TOPLEVEL
     !   20-  24 timestep
     !   30-  33 RHS_WRAPPER
     !   50- 100 Fundamental functions
@@ -57,6 +57,7 @@ contains
     !   70-  74    xfer_block_data
     !   80-  85    sync ghosts
     !   90-  92    balanceLoad_tree
+    !   95-  98    probes_wrapper
     !  100- 200 adapt functions
     !  100- 115    adapt_tree
     !  120- 124    coarseningIndicator

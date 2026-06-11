@@ -125,7 +125,7 @@
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=cshort), intent(out) :: name
+    character(len=clong), intent(out) :: name
 
     if (allocated(params_ns%names)) then
       name = params_ns%names(N)

@@ -14,6 +14,7 @@ module module_physics_metamodule
     use module_ConvDiff_new
     use module_acm
     use module_navier_stokes
+    use module_nspp
     use module_t_files
 
     implicit none
@@ -55,7 +56,7 @@ contains
         select case ( physics )
         case ('ACM-new')
             if (size(mask,3)==1) then
-                call create_mask_2D_ACM( time, x0, dx, Bs, g, mask(:,:,1,:), stage )
+                call create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             else
                 call create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage)
             endif
@@ -65,6 +66,13 @@ contains
 
         case ('navier_stokes')
             call create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
+
+        case ('NSPP')
+            if (size(mask,3)==1) then
+                call create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
+            else
+                call create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage)
+            endif
 
         case default
             call abort(1212,'unknown physics...say whaaat?')
@@ -101,6 +109,9 @@ contains
         case ('navier_stokes')
             call READ_PARAMETERS_NStokes( filename, N_mask_components, g )
 
+        case ('NSPP')
+            call READ_PARAMETERS_NSPP( filename, N_mask_components, g )
+
         case default
             call abort(1212,'unknown physics...say whaaat?')
 
@@ -120,7 +131,7 @@ contains
     ! NOTE that as we have way more work arrays than actual state variables (typically
     ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
     !-----------------------------------------------------------------------------
-    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask, n_domain)
+    subroutine PREPARE_SAVE_DATA_meta( physics, time, u, g, x0, dx, work, mask, n_domain, names_override)
         implicit none
         character(len=*), intent(in) :: physics
 
@@ -158,15 +169,20 @@ contains
         ! currently only acessible in the local stage
         integer(kind=2), intent(in) :: n_domain(3)
 
+        character(len=*), optional, intent(in) :: names_override(:)
+
         select case(physics)
         case ('ACM-new')
-            call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
+            call PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, names_override=names_override )
 
         case ('ConvDiff-new')
-            call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
+            call PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work, names_override=names_override )
 
         case ('navier_stokes')
             call PREPARE_SAVE_DATA_NStokes( time, u, g, x0, dx, work, n_domain )
+
+        case ('NSPP')
+            call PREPARE_SAVE_DATA_NSPP( time, u, g, x0, dx, work, mask, n_domain, names_override=names_override )
 
         case default
             call abort(88119, "[PREPARE_SAVE_DATA (metamodule)] unknown physics....")
@@ -189,7 +205,7 @@ contains
         ! component index
         integer(kind=ik), intent(in) :: N
         ! returns the name
-        character(len=cshort), intent(out) :: name
+        character(len=clong), intent(out) :: name
 
         select case(physics)
         case ('ACM-new')
@@ -200,6 +216,9 @@ contains
 
         case ('navier_stokes')
             call FIELD_NAMES_NStokes(N, name)
+
+        case ('NSPP')
+            call FIELD_NAMES_NSPP(N, name)
 
         case default
             call abort(88119, "[FIELD_NAMES (metamodule):] unknown physics....")
@@ -215,7 +234,7 @@ contains
     ! You just get a block data (e.g. ux, uy, uz, p) and compute the right hand side
     ! from that. Ghost nodes are assumed to be sync'ed.
     !-----------------------------------------------------------------------------
-    subroutine RHS_META( physics, time, u, g, x0, dx, rhs, mask, stage, n_domain)
+    subroutine RHS_META( physics, time, u, g, x0, dx, rhs, mask, stage, n_domain, discretization_overwrite)
         implicit none
 
         character(len=*), intent(in) :: physics
@@ -262,6 +281,9 @@ contains
         ! currently only acessible in the local stage
         integer(kind=2), optional, intent(in):: n_domain(3)
 
+        ! optional overwrite of discretization order
+        character(len=cshort), optional, intent(in) :: discretization_overwrite
+
         select case(physics)
         case ("ACM-new")
             call RHS_ACM( time, u, g, x0, dx,  rhs, mask, stage, n_domain )
@@ -271,6 +293,9 @@ contains
 
         case ("navier_stokes")
             call RHS_NStokes( time, u, g, x0, dx, rhs, stage, n_domain )
+
+        case ("NSPP")
+            call RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretization_overwrite)
 
         case default
             call abort(2152000, "[RHS_wrapper.f90]: physics_type is unknown"//physics)
@@ -333,6 +358,9 @@ contains
         case ("navier_stokes")
             call PREPARE_THRESHOLDFIELD_NStokes( u, g, x0, dx, thresholdfield_block, &
                                N_thresholding_components)
+        case ("NSPP")
+            call PREPARE_THRESHOLDFIELD_NSPP( u, g, x0, dx, thresholdfield_block, &
+                               N_thresholding_components)
         case default
             call abort(2152000, "[PREPARE_THRESHOLDFIELD_meta]: physics_type is unknown"//physics)
 
@@ -392,6 +420,9 @@ contains
         case ("navier_stokes")
             call STATISTICS_NStokes( time, u, g, x0, dx, stage )
 
+        case ("NSPP")
+            call STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, rhs, mask )
+
         case default
             call abort(2152000, "[STATISTICS_meta]: physics_type is unknown"//physics)
 
@@ -444,6 +475,9 @@ contains
         case ("navier_stokes")
             call abort(250915, "time statistics not implemented for Navier-Stokes")
 
+        case ("NSPP")
+            call abort(250916, "time statistics not implemented for NSPP")
+
         case default
             call abort(2152000, "[TIME_STATISTICS_meta]: physics_type is unknown"//physics)
 
@@ -473,6 +507,9 @@ contains
 
         case ("navier_stokes")
             call INITIALIZE_ASCII_FILES_NStokes( time, overwrite )
+
+        case ("NSPP")
+            call INITIALIZE_ASCII_FILES_NSPP( time, overwrite )
 
         case default
             call abort(3102019, "[INITIALIZE_ASCII_FILES_meta]: physics_type is unknown"//physics)
@@ -523,6 +560,10 @@ contains
         case ('navier_stokes')
             ! navier stokes
             call GET_DT_BLOCK_NStokes( time, u, Bs, g, x0, dx, dt )
+
+        case ('NSPP')
+            ! navier stokes pressure poisson
+            call GET_DT_BLOCK_NSPP( time, iteration, u, Bs, g, x0, dx, dt )
 
         case default
             call abort('phycics module unkown.')
@@ -576,6 +617,9 @@ contains
         case ("navier_stokes")
             call INICOND_NStokes( time, u, g, x0, dx, n_domain )
 
+        case ("NSPP")
+            call INICOND_NSPP( time, u, g, x0, dx, n_domain )
+
         case default
             call abort(999,"[INICOND (metamodule):] unknown physics. Its getting hard to find qualified personel.")
 
@@ -628,6 +672,9 @@ contains
         select case (physics)
         case ("ACM-new")
             call BOUNDCOND_ACM( time, u, g, x0, dx, n_domain, spaghetti_form, edgesOnly)
+        
+        case ("NSPP")
+            call BOUNDCOND_NSPP( time, u, g, x0, dx, n_domain, spaghetti_form, edgesOnly)
 
         ! case ("ConvDiff-new")
         !     call BOUNDCOND_ConvDiff( time, u, g, x0, dx )

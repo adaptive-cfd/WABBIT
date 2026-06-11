@@ -26,6 +26,10 @@ module module_globals
     ! this refinement flag tells us, that a block is kept but it's not significant -- merely kept due to gradedness and completeness reasons.
     ! it is important to communicate between coarsening and refinement in case we only want to refine significant blocks
     integer, parameter :: REF_UNSIGNIFICANT_STAY = 9          ! should be > 0
+    ! The inidicator "undo_refinement" does pretty much what it say: If the grid has previously been refined, newly created
+    ! blocks have the status REF_FRESHLY_REFINED. Those blocks are coarsened again if "undo_refinement" is used. Useful
+    ! for development. 
+    integer, parameter :: REF_FRESHLY_REFINED = 34
     ! this parameter is a hack. in most parts of the code, a block has n_eqn component entries.
     ! universality dictates that we can also use a different number of components, for example
     ! when syn'ing the mask function (which in many cases has six entries.)
@@ -240,11 +244,17 @@ module module_globals
         !-----------------------------------------------------------------------------
         ! 2-norm length of vectors
         !-----------------------------------------------------------------------------
-        function norm2(a)
+        function norm2_2d(a)
+            implicit none
+            real(kind=rk),dimension(1:2),intent(in) :: a
+            real(kind=rk) :: norm2_2d
+            norm2_2d = sqrt( a(1)*a(1) + a(2)*a(2) )
+        end function
+        function norm2_3d(a)
             implicit none
             real(kind=rk),dimension(1:3),intent(in) :: a
-            real(kind=rk) :: norm2
-            norm2 = sqrt( a(1)*a(1) + a(2)*a(2) + a(3)*a(3) )
+            real(kind=rk) :: norm2_3d
+            norm2_3d = sqrt( a(1)*a(1) + a(2)*a(2) + a(3)*a(3) )
         end function
 
         !-----------------------------------------------------------------------------

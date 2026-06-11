@@ -133,12 +133,13 @@ end subroutine
 
 
 
-subroutine rigid_solid_init(time, Insect, resume_backup)
+subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
     implicit none
 
     real(kind=rk), intent(in) :: time
     type(diptera), intent(inout) :: Insect
     logical, intent(in) :: resume_backup
+    integer, intent(in) :: Insect_ID  ! we need to know which insect we want to read back in
     real(kind=rk) :: yaw,pitch,roll,a,t,p
     real(kind=rk), ALLOCATABLE :: array(:,:)
     integer :: mpicode, n_lines, n_cols, n_header, it, n_candidates
@@ -183,7 +184,8 @@ subroutine rigid_solid_init(time, Insect, resume_backup)
 
             do it = n_lines, 1, -1
                 if ( abs(array(it,1)-time) <= 1.0e-6 ) then
-                    Insect%STATE = array(it,2:21)
+                    ! each insect does 23 entries in state-vector: 20 state vector and 3 forces
+                    Insect%STATE = array(it,2+23*(Insect_ID-1):21+23*(Insect_ID-1))
                     write(*,*) "Found suitable entry in line=", it, " time=", array(it,1)
                     write(*,'("Insect%STATE=(",20(es15.8,1x),")")')  Insect%STATE
                     exit

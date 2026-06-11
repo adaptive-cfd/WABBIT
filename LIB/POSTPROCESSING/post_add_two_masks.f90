@@ -13,7 +13,7 @@ subroutine post_add_two_masks(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: mode, fname1, fname2, fname_out
+    character(len=clong) :: mode, fname1, fname2, fname_out, args
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
@@ -21,7 +21,7 @@ subroutine post_add_two_masks(params)
     integer(kind=ik) :: hvy_id, lgt_id, fsize, j, tree_ID, k
 
     integer(kind=ik) :: iteration, Bs(1:3), tc_length1, dim, tc_length2, N1, N2
-    real(kind=rk) :: time, domain(1:3), norm
+    real(kind=rk) :: time, domain(1:3), norm, maxmem
 
     integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
     integer(kind=ik) , save :: lgt_n_ref(2)=0_ik
@@ -36,15 +36,28 @@ subroutine post_add_two_masks(params)
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --add mask_001.h5 mask_002.h5 output.h5"
-            write(*,*) "./wabbit-post --subtract mask_001.h5 mask_002.h5 output.h5"
-            write(*,*) "./wabbit-post --multiply mask_001.h5 mask_002.h5 output.h5"
-            write(*,*) "./wabbit-post --grid1-to-grid2 mask_001.h5 mask_002.h5 output.h5"
-            write(*,*) "./wabbit-post --noise-like-grid1 mask_001.h5 mask_002.h5 output.h5"
-            write(*,*) "------------------------------------------------------------------"
+            write(*,*) "Do arithmetic operations on adaptive grids"
+            write(*,*) "--------------------------------------------------------------"
             write(*,*) ""
+            write(*,*) " Call:"
+            write(*,*) " ./wabbit-post --add DATA1.h5 DATA2.h5 output.h5 [--memory, --wavelet]"
             write(*,*) ""
+            write(*,*) "--------------------------------------------------------------"
             write(*,*) ""
+            write(*,*) "Arithmetic modes (refines the grids to finest common level, applies operation and writes result on grid1 (first input file)):"
+            write(*,*) "   --add / --subtract / --multiply / --divide"
+            write(*,*) "Arithmetic modes (assumes that grids are the same):"
+            write(*,*) "   --add-same-grid / --subtract-same-grid / --multiply-same-grid / --divide-same-grid "
+            write(*,*) ""
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) ""
+            write(*,*) "Grid operation (no arithmetic):"
+            write(*,*) "   --grid1-to-grid2"
+            write(*,*) ""
+            write(*,*) "--------------------------------------------------------------"
+            write(*,*) ""
+            write(*,*) "Noise initialization mode:"
+            write(*,*) "   --noise-like-grid1"
             write(*,*) ""
             write(*,*) "------------------------------------------------------------------"
         end if
@@ -62,16 +75,21 @@ subroutine post_add_two_masks(params)
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
     call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-
     if (mode=="--test_operations") then
-        params%number_blocks = 5*max(N1,N2) ! just to get some memory:
+        params%number_blocks = ceiling(5.0*dble(max(N1,N2)) / dble(params%number_procs)) ! just to get some memory in case not provided, in theory we don't know how much we need
+    elseif(mode=="--grid1-to-grid2") then
+        params%number_blocks = ceiling(  real(N1+N2)/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.2_rk)+4 ! we only neet classical 8/7 for decomposition, but of both grids
     else
-        params%number_blocks = 3*max(N1,N2) ! just to get some memory:
+        params%number_blocks = ceiling(3.0*dble(max(N1,N2)) / dble(params%number_procs)) ! just to get some memory in case not provided, in theory we don't know how much we need
     end if
     params%domain_size = domain
     params%Jmax = max( tc_length2, tc_length1 )
     params%Jmin = 0
-    params%n_eqn = 1
+    if (mode=="--add-same-grid" .or. mode=="--subtract-same-grid" .or. mode=="--multiply-same-grid" .or. mode=="--divide-same-grid") then
+        params%n_eqn = 2
+    else
+        params%n_eqn = 1
+    end if
 
     allocate(params%threshold_state_vector_component(params%n_eqn))
     params%threshold_state_vector_component(1:params%n_eqn)=1
@@ -89,7 +107,7 @@ subroutine post_add_two_masks(params)
 
 
     ! we have to allocate grid if this routine is called for the first time
-    call allocate_forest(params, hvy_block, hvy_work, hvy_tmp=hvy_tmp)
+    call allocate_forest(params, hvy_block, hvy_work, hvy_tmp=hvy_tmp, neqn_hvy_tmp=1, nrhs_slots1=0)
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
@@ -101,11 +119,16 @@ subroutine post_add_two_masks(params)
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
 
-    call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
-    call readHDF5vct_tree((/fname2/), params, hvy_block, tree_ID=2, verbosity=.true.)
+    if (mode == "--add-same-grid" .or. mode == "--subtract-same-grid" .or. mode == "--multiply-same-grid" .or. mode == "--divide-same-grid") then
+        call readHDF5vct_tree((/fname1, fname2/), params, hvy_block, tree_ID=1, verbosity=.true.)
+    else if (mode == "--noise-like-grid1") then
+        call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
+    else
+        call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
+        call readHDF5vct_tree((/fname2/), params, hvy_block, tree_ID=2, verbosity=.true.)
+    endif
 
     call createActiveSortedLists_forest(params)
-
 
     select case(mode)
     case ("--noise-like-grid1")
@@ -118,10 +141,28 @@ subroutine post_add_two_masks(params)
         call add_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2, verbosity=.true.)
 
     case ("--subtract")
-        call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2)
+        call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2, verbosity=.true.)
 
     case ("--multiply")
-        call multiply_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2)
+        call multiply_two_trees(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2, verbosity=.true.)
+
+    case ("--divide")
+        call tree_pointwise_arithmetic(params, hvy_block, hvy_tmp, tree_ID1=1, tree_ID2=2, operation="/")
+    
+    case ("--add-same-grid", "--subtract-same-grid", "--multiply-same-grid", "--divide-same-grid")
+        ! we assume that the grids are the same, so we can just loop over the active blocks
+        do k = 1, hvy_n(1)
+            hvy_id = hvy_active(k, 1)
+            if (mode == "--add-same-grid") then
+                hvy_block(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id) + hvy_block(:,:,:,2,hvy_id)
+            else if (mode == "--subtract-same-grid") then
+                hvy_block(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id) - hvy_block(:,:,:,2,hvy_id)
+            else if (mode == "--multiply-same-grid") then
+                hvy_block(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id) * hvy_block(:,:,:,2,hvy_id)
+            else if (mode == "--divide-same-grid") then
+                hvy_block(:,:,:,1,hvy_id) = hvy_block(:,:,:,1,hvy_id) / hvy_block(:,:,:,2,hvy_id)
+            end if
+        enddo
     
     case ("--grid1-to-grid2")
         ! Store (both) grids (=only treedata) in the *_ref variables
@@ -129,7 +170,6 @@ subroutine post_add_two_masks(params)
         ! before applying wavelet filters we need to sync
         call sync_ghosts_tree(params, hvy_block, tree_ID=1)
         ! make grid1 equal to grid 1 (by coarsening and refining).
-        ! something is not working here yet but I don't have the brain for it currently
         if (params%rank==0) write(*,'(A)') "Coarsening grid 1 to grid 2"
         call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
         hvy_block, hvy_tmp, tree_ID=1, ref_can_be_finer=.true., verbosity=.true.)
@@ -177,8 +217,11 @@ subroutine post_add_two_masks(params)
     tree_ID = 1
     call updateNeighbors_tree( params, tree_ID, search_overlapping=.false.)
 
-    tree_ID = 2
-    call updateNeighbors_tree( params, tree_ID, search_overlapping=.false.)
+    ! this seems unnecessary
+    ! if (not (mode == "--noise-like-grid1")) then
+    !     tree_ID = 2
+    !     call updateNeighbors_tree( params, tree_ID, search_overlapping=.false.)
+    ! end if
 
     call saveHDF5_tree(fname_out, time, iteration, 1, params, hvy_block, tree_ID=1)
 

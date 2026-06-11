@@ -26,6 +26,7 @@ contains
 
 #include "conversion_routines.f90"
 #include "wavelet_decomposition_reconstruction.f90"
+#include "sub0_decomposition.f90"
 
 
     ! this function is only used in merge_blocks, we could remove it
@@ -1073,10 +1074,10 @@ contains
             !           consequently, the coarsen(refine(u)) unit test will fail.
             ! Issue #2: Coarse extension is to be clarified with coiflet -> copying of SC near interface may make less sense than for CDF ?
             allocate(params%HD(-4:7))
-            allocate(params%GD(-6:5))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
+            allocate(params%GD(-7:4))
 
             allocate(params%HR(-7:4))
-            allocate(params%GR(-5:6))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
+            allocate(params%GR(-4:7))
 
             ! copied from flusi coiflet (output)
             params%HD=(/1.638733646318000E-02, -4.146493678197000E-02, -6.737255472230000E-02, 3.861100668230900E-01, 8.127236354496100E-01, 4.170051844237800E-01,-7.648859907826000E-02,-5.943441864647000E-02, 2.368017194688000E-02, 5.611434819370000E-03,-1.823208870910000E-03,-7.205494453700000E-04/)
@@ -1087,7 +1088,9 @@ contains
             ! As the coiflets are *not* strictly interpolating, only "almost-interpolating", the combination with 
             ! a fourth order interpolation in the ghost nodes is questionable. The "predictor" is used in the ghost nodes interpolation.
             params%order_predictor = "multiresolution_4th"
+            params%poisson_order_predictor = "multiresolution_6th"
             CDFX = 4  ! This wavelet is quasi-interpolating of order 4
+            CDFY = 4  ! This wavelet has 4 vanishing moments? I don't think so actually
 
             do i = 1, 100
                 write(*,*) "Warning: COIFLET12 is not yet fully tested and implemented, do not use for production runs!"
@@ -1277,16 +1280,24 @@ contains
             ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually)
             if (CDFX == 2) then
                 params%order_predictor = "multiresolution_2nd"
+                params%poisson_order_predictor = "multiresolution_4th"
             elseif (CDFX == 4) then
                 params%order_predictor = "multiresolution_4th"
+                params%poisson_order_predictor = "multiresolution_6th"
             elseif (CDFX == 6) then
                 params%order_predictor = "multiresolution_6th"
+                params%poisson_order_predictor = "multiresolution_8th"
             elseif (CDFX == 8) then
                 params%order_predictor = "multiresolution_8th"
+                params%poisson_order_predictor = "multiresolution_10th"
             elseif (CDFX == 10) then
                 params%order_predictor = "multiresolution_10th"
+                params%poisson_order_predictor = "multiresolution_12th"
             elseif (CDFX == 12) then
+                ! 14th doesn't exist, we just use the 12th order predictor for poisson as well
+                ! it's not like anyone's gonna use that anyways
                 params%order_predictor = "multiresolution_12th"
+                params%poisson_order_predictor = "multiresolution_12th"
             endif
         end select
 

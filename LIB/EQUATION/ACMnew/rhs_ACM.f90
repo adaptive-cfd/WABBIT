@@ -55,6 +55,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
     integer(kind=2) :: color
+    integer(kind=ik) :: i_insect
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: RHS_ACM called but ACM not initialized"
 
@@ -100,12 +101,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             params_acm%mean_flow = 0.0_rk
         endif
 
-        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+        ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+        call Update_All_Insects(time)
 
         if (params_acm%use_free_flight_solver) then
             ! reset forces, we compute their value now
-            params_acm%force_insect_g = 0.0_rk
-            params_acm%moment_insect_g = 0.0_rk
+            params_acm%force_insect_g(:, :) = 0.0_rk
+            params_acm%moment_insect_g(:, :) = 0.0_rk
         endif
 
     case ("integral_stage")
@@ -167,63 +169,66 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
+                do i_insect = 1, n_insects
+                    do iy = g+1, Bs(2)+g
+                        y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
+                        do ix = g+1, Bs(1)+g
+                            x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
 
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                    do ix = g+1, Bs(1)+g
-                        x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+                            ! get this points color
+                            color = int( mask(ix, iy, 1, 5), kind=2 )
 
-                        ! get this points color
-                        color = int( mask(ix, iy, 1, 5), kind=2 )
+                            ! exclude walls, trees, etc... (they have color 0)
+                            ! if (color>0_2 .and. color < 6_2) then
+                            ! penalization term
+                            penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
 
-                        ! exclude walls, trees, etc... (they have color 0)
-                        ! if (color>0_2 .and. color < 6_2) then
-                        ! penalization term
-                        penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
+                            f_block = f_block - penal
+                            f_block(3) = 0.0_rk
 
-                        f_block = f_block - penal
-                        f_block(3) = 0.0_rk
+                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                        ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-
-                        ! moments. For insects, we compute the total moment wrt to the body center
-                        ! params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
-                        ! endif
+                            ! moments. For insects, we compute the total moment wrt to the body center
+                            ! params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
+                            ! endif
+                        enddo
                     enddo
-                enddo
 
-                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
+                    params_acm%force_insect_g(:, i_insect) = params_acm%force_insect_g(:, i_insect) + f_block*dV
+                enddo
             else
                 dV = dx(1)*dx(2)*dx(3)
                 C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
-                do iz = g+1, Bs(3)+g
-                    z = x0(3) + dble(iz-(g+1)) * dx(3) - Insect%xc_body_g(3) ! note: x-xc insect
-                    do iy = g+1, Bs(2)+g
-                        y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                        do ix = g+1, Bs(1)+g
-                            x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+                do i_insect = 1, n_insects
+                    do iz = g+1, Bs(3)+g
+                        z = x0(3) + dble(iz-(g+1)) * dx(3) - Insects(i_insect)%xc_body_g(3) ! note: x-xc insect
+                        do iy = g+1, Bs(2)+g
+                            y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
+                            do ix = g+1, Bs(1)+g
+                                x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
 
-                            ! get this points color
-                            color = int( mask(ix, iy, iz, 5), kind=2 )
+                                ! get this points color
+                                color = int( mask(ix, iy, iz, 5), kind=2 )
 
-                            ! exclude walls, trees, etc... (they have color 0)
-                            if (color>0_2 .and. color < 6_2) then
-                                ! penalization term
-                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+                                ! exclude walls, trees, etc... (they have color 0)
+                                if (color>0_2 .and. color < 6_2) then
+                                    ! penalization term
+                                    penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
-                                f_block = f_block - penal
+                                    f_block = f_block - penal
 
-                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+                                    ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                                ! moments. For insects, we compute the total moment wrt to the body center
-                                params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
-                            endif
+                                    ! moments. For insects, we compute the total moment wrt to the body center
+                                    params_acm%moment_insect_g(:, i_insect) = params_acm%moment_insect_g(:, i_insect) - cross((/x, y, z/), penal)*dV
+                                endif
+                            enddo
                         enddo
                     enddo
+                    params_acm%force_insect_g(:, i_insect) = params_acm%force_insect_g(:, i_insect) + f_block*dV
                 enddo
-                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
             endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
         endif
@@ -245,8 +250,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         endif
 
         if (params_acm%use_free_flight_solver) then
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         endif
 
     case ("local_stage")
@@ -363,6 +368,8 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re, FD2_s, FD2_e
 
+    character(len=clong) :: write_statement
+
     ! set parameters for readability
     c_0         = params_acm%c_0
     nu          = params_acm%nu
@@ -378,8 +385,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     C_eta_inv = 1.0_rk / C_eta
 
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
-        call abort(66233,"wrong size, I go for a walk instead.")
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
+        write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
+        call abort(66233,"wrong size, I go for a walk instead: " // trim(write_statement))
     endif
 
 
@@ -857,7 +865,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! sponge term.
     ! --------------------------------------------------------------------------
     ! HACK
-    if (.not.((params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local"))) then 
+    if (all(params_acm%geometries(:) /= "lamballais") .or. all(params_acm%geometries(:) /= "lamballais-local")) then 
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse
             C_sponge_inv = 1.0_rk / params_acm%C_sponge
@@ -967,7 +975,12 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re, FD2_s, FD2_e
+    character(len=clong) :: write_statement
 
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=Bs(3)+2*g .or. size(phi,4)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
+        write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " x ", size(phi,4), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", Bs(3)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
+        call abort(66233,"wrong size, I go for a walk instead: " // trim(write_statement))
+    endif
 
     ! set parameters for readability
     c_0         = params_acm%c_0

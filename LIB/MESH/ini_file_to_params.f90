@@ -63,6 +63,10 @@ subroutine ini_file_to_params( params, filename )
    ! place in those modules, i.e., they are not read here.)
    call read_param_mpi(FILE, 'Physics', 'physics_type', params%physics_type, "---" )
 
+   ! usually, we are specialized in solving purely hyperbolic equations, with one exception
+   params%PDE_type = "hyperbolic"
+   if (params%physics_type == 'NSPP') params%PDE_type = "mixed_hyperbolic_parabolic"
+
    ! if the initial condition is read from file, it is handled by wabbit itself, i.e. not
    ! by the physics modules. the pyhsics modules cannot do this, because they just see 'blocks'
    ! and never the entire grid as such.
@@ -85,12 +89,68 @@ subroutine ini_file_to_params( params, filename )
 
       params%input_files = "---"
       call read_param_mpi(FILE, 'Physics', 'input_files', params%input_files, params%input_files, check_file_exists=.true. )
-   end if
+   else
+      call read_param_mpi(FILE, 'Physics', 'inicond_vorticity_formulation', params%inicond_vorticity_formulation, .false.)
+      if (params%physics_type == "ACM-new") then
+         call read_param_mpi(FILE, 'Physics', 'inicond_pressure_from_velocity', params%inicond_pressure_from_velocity, params%inicond_vorticity_formulation)
+      endif
+      call read_param_mpi(FILE, 'Physics', 'inicond_helmholtz_projection', params%inicond_helmholtz_projection, .false.)
+   endif
 
    ! wabbit does need to know how many fiels are written to disk when saving is triggered.
    ! e.g. saving ux, uy and p would mean 3. The names of these files as well as their contents
    ! are defined by the physics modules.
    call read_param_mpi(FILE, 'Saving', 'N_fields_saved', params%N_fields_saved, 3 )
+
+   !***************************************************************************
+   ! read probe parameters (also configured in [Saving])
+   call read_param_mpi(FILE, 'Saving', 'nsave_probes', params%nsave_probes, 99999999_ik )
+   call read_param_mpi(FILE, 'Saving', 'tsave_probes', params%tsave_probes, 9999999.9_rk )
+   call read_param_mpi(FILE, 'Saving', 'probe_start_time', params%probe_start_time, 0.0_rk )
+   call read_param_mpi(FILE, 'Saving', 'probe_interpolation_order', params%probe_interpolation_order, 1 )
+   call read_param_mpi(FILE, 'Saving', 'n_probes', params%n_probes, 0 )
+   call read_param_mpi(FILE, 'Saving', 'n_probe_lines', params%n_probe_lines, 0 )
+   call read_param_mpi(FILE, 'Saving', 'N_probe_variables', params%N_probe_variables, 0 )
+
+   if (params%n_probes > 0) then
+      if (.not. allocated(params%probe_x)) allocate(params%probe_x(1:params%n_probes))
+      if (.not. allocated(params%probe_y)) allocate(params%probe_y(1:params%n_probes))
+      if (.not. allocated(params%probe_z)) allocate(params%probe_z(1:params%n_probes))
+      params%probe_x = 0.0_rk
+      params%probe_y = 0.0_rk
+      params%probe_z = 0.0_rk
+      call read_param_mpi(FILE, 'Saving', 'probe_x', params%probe_x, params%probe_x )
+      call read_param_mpi(FILE, 'Saving', 'probe_y', params%probe_y, params%probe_y )
+      call read_param_mpi(FILE, 'Saving', 'probe_z', params%probe_z, params%probe_z )
+   endif
+   if (params%n_probe_lines > 0) then
+      if (.not. allocated(params%probe_line_x1)) allocate(params%probe_line_x1(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_y1)) allocate(params%probe_line_y1(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_z1)) allocate(params%probe_line_z1(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_x2)) allocate(params%probe_line_x2(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_y2)) allocate(params%probe_line_y2(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_z2)) allocate(params%probe_line_z2(1:params%n_probe_lines))
+      if (.not. allocated(params%probe_line_npoints)) allocate(params%probe_line_npoints(1:params%n_probe_lines))
+      params%probe_line_x1 = 0.0_rk
+      params%probe_line_y1 = 0.0_rk
+      params%probe_line_z1 = 0.0_rk
+      params%probe_line_x2 = 0.0_rk
+      params%probe_line_y2 = 0.0_rk
+      params%probe_line_z2 = 0.0_rk
+      params%probe_line_npoints = 0_ik
+      call read_param_mpi(FILE, 'Saving', 'probe_line_x1', params%probe_line_x1, params%probe_line_x1 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_y1', params%probe_line_y1, params%probe_line_y1 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_z1', params%probe_line_z1, params%probe_line_z1 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_x2', params%probe_line_x2, params%probe_line_x2 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_y2', params%probe_line_y2, params%probe_line_y2 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_z2', params%probe_line_z2, params%probe_line_z2 )
+      call read_param_mpi(FILE, 'Saving', 'probe_line_npoints', params%probe_line_npoints, params%probe_line_npoints )
+   endif
+
+   if (params%N_probe_variables > 0) then
+      if (.not. allocated(params%probe_variables)) allocate(params%probe_variables(1:params%N_probe_variables))
+      call read_param_mpi(FILE, 'Saving', 'probe_variables', params%probe_variables, (/ 'none' /))
+   endif
 
    !***************************************************************************
    ! read DISCRETIZATION parameters
@@ -99,12 +159,12 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Discretization', 'order_discretization', params%order_discretization, "---" )
    ! poisson order
    call read_param_mpi(FILE, 'Discretization', 'poisson_order', params%poisson_order, "FD_4th_comp_1_3")
-   call read_param_mpi(FILE, 'Discretization', 'poisson_Jmin', params%poisson_Jmin, params%Jmin )
+   call read_param_mpi(FILE, 'Discretization', 'poisson_Jmin', params%poisson_Jmin, 0 )
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_end_criteria', params%poisson_cycle_end_criteria, "fixed_iterations")
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_it', params%poisson_cycle_it, 6)
-   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_abs', params%poisson_cycle_tol_abs, 1.0e-6_rk)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_abs', params%poisson_cycle_tol_abs, 1.0e-8_rk)
    call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_tol_rel', params%poisson_cycle_tol_rel, 1.0e-3_rk)
-   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_max_it', params%poisson_cycle_max_it, 100)
+   call read_param_mpi(FILE, 'Discretization', 'poisson_cycle_max_it', params%poisson_cycle_max_it, 50)
    call read_param_mpi(FILE, 'Discretization', 'poisson_GS_it', params%poisson_GS_it, 8)
    call read_param_mpi(FILE, 'Discretization', 'poisson_Sync_it', params%poisson_Sync_it, 2)
    call read_param_mpi(FILE, 'Discretization', 'poisson_coarsest', params%poisson_coarsest, "FFT")
@@ -157,6 +217,8 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'Debug', 'debug_pruned2full', params%debug_pruned2full, .false.)
    call read_param_mpi(FILE, 'Debug', 'debug_poisson', params%debug_poisson, .false.)
 
+   call read_param_mpi(FILE, 'Debug', 'verbose_level', params%verbose_level, 1)
+
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
@@ -197,7 +259,20 @@ subroutine ini_file_to_params( params, filename )
    FD2_size = max(FD_l, FD_r)
    FD_max_size = max(FD1_size, FD2_size)
 
-   ! check ghost nodes number
+   ! we have to adjust g according to poisson stencil size
+   ! ToDo: Sometimes we want to do helmholtz projections, so we need to check the size then as well
+   if (params%PDE_type == "mixed_hyperbolic_parabolic") then
+      call setup_FD2_stencil(params%order_discretization, filter_dummy, FD_l, FD_r, use_composite_stencils=.true.)
+      FD2_size = max(FD_l, FD_r)
+      FD_max_size = max(FD_max_size, FD2_size)
+
+      call setup_FD2_stencil(params%poisson_order, filter_dummy, FD_l, FD_r, use_composite_stencils=.true.)
+      FD2_size = max(FD_l, FD_r)
+      FD_max_size = max(FD_max_size, FD2_size)
+   endif
+
+   ! check ghost nodes number for order predictor
+   ! here we assume, that we always predict from a level to the next, not from a decomposed grid with SC only
    if (params%rank==0) write(*,'("INIT: checking if g and predictor work together")')
    if ( (params%g < 6 .and. params%order_predictor == 'multiresolution_12th') .or. &
         (params%g < 5 .and. params%order_predictor == 'multiresolution_10th') .or. &
@@ -208,8 +283,11 @@ subroutine ini_file_to_params( params, filename )
       call abort("ERROR: need more ghost nodes for order of supplied refinement interpolatior")
    end if
    if ( params%g < FD_max_size ) then
-      write(*, "(A, i0, A, i0)") "ERROR: 'number_ghost_nodes' was set smaller as required for FD scheme, you have to adapt it from ", params%g, " to ", FD_max_size
-      call abort(251103, "ERROR: need more ghost nodes for order of supplied finite distance scheme")
+      if (params%rank==0) then
+         write(*, "(A, i0, A, i0)") "WARNING: 'number_ghost_nodes' was set smaller as required for FD scheme, adapting it from ", params%g, " to ", FD_max_size
+      endif
+      params%g = FD_max_size
+      ! call abort(251103, "ERROR: need more ghost nodes for order of supplied finite distance scheme")
    end if
 
    ! alter g_RHS if necessary, CDF4Y wavelets need only g_RHS=2 for example
@@ -223,25 +301,19 @@ subroutine ini_file_to_params( params, filename )
       params%g_RHS = g_RHS_min
    endif
 
-   ! ! JB ToDo - correct once this is more settled
-   ! ! we want to know the stencil size for laplacian schemes usually, so lets save this here
-   ! if (params%poisson_order == 'CFD_2nd') then
-   !    params%poisson_stencil_size = 1
-   ! elseif (params%poisson_order == 'CFD_4th') then
-   !    params%poisson_stencil_size = 2
-   ! elseif (params%poisson_order == 'CFD_6th') then
-   !    params%poisson_stencil_size = 3
-   ! elseif (params%poisson_order == 'CFD_8th') then
-   !    params%poisson_stencil_size = 4
-   ! elseif (params%poisson_order == 'MST_6th') then
-   !    params%poisson_stencil_size = 1
-   ! else
-   !    call abort(1234567, "Error: no laplacian order specified or not supported!")
-   ! endif
-   ! if ( params%g < params%poisson_stencil_size ) then
-   !    call abort("ERROR: need more ghost nodes for order of supplied finite difference laplacian scheme")
-   ! end if
+   ! check ghost nodes number for predictor of Poisson equation, which has to be 2 orders higher for adaptive grids
+   if (params%PDE_type == "mixed_hyperbolic_parabolic") then
+      if (params%rank==0) write(*,'("INIT: checking if g and predictor for Poisson equation work together")')
+      read(params%poisson_order_predictor(17:17), *) FD_max_size
+      if (FD_max_size == 1) read(params%poisson_order_predictor(17:18), *) FD_max_size
 
+      if (params%g < FD_max_size/2) then
+         if (params%rank==0) then
+            write(*, "(A, i0, A, i0)") "WARNING: 'number_ghost_nodes' was set smaller as required for Poisson predictor, adapting it from ", params%g, " to ", FD_max_size/2
+         endif
+         params%g = FD_max_size/2
+      end if
+   endif
  
 end subroutine ini_file_to_params
 
@@ -351,28 +423,35 @@ subroutine ini_blocks(params, FILE )
    ! which use module_params it cannot be called here (circular dependency....)
    ! compute the number of ghost points, which for CDFXY is X for unlifted and X+Y-1 for lifted wavelets
    ! check if it is lifted or unlifted, which depends on Y (0 for unlifted and >0 for lifted wavelets)
-   read(params%wavelet(4:4), *) CDFX
-   ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
-   if (CDFX == 1) then
-         read(params%wavelet(4:5), *) CDFX
-   endif
-   if (all(CDFX /= (/2,4,6,8,10,12/))) then
-         call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
-   endif
-   if (CDFX < 10) then
-         read(params%wavelet(5:5), *) CDFY
-   else
-         read(params%wavelet(6:6), *) CDFY
-   endif
-   if (CDFY == 1) then
-         if (CDFX < 10) then
-            read(params%wavelet(5:6), *) CDFY
-         else
-            read(params%wavelet(6:7), *) CDFY
+   if (params%wavelet(1:3) /= "CDF") then
+         if (params%wavelet == "coiflet12") then
+            CDFX = 4
+            CDFY = 4
          endif
-   endif
-   if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
-         call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
+   else
+      read(params%wavelet(4:4), *) CDFX
+      ! Thomas will probably hate me for paving the way for 10th and 12th order wavelets, but well...
+      if (CDFX == 1) then
+            read(params%wavelet(4:5), *) CDFX
+      endif
+      if (all(CDFX /= (/2,4,6,8,10,12/))) then
+            call abort( 251103, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
+      endif
+      if (CDFX < 10) then
+            read(params%wavelet(5:5), *) CDFY
+      else
+            read(params%wavelet(6:6), *) CDFY
+      endif
+      if (CDFY == 1) then
+            if (CDFX < 10) then
+               read(params%wavelet(5:6), *) CDFY
+            else
+               read(params%wavelet(6:7), *) CDFY
+            endif
+      endif
+      if (all(CDFY /= (/0,2,4,6,8,10,12/))) then
+            call abort( 251103, "No default specified for this wavelet...! params%wavelet="//trim(adjustl(params%wavelet)) )
+      endif
    endif
 
    ! Now let's set the default ghost node numbers depending on the wavelet
@@ -498,7 +577,21 @@ subroutine ini_time(params, FILE )
    call read_param_mpi(FILE, 'Time', 'write_freq', params%write_freq, 25 )
    ! read output write interval
    call read_param_mpi(FILE, 'Time', 'write_time', params%write_time, 1.0_rk )
+   if (params%write_time <= 0.0_rk .and. params%write_method == "fixed_time") then
+      params%write_time = 1.0e200_rk
+      if (params%rank == 0) write(*, '(A)') "INIT: 'write_time' <= 0 : Disabling write_time output trigger."
+   endif
    call read_param_mpi(FILE, 'Time', 'write_time_first', params%write_time_first, 0.0_rk )
+   ! read output backup write infos
+   call read_param_mpi(FILE, 'Time', 'write_backup_n', params%write_backup_n, 0 )
+   if (params%write_backup_n > 0) then
+      call read_param_mpi(FILE, 'Time', 'write_backup_time', params%write_backup_time, 1.0_rk )
+      call read_param_mpi(FILE, 'Time', 'write_backup_walltime', params%write_backup_walltime, 99999.9_rk )
+      allocate(params%write_backup_time_list(1:params%write_backup_n))
+      allocate(params%write_backup_iteration_list(1:params%write_backup_n))
+      params%write_backup_time_list(:) = -1.0_rk
+      params%write_backup_iteration_list(:) = -1_ik
+   endif
    ! read output write frequency
    call read_param_mpi(FILE, 'Time', 'walltime_write', params%walltime_write, 99999.9_rk )
    ! read value of fixed time step

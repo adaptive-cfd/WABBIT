@@ -217,7 +217,7 @@ subroutine check_oom(params, tree_id, error_OOM, check_full_tree, check_ref)
     if (error_OOM) then
         allocate(hvy_n_procs(1:params%number_procs), stat=mpierr)
         ! Gather hvy_n_afterRefinement from all ranks to rank 0
-        call MPI_GATHER(hvy_n_afterRefinement, 1, MPI_INTEGER, hvy_n_procs, 1, MPI_INTEGER, 0, WABBIT_COMM, mpierr)
+        call MPI_GATHER(hvy_n_afterRefinement, 1, MPI_INTEGER4, hvy_n_procs, 1, MPI_INTEGER4, 0, WABBIT_COMM, mpierr)
         if (params%rank == 0) then
             open(unit=99, file="oom_hvy_n_per_rank.txt", status="replace")
             write(99,'(A, i0)') "Rank, current hvy_n, expected hvy_n after refinement, limit is: ", params%number_blocks

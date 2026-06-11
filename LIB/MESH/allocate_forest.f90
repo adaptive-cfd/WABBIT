@@ -370,7 +370,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 end subroutine allocate_forest
 
 
-subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
+subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask )
 
     implicit none
 
@@ -381,6 +381,8 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
     !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
+    !> heavy mask array
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
 
     if (params%rank == 0) then
         write(*,'(80("─"))')
@@ -394,6 +396,9 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     if (present(hvy_tmp)) then
         if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     endif
+    if (present(hvy_mask)) then
+        if (allocated(hvy_mask)) deallocate( hvy_mask )
+    endif
     if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
@@ -405,6 +410,18 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
 
     if (allocated(params%threshold_state_vector_component)) deallocate( params%threshold_state_vector_component )
     if (allocated(params%input_files)) deallocate( params%input_files )
+    if (allocated(params%butcher_tableau)) deallocate( params%butcher_tableau )
+    if (allocated(params%symmetry_vector_component)) deallocate( params%symmetry_vector_component )
+    if (allocated(params%time_statistics_names)) deallocate( params%time_statistics_names )
+    if (allocated(params%field_names)) deallocate( params%field_names )
+    if (allocated(params%filter_component)) deallocate( params%filter_component )
+    if (allocated(params%HD)) deallocate( params%HD )
+    if (allocated(params%GD)) deallocate( params%GD )
+    if (allocated(params%HR)) deallocate( params%HR )
+    if (allocated(params%GR)) deallocate( params%GR )
+    if (allocated(params%MGR)) deallocate( params%MGR )
+
+    
 
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"

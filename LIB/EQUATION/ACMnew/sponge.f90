@@ -24,7 +24,7 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
                 ! distance to borders of domain
                 tmp = minval( (/x,y,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2))/) )
 
-                sponge(ix,iy) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                sponge(ix,iy) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
             end do
         end do
 
@@ -47,7 +47,7 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g)
 
                 ! distance to borders of domain
                 tmp = -( (x**p + y**p)**(1.0_rk/p) - offset)
-                sponge(ix,iy) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
+                sponge(ix,iy) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, &
                 0.5_rk*params_acm%L_sponge)
             end do
         end do
@@ -97,7 +97,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
                         tmp = minval( (/x,y,z,-(x-params_acm%domain_size(1)),&
                             -(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
 
-                        sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                        sponge(ix,iy,iz) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
                     end do
                 end do
             end do
@@ -117,7 +117,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
                     ! distance to borders of domain
                     tmp = minval( (/x,z,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
 
-                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                    sponge(ix,iy,iz) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
                 end do
             end do
         end do
@@ -136,7 +136,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
                     ! distance to borders of domain
                     tmp = minval( (/x,-(x-params_acm%domain_size(1)),-(y-params_acm%domain_size(2)),-(z-params_acm%domain_size(3))/) )
 
-                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+                    sponge(ix,iy,iz) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
                 end do
             end do
         end do
@@ -149,7 +149,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
             ! distance to borders of domain
             tmp = minval( (/x,-(x-params_acm%domain_size(1))/) )
 
-            sponge(ix,:,:) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
+            sponge(ix,:,:) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, 0.5_rk*params_acm%L_sponge)
         end do
 
 
@@ -186,7 +186,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
                         ! distance to borders of domain
                         tmp = -( (x + y + z)**pinv - offset)
 
-                        sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
+                        sponge(ix,iy,iz) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, &
                         0.5_rk*params_acm%L_sponge)
                     end do
                 end do
@@ -199,6 +199,8 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         ! which is a nice and simple way to get a rectangle with round corners.
         ! This sponge type is moving with the insect, which we assume to be in the centre
         ! of it
+        
+        ! Attention: For multiple insects, this is always centered around the first insect in the list, as for multiple insects this sponge types makes only little sense anyways
 
         if ( maxval(abs(params_acm%domain_size-params_acm%domain_size(1))) > 1.0e-10_rk) then
             call abort(1610184,"ERROR: for the p-norm sponge, the domain has to be same size in all directions.")
@@ -209,16 +211,16 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g)
         offset = 0.5_rk * params_acm%domain_size(1)
 
         do iz = g+1, Bs(3)+g
-            z = (dble(iz-(g+1)) * dx(3) + x0(3) - Insect%xc_body_g(3))**p
+            z = (dble(iz-(g+1)) * dx(3) + x0(3) - Insects(1)%xc_body_g(3))**p
             do iy = g+1, Bs(2)+g
-                y = (dble(iy-(g+1)) * dx(2) + x0(2) - Insect%xc_body_g(2))**p
+                y = (dble(iy-(g+1)) * dx(2) + x0(2) - Insects(1)%xc_body_g(2))**p
                 do ix = g+1, Bs(1)+g
-                    x = (dble(ix-(g+1)) * dx(1) + x0(1) - Insect%xc_body_g(1))**p
+                    x = (dble(ix-(g+1)) * dx(1) + x0(1) - Insects(1)%xc_body_g(1))**p
 
                     ! distance to borders of domain
                     tmp = -( (x + y + z)**pinv - offset)
 
-                    sponge(ix,iy,iz) = smoothstep( tmp, 0.5_rk*params_acm%L_sponge, &
+                    sponge(ix,iy,iz) = step_cosine( tmp, 0.5_rk*params_acm%L_sponge, &
                     0.5_rk*params_acm%L_sponge)
                 end do
             end do

@@ -180,15 +180,30 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         ! only root sets the flag, then we sync. It is messy if all procs set a
         ! random value which is not sync'ed
         if (params%rank == 0) then
+            ! First pass: check which blocks would like to refine based on random chance
             tags = 0
             do k = 1, lgt_n(tree_ID)
                 call random_number(r)
-                ! set refinement status to refine
-                if (r<=ref_chance .and. tags<max_blocks .and. lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS)==0) then
-                    tags = tags + 1
+                ! temporarily mark blocks that pass the random test
+                if (r<=ref_chance .and. lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS)==0) then
                     lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = 1
+                    tags = tags + 1
                 end if
             end do
+            
+            ! Second pass: if too many blocks want to refine, randomly deselect some
+            ! This ensures spatial uniformity rather than bias toward early blocks
+            if (tags > max_blocks) then
+                do k = 1, lgt_n(tree_ID)
+                    if (lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) == 1) then
+                        call random_number(r)
+                        ! keep only a fraction of the tagged blocks
+                        if (r > dble(max_blocks)/dble(tags)) then
+                            lgt_block( lgt_active(k, tree_ID), IDX_REFINE_STS ) = 0
+                        end if
+                    end if
+                end do
+            end if
         endif
 
         ! sync light data, as only root sets random refinement

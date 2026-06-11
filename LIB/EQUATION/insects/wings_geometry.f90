@@ -600,38 +600,38 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
                             ! wing deformation
                             ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
                             if ( Insect%deformable(wingID) ) then
-                              a = deformation_a(wingID)
-                              b = deformation_b(wingID)
-                              c = deformation_c(wingID)
-                              tt = mod(Insect%time, deformations(a*c,1,wingID))
+                              a = Insect%deformation_a(wingID)
+                              b = Insect%deformation_b(wingID)
+                              c = Insect%deformation_c(wingID)
+                              tt = mod(Insect%time, Insect%deformations(a*c,1,wingID))
                               do k = 1, c-1
-                                t1 = deformations(a*k-1,1,wingID)
-                                t2 = deformations(a*k+1,1,wingID)
+                                t1 = Insect%deformations(a*k-1,1,wingID)
+                                t2 = Insect%deformations(a*k+1,1,wingID)
                                 !if (Insect%time >= t1 .AND. Insect%time <= t2) then
                                 if (tt >= t1 .AND. tt <= t2) then
                                   exit
                                 endif
                               enddo
                               !if (k == c-1) then
-                              !       t1 = deformations(a*c,1,wingID)
+                              !       t1 = Insect%deformations(a*c,1,wingID)
                               !       k = mod(k,c)
-                              !       t1 = t1 + deformations(a*k-1,1,wingID)
-                              !       t2 = t1 + deformations(a*k+1,1,wingID)
+                              !       t1 = t1 + Insect%deformations(a*k-1,1,wingID)
+                              !       t2 = t1 + Insect%deformations(a*k+1,1,wingID)
                               !end if
                               do j = 1, b
                                 do i = 1, a
                                   if (k>=c-1) then
-                                    deformation_profile(i,j,wingID) = deformations(a*k-1,j+1,wingID)
+                                    Insect%deformation_profile(i,j,wingID) = Insect%deformations(a*k-1,j+1,wingID)
                                   else
-                                    def1 = deformations(a*k-1,j+1,wingID)
-                                    def2 = deformations(a*k+1,j+1,wingID)
-                                    deformation_profile(i,j,wingID) = def1 + (tt-t1)/(t2-t1)*(def2-def1)
-                                    !deformation_profile(i,j,wingID) = def1 + (Insect%time-t1)/(t2-t1)*(def2-def1)
-                                    !deformation_profile(i,j,wingID) = (deformations(a*k-1,j+1,wingID)+deformations(a*k+1,j+1,wingID))/2_rk
+                                    def1 = Insect%deformations(a*k-1,j+1,wingID)
+                                    def2 = Insect%deformations(a*k+1,j+1,wingID)
+                                    Insect%deformation_profile(i,j,wingID) = def1 + (tt-t1)/(t2-t1)*(def2-def1)
+                                    !Insect%deformation_profile(i,j,wingID) = def1 + (Insect%time-t1)/(t2-t1)*(def2-def1)
+                                    !Insect%deformation_profile(i,j,wingID) = (Insect%deformations(a*k-1,j+1,wingID)+Insect%deformations(a*k+1,j+1,wingID))/2_rk
                                   endif
                                 enddo
                               enddo
-                              zz0 = interp2_nonper( x_wing(1), x_wing(2), deformation_profile(:,:,wingID), Insect%deformation_array_bbox(1:4,wingID), a, b )
+                              zz0 = interp2_nonper( x_wing(1), x_wing(2), Insect%deformation_profile(:,:,wingID), Insect%deformation_array_bbox(1:4,wingID), a, b )
                               Insect%wing_bounding_box(5,wingID) = min(Insect%wing_bounding_box(5,wingID), zz0 - Insect%WingThickness / 2.0_pr)
                               Insect%wing_bounding_box(6,wingID) = max(Insect%wing_bounding_box(6,wingID), zz0 + Insect%WingThickness / 2.0_pr)
                               !write(*,*) "x_wing(1)=",x_wing(1),"x_wing(2)=",x_wing(2),"array=",Insect%deformation_array_bbox(:,wingID)
@@ -1441,10 +1441,10 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
             ! wing deformation
             zz0 = interp2_nonper(Insect%bristles_coords(wingID,j,1), &
                         Insect%bristles_coords(wingID,j,2), &
-                        deformation_profile(:,:,wingID), &
+                        Insect%deformation_profile(:,:,wingID), &
                         Insect%deformation_array_bbox(1:4,wingID), &
-                        deformation_a(wingID), &
-                        deformation_b(wingID))
+                        Insect%deformation_a(wingID), &
+                        Insect%deformation_b(wingID))
           endif
           !KVN-2025>>>>>
 
@@ -2338,17 +2338,17 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
         call read_param_mpi(ifile,"Wing","deformation_array_bbox",Insect%deformation_array_bbox(1:4,wingID), (/0.0_rk,0.0_rk,0.0_rk,0.0_rk/))
         call param_matrix_size_mpi(ifile,"Wing","deformations",a1,b1)
         call Allocate_Arrays(Insect,"deformations",a1,b1)
-        call param_matrix_read_mpi(ifile,"Wing","deformations",deformations(:,:,wingID))
+        call param_matrix_read_mpi(ifile,"Wing","deformations",Insect%deformations(:,:,wingID))
         do a = 1, a1
-          if ( deformations(a,1,wingID) /= deformations(a+1,1,wingID) ) then
+          if ( Insect%deformations(a,1,wingID) /= Insect%deformations(a+1,1,wingID) ) then
             exit
           end if
         end do
         b = b1 - 1
         c = a1/a
-        deformation_a(wingID) = a
-        deformation_b(wingID) = b
-        deformation_c(wingID) = c
+        Insect%deformation_a(wingID) = a
+        Insect%deformation_b(wingID) = b
+        Insect%deformation_c(wingID) = c
         call Allocate_Arrays(Insect,"deformation_profile",a,b)
     else
         if (root) write(*,*) "wing is non-deformable"

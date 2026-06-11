@@ -314,6 +314,12 @@ module module_insects
       real(kind=rk), allocatable, dimension(:,:,:) :: damage_mask
       ! wing damage mask array dimensions
       integer, dimension(1:4) :: damage_a, damage_b
+      !KVN-2025>>>>>
+      ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+      real(kind=rk), allocatable, dimension(:,:,:) :: deformations
+      real(kind=rk), allocatable, dimension(:,:,:) :: deformation_profile
+      integer, dimension(1:4) :: deformation_a, deformation_b, deformation_c
+      !KVN-2025<<<<<
 
       ! wing signed distance function, if the 3d-interpolation approach is used.
       ! This is useful for highly complex wings, where one generates the mask only once
@@ -405,32 +411,32 @@ contains
        !KVN-2025>>>>>
        ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
        case ("deformations")
-         if (.not.allocated(deformations)) then
-            allocate(deformations(1:a,1:b,1:4))
+         if (.not.allocated(Insect%deformations)) then
+            allocate(Insect%deformations(1:a,1:b,1:4))
          else
-            a_old = size(deformations,1)
-            b_old = size(deformations,2)
+            a_old = size(Insect%deformations,1)
+            b_old = size(Insect%deformations,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = deformations(:,:,:)
-               deallocate(deformations)
-               allocate(deformations(1:a,1:b,1:4))
-               deformations(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%deformations(:,:,:)
+               deallocate(Insect%deformations)
+               allocate(Insect%deformations(1:a,1:b,1:4))
+               Insect%deformations(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
        case ("deformation_profile")
-         if (.not.allocated(deformation_profile)) then
-            allocate(deformation_profile(1:a,1:b,1:4))
+         if (.not.allocated(Insect%deformation_profile)) then
+            allocate(Insect%deformation_profile(1:a,1:b,1:4))
          else
-            a_old = size(deformation_profile,1)
-            b_old = size(deformation_profile,2)
+            a_old = size(Insect%deformation_profile,1)
+            b_old = size(Insect%deformation_profile,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = deformation_profile(:,:,:)
-               deallocate(deformation_profile)
-               allocate(deformation_profile(1:a,1:b,1:4))
-               deformation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%deformation_profile(:,:,:)
+               deallocate(Insect%deformation_profile)
+               allocate(Insect%deformation_profile(1:a,1:b,1:4))
+               Insect%deformation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif

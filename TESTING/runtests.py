@@ -108,7 +108,7 @@ tests = [
         {"test_name":"dry_butterflyKineloaderV2", "wavelet":"CDF22", "dim":3},
         {"test_name":"dry_snowman", "wavelet":"CDF22", "dim":2},
         {"test_name":"dry_snowman", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_3Dbristles", "wavelet":"CDF22", "dim":3},22d67b1e8cbafbfcd7fbb310024baf7e2e0c3e2
+        {"test_name":"dry_3Dbristles", "wavelet":"CDF22", "dim":3}
 
 #        f"---{group_names[8]}---",  # group identifier
 #        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},

@@ -26,7 +26,7 @@ subroutine post_dry_run
     character(len=cshort)               :: filename, fname, grid_list
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
     real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final
-    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color
+    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, include_tfinal
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -73,6 +73,7 @@ subroutine post_dry_run
         write(*,*) ""
         write(*,*) " --tstart: Start mask generation at this time."
         write(*,*) " --tfinal: End mask generation at this time, overwriting that from INI file"
+        write(*,*) " --include-tfinal: Usually, we skip the last time step (as for periodic data this is redundant), but optionally may want to include it"
         write(*,*) ""
         write(*,*) " --grid-list=list.txt"
         write(*,*) "   If given, we read in the specified h5 files and create the mask"
@@ -98,6 +99,7 @@ subroutine post_dry_run
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
     call get_cmd_arg( "--tstart", time_start, default=0.0_rk )
     call get_cmd_arg( "--tfinal", time_final, default=params%time_max )
+    call get_cmd_arg( "--include-tfinal", include_tfinal, default=.false. )
     params%time_max = time_final
     
 
@@ -173,7 +175,7 @@ subroutine post_dry_run
         ! traditional mode: create the grid AND the mask, possibly with pruning.
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
 
-        do while ( time <= params%time_max )
+        do while ( time < params%time_max .or. (include_tfinal .and. time == params%time_max) )
             ! start with an equidistant grid on coarsest level.
             ! routine also deletes any existing mesh in the tree.
             call createEquidistantGrid_tree( params, hvy_mask, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )

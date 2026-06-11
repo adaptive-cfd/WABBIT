@@ -63,13 +63,13 @@ subroutine post_unit_test(params)
             write(*, '(A)') "Parameters with default value:"
             write(*, '(A)') "   --wavelet=CDF44           - wavelet to be utilized"
             write(*, '(A)') "   --memory=8.0GB            - memory to initialize arrays"
-            write(*, '(A)') "   --JMax=10 (2D), 6 (3D)    - maximum block level"
-            write(*, '(A)') "   --JMin=0                  - minimum block level"
+            write(*, '(A)') "   --Jmax=10 (2D), 6 (3D)    - maximum block level"
+            write(*, '(A)') "   --Jmin=0                  - minimum block level"
             write(*, '(A)') "   --dim=2                   - dimension of test"
             write(*, '(A)') "   --Bs                      - Block size, default adapts to wavelet"
             write(*, '(A)') "   --g                       - Amount of ghost points, default adapts to wavelet"
             write(*, '(A)') "   --verbose=0               - prints and saves more debugging data for tests"
-            write(*, '(A)') "   --max_grid_density=0.1    - Percentage of memory utilization to be targeted for random grids"
+            write(*, '(A)') "   --max-grid-density=0.1    - Percentage of memory utilization to be targeted for random grids"
             write(*,'(20("_/¯\"))')
         end if
         return

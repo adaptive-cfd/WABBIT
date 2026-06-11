@@ -108,7 +108,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (threshold_block)", 1000, MPI_Wtime()-t0 )
     case default
-        call abort(151413,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
+        call abort(87455214,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
     end select
 

@@ -81,12 +81,32 @@ end subroutine filter_wrapper
 
 ! creates the explicit filter stencils, which can be used for superviscosity
 ! these have 2nd order accuracy and are of order 'order'
+! (They are second order FD stencils for the 'order'-th derivative)
 subroutine generate_superviscosity_stencil(stencil, length, order)
     real(kind=rk), intent(inout), allocatable :: stencil(:)
     integer(kind=ik), intent(in) :: order
     integer(kind=ik), intent(inout) :: length
     integer(kind=ik) :: k
     integer(kind=ik) :: binom
+
+    ! These generalized filter come from
+    ! A general class of commutative filters for LES in complex geometries
+    ! OV Vasilyev, TS Lund, P Moin - Journal of computational physics, 1998
+    ! 
+    ! For example for the case explicit_3pt:
+    ! Table I, case 1
+    !
+    ! If you look closely, you'll realize that those filters are the same as
+    ! higher order viscosity terms (hyperviscosity) with some given numerical 
+    ! dissipation. 
+    !
+    ! The explicit_3pt filter corresponds to D2, the explicit_5pt to D4 (with a coefficient of 
+    ! nu_num = -dx**4 / (16*dt) (yes, its a negative sign because it's 1i**4) )
+    ! and the explicit_7pt to a 6th derivative (D6, central, 2nd order) with a diffusion of (dx**6/64*dt).
+    !
+    ! stencil_size = 3
+    ! a = (stencil_size-1)/2
+    ! stencil(-a:+a) = (/ 1.0_rk/4.0_rk, -1.0_rk/2.0_rk, 1.0_rk/4.0_rk /)
 
     length = order/2
     if (allocated(stencil)) then

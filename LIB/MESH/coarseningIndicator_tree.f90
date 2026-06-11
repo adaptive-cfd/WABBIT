@@ -54,6 +54,8 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! we do not reset the refinement status)
     if (indicator == 'nothing (external)') return
 
+    ! reset refinement status to "stay" on all active blocks
+    ! caution: if the code will ever be adapted again to not work on whole tree then this needs to be adapted
     if( indicator /= 'undo_refinement') then
         ! The inidicator "undo_refinement" does pretty much what it says: If the grid has previously been refined, newly created
         ! blocks have the status REF_FRESHLY_REFINED. Those blocks are coarsened again if "undo_refinement" is used. Useful

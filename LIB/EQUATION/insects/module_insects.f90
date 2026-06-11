@@ -234,6 +234,15 @@ module module_insects
       character(len=clong) :: smoothing_thickness = "global", wing_file_type(1:4) = "fourier"
       logical :: corrugated(1:4) = .false.
       real(kind=rk) :: corrugation_array_bbox(1:4,1:4)
+      !KVN-2025>>>>>
+      ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+      logical :: deformable(1:4) = .false.
+      real(kind=rk) :: deformation_array_bbox(1:4,1:4)
+      !KVN-2025<<<<<
+      ! stuff for bristles
+      !KVN-2025>>>>>
+      logical :: bristles3D(1:4) = .false.
+      !KVN-2025<<<<<
       logical :: bristles(1:4) = .false.
       logical :: bristles_simplex(1:4) = .false.
       integer :: n_bristles(1:4)
@@ -393,6 +402,39 @@ contains
                deallocate(profile_tmp)
             endif
          endif
+       !KVN-2025>>>>>
+       ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+       case ("deformations")
+         if (.not.allocated(deformations)) then
+            allocate(deformations(1:a,1:b,1:4))
+         else
+            a_old = size(deformations,1)
+            b_old = size(deformations,2)
+            if ( (a_old<a) .or. (b_old<b) ) then
+               allocate(profile_tmp(1:a_old,1:b_old,1:4))
+               profile_tmp(:,:,:) = deformations(:,:,:)
+               deallocate(deformations)
+               allocate(deformations(1:a,1:b,1:4))
+               deformations(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               deallocate(profile_tmp)
+            endif
+         endif
+       case ("deformation_profile")
+         if (.not.allocated(deformation_profile)) then
+            allocate(deformation_profile(1:a,1:b,1:4))
+         else
+            a_old = size(deformation_profile,1)
+            b_old = size(deformation_profile,2)
+            if ( (a_old<a) .or. (b_old<b) ) then
+               allocate(profile_tmp(1:a_old,1:b_old,1:4))
+               profile_tmp(:,:,:) = deformation_profile(:,:,:)
+               deallocate(deformation_profile)
+               allocate(deformation_profile(1:a,1:b,1:4))
+               deformation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               deallocate(profile_tmp)
+            endif
+         endif
+         !KVN-2025<<<<<
        case ("damage_mask")
          if (.not.allocated(Insect%damage_mask)) then
             allocate(Insect%damage_mask(1:a,1:b,1:4))

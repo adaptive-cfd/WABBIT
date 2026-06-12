@@ -116,6 +116,8 @@ contains
         ! setup interpolation coefficients
         ! All orders from Taylor expansion
         ! Order 1-8 verified with Deriaz. JCP2023
+        ! Why is this done every time? For the poisson solver, we really need this to be variable: the prediction order needs to 
+        ! be R+2 with R the order of the FD approx. For the wavelets, we always use the same predictor.
         select case(order_predictor)
         case ("multiresolution_2nd")
             allocate(c(1:2))

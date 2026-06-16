@@ -121,7 +121,7 @@ end function signed_distance_cylinder_3D
 !! Assumptions (for performance):
 !! - `x1` and `x2` are distinct (so `axis_len2 > 0`). No degenerate check.
 !-------------------------------------------------------------------------------
-function signed_distance_capsule_3D(point, x1, x2, radius, ba_in, baba_in) result(dist)
+function signed_distance_cylinder_rounded_3D(point, x1, x2, radius, ba_in, baba_in) result(dist)
     implicit none
     real(kind=rk), dimension(3), intent(in) :: point, x1, x2
     real(kind=rk), intent(in) :: radius
@@ -145,4 +145,4 @@ function signed_distance_capsule_3D(point, x1, x2, radius, ba_in, baba_in) resul
     proj = dot_product(point_rel, axis) / axis_len2
     proj = max(0.0_rk, min(1.0_rk, proj))  ! clamp to [0,1] to stay within the segment
     dist = norm2_3d(point_rel - proj * axis) - radius
-end function signed_distance_capsule_3D
+end function signed_distance_cylinder_rounded_3D

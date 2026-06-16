@@ -18,6 +18,7 @@ subroutine draw_active_grid_winglets(time, Insect_id, xx0, ddx, mask, mask_color
 
     Insects(Insect_id)%smooth = Insects(Insect_id)%C_smooth*maxval(ddx)
     if (Insects(Insect_id)%smoothing_type == "hester") then
+        Insects(Insect_id)%smooth = Insects(Insect_id)%epsilon_hester
         Insects(Insect_id)%safety = max(5.0_rk*Insects(Insect_id)%epsilon_hester, 2*maxval(ddx))
     else
         Insects(Insect_id)%safety = 3.5_rk*Insects(Insect_id)%smooth

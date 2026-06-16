@@ -63,6 +63,7 @@ program main
     ! some variables, loop, debug information and more
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, mpicode, Jmin1, Jmax1
     character(len=2*clong)              :: write_statement  ! dynamically build the output lengths
+    character(len=cshort)               :: tfile_headers(1:100)
     character(len=8)                    :: date_now
     character(len=10)                   :: time_now
     ! cpu time variables for running time calculation
@@ -214,18 +215,39 @@ program main
 
     ! a few files have to be intialized by wabbit, because they are logfiles produced
     ! by wabbit independent of the physics modules.
-    call init_t_file('dt.t', overwrite, (/ "           time", "             dt" /))
-    call init_t_file('performance.t', overwrite, (/ "           time", "      iteration", "      t_stepper", "   N_blocks_rhs", "       N_blocks", &
-        "           Jmin", "           Jmax", "        N_procs", " N_blocks_total" /))
+    tfile_headers(1) = "time"
+    tfile_headers(2) = "dt"
+    call init_t_file('dt.t', overwrite, tfile_headers(1:2) )
+    tfile_headers(2) = "iteration"
+    tfile_headers(3) = "t_stepper"
+    tfile_headers(4) = "N_blocks_rhs"
+    tfile_headers(5) = "N_blocks"
+    tfile_headers(6) = "Jmin"
+    tfile_headers(7) = "Jmax"
+    tfile_headers(8) = "N_procs"
+    tfile_headers(9) = "N_blocks_total"
+    call init_t_file('performance.t', overwrite, tfile_headers(1:9) )
     call init_t_file('eps_norm.t', overwrite)
-    call init_t_file('krylov_err.t', overwrite, (/ "           time", "             dt", "            err", "         M_iter", "          M_max" /))
-    call init_t_file('block_xfer.t', overwrite, (/ "             t0", "        counter", "    Nxfer_total", "     Nxfer_done", "Nxfer_notPosNow" /))
+    tfile_headers(2) = "dt"
+    tfile_headers(3) = "err"
+    tfile_headers(4) = "M_iter"
+    call init_t_file('krylov_err.t', overwrite, tfile_headers(1:4) )
+    tfile_headers(1) = "t0"
+    tfile_headers(2) = "counter"
+    tfile_headers(3) = "Nxfer_total"
+    tfile_headers(4) = "Nxfer_done"
+    tfile_headers(5) = "Nxfer_notPosNow"
+    call init_t_file('block_xfer.t', overwrite, tfile_headers(1:5) )
     call init_t_file('thresholding.t', overwrite)
 
     call init_probes_file(params, overwrite)
 
     if (params%physics_type == "NSPP" .or. params%inicond_helmholtz_projection .or. params%inicond_vorticity_formulation .or. params%inicond_pressure_from_velocity ) then
-        call init_t_file('poisson_solver.t', overwrite, (/ "           time", "        i_cycle", "  residual_Linf", "   residual_rel" /))
+        tfile_headers(1) = "time"
+        tfile_headers(2) = "i_cycle"
+        tfile_headers(3) = "residual_Linf"
+        tfile_headers(4) = "residual_rel"
+        call init_t_file('poisson_solver.t', overwrite, tfile_headers(1:4) )
     endif
 
     if (rank==0) then

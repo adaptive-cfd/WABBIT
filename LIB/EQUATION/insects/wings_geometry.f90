@@ -35,6 +35,7 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
         mask_color = 0
     else
         ! for the fixed-grid codes, delete only the body.
+        ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
         where (mask_color==Insect%color_r .or. mask_color==Insect%color_l .or. &
                 mask_color==Insect%color_r2 .or. mask_color==Insect%color_l2)
             mask = 0.00_rk
@@ -64,6 +65,7 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
   if (Insect%smoothing_thickness=="local" .or. .not. grid_time_dependent) then
     Insect%smooth = Insect%C_smooth*maxval(ddx)
     if (Insect%smoothing_type == "hester") then
+        Insect%smooth = Insect%epsilon_hester
         Insect%safety = max(5.0_rk*Insect%epsilon_hester, 2*maxval(ddx))
     else
         Insect%safety = 3.5_rk*Insect%smooth
@@ -109,6 +111,7 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect, delet
 
             c = mask_color(ix,iy,iz)
             ! skip all parts that do not belong to the wings (ie they have a different color)
+            ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
             if (c==Insect%color_l .or. c==Insect%color_r .or. &
                 c==Insect%color_l2 .or. c==Insect%color_r2 ) then
 
@@ -294,7 +297,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                           !-- get smooth (radial) step function
                           R = dsqrt ( (x_wing(1)-Insect%xc(wingID))**2 + (x_wing(2)-Insect%yc(wingID))**2 )
-                          R_tmp = step_cosine(R,R0, Insect%smooth)
+                          R_tmp = step(R,R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
 
                           ! wing corrugation (i.e. deviation from a flat plate)
                           if ( Insect%corrugated(wingID) ) then
@@ -329,7 +332,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                               D = 1.0_rk
                           endif
 
-                          z_tmp = step_cosine( dabs(x_wing(3)-zz0), 0.5_rk*t, Insect%smooth )
+                          z_tmp = step( dabs(x_wing(3)-zz0), 0.5_rk*t, Insect%smooth, Insect%safety, Insect%smoothing_type_int )
                           ! mask function approximated as product of 1D mask functions:
                           mask_tmp = z_tmp*R_tmp*D
 
@@ -446,19 +449,19 @@ subroutine draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_win
                       if ((x_wing(1)>-c_membrane/2.0-s).and.(x_wing(1)<c_membrane/2.0+s)) then
                           !-- smooth length
                           if (x_wing(2)<0.0_rk) then  ! xs is chordlength coordinate
-                              y_tmp = step_cosine(-x_wing(2), 0.0_rk, Insect%smooth)
+                              y_tmp = step(-x_wing(2), 0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                           else
-                              y_tmp = step_cosine( x_wing(2), L_membrane, Insect%smooth)
+                              y_tmp = step( x_wing(2), L_membrane, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                           endif
 
                           !-- smooth height
-                          z_tmp = step_cosine(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+                          z_tmp = step(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
                           !-- smooth shape
                           if (x_wing(1)<0.0_rk) then
-                              x_tmp = step_cosine(-x_wing(1), c_membrane/2.0, Insect%smooth)
+                              x_tmp = step(-x_wing(1), c_membrane/2.0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                           else
-                              x_tmp = step_cosine( x_wing(1), c_membrane/2.0, Insect%smooth)
+                              x_tmp = step( x_wing(1), c_membrane/2.0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                           endif
 
                           mask_tmp = z_tmp*y_tmp*x_tmp
@@ -584,7 +587,7 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
                             
                             !-- get smooth rectangular function
                             R = dabs ( x_wing(1) - 0.5*(xte+xle) )
-                            R_tmp = step_cosine(R, R0, Insect%smooth)
+                            R_tmp = step(R, R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             
                             ! wing corrugation (i.e. deviation from a flat plate)
                             if ( Insect%corrugated(wingID) ) then
@@ -663,7 +666,7 @@ subroutine draw_blade_fourier(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
                                 t = Insect%WingThickness
                             endif
                             
-                            z_tmp = step_cosine( dabs(x_wing(3)-zz0), 0.5_rk*t, Insect%smooth ) ! thickness
+                            z_tmp = step( dabs(x_wing(3)-zz0), 0.5_rk*t, Insect%smooth, Insect%safety, Insect%smoothing_type_int ) ! thickness
                             mask_tmp = z_tmp*R_tmp
                             
                             !-----------------------------------------
@@ -909,19 +912,19 @@ subroutine draw_wing_suzuki(xx0, ddx, mask, mask_color, us,Insect,color_wing,win
                         if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
                             !-- smooth length
                             if ( x_wing(2) < 0.5_rk*(y_left+y_right) ) then
-                                y_tmp = step_cosine(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth)
+                                y_tmp = step(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                y_tmp = step_cosine( (x_wing(2)-y_left), y_right-y_left, Insect%smooth)
+                                y_tmp = step( (x_wing(2)-y_left), y_right-y_left, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             !-- smooth height
-                            z_tmp = step_cosine(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+                            z_tmp = step(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
                             !-- smooth shape
                             if (x_wing(1) < 0.0_rk) then
-                                x_tmp = step_cosine(-x_wing(1),-x_bot, Insect%smooth)
+                                x_tmp = step(-x_wing(1),-x_bot, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                x_tmp = step_cosine( x_wing(1), x_top, Insect%smooth)
+                                x_tmp = step( x_wing(1), x_top, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             mask_tmp = z_tmp*y_tmp*x_tmp
@@ -1002,19 +1005,19 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                         if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
                             !-- smooth length
                             if ( x_wing(2) < 0.5_rk*(y_left+y_right) ) then
-                                y_tmp = step_cosine(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth)
+                                y_tmp = step(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                y_tmp = step_cosine( (x_wing(2)-y_left), y_right-y_left, Insect%smooth)
+                                y_tmp = step( (x_wing(2)-y_left), y_right-y_left, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             !-- smooth height
-                            z_tmp = step_cosine(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+                            z_tmp = step(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
                             !-- smooth shape
                             if (x_wing(1)<0.0_rk) then
-                                x_tmp = step_cosine(-x_wing(1),-x_bot, Insect%smooth)
+                                x_tmp = step(-x_wing(1),-x_bot, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                x_tmp = step_cosine( x_wing(1), x_top, Insect%smooth)
+                                x_tmp = step( x_wing(1), x_top, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             mask_tmp = z_tmp*y_tmp*x_tmp
@@ -1095,19 +1098,19 @@ subroutine draw_wing_rectangular_suzuki_butterfly(xx0, ddx, mask, mask_color, us
                         if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
                             !-- smooth length
                             if ( x_wing(2) < 0.5_rk*(y_left+y_right) ) then
-                                y_tmp = step_cosine(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth)
+                                y_tmp = step(-(x_wing(2)-y_left), 0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                y_tmp = step_cosine( (x_wing(2)-y_left), y_right-y_left, Insect%smooth)
+                                y_tmp = step( (x_wing(2)-y_left), y_right-y_left, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             !-- smooth height
-                            z_tmp = step_cosine(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+                            z_tmp = step(dabs(x_wing(3)), 0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
                             !-- smooth shape
                             if (x_wing(1)<0.0_rk) then
-                                x_tmp = step_cosine(-x_wing(1),-x_bot, Insect%smooth)
+                                x_tmp = step(-x_wing(1),-x_bot, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             else
-                                x_tmp = step_cosine( x_wing(1), x_top, Insect%smooth)
+                                x_tmp = step( x_wing(1), x_top, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                             endif
 
                             mask_tmp = z_tmp*y_tmp*x_tmp
@@ -1198,19 +1201,19 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
             if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
               !-- smooth length
               if (x_wing(2)<0.0_rk) then  ! xs is chordlength coordinate
-                y_tmp = step_cosine(-x_wing(2),0.0_rk, Insect%smooth)
+                y_tmp = step(-x_wing(2),0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               else
-                y_tmp = step_cosine( x_wing(2),1.0_rk, Insect%smooth)
+                y_tmp = step( x_wing(2),1.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               endif
 
               !-- smooth height
-              z_tmp = step_cosine(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+              z_tmp = step(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
               !-- smooth shape
               if (x_wing(1)<0.0_rk) then
-                x_tmp = step_cosine(-x_wing(1),-x_bot, Insect%smooth)
+                x_tmp = step(-x_wing(1),-x_bot, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               else
-                x_tmp = step_cosine( x_wing(1), x_top, Insect%smooth)
+                x_tmp = step( x_wing(1), x_top, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               endif
 
               mask_tmp = z_tmp*y_tmp*x_tmp
@@ -1296,19 +1299,19 @@ subroutine draw_wing_mosquito(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
             if ((x_wing(1)>x_bot-Insect%safety).and.(x_wing(1)<x_top+Insect%safety)) then
               !-- smooth length
               if (x_wing(2)<0.0_rk) then  ! xs is chordlength coordinate
-                y_tmp = step_cosine(-x_wing(2),0.0_rk, Insect%smooth)
+                y_tmp = step(-x_wing(2),0.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               else
-                y_tmp = step_cosine( x_wing(2),1.0_rk, Insect%smooth)
+                y_tmp = step( x_wing(2),1.0_rk, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               endif
 
               !-- smooth height
-              z_tmp = step_cosine(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+              z_tmp = step(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
               !-- smooth shape
               if (x_wing(1)<0.0_rk) then
-                x_tmp = step_cosine(-x_wing(1),-x_bot, Insect%smooth)
+                x_tmp = step(-x_wing(1),-x_bot, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               else
-                x_tmp = step_cosine( x_wing(1), x_top, Insect%smooth)
+                x_tmp = step( x_wing(1), x_top, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
               endif
 
               mask_tmp = z_tmp*y_tmp*x_tmp
@@ -1396,6 +1399,7 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
                           !-----------------------------------------
                           ! set new value for solid velocity us
                           !-----------------------------------------
+                          ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
                           if ( (mask(ix,iy,iz)>0.0).and.(mask_color(ix,iy,iz)==color_wing) ) then
                               !------------------------------------------------
                               ! solid body rotation
@@ -2611,7 +2615,7 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
                     R = sqrt( sum(vp**2) / sum(u**2) )
 
                     if (R <= R0+safety) then
-                        t = step_cosine(R, R0, Insect%smooth)
+                        t = step(R, R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                         if (t >= mask(ix,iy,iz)) then
 
                             mask(ix,iy,iz) = t
@@ -2674,7 +2678,7 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
                 ! compute radius
                 R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
                 if ( R <= R0+Insect%safety ) then
-                    t = step_cosine(R, R0, Insect%smooth)
+                    t = step(R, R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                     if ( t >= mask(ix,iy,iz) ) then
                         ! set new value
                         mask(ix,iy,iz) = t
@@ -2736,7 +2740,7 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
                 ! compute radius
                 R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
                 if ( R <= R0+Insect%safety ) then
-                    t = step_cosine(R, R0, Insect%smooth)
+                    t = step(R, R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int)
                     if ( t >= mask(ix,iy,iz) ) then
                         ! set new value
                         mask(ix,iy,iz) = t
@@ -2830,7 +2834,7 @@ subroutine draw_trianglular_prism(xx0, ddx, mask, mask_color, us,Insect,color_wi
                       if ( (v1==1) .and. (v2==1) .and. (v3==1) ) then
 
                            !-- smooth height
-                           mask_tmp = step_cosine(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth) ! thickness
+                           mask_tmp = step(dabs(x_wing(3)),0.5_rk*Insect%WingThickness, Insect%smooth, Insect%safety, Insect%smoothing_type_int) ! thickness
 
                            if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0_rk)) then
                                mask(ix,iy,iz) = mask_tmp

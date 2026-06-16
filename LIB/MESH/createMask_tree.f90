@@ -16,6 +16,8 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     t_cycle = MPI_wtime()
     Bs      = params%Bs
     g       = params%g
+    x0       = 0.0_rk
+    dx       = 0.0_rk
     Jactive = maxActiveLevel_tree(tree_ID_flow)
     Jmax    = params%Jmax
     tree_n  = params%forest_size ! used only for resetting at this point

@@ -87,24 +87,25 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
         else
             name = params_acm%names(k)
         endif
-        select case(name)
-        case('ux', 'Ux', 'UX')
+        ! names have to be standardized here, meaning all lower-case and no "_"
+        select case(trim(standardize_string(name)))
+        case('ux')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,1)
 
-        case('uy', 'Uy', 'UY')
+        case('uy')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,2)
 
-        case('uz', 'Uz', 'UZ')
+        case('uz')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,3)
 
-        case('p', 'P')
+        case('p')
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor', 'vort', 'Vor', 'Vort', 'vorticity', 'Vorticity')
+        case('vor', 'vort', 'vorticity')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
@@ -116,7 +117,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
             call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
-        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
+        case('vorx', 'vory', 'vorz', 'vorabs')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
@@ -128,15 +129,15 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
             call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! for different components y,z we need to copy the desired one to the first position
-            if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
+            if (trim(standardize_string(name)) == 'vory') then
                 work(:,:,:,k) = work(:,:,:,k+1)
-            elseif (name == 'vorz' .or. name == 'Vorz' .or. name == 'VorZ') then
+            elseif (trim(standardize_string(name)) == 'vorz') then
                 work(:,:,:,k) = work(:,:,:,k+2)
-            elseif (name=='vorabs' .or. name=='Vorabs' .or.name=='VorAbs' .or. name=='vor-abs' .or. name=='Vor-abs' .or. name=='Vor-Abs') then
+            elseif (trim(standardize_string(name)) == 'vorabs') then
                 work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
         
-        case('helx', 'Helx', 'HelX', 'hely', 'Hely', 'HelY', 'helz', 'Helz', 'HelZ', 'helabs', 'Helabs', 'HelAbs', 'hel-abs', 'Hel-abs', 'Hel-Abs')
+        case('helx', 'hely', 'helz', 'helabs', 'hel-abs')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity for helicity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
@@ -150,11 +151,11 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
             ! compute by velocity to get local helicity
             work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
             ! for different components y,z we need to copy the desired one to the first position
-            if (name == 'hely' .or. name == 'Hely' .or. name == 'HelY') then
+            if (trim(standardize_string(name)) == 'hely') then
                 work(:,:,:,k) = work(:,:,:,k+1)
-            elseif (name == 'helz' .or. name == 'Helz' .or. name == 'HelZ') then
+            elseif (trim(standardize_string(name)) == 'helz') then
                 work(:,:,:,k) = work(:,:,:,k+2)
-            elseif (name=='helabs' .or. name=='Helabs' .or.name=='HelAbs' .or. name=='hel-abs' .or. name=='Hel-abs' .or. name=='Hel-Abs') then
+            elseif (trim(standardize_string(name)) == 'helabs' .or. trim(standardize_string(name)) == 'hel-abs') then
                 work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
 
@@ -166,15 +167,15 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
             ! local dissipation rate computed over velocity weighted laplacian
             call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
         
-        case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
-            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz', &
-            'pdx', 'Pdx', 'pdy', 'Pdy', 'pdz', 'Pdz')
+        case('gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', &
+            'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', &
+            'pdx', 'pdy', 'pdz')
             ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
-            if (INDEX(name, 'x') > 0) then
+            if (INDEX(trim(standardize_string(name)), 'x') > 0) then
                 call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k))
-            elseif (INDEX(name, 'y') > 0) then
+            elseif (INDEX(trim(standardize_string(name)), 'y') > 0) then
                 call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k))
-            elseif (INDEX(name, 'z') > 0) then
+            elseif (INDEX(trim(standardize_string(name)), 'z') > 0) then
                 if (params_acm%dim == 3) then
                     call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k))
                 else
@@ -280,18 +281,18 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, name
         end select
 
 
-        if (name(1:6) == "scalar") then
+        if (trim(standardize_string(name(1:6))) == "scalar") then
             ! check if the 7th character is actually a digit
-            if (.not. (name(7:7) >= '0' .and. name(7:7) <= '9')) then
-                call abort(250920, "ERROR: PREPARE_SAVE_DATA_ACM: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//name(7:7)//"' at position 7.")
+            if (.not. (trim(standardize_string(name(7:7))) >= '0' .and. trim(standardize_string(name(7:7))) <= '9')) then
+                call abort(250920, "ERROR: PREPARE_SAVE_DATA_ACM: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//trim(standardize_string(name(7:7)))//"' at position 7.")
             end if
             read( name(7:7), * ) iscalar
             work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
         endif
 
         ! if any of those endings is in the name, then it is a timestatistics variable
-        if (index(name, "-avg") > 0 .or. index(name, "-var") > 0 .or. index(name, "-minmax") > 0 &
-            .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
+        if (index(trim(standardize_string(name)), "-avg") > 0 .or. index(trim(standardize_string(name)), "-var") > 0 .or. index(trim(standardize_string(name)), "-minmax") > 0 &
+            .or. index(trim(standardize_string(name)), "-min") > 0 .or. index(trim(standardize_string(name)), "-max") > 0 .or. index(trim(standardize_string(name)), "-cov") > 0) then
             ! now we have to find the index of it
             do i_time_statistics = 1, params_acm%N_time_statistics
                 if (name == trim(params_acm%time_statistics_names(i_time_statistics))) exit

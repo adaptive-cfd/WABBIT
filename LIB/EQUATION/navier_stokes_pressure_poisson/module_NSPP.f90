@@ -13,7 +13,7 @@ module module_nspp
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, compute_divergence, compute_derivative, compute_dissipation, compute_gradient, compute_laplacian, subtract_scalar_gradient
-  use module_helpers, only : startup_conditioner, step_cosine, random_data, fseries_eval, dump_block_fancy, dump_block
+  use module_helpers
   use module_timing
   use module_geometry
 
@@ -57,11 +57,15 @@ module module_nspp
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
+    ! this is the force and moment that is applied on the insect from the fluid, it will be computed during RHS computations
+    ! as it is computed by the physics module, it was designed to be a member of the physics module at first
+    ! ToDo: the insects should contain the information themselves
     real(kind=rk), allocatable :: force_insect_g(:, :), moment_insect_g(:, :)
     ! nu
     real(kind=rk) :: nu
     real(kind=rk) :: dx_min = -1.0_rk
-    ! forces for the different colors
+    ! Forces for the different colors
+    ! These are computed and used only in statistics output
     real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:)
     logical :: penalization, compute_flow=.true.
     ! sponge term:
@@ -131,6 +135,7 @@ module module_nspp
     real(kind=rk) :: R0, R1, R2
     character(len=clong) :: file_usx, file_usy, file_usp
     character(len=cshort) :: smoothing_type
+    integer(kind=ik) :: smoothing_type_int
     real(kind=rk) :: smoothing_width, smoothing_safety
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
@@ -283,7 +288,10 @@ contains
         params_nspp%geometry_string = ""
         call read_param_mpi(FILE, 'VPM', 'geometry_files', params_nspp%geometry_files, defaultvalue=params_nspp%geometry_files )
         call read_param_mpi(FILE, 'VPM', 'geometry_string', params_nspp%geometry_string, defaultvalue=params_nspp%geometry_string )
-        params_nspp%geometry_colors(:) = 1
+        ! colors default to increasing from 0
+        do i=1,params_nspp%n_geometries
+            params_nspp%geometry_colors(i) = i - 1
+        enddo
         call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_nspp%geometry_colors, defaultvalue=params_nspp%geometry_colors )
     endif
     
@@ -303,6 +311,16 @@ contains
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_nspp%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_nspp%file_usp, 'none')
     call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_nspp%smoothing_type, 'cos')
+    select case(params_nspp%smoothing_type)
+        case("cos", "cosine")
+            params_nspp%smoothing_type_int = STEP_METHOD_COSINE
+        case("hester")
+            params_nspp%smoothing_type_int = STEP_METHOD_HESTER
+        case("dis", "disc", "discontinuous")
+            params_nspp%smoothing_type_int = STEP_METHOD_DISC
+        case default
+            call abort(62371118, "unknown smoothing type: "//params_nspp%smoothing_type)
+    end select
 
     ! stuff for channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_nspp%use_channel_forcing, .false. )
@@ -503,10 +521,10 @@ contains
             call get_insect_id( i, insect_id )
             if (params_nspp%set_mask_on_ghost_nodes) then
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=0)
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=0, colors_default=(/params_nspp%n_geometries + 5*insect_id,params_nspp%n_geometries+1+5*insect_id,params_nspp%n_geometries+2+5*insect_id,params_nspp%n_geometries+3+5*insect_id,params_nspp%n_geometries+4+5*insect_id, params_nspp%geometry_colors(i)/))
             else
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=g)
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=g, colors_default=(/params_nspp%n_geometries + 5*insect_id,params_nspp%n_geometries+1+5*insect_id,params_nspp%n_geometries+2+5*insect_id,params_nspp%n_geometries+3+5*insect_id,params_nspp%n_geometries+4+5*insect_id, params_nspp%geometry_colors(i)/))
             endif
 
             ! compute maximum color
@@ -705,7 +723,7 @@ contains
       logical, intent(in) :: overwrite
       logical :: is_insect, has_two_wings
       integer :: i_insect, i_color
-      character(len=15) :: headers(1:100)  ! we can use this to create headers
+      character(len=cshort) :: headers(1:100)  ! we can use this to create headers
 
       is_insect = .false.
       if (any(params_nspp%geometries(:) == "Insect").or.any(params_nspp%geometries(:)=="active_grid") &
@@ -716,17 +734,25 @@ contains
         has_two_wings = has_two_wings .or. (insects(i_insect)%second_wing_pair)
       enddo
 
-
+      headers(1) = "time"
 
       call init_t_file('meanflow.t', overwrite)
-      call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin"/))
-      call init_t_file('enstrophy.t', overwrite, (/"           time", "      enstrophy", "     max(omega)"/))
+      headers(2) = "e_kin"
+      call init_t_file('e_kin.t', overwrite, headers(1:2))
+      headers(2) = "enstrophy"
+      headers(3) = "max(omega)"
+      call init_t_file('enstrophy.t', overwrite, headers(1:3))
       if (params_nspp%dim == 3) then
-        call init_t_file('helicity.t', overwrite, (/"           time", "       helicity"/))
+        headers(2) = "helicity"
+        call init_t_file('helicity.t', overwrite, headers(1:2))
       endif
-      call init_t_file('dissipation.t', overwrite, (/"           time", " nu u laplace u"/))
-      call init_t_file('div.t', overwrite,  (/"           time", "       max(div)", "       min(div)"/))
-      call init_t_file('umag.t', overwrite, (/"           time", "       max(|u|)"/))
+      headers(2) = "nu u laplace u"
+      call init_t_file('dissipation.t', overwrite, headers(1:2))
+      headers(2) = "max(div)"
+      headers(3) = "min(div)"
+      call init_t_file('div.t', overwrite,  headers(1:3))
+      headers(2) = "max(|u|)=um"
+      call init_t_file('umag.t', overwrite, headers(1:2))
       if (params_nspp%HIT_linear_forcing) then
         call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
@@ -746,16 +772,16 @@ contains
         ! dynamic initialization of force array so that it makes sense
         headers(1) = "           time"
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "   c", i_color, ":force_X"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "   c", i_color, ":force_Y"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "   c", i_color, ":force_Z"
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":force_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":force_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":force_Z"
         enddo
         call init_t_file('forces_color.t', overwrite, headers(1:3*ncolors+1) )
         headers(1) = "           time"
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "  c", i_color, ":moment_X"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "  c", i_color, ":moment_Y"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "  c", i_color, ":moment_Z"
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":moment_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":moment_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":moment_Z"
         enddo
         call init_t_file('moments_color.t', overwrite, headers(1:3*ncolors+1) )
 
@@ -765,8 +791,8 @@ contains
             ! headers for aero power file
             headers(1) = "           time"
             do i_insect = 1, n_insects
-                write(headers((i_insect-1)*2 + 2),"(A,i0.2,A)") "       I", i_insect, ":apow"
-                write(headers((i_insect-1)*2 + 3),"(A,i0.2,A)") "       I", i_insect, ":ipow"
+                write(headers((i_insect-1)*2 + 2),"(A,i0.2,A)") "I", i_insect, ":apow"
+                write(headers((i_insect-1)*2 + 3),"(A,i0.2,A)") "I", i_insect, ":ipow"
             enddo
             call init_t_file('aero_power.t', overwrite, headers(1:2*n_insects+1) )
 
@@ -780,29 +806,29 @@ contains
             ! headers for state vector file
             headers(1) = "           time"
             do i_insect = 1, n_insects
-                write(headers((i_insect-1)*23 + 2),"(A,i0.2,A)") "      I", i_insect, ":x-pos"
-                write(headers((i_insect-1)*23 + 3),"(A,i0.2,A)") "      I", i_insect, ":y-pos"
-                write(headers((i_insect-1)*23 + 4),"(A,i0.2,A)") "      I", i_insect, ":z-pos"
-                write(headers((i_insect-1)*23 + 5),"(A,i0.2,A)") "      I", i_insect, ":x-vel"
-                write(headers((i_insect-1)*23 + 6),"(A,i0.2,A)") "      I", i_insect, ":y-vel"
-                write(headers((i_insect-1)*23 + 7),"(A,i0.2,A)") "      I", i_insect, ":z-vel"
-                write(headers((i_insect-1)*23 + 8),"(A,i0.2,A)") "    I", i_insect, ":q1-body"
-                write(headers((i_insect-1)*23 + 9),"(A,i0.2,A)") "    I", i_insect, ":q2-body"
-                write(headers((i_insect-1)*23 + 10),"(A,i0.2,A)") "    I", i_insect, ":q3-body"
-                write(headers((i_insect-1)*23 + 11),"(A,i0.2,A)") "    I", i_insect, ":q4-body"
-                write(headers((i_insect-1)*23 + 12),"(A,i0.2,A)") "   I", i_insect, ":w-x-body"
-                write(headers((i_insect-1)*23 + 13),"(A,i0.2,A)") "   I", i_insect, ":w-y-body"
-                write(headers((i_insect-1)*23 + 14),"(A,i0.2,A)") "   I", i_insect, ":w-z-body"
-                write(headers((i_insect-1)*23 + 15),"(A,i0.2,A)") "       I", i_insect, ":q1-l"
-                write(headers((i_insect-1)*23 + 16),"(A,i0.2,A)") "       I", i_insect, ":q2-l"
-                write(headers((i_insect-1)*23 + 17),"(A,i0.2,A)") "       I", i_insect, ":q3-l"
-                write(headers((i_insect-1)*23 + 18),"(A,i0.2,A)") "       I", i_insect, ":q4-l"
-                write(headers((i_insect-1)*23 + 19),"(A,i0.2,A)") "      I", i_insect, ":w-x-l"
-                write(headers((i_insect-1)*23 + 20),"(A,i0.2,A)") "      I", i_insect, ":w-y-l"
-                write(headers((i_insect-1)*23 + 21),"(A,i0.2,A)") "      I", i_insect, ":w-z-l"
-                write(headers((i_insect-1)*23 + 22),"(A,i0.2,A)") "  I", i_insect, ":force-g-x"
-                write(headers((i_insect-1)*23 + 23),"(A,i0.2,A)") "  I", i_insect, ":force-g-y"
-                write(headers((i_insect-1)*23 + 24),"(A,i0.2,A)") "  I", i_insect, ":force-g-z"
+                write(headers((i_insect-1)*23 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                write(headers((i_insect-1)*23 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                write(headers((i_insect-1)*23 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                write(headers((i_insect-1)*23 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                write(headers((i_insect-1)*23 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                write(headers((i_insect-1)*23 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                write(headers((i_insect-1)*23 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
+                write(headers((i_insect-1)*23 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
+                write(headers((i_insect-1)*23 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
+                write(headers((i_insect-1)*23 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
+                write(headers((i_insect-1)*23 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
+                write(headers((i_insect-1)*23 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
+                write(headers((i_insect-1)*23 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
+                write(headers((i_insect-1)*23 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
+                write(headers((i_insect-1)*23 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
+                write(headers((i_insect-1)*23 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
+                write(headers((i_insect-1)*23 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
+                write(headers((i_insect-1)*23 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
+                write(headers((i_insect-1)*23 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
+                write(headers((i_insect-1)*23 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
+                write(headers((i_insect-1)*23 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
+                write(headers((i_insect-1)*23 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
+                write(headers((i_insect-1)*23 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
             enddo
             call init_t_file('insect_state_vector.t', overwrite, headers(1:23*n_insects+1) )
 
@@ -827,7 +853,7 @@ contains
   end subroutine INITIALIZE_ASCII_FILES_NSPP
 
 
-  !> In geometry string, we might have [composition, insect, composition, insect].
+  !> In geometry string, we might have [primitives-collection, insect, primitives-collection, insect].
   !! Now, when looping over all geometries, we want to now that geometry 4 corresponds to the second insect.
   !! This routine does exactly that.
   subroutine get_insect_id(i_geom, insect_id)

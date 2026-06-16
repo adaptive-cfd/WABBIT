@@ -293,14 +293,16 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
                         ! moments. For insects, we compute the total moment wrt to the body center, and
                         ! the wing moments wrt to the hinge points. The latter two are used to compute the
                         ! aerodynamic power. Makes sense only in 3D.
-                        ! ToDo: This is currently only for one insect and assumes all color values
-                        ! Better would be to loop over all insects and check if color belongs to it, then add it to the Geometry color (that is independent of the actual insect colors?)
-                        ! However, then we need geometry_id, insect_id and check all insect colors, yikes
-                        if ((is_insect).and.(color>0_2 .and. color < 6_2)) then ! Insect has colors (1,2,3,4,5) at most
-                            ! in the zeroth color, we compute the total moment for the whole
-                            ! insect wrt the center point (body+wings)
-                            x_lev(1:3) = (/x, y, z/) - insects(1)%xc_body_g(1:3)
-                            moment_block(:,0)  = moment_block(:,0) - cross(x_lev, penal)
+                        if (is_insect .and. params_nspp%dim == 3) then
+                            do i_insect = 1, n_insects
+                                if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
+                                    ! in the geometry color of the insect, we compute the total force and moment for the whole
+                                    ! insect wrt the center point (body+wings)
+                                    force_block(1:params_nspp%dim, insects(i_insect)%color_geometry) = force_block(1:params_nspp%dim, insects(i_insect)%color_geometry) - penal(1:params_nspp%dim)
+                                    x_lev(1:3) = (/x, y, z/) - Insects(1)%xc_body_g(1:3)
+                                    moment_block(:,insects(i_insect)%color_geometry)  = moment_block(:,insects(i_insect)%color_geometry) - cross(x_lev, penal)
+                                endif
+                            enddo
                         endif
                     enddo
                 enddo

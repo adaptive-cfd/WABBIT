@@ -225,10 +225,10 @@ $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integrat
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_geometry.o: module_geometry.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
-	geometry_primitive_2D.f90 geometry_primitive_3D.f90 geometry_compositions.f90
+	geometry_primitive_2D.f90 geometry_primitive_3D.f90 geometry_primitives_collection.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o $(OBJDIR)/module_helpers.o
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \

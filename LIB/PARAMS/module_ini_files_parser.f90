@@ -17,6 +17,7 @@
 !-------------------------------------------------------------------------------
 module module_ini_files_parser
     use module_globals
+    use module_helpers, only: merge_blanks, str_replace_text
 
     ! it sometimes is useful, for codes with equidistant resolution, to specify
     ! values as multiples of grid spacing, mostly for convergence tests and the like
@@ -1203,10 +1204,11 @@ module module_ini_files_parser
                 if (index(line,'['//trim(adjustl(section))//']')==1) then
                     ! yes, it does
                     foundsection = .true.
-                elseif (line(1:1) == '[') then
-                    ! we're already at the next section mark, so we leave the section we
-                    ! were looking for again
-                    foundsection = .false.
+                elseif (line(1:1) == '[' .and. foundsection) then
+                    ! we're already at the next section mark, so we just left the section we were looking for
+                    ! we assume that no section exists twice, so we can exit now
+                    exit
+                    ! foundsection = .false.
                 endif
 
                 !-- we're inside the section we want
@@ -1468,53 +1470,5 @@ module module_ini_files_parser
                 write(*,'("Reading    ",A,"::",A," as Matrix of size ",i6," x ",i4)') trim(section), trim(keyword), matrixlines, matrixcols
             endif
         end subroutine param_matrix_read
-
-
-
-        ! source: http://fortranwiki.org/fortran/show/String_Functions
-        FUNCTION str_replace_text (strInput, strFind, strReplace)  RESULT(strOutput)
-            CHARACTER(*) :: strInput, strFind, strReplace
-            CHARACTER(LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
-            INTEGER :: i, nt
-
-            ! copy
-            strOutput = strInput
-            nt = LEN(strFind)
-
-            ! loop until you find no more existing instances
-            DO
-                i = INDEX(strOutput, strFind(:nt))
-                IF (i == 0) EXIT ! no more things to replace..
-                ! concatenate output string
-                strOutput = strOutput(:i-1) // strReplace // strOutput(i+nt:)
-            END DO
-        END FUNCTION str_replace_text
-
-
-        !-------------------------------------------------------------------------!
-        !> @brief remove (multiple) blancs as separators in a string
-        subroutine merge_blanks(string_merge)
-            ! this routine removes blanks at the beginning and end of an string
-            ! and multiple blanks which are right next to each other
-
-            implicit none
-            character(len=*), intent(inout) :: string_merge
-            integer(kind=ik) :: i, j, len_str, count
-
-            len_str = len_trim(string_merge)
-            count = 0
-
-            string_merge = string_merge
-            do i=1,len_str-1
-                if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
-                    count = count + 1
-                    string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
-                end if
-            end do
-
-            string_merge = adjustl(string_merge)
-
-        end subroutine merge_blanks
-
 
     end module

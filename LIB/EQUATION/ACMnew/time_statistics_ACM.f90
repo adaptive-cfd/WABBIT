@@ -51,7 +51,7 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
     end if
 
     do i_ts = 1, params_acm%N_time_statistics
-        select case (trim(params_acm%time_statistics_names(i_ts)))
+        select case (trim(standardize_string(params_acm%time_statistics_names(i_ts))))
         case ("ux-avg")
             ! compute the average of ux over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * u(:,:,:,1)
@@ -477,7 +477,7 @@ subroutine find_single_mean_index(current_idx, mean_name, mean_idx)
     
     ! Search for mean name after current index
     do j = current_idx + 1, params_acm%N_time_statistics
-        if (trim(params_acm%time_statistics_names(j)) == trim(mean_name)) then
+        if (trim(standardize_string(params_acm%time_statistics_names(j))) == trim(standardize_string(mean_name))) then
             mean_idx = j
             exit
         end if

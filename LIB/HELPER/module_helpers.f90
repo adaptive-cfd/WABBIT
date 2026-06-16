@@ -20,8 +20,13 @@ module module_helpers
         module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
 
-    ! ! routines of the interface should be private to hide them from outside this module
-    ! private :: step_cosine1, step_cosine2
+    ! routines of the steps wrapper should be private to hide them from outside this module
+    private :: step_cosine2, step_cosine3, step_cosine4, step_hester3, step_hester4, step_disc2, step_disc4
+
+    !> method numbers for step function, used in the wrapper "step"
+    integer, parameter :: STEP_METHOD_COSINE = 1
+    integer, parameter :: STEP_METHOD_HESTER = 2
+    integer, parameter :: STEP_METHOD_DISC   = 3
 
 contains
 
@@ -361,6 +366,29 @@ contains
         return
     end function startup_conditioner
 
+    !==========================================================================
+    !> \brief This subroutine acts as a wrapper for the different step functions
+    function step(x,t,h,safety,method)
+        use module_globals
+        implicit none
+        real(kind=rk), intent(in)  :: x,t,h,safety
+        integer, intent(in) :: method
+        real(kind=rk)              :: step
+
+        select case (method)
+            case (STEP_METHOD_COSINE)
+                step = step_cosine4(x,t,h,safety)
+            case (STEP_METHOD_HESTER)
+                step = step_hester4(x,t,h,safety)
+            case (STEP_METHOD_DISC)
+                step = step_disc4(x,t,h,safety)
+            case default
+                write(*,'("ERROR: method ",I0," not implemented for step function")') method
+                call abort(191919, "Invalid method for step function")
+        end select
+
+    end function step
+
     
     !==========================================================================
     !> \brief This subroutine returns the value f of a smooth step function using a cosine function \n
@@ -382,10 +410,10 @@ contains
         !-------------------------------------------------
         if (delta<=-h) then
             f = 1.0_rk
-        elseif ( -h<delta .and. delta<+h  ) then
-            f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-        else
+        elseif (delta >=+h) then
             f = 0.0_rk
+        else
+            f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
         endif
 
         step_cosine2=f
@@ -408,16 +436,17 @@ contains
         implicit none
         real(kind=rk), intent(in)  :: x,t,h
         real(kind=rk)              :: step_cosine3
-
+        real(kind=rk)              :: x_rel
+        x_rel = x - t
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
-        if (x<=t-h) then
+        if (x_rel<=-h) then
             step_cosine3 = 1.0_rk
-        elseif (((t-h)<x).and.(x<(t+h))) then
-            step_cosine3 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
-        else
+        elseif (x_rel >=+h) then
             step_cosine3 = 0.0_rk
+        else
+            step_cosine3 = 0.5_rk * (1.0_rk + dcos((x_rel+h) * pi / (2.0_rk*h)) )
         endif
 
     end function step_cosine3
@@ -438,16 +467,17 @@ contains
         implicit none
         real(kind=rk), intent(in)  :: x,t,h,safety  ! safety ignored for cosine, has to be h but is passed for interfacing
         real(kind=rk)              :: step_cosine4
-
+        real(kind=rk)              :: x_rel
+        x_rel = x - t
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
-        if (x<=t-h) then
+        if (x_rel<=-h) then
             step_cosine4 = 1.0_rk
-        elseif (((t-h)<x).and.(x<(t+h))) then
-            step_cosine4 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
-        else
+        elseif (x_rel >=+h) then
             step_cosine4 = 0.0_rk
+        else
+            step_cosine4 = 0.5_rk * (1.0_rk + dcos((x_rel+h) * pi / (2.0_rk*h)) )
         endif
 
     end function step_cosine4
@@ -464,17 +494,14 @@ contains
     real(kind=rk) function step_hester3(x, epsilon_hester, safety)
         implicit none
         real(kind=rk), intent(in) :: x, epsilon_hester, safety
-        real(kind=rk) :: xi
-        real(kind=rk), parameter :: delta = 2.64822828_rk
-
+        real(kind=rk), parameter  :: delta = 2.64822828_rk
         ! safety disabled for now, as for low K_eta values possibly safety < dx
         if (x > safety) then
             step_hester3 = 0.0_rk
         elseif (x < -safety) then
             step_hester3 = 1.0_rk
         else
-            xi = (x) / epsilon_hester
-            step_hester3 = 0.5_rk * (1.0_rk - tanh(2.0_rk*xi/delta))
+            step_hester3 = 0.5_rk * (1.0_rk - tanh(2.0_rk*x/delta/epsilon_hester))
         endif
     end function step_hester3
 
@@ -490,17 +517,16 @@ contains
     real(kind=rk) function step_hester4(x, t, epsilon_hester, safety)
         implicit none
         real(kind=rk), intent(in) :: x, t, epsilon_hester, safety
-        real(kind=rk) :: xi
+        real(kind=rk) :: x_rel
         real(kind=rk), parameter :: delta = 2.64822828_rk
-
+        x_rel = x - t
         ! safety disabled for now, as for low K_eta values possibly safety < dx
-        if (x - t > safety) then
+        if (x_rel > safety) then
             step_hester4 = 0.0_rk
-        elseif (x - t < -safety) then
+        elseif (x_rel < -safety) then
             step_hester4 = 1.0_rk
         else
-            xi = (x - t) / epsilon_hester
-            step_hester4 = 0.5_rk * (1.0_rk - tanh(2.0_rk*xi/delta))
+            step_hester4 = 0.5_rk * (1.0_rk - tanh(2.0_rk*x_rel/delta/epsilon_hester))
         endif
     end function step_hester4
 
@@ -712,10 +738,11 @@ contains
 
     ! source: http://fortranwiki.org/fortran/show/String_Functions
     ! Modified to correctly work with blanks (ie replace "a " by "b", note the blank after a)
-    FUNCTION str_replace_text (strInput, strFind, strReplace)  RESULT(strOutput)
-        CHARACTER(*) :: strInput, strFind, strReplace
-        CHARACTER(LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
-        INTEGER :: i, nt
+    pure function str_replace_text (strInput, strFind, strReplace)  result(strOutput)
+        implicit none
+        character(len=*), intent(in) :: strInput, strFind, strReplace
+        character(len=LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
+        integer :: i, nt
 
         ! copy
         strOutput = strInput
@@ -728,7 +755,7 @@ contains
             ! concatenate output string
             strOutput = strOutput(:i-1) // strReplace // strOutput(i+nt:)
         END DO
-    END FUNCTION str_replace_text
+    end function str_replace_text
 
 
     !> We have timestamps for our files that have length 12 for 12.6f.
@@ -742,30 +769,120 @@ contains
     end function timestr
 
 
-    !-------------------------------------------------------------------------!
-    !> @brief remove (multiple) blancs as separators in a string
-    subroutine merge_blanks(string_merge)
-        ! this routine removes blanks at the beginning and end of an string
-        ! and multiple blanks which are right next to each other
+    ! !-------------------------------------------------------------------------!
+    ! !> @brief remove (multiple) blancs as separators in a string
+    ! subroutine merge_blanks(string_merge)
+    !     ! this routine removes blanks at the beginning and end of an string
+    !     ! and multiple blanks which are right next to each other
 
+    !     implicit none
+    !     character(len=*), intent(inout) :: string_merge
+    !     integer(kind=ik) :: i, j, len_str, count
+
+    !     len_str = len(string_merge)
+    !     count = 0
+
+    !     string_merge = string_merge
+    !     do i=1,len_str-1
+    !         if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
+    !             count = count + 1
+    !             string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+    !         end if
+    !     end do
+
+    !     string_merge = adjustl(string_merge)
+
+    ! end subroutine merge_blanks
+
+    !-------------------------------------------------------------------------!
+    !> @brief remove (multiple) blancs as separators in a string using only a single pass
+    subroutine merge_blanks(string_merge)
         implicit none
         character(len=*), intent(inout) :: string_merge
-        integer(kind=ik) :: i, j, len_str, count
+        integer(kind=ik) :: i, j, n
+        logical :: prev_space
 
-        len_str = len(string_merge)
-        count = 0
+        n = len(string_merge)
+        j = 0
+        prev_space = .true.   ! treat start as space -> strips leading blanks too
 
-        string_merge = string_merge
-        do i=1,len_str-1
-            if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
-                count = count + 1
-                string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+        ! we loop through all characters and copy them to the left, but only if they are not a space, or if they are the first space after a non-space character
+        do i = 1, n
+            if (string_merge(i:i) == ' ') then
+                if (.not. prev_space) then
+                    j = j + 1
+                    string_merge(j:j) = ' '
+                    prev_space = .true.
+                end if
+            else
+                j = j + 1
+                string_merge(j:j) = string_merge(i:i)
+                prev_space = .false.
             end if
         end do
 
-        string_merge = adjustl(string_merge)
-
+        ! strip trailing space emitted by the loop
+        if (j > 0) then
+            if (string_merge(j:j) == ' ') j = j - 1
+        end if
+        ! wipe the end, which is now only spaces
+        if (j < n) string_merge(j+1:n) = ' '
     end subroutine merge_blanks
+
+    !> Changes a string to lower case
+    pure function to_lower (str) Result (string)
+        implicit None
+        character(*), Intent(In) :: str
+        character(len(str))      :: string
+        integer :: ic, i
+        character(26), Parameter :: cap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(26), Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+
+        ! Make each letter smol if it is uppercase
+        string = str
+        do i = 1, LEN_TRIM(str)
+            ic = INDEX(cap, str(i:i))
+            if (ic > 0) string(i:i) = low(ic:ic)
+        end do
+    end function to_lower
+
+    !> Changes a string to upper case
+    pure function to_upper (str) Result (string)
+        implicit None
+        character(*), Intent(In) :: str
+        character(len(str))      :: string
+        integer :: ic, i
+        character(26), Parameter :: cap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(26), Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+
+        ! Capitalize each letter if it is lowecase
+        string = str
+        do i = 1, LEN_TRIM(str)
+            ic = INDEX(low, str(i:i))
+            if (ic > 0) string(i:i) = cap(ic:ic)
+        end do
+
+    End Function to_upper
+
+    !-------------------------------------------------------------------------!
+    !> @brief compare if strings are similar, so allow for upper-lower case and "-" or "_" to be the same
+    logical function strings_are_similar(str1, str2)
+        implicit none
+        character(len=*), intent(in) :: str1, str2
+
+        strings_are_similar = (standardize_string(str1) == standardize_string(str2))
+
+    end function strings_are_similar
+
+    !-------------------------------------------------------------------------!
+    !> @brief standardize string by setting it to all lower-case and changing "_" to "-"
+    pure function standardize_string(str_in) result(str_out)
+        implicit none
+        character(len=*), intent(in) :: str_in
+        character(len=len(str_in)) :: str_out
+
+        str_out = adjustl(str_replace_text(to_lower(str_in),"_","-"))
+    end function standardize_string
 
     !-------------------------------------------------------------------------!
     !> @brief count number of vector elements in a string

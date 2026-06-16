@@ -11,7 +11,7 @@ end subroutine insects_array_init
 
 
 subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, box_domain, &
-    viscosity, c_eta_in, dx_reference, smoothing_type, N_ghost_nodes, periodic)
+    viscosity, c_eta_in, dx_reference, smoothing_type, N_ghost_nodes, periodic, colors_default)
     implicit none
     real(kind=rk), intent(in) :: time
     character(len=*), intent(in) :: fname_ini
@@ -34,6 +34,9 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
     integer, optional, intent(in) :: N_ghost_nodes
     !
     logical, optional, intent(in) :: periodic
+    !> default colors for the insect geometries, in case they are not set in the ini file. This is useful to avoid color conflicts with the user defined geometries, which are colored from 0 to n_geometries-1.
+    !! The default is to set the insect colors to start right after n_geometries and be unique for all parts (body, left wing, right wing, left wing 2, right wing 2, geometry / full insect) and individual insects.
+    integer, optional, intent(in) :: colors_default(6)
 
     type(inifile) :: PARAMS
     real(kind=rk) :: defaultvec(1:3), defaultvec5(5)
@@ -116,11 +119,11 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
     Insects(Insect_ID)%smoothing_type = smoothing_type
     select case(smoothing_type)
         case("cos", "cosine")
-            Insects(Insect_ID)%smoothing_i = 0
+            Insects(Insect_ID)%smoothing_type_int = STEP_METHOD_COSINE
         case ("hester")
-            Insects(Insect_ID)%smoothing_i = 1
+            Insects(Insect_ID)%smoothing_type_int = STEP_METHOD_HESTER
         case("discontinuous", "dis")
-            Insects(Insect_ID)%smoothing_i = 2
+            Insects(Insect_ID)%smoothing_type_int = STEP_METHOD_DISC
         case default
             call abort(260602, "Insect hit a tree - Never heard of the smoothing type "//trim(smoothing_type))
     end select
@@ -349,6 +352,7 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
     Insects(Insect_ID)%dx_reference = dx_reference
     Insects(Insect_ID)%smooth = Insects(Insect_ID)%C_smooth*dx_reference
     if (Insects(Insect_ID)%smoothing_type == "hester") then
+        Insects(Insect_ID)%smooth = Insects(Insect_ID)%epsilon_hester
         Insects(Insect_ID)%safety = max(5.0_rk*Insects(Insect_ID)%epsilon_hester, 2*dx_reference)
     else
         Insects(Insect_ID)%safety = 3.5_rk*Insects(Insect_ID)%smooth
@@ -369,14 +373,23 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
         call read_param_mpi(PARAMS,insect_name_str,"x_pivot_r2",Insects(Insect_ID)%x_pivot_r2_b, defaultvec)
     endif
 
-    ! default colors for body and wings
+    ! default colors for body, left wing, right wing, left wing 2, right wing 2, geometry / full insect
     defaultvec5 = (/1.0_rk, 2.0_rk, 3.0_rk, 4.0_rk, 5.0_rk/)
+    if (present(colors_default)) defaultvec5 = real(colors_default(1:5), kind=rk)
+
     call read_param_mpi(PARAMS,insect_name_str,"colors", defaultvec5, defaultvec5)
     Insects(Insect_ID)%color_body = int(defaultvec5(1), kind=2)
     Insects(Insect_ID)%color_l    = int(defaultvec5(2), kind=2)
     Insects(Insect_ID)%color_r    = int(defaultvec5(3), kind=2)
     Insects(Insect_ID)%color_l2   = int(defaultvec5(4), kind=2)
     Insects(Insect_ID)%color_r2   = int(defaultvec5(5), kind=2)
+    ! the color_geometry is used only for statistics of forces/moments wrt to the full insect
+    ! physics module should provide this as input
+    if (present(colors_default)) then
+        Insects(Insect_ID)%color_geometry = colors_default(6)
+    else
+        Insects(Insect_ID)%color_geometry = 0_2
+    endif
 
     ! clean ini file
     call clean_ini_file_mpi(PARAMS)

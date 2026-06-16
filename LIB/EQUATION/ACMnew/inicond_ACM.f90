@@ -48,7 +48,8 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         call abort(23091801,"ACM: state vector has not the right number of components")
     endif
 
-    select case (params_acm%inicond)
+    ! names have to be standardized here, meaning all lower-case and no "_"
+    select case (trim(standardize_string(params_acm%inicond)))
     case ("noise")
         call random_data(u)
         u = u * params_acm%beta
@@ -57,7 +58,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         call random_data(u)
         u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
 
-    case ("noise_unique")
+    case ("noise-unique")
 	! Random data, but results in the same random data on a given grid every time it is called
         call random_data_unique(u, x0, dx, (/g,g,g/), params_acm%domain_size, params_acm%Jmax, Bs )
         u = 2.0_rk*(u - 0.5_rk) * params_acm%beta
@@ -286,7 +287,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             u(:,:,:,idir) = params_acm%u_mean_set(idir)
         enddo
         
-    case("meanflow_channel")
+    case("meanflow-channel")
         ! set the initial condition for channel simulations: the ux-flow is 1 inside the channel and 0 inside the wall
         ! the y,z directions have perturbations (sin-waves) with ampltiude beta (set in INI-file)
         if (params_acm%dim == 2) then
@@ -348,7 +349,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
 
         endif
 
-    case("taylor_green")
+    case("taylor-green")
         ! this condition is 2D only!
         if (params_acm%dim==2) then
             do iy= 1,Bs(2)+2*g
@@ -392,7 +393,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         else
             call abort(250708, "taylor-green-vanRees2011 is a 3D test case. Use taylor-green for 2D case")
         endif
-    case("mixing_layer")
+    case("mixing-layer")
         ! random excitement
         call random_data(u)
         u(:,:,:,params_acm%dim+1:) = 0.0_rk  ! we only need random velocity data
@@ -452,7 +453,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             enddo
         enddo
 
-    case("mixing_layer_rollup")
+    case("mixing-layer-rollup")
         ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is symmetric in z
         do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
             z = 0.0_rk
@@ -477,7 +478,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                 enddo
             enddo
         enddo
-    case("mixing_layer_rollup2")
+    case("mixing-layer-rollup2")
         ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is periodic in all directions with 2 shear layers
         do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
             z = 0.0_rk
@@ -506,7 +507,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                 enddo
             enddo
         enddo
-    case("mixing_layer_rollup3")
+    case("mixing-layer-rollup3")
         ! this IC amplifies the most unstable mode in 2D for a 2D roll-up (works in 2D and 3D), domain is periodic in all directions with 2 shear layers
         ! compares to Yasuda2023 and AbdulGafoor2024
         do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)

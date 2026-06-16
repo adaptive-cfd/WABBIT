@@ -60,7 +60,7 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
     real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
     integer(kind=2) :: color
     integer(kind=ik) :: i_insect
-    character(len=cshort) :: discretization
+    character(len=clong) :: discretization
 
 
     if (.not. params_nspp%initialized) write(*,*) "WARNING: RHS_NSPP called but NSPP not initialized"

@@ -283,7 +283,7 @@ module module_insects
       real(kind=rk) :: safety=0.0_rk, smooth=0.0_rk, C_smooth=1.0_rk, dx_reference=0.0_rk, C_shell_thickness=5.0_rk
       ! some more VPM parameters will be stored in the insect, that can be individual
       character(len=clong) :: smoothing_type=""
-      integer :: smoothing_i=0  ! in point-wise loops, we have to avoid character comparisons, so we use this integer
+      integer :: smoothing_type_int=0  ! in point-wise loops, we have to avoid character comparisons, so we use this integer
       real(kind=rk) :: epsilon_hester=0.0_rk
       ! parameter for hovering:
       real(kind=rk) :: distance_from_sponge=0.0_rk
@@ -294,7 +294,13 @@ module module_insects
       ! parameters for mask coloring
       !-------------------------------------------------------------
       ! available color values
-      integer(kind=2) :: color_body=1, color_l=2, color_r=3, color_l2=4, color_r2=5
+      ! color_body - color of main body of the insect
+      ! color_l - color of left wing
+      ! color_r - color of right wing
+      ! color_l2 - color of second left wing, if it exists
+      ! color_r2 - color of second right wing, if it exists
+      ! color_geometry - color of the full insect, used for computing forces / moments wrt the full insect
+      integer(kind=2) :: color_body=1, color_l=2, color_r=3, color_l2=4, color_r2=5, color_geometry=0
 
       !-------------------------------------------------------------
       ! Allocatable arrays used in Insect object
@@ -653,7 +659,7 @@ contains
    !-------------------------------------------------------------------------------
    ! Main routine for drawing insects. Draws body and wings, parameters are in "INSECT"
    !-------------------------------------------------------------------------------
-   subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us )
+   subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us, delete )
       implicit none
 
       real(kind=rk), intent(in)      :: time
@@ -662,6 +668,7 @@ contains
       real(kind=rk), intent(inout)   :: mask(0:,0:,0:)
       real(kind=rk), intent(inout)   :: us(0:,0:,0:,1:)
       real(kind=rk), intent(inout)   :: mask_color(0:,0:,0:)
+      logical, intent(in)            :: delete  !< delete old mask?
 
       if ((dabs(Insect%time-time)>1.0d-10).and.root) then
          write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
@@ -677,6 +684,7 @@ contains
       if (Insect%smoothing_thickness=="local") then
          Insect%smooth = Insect%C_smooth*maxval(ddx)
          if (Insect%smoothing_type == "hester") then
+            Insect%smooth = Insect%epsilon_hester
             Insect%safety = max(5.0_rk*Insect%epsilon_hester, 2*maxval(ddx))
         else
             Insect%safety = 3.5_rk*Insect%smooth
@@ -684,7 +692,7 @@ contains
       endif
 
       ! delete old mask
-      call delete_old_mask( time, mask, mask_color, us, Insect )
+      if (delete) call delete_old_mask( time, mask, mask_color, us, Insect )
 
       !-----------------------------------------------------------------------------
       ! BODY. Now the body is special: if the insect does not move (or rotate), the
@@ -1247,6 +1255,7 @@ contains
       !-----------------------------------------------------------------------------
       if (Insect%body_moves=="no" .and. .not. grid_time_dependent .and. cleaned_already_once) then
          ! the body is at rest, so we will not draw it. Delete the wings, as they move.
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
          where (mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
             mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
             mask = 0.0_rk
@@ -1255,6 +1264,7 @@ contains
          ! as the body rests it has no solid body velocity, which means we can safely
          ! reset the velocity everywhere (this step is actually unnessesary, but for
          ! safety we do it as well)
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
          where (mask_color==dble(color_body) .or. mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
             mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
             us(:,:,:,1) = 0.0_rk
@@ -1264,6 +1274,7 @@ contains
       else
          ! the body of the insect moves, so we will construct the entire insect in this
          ! (and any other) call, we need to reset the mask of the insect only
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
          where (mask_color==dble(color_body) .or. mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
             mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
             mask = 0.0_rk

@@ -42,7 +42,7 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
 
     if (.not. params_nspp%initialized) write(*,'(A)') "WARNING: create_mask_3D_NSPP called but NSPP not initialized"
 
-    ! Initialization of Insects, this needs to be called only once for all insects
+    ! Initialization of Insects, this needs to be called only by one call every time the mask is created for all insects at once
     if (stage == "init_stage") then
         call update_all_insects(time)
     endif
@@ -52,11 +52,11 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
     ! loop over all individual geometries
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     do i_geom= 1, params_nspp%n_geometries
-        select case (params_nspp%geometries(i_geom))
+        select case (trim(standardize_string(params_nspp%geometries(i_geom))))
 
         case ('sphere-fixed')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_fixed_sphere(x0, dx, Bs, g, mask )
+                call draw_sphere( mask(:,:,:,1), mask(:,:,:,5), x0, dx, g, params_nspp%x_cntr(1:3), params_nspp%R_cyl, color_set=1_ik, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
             endif
 
         case ('sphere-free')
@@ -65,7 +65,7 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
                 call draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
             endif
 
-        case ('active_grid')
+        case ('active-grid')
             !-----------------------------------------------------------------------
             ! ACTIVE GRID
             !-----------------------------------------------------------------------
@@ -77,7 +77,7 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
             endif
 
 
-        case ('Insect')
+        case ('insect')
             !-----------------------------------------------------------------------
             ! INSECT MODULE
             !-----------------------------------------------------------------------
@@ -92,6 +92,9 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
             !     call Update_Insect(time, Insect)
             ! endif
 
+            ! 2026-06-15 : JB Disabled insect mask deleting itself, as at the start of create_mask_tree the whole mask is always wiped
+            !              Obviously, for static grids and masks (channel?) this is not needed and could be optimized later on
+
             call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
 
             select case(stage)
@@ -99,7 +102,7 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
                 ! insect body: note non-tethered-flight is a problem
                 if (Insects(insect_id)%body_moves == "no") then
                     call draw_insect_body( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
-                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.true.)
+                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.false.)
                 endif
 
 
@@ -107,44 +110,43 @@ subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
                 if (Insects(insect_id)%body_moves == "no") then
                     ! wings
                     call draw_insect_wings( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
-                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.true.)
+                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.false.)
                 else
                     ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
-                    call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4) )
+                    call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4), delete=.false. )
                 endif
 
             case ("all-parts")
                 ! wings and body
                 ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
-                call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4) )
+                call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4), delete=.false. )
 
             case ("init_stage")
                 ! do nothing
-
             case default
                 call abort(16072019, "unknown request to create_mask")
 
             end select
 
-        case ('channel_3D')
+        case ('channel-3d')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
                 call draw_channel(x0, dx, Bs, g, mask )
             endif
         
-        case ('composition')
+        case ('primitives-collection')
             if (stage == "init_stage") then
                 ! init and setup all geometries
                 ! either from file or from string, but not both
                 if (params_nspp%geometry_files(i_geom) /= "") then
-                    call init_composition(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_composition=i_geom)
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_collection=i_geom)
                 elseif (params_nspp%geometry_string /= "") then
-                    call init_composition(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_composition=i_geom)
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_collection=i_geom)
                 else
-                    call abort(260603, "ERROR: composition geometry selected but no composition string or file provided!")
+                    call abort(260603, "ERROR: primitives-collection geometry selected but no geometry string or file provided!")
                 endif
             elseif (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
-                call draw_composition(mask, x0, dx, Bs, g, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_composition=i_geom)
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_collection=i_geom)
             endif
 
         case ('none')
@@ -209,7 +211,7 @@ subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
     ! Mask function and forcing values
     !---------------------------------------------------------------------------
     do i_geom = 1, params_nspp%n_geometries
-        select case (params_nspp%geometries(i_geom))
+        select case (trim(standardize_string(params_nspp%geometries(i_geom))))
         case ('rotating-rod')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_rotating_rod( time, mask(:,:,1,:), x0, dx, Bs, g )
@@ -217,7 +219,7 @@ subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
 
         case ('circle', 'cylinder')  ! someone called this cylinder, but it is actually a circle in 2D
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_circle( mask(:,:,1,:), x0, dx, Bs, g, params_nspp%x_cntr(1:2), params_nspp%R_cyl, color_set=1_ik, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, params_nspp%x_cntr(1:2), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
             endif
 
         case ('lamballais')
@@ -242,7 +244,7 @@ subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
                 call draw_free_cylinder( mask(:,:,1,:), x0, dx, Bs, g, insect_id )
             endif
 
-        case ('rotating_cylinder')
+        case ('rotating-cylinder')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_rotating_cylinder( time, mask(:,:,1,:), x0, dx, Bs, g )
             endif
@@ -250,8 +252,8 @@ subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
         case ('two-circles', 'two-cylinders')  ! actually two circles in 2D
             if (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! center coefficients where hardcoded, I just repeat them here to include this old condition
-                call draw_circle( mask(:,:,1,:), x0, dx, Bs, g, (/0.5884_rk*params_nspp%domain_size(1), 0.4116_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=1_ik, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
-                call draw_circle( mask(:,:,1,:), x0, dx, Bs, g, (/0.4116_rk*params_nspp%domain_size(1), 0.5884_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=1_ik, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.5884_rk*params_nspp%domain_size(1), 0.4116_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.4116_rk*params_nspp%domain_size(1), 0.5884_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
             endif
 
         case ('two-moving-cylinders')
@@ -266,32 +268,33 @@ subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
 
         case ('cavity')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                ! ! cavity means that the periodic borders are walls. It is like drawing 2 rectangles with half-size l and height infinity
-                ! call draw_rectangle( mask, x0, dx, Bs, g, center=(/0.5_rk*params_nspp%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params%acm_length/), angle=0.0_rk, color_set=1_ik, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
-                ! call draw_rectangle( mask, x0, dx, Bs, g, center=(/0.0_rk, 0.5_rk*params_nspp%domain_size(1)/), half_size=(/params%acm_length, 1.0e6_rk/), angle=0.0_rk, color_set=1_ik, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                ! cavity means that the periodic borders are walls. It is like drawing 4 rectangles with half-size l and height infinity to cover all borders
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_nspp%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params_nspp%length/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_nspp%domain_size(1), params_nspp%domain_size(2)/), half_size=(/1.0e6_rk, params_nspp%length/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
 
-                call draw_cavity( mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.0_rk, 0.5_rk*params_nspp%domain_size(2)/), half_size=(/params_nspp%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/params_nspp%domain_size(1), 0.5_rk*params_nspp%domain_size(2)/), half_size=(/params_nspp%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
             endif
 
-        case ('2D-wingsection')
+        case ('2d-wingsection')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_2d_wingsections( time, mask(:,:,1,:), x0, dx, Bs, g )
             endif
 
-        case ('composition')
+        case ('primitives-collection')
             if (stage == "init_stage") then
                 ! init and setup all geometries
                 ! either from file or from string, but not both
                 if (params_nspp%geometry_files(i_geom) /= "") then
-                    call init_composition(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_composition=i_geom)
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_collection=i_geom)
                 elseif (params_nspp%geometry_string /= "") then
-                    call init_composition(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_composition=i_geom)
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_collection=i_geom)
                 else
-                    call abort(260603, "ERROR: composition geometry selected but no composition string or file provided!")
+                    call abort(260603, "ERROR: primitives-collection geometry selected but no geometry string or file provided!")
                 endif
             elseif (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
-                call draw_composition(mask, x0, dx, Bs, g, smoothing_type=params_nspp%smoothing_type, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_composition=i_geom)
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_collection=i_geom)
             endif
 
         case ('none')
@@ -740,7 +743,7 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id )
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
 
-            tmp = step_cosine(r, params_nspp%R_cyl, h)
+            tmp = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
             if (tmp >= mask(ix,iy,1)) then
                 ! mask function
                 mask(ix,iy,1) = tmp
@@ -805,8 +808,8 @@ subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id )
             ! note origin is in the domain middle in x-direction (used for dev only...)
             x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_nspp%domain_size(1)
 
-            tmpx = step_cosine( abs(x), 0.5_rk*params_nspp%length, h)
-            tmpy = step_cosine( abs(y), 0.5_rk*params_nspp%thickness, h)
+            tmpx = step( abs(x), 0.5_rk*params_nspp%length, h, 5*h, params_nspp%smoothing_type_int)
+            tmpy = step( abs(y), 0.5_rk*params_nspp%thickness, h, 5*h, params_nspp%smoothing_type_int)
 
             tmp = tmpy*tmpx
 
@@ -867,7 +870,7 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
                 ! distance from center of cylinder
                 r = dsqrt(x*x + y*y + z*z)
 
-                mask(ix,iy,iz,1) = step_cosine(r, params_nspp%R_cyl, h)
+                mask(ix,iy,iz,1) = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
                 mask(ix,iy,iz,2) = Insects(insect_id)%STATE(4)
                 mask(ix,iy,iz,3) = Insects(insect_id)%STATE(5)
                 mask(ix,iy,iz,4) = Insects(insect_id)%STATE(6)
@@ -878,66 +881,6 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
     end do
 
 end subroutine draw_free_sphere
-
-!-------------------------------------------------------------------------------
-
-subroutine draw_fixed_sphere(x0, dx, Bs, g, mask )
-
-    use module_params
-    use module_globals
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min
-    ! loop variables
-    integer(kind=ik) :: ix, iy, iz
-
-    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
-        call abort(777107, "mask: wrong array size, there's pirates, captain!")
-    endif
-
-    ! reset mask array
-    mask = 0.0_rk
-
-    ! parameter for smoothing function (width)
-
-    !h = 2*minval(dx)
-    dx_min = params_nspp%dx_min
-    h = 1.5_rk * dx_min
-
-
-    ! Note: this basic mask function is set on the ghost nodes as well.
-    do iz = g+1, Bs(3)+g
-        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_nspp%x_cntr(3)
-        do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
-            do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
-
-                ! distance from center of cylinder
-                r = dsqrt(x*x + y*y + z*z)
-
-                tmp = step_cosine(r, params_nspp%R_cyl, h)
-
-                if (tmp >= mask(ix,iy,iz,1)) then
-                    mask(ix,iy,iz,1) = tmp
-                    ! color
-                    mask(ix,iy,iz,5) = 1.0_rk
-                endif
-            end do
-        end do
-    end do
-
-end subroutine draw_fixed_sphere
 
 !-------------------------------------------------------------------------------
 
@@ -1086,53 +1029,6 @@ subroutine draw_channel(x0, dx, Bs, g, mask )
 end subroutine draw_channel
 
 !-------------------------------------------------------------------------------
-
-subroutine draw_cylinderz(x0, dx, Bs, g, mask )
-
-    use module_params
-    use module_globals
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
-    ! loop variables
-    integer(kind=ik) :: ix, iy, iz
-
-    ! reset mask array
-    mask = 0.0_rk
-
-    ! parameter for smoothing function (width)
-    h = params_nspp%C_smooth*minval(dx)
-
-    do iz = g+1, Bs(3)+g
-        z = dble(iz-(g+1)) * dx(3) + x0(3) - params_nspp%domain_size(3)/2.0
-        do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%domain_size(2)/2.0
-            do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%domain_size(1)/2.0
-
-                ! distance from center of cylinder
-                r = dsqrt(x*x + y*y)
-
-                mask(ix,iy,iz,1) = step_cosine(r, params_nspp%R_cyl, h)
-                ! color
-                mask(ix,iy,iz,5) = 1.0_rk
-            end do
-        end do
-    end do
-
-end subroutine draw_cylinderz
-
-!-------------------------------------------------------------------------------
 ! A cylinder that rotates around the domain center with a radius of 1 and a frequency of 1 (non-dimensional units)
 subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
 
@@ -1183,7 +1079,7 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
             ! distance from center of cylinder
             r = dsqrt( (x-x00)*(x-x00) + (y-y00)*(y-y00) )
 
-            tmp = step_cosine(r, params_nspp%R_cyl, h)
+            tmp = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
 
             if (tmp >= mask(ix,iy,1) .and. tmp > 0.0_rk) then
                 ! mask function
@@ -1201,73 +1097,7 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
 end subroutine draw_rotating_cylinder
 
 ! ------------------------------------------------------------------------------
-! A cavity, i.e. a rectangular domain with walls on all sides
-subroutine draw_cavity(mask, x0, dx, Bs, g )
-
-    use module_params
-    use module_globals
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in) :: x0, dx
-
-    ! auxiliary variables
-    real(kind=rk)  :: x, y, length, tmp
-    real(kind=rk), parameter :: c_smooth = 2.0_rk
-    ! loop variables
-    integer(kind=ik) :: ix, iy
-
-    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
-        call abort(777107, "mask: wrong array size, there's pirates, captain!")
-    endif
-
-    ! reset mask array
-    mask = 0.0_rk
-    length= params_nspp%length
-
-    if (params_nspp%dx_min <= 0.0_rk) call abort(0509198,"params_nspp%dx_min invalid (not set?)")
-
-
-    ! Note: this basic mask function is set on the ghost nodes as well.
-    ! Discontinuous version
-    ! do iy = 1, Bs(2)+2*g
-    !     y = dble(iy-(g+1)) * dx(2) + x0(2)
-    !     do ix = 1, Bs(1)+2*g
-    !         x = dble(ix-(g+1)) * dx(1) + x0(1)
-    !
-    !         if ( x<length .or. x>params_nspp%domain_size(1)-length &
-    !             .or. y<length .or. y>params_nspp%domain_size(2)-length) then
-    !             ! mask function
-    !             mask(ix,iy,1) = 1.0_rk
-    !             ! color
-    !             mask(ix,iy,5) = 1.0_rk
-    !         endif
-    !     end do
-    ! end do
-
-    ! smoothed version
-    do iy = 1, Bs(2)+2*g
-        y = dble(iy-(g+1)) * dx(2) + x0(2)
-        do ix = 1, Bs(1)+2*g
-            x = dble(ix-(g+1)) * dx(1) + x0(1)
-
-            ! distance to borders of domain
-            tmp = minval( (/x,y,-(x-params_nspp%domain_size(1)),-(y-params_nspp%domain_size(2))/) )
-
-            mask(ix,iy,1) = step_cosine( tmp, length, c_smooth*params_nspp%dx_min)
-
-        end do
-    end do
-
-end subroutine draw_cavity
-
-
+! Two cylinders that move! Yaj
 subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 
     use module_params
@@ -1610,9 +1440,7 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
             yref = y*dcos(anglez2) - x*dsin(anglez2)
             rref = dsqrt( xref**2 + 4.0d0**2 * yref**2 ) ! Radius in cylindrical coordinates
 
-            tmp = step_cosine(rref, rmax-0.0d0*hsmth, hsmth)
-            ! call step_cosine (tmp, rref, rmax-0.0d0*hsmth, hsmth)
-
+            tmp = step(rref, rmax-0.0d0*hsmth, hsmth, 5*hsmth, params_nspp%smoothing_type_int)
 
             mask(ix,iy,1) = tmp
             mask(ix,iy,2) = -omz2*y + vx2

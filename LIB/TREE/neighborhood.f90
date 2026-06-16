@@ -383,7 +383,7 @@ end subroutine inverse_relation
 
 
 !> \brief Check if a neighbor is only used for 3D relations or not, useful if 2D neighborhoods need to skip those
-function is_3D_neighbor(neighborhood)
+pure function is_3D_neighbor(neighborhood)
     implicit none
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
     logical                        :: is_3D_neighbor
@@ -412,39 +412,38 @@ end function
 !> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
 !> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
 !> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
-subroutine neighborhood2patchID(neighborhood, patchID)
+pure function neighborhood2patchID(neighborhood)
     implicit none
 
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
-    integer(kind=ik), intent(out)  :: patchID       !< location of neighbor, where is the neighbor physically?
-    integer(kind=ik) :: n_temp
+    integer(kind=ik) :: neighborhood2patchID, n_temp
 
     n_temp = mod(neighborhood-1, 56)+1  ! project level diffs out of the neighborhood
 
     ! faces - divide by 4 and add ofset
     if (n_temp <= 24) then
-        patchID = (n_temp-1) / 4 + 1
+        neighborhood2patchID = (n_temp-1) / 4 + 1
     ! edges, divide by 2 and add offset
     elseif (n_temp <= 48) then
-        patchID = (n_temp-25) / 2 + 1+6
+        neighborhood2patchID = (n_temp-25) / 2 + 1+6
     ! corners, leave them as they are
     elseif (n_temp <= 56) then
-        patchID = (n_temp-49) + 1+6+12
+        neighborhood2patchID = (n_temp-49) + 1+6+12
     else
-        call abort(20240723, "You ended up in the wrong neighborhood")
+        ! call abort(20240723, "You ended up in the wrong neighborhood")
     endif
-end 
+end function
 
 !> Convert a neighborhood to a different lvl_diff and give back the lower bound of possible indices.
 !> This is needed as neighborhood relations might have multiple counterparts (up to 4)
-function np_l(neighborhood, level)
+pure function np_l(neighborhood, level)
     implicit none
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
     integer(kind=ik), intent(in)  :: level          !< level at which to return the lower bound
     integer(kind=ik) :: np_l, patchID
 
     ! convert neighborhood to patch
-    call neighborhood2patchID(neighborhood, patchID)
+    patchID = neighborhood2patchID(neighborhood)
 
     ! convert back
     ! faces - divide by 4 and add ofset
@@ -457,7 +456,8 @@ function np_l(neighborhood, level)
     elseif (patchID <= 6+12+8) then
         np_l = (patchID-1-6-12) + 1+24+24
     else
-        call abort(20240723, "You ended up in the wrong neighborhood")
+        np_l = -10000  ! write garbage
+        ! call abort(20240723, "You ended up in the wrong neighborhood")
     endif
     ! add level offset
     if (level == +1) then
@@ -468,14 +468,14 @@ function np_l(neighborhood, level)
 end function
 !> Convert a neighborhood to a different lvl_diff and give back the lower bound of possible indices.
 !> This is needed as neighborhood relations might have multiple counterparts (up to 4)
-function np_u(neighborhood, level)
+pure function np_u(neighborhood, level)
     implicit none
     integer(kind=ik), intent(in)   :: neighborhood  !< neighborhood of significant patch
     integer(kind=ik), intent(in)  :: level          !< level at which to return the lower bound
     integer(kind=ik) :: np_u, patchID
 
     ! convert neighborhood to patch
-    call neighborhood2patchID(neighborhood, patchID)
+    patchID = neighborhood2patchID(neighborhood)
 
     ! convert back
     ! faces - divide by 4 and add ofset
@@ -488,7 +488,8 @@ function np_u(neighborhood, level)
     elseif (patchID <= 6+12+8) then
         np_u = (patchID-6-12) + 24+24
     else
-        call abort(20240723, "You ended up in the wrong neighborhood")
+        np_u = -10000  ! write garbage
+        ! call abort(20240723, "You ended up in the wrong neighborhood")
     endif
     ! add level offset
     if (level == +1) then

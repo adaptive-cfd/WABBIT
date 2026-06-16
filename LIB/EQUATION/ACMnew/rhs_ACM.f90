@@ -2062,7 +2062,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
-    character(len=cshort), intent(in)       :: order_discretization
+    character(len=clong), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
     ! when implementing boundary conditions, it is necessary to know if the local field (block)

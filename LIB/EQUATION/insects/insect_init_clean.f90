@@ -67,6 +67,8 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
             call abort(260602, "Insect flew away, no section found for " // trim(insect_name_str))
         endif
     else
+        ! If insect_ID==1, we either read from [Insects], which is the old format, or from the new format [Insect1]
+        ! if [Insects] is found - we take that. That ensures compatibility with old INI files.
         insect_name_str = "Insects"
         ! check if insect parameters are under legacy name
         call param_section_exists_mpi(PARAMS, insect_name_str, section_exists)

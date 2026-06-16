@@ -64,7 +64,7 @@ subroutine draw_sphere(mask, color, x0, dx, g, center, radius, color_set, smooth
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk),optional,intent(in) :: bounding_box(1:6)
-    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:3), dist, safety, tmp
@@ -148,7 +148,7 @@ subroutine draw_cylinder(mask, color, x0, dx, g, endpoint_1, endpoint_2, radius,
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk),optional,intent(in) :: bounding_box(1:6)
-    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:3), dist, safety, tmp, ba(1:3), baba, er(1:3), et(1:3)
@@ -240,7 +240,7 @@ subroutine draw_cylinder_rounded(mask, color, x0, dx, g, endpoint_1, endpoint_2,
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk),optional,intent(in) :: bounding_box(1:6)
-    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:3), dist, safety, tmp, ba(1:3), baba
@@ -330,7 +330,7 @@ subroutine draw_circle(mask, color, x0, dx, g, center, radius, color_set, smooth
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk), optional,intent(in) :: bounding_box(1:4)
-    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:2), dist, safety, tmp
@@ -414,7 +414,7 @@ subroutine draw_rectangle(mask, color, x0, dx, g, center, half_size, angle, colo
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk),optional,intent(in) :: bounding_box(1:4)
-    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:2), dist, safety, tmp, sin_a, cos_a
@@ -499,7 +499,7 @@ subroutine draw_triangle(mask, color, x0, dx, g, vertex1, vertex2, vertex3, colo
     real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
     real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
     real(kind=rk),optional,intent(in) :: bounding_box(1:4)
-    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI, it is actually at index 0, so we can provide here the indices of x0, defaults to WABBIT formulation
+    integer, optional, intent(in) :: x0_indices(1:2)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
 
     ! auxiliary variables
     real(kind=rk)  :: xyz(1:2), dist, safety, tmp

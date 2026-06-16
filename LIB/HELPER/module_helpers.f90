@@ -495,7 +495,6 @@ contains
         implicit none
         real(kind=rk), intent(in) :: x, epsilon_hester, safety
         real(kind=rk), parameter  :: delta = 2.64822828_rk
-        ! safety disabled for now, as for low K_eta values possibly safety < dx
         if (x > safety) then
             step_hester3 = 0.0_rk
         elseif (x < -safety) then
@@ -520,7 +519,6 @@ contains
         real(kind=rk) :: x_rel
         real(kind=rk), parameter :: delta = 2.64822828_rk
         x_rel = x - t
-        ! safety disabled for now, as for low K_eta values possibly safety < dx
         if (x_rel > safety) then
             step_hester4 = 0.0_rk
         elseif (x_rel < -safety) then

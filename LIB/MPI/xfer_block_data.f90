@@ -862,7 +862,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
         if (.not. allocated(points_synched_list)) allocate(points_synched_list(1:params%number_procs))
 
         ! debug send volume
-        call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER4, points_synched_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
         if (params%rank == 0) then
             open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
             ! 0 is send as stage
@@ -875,7 +875,7 @@ subroutine prepare_update_family_metadata(params, tree_ID, count_send, sync_case
             close(99)
         endif
         ! debug recv volume
-        call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER4, points_synched_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
         if (params%rank == 0) then
             open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
             ! 0 is send as stage

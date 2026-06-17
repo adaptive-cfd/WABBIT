@@ -43,7 +43,7 @@ end function
 !> 33-40 : X-Z edge (2--, 2+-, 2-+, 2++)
 !> 41-48 : Y-Z edge (2--, 2+-, 2-+, 2++)
 !> 49-56 : corners (---, +--, -+-, ++-, --+, +-+, -++, +++)
-subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff, gminus, gplus)
+subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff, gminus, gplus, set_order_predictor)
     implicit none
 
     type (type_params), intent(in)                  :: params
@@ -56,8 +56,13 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
     integer(kind=ik), intent(in)                    :: relation
     !> difference between block levels
     integer(kind=ik), intent(in)                    :: lvl_diff, gminus, gplus
+    character(len=cshort), intent(in), optional :: set_order_predictor  !< if present, this overwrites params%order_predictor
 
     integer(kind=ik) :: n(1:3), g(3), Bs(1:3), i_dim, a, min_size, Nsender
+    character(len=cshort) :: order_predictor
+
+    order_predictor = params%order_predictor
+    if (present(set_order_predictor)) order_predictor = set_order_predictor
 
     g(:) = params%g
     Bs = params%bs
@@ -70,17 +75,17 @@ subroutine set_send_bounds( params, data_bounds, data_buffer, relation, lvl_diff
     ! the number a is how many extra coarse points on the sender side you use to
     ! avoid one-sided interpolation. The actual formula is S = (order-2 )/2 so for
     ! 6th order you would require 2 extra ones.
-    if (params%order_predictor == "multiresolution_2nd" ) then
+    if (order_predictor == "multiresolution_2nd" ) then
         a = 0
-    elseif (params%order_predictor == "multiresolution_4th" ) then
+    elseif (order_predictor == "multiresolution_4th" ) then
         a = 1
-    elseif (params%order_predictor == "multiresolution_6th" ) then
+    elseif (order_predictor == "multiresolution_6th" ) then
         a = 2
-    elseif (params%order_predictor == "multiresolution_8th" ) then
+    elseif (order_predictor == "multiresolution_8th" ) then
         a = 3
-    elseif (params%order_predictor == "multiresolution_10th" ) then
+    elseif (order_predictor == "multiresolution_10th" ) then
         a = 4
-    elseif (params%order_predictor == "multiresolution_12th" ) then
+    elseif (order_predictor == "multiresolution_12th" ) then
         a = 5
     else
         call abort(2875490, "The predictor method is unknown")

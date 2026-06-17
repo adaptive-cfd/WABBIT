@@ -308,7 +308,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
             if (.not. allocated(points_synched_list)) allocate(points_synched_list(1:params%number_procs))
 
             ! debug send volume
-            call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(sum(data_send_counter), 1, MPI_INTEGER4, points_synched_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
                 if (params%number_procs == 1) then
@@ -320,7 +320,7 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
                 close(99)
             endif
             ! debug recv volume
-            call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER, points_synched_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(sum(data_recv_counter), 1, MPI_INTEGER4, points_synched_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 open(unit=99, file=trim("debug_sync.csv"), status="unknown", position="append")
                 if (params%number_procs == 1) then

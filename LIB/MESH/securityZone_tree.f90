@@ -313,7 +313,7 @@ subroutine lgt_encode_significant_patch(lgtID, neighborhood)
 
     integer(kind=ik)    :: patchID, ref_encoded
 
-    call neighborhood2patchID(neighborhood, patchID)
+    patchID = neighborhood2patchID(neighborhood)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)
@@ -348,7 +348,7 @@ function lgt_decode_significant_patch(lgtID, neighborhood)
 
     integer(kind=ik)    :: patchID, ref_encoded, bit_extracted
 
-    call neighborhood2patchID(neighborhood, patchID)
+    patchID = neighborhood2patchID(neighborhood)
 
     ! get current ref status, should be zero except if already some value was encoded, then we will encode it on top of it
     ref_encoded = lgt_block(lgtID, IDX_REFINE_STS)

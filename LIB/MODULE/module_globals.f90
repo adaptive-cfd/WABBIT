@@ -244,11 +244,17 @@ module module_globals
         !-----------------------------------------------------------------------------
         ! 2-norm length of vectors
         !-----------------------------------------------------------------------------
-        function norm2(a)
+        function norm2_2d(a)
+            implicit none
+            real(kind=rk),dimension(1:2),intent(in) :: a
+            real(kind=rk) :: norm2_2d
+            norm2_2d = sqrt( a(1)*a(1) + a(2)*a(2) )
+        end function
+        function norm2_3d(a)
             implicit none
             real(kind=rk),dimension(1:3),intent(in) :: a
-            real(kind=rk) :: norm2
-            norm2 = sqrt( a(1)*a(1) + a(2)*a(2) + a(3)*a(3) )
+            real(kind=rk) :: norm2_3d
+            norm2_3d = sqrt( a(1)*a(1) + a(2)*a(2) + a(3)*a(3) )
         end function
 
         !-----------------------------------------------------------------------------

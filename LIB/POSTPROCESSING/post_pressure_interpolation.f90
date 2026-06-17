@@ -9,9 +9,6 @@ subroutine post_pressure_interpolation(params)
     use module_time_step
     use module_unit_test
     use module_bridge_interface     ! bridge implementation of wabbit
-    ! HACK.We should load only the metamodule, but we require WRITE_INSECT_DATA(time)
-    ! to dump kinematics data.
-    use module_ACM
     use module_forestMetaData
     use module_insects
 
@@ -25,7 +22,7 @@ subroutine post_pressure_interpolation(params)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_block(:, :, :, :, :)
     real(kind=rk)                       :: time, xx, yy, zz, delx, dely, delz, tmp           ! time loop variables
     character(len=cshort)               :: pressure_filename, ini_filename, wing_fname, fname_out
-    integer(kind=ik)                    :: k, lgt_id, Bs(1:3), g, hvy_id, iter, iteration, tree_ID=1, N_support, nlines, ncols
+    integer(kind=ik)                    :: k, lgt_id, Bs(1:3), g, hvy_id, iter, iteration, tree_ID=1, N_support, nlines, ncols, n_blocks
     real(kind=rk)                       :: x(1:3), x0(1:3), dx(1:3), x_wing_w(1:3), x_wing_b(1:3), x_wing_g(1:3), x_wing_normal(1:3), coeff(1:3)
     real(kind=rk)                       :: block_x_min(1:3), block_x_max(1:3)
     integer(kind=ik)                    :: ipoint, ix, iy, iz, ix0, iy0, iz0
@@ -119,7 +116,7 @@ subroutine post_pressure_interpolation(params)
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
-    call read_attributes(pressure_filename, iteration, time, iteration, domain, Bs, tc_length, dim, &
+    call read_attributes(pressure_filename, n_blocks, time, iteration, domain, Bs, tc_length, dim, &
          periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
     ! reset the grid: all blocks are inactive and empty
     ! call reset_tree(params, .true., tree_ID)
@@ -133,8 +130,8 @@ subroutine post_pressure_interpolation(params)
     ! read in pressure data
     call readHDF5vct_tree( (/pressure_filename/), params, hvy_block, tree_ID)
 
-    ! update kinematics at the right time
-    call Update_Insect(time, Insect)
+    ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+    call Update_All_Insects(time)
 
     ! BEFORE WE CAN INTERPOLATE THE GHOTS NODES NEED TO BE FILLED
     call sync_ghosts_tree( params, hvy_block, tree_ID=tree_ID )
@@ -170,17 +167,17 @@ subroutine post_pressure_interpolation(params)
                 if (surface_type == 2) then                    
                     x_wing_w(1:3) = x_wing_w(1:3)
                 else if (surface_type == 3) then
-                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insect%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
                 else if (surface_type == 1) then
-                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insect%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
                 else
                     call abort(372936, "surface type must be 1=bottom, 2=middle 3=top surface")
                 end if
 
                 ! then bring it to body system
-                x_wing_b = matmul( transpose(Insect%M_b2w_r), x_wing_w ) + Insect%x_pivot_r_b
+                x_wing_b = matmul( transpose(Insects(1)%M_b2w_r), x_wing_w ) + Insects(1)%x_pivot_r_b
                 ! and finnaly to global system
-                x_wing_g = matmul( transpose(Insect%M_g2b), x_wing_b ) + Insect%xc_body_g
+                x_wing_g = matmul( transpose(Insects(1)%M_g2b), x_wing_b ) + Insects(1)%xc_body_g
                 ! save point on the wing now in global system
                 wing_points_g(ipoint, 1:3, surface_type) = x_wing_g(1:3)
             enddo
@@ -195,17 +192,17 @@ subroutine post_pressure_interpolation(params)
                 if (surface_type == 2) then                    
                     x_wing_w(1:3) = x_wing_w(1:3)
                 else if (surface_type == 3) then
-                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insect%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
                 else if (surface_type == 1) then
-                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insect%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
                 else
                     call abort(372936, "surface type must be 1=bottom, 2=middle 3=top surface")
                 end if
 
                 ! then bring it to body system
-                x_wing_b = matmul( transpose(Insect%M_b2w_l), x_wing_w ) + Insect%x_pivot_l_b
+                x_wing_b = matmul( transpose(Insects(1)%M_b2w_l), x_wing_w ) + Insects(1)%x_pivot_l_b
                 ! and finnaly to global system
-                x_wing_g = matmul( transpose(Insect%M_g2b), x_wing_b ) + Insect%xc_body_g
+                x_wing_g = matmul( transpose(Insects(1)%M_g2b), x_wing_b ) + Insects(1)%xc_body_g
                 ! save point on the wing now in global system
                 wing_points_g(ipoint, 1:3, surface_type) = x_wing_g(1:3)
             enddo

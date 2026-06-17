@@ -1,0 +1,334 @@
+!-----------------------------------------------------------------------------
+! save data. Since you might want to save derived data, such as the vorticity,
+! the divergence etc., which are not in your state vector, this routine has to
+! copy and compute what you want to save to the work array.
+!
+! In the main code, save_fields than saves the first N_fields_saved components of the
+! work array to file.
+!
+! NOTE that as we have way more work arrays than actual state variables (typically
+! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
+!-----------------------------------------------------------------------------
+subroutine PREPARE_SAVE_DATA_NSPP( time, u, g, x0, dx, work, mask, n_domain, names_override )
+    implicit none
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+
+    ! block data, containg the state vector. In general a 4D field (3 dims+components)
+    ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
+    real(kind=rk), intent(in) :: u(1:,1:,1:,1:)
+
+    ! as you are allowed to compute the RHS only in the interior of the field
+    ! you also need to know where 'interior' starts: so we pass the number of ghost points
+    integer, intent(in) :: g
+
+    ! for each block, you'll need to know where it lies in physical space. The first
+    ! non-ghost point has the coordinate x0, from then on its just cartesian with dx spacing
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+
+    ! output in work array.
+    real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
+
+    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
+    ! block level) so the physics modules have to provide an interface to create the mask at a tree
+    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
+
+    ! when implementing boundary conditions, it is necessary to know if the local field (block)
+    ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
+    ! The n_domain tells you if the local field is adjacent to a domain boundary:
+    ! n_domain(i) can be either 0, 1, -1,
+    !  0: no boundary in the direction +/-e_i
+    !  1: boundary in the direction +e_i
+    ! -1: boundary in the direction - e_i
+    ! currently only acessible in the local stage
+    ! NOTE: NSPP only supports symmetry BC for the moment (which is handled by wabbit and not NSPP)
+    integer(kind=2), intent(in) :: n_domain(3)
+
+    ! if you want to save something that is not in the default list of variables, you can specify a list of names here.
+    character(len=*), optional, intent(in) :: names_override(:)
+
+    ! local variables
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics, n_names
+    integer(kind=ik), dimension(3) :: Bs
+    character(len=cshort) :: name
+
+    if (.not. params_nspp%initialized) write(*,*) "WARNING: PREPARE_SAVE_DATA_NSPP called but NSPP not initialized"
+    ! number of state variables
+    neqn = size(u,4)
+    ! number of available work array slots
+    nwork = size(work,4)
+
+
+    Bs(1) = size(u,1) - 2*g
+    Bs(2) = size(u,2) - 2*g
+    Bs(3) = size(u,3) - 2*g
+
+    ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+    call Update_All_Insects(time)
+
+    if (present(names_override)) then
+        n_names = size(names_override)
+    else
+        n_names = size(params_nspp%names,1)
+    endif
+
+    if (size(work,4) < n_names) then
+        call abort(2505201, "ACM: PREPARE_SAVE_DATA_ACM: work array has insufficient components for requested names list")
+    endif
+
+    do k = 1, n_names
+        if (present(names_override)) then
+            name = names_override(k)
+        else
+            name = params_nspp%names(k)
+        endif
+        ! names have to be standardized here, meaning all lower-case and no "_"
+        select case(trim(standardize_string(name)))
+        case('ux')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,1)
+
+        case('uy')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,2)
+
+        case('uz')
+            ! copy state vector
+            work(:,:,:,k) = u(:,:,:,3)
+
+        case('p')
+            ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
+            work(:,:,:,k) = u(:,:,:,params_nspp%dim+1)
+
+        case('vor', 'vort', 'vorticity')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"NSPP: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
+            endif
+            if (params_nspp%dim /= 2) then
+                call abort(19101811,"NSPP: storing scalar vor is not possible in 3D - use any of 'vorx' 'vory' 'vorz' 'vorabs' or compute in post (known bug)")
+            endif
+
+            ! vorticity
+            call compute_vorticity(u(:,:,:,1:3), &
+            dx, Bs, g, params_nspp%discretization, work(:,:,:,k:k+2))
+
+        case('vorx', 'vory', 'vorz', 'vorabs', 'vor-abs')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"NSPP: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
+            endif
+            if (params_nspp%dim /= 3) then
+                call abort(19101811,"NSPP: storing vector vor is not possible in 2D - use 'vor' or compute in post (known bug)")
+            endif
+
+            ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
+            call compute_vorticity(u(:,:,:,1:3), &
+            dx, Bs, g, params_nspp%discretization, work(:,:,:,k:k+2))
+            ! for different components y,z we need to copy the desired one to the first position
+            if (trim(standardize_string(name)) == 'vory') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (trim(standardize_string(name)) == 'vorz') then
+                work(:,:,:,k) = work(:,:,:,k+2)
+            elseif (trim(standardize_string(name)) == 'vorabs' .or. trim(standardize_string(name)) == 'vor-abs') then
+                work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
+            endif
+        
+        case('helx', 'hely', 'helz', 'helabs', 'hel-abs')
+            if (size(work,4) - k < 2) then
+                call abort(19101810,"NSPP: Not enough space to compute vorticity for helicity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
+            endif
+            if (params_nspp%dim /= 3) then
+                call abort(19101811,"NSPP: Helicity is always 0 in 2D - we do not need to store that!")
+            endif
+
+            ! vorticity, this effectively computes it three times for all components, but I just assume we do not save often
+            call compute_vorticity(u(:,:,:,1:3), &
+            dx, Bs, g, params_nspp%discretization, work(:,:,:,k:k+2))
+            ! compute by velocity to get local helicity
+            work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
+            ! for different components y,z we need to copy the desired one to the first position
+            if (trim(standardize_string(name)) == 'hely') then
+                work(:,:,:,k) = work(:,:,:,k+1)
+            elseif (trim(standardize_string(name)) == 'helz') then
+                work(:,:,:,k) = work(:,:,:,k+2)
+            elseif (trim(standardize_string(name)) == 'helabs' .or. trim(standardize_string(name)) == 'hel-abs') then
+                work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
+            endif
+
+        case('div', 'divu', 'divergence')
+            ! div(u)
+            call compute_divergence(u(:,:,:,1:params_nspp%dim), dx, Bs, g, params_nspp%discretization, work(:,:,:,k))
+        
+        case('diss', 'dissipation')
+            ! local dissipation rate computed over velocity weighted laplacian
+            call compute_dissipation(u(:,:,:,1:params_nspp%dim), dx, Bs, g, params_nspp%discretization, work(:,:,:,k))
+        
+        case('gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', &
+            'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', &
+            'pdx', 'pdy', 'pdz')
+            ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
+            if (INDEX(trim(standardize_string(name)), 'x') > 0) then
+                call compute_derivative(u(:,:,:,params_nspp%dim+1), dx, Bs, g, 1, 1, params_nspp%discretization, work(:,:,:,k))
+            elseif (INDEX(trim(standardize_string(name)), 'y') > 0) then
+                call compute_derivative(u(:,:,:,params_nspp%dim+1), dx, Bs, g, 2, 1, params_nspp%discretization, work(:,:,:,k))
+            elseif (INDEX(trim(standardize_string(name)), 'z') > 0) then
+                if (params_nspp%dim == 3) then
+                    call compute_derivative(u(:,:,:,params_nspp%dim+1), dx, Bs, g, 3, 1, params_nspp%discretization, work(:,:,:,k))
+                else
+                    call abort(19101812,"NSPP: Gradient of p in z-direction is not defined for 2D runs")
+                endif
+            endif
+        
+        case('uxdx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_nspp%discretization, work(:,:,:,k)) ! dux/dx
+        case('uxdy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_nspp%discretization, work(:,:,:,k)) ! dux/dy
+        case('uxdz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_nspp%discretization, work(:,:,:,k)) ! dux/dz
+            else
+                call abort(19101812,"ACM: derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 1, params_nspp%discretization, work(:,:,:,k)) ! duy/dx
+        case('uydy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 1, params_nspp%discretization, work(:,:,:,k)) ! duy/dy
+        case('uydz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 1, params_nspp%discretization, work(:,:,:,k)) ! duy/dz
+            else
+                call abort(19101812,"ACM: derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdx')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 1, params_nspp%discretization, work(:,:,:,k)) ! duz/dx
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdy')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 1, params_nspp%discretization, work(:,:,:,k)) ! duz/dy
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 1, params_nspp%discretization, work(:,:,:,k)) ! duz/dz
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uxdxx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2ux/dx^2
+        case('uxdyy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2ux/dy^2
+        case('uxdzz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2ux/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydxx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uy/dx^2
+        case('uydyy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uy/dy^2
+        case('uydzz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uy/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdxx')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uz/dx^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdyy')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uz/dy^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdzz')
+            if (params_nspp%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 2, params_nspp%discretization, work(:,:,:,k)) ! d^2uz/dz^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif 
+
+        case('mask')
+            work(:,:,:,k) = mask(:,:,:,1)
+
+        case('usx')
+            work(:,:,:,k) = mask(:,:,:,2)
+
+        case('usy')
+            work(:,:,:,k) = mask(:,:,:,3)
+
+        case('usz')
+            work(:,:,:,k) = mask(:,:,:,4)
+
+        case('color')
+            work(:,:,:,k) = mask(:,:,:,5)
+
+        case('sponge')
+            work(:,:,:,k) = mask(:,:,:,6)
+
+        end select
+
+
+        if (trim(standardize_string(name(1:6))) == "scalar") then
+            ! check if the 7th character is actually a digit
+            if (.not. (trim(standardize_string(name(7:7))) >= '0' .and. trim(standardize_string(name(7:7))) <= '9')) then
+                call abort(250920, "ERROR: PREPARE_SAVE_DATA_NSPP: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//trim(standardize_string(name(7:7)))//"' at position 7.")
+            end if
+            read( name(7:7), * ) iscalar
+            work(:,:,:,k) = u(:,:,:,params_nspp%dim + 1 + iscalar)
+        endif
+
+        ! if any of those endings is in the name, then it is a timestatistics variable
+        if (index(trim(standardize_string(name)), "-avg") > 0 .or. index(trim(standardize_string(name)), "-var") > 0 .or. index(trim(standardize_string(name)), "-minmax") > 0 &
+            .or. index(trim(standardize_string(name)), "-min") > 0 .or. index(trim(standardize_string(name)), "-max") > 0 .or. index(trim(standardize_string(name)), "-cov") > 0) then
+            ! now we have to find the index of it
+            do i_time_statistics = 1, params_nspp%N_time_statistics
+                if (name == trim(params_nspp%time_statistics_names(i_time_statistics))) exit
+            end do
+
+            ! safety check if the name was found
+            if (i_time_statistics > params_nspp%N_time_statistics) then
+                call abort(250929, "ERROR: PREPARE_SAVE_DATA_NSPP: field_name " // trim(name) // " not found in time_statistics_names")
+            endif
+
+            work(:,:,:,k) = u(:,:,:,params_nspp%dim + 1 + params_nspp%N_scalars + i_time_statistics)
+        endif
+    end do
+
+end subroutine
+
+
+!-----------------------------------------------------------------------------
+! when savig to disk, WABBIT would like to know how you named you variables.
+! e.g. u(:,:,:,1) is called "ux"
+!
+! the main routine save_fields has to know how you label the stuff you want to
+! store from the work array, and this routine returns those strings
+!-----------------------------------------------------------------------------
+subroutine FIELD_NAMES_NSPP( N, name )
+    implicit none
+    ! component index
+    integer(kind=ik), intent(in) :: N
+    ! returns the name
+    character(len=clong), intent(out) :: name
+
+    if (.not. params_nspp%initialized) write(*,*) "WARNING: FIELD_NAMES_NSPP called but NSPP not initialized"
+
+    if (allocated(params_nspp%names)) then
+        name = params_nspp%names(N)
+    else
+        call abort(5554,'Something ricked')
+    endif
+
+end subroutine FIELD_NAMES_NSPP

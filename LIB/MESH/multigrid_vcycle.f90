@@ -1,4 +1,4 @@
-subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, verbose, hvy_full)
+subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, verbose, hvy_full, time)
     implicit none
 
     !> parameter struct
@@ -14,6 +14,7 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     logical, intent(in), optional      :: verbose
     !> full physically allocated contiguous array to avoid Intel compiler issues with array sections
     real(kind=rk), intent(inout), optional :: hvy_full(:, :, :, :, :)
+    real(kind=rk), intent(in), optional :: time  !< current time, used only for logging
 
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, ic, i_cycle
     real(kind=rk)                      :: dx(1:3), x0(1:3), residual(1:4*size(hvy_sol,4)), norm_sol(1:size(hvy_sol,4))
@@ -21,11 +22,14 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     logical                            :: verbose_apply, init0
     character(len=cshort)              :: fname
     integer(kind=ik), dimension(:), allocatable, save :: lgt_refinementStatus_backup
+    real(kind=rk)                      :: time_set
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
     init0 = .false.
     if (present(init_0)) init0 = init_0
+    time_set = 0.0_rk
+    if (present(time)) time_set = time
 
     ! For the Mehrstellenverfahren, we actually do solve the system Au = Bb
     ! So before doing anything, we apply the matrix B on b, this is a large tensorial matrix, but we only have to apply this operation once
@@ -90,13 +94,20 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
             if (i_cycle >= params%poisson_cycle_it) exit
         elseif (params%poisson_cycle_end_criteria == "tolerance") then
             if (all(residual(1:size(hvy_sol,4)) < params%poisson_cycle_tol_abs)) exit
-            if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel) .and. all(norm_sol(1:size(hvy_sol,4)) > 1e-8)) exit
+            ! important, here I have a criteria that is important if norm_sol is close to 0 to avoid division by 0
+            ! However, it can in rare cases really get close to 0 (for Helmholtz projection if div is really close to 0)
+            ! even if we start by 1e-10, we can achieve residuals of 1e-24. Maybe we could actually delete the check, but I leave it there for now
+            if (all(residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) < params%poisson_cycle_tol_rel) .and. all(norm_sol(1:size(hvy_sol,4)) > 1e-15)) exit
         else
             call abort(250903, "Don't know how to stop! Please choose between 'fixed_iterations' and 'tolerance', thank you :)")
         endif
 
         if (any(residual(1:size(hvy_sol,4)) > LIM_DIVERGED)) then
             write(fname, '(A, i0, A, es10.3)') "Poisson solver diverged, aborting at it ", i_cycle, ", Max Res Linfty: ", maxval(residual(1:size(hvy_sol,4)))
+            ! done by all ranks but well I hope the cluster can take one for the team.
+            ! This (empty) file is for scripting purposes on the supercomputers.
+            open (77, file='NSPP_diverged', status='replace')
+            close(77)
             call abort(260121, fname)
         endif
 
@@ -120,6 +131,8 @@ subroutine multigrid_solve(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, init_0, 
     if (params%rank == 0 .and. .not. verbose_apply) then
         write(fname, '(A, i0, A, i0, A)') "(A, i0, A, ", size(hvy_sol,4), "(es10.3, 1x), A, ", size(hvy_sol,4), "(es10.3, 1x))"
         write(*, fname) "   Final Residual after ", i_cycle, " it, Linfty: ", residual(1:size(hvy_sol,4)), " , rel to RHS: ", residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4))
+
+        call append_t_file( 'poisson_solver.t', (/ time_set, dble(i_cycle), residual(1:size(hvy_sol,4)), residual(1:size(hvy_sol,4))/norm_sol(1:size(hvy_sol,4)) /) )
     endif
 
     ! delete all non-leaf blocks with daughters as we for now do not have any use for them
@@ -175,6 +188,7 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     integer(kind=2)                    :: n_domain(1:3)
     integer(kind=tsize)                :: treecode
     logical                            :: verbose_apply
+    character(len=cshort)              :: order_predictor_backup
     
     ! Array for treecode mapping: (hvy_id, tc_part1, tc_part2)
     integer(kind=ik), save, allocatable :: tc_map_old(:,:)
@@ -185,6 +199,12 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     if (present(verbose)) verbose_apply = verbose
 
     nc = size(hvy_sol,4)
+
+    ! in this routine, we sync the solution of the Poisson equation
+    ! in order to have consistent convergence order, this needs interpolation order of p+2
+    ! so we temporarily increase the interpolation order here
+    ! ATTENTION: this is still prototype and quite hacky, it circumvents some size checks
+    order_predictor_backup = params%order_predictor
 
     ! Logic to define the solution layer at each iteration:
     !    Downwards - we simply do a wavelet decomposition of the residual, but only using the scaling filter
@@ -204,7 +224,9 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     t_block = MPI_Wtime()
     ! call sync_ghosts_RHS_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, g_minus=a, g_plus=a)
     ! call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, g_minus=a, g_plus=a)
+    params%order_predictor = params%poisson_order_predictor
     call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID)
+    params%order_predictor = order_predictor_backup
     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
 
     ! JB Comment: I think this is not necessary, we do coarse extension but only keep the block values and not the decomposed ones, so we should reconstruct the original values later on without any problems
@@ -374,7 +396,9 @@ subroutine multigrid_vcycle(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, verbose
     call toc( "MG - RHS and solution restoration", 10032, MPI_Wtime()-t_block )
 
     ! sync before computing final residual
-    call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID, params%poisson_stencil_size, params%poisson_stencil_size)
+    params%order_predictor = params%poisson_order_predictor
+    call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID)
+    params%order_predictor = order_predictor_backup
     ! call sync_ghosts_tree(params, hvy_sol(:,:,:,1:nc,:), tree_ID)
     call toc( "Sync Layer", 10010, MPI_Wtime()-t_block )
 
@@ -474,10 +498,12 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
     real(kind=rk)      :: dx(1:3), x0(1:3)
     logical            :: verbose_apply, balance_load_needed
     integer (kind=ik)  :: num_leaf, num_operate
+    character(len=cshort)              :: order_predictor_backup
 
     verbose_apply = .false.
     if (present(verbose)) verbose_apply = verbose
     balance_load_needed = .false.
+
 
     nc = size(hvy_sol,4)
 
@@ -659,7 +685,12 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
             enddo
         enddo
 
-        ! do actual sweeps
+        ! --- do actual sweeps ---
+        ! in this routine, we sync the solution of the Poisson equation
+        ! in order to have consistent convergence order, this needs interpolation order of p+2
+        ! so we temporarily increase the interpolation order here
+        order_predictor_backup = params%order_predictor
+        params%order_predictor = params%poisson_order_predictor
         ! if (i_level /= Jmax_a) then
             sync_freq = params%poisson_Sync_it
             ! sync_freq = params%g / params%poisson_stencil_size
@@ -680,6 +711,7 @@ subroutine multigrid_upwards(params, hvy_sol, hvy_RHS, hvy_work, tree_ID, Jmin, 
                 sweep_forward = .not. sweep_forward
             enddo
         ! endif
+        params%order_predictor = order_predictor_backup
 
         if (verbose_apply) then
             t_print = MPI_Wtime()-t_loop
@@ -726,6 +758,7 @@ subroutine reorder_hvy_arrays(params, hvy_data, tree_ID, tc_map_old, n_leaves, h
     real(kind=rk), allocatable, save :: tmp_data(:,:,:,:), tmp_data_2(:,:,:,:)
     integer(kind=ik), allocatable, save :: current_to_original(:), original_to_current(:), tmp_lgt_block(:)
     integer(kind=ik) :: Bs(1:3), g
+    logical :: verbose=.false.
     
     ! Get grid parameters
     Bs = params%Bs
@@ -770,7 +803,7 @@ subroutine reorder_hvy_arrays(params, hvy_data, tree_ID, tc_map_old, n_leaves, h
         
         ! Find this treecode in tc_map_old to get original hvy_id (before load balance)
         call find_id_by_treecode(tc_map_old, n_leaves, treecode, original_hvy_id, tc_found)
-        
+
         if (.not. tc_found) then
             call abort(260116, "[reorder_hvy_arrays] ERROR: Treecode not found in tc_map_old during reordering")
         endif

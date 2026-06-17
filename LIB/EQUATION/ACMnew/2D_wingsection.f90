@@ -75,8 +75,8 @@ subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
                 u = u00 - omega*y
                 v = v00 + omega*x
 
-                tmp = smoothstep(abs(xp-0.5_rk), 0.5_rk, h)
-                tmp = tmp*smoothstep(abs(yp), 0.5_rk*wingsections(i)%section_thickness, h)
+                tmp = step(abs(xp-0.5_rk), 0.5_rk, h, 5*h, params_acm%smoothing_type_int)
+                tmp = tmp*step(abs(yp), 0.5_rk*wingsections(i)%section_thickness, h, 5*h, params_acm%smoothing_type_int)
 
                 if (tmp >= mask(ix,iy,1)) then
                     ! mask function

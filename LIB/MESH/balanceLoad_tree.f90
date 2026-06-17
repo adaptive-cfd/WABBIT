@@ -294,7 +294,7 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceMode, balance_re
         
         do i_var = 1, 3
             ! gather number of blocks send/received/kept on rank 0
-            call MPI_GATHER(num_blocks_count(i_var), 1, MPI_INTEGER, blocksPerRank_balanced, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(num_blocks_count(i_var), 1, MPI_INTEGER4, blocksPerRank_balanced, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 if (present(balance_name)) then
                     string_prepare = trim(adjustl(balance_name))//","

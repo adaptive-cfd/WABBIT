@@ -445,11 +445,12 @@ end subroutine createActiveSortedLists_tree
 !>    lgt_active(:,tree_ID) - active block list of tree
 !>    lgt_n(:,tree_ID)      - number of active blocks in tree
 !> \author PKrah
-subroutine createActiveSortedLists_forest(params)
+subroutine createActiveSortedLists_forest(params, sort_only_treecode)
 
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(in) :: params
+    logical, intent(in), optional :: sort_only_treecode  !< if true, we only sort after treeid-treecode and not treeid-level-treecode, works only for leaf grids
     !-----------------------------------------------------------------
 
     integer(kind=ik) :: k, N, hvy_id, block_rank, fsize
@@ -457,6 +458,7 @@ subroutine createActiveSortedLists_forest(params)
     integer(kind=tsize) :: treecode_int
     integer(kind=ik) :: tc_ik(2)
     real(kind=rk) :: t0
+    logical :: sortOnlyTreecode
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -470,6 +472,9 @@ subroutine createActiveSortedLists_forest(params)
     rank  = params%rank
     N     = params%number_blocks
     fsize = params%forest_size
+
+    sortOnlyTreecode = .false.
+    if (present(sort_only_treecode)) sortOnlyTreecode = sort_only_treecode
 
     ! =======================================================
     ! Reset active lists of all trees
@@ -540,7 +545,13 @@ subroutine createActiveSortedLists_forest(params)
             ! as max_level is 31 for 2D, we shift tree_ID by 100
             ! this might be confusing but can be entangled easily
             ! fourth index stores the level and tree_id
-            lgt_sortednumlist(4, lgt_n(tree_ID), tree_ID) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
+            if (sortOnlyTreecode) then
+                ! If we only insert the treecode, then all level will be encoded as 0
+                ! We assume that no treecode exists two times (which is true for leaf grids)
+                lgt_sortednumlist(4, lgt_n(tree_ID), tree_ID) = tree_ID * 100
+            else
+                lgt_sortednumlist(4, lgt_n(tree_ID), tree_ID) = lgt_block(k, IDX_MESH_LVL) + tree_ID * 100
+            endif
 
             ! ! fourth index stores the level
             ! lgt_sortednumlist(lgt_n(tree_ID), 4, tree_ID) = lgt_block(k, IDX_MESH_LVL)

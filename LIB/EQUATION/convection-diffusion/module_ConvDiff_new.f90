@@ -184,7 +184,7 @@ contains
   ! NOTE that as we have way more work arrays than actual state variables (typically
   ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
   !-----------------------------------------------------------------------------
-  subroutine PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
+  subroutine PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work, names_override )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -205,8 +205,11 @@ contains
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
+    ! if you want to save something that is not in the default list of variables, you can specify a list of names here.
+    character(len=*), optional, intent(in) :: names_override(:)
+
     ! local variables
-    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics
+    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics, n_names
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -214,8 +217,22 @@ contains
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    do k = 1, size(params_convdiff%names,1)
-        name = params_convdiff%names(k)
+    if (present(names_override)) then
+        n_names = size(names_override)
+    else
+        n_names = size(params_convdiff%names,1)
+    endif
+
+    if (size(work,4) < n_names) then
+        call abort(2505201, "ACM: PREPARE_SAVE_DATA_ACM: work array has insufficient components for requested names list")
+    endif
+
+    do k = 1, n_names
+        if (present(names_override)) then
+            name = names_override(k)
+        else
+            name = params_convdiff%names(k)
+        endif
         
         ! saving of phi, read if it starts with "phi" and has no "-" in there for time statistics
         if (name(1:3) == "phi" .and. index(name, "-") == 0) then
@@ -290,7 +307,7 @@ contains
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=cshort), intent(out) :: name
+    character(len=clong), intent(out) :: name
 
     if (allocated(params_convdiff%names)) then
       name = params_convdiff%names(N)

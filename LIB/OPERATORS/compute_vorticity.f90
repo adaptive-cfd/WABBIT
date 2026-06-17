@@ -239,3 +239,120 @@ subroutine compute_helicity_abs(u, dx, Bs, g, discretization, hel_abs)
     end if
 
 end subroutine compute_helicity_abs
+
+
+!> \brief Compute vorticity stretching: alpha = omega_hat_i * e_ij * omega_hat_j
+!! where omega_hat = omega / |omega| is normalized vorticity
+!! and e_ij = 0.5*(u_i,j + u_j,i) is the symmetric strain rate tensor
+!! This quantity measures the alignment of vorticity with the principal stretching direction
+subroutine compute_vorticity_stretching(u, dx, Bs, g, discretization, vor_stretch)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+    implicit none
+
+    real(kind=rk), dimension(3), intent(in)        :: dx                        !> spacing of the block
+    real(kind=rk), dimension(:,:,:,:), intent(in)  :: u                         !> local datafields
+    real(kind=rk), dimension(:,:,:), intent(out)   :: vor_stretch               !> vorticity stretching (scalar)
+    character(len=*), intent(in)                   :: discretization
+    integer(kind=ik), intent(in)                   :: g                         !> grid parameters
+    integer(kind=ik), dimension(3), intent(in)     :: Bs
+    
+    !> derivatives
+    real(kind=rk)                                  :: uxdx, uxdy, uxdz, uydx, uydy, uydz, uzdx, uzdy, uzdz
+    real(kind=rk)                                  :: u_dy, u_dz, v_dx, v_dz, w_dx, w_dy
+    real(kind=rk)                                  :: vort_x, vort_y, vort_z    !> vorticity components
+    real(kind=rk)                                  :: omega_mag, omega_mag_inv  !> vorticity magnitude and its inverse
+    real(kind=rk)                                  :: omega_hat(3)              !> normalized vorticity
+    real(kind=rk)                                  :: e_tensor(3,3)             !> strain rate tensor
+    real(kind=rk)                                  :: dx_inv, dy_inv, dz_inv    !> inverse of dx, dy, dz
+    real(kind=rk), parameter                       :: eps = 1.0e-10_rk          !> regularization parameter for |omega| -> 0
+    integer(kind=ik)                               :: ix, iy, iz, i, j          !> loop variables
+
+    !> parameters for FD1_l operator
+    real(kind=rk), allocatable, dimension(:) :: FD1_l
+    integer(kind=ik) :: FD1_ls, FD1_le
+
+    ! Setup finite difference stencils
+    call setup_FD1_left_stencil(discretization, FD1_l, FD1_ls, FD1_le)
+
+    vor_stretch = 0.0_rk
+
+    dx_inv = 1.0_rk / dx(1)
+    dy_inv = 1.0_rk / dx(2)
+
+    if (size(u,3)>2) then ! 3D case only
+        dz_inv = 1.0_rk / dx(3)
+        
+        do ix = g+1, Bs(1)+g
+            do iy = g+1, Bs(2)+g
+                do iz = g+1, Bs(3)+g
+                    ! ===================================================================
+                    ! Compute all 9 velocity gradient components
+                    ! ===================================================================
+                    uxdx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 1)) * dx_inv
+                    uxdy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 1)) * dy_inv
+                    uxdz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 1)) * dz_inv
+
+                    uydx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 2)) * dx_inv
+                    uydy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 2)) * dy_inv
+                    uydz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 2)) * dz_inv
+
+                    uzdx = sum(FD1_l(FD1_ls:FD1_le) * u(ix+FD1_ls:ix+FD1_le, iy, iz, 3)) * dx_inv
+                    uzdy = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy+FD1_ls:iy+FD1_le, iz, 3)) * dy_inv
+                    uzdz = sum(FD1_l(FD1_ls:FD1_le) * u(ix, iy, iz+FD1_ls:iz+FD1_le, 3)) * dz_inv
+
+                    ! ===================================================================
+                    ! Compute symmetric strain rate tensor: e_ij = 0.5 * (u_i,j + u_j,i)
+                    ! ===================================================================
+                    e_tensor(1,1) = uxdx                      ! e_xx = du/dx
+                    e_tensor(2,2) = uydy                      ! e_yy = dv/dy
+                    e_tensor(3,3) = uzdz                      ! e_zz = dw/dz
+                    e_tensor(1,2) = 0.5_rk * (uxdy + uydx)    ! e_xy = 0.5*(du/dy + dv/dx)
+                    e_tensor(1,3) = 0.5_rk * (uxdz + uzdx)    ! e_xz = 0.5*(du/dz + dw/dx)
+                    e_tensor(2,3) = 0.5_rk * (uydz + uzdy)    ! e_yz = 0.5*(dv/dz + dw/dy)
+                    e_tensor(2,1) = e_tensor(1,2)             ! symmetry
+                    e_tensor(3,1) = e_tensor(1,3)             ! symmetry
+                    e_tensor(3,2) = e_tensor(2,3)             ! symmetry
+
+                    ! ===================================================================
+                    ! Compute vorticity components
+                    ! ===================================================================
+                    vort_x = uzdy - uydz   ! omega_x = dw/dy - dv/dz
+                    vort_y = uxdz - uzdx   ! omega_y = du/dz - dw/dx
+                    vort_z = uydx - uxdy   ! omega_z = dv/dx - du/dy
+
+                    ! ===================================================================
+                    ! Compute vorticity magnitude and normalize
+                    ! ===================================================================
+                    omega_mag = sqrt(vort_x**2 + vort_y**2 + vort_z**2)
+                    
+                    ! Singularity handling: avoid division by zero when |omega| -> 0
+                    ! Use regularization: omega_hat = omega / (|omega| + eps)
+                    if (omega_mag > eps) then
+                        omega_mag_inv = 1.0_rk / omega_mag
+                        omega_hat(1) = vort_x * omega_mag_inv
+                        omega_hat(2) = vort_y * omega_mag_inv
+                        omega_hat(3) = vort_z * omega_mag_inv
+                    else
+                        ! In regions of negligible vorticity, set stretching to zero
+                        omega_hat = 0.0_rk
+                    end if
+
+                    ! ===================================================================
+                    ! Compute vorticity stretching: alpha = omega_hat_i * e_ij * omega_hat_j
+                    ! ===================================================================
+                    vor_stretch(ix,iy,iz) = 0.0_rk
+                    do i = 1, 3
+                        do j = 1, 3
+                            vor_stretch(ix,iy,iz) = vor_stretch(ix,iy,iz) + omega_hat(i) * e_tensor(i,j) * omega_hat(j)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+    else
+        ! 2D case: vorticity stretching is not meaningful in 2D
+        call abort(23324, "ERROR: vorticity stretching is only defined for 3D flows.")
+    end if
+
+end subroutine compute_vorticity_stretching

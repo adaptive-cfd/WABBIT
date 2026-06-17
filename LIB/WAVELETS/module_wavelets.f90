@@ -26,6 +26,7 @@ contains
 
 #include "conversion_routines.f90"
 #include "wavelet_decomposition_reconstruction.f90"
+#include "sub0_decomposition.f90"
 
 
     ! this function is only used in merge_blocks, we could remove it
@@ -115,6 +116,8 @@ contains
         ! setup interpolation coefficients
         ! All orders from Taylor expansion
         ! Order 1-8 verified with Deriaz. JCP2023
+        ! Why is this done every time? For the poisson solver, we really need this to be variable: the prediction order needs to 
+        ! be R+2 with R the order of the FD approx. For the wavelets, we always use the same predictor.
         select case(order_predictor)
         case ("multiresolution_2nd")
             allocate(c(1:2))
@@ -165,22 +168,83 @@ contains
         ! Sometimes called checkerboard copying
         fine(1:nxfine:2, 1:nyfine:2, 1:nzfine:2) = coarse(:, :, :)
 
-        ! matrix operation version
-        ! x-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) = fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) + c(shift)*fine(2*N+shift_fine:nxfine-(2*N-1)+shift_fine:2,1:nyfine:2,1:nzfine:2)
-        end do
-        ! y-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) = fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) + c(shift)*fine(:,2*N+shift_fine:nyfine-(2*N-1)+shift_fine:2,1:nzfine:2)
-        end do
-        ! z-interpolation
-        do shift = 1, size(c,1)
-            shift_fine = -size(c,1)+(2*shift-1)
-            fine(:,:,2*N:nzfine-(2*N-1):2) = fine(:,:,2*N:nzfine-(2*N-1):2) + c(shift)*fine(:,:,2*N+shift_fine:nzfine-(2*N-1)+shift_fine:2)
-        end do
+        ! hardcoding stencils as this is performance critical code
+        select case(size(c,1))
+        case (2)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 2, nxfine-1, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-1,iyfine,izfine) + c(2)*fine(ixfine+1,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 2, nyfine-1, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-1,izfine) + c(2)*fine(ixfine,iyfine+1,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 2, nzfine-1, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-1) + c(2)*fine(:,:,izfine+1)
+            end do
+        case (4)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 4, nxfine-3, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-3,iyfine,izfine) + c(2)*fine(ixfine-1,iyfine,izfine) + &
+                                                 c(3)*fine(ixfine+1,iyfine,izfine) + c(4)*fine(ixfine+3,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 4, nyfine-3, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-3,izfine) + c(2)*fine(ixfine,iyfine-1,izfine) + &
+                                                 c(3)*fine(ixfine,iyfine+1,izfine) + c(4)*fine(ixfine,iyfine+3,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 4, nzfine-3, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-3) + c(2)*fine(:,:,izfine-1) + &
+                                   c(3)*fine(:,:,izfine+1) + c(4)*fine(:,:,izfine+3)
+            end do
+        case (6)
+            ! interpolation in z=const plane, trying to fit one slice into cache
+            do izfine = 1, nzfine, 2;
+                ! x interpolation
+                do iyfine = 1, nyfine, 2; do ixfine = 6, nxfine-5, 2
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine-5,iyfine,izfine) + c(2)*fine(ixfine-3,iyfine,izfine) + &
+                                                 c(3)*fine(ixfine-1,iyfine,izfine) + c(4)*fine(ixfine+1,iyfine,izfine) + &
+                                                 c(5)*fine(ixfine+3,iyfine,izfine) + c(6)*fine(ixfine+5,iyfine,izfine)
+                end do; end do;
+                ! y interpolation
+                do iyfine = 6, nyfine-5, 2; do ixfine = 1, nxfine, 1
+                    fine(ixfine,iyfine,izfine) = c(1)*fine(ixfine,iyfine-5,izfine) + c(2)*fine(ixfine,iyfine-3,izfine) + &
+                                                 c(3)*fine(ixfine,iyfine-1,izfine) + c(4)*fine(ixfine,iyfine+1,izfine) + &
+                                                 c(5)*fine(ixfine,iyfine+3,izfine) + c(6)*fine(ixfine,iyfine+5,izfine)
+                end do; end do;
+            end do
+            ! interpolation along z, now fully vectorized
+            do izfine = 6, nzfine-5, 2
+                fine(:,:,izfine) = c(1)*fine(:,:,izfine-5) + c(2)*fine(:,:,izfine-3) + &
+                                   c(3)*fine(:,:,izfine-1) + c(4)*fine(:,:,izfine+1) + &
+                                   c(5)*fine(:,:,izfine+3) + c(6)*fine(:,:,izfine+5)
+            end do
+        case default
+            ! for higher order stencils, we fall back to the general matrix operation version
+            ! x-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) = fine(2*N:nxfine-(2*N-1):2,1:nyfine:2,1:nzfine:2) + c(shift)*fine(2*N+shift_fine:nxfine-(2*N-1)+shift_fine:2,1:nyfine:2,1:nzfine:2)
+            end do
+            ! y-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) = fine(:,2*N:nyfine-(2*N-1):2,1:nzfine:2) + c(shift)*fine(:,2*N+shift_fine:nyfine-(2*N-1)+shift_fine:2,1:nzfine:2)
+            end do
+            ! z-interpolation
+            do shift = 1, size(c,1)
+                shift_fine = -size(c,1)+(2*shift-1)
+                fine(:,:,2*N:nzfine-(2*N-1):2) = fine(:,:,2*N:nzfine-(2*N-1):2) + c(shift)*fine(:,:,2*N+shift_fine:nzfine-(2*N-1)+shift_fine:2)
+            end do
+        end select
 
         ! do izfine = 1, nzfine, 2
         !     ! in the z=const planes, we execute the 2D code.
@@ -1012,10 +1076,10 @@ contains
             !           consequently, the coarsen(refine(u)) unit test will fail.
             ! Issue #2: Coarse extension is to be clarified with coiflet -> copying of SC near interface may make less sense than for CDF ?
             allocate(params%HD(-4:7))
-            allocate(params%GD(-6:5))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
+            allocate(params%GD(-7:4))
 
             allocate(params%HR(-7:4))
-            allocate(params%GR(-5:6))  ! maybe needs to be shifted after reshifting wavelet filters to be symmetric
+            allocate(params%GR(-4:7))
 
             ! copied from flusi coiflet (output)
             params%HD=(/1.638733646318000E-02, -4.146493678197000E-02, -6.737255472230000E-02, 3.861100668230900E-01, 8.127236354496100E-01, 4.170051844237800E-01,-7.648859907826000E-02,-5.943441864647000E-02, 2.368017194688000E-02, 5.611434819370000E-03,-1.823208870910000E-03,-7.205494453700000E-04/)
@@ -1026,7 +1090,9 @@ contains
             ! As the coiflets are *not* strictly interpolating, only "almost-interpolating", the combination with 
             ! a fourth order interpolation in the ghost nodes is questionable. The "predictor" is used in the ghost nodes interpolation.
             params%order_predictor = "multiresolution_4th"
+            params%poisson_order_predictor = "multiresolution_6th"
             CDFX = 4  ! This wavelet is quasi-interpolating of order 4
+            CDFY = 4  ! This wavelet has 4 vanishing moments? I don't think so actually
 
             do i = 1, 100
                 write(*,*) "Warning: COIFLET12 is not yet fully tested and implemented, do not use for production runs!"
@@ -1216,16 +1282,24 @@ contains
             ! order predictor is decided by X in CDFXY (it is coinciding with the HR filter actually)
             if (CDFX == 2) then
                 params%order_predictor = "multiresolution_2nd"
+                params%poisson_order_predictor = "multiresolution_4th"
             elseif (CDFX == 4) then
                 params%order_predictor = "multiresolution_4th"
+                params%poisson_order_predictor = "multiresolution_6th"
             elseif (CDFX == 6) then
                 params%order_predictor = "multiresolution_6th"
+                params%poisson_order_predictor = "multiresolution_8th"
             elseif (CDFX == 8) then
                 params%order_predictor = "multiresolution_8th"
+                params%poisson_order_predictor = "multiresolution_10th"
             elseif (CDFX == 10) then
                 params%order_predictor = "multiresolution_10th"
+                params%poisson_order_predictor = "multiresolution_12th"
             elseif (CDFX == 12) then
+                ! 14th doesn't exist, we just use the 12th order predictor for poisson as well
+                ! it's not like anyone's gonna use that anyways
                 params%order_predictor = "multiresolution_12th"
+                params%poisson_order_predictor = "multiresolution_12th"
             endif
         end select
 

@@ -252,7 +252,7 @@ subroutine post_stl2dist(params)
             do iz = 1, Bs(3)+2*g
                 do iy = 1, Bs(2)+2*g
                     do ix = 1, Bs(1)+2*g
-                        hvy_block(ix,iy,iz,1,hvy_id) = smoothstep( hvy_block(ix,iy,iz,1,hvy_id), 0.0_rk, 1.5_rk*dx(1) )
+                        hvy_block(ix,iy,iz,1,hvy_id) = step_cosine( hvy_block(ix,iy,iz,1,hvy_id), 0.0_rk, 1.5_rk*dx(1) )
                     enddo
                 enddo
             enddo

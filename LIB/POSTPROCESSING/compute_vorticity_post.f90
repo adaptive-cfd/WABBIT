@@ -72,6 +72,17 @@ subroutine compute_vorticity_post(params)
             write(*, '(A)') " Computes Q-criterion of 2D/3D velocity field, saves in "
             write(*, '(A)') " Qcrit_*.h5"
             write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --vorticity-stretching"
+            write(*, '(A)') "./wabbit-post --vorticity-stretching source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
+            write(*, '(A)') " Computes vorticity stretching alpha = omega_hat_i * e_ij * omega_hat_j"
+            write(*, '(A)') " where omega_hat is normalized vorticity and e_ij is the strain rate tensor."
+            write(*, '(A)') " Only for 3D flows. Saves in vorstretch_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --energy"
+            write(*, '(A)') "./wabbit-post --energy source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " Computes kinetic energy per unit mass E = 0.5*(ux^2 + uy^2 + uz^2)"
+            write(*, '(A)') " Saves in energy_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
         end if
         return
     endif
@@ -117,6 +128,9 @@ subroutine compute_vorticity_post(params)
     elseif (order == "4_comp_04") then
         params%order_discretization = "FD_4th_comp_0_4"
         if (params%wavelet == "---") params%wavelet = "CDF40"  ! wavelet used for adaptive syncing
+    elseif (order == "5_comp_14") then
+        params%order_discretization = "FD_5th_comp_1_4"
+        if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
     elseif (order == "5_comp_23") then
         params%order_discretization = "FD_5th_comp_2_3"
         if (params%wavelet == "---") params%wavelet = "CDF60"  ! wavelet used for adaptive syncing
@@ -170,7 +184,7 @@ subroutine compute_vorticity_post(params)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     nwork = 1
-    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
+    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz" .or. operator == "--helicity") then
         nwork = 3
     endif
 
@@ -195,7 +209,7 @@ subroutine compute_vorticity_post(params)
 
         if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
             call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
-            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,:,hvyID))
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
 
         elseif (operator=="--vor-abs") then
             call compute_vorticity_abs(hvy_block(:,:,:,1:3,hvyID), &
@@ -207,6 +221,10 @@ subroutine compute_vorticity_post(params)
 
         elseif (operator=="--hel-abs") then
             call compute_helicity_abs(hvy_block(:,:,:,1:3,hvyID), &
+            dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
+
+        elseif (operator=="--vorticity-stretching") then
+            call compute_vorticity_stretching(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
         elseif (operator == "--divergence") then
@@ -231,6 +249,17 @@ subroutine compute_vorticity_post(params)
             call compute_dissipation( hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
+        elseif (operator == "--energy") then
+            ! Compute kinetic energy: E = 0.5 * (ux^2 + uy^2 + uz^2)
+            if (params%dim == 3) then
+                hvy_tmp(:,:,:,1,hvyID) = 0.5_rk * ( hvy_block(:,:,:,1,hvyID)**2 &
+                                                  + hvy_block(:,:,:,2,hvyID)**2 &
+                                                  + hvy_block(:,:,:,3,hvyID)**2 )
+            else
+                hvy_tmp(:,:,:,1,hvyID) = 0.5_rk * ( hvy_block(:,:,:,1,hvyID)**2 &
+                                                  + hvy_block(:,:,:,2,hvyID)**2 )
+            endif
+
         else
             call abort(1812011, "operator is neither --vorticity --vor-abs --divergence --Q")
 
@@ -239,56 +268,63 @@ subroutine compute_vorticity_post(params)
 
     if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
         if (operator /= "--vory" .and. operator /= "--vorz") then
-            write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+            write( fname,'(a, "_", a, ".h5")') 'vorx', trim(adjustl(timestr(time)))
             call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
         end if
 
         if (params%dim == 3) then
             if (operator /= "--vorx" .and. operator /= "--vorz") then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vory', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') 'vory', trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
             end if
             if (operator /= "--vorx" .and. operator /= "--vory") then
-                write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+                write( fname,'(a, "_", a, ".h5")') 'vorz', trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
             end if
         end if
 
     elseif (operator == "--vor-abs") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'vorabs', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'vorabs', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--helicity") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'helx', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'hely', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'hely', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID )
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helz', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'helz', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--hel-abs") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'helabs', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'helabs', trim(adjustl(timestr(time)))
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+
+    elseif (operator=="--vorticity-stretching") then
+        write( fname,'(a, "_", a, ".h5")') 'vorstretch', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--divergence") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'divu', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
-
+        write( fname,'(a, "_", a, ".h5")') 'divu', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--Q") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'Qcrit', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'Qcrit', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
     elseif (operator=="--dissipation") then
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'dissipation', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'dissipation', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
     elseif (operator=="--copy") then
 
-        write( fname,'(a, "_", i6.6, i6.6, ".h5")') 'copyUx', int(time+1.0e-12_rk, kind=ik), nint(max((time-int(time+1.0e-12_rk, kind=ik))*1.0e6_rk, 0.0_rk), kind=ik)
+        write( fname,'(a, "_", a, ".h5")') 'copyUx', trim(adjustl(timestr(time)))
+        call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
+    
+    elseif (operator=="--energy") then
+        write( fname,'(a, "_", a, ".h5")') 'energy', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     endif
 

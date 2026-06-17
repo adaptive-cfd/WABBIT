@@ -34,10 +34,13 @@ real(kind=rk), parameter :: FD2_C6(-3:3) = (/  2.0_rk, -27.0_rk,   270.0_rk, -49
 real(kind=rk), parameter :: FD2_C8(-4:4) = (/ -9.0_rk,  128.0_rk, -1008.0_rk, 8064.0_rk, -14350.0_rk, 8064.0_rk, -1008.0_rk, 128.0_rk, -9.0_rk /) / 5040_rk  ! 8th order central difference for second derivative
 
 ! Composite second derivative stencils (from module_poisson)
+real(kind=rk), parameter :: FD2_COMP2_0_2(-2:2) = (/ -3.0_rk, 16.0_rk, -26.0_rk, 16.0_rk, -3.0_rk /) / 4.0_rk  ! 3th order composite difference (-1,2)
 real(kind=rk), parameter :: FD2_COMP3_1_2(-3:3) = (/ -2.0_rk, 9.0_rk, 18.0_rk, -50.0_rk, 18.0_rk, 9.0_rk, -2.0_rk /) / 36.0_rk  ! 3th order composite difference (-1,2)
 real(kind=rk), parameter :: FD2_COMP4_0_4(-4:4) = (/ -75.0_rk, 544.0_rk, -1776.0_rk, 3552.0_rk, -4490.0_rk, 3552.0_rk, -1776.0_rk, 544.0_rk, -75.0_rk /) / 144.0_rk  ! 4th order composite difference (0,4)
 real(kind=rk), parameter :: FD2_COMP4_2_2(-4:4) = (/ 1.0_rk, -16.0_rk, 64.0_rk, 16.0_rk, -130.0_rk, 16.0_rk, 64.0_rk, -16.0_rk, 1.0_rk /) / 144.0_rk  ! 4th order composite difference (2,2)
 real(kind=rk), parameter :: FD2_COMP4_1_3(-4:4) = (/ 3.0_rk, -8.0_rk, -24.0_rk, 264.0_rk, -470.0_rk, 264.0_rk, -24.0_rk, -8.0_rk, 3.0_rk /) / 144.0_rk  ! 4th order composite difference (1,3)
+real(kind=rk), parameter :: FD2_COMP5_0_5(-5:5) = (/ 1644.0_rk, -13875.0_rk, 53500.0_rk, -126000.0_rk, 207000.0_rk, -244538.0_rk, 207000.0_rk, -126000.0_rk, 53500.0_rk, -13875.0_rk, 1644.0_rk /) / 3600.0_rk  ! 5th order composite difference (0,5)
+real(kind=rk), parameter :: FD2_COMP5_1_4(-5:5) = (/ -36.0_rk, 45.0_rk, 940.0_rk, -5040.0_rk, 15480.0_rk, -22778.0_rk, 15480.0_rk, -5040.0_rk, 940.0_rk, 45.0_rk, -36.0_rk /) / 3600.0_rk  ! 5th order composite difference (1,4)
 real(kind=rk), parameter :: FD2_COMP5_2_3(-5:5) = (/ -6.0_rk, 105.0_rk, -590.0_rk, 1440.0_rk, 1620.0_rk, -5138.0_rk, 1620.0_rk, 1440.0_rk, -590.0_rk, 105.0_rk, -6.0_rk /) / 3600.0_rk  ! 5th order composite difference (2,3)
 real(kind=rk), parameter :: FD2_COMP6_3_3(-6:6) = (/ 1.0_rk, -18.0_rk, 171.0_rk, -810.0_rk, 1935.0_rk, 828.0_rk, -4214.0_rk, 828.0_rk, 1935.0_rk, -810.0_rk, 171.0_rk, -18.0_rk, 1.0_rk /) / 3600.0_rk  ! 6th order composite difference (3,3)
 real(kind=rk), parameter :: FD2_COMP6_2_4(-6:6) = (/ 2.0_rk, -40.0_rk, 217.0_rk, -520.0_rk, 270.0_rk, 4656.0_rk, -9170.0_rk, 4656.0_rk, 270.0_rk, -520.0_rk, 217.0_rk, -40.0_rk, 2.0_rk /) / 3600.0_rk  ! 6th order composite difference (2,4)
@@ -57,7 +60,7 @@ real(kind=rk), parameter :: FD1X_C4(-2:2) = (/ -1.0_rk/48.0_rk, 1.0_rk/3.0_rk, 0
 ! Forward finite difference stencils for first derivative (used at left boundaries)
 ! R0 = starting from point 0, using points to the right
 real(kind=rk), parameter :: FD1_COMP1_0_1(0:1) = (/ -1.0_rk, 1.0_rk /)  ! 1st order forward difference (2-point)
-real(kind=rk), parameter :: FD1_COMP2_0_2(0:2) = (/ -3.0_rk, 6.0_rk, -1.0_rk /) / 2.0_rk  ! 2nd order forward difference (3-point)
+real(kind=rk), parameter :: FD1_COMP2_0_2(0:2) = (/ -3.0_rk, 4.0_rk, -1.0_rk /) / 2.0_rk  ! 2nd order forward difference (3-point)
 real(kind=rk), parameter :: FD1_COMP3_0_3(0:3) = (/ -11.0_rk, 18.0_rk, -9.0_rk, 2.0_rk /) / 6.0_rk  ! 3rd order forward difference (4-point)
 real(kind=rk), parameter :: FD1_COMP4_0_4(0:4) = (/ -25.0_rk, 48.0_rk, -36.0_rk, 16.0_rk, -3.0_rk /) / 12.0_rk  ! 4th order forward difference (5-point)
 real(kind=rk), parameter :: FD1_COMP5_0_5(0:5) = (/ -137.0_rk, 300.0_rk, -300.0_rk, 200.0_rk, -75.0_rk, 12.0_rk /) / 60.0_rk  ! 5th order forward difference (6-point)
@@ -67,6 +70,7 @@ real(kind=rk), parameter :: FD1_COMP6_0_6(0:6) = (/ -147.0_rk, 360.0_rk, -450.0_
 ! R1 = starting from point -1, using mostly points to the right
 real(kind=rk), parameter :: FD1_COMP3_1_2(-1:2) = (/ -2.0_rk, -3.0_rk, 6.0_rk, -1.0_rk /) / 6.0_rk  ! 3rd order biased difference (4-point, stencil from -1 to +2)
 real(kind=rk), parameter :: FD1_COMP4_1_3(-1:3) = (/ -3.0_rk, -10.0_rk, 18.0_rk, -6.0_rk, 1.0_rk /) / 12.0_rk  ! 4th order biased difference (5-point, stencil from -1 to +3)
+real(kind=rk), parameter :: FD1_COMP5_1_4(-1:4) = (/ -12.0_rk, -65.0_rk, 120.0_rk, -60.0_rk, 20.0_rk, -3.0_rk /) / 60.0_rk  ! 5th order biased difference (6-point, stencil from -1 to +4)
 real(kind=rk), parameter :: FD1_COMP5_2_3(-2:3) = (/  3.0_rk, -30.0_rk, -20.0_rk, 60.0_rk, -15.0_rk, 2.0_rk /) / 60.0_rk  ! 5th order biased difference (6-point, stencil from -2 to +3)
 real(kind=rk), parameter :: FD1_COMP6_1_5(-1:5) = (/ -10.0_rk, -77.0_rk, 150.0_rk, -100.0_rk, 50.0_rk, -15.0_rk, 2.0_rk /) / 60.0_rk  ! 6th order biased difference (7-point, stencil from -1 to +5)
 real(kind=rk), parameter :: FD1_COMP6_2_4(-2:4) = (/  2.0_rk, -24.0_rk, -35.0_rk, 80.0_rk, -30.0_rk, 8.0_rk, -1.0_rk /) / 60.0_rk  ! 6th order biased difference (7-point, stencil from -2 to +4)
@@ -76,7 +80,7 @@ real(kind=rk), parameter :: FD1_COMP8_3_5(-3:5) = (/ -5.0_rk, 60.0_rk, -420.0_rk
 !**********************************************************************************************
 ! These are the important routines that are visible to WABBIT:
 !**********************************************************************************************
-PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_helicity, compute_helicity_abs, compute_divergence, compute_gradient, compute_laplacian, compute_Qcriterion, compute_dissipation, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil
+PUBLIC :: compute_derivative, compute_vorticity, compute_vorticity_abs, compute_vorticity_stretching, compute_helicity, compute_helicity_abs, compute_divergence, compute_gradient, compute_laplacian, compute_Qcriterion, compute_dissipation, componentWiseNorm_tree, componentWiseNorm_block, setup_FD1_left_stencil, setup_FD1_right_stencil, setup_FD2_stencil, setup_FD1X_stencil, subtract_scalar_gradient
 
 contains
 
@@ -88,6 +92,7 @@ contains
 #include "compute_gradient.f90"
 #include "compute_laplacian.f90"
 #include "componentWiseNorm_tree.f90"
+#include "subtract_scalar_gradient.f90"
 
 
 !**********************************************************************************************
@@ -133,6 +138,16 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 3
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = FD1_CTWR4(:)
+        case("FD_1st_comp_0_1")
+            l_start = 0
+            l_end = 1
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = FD1_COMP1_0_1(:)
+        case("FD_2nd_comp_0_2")
+            l_start = -2
+            l_end = 0
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = FD1_COMP2_0_2(-l_start:-l_end:-1) ! left side is reversed
         case("FD_3rd_comp_1_2")
             l_start = -2
             l_end = 1
@@ -148,11 +163,26 @@ subroutine setup_FD1_left_stencil(FD1_order_discretization_in, FD1_l_array, l_st
             l_end = 1
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = -FD1_COMP4_1_3(-l_start:-l_end:-1) ! left side is reversed
+        case("FD_5th_comp_0_5")
+            l_start = -5
+            l_end = 0
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = -FD1_COMP5_0_5(-l_start:-l_end:-1) ! left side is reversed
+        case("FD_5th_comp_1_4")
+            l_start = -4
+            l_end = 1
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = -FD1_COMP5_1_4(-l_start:-l_end:-1) ! left side is reversed
         case("FD_5th_comp_2_3")
             l_start = -3
             l_end = 2
             allocate(FD1_l_array(l_start:l_end))
             FD1_l_array(:) = -FD1_COMP5_2_3(-l_start:-l_end:-1) ! left side is reversed
+        case("FD_6th_comp_0_6")
+            l_start = -6
+            l_end = 0
+            allocate(FD1_l_array(l_start:l_end))
+            FD1_l_array(:) = -FD1_COMP6_0_6(-l_start:-l_end:-1) ! left side is reversed
         case("FD_6th_comp_1_5")
             l_start = -5
             l_end = 1
@@ -221,6 +251,16 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_CTWR4(:)
+        case("FD_1st_comp_0_1")
+            r_start = 0
+            r_end = 1
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_COMP1_0_1(:)
+        case("FD_2nd_comp_0_2")
+            r_start = 0
+            r_end = 2
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_COMP2_0_2(:)
         case("FD_3rd_comp_1_2")
             r_start = -1
             r_end = 2
@@ -236,11 +276,26 @@ subroutine setup_FD1_right_stencil(FD1_order_discretization_in, FD1_r_array, r_s
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_COMP4_1_3(:)
+        case("FD_5th_comp_0_5")
+            r_start = 0
+            r_end = 5
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_COMP5_0_5(:)
+        case("FD_5th_comp_1_4")
+            r_start = -1
+            r_end = 4
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_COMP5_1_4(:)
         case("FD_5th_comp_2_3")
             r_start = -2
             r_end = 3
             allocate(FD1_r_array(r_start:r_end))
             FD1_r_array(:) = FD1_COMP5_2_3(:)
+        case("FD_6th_comp_0_6")
+            r_start = 0
+            r_end = 6
+            allocate(FD1_r_array(r_start:r_end))
+            FD1_r_array(:) = FD1_COMP6_0_6(:)
         case("FD_6th_comp_2_4")
             r_start = -2
             r_end = 4
@@ -275,7 +330,7 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
     character(len=*), intent(in) :: FD2_order_discretization_in !> order of the second derivative discretization
     real(kind=rk), allocatable, intent(inout) :: FD2_array(:) !> second derivative stencil array
     integer(kind=ik), intent(inout) :: fd2_start, fd2_end !> second derivative stencil bounds
-    logical, intent(in), optional :: use_composite_stencils !> if true, use exact composite stencils; if false (default), use central stencils for composite orders
+    logical, intent(in), optional :: use_composite_stencils !> if true, use the correct corresponding composite stencils; if false (default), use central stencils even though we have inputted a composite stencil. This is used to allow the diffusion term to be computed with central stencils, even when using composite stencils for everything else
     
     logical :: use_composite
     
@@ -291,11 +346,30 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
     if (allocated(FD2_array)) deallocate(FD2_array)
     
     select case(FD2_order_discretization_in)
+        case("FD_1st_comp_0_1")
+            ! First order stencil results in second order central composite stencil by chance
+            fd2_start = -1
+            fd2_end = 1
+            allocate(FD2_array(fd2_start:fd2_end))
+            FD2_array(:) = FD2_C2(:)
         case("FD_2nd_central")
             fd2_start = -1
             fd2_end = 1
             allocate(FD2_array(fd2_start:fd2_end))
             FD2_array(:) = FD2_C2(:)
+        case("FD_2nd_comp_0_2")
+            if (use_composite) then
+                fd2_start = -2
+                fd2_end = 0
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_COMP2_0_2(:)
+            else
+                ! fall back to central 2nd order stencil
+                fd2_start = -1
+                fd2_end = 1
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_C2(:)
+            endif
         case("FD_3rd_comp_1_2")
             if (use_composite) then
                 fd2_start = -3
@@ -352,6 +426,32 @@ subroutine setup_FD2_stencil(FD2_order_discretization_in, FD2_array, fd2_start, 
                 fd2_end = 2
                 allocate(FD2_array(fd2_start:fd2_end))
                 FD2_array(:) = FD2_C4(:)
+            endif
+        case("FD_5th_comp_0_5")
+            if (use_composite) then
+                fd2_start = -5
+                fd2_end = 5
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_COMP5_0_5(:)
+            ! no corresponding 5th order central stencil, fallback to 6th order
+            else
+                fd2_start = -3
+                fd2_end = 3
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_C6(:)
+            endif
+        case("FD_5th_comp_1_4")
+            if (use_composite) then
+                fd2_start = -5
+                fd2_end = 5
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_COMP5_1_4(:)
+            ! no corresponding 5th order central stencil, fallback to 6th order
+            else
+                fd2_start = -3
+                fd2_end = 3
+                allocate(FD2_array(fd2_start:fd2_end))
+                FD2_array(:) = FD2_C6(:)
             endif
         case("FD_5th_comp_2_3")
             if (use_composite) then

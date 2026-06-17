@@ -39,10 +39,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         mask_i(l) = l
     end do
 
-    if (.not. present(norm_case)) then
-        ! normal one, we sum up over all leafs
-        norm_case_id = 1
-    else
+    ! normal one, we sum up over all leafs
+    norm_case_id = 1  ! 
+    if (present(norm_case)) then
         ! treat the norm computations as for SC
         ! with this, we will skip every second point in each direction and multiply the L2norms for the fields by 2^d, as the cells are larger
         if (index(norm_case, "SC") > 0) then
@@ -62,7 +61,7 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
     endif
 
     select case (which_norm)
-    case ("L2", "H1", "L1", "Linfty", "Mean")
+    case ("L2", "H1", "L1", "L3", "L4", "Linfty", "Mean")
         if (which_norm == "Linfty") then
             norm = -1.0_rk
         else
@@ -117,6 +116,10 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                         norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**2 )
                     elseif (which_norm == "L1") then
                         norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
+                    elseif (which_norm == "L3") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**3 )
+                    elseif (which_norm == "L4") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )**4 )
                     elseif (which_norm == "Linfty" .and. sign == 1) then
                         norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), p, hvy_id )) )
                     elseif (which_norm == "Mean") then
@@ -144,6 +147,10 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
                         norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**2 )
                     elseif (which_norm == "L1") then
                         norm_block = sum( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
+                    elseif (which_norm == "L3") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**3 )
+                    elseif (which_norm == "L4") then
+                        norm_block = sum( hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )**4 )
                     elseif (which_norm == "Linfty" .and. sign == 1) then
                         norm_block = maxval( abs(hvy_block(g(1)+1:Bs(1)+g(1):mod(norm_case_id,10), g(2)+1:Bs(2)+g(2):mod(norm_case_id,10), g(3)+1:Bs(3)+g(3):mod(norm_case_id,10), mask, hvy_id )) )
                     elseif (which_norm == "Mean") then
@@ -180,6 +187,12 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         ! L2 and H1 need to receive square root
         if (which_norm == "L2" .or. which_norm == "H1") then
             norm = sqrt( norm )
+        endif
+        ! L3 and L4 need to receive 3rd or 4th root
+        if (which_norm == "L3") then
+            norm = dsign(abs(norm)**(1.0_rk/3.0_rk), norm)
+        elseif (which_norm == "L4") then
+            norm = sqrt( sqrt( norm ) )
         endif
     
 

@@ -96,3 +96,61 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
     call balanceLoad_tree( params, hvy_block, tree_ID )
 end subroutine
 !##############################################################
+
+
+!##############################################################
+! This routine only coarsens blocks above a target level.
+! If target_level is not passed, then max_treelevel is assumed.
+! Blocks below or at target level are left untouched.
+subroutine coarsenToLevel_tree(params, hvy_block, hvy_tmp, tree_ID, target_level, verbosity)
+    ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
+    use module_params
+
+    implicit none
+    !-----------------------------------------------------------------
+    type (type_params), intent(inout) :: params   !< params structure
+    real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    integer(kind=ik), intent(in)      :: tree_ID
+    real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
+    integer(kind=ik), intent(in), optional :: target_level
+    logical, intent(in), optional     :: verbosity !< if true: additional information of processing
+    !-----------------------------------------------------------------
+    integer(kind=ik) :: level, k, lgt_id, level_this, n_marked
+    logical :: verbose
+
+    verbose = .false.
+    if (present(verbosity)) verbose = verbosity
+
+    if (present(target_level)) then
+        level = target_level
+    else
+        level = params%Jmax
+    endif
+
+    do while (maxActiveLevel_tree(tree_ID) > level)
+        n_marked = 0
+
+        ! check where coarsening is needed and set refinement status to -1 (coarsen)
+        do k = 1, lgt_n(tree_ID)
+            lgt_id = lgt_active(k, tree_ID)
+            level_this = lgt_block(lgt_id, IDX_MESH_LVL)
+
+            if (level_this > level) then
+                lgt_block(lgt_id, IDX_REFINE_STS) = -1
+                n_marked = n_marked + 1
+            else
+                lgt_block(lgt_id, IDX_REFINE_STS) = 0
+            endif
+        enddo
+
+        call synchronize_lgt_data(params, refinement_status_only=.true.)
+
+        if (verbose .and. params%rank==0) then
+            write(*,'("coarsenToLevel_tree : target_level=",i4,", tagged blocks=",i8)') level, n_marked
+        endif
+
+        call adapt_tree(0.0_rk, params, hvy_block, tree_ID, "nothing (external)", hvy_tmp, &
+            ignore_coarsening=.false., init_full_tree_grid=.true.)
+    enddo
+end subroutine
+!##############################################################

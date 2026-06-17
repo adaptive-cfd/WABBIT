@@ -80,10 +80,9 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     if (present(init_full_tree_grid)) initFullTreeGrid = init_full_tree_grid
 
 
-    ! To avoid that the incoming hvy_neighbor array and active lists are outdated
-    ! we synchronize them.
+    ! To avoid that the incoming hvy_neighbor array and active lists are outdated we synchronize them.
     t_block = MPI_Wtime()
-    call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=.false.)
+    call updateMetadata_tree(params, tree_ID, Jmin_set=Jmin, search_overlapping=(.not. initFullTreeGrid))
     call toc( "adapt_tree (updateMetadata_tree)", 101, MPI_Wtime()-t_block )
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -455,7 +454,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
         if (params%debug_wavelet_decompose) then
             if (.not. allocated(blocks_decomposed_list)) allocate(blocks_decomposed_list(1:params%number_procs))
 
-            call MPI_GATHER(blocks_decomposed, 1, MPI_INTEGER, blocks_decomposed_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(blocks_decomposed, 1, MPI_INTEGER4, blocks_decomposed_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 open(unit=99, file=trim("debug_wavelet_decompose.csv"), status="unknown", position="append")
                 string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
@@ -640,7 +639,7 @@ subroutine wavelet_reconstruct_full_tree(params, hvy_block, hvy_tmp, tree_ID, Jm
         if (params%debug_wavelet_reconstruct) then
             if (.not. allocated(blocks_reconstructed_list)) allocate(blocks_reconstructed_list(1:params%number_procs))
 
-            call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER, blocks_reconstructed_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER4, blocks_reconstructed_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 open(unit=99, file=trim("debug_wavelet_reconstruct.csv"), status="unknown", position="append")
                 string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
@@ -853,7 +852,7 @@ subroutine wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block, hvy_tmp,
         if (params%debug_wavelet_reconstruct) then
             if (.not. allocated(blocks_reconstructed_list)) allocate(blocks_reconstructed_list(1:params%number_procs))
 
-            call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER, blocks_reconstructed_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+            call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER4, blocks_reconstructed_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
             if (params%rank == 0) then
                 open(unit=99, file=trim("debug_wavelet_reconstruct.csv"), status="unknown", position="append")
                 string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
@@ -939,7 +938,7 @@ subroutine wavelet_reconstruct_full_tree_CEoptimized(params, hvy_block, hvy_tmp,
             if (params%debug_wavelet_reconstruct) then
                 if (.not. allocated(blocks_reconstructed_list)) allocate(blocks_reconstructed_list(1:params%number_procs))
 
-                call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER, blocks_reconstructed_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+                call MPI_GATHER(blocks_reconstructed, 1, MPI_INTEGER4, blocks_reconstructed_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
                 if (params%rank == 0) then
                     open(unit=99, file=trim("debug_wavelet_reconstruct.csv"), status="unknown", position="append")
                     string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row

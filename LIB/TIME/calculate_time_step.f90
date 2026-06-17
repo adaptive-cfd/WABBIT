@@ -66,6 +66,17 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
         end if
     end if
 
+    if ( params%write_backup_n > 0) then
+        ! time step should also fit in backup time step size
+        ! criterion: check in time+dt above next backup time
+        ! if so: truncate time+dt
+        ! this is done by checking if we cross a multiple of write_backup_time (and therefore the remainder restarts from 0), this assumes that write_backup_time > dt
+        ! We also add a buffer of 1e-12 to avoid numerical issues
+        if ( mod(time+dt, params%write_backup_time) < mod(time+1e-12_rk, params%write_backup_time) .and. .not. abs(mod(time, params%write_backup_time)) < 1e-12_rk) then
+            dt = params%write_backup_time - mod(time, params%write_backup_time)
+        end if
+    end if
+
 
     if ( abs(params%tsave_stats-9999999.9_rk)>1e-3_rk ) then
         ! time step should also fit in statistics output time step size
@@ -82,6 +93,24 @@ subroutine calculate_time_step( params, time, iteration, hvy_block, dt, tree_ID 
         ! time step should hit time_statistics_start_time exactly
         if ( time+dt > params%time_statistics_start_time .and. time<params%time_statistics_start_time ) then
             dt = params%time_statistics_start_time - time
+        end if
+    end if
+
+    if ( abs(params%tsave_probes-9999999.9_rk)>1e-3_rk .or. params%nsave_probes /= 99999999_ik ) then
+        ! Ensure we can hit probe_start_time exactly if probes are enabled
+        if ( time+dt > params%probe_start_time .and. time < params%probe_start_time ) then
+            dt = params%probe_start_time - time
+        end if
+    end if
+
+    if ( abs(params%tsave_probes-9999999.9_rk)>1e-3_rk ) then
+        ! time step should also fit probe output time step size relative to probe_start_time
+        ! We add a buffer of 1e-12 to avoid numerical issues.
+        if ( time + 1e-12_rk >= params%probe_start_time ) then
+            if ( mod((time-params%probe_start_time)+dt, params%tsave_probes) < mod((time-params%probe_start_time)+1e-12_rk, params%tsave_probes) &
+                .and. .not. abs(mod((time-params%probe_start_time), params%tsave_probes)) < 1e-12_rk ) then
+                dt = params%tsave_probes - mod((time-params%probe_start_time), params%tsave_probes)
+            end if
         end if
     end if
 

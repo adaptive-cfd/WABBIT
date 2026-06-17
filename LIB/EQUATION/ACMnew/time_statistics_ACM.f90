@@ -51,7 +51,7 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
     end if
 
     do i_ts = 1, params_acm%N_time_statistics
-        select case (trim(params_acm%time_statistics_names(i_ts)))
+        select case (trim(standardize_string(params_acm%time_statistics_names(i_ts))))
         case ("ux-avg")
             ! compute the average of ux over time
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * u(:,:,:,1)
@@ -229,111 +229,111 @@ subroutine TIME_STATISTICS_ACM( time, dt, time_start, u, g, x0, dx, work, mask )
 
         ! Velocity derivative cases
         case ("uxdx-avg")
-            ! compute the average of ∂ux/∂x over time
+            ! compute the average of dux/dx over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uxdy-avg")
-            ! compute the average of ∂ux/∂y over time
+            ! compute the average of dux/dy over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uxdz-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uxdz not available in 2D simulations.")
-            ! compute the average of ∂ux/∂z over time
+            ! compute the average of dux/dz over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydx-avg")
-            ! compute the average of ∂uy/∂x over time
+            ! compute the average of duy/dx over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydy-avg")
-            ! compute the average of ∂uy/∂y over time
+            ! compute the average of duy/dy over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydz-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uydz not available in 2D simulations.")
-            ! compute the average of ∂uy/∂z over time
+            ! compute the average of duy/dz over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdx-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdx not available in 2D simulations.")
-            ! compute the average of ∂uz/∂x over time
+            ! compute the average of duz/dx over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdy-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdy not available in 2D simulations.")
-            ! compute the average of ∂uz/∂y over time
+            ! compute the average of duz/dy over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdz-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdz not available in 2D simulations.")
-            ! compute the average of ∂uz/∂z over time
+            ! compute the average of duz/dz over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         
         ! Squared velocity derivative cases
         case ("uxdx2-avg")
-            ! compute the average of (∂ux/∂x)² over time
+            ! compute the average of (dux/dx)^2 over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uxdy2-avg")
-            ! compute the average of (∂ux/∂y)² over time
+            ! compute the average of (dux/dy)^2 over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uxdz2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uxdz2 not available in 2D simulations.")
-            ! compute the average of (∂ux/∂z)² over time
+            ! compute the average of (dux/dz)^2 over time
             call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydx2-avg")
-            ! compute the average of (∂uy/∂x)² over time
+            ! compute the average of (duy/dx)^2 over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydy2-avg")
-            ! compute the average of (∂uy/∂y)² over time
+            ! compute the average of (duy/dy)^2 over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uydz2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uydz2 not available in 2D simulations.")
-            ! compute the average of (∂uy/∂z)² over time
+            ! compute the average of (duy/dz)^2 over time
             call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdx2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdx2 not available in 2D simulations.")
-            ! compute the average of (∂uz/∂x)² over time
+            ! compute the average of (duz/dx)^2 over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdy2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdy2 not available in 2D simulations.")
-            ! compute the average of (∂uz/∂y)² over time
+            ! compute the average of (duz/dy)^2 over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uzdz2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uzdz2 not available in 2D simulations.")
-            ! compute the average of (∂uz/∂z)² over time
+            ! compute the average of (duz/dz)^2 over time
             call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,1))
             work(:,:,:,1) = work(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         
         ! Squared velocity component cases
         case ("ux-2-avg")
-            ! compute the average of ux² over time
+            ! compute the average of ux^2 over time
             work(:,:,:,1) = u(:,:,:,1)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uy-2-avg")
-            ! compute the average of uy² over time
+            ! compute the average of uy^2 over time
             work(:,:,:,1) = u(:,:,:,2)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
         case ("uz-2-avg")
             if (params_acm%dim == 2) call abort(250916, "[TIME_STATISTICS_ACM]: uz-2 not available in 2D simulations.")
-            ! compute the average of uz² over time
+            ! compute the average of uz^2 over time
             work(:,:,:,1) = u(:,:,:,3)**2
             u(:,:,:,N_offset + i_ts) = (time_diff-dt)/time_diff * u(:,:,:,N_offset + i_ts) + dt/time_diff * work(:,:,:,1)
 
@@ -477,7 +477,7 @@ subroutine find_single_mean_index(current_idx, mean_name, mean_idx)
     
     ! Search for mean name after current index
     do j = current_idx + 1, params_acm%N_time_statistics
-        if (trim(params_acm%time_statistics_names(j)) == trim(mean_name)) then
+        if (trim(standardize_string(params_acm%time_statistics_names(j))) == trim(standardize_string(mean_name))) then
             mean_idx = j
             exit
         end if

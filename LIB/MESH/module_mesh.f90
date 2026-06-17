@@ -18,14 +18,23 @@ module module_mesh
     ! if the threshold_mask option is used, then the mesh module needs to create the mask function here
     ! hence we require the metamodule to be used.
     use module_physics_metamodule
+    ! Poisson solver stencils and single-block operations (GS, CG)
+    use module_poisson
+    ! FFT for coarsest level solve
+    use module_fft
 
     implicit none
 
 contains
 
+! Poisson solver tree-level operations (absorbed from module_poisson to avoid circular dependency)
+#include "multigrid_vcycle.f90"
+#include "poisson_operations.f90"
+
+! Mesh operations
 #include "securityZone_tree.f90"
 #include "coarseExtensionUpdate_tree.f90"
-#include "refineToEquidistant_tree.f90"
+#include "adaptToLevel_tree.f90"
 #include "InputOutput_Flusi.f90"
 #include "InputOutput.f90"
 #include "create_active_and_sorted_lists.f90"
@@ -58,6 +67,7 @@ contains
 #include "createEquidistantGrid_tree.f90"
 #include "createRandomGrid_tree.f90"
 #include "reset_tree.f90"
+#include "probes.f90"
 #include "allocate_forest.f90"
 #include "write_block_distribution.f90"
 #include "check_lgt_block_synchronization.f90"
